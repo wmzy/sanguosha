@@ -8,19 +8,21 @@
 //     A. 不出杀(pass)→ 发起者获得 A 的武器
 //     B. A 出杀 → 对 B 询问闪 → B 不出 → B 扣 1 血
 //   负面(expectRejected):
-//     - A 无武器 / killTarget=A / killTarget=发起者 / killTarget 不存在 / 自己当 A
+//     - A 无武器 / killTarget=A / killTarget 不存在 / 自己当 A
 //     - 非自己回合 / 牌不在手 / 牌名错
+// (注:killTarget=发起者自己 是合法的——借别人的刀杀自己)
 //
 // 每步用 expectPending + respondInfo 验证 pending + cardFilter。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import type { Card, GameState } from '../../src/engine/types';
+import type { ActionPrompt, Card, GameState, GameView } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 import { DEFAULT_SKILLS } from '../../src/engine/atoms/选将';
 import { findActionEntry } from '../../src/engine/skill';
+import { getCardEffect } from '../../src/engine/card-effect/registry';
 
 function makePlayer(opts: {
   index: number;
@@ -328,22 +330,47 @@ describe('借刀杀人', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 5. validate 拒绝:killTarget = 发起者
+  // 5. 正面:killTarget = 发起者(P1 自己) —— 借别人的刀杀自己
+  //    规则:借刀杀人可指定发起者自己为杀的目标 B;A 出杀 → 杀使用者自己
   // ─────────────────────────────────────────────────────────────
-  it('killTarget = 发起者(P1) → 被拒绝(killTargetNotOwner)', async () => {
+  it('killTarget = 发起者(P1 自己) → P2 出杀杀 P1 → P1 被询问闪 → 不闪扣血', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
+    const p2Kill = makeCard('p2s', '杀', '♥', '5', '基本牌');
+    // P1 额外一张手牌:触发借刀杀人后仍有手牌,询问闪才走 silent 创建 pending
+    // (无手牌时 cardResponsePreResolveForTarget 会 skip 询问闪,不创建 pending)
+    const p1Extra = makeCard('p1k', '杀', '♠', '9', '基本牌');
     await harness.setup(
       buildState({
+        p1Hand: ['jd1', 'p1k'],
+        p2Hand: ['p2s'],
         p2Equipment: { 武器: 'wp1' },
-        extraCards: { wp1: weapon },
+        p2Skills: ['杀', '无懈可击'],
+        extraCards: { wp1: weapon, p2s: p2Kill, p1k: p1Extra },
       }),
     );
     const P1 = harness.player('P1');
-    await P1.expectRejected({
-      skillId: '借刀杀人',
-      actionType: 'use',
-      params: { cardId: 'jd1', target: 1, killTarget: 0 },
-    });
+    const P2 = harness.player('P2');
+    const p1HealthBefore = harness.state.players[0].health;
+
+    // killTarget=0(P1 自己) —— 借刀杀人允许借别人的刀杀自己
+    await P1.triggerAction('借刀杀人', 'use', { cardId: 'jd1', target: 1, killTarget: 0 });
+    await P1.pass(); // 无懈窗口
+
+    // P2 被问询出杀 → 出杀(杀 P1 自己)
+    P2.expectPending('请求回应');
+    await P2.respond('借刀杀人', { cardId: 'p2s', targets: [0] });
+
+    // 杀对 P1 结算 → P1 被询问闪
+    P1.expectPending('询问闪');
+    await P1.pass(); // 不闪
+
+    // P1 被借刀杀自己成功 → 扣 1 血
+    expect(harness.state.players[0].health).toBe(p1HealthBefore - 1);
+    // P2 出了杀(进弃牌堆),不交武器
+    expect(harness.state.zones.discardPile).toContain('p2s');
+    expect(harness.state.players[1].equipment['武器']).toBe('wp1');
+    // 借刀杀人进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('jd1');
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -687,5 +714,40 @@ describe('借刀杀人', () => {
     expect(findActionEntry(harness.state, '借刀杀人', 1, 'respond')).toBeDefined();
     // 同理铁索连环 recast 也应随 DEFAULT_SKILLS 实例化
     expect(findActionEntry(harness.state, '铁索连环', 0, 'recast')).toBeDefined();
+  });
+
+  // ─── 回归:借刀杀人 use action 的 prompt 必须声明双目标 slots(A 持武器 + B 杀目标)。
+  //     缺 slots 时前端 derivePlayRules 判 hasSlots=false，把借刀杀人当单目标牌:
+  //     选 A 即可点出牌,但 buildPlayParams 产出 {targets:[A]} 缺 killTarget →
+  //     后端 canUseBorrowedSword 返回 'killTarget required' 静默拒绝 →
+  //     表现为「无法选杀的目标、出牌无响应」。
+  it('use action prompt 声明双目标 slots(A 须持武器 + B 任意其他角色)', () => {
+    const eff = getCardEffect('借刀杀人');
+    expect(eff).toBeDefined();
+    const prompt = eff!.prompt as Extract<ActionPrompt, { type: 'useCardAndTarget' }>;
+    expect(prompt.type).toBe('useCardAndTarget');
+    const slots = prompt.targetFilter?.slots;
+    expect(slots, '借刀杀人 prompt 必须声明双目标 slots').toBeDefined();
+    expect(slots!.length).toBe(2);
+
+    // P0=自己, P1=持武器, P2=徒手
+    const view = {
+      currentPlayerIndex: 0,
+      players: [
+        { alive: true, equipment: {} },
+        { alive: true, equipment: { 武器: 'wp1' } },
+        { alive: true, equipment: {} },
+      ],
+    } as unknown as GameView;
+
+    // A 槽位:须持有武器的其他角色
+    expect(slots![0].filter!(view, 1, { selected: [] })).toBe(true);  // P1 持武器
+    expect(slots![0].filter!(view, 2, { selected: [] })).toBe(false); // P2 徒手
+    expect(slots![0].filter!(view, 0, { selected: [] })).toBe(false); // 自己
+
+    // B 槽位:任意存活角色,排除自己与已选 A
+    expect(slots![1].filter!(view, 2, { selected: [1] })).toBe(true);  // P2 可(≠A=P1)
+    expect(slots![1].filter!(view, 1, { selected: [1] })).toBe(false); // =A 不可
+    expect(slots![1].filter!(view, 0, { selected: [1] })).toBe(true);  // 发起者自己可(借刀杀自己)
   });
 });

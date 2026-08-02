@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-02
 
+### Fixed — 借刀杀人无法选择杀的目标、出牌无响应
+
+借刀杀人选中后玩家只能点选一个目标(借刀对象 A),无法点选杀的目标 B,但「出牌」按钮可点,点击后无任何响应。根因:借刀杀人 use action 的 `prompt.targetFilter` 仅声明 `{ min: 1, max: 1 }` 单目标,**未声明双目标 `slots`**。前端 `derivePlayRules` 据此判 `hasSlots=false`,把借刀杀人当单目标牌:
+- 玩家只能选 A,`playButtonState` 选了 A 即 `canPlay=true`
+- `buildPlayParams` 走单目标路径产出 `{ cardId, targets: [A] }`,缺 `killTarget`
+- 后端 `canUseBorrowedSword` 读不到 killTarget → 返回 `'killTarget required'` 静默拒绝
+- 前端无回显 → 表现为「无法选 B、出牌无响应」
+
+讽刺的是前端 `usePlayInteraction.test.ts` 的 `borrowSwordAction` 夹具**手动构造**了带 slots 的正确 action 且测试全过,但真实引擎 `借刀杀人.ts` 的 prompt 漏了 slots——「测试用 mock 验证了正确行为,真实定义却缺失」。
+
+同步修正一个规则错误:借刀杀人允许「借别人的刀杀自己」(killTarget=发起者),原实现却禁止。删除 `canUseBorrowedSword` 中 `killTargetIdx === ownerId` 的拒绝,前端 B 槽位 filter 也不再排除发起者自己。
+
+#### Changed
+- **借刀杀人 use action prompt 补双目标 slots**:A 槽位=持有武器的其他存活角色(`equipment['武器']` 存在),B 槽位=任意存活角色(含发起者自己,仅排除已选 A)。filter 仅为前端 UI 置灰提示,权威校验仍在后端 `canUseBorrowedSword`。(`src/engine/card-effects/借刀杀人.ts`)
+- **`canUseBorrowedSword` 允许 killTarget=发起者**:删除 `killTargetIdx === ownerId` 的拒绝(killTarget 可为发起者自己);仅保留 `killTargetIdx === targetIdx`(B≠A)禁令。(`src/engine/card-effects/借刀杀人.ts`)
+
+#### 测试
+- **回归测试**:`tests/skill-tests/借刀杀人.test.ts` 新增——
+  1. 断言 `getCardEffect('借刀杀人').prompt.targetFilter.slots` 存在且长度为 2,A 槽位 filter 拒绝徒手/自己、B 槽位 filter 接受发起者自己(借刀杀自己)、拒绝已选 A。
+  2. 原「killTarget=发起者被拒绝」负面用例改写为正面用例:killTarget=P1 自己 → P2 出杀 → P1 被询问闪 → 不闪扣 1 血。删除 slots 或恢复禁令即失败。
+
 ### Fixed — 制衡选牌点击装备误弹技能 confirm(寒冰剑等)
 
 制衡选牌时点击装备区的寒冰剑(或其他自带 respond-confirm action 的装备),不选中该牌反而弹出该装备技能的「发动/不发动」弹窗,导致选择失败。所有 source='handAndEquip' 的 distribute 选牌(制衡/界制衡)均受影响。
