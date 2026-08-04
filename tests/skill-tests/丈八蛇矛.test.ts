@@ -6,12 +6,14 @@ import { frameCards } from '../../src/engine/index';
 //   (杀 cardId = `${id1}#${id2}#丈八蛇矛`,影子卡)
 //
 // 验证:
-//   1. 正面:2 张手牌 transformThenUse 杀 → 创建影子杀,P2 扣血
-//   2. 正面:验证 cardMap 有影子卡(2张 → 1张 杀)
-//   3. 负面:1 张牌 → 拒绝
-//   4. 负面:同一张牌 → 拒绝
-//   5. 负面:未装备丈八蛇矛 → 拒绝
+//   1. 正面:2 张手牌 transformThenUse 杀 → 创建影子杀,P2 扣血(同时验证 cardMap 影子卡)
+//   2. 负面:1 张牌 → 拒绝
+//   3. 负面:同一张牌 → 拒绝
+//   4. 负面:未装备丈八蛇矛 → 拒绝
+//   5. 负面:非自己回合 → 拒绝(发动时机)
 //   6. rollback:杀.use 失败(无目标)→ 两张原卡还原,影子卡删除
+//   7. color:两张同色(♠+♣) → 影子卡 color=黑,suit=空
+//   8. color:两张异色(♠+♥) → 影子卡 color=无色,suit=空
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -186,6 +188,35 @@ describe('丈八蛇矛', () => {
       ],
       cardMap: { c1, c2 },
       currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.expectRejected({
+      skillId: '丈八蛇矛',
+      actionType: 'transform',
+      params: { cardIds: ['c1', 'c2'] },
+    });
+  });
+
+  it('transform:非自己回合 → 拒绝(发动时机)', async () => {
+    const c1 = makeCard('c1', '闪', '♠', '2');
+    const c2 = makeCard('c2', '桃', '♣', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1', 'c2'],
+          skills: ['丈八蛇矛'],
+          equipment: { 武器: 'zb' },
+        }),
+        makePlayer({ index: 1, name: 'P2', skills: [] }),
+      ],
+      cardMap: { zb: ZHANGBA, c1, c2 },
+      currentPlayerIndex: 1, // P2 的回合 → P1 非自己回合
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
