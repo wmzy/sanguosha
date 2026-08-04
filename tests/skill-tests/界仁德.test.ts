@@ -104,11 +104,10 @@ describe('界仁德', () => {
     const c1 = makeCard('c1', '杀', '♠', 'A');
     const c2 = makeCard('c2', '杀', '♠', '2');
     const state: GameState = createGameState({
+      // 2 人局:P1(座次0)与 P2(座次1)相邻,P2 在徒手攻击范围(1)内
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'], health: 3, maxHealth: 4 }),
         makePlayer({ index: 1, name: 'P2', hand: [] }),
-        // P2 在 P3 攻击范围内(P3 座次 2,徒手范围 1,可对相邻座次 1)
-        makePlayer({ index: 2, name: 'P3', hand: [], skills: [], faction: '群' }),
       ],
       cardMap: { c1, c2 },
       currentPlayerIndex: 0,
