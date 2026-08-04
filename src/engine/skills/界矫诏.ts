@@ -25,7 +25,7 @@
 // 待澄清: 文档未说明"修改矫诏"(殚心)对矫诏的具体效果,故本实现按文档逐字:
 //   矫诏效果恒为基础版本,殚心仅做计数(见 界殚心.ts)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import {
   registerAction,
   registerAfterHook,

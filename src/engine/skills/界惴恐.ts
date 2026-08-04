@@ -38,7 +38,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { runRankCompareFlow } from '../rank-flow';
 import { runUseFlow } from '../card-effect/use-card';
 import {

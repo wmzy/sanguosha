@@ -21,7 +21,7 @@
 //   - turn.vars['崩坏/disabled'] 由 界酒池 after-hook on '去标记' 写入(酒增伤生效时)
 //   - turn.vars 随「回合结束」atom 自动清空(语义贴合"本回合")
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CHOOSE_RT = '界崩坏/choose';

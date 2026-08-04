@@ -42,7 +42,7 @@
 // respond(质疑)注册到每个座次(被问询者非于吉),onInit 返回合并卸载函数
 //   (unloadSkillInstance 仅按 (skillId,于吉座次) 清 action,清不到其他座次)。
 import type { ActionContext, Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { registerAction, hasBlockingPending } from '../skill';
 import { inAttackRange } from '../distance';

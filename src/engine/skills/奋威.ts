@@ -26,7 +26,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, topFrame } from '../create-engine';
+import { applyAtom, topFrame } from '../index';
 import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
 
 const USED_KEY = '奋威/used';

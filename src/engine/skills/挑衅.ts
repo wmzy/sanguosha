@@ -17,7 +17,7 @@
 //        写 player.vars['挑衅/usedThisTurn']
 //   距离:inAttackRange(state, 目标, 姜维)—— 目标的杀能攻击到姜维
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending } from '../skill';

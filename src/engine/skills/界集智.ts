@@ -35,7 +35,7 @@
 // 非延时锦囊(10):过河拆桥/顺手牵羊/无中生有/无懈可击/借刀杀人/桃园结义/
 //                 五谷丰登/南蛮入侵/万箭齐发/决斗
 import type { FrontendAPI, GameState, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
 /** 非延时锦囊牌名集合 */

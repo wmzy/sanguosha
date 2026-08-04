@@ -1,5 +1,5 @@
 // tests/skill-tests/丈八蛇矛.test.ts
-import { frameCards } from '../../src/engine/create-engine';
+import { frameCards } from '../../src/engine/index';
 // 丈八蛇矛(武器,攻击范围 3)·转化技:你可以将 2 张手牌当【杀】使用或打出。
 //
 // 模型:preceding=[丈八蛇矛.transform cardIds=[id1,id2]] + 主 action=杀.use

@@ -12,10 +12,10 @@
 //   或 playercard-equip-distribute.test.tsx(若 bug 在 UI 渲染)。
 import { describe, it, expect } from 'vitest';
 import { dispatchAndWait, fireTimeoutAndWait, SkillTestHarness } from '../../engine-harness';
-import { registerSkillsFromState } from '../../../src/engine/create-engine';
+import { registerSkillsFromState } from '../../../src/engine/index';
 import { ReplayRecorder } from '../../../src/client/replay/recorder';
 import { getViewAt } from '../../../src/client/replay/replayEngine';
-import { buildView } from '../../../src/engine/create-engine';
+import { buildView } from '../../../src/engine/index';
 import type { Card, GameState } from '../../../src/engine/types';
 import { createGameState } from '../../../src/engine/types';
 import '../../../src/engine/atoms';

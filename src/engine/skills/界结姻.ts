@@ -26,7 +26,7 @@
 //     { cost: '弃手牌', target, cardIds: [id] }   或 { cost: '弃手牌', target, cardId }
 //     { cost: '置装备', target, cardId }           (cardId 为手牌中的装备牌)
 import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { getGender } from '../character-meta';

@@ -26,7 +26,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, topFrame } from '../create-engine';
+import { applyAtom, topFrame } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
 const SKILL_ID = '界激昂';

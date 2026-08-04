@@ -16,7 +16,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界苦肉'(避开标苦肉冲突);
 //   内部 Skill.name = '苦肉'(OL 官方技能名,玩家可见)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../once-per-turn';
 import { registerAction, type SkillModule } from '../skill';
 

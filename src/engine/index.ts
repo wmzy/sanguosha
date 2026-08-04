@@ -1,4 +1,4 @@
-// src/engine/create-engine.ts
+// src/engine/index.ts
 // 引擎主入口(顶层函数,无闭包)。
 //
 // 主要导出:
@@ -506,7 +506,7 @@ export async function fireTimeout(state: GameState): Promise<void> {
 }
 
 // ==================== 从 engine-api.ts 合并的导出 ====================
-// 以下函数原属 engine-api.ts,现已合并到本文件。skill 文件通过 import from '../create-engine' 使用。
+// 以下函数原属 engine-api.ts,现已合并到本文件。skill 文件通过 import from '../index' 使用。
 
 // ─── 帧管理 ──────────────────────────────────────────────────
 

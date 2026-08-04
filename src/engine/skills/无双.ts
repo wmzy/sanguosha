@@ -13,7 +13,7 @@
 //   询问闪 after-hook 在 询问闪 resolve 时触发,此时闪的 respond action 已设置标记。
 
 import type { GameState, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAfterHook } from '../skill';
 import { isCancelled, clearCancelled } from '../card-effect/registry';
 import { consumePlayedSlashes } from '../card-effect/play-card';

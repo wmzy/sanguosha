@@ -14,7 +14,7 @@
 //   9. 负面:不在手牌也不在装备区的牌 → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
-import { dispatch as engineDispatch } from '../../src/engine/create-engine';
+import { dispatch as engineDispatch } from '../../src/engine/index';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';

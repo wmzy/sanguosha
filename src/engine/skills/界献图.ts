@@ -29,7 +29,7 @@ import type {
   Skill,
   SkillModule,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
 const SKILL_ID = '界献图';

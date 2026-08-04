@@ -9,7 +9,7 @@
 //               弃置 → 回复体力(amount=1)。
 //   - 限一次:players[ownerId].vars['青囊/usedThisTurn'](后端) + turnUsage(前端)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction } from '../skill';
 

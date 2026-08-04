@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { waitForStable } from '../../engine-harness';
 import '../../../src/engine/atoms';
 import '../../../src/engine/skills';
-import { bootstrap, dispatch } from '../../../src/engine/create-engine';
+import { bootstrap, dispatch } from '../../../src/engine/index';
 import { createGameState } from '../../../src/engine/types';
 import type { GameState } from '../../../src/engine/types';
 import { hasBlockingPending } from '../../../src/engine/skill';

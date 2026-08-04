@@ -10,7 +10,7 @@
 //      挂载点与贯石斧/青龙偃月刀相同(被抵消 after),通过 ctx.frame.skillId==='杀'
 //      + atom.source===ownerId 精准定位"自己主动使用的杀被闪抵消"。
 import type { Skill, GameState } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAfterHook } from '../skill';
 import { registerSlashUnlimitedProvider } from '../slash-quota';
 

@@ -34,7 +34,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom, frameCards } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { flipFaceDown, flipFaceUp } from '../face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';

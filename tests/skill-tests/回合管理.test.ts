@@ -444,9 +444,9 @@ describe('回合管理', () => {
     const P1 = harness.player('P1');
 
     // 触发阶段结束(摸牌)→ hook 推进到出牌 → __出牌 循环启动
-    const { dispatch } = await import('../../src/engine/create-engine');
+    const { dispatch } = await import('../../src/engine/index');
     // 用 applyAtom 触发阶段链
-    const { applyAtom } = await import('../../src/engine/create-engine');
+    const { applyAtom } = await import('../../src/engine/index');
     await applyAtom(harness.state, { type: '阶段结束', player: 0, phase: '摸牌' });
     await harness.waitForStable();
 
@@ -457,7 +457,7 @@ describe('回合管理', () => {
     // 模拟超时:触发 __出牌 slot 的 onTimeout → 自动结束回合
     // 不用 P1.pass()(会触发 processAllEvents 自动对比,在过渡期间视图增量可能有滞后);
     // 直接 fireTimeout 并等待稳定后检查引擎状态(权威来源)。
-    const { fireTimeout } = await import('../../src/engine/create-engine');
+    const { fireTimeout } = await import('../../src/engine/index');
     await fireTimeout(harness.state);
     await harness.waitForStable();
 

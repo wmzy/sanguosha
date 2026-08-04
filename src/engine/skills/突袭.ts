@@ -17,7 +17,7 @@ import type {
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerBeforeHook } from '../skill';
 
 const TRIGGER_RT = '突袭/trigger';

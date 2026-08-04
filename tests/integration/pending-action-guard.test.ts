@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   dispatch as engineDispatch,
   registerSkillsFromState,
-} from '../../src/engine/create-engine';
+} from '../../src/engine/index';
 import { findActionEntry } from '../../src/engine/skill';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

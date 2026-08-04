@@ -6,7 +6,7 @@ import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { registerAfterHook } from '../../src/engine/skill';
-import { frameCards } from '../../src/engine/create-engine';
+import { frameCards } from '../../src/engine/index';
 
 function build(opts?: {
   p2Hand?: string[];

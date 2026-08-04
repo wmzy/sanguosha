@@ -16,7 +16,7 @@
 import type { GameState } from './types';
 import type { DamageType } from '../shared/types';
 import { TARGET_SYSTEM } from './types';
-import { applyAtom } from './create-engine';
+import { applyAtom } from './index';
 import { runDamageFlow } from './damage-flow';
 import { registerAfterHook } from './skill';
 
@@ -70,7 +70,7 @@ export function isChained(state: GameState, idx: number): boolean {
  *
  *  这是「连环状态 × 属性伤害」的联动行为，与铁索连环牌解耦：置入连环状态的途径
  *  不限于铁索连环牌（武将技能可直接调 setChain）。原驻 skills/铁索连环.ts，
- *  现作为伤害结算基础设施由 create-engine 的 bootstrap/registerSkillsFromState 注册。
+ *  现作为伤害结算基础设施由 index 的 bootstrap/registerSkillsFromState 注册。
  *  localVars[CONDUCTING_VAR] 防止传导伤害递归触发。 */
 export function registerChainConductionHook(state: GameState): void {
   registerAfterHook(state, '铁索连环', TARGET_SYSTEM, '伤害结算结束后', async (ctx) => {

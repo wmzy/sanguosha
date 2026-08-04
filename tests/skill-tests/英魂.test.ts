@@ -6,7 +6,7 @@
 //   (准备阶段是回合一首个阶段,无法由更早阶段推进进入,故直接派发)。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
-import { applyAtom } from '../../src/engine/create-engine';
+import { applyAtom } from '../../src/engine/index';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';

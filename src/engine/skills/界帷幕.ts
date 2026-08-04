@@ -20,7 +20,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界帷幕'(避开标帷幕冲突);
 //   内部 Skill.name = '帷幕'(OL 官方技能名,玩家可见)。
 import type { Card, HookResult, Skill, GameState } from '../types';
-import { applyAtom, topFrame } from '../create-engine';
+import { applyAtom, topFrame } from '../index';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界帷幕';

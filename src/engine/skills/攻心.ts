@@ -16,7 +16,7 @@
 //   - 置牌堆顶:牌堆顶=deck 末尾(摸牌 atom 从末尾抽 slice(-count)),故 移动牌 to '牌堆' 即置顶。
 //   - 展示:复用「展示」atom 公开牌面(apply no-op,广播 cardId+牌面)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 

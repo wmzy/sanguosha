@@ -20,7 +20,7 @@
 // 与界不屈的差异:界版额外有手牌上限规则(有创牌时手牌上限=创牌数量);标版无此规则。
 //   二者共用 置创牌 atom(重复时移去此牌——对两版本语义一致)。
 import type { GameState, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAfterHook } from '../skill';
 
 const SURVIVE_KEY = '不屈/存活';

@@ -30,7 +30,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 

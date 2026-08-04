@@ -12,7 +12,7 @@
 
 import type { Card, GameState, GameView, Json } from '../types';
 import type { ActionPrompt } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
 import { isCardBanned } from '../card-effect/validate';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';

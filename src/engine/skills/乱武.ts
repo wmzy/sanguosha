@@ -22,7 +22,7 @@
 //   - "无法如此做"按 pass/超时 = 失去 1 体力(描述语义:无杀或不出即失血)。
 //   - 限定技标记用 player.vars(整局永久),非 turn.vars。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending } from '../skill';

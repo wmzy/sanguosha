@@ -25,7 +25,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界势斩';
 //   内部 Skill.name = '势斩'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { runUseFlow } from '../card-effect/use-card';

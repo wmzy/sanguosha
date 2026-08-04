@@ -24,7 +24,7 @@ import type {
   Skill,
   GameView,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../skill';
 import { skipPhase } from '../skip-phase';
 

@@ -20,7 +20,7 @@ import type {
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const TAG = '烈弓/禁闪';

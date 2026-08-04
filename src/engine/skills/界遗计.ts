@@ -7,7 +7,7 @@
 //     可从任意手牌中选,总数至多 2 张、目标至多 2 人)。
 //   交牌是可选的:confirm 询问;无其他存活角色或自己无手牌时跳过交牌环节。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 // 内部 requestType/localVars 键名保持原前缀「遗计/」,不改为「界遗计/」

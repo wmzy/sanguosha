@@ -98,7 +98,7 @@ describe('模块 C:濒死流程修正', () => {
     });
 
     const { dispatchAndWait, fireTimeoutAndWait } = await import('../engine-harness');
-    const { registerSkillsFromState } = await import('../../src/engine/create-engine');
+    const { registerSkillsFromState } = await import('../../src/engine/index');
     await registerSkillsFromState(state);
 
     // P1 杀 P2(距离1)
@@ -162,7 +162,7 @@ describe('模块 C:濒死流程修正', () => {
     });
 
     const { dispatchAndWait, fireTimeoutAndWait } = await import('../engine-harness');
-    const { registerSkillsFromState } = await import('../../src/engine/create-engine');
+    const { registerSkillsFromState } = await import('../../src/engine/index');
     await registerSkillsFromState(state);
 
     // P1 杀 P2

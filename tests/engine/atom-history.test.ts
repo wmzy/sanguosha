@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGameState } from '../../src/engine/types';
-import { applyAtom } from '../../src/engine/create-engine';
+import { applyAtom } from '../../src/engine/index';
 import { eventsForViewer } from '../../src/engine/view/events-for-viewer';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -178,7 +178,7 @@ describe('dispatch 返回 boolean', () => {
       currentPlayerIndex: 0,
       phase: '出牌',
     });
-    const { dispatch } = await import('../../src/engine/create-engine');
+    const { dispatch } = await import('../../src/engine/index');
     const msg = {
       skillId: '不存在',
       actionType: 'use' as const,

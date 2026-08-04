@@ -1,6 +1,6 @@
 // src/engine/atom.ts
 // atom 注册表 + 基础 apply 引擎(同步,无 awaits)
-// 完整 apply pipeline(含 before/after 钩子 + awaits 等待)由 create-engine.ts 接管
+// 完整 apply pipeline(含 before/after 钩子 + awaits 等待)由 index.ts 接管
 
 import type { Atom, AtomDefinition, GameState, ViewEvent, ViewEventSplit } from './types';
 

@@ -4,7 +4,7 @@
 //
 // use 结算逻辑在 card-effects/铁索连环.ts (CardEffect.resolve)。
 // 连环传导(属性伤害联动)已迁出至 face-down.ts 的 registerChainConductionHook,
-//   由 create-engine 的 bootstrap/registerSkillsFromState 作为伤害结算基础设施注册,
+//   由 index 的 bootstrap/registerSkillsFromState 作为伤害结算基础设施注册,
 //   与铁索连环牌解耦——任何途径置入连环状态都受传导管辖。
 //
 // 本文件仅保留 recast action(重铸替代出牌):自定义 actionType,不走标准使用流程。

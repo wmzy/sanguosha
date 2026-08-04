@@ -15,7 +15,7 @@ import {
   frameCards,
   dispatch as engineDispatch,
   applyAtom,
-} from '../../src/engine/create-engine';
+} from '../../src/engine/index';
 import { fireTimeoutAndWait, dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

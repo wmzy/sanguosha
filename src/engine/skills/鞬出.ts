@@ -31,7 +31,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const TAG = '鞬出/禁闪';

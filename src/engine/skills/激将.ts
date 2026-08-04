@@ -16,7 +16,7 @@
 //     指定 killTarget,use execute 读 localVars['激将/出杀选择'] → runUseFlow(none)
 //     走完整杀结算,damageType 由 cardMap 自动传导(火杀/雷杀不丢)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
 import { registerAction, hasBlockingPending } from '../skill';
 import { inAttackRange } from '../distance';

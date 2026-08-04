@@ -8,7 +8,7 @@
 //   - discard: 弃置选定牌(过河拆桥);奇才(界黄月英)防具/宝物保护 → 不可被弃置
 //   - obtain:  获得选定牌(顺手牵羊/反馈)
 import type { ActionLogEntry, GameState, Json } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { QICAI_PROTECTED_SLOTS } from './界奇才';
 
 /** 在 actionLog 中当前(最后一条)条目之前插入一条"设置手牌顺序"条目。

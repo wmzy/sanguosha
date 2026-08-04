@@ -22,7 +22,7 @@ import type {
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, registerBeforeHook } from '../skill';
 import { skipPhase } from '../skip-phase';
 import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';

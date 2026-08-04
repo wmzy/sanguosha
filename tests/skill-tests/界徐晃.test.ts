@@ -15,7 +15,7 @@
 //   - 截辎:标版"他人跳摸牌后徐晃摸1张";界版完整辎标记系统 + 额外摸牌阶段
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable, disableAutoCompare } from '../engine-harness';
-import { applyAtom } from '../../src/engine/create-engine';
+import { applyAtom } from '../../src/engine/index';
 import { runDamageFlow } from '../../src/engine/damage-flow';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

@@ -47,7 +47,7 @@ import type {
   Skill,
   SkillModule,
 } from '../types';
-import { applyAtom, topFrame } from '../create-engine';
+import { applyAtom, topFrame } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 import { isDelayedTrick } from '../card-meta';
 import { runPickTargetCardPanel } from './选牌面板';

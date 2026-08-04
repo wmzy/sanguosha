@@ -1,7 +1,7 @@
 // 非锁定技失效扩展点——查询型提供者模式(与 slash-quota/hand-limit 同构)。
 //
 // "非锁定技失效"类效果(义绝/界铁骑/界完杀):令目标的非锁定技 hook 不触发。
-// 引擎核心 create-engine.applyAtom 在跑 before/after hooks 时,对每个 hook
+// 引擎核心 index.applyAtom 在跑 before/after hooks 时,对每个 hook
 // 查询 isHookSuppressed:若任一 provider 返回 true 则跳过该 hook。
 //
 // 优势:

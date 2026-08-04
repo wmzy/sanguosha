@@ -16,7 +16,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
-import { applyAtom, frameCards, pushFrame, popFrame } from '../../src/engine/create-engine';
+import { applyAtom, frameCards, pushFrame, popFrame } from '../../src/engine/index';
 import { runDamageFlow } from '../../src/engine/damage-flow';
 import {
   registerCardEffect,

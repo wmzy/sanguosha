@@ -20,7 +20,7 @@
 //       若无人濒死则移除所有完杀 tag。回复体力也覆盖不屈(陷入濒死后由其他 hook
 //       直接 回复体力 救活,无 死亡流程)的退出路径。
 //       (模块 B:击杀 拆分为 runDeathFlow,cleanup 时点从 击杀 after-hook 迁至 死亡后 after-hook)
-//   ③ SUPPRESSION_TAGS(create-engine.ts)新增 '完杀/非锁定技失效',引擎在
+//   ③ SUPPRESSION_TAGS(index.ts)新增 '完杀/非锁定技失效',引擎在
 //     runBeforeHooks/runAfterHooks 中据 player.tags 自动过滤被压制技能的非锁定技 hook。
 //
 // 边界与差异:
@@ -37,7 +37,7 @@ import { registerSuppressionProvider } from '../skill-suppression';
 const SKILL_ID = '界完杀';
 const DISPLAY_NAME = '完杀';
 
-/** 非锁定技失效 tag(由 SUPPRESSION_TAGS 识别,见 create-engine.ts) */
+/** 非锁定技失效 tag(由 SUPPRESSION_TAGS 识别,见 index.ts) */
 const SUPPRESSION_TAG = '完杀/非锁定技失效';
 
 export function createSkill(id: string, ownerId: number): Skill {

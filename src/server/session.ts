@@ -14,7 +14,7 @@ import {
   checkGameOver,
   restore,
   type GameConfig,
-} from '../engine/create-engine';
+} from '../engine/index';
 import { eventsForViewer } from '../engine/view/events-for-viewer';
 import { getPendingDeadline } from '../engine/view/buildView';
 import {

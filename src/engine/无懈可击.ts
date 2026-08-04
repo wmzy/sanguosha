@@ -20,7 +20,7 @@
 // 延时锦囊场景：判定阶段 before-hook 中 pushFrame 后调用本函数。
 import type { GameState, Json, SettlementFrame } from './types';
 import { TARGET_BROADCAST } from './types';
-import { applyAtom } from './create-engine';
+import { applyAtom } from './index';
 import type { CancellableBy } from './card-effect/registry';
 
 const RESPONDED_KEY = '抵消/已回应';

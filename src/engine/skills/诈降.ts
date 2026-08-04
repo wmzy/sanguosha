@@ -20,7 +20,7 @@
 // turn-scoped:turn.vars / turnUsage 在回合结束 atom 自动清空,效果仅本回合。
 // provider 随技能实例生命周期注册/卸载(返回的 unload 由 setSkillInstanceUnload 清理)。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerBeforeHook, registerAfterHook, type SkillModule } from '../skill';
 import { registerSlashExtraProvider } from '../slash-quota';
 import { registerAttackRangeExemptor, effectiveDistance } from '../distance';

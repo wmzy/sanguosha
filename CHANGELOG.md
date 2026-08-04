@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — 2026-08-05
+
+### Fixed — preceding 视图缓冲与异步 rollback，解围回滚时重挂装备技能
+
+- **view 缓冲机制**:dispatch 处理 preceding 阶段引入 `state.viewBuffering` 标志，抑制 `notifyStateChange`，主 validate 通过后一次性 flush 广播；失败时截断 atomHistory + 调用 rollback。`rollbackPreceding` 替代原 `rollbacks.reverse().forEach(...)`。（`src/engine/create-engine.ts`、`src/engine/types/state.ts`）
+- **rollback 异步化**:`ActionEntry.rollback` 签名从 `void` 改为 `void | Promise<void>`，支持异步 rollback。（`src/engine/types/skill.ts`、`src/engine/skill.ts`）
+- **解围 rollback 重挂装备技能**:rollback 改为 async，在回滚时重新调用 `instantiateSkill` 挂载装备技能实例，并还原 `player.skills` 数组。（`src/engine/skills/解围.ts`）
+
 ## [Unreleased] — 2026-08-02
 
 ### Fixed — 8 个基线 tsc 错误清零

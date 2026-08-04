@@ -25,7 +25,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界窃听'(避开与未来标版冲突);
 //   内部 Skill.name = '窃听'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 import { skillLoaders } from './index';
 

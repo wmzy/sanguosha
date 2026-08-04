@@ -24,7 +24,7 @@
 //   乐不思蜀被无懈可击抵消或判定结束后,由 乐不思蜀.ts 的 移除延时锦囊 清 pendingTricks。
 //   无次数限制(描述明确)。
 import type { Card, EquipSlot, FrontendAPI, GameView, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending } from '../skill';
 

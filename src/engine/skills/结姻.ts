@@ -13,7 +13,7 @@
 // 前端交互:select 2 张手牌 + 选 1 名已受伤男性目标 → distribute/allocate 提交 allocation。
 //   兼容简单格式 cardIds + target(测试/headless 直发)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { getGender } from '../character-meta';

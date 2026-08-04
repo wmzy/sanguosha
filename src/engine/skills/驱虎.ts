@@ -11,7 +11,7 @@
 //     validate 严格检查 pending requestType,非驱虎 pending 时拒绝(无副作用)。
 //   - 每回合限一次:用 player.vars['驱虎/usedThisTurn'] + 回合用量 atom 同步 view。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { runRankCompareFlow } from '../rank-flow';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';

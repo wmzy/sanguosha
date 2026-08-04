@@ -316,7 +316,7 @@ describe('界趫猛', () => {
   // ─────────────────────────────────────────────────────────────
   it('用例5:非杀伤害(无 cardId)→ 不触发趫猛', async () => {
     const { registerSkillsFromState } = await import(
-      '../../src/engine/create-engine'
+      '../../src/engine/index'
     );
     const state: GameState = createGameState({
       players: [
@@ -349,7 +349,7 @@ describe('界趫猛', () => {
 
   it('用例5b:伤害 cardId 是万箭齐发(非杀)→ 不触发趫猛', async () => {
     const { registerSkillsFromState } = await import(
-      '../../src/engine/create-engine'
+      '../../src/engine/index'
     );
     const state: GameState = createGameState({
       players: [

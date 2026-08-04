@@ -5,7 +5,7 @@
 
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
 /** 桃园结义的逐目标结算：满血跳过 → 回复体力 */

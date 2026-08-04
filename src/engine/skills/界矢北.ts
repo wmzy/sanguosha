@@ -31,7 +31,7 @@ import type {
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerBeforeHook, registerAfterHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界矢北';

@@ -5,7 +5,7 @@
 //
 // 重铸(recast)不走 runUseFlow，由 skills/铁索连环.ts 的 recast action 处理。
 // 连环传导(属性伤害联动)在 face-down.ts 的 registerChainConductionHook，
-//   由 create-engine 作为伤害结算基础设施注册。
+//   由 index 作为伤害结算基础设施注册。
 
 import type { Card, GameState } from '../types';
 import type { ActionPrompt } from '../types';

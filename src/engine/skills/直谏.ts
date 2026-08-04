@@ -13,7 +13,7 @@
 //   - 不得替换原装备:validate 检查目标对应 slot 为空。
 //   - 无次数限制。
 import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { skillLoaders } from './index';
 

@@ -10,7 +10,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界鬼道';
 //   内部 Skill.name = '鬼道'(OL 官方技能名,玩家可见)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom, frameCards } from '../index';
 import { registerAction, registerJudgeModifier } from '../skill';
 
 const SKILL_ID = '界鬼道';

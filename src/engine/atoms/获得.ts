@@ -6,7 +6,7 @@
 // 从装备区获得不发标记。本 atom 的 apply + view 事件保持不变(含信息分级)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 
 /** localVars key:本次获得是否来自 from 玩家的手牌(afterApply 发时机标记用) */
 const FROM_HAND_KEY = '__获得/来自手牌';

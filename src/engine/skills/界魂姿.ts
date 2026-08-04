@@ -28,7 +28,7 @@
 //     英姿/英魂 以 ownerId=孙策座次 实例化,内部用 skill.ownerId 工作,归属正确
 //   - 英姿/英魂 已实现(周瑜·英姿、孙坚·英魂),直接挂载
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 import { performYinghunPrepare } from './英魂';
 

@@ -12,7 +12,7 @@
 //   - 修改帧 params.resolvedTargets:把流离原目标替换为新目标
 //   - 杀.execute 下一轮 结算 读帧 resolvedTargets[i] 而非原始 targets[i]
 import { describe, it, expect } from 'vitest';
-import { registerSkillsFromState } from '../../src/engine/create-engine';
+import { registerSkillsFromState } from '../../src/engine/index';
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

@@ -163,7 +163,7 @@ interface Skill {
 
 技能不通过闭包对象(BackendAPI/EngineApi)操作状态,而是直接 import 顶层函数:
 + `registerAction`、`registerBeforeHook`、`registerAfterHook` ← `'../skill'`
-+ `applyAtom`、`pushFrame`、`popFrame`、`topFrame`、`pushNotify` ← `'../create-engine'`
++ `applyAtom`、`pushFrame`、`popFrame`、`topFrame`、`pushNotify` ← `'../index'`
 + `state` 和 `ownerId` 通过 validate/execute 参数或 onInit 闭包传入,不需要全局单例
 
 **tree-shaking**：
@@ -179,8 +179,8 @@ interface Skill {
 ```ts
 // 从 skill.ts import
 import { registerAction, registerBeforeHook, registerAfterHook } from '../skill';
-// 从 create-engine.ts import
-import { applyAtom, pushFrame, popFrame, topFrame, pushNotify } from '../create-engine';
+// 从 index.ts import
+import { applyAtom, pushFrame, popFrame, topFrame, pushNotify } from '../index';
 
 // 注册 action。当客户端触发匹配 skillId 和 actionType 时,execute 被调用。
 // validate 不通过 → 静默丢弃,不记入 action 日志。返回卸载函数。
@@ -621,7 +621,7 @@ mutate 该数组的元素,杀的结算循环从帧上读当前值(见 §4.3 para
 ```ts
 // ── 杀.ts ──
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, type SkillModule } from '../skill';
 import { inAttackRange } from '../distance';
 import { canSlash, incSlashUsed } from '../slash-quota';
@@ -1813,7 +1813,7 @@ src/engine/
   atom-registry.ts     # atom 注册表
   event-stream.ts      # 前端事件流管理（per-player）
   types.ts             # 所有类型定义
-  create-engine.ts     # 引擎主入口(create/bootstrap/dispatch/buildView/fireTimeout/resetForTest) + 原属 engine-api.ts 的导出(applyAtom/pushFrame/popFrame/pushNotify 等)
+  index.ts     # 引擎主入口(create/bootstrap/dispatch/buildView/fireTimeout/resetForTest) + 原属 engine-api.ts 的导出(applyAtom/pushFrame/popFrame/pushNotify 等)
   atoms/               # atom 定义（每个文件一个 atom）
     受伤.ts
     摸牌.ts
@@ -1882,7 +1882,7 @@ src/server/
 | `BackendAPI` / `EngineApi` | 已删除——技能直接 import 顶层函数,不需要闭包对象 |
 | `createEngineApi` | 已删除——从未使用 |
 | `getCurrentState()` / `getCurrentOwnerId()` | 已删除——validate/execute 签名直接接收 state 参数 |
-| `engine-api.ts` | 已合并到 `create-engine.ts`——所有函数从 create-engine 导出 |
+| `engine-api.ts` | 已合并到 `index.ts`——所有函数从 index 导出 |
 | `registerSkillModule` | 已删除——技能模块通过 `skills/index.ts` 的 skillLoaders map 注册 |
 | `toPlayerViews` / `AtomPlayerViews` | 已删除——被 `toViewEvents` / `ViewEventSplit` 替代。旧设计返回原始 Atom 的不同版本；新设计返回前端语义化的 ViewEvent，内联 effect |
 
@@ -2004,5 +2004,5 @@ state.playerConfig[ownerId].timeout = 60000  // 60秒
 | [0017](./decisions/0017-skill-pindian-multistep.md) | pindian / multiStep SkillPhase | 拼点 + 多步 prompt 骨架 |
 | [0018](./decisions/0018-deprecated-test-apis.md) | 废弃全局测试 API | 测试从 `clearXxx()` 迁到 `engine.clearForTest()`；多实例隔离 |
 | [0026](./decisions/0026-unified-engine-architecture.md) | 统一引擎架构：技能编排 + Atom 执行 + 栈驱动 | **本文档概念起源**：牌=令牌、使用牌=技能、validate 下放、栈驱动执行 |
-| [0027](./decisions/0027-create-engine-top-level-functions.md) | create-engine 重构：顶层函数 + state 原地变更 | §4.2 顶层函数式 API 的来历 |
+| [0027](./decisions/0027-index-top-level-functions.md) | index 重构：顶层函数 + state 原地变更 | §4.2 顶层函数式 API 的来历 |
 | [0028](./decisions/0028-engine-api-top-level-functions.md) | engine-api 顶层化：无 EngineApi 闭包，无 BackendAPI 回调参数 | 技能直接 import 顶层函数，无闭包对象 |

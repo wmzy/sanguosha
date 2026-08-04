@@ -401,7 +401,7 @@ describe('界解烦', () => {
     expect(harness.state.turn.vars['界解烦/resetOnEnd']).toBe(0);
 
     // 触发回合结束 atom(直接 applyAtom)
-    const { applyAtom } = await import('../../src/engine/create-engine');
+    const { applyAtom } = await import('../../src/engine/index');
     void applyAtom(harness.state, { type: '回合结束', player: 0 });
     await harness.waitForStable();
 
@@ -440,7 +440,7 @@ describe('界解烦', () => {
     expect(harness.state.turn.vars['界解烦/resetOnEnd']).toBeUndefined();
 
     // 触发回合结束 atom
-    const { applyAtom } = await import('../../src/engine/create-engine');
+    const { applyAtom } = await import('../../src/engine/index');
     void applyAtom(harness.state, { type: '回合结束', player: 0 });
     await harness.waitForStable();
 

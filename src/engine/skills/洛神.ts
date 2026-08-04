@@ -12,7 +12,7 @@
 // 因此洛神的 判定牌生效后 hook 读 frameCards(此时判定牌还在处理区);随后 runJudgeFlow 收尾把
 // 判定牌移入弃牌堆。洛神主循环在 runJudgeFlow 返回后,从弃牌堆顶读判定牌。
 import type { FrontendAPI, Skill, GameState, Card } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom, frameCards } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook } from '../skill';
 

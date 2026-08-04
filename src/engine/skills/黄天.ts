@@ -13,7 +13,7 @@
 // 主公判定:ownerId === 0(参考激将/若愚的主公判定约定)。
 // 限一次:player.vars['黄天/usedThisTurn'](后缀约定,回合结束 atom 自动清空)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending } from '../skill';
 

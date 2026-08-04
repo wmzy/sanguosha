@@ -30,7 +30,7 @@ import type {
   Skill,
   SkillModule,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
 const SKILL_ID = '界秘计';

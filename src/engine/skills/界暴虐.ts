@@ -34,7 +34,7 @@
 //   - 黑桃 = ♠
 //   - 获得判定牌:在 await applyAtom(判定) 完成后,从 discardPile 末尾拿
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook } from '../skill';
 

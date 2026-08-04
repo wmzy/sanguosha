@@ -3,7 +3,7 @@ import {
   dispatch,
   applyAtom,
   registerSkillsFromState,
-} from '../../src/engine/create-engine';
+} from '../../src/engine/index';
 import { registerAction } from '../../src/engine/skill';
 import { createGameState } from '../../src/engine/types';
 

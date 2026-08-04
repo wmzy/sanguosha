@@ -38,7 +38,7 @@ import {
   type SkillModule,
 } from '../skill';
 import type { ActionEntry } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { defaultPlayActive } from '../action-active';
 
 const SKILL_ID = '界禁酒';

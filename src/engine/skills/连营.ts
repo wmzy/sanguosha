@@ -21,7 +21,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const CONFIRM_RT = '连营/confirm';

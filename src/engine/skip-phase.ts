@@ -11,7 +11,7 @@
 //
 // 本函数封装这三步,避免每个技能手动重复、遗忘顺序。
 import type { GameState, HookResult } from './types';
-import { applyAtom } from './create-engine';
+import { applyAtom } from './index';
 
 /**
  * 在「阶段开始」atom 的 before-hook 中跳过当前阶段。

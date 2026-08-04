@@ -57,7 +57,7 @@
 //     覆盖(待新增"设置化身身份" atom + 视图事件 + 6 个消费者更新)。
 //     影响:结姻/界结姻/离间/肉林/界燕语/界荐言 等性别相关技能仍按界左慈原角色判定。
 import type { Faction, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { createRng } from '../../shared/rng';
 import { registerAction, registerAfterHook } from '../skill';
 import { allCharacters } from '../cards/characters';

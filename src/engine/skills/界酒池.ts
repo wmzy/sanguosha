@@ -21,7 +21,7 @@
 //   - turn.vars['崩坏/disabled'] 随「回合结束」atom 自动清空(语义贴合"本回合")
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../skill';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { defaultPlayActive } from '../action-active';
 
 const DISABLE_BENGHUAI_VAR = '崩坏/disabled';

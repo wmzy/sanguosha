@@ -9,7 +9,7 @@
 //   - faction 从 player.faction 读取
 //   - 仅主公曹丕可用(isLord 判定),非主公时 hook 注册但不触发(主公技限制)
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom, frameCards } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '颂威/confirm';

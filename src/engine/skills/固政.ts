@@ -20,7 +20,7 @@
 //   - 仅弃牌阶段弃置的牌计入("该角色弃置的牌");非弃牌阶段的弃置(制衡/寒冰剑等)被
 //     state.phase!=='弃牌' 过滤。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 
 const CONFIRM_REQUEST = '固政/确认';

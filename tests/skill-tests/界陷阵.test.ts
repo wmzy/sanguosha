@@ -525,7 +525,7 @@ describe('界陷阵', () => {
 
     // 触发回合结束 atom → turn.vars 自动清空
     void harness.state.atomHistory;
-    const { applyAtom } = await import('../../src/engine/create-engine');
+    const { applyAtom } = await import('../../src/engine/index');
     void applyAtom(harness.state, { type: '回合结束', player: 0 });
     await waitForStable(harness.state);
 

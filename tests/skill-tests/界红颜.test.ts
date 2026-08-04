@@ -11,7 +11,7 @@
 //   4. 装备区红桃牌被弃/移除后 → 回归默认上限
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
-import { applyAtom, pushFrame, popFrame } from '../../src/engine/create-engine';
+import { applyAtom, pushFrame, popFrame } from '../../src/engine/index';
 import { runJudgeFlow } from '../../src/engine/judge-flow';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

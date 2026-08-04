@@ -37,7 +37,7 @@
 // "同颜色"判定用 card.color(红/黑);标版用 card.suit(花色)。
 import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { 询问抵消 } from '../无懈可击';
 import { defaultPlayActive } from '../action-active';

@@ -23,7 +23,7 @@
 //   移动后若 牌堆为空且弃牌堆有牌,触发 重洗。与 摸牌 内部的 planDraw 重洗互补——
 //   摸牌 路径自带重洗,runMoveCardFlow 的重洗覆盖非摸牌路径(如牌堆顶被取走后耗尽)。
 import type { GameState, MoveReason, ZoneLoc } from './types';
-import { applyAtom } from './create-engine';
+import { applyAtom } from './index';
 import { MOVE_TO_KEY } from './atoms/move-timing';
 
 /** 牌堆空但弃牌堆有牌时,弃牌堆随机置入牌堆(标准三国杀规则)。 */

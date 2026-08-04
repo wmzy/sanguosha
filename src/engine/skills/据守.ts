@@ -20,7 +20,7 @@
 //
 // 注:界曹仁的界据守(独立文件)仍保留"翻面+跳过下一回合"机制,与本标版规则不同。
 import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending } from '../skill';
 import { skillLoaders } from './index';

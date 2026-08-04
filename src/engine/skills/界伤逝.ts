@@ -24,7 +24,7 @@
 //     故无重入。
 //   - 春华在自己的回合内反复触发是合法的(例如连出两张牌,每张都触发一次)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const CONFIRM_RT = '界伤逝/confirm';

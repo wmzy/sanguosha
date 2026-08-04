@@ -4,7 +4,7 @@
 // 请求回应:通用等待型 atom — 等待 target 玩家回应
 import type { ActionPrompt, AtomDefinition, Card, Json, ViewEventSplit, ViewEvent } from '../types';
 
-import { applyAtom, resolveTimeoutMs } from '../create-engine';
+import { applyAtom, resolveTimeoutMs } from '../index';
 import { registerAtom } from '../atom';
 import { handLimit } from '../hand-limit';
 import { resolveChoosePlayerCandidates } from '../view/choosePlayerCandidates';

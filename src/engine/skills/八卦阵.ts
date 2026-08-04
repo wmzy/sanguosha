@@ -11,7 +11,7 @@
 // 返回后自己检查处理区,与询问闪是否被 cancel 无关。武器技挂在独立的"被抵消"
 // atom after(非询问闪 after),故不受询问闪 cancel 影响。
 import type { Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerBeforeHook } from '../skill';
 

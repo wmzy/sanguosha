@@ -9,7 +9,7 @@
 
 import type { Card, SettlementFrame } from '../types';
 import type { ActionPrompt } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom, frameCards } from '../index';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
 /** 从使用者开始,按座次旋转的所有存活玩家 */

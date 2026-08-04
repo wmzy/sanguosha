@@ -15,7 +15,7 @@ import type {
 import { TARGET_SYSTEM } from '../types';
 import { createRng } from '../../shared/rng';
 import { createStandardDeck, shuffle } from '../../shared/deck';
-import { applyAtom, resolveTimeoutMs } from '../create-engine';
+import { applyAtom, resolveTimeoutMs } from '../index';
 import { registerAtom } from '../atom';
 
 /** 默认通用技能列表 */
@@ -303,7 +303,7 @@ registerAtom(选将询问);
 // 全部 resolve 后父 applyAtom 的 Promise 才 resolve(语义同 Promise.all)。
 //
 // 与 串行选将询问 的区别:主公先选(串行)后,其余人同时选(并行),加快开局。
-// 引擎管线(create-engine.ts)把它拆成多个单 target 的 选将询问 slot,各 slot 独立 pending。
+// 引擎管线(index.ts)把它拆成多个单 target 的 选将询问 slot,各 slot 独立 pending。
 // respond action(系统规则:选将)按 slot.atom.target 精确匹配,与串行路径完全一致。
 export const 并行选将: AtomDefinition<{
   type: '并行选将';

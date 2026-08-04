@@ -44,7 +44,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, pushFrame, popFrame, topFrame } from '../create-engine';
+import { applyAtom, pushFrame, popFrame, topFrame } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界破军';

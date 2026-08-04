@@ -13,7 +13,7 @@
 //
 //   关键:增上限必须在回复前(先增加上限,再回复),否则回复被旧上限 clamp。
 import type { FrontendAPI, GameState, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAfterHook } from '../skill';
 
 const AWAKENED_KEY = '若愚/awakened';

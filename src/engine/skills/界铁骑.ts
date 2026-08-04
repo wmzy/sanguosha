@@ -4,7 +4,7 @@
 //
 // 与标铁骑 src/engine/skills/铁骑.ts 差异(官方对齐):
 //   1. 新增「本回合非锁定技失效」:发动后给目标加 SUPPRESSION_TAG,
-//      create-engine.runBeforeHooks/runAfterHooks 据此跳过目标的非锁定技 hook
+//      index.runBeforeHooks/runAfterHooks 据此跳过目标的非锁定技 hook
 //      (锁定技与装备技描述含「锁定技/防具:/武器:」标记,不受压制)。
 //   2. 「判定后弃同花色牌免闪」:旧版直接 cancel 询问闪强制命中,且只看红/黑色;
 //      官方为判定后令目标选弃一张与判定结果同花色(♠/♥/♣/♦)的牌,
@@ -23,19 +23,19 @@
 //        没弃/超时/无同花色牌 → cancel(强制命中)。
 //
 // SUPPRESSION_TAG 生命周期:发动时加,界马超回合结束 after hook 清。
-//   标签由 create-engine 的 hook 过滤器读取,实现「目标非锁定技失效」。
+//   标签由 index 的 hook 过滤器读取,实现「目标非锁定技失效」。
 import type {
   FrontendAPI,
   GameState,
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom, frameCards } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 import { registerSuppressionProvider } from '../skill-suppression';
 
-/** 标签:目标本回合非锁定技失效(create-engine.runBeforeHooks/runAfterHooks 读取) */
+/** 标签:目标本回合非锁定技失效(index.runBeforeHooks/runAfterHooks 读取) */
 export const SUPPRESSION_TAG = '界铁骑/非锁定技失效';
 const CONFIRM = '铁骑/confirmed';
 const TARGET_VAR = '铁骑/target';

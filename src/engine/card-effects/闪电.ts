@@ -7,7 +7,7 @@
 
 import type { Card, ActionPrompt, GameState } from '../types';
 import { TARGET_SYSTEM } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { runDamageFlow } from '../damage-flow';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';

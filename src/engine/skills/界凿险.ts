@@ -18,7 +18,7 @@ import type {
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { startTurn } from '../turn-flow';
 import { registerAfterHook, registerBeforeHook } from '../skill';
 

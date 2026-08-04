@@ -24,7 +24,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 import { skipPhase } from '../skip-phase';

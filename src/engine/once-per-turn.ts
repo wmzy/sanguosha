@@ -4,7 +4,7 @@
 // atom 投影 view、activeWhen 叠加 defaultPlayActive + turnUsage 判定。统一到此处,消除样板。
 // key 恒为 技能名(中文) + '/usedThisTurn',由「回合结束」atom 自动清空(后缀约定)。
 import type { GameState, ActionContext } from './types';
-import { applyAtom } from './create-engine';
+import { applyAtom } from './index';
 import { defaultPlayActive } from './action-active';
 
 const SUFFIX = '/usedThisTurn';

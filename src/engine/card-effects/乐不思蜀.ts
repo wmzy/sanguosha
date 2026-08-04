@@ -9,7 +9,7 @@
 
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 

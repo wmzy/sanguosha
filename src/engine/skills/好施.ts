@@ -17,7 +17,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
 import {
   registerAction,

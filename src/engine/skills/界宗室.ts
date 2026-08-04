@@ -27,7 +27,7 @@ import type {
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerBeforeHook, type SkillModule } from '../skill';
 import { registerHandLimitProvider } from '../hand-limit';
 

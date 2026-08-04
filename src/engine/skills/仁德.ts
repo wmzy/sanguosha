@@ -2,7 +2,7 @@
 //   出牌阶段,可以将任意数量手牌交给其他角色;以此法失去第二张牌时,回复 1 点体力。
 //   无发动次数限制(可多次使用,但回血每回合仅一次)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

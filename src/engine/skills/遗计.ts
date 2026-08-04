@@ -12,7 +12,7 @@
 //     顺序逐张摸给目标;validate 已强制两张牌全部分配,顺序处理必精确命中。
 //   - **可选**:玩家可 pass(空 allocation)放弃发动,牌留在牌堆顶。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const DISTRIBUTE_RT = '遗计/distribute';

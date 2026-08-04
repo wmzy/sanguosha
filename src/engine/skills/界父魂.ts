@@ -44,7 +44,7 @@ import type {
 } from '../types';
 import type { Color } from '../../shared/types';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../skill';
-import { applyAtom, topFrame } from '../create-engine';
+import { applyAtom, topFrame } from '../index';
 import { registerSlashUnlimitedProvider } from '../slash-quota';
 import { viewCanAttack } from '../viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../action-active';

@@ -5,7 +5,7 @@
 
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { registerCardEffect, type CardEffect, type ResolveCtx, isCancelled } from '../card-effect/registry';
 

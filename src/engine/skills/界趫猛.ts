@@ -28,7 +28,7 @@
 //   - 一个技能实例只能注册一个 respond action(actionKey 冲突),
 //     故 confirm 与选牌合并为单 respond 按 requestType 分支(同狂骨/反馈/制霸模式)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
 /** 是否发动趫猛的 requestType */

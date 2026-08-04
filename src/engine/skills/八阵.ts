@@ -7,7 +7,7 @@
 //
 // 无防具检查:防具 slot 名为 '防具',equipment['防具'] 为空即无防具。
 import type { Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerBeforeHook } from '../skill';
 

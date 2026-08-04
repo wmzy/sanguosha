@@ -43,7 +43,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { runRankCompareFlow } from '../rank-flow';
 import {
   registerAction,

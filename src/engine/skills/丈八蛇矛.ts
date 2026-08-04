@@ -40,7 +40,7 @@
 // cardId = ${id1}#${id2}#丈八蛇矛。
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { viewCanAttack } from '../viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
 

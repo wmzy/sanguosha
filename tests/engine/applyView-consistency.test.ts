@@ -7,7 +7,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { viewReducer } from '../../src/client/view/reducer';
 import { getAtomDef } from '../../src/engine/atom';
-import { applyAtom } from '../../src/engine/create-engine';
+import { applyAtom } from '../../src/engine/index';
 import { buildView } from '../../src/engine/view/buildView';
 import { createGameState } from '../../src/engine/types';
 import type { GameView, ViewEvent, Card, GameState, PlayerState } from '../../src/engine/types';

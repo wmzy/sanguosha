@@ -39,7 +39,7 @@ import {
   fireTimeout as engineFireTimeout,
   buildView as engineBuildView,
   registerSkillsFromState,
-} from '../src/engine/create-engine';
+} from '../src/engine/index';
 
 import { getAtomDef } from '../src/engine/atom';
 import { getSkillModule, isSkillModuleRegistered } from '../src/engine/skill';

@@ -224,7 +224,7 @@ describe('界义从', () => {
     //
     // 更简单:dispatch 一个 失去体力 atom 直接走 hook 链。
     const { registerSkillsFromState, applyAtom } = await import(
-      '../../src/engine/create-engine'
+      '../../src/engine/index'
     );
     const state: GameState = createGameState({
       players: [

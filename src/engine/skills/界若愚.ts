@@ -18,7 +18,7 @@
 //   关键:增上限必须在回复前(先增加上限,再回复),否则回复被旧上限 clamp。
 //   独立界版文件,注册键 '界若愚'(与标版若愚键隔离,不修改标版)。
 import type { FrontendAPI, GameState, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAfterHook } from '../skill';
 
 const AWAKENED_KEY = '界若愚/awakened';

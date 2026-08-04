@@ -468,7 +468,7 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
 }
 
 /**
- * 实例化单个 skill(从 create-engine bootstrap / registerSkillsFromState / 添加技能 atom 调用)。
+ * 实例化单个 skill(从 index bootstrap / registerSkillsFromState / 添加技能 atom 调用)。
  *
  * 幂等:若 (skillId, ownerId) 已有实例,先卸载旧实例(调其 unload 函数 + 清 action/hook 注册),
  * 再重新注册。保证 registerSkillsFromState 重入、并发 dispatch、动态 添加技能 等场景不会因

@@ -8,7 +8,7 @@
 // 界限突破:红色牌包括装备区(原版仅手牌)。装备区红色牌转化时先卸下到手牌再「当作」。
 import type { Card, EquipSlot, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { viewCanAttack } from '../viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
 import { registerAttackRangeExemptor } from '../distance';

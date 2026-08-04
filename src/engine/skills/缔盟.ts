@@ -14,7 +14,7 @@
 //   - 限一次/回合:缔盟/usedThisTurn,回合用量 atom 同步到 view
 //   - 限一次标记必须在第一个 await 前设置,防 dispatch 重入(同制衡/结姻)
 import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 

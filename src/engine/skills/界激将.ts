@@ -32,7 +32,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
+import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
 import { registerAction, registerAfterHook, hasBlockingPending, type SkillModule } from '../skill';
 import { inAttackRange } from '../distance';

@@ -11,7 +11,7 @@
 // 距离 1 以内:effectiveDistance 最小为 1(座位相邻或自己),<= 1 即满足。
 // 装备 -1 马(进攻修正)通过 player.vars['距离/进攻修正'] 进一步缩短距离——自动支持。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 import { effectiveDistance } from '../distance';
 

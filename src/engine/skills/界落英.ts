@@ -26,7 +26,7 @@
 //     抽取判定牌会破坏 runJudgeFlow 收尾 splice——本实现加 frame.cards.length === 1
 //     防御:多牌场景下跳过获取(让判定牌正常入弃牌堆),避免状态损坏。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom, frameCards } from '../index';
 import {
   registerAction,
   registerAfterHook,

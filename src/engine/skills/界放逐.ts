@@ -23,7 +23,7 @@ import type {
   Skill,
   GameView,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '界放逐/confirm';

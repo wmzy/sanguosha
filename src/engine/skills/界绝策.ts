@@ -26,7 +26,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 

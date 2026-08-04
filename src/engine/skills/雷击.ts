@@ -17,7 +17,7 @@
 // 已知限制:配合八卦阵判定出的虚拟闪不触发雷击(八卦阵在询问闪 before hook 中 cancel,
 //   故询问闪 after hook 不执行)。同鬼才 hook 顺序限制,属引擎判定/取消机制固有局限。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook } from '../skill';

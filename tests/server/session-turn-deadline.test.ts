@@ -9,7 +9,7 @@
 // 1. buildView 在有 __出牌 pending 时返回非空 deadline
 // 2. event 消息携带 deadline(仅在变化时),前端据此同步倒计时
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { checkGameOver } from '../../src/engine/create-engine';
+import { checkGameOver } from '../../src/engine/index';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';

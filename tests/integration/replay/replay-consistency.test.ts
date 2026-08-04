@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest';
 import { SkillTestHarness, dispatchAndWait, fireTimeoutAndWait } from '../../engine-harness';
 import { ReplayRecorder } from '../../../src/client/replay/recorder';
 import { getViewAt } from '../../../src/client/replay/replayEngine';
-import { buildView } from '../../../src/engine/create-engine';
+import { buildView } from '../../../src/engine/index';
 import type { GameState, GameView } from '../../../src/engine/types';
 import { createGameState } from '../../../src/engine/types';
 

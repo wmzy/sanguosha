@@ -5,7 +5,7 @@
 // 实现:询问是否获得 → 移动牌(处理区→手牌)。判定阶段 frame 通常仅含判定牌,
 //   拿走后 frame 空,runJudgeFlow 收尾 splice 末尾为 no-op。
 import type { FrontendAPI, GameState, Skill } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom, frameCards } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CHOOSE_RT = '天妒/choose';

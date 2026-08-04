@@ -38,7 +38,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const BASE_VAR = '界再起/base'; // turn.vars:本回合弃牌堆基线长度

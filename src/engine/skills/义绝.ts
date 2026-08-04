@@ -9,7 +9,7 @@
 //   3. 引擎 用 展示 atom 公开所选牌(全员可见其牌面)
 //   4. 按展示牌颜色分支:
 //        黑色(♠/♣):目标加三标签——
-//          '义绝/非锁定技失效'(create-engine hook 过滤器读取,跳过目标非锁定技 hook)
+//          '义绝/非锁定技失效'(index hook 过滤器读取,跳过目标非锁定技 hook)
 //          '义绝/禁出牌'(本技能 before-hook on '请求回应' 读取,cancel 任何要求该目标
 //                       使用/打出牌的 prompt;纯选择型 prompt 如 confirm/chooseSuit 不受影响)
 //          '义绝/红桃杀加伤'(本技能 before-hook on '造成伤害时' 读取,owner 红桃杀+1 伤)
@@ -32,7 +32,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, type SkillModule } from '../skill';
 import { registerSuppressionProvider } from '../skill-suppression';
@@ -46,7 +46,7 @@ const REVEAL_KEY = '义绝/revealedCardId';
 /** localVars:发起者是否选择回血(choice=true/false)。 */
 const HEAL_KEY = '义绝/healChoice';
 
-/** 标签:目标本回合非锁定技失效(create-engine isHookSuppressed 读取)。 */
+/** 标签:目标本回合非锁定技失效(index isHookSuppressed 读取)。 */
 const SUPPRESSION_TAG = '义绝/非锁定技失效';
 /** 标签:目标本回合不能使用或打出手牌(本技能 before-hook on '请求回应' 读取)。 */
 const BAN_TAG = '义绝/禁出牌';
@@ -79,7 +79,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── 非锁定技失效 provider:目标持有 SUPPRESSION_TAG 时,其非锁定技 hook 被压制 ──
-  //   通过 skill-suppression 扩展点注册,避免引擎核心(create-engine.ts)硬编码技能名/标签。
+  //   通过 skill-suppression 扩展点注册,避免引擎核心(index.ts)硬编码技能名/标签。
   const unloadSuppression = registerSuppressionProvider(
     state,
     (st, targetOwnerId, _skillId) =>

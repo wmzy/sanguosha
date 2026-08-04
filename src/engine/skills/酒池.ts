@@ -9,7 +9,7 @@
 // 无次数限制。
 import type { Card, GameState, Json, Skill, FrontendAPI } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { defaultPlayActive } from '../action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {

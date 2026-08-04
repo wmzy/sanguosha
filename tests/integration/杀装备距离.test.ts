@@ -11,7 +11,7 @@
 //       dispatch 走真实 action 路径(不动用 SkillTestHarness),
 //       测的是新引擎 顶层 API + 距离/装备/杀的端到端协作。
 import { describe, it, expect } from 'vitest';
-import { registerSkillsFromState } from '../../src/engine/create-engine';
+import { registerSkillsFromState } from '../../src/engine/index';
 import { fireTimeoutAndWait, dispatchAndWait } from '../engine-harness';
 import { inAttackRange } from '../../src/engine/distance';
 import { slashMax } from '../../src/engine/slash-quota';

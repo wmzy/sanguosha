@@ -24,7 +24,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界除疠'(避开标版可能的除疠冲突);
 //   内部 Skill.name = '除疠'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { createRng } from '../../shared/rng';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';

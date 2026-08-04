@@ -19,7 +19,7 @@
 //   - 顺手牵羊的距离检查在 use.validate 中:此时田已消耗、距离修正已更新,
 //     若距离变远导致 use validate 失败,rollback 恢复一切(安全)
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { defaultPlayActive } from '../action-active';
 import { registerAction } from '../skill';
 

@@ -15,7 +15,7 @@ import type {
   Skill,
   GameState,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAfterHook } from '../skill';
 import { DEFAULT_SKILLS } from '../atoms/选将';
 

@@ -7,7 +7,7 @@
 // 杀技能零感知武圣——它看到的永远是 cardMap 里的一张“杀”。
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { viewCanAttack } from '../viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
 

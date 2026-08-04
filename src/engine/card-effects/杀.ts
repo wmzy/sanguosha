@@ -11,7 +11,7 @@
 
 import type { Card, GameView, GameState, Json } from '../types';
 import type { ActionPrompt } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';

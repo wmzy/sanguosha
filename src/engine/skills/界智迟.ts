@@ -35,7 +35,7 @@ import type {
   Skill,
   SkillModule,
 } from '../types';
-import { topFrame } from '../create-engine';
+import { topFrame } from '../index';
 import { registerAfterHook, registerBeforeHook } from '../skill';
 
 const SKILL_ID = '界智迟';

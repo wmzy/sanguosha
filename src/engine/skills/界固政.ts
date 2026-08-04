@@ -26,7 +26,7 @@
 //   - 仅在仍位于弃牌堆的牌中选取(防御性:理论上不会有牌被中途移走)。
 //   - 自己不存活则不触发;目标(弃牌者)死亡仍可正常结算(牌已入弃牌堆)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const SKILL_NAME = '界固政';

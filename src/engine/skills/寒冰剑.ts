@@ -3,7 +3,7 @@
 // 寒冰剑(武器,攻击范围 2):
 //   每当你使用【杀】对目标造成伤害时,你可以防止此伤害,改为弃置其两张牌。
 import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

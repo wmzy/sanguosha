@@ -19,7 +19,7 @@
 // 迁移后，卡牌只需 registerCardEffect，不再注册 action。
 
 import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
-import { applyAtom, frameCards, popFrame, pushFrame, topFrame } from '../create-engine';
+import { applyAtom, frameCards, popFrame, pushFrame, topFrame } from '../index';
 import { registerAction, registerBeforeHook } from '../skill';
 import { 询问抵消 } from '../无懈可击';
 import { validateCardUse, computeAutoTargets } from './validate';
@@ -347,7 +347,7 @@ export async function resumeDelayedSettlement(
 }
 
 /** 注册延时锦囊（乐不思蜀/兵粮寸断/闪电）的全局判定阶段 before-hook + 跳过阶段 hook。
- *  在 create-engine bootstrap / registerSkillsFromState 中调用。
+ *  在 index bootstrap / registerSkillsFromState 中调用。
  *  全局注册(ownerId=-1)：判定阶段 hook 检查 atom.player 的判定区有无延时锦囊。 */
 export function registerDelayedTrickHooks(state: GameState): void {
   // 判定阶段 before-hook：判定区有延时锦囊 → 逐个结算最后置入的，循环直到清空（对齐 game.md）

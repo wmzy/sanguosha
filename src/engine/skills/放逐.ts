@@ -25,7 +25,7 @@ import type {
   Skill,
   GameView,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 

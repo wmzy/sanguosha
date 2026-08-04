@@ -11,7 +11,7 @@
 // 选择:减1点体力上限(设上限) 或 减1点体力(失去体力)。
 //   体力上限最低降至 1(设上限 atom.validate 要求 amount>0)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CHOOSE_RT = '崩坏/choose';

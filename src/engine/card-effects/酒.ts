@@ -6,7 +6,7 @@
 
 import type { Card } from '../types';
 import type { ActionPrompt } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerBeforeHook } from '../skill';
 import { defaultPlayActive } from '../action-active';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
@@ -15,7 +15,7 @@ import type { HookResult } from '../types';
 /** 注册酒的全局「造成伤害」before-hook（消费增伤标记）。
  *  酒的使用者拥有 '酒/nextKillDamageBonus' 标记时，其造成的伤害 +1，然后消耗标记。
  *  全局注册(ownerId=-1)——酒是基本牌面能力，不限技能持有者。
- *  在 create-engine bootstrap 中调用。 */
+ *  在 index bootstrap 中调用。 */
 export function registerWineHook(state: import('../types').GameState): void {
   registerBeforeHook(state, '酒', -1, '造成伤害时', async (ctx): Promise<HookResult | void> => {
     const atom = ctx.atom;

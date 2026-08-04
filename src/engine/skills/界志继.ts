@@ -18,7 +18,7 @@
 //   觉醒标记:player.vars['志继/awakened'](后缀不含 usedThisTurn,不被「回合结束」清理)
 //   防重入:AWAKENED_KEY 在 awaken() 入口即设,准备阶段触发后即使结束阶段无手牌也不会再触发。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CHOOSE_RT = '界志继/choose';

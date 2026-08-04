@@ -15,7 +15,7 @@
 //   9. 端到端:回合外累计获得 ≥ 体力上限张 ♣牌 且 背面朝上 → 触发翻回询问
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
-import { applyAtom } from '../../src/engine/create-engine';
+import { applyAtom } from '../../src/engine/index';
 import { runJudgeFlow } from '../../src/engine/judge-flow';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

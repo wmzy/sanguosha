@@ -27,7 +27,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, topFrame } from '../create-engine';
+import { applyAtom, topFrame } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '界谦逊/trigger';

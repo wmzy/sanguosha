@@ -36,7 +36,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界镇军';

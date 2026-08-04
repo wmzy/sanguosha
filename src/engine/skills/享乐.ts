@@ -16,7 +16,7 @@
 //   说明:与仁王盾同 atom(检测有效性)天然互斥——cancel 后后续 hook 与 杀结算跳过。
 //        source 是其他玩家,故 respond 需为所有玩家注册(参考驱虎)。
 import type { FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerBeforeHook } from '../skill';
 
 /** 是否基本牌(杀/闪/桃) */

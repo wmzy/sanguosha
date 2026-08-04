@@ -36,7 +36,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, topFrame } from '../create-engine';
+import { applyAtom, topFrame } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
 import {
   registerAction,

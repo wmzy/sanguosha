@@ -42,7 +42,7 @@ import type {
   Skill,
   GameView,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 import { runPickTargetCardPanel } from './选牌面板';
 

@@ -1,7 +1,7 @@
 // 白银狮子(防具):当你受到伤害时,此伤害值最多为 1。
 //   失去装备区的白银狮子时回复 1 点体力。
 import type { HookResult, Skill, GameState } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAfterHook, registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

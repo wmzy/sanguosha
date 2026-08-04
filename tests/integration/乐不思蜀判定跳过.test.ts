@@ -11,7 +11,7 @@
 //
 // 关键机制:见 乐不思蜀.ts
 import { describe, it, expect } from 'vitest';
-import { registerSkillsFromState, applyAtom } from '../../src/engine/create-engine';
+import { registerSkillsFromState, applyAtom } from '../../src/engine/index';
 import { fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';

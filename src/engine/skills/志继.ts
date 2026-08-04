@@ -14,7 +14,7 @@
 //
 //   钩子:「阶段开始」(phase='准备')after-hook(atom.player===ownerId)→ 条件满足 → 二选一 → 执行。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CHOOSE_RT = '志继/choose';

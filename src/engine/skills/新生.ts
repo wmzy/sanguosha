@@ -22,7 +22,7 @@
 //
 // 通用机制:不涉及出杀次数/装备/横切规则。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 import { allCharacters } from '../cards/characters';
 import { createRng } from '../../shared/rng';

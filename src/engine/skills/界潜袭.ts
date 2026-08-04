@@ -40,7 +40,7 @@ import type {
   Skill,
 } from '../types';
 import type { Color } from '../../shared/types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { effectiveDistance } from '../distance';
 import {
   registerAction,

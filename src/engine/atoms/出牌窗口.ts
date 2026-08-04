@@ -4,7 +4,7 @@
 // 每次操作都 resolve 当前窗口(回合管理的 IIFE 循环重建它)。超时则结束回合。
 // isBlocking=false 让 hasBlockingPending / 前端 isPerspectiveAwaiting 跳过它。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { applyAtom, resolveTimeoutMs } from '../create-engine';
+import { applyAtom, resolveTimeoutMs } from '../index';
 import { registerAtom } from '../atom';
 
 const DEFAULT_TIMEOUT_SEC = 50;

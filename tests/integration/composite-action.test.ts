@@ -6,7 +6,7 @@ import {
   dispatch,
   registerSkillsFromState,
   fireTimeout,
-} from '../../src/engine/create-engine';
+} from '../../src/engine/index';
 import { waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

@@ -27,7 +27,7 @@
 //   - 与濒死求桃无关:濒死求桃时 target=孙权(被救者),本 hook 要求 target≠孙权,
 //     故天然不与濒死求桃场景冲突,无需检查 求桃/已救 标志。
 import type { GameState, HookResult, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerBeforeHook } from '../skill';
 
 /** 界救援问询的 requestType(隔离 respond 路由) */

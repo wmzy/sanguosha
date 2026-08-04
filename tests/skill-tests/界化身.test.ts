@@ -16,7 +16,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
-import { applyAtom } from '../../src/engine/create-engine';
+import { applyAtom } from '../../src/engine/index';
 
 // 已知引擎局限:化身通过「添加技能」动态获得任意武将技能,而「添加技能」atom 的
 // toViewEvents 仅同步马匹 distanceVars,不同步 武将技能 onInit 中设置的距离 vars

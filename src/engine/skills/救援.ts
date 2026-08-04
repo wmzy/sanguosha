@@ -20,7 +20,7 @@
 //   - 嵌套安全:bonus 回复体力不携带 source 字段,故 hook 内 `typeof source !== 'number'`
 //     早退条件会阻止再次触发(桃/救援加成的区分依据)。
 import type { Skill, GameState } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAfterHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

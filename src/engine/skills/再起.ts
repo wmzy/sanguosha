@@ -19,7 +19,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom, frameCards } from '../index';
 import { registerAction, registerBeforeHook } from '../skill';
 
 const TRIGGER_RT = '再起/trigger';

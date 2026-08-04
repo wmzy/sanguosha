@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../../engine-harness';
 import '../../../src/engine/atoms';
 import '../../../src/engine/skills';
-import { applyAtom } from '../../../src/engine/create-engine';
+import { applyAtom } from '../../../src/engine/index';
 import { createGameState } from '../../../src/engine/types';
 import type { GameState } from '../../../src/engine/types';
 

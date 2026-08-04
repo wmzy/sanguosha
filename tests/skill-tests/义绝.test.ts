@@ -581,7 +581,7 @@ describe('义绝', () => {
     expect(harness.state.players[1].tags).toContain('义绝/禁出牌');
 
     // 推进到回合结束
-    const { applyAtom } = await import('../../src/engine/create-engine');
+    const { applyAtom } = await import('../../src/engine/index');
     await applyAtom(harness.state, { type: '回合结束', player: 0 });
     harness.processAllEvents();
 

@@ -30,7 +30,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { startTurn } from '../turn-flow';
 import { registerAction, registerBeforeHook } from '../skill';
 

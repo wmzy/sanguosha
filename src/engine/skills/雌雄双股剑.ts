@@ -2,7 +2,7 @@
 //   你使用【杀】指定目标后触发效果:目标弃1张手牌(或你摸1张牌)。
 //   简化:不对性别做判断(需角色性别数据),总是触发。
 import type { Skill, GameState } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAfterHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

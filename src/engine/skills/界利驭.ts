@@ -42,7 +42,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界利驭'(避开标版未实现的"利驭");
 //   内部 Skill.name = '利驭'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 import { runPickTargetCardPanel } from './选牌面板';
 import { runUseFlow } from '../card-effect/use-card';

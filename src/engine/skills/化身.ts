@@ -39,7 +39,7 @@
 //     完整的武将牌+技能选择面板 UI 为"待澄清/后续"。
 //   - 只有一个可选技能时自动选取(无需询问)。
 import type { Faction, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { createRng } from '../../shared/rng';
 import { registerAction, registerAfterHook } from '../skill';
 import { allCharacters } from '../cards/characters';

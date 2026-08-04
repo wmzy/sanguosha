@@ -6,7 +6,7 @@
 
 import type { Card } from '../types';
 import type { ActionPrompt, GameView } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';

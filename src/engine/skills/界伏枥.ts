@@ -30,7 +30,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { flipFaceDown, flipFaceUp, isFaceDown, performSkipTurn } from '../face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 

@@ -15,7 +15,7 @@
 //   注:不用「获得」atom——它不清理弃牌堆(apply 仅过滤来源玩家手牌/装备)。
 //       改用「移动牌」(弃牌堆→手牌),其 default applyView 正确同步 discardPileCount-1 与 handCount+1。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
-import { applyAtom, topFrame } from '../create-engine';
+import { applyAtom, topFrame } from '../index';
 import { registerAfterHook, registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

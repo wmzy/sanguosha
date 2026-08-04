@@ -2,7 +2,7 @@
 // 验证乐不思蜀延时锦囊:对目标判定区放入 + 判定阶段判定 + 跳过出牌阶段
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
-import { applyAtom } from '../../src/engine/create-engine';
+import { applyAtom } from '../../src/engine/index';
 import { 判定 as 判定Atom } from '../../src/engine/atoms/判定';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

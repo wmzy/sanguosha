@@ -15,7 +15,7 @@
 //   - 每回合限一次:反间/usedThisTurn(后缀约定,回合结束 atom 自动清空)。
 //   - "展示之":牌移动到目标手牌(目标可见其牌面);花色比对在引擎内完成。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { createRng } from '../../shared/rng';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';

@@ -8,7 +8,7 @@
 //   4. 杀命中 + 无麒麟弓 → 不触发弃马
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
-import { registerSkillsFromState } from '../../src/engine/create-engine';
+import { registerSkillsFromState } from '../../src/engine/index';
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

@@ -26,7 +26,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, frameCards } from '../create-engine';
+import { applyAtom, frameCards } from '../index';
 import { registerAction, registerJudgeModifier } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

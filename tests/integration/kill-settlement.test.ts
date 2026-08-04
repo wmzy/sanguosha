@@ -1,5 +1,5 @@
 // 杀的完整结算流程测试:出杀→询问闪→出闪/不出闪→伤害/miss→处理区清理
-import { applyAtom, frameCards } from '../../src/engine/create-engine';
+import { applyAtom, frameCards } from '../../src/engine/index';
 import { SHORT_DELAY_MS } from '../../src/engine/card-response-availability';
 import { fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import { describe, it, expect, beforeEach } from 'vitest';

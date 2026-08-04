@@ -1,7 +1,7 @@
 // 制衡(孙权):
 //   出牌阶段限一次:弃任意数量的牌(手牌或装备),然后摸等量的牌。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction } from '../skill';
 

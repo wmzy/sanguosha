@@ -22,7 +22,7 @@ skillLoaders['界潜心'] = async () => 界潜心Module as unknown as SkillModul
 skillLoaders['界荐言'] = async () => 界荐言Module as unknown as SkillModule;
 
 import { createGameState } from '../../src/engine/types';
-import { applyAtom } from '../../src/engine/create-engine';
+import { applyAtom } from '../../src/engine/index';
 import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { GameState, PlayerState } from '../../src/engine/types';
 

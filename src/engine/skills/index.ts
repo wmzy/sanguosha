@@ -8,7 +8,7 @@ import { setSkillModuleResolver, setSkillModuleChecker } from '../skill';
 import '../card-effects';
 
 // 注意:系统规则的全局 hooks 不再在模块加载时注册(state-bound 注册表要求绑定到具体 state)。
-// 改由 create-engine 的 bootstrap / registerSkillsFromState 对每个真实 state 调用 系统规则.onInit 注册。
+// 改由 index 的 bootstrap / registerSkillsFromState 对每个真实 state 调用 系统规则.onInit 注册。
 
 type Loader = () => Promise<SkillModule>;
 
@@ -409,5 +409,5 @@ setSkillModuleResolver(async (id: string): Promise<SkillModule> => {
 // 同步检查器:供 instantiateSkill 在 await 前判断模块是否存在,避免 try-catch 控制流
 setSkillModuleChecker((id: string): boolean => id in skillLoaders);
 
-// 系统规则的全局 hooks 已移至 create-engine 的 bootstrap/registerSkillsFromState 中,
+// 系统规则的全局 hooks 已移至 index 的 bootstrap/registerSkillsFromState 中,
 // 对每个真实 state 调用 系统规则.onInit(state) 注册(state-bound 注册表要求)。

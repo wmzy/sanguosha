@@ -4,7 +4,7 @@
 //   runDyingFlow(系统规则.ts)按座次依次向每个存活玩家 dispatch 请求回应(桃/求桃)。
 //   贾诩回合内,被问询者既非贾诩本人、又非当前濒死者时,该请求被 cancel
 //   (applyAtom 在 before-hook cancel 后直接 return,不创建 pending slot——见
-//    create-engine.ts applyAtom 的 cancelled 分支位于 def.pending 判定之前)。
+//    index.ts applyAtom 的 cancelled 分支位于 def.pending 判定之前)。
 //   等价于"该角色不能使用桃"。贾诩本人与濒死角色本人不受限制。
 //
 //   钩子注册在贾诩座次(ownerId),但 请求回应 atom 的 target 是被问询者(随座次变化),

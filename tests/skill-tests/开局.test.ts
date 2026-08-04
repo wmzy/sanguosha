@@ -7,7 +7,7 @@
 //   3. 正面:主公先选(串行)
 //   4. 负面:playerCount < 2 → validate 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
-import { bootstrap, type GameConfig } from '../../src/engine/create-engine';
+import { bootstrap, type GameConfig } from '../../src/engine/index';
 import { dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

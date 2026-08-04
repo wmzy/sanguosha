@@ -12,7 +12,7 @@
 //   - 默认:目标须在距离 1 以内(与兵粮寸断一致)
 //   - 放松:目标手牌数 >= 徐晃手牌数 → 无距离限制
 import type { Card, GameView, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending } from '../skill';
 import { effectiveDistance } from '../distance';

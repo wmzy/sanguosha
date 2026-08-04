@@ -18,7 +18,7 @@ import type {
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom } from '../create-engine';
+import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 /** turn.vars key:本回合是否使用/打出过杀(移动牌 after 写,阶段开始 before 读)。

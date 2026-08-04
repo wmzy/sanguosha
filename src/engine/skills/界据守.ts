@@ -12,7 +12,7 @@
 //     玩家选一张手牌 → 若为装备牌则装备(含旧装备替换),否则弃置。
 //   - 内部标签/localVars/requestType 键名保持原前缀 '据守/xxx'(不改为 '界据守/xxx')。
 import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../face-down';
 import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../skill';

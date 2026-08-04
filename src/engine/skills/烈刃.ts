@@ -18,7 +18,7 @@
 //   - 拼点点数:A=1, 2-10=面值, J=11, Q=12, K=13;大者赢,相等算没赢
 //   - 拼点流程参考驱虎.ts;获得牌参考反馈.ts
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../create-engine';
+import { applyAtom, popFrame, pushFrame } from '../index';
 import { runRankCompareFlow } from '../rank-flow';
 import { registerAction, registerAfterHook } from '../skill';
 
