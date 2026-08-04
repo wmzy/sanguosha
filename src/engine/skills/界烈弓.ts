@@ -187,10 +187,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const targetIdx = atom.target;
       if (targetIdx === undefined) return;
       const cardId = atom.cardId;
-      if (typeof cardId === 'string') {
-        const card = ctx.state.cardMap[cardId];
-        if (card?.name !== '杀') return;
-      }
+      // cardId 非 string(虚拟伤害等)不触发;仅实体杀的伤害才加伤
+      if (typeof cardId !== 'string') return;
+      const card = ctx.state.cardMap[cardId];
+      if (card?.name !== '杀') return;
       const player = ctx.state.players[targetIdx];
       if (!player?.tags.includes(TAG_BONUS)) return;
       await applyAtom(ctx.state, { type: '去标签', player: targetIdx, tag: TAG_BONUS });

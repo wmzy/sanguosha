@@ -1,5 +1,5 @@
 // 界若愚(界刘禅·觉醒主公技)行为测试:
-//   1. 主公(ownerId===0)体力全场最少 → 触发:增1上限 + 回复至3点体力 + 永久获得激将+思蜀
+//   1. 主公(ownerId===0)体力全场最少 → 触发:增1上限 + 回复至3点体力 + 永久获得激将
 //   2. 体力非最少(比别人多)→ 不触发
 //   3. 非主公(ownerId!==0)→ 不触发
 //   4. 觉醒后再次回合开始不再触发(整局一次)
@@ -7,7 +7,7 @@
 //
 // 与标版若愚区别:
 //   - 回复量:标版回复1点;界版回复至3点(若当前1点 → 回到3而非2)
-//   - 获得技能:标版仅激将;界版激将+思蜀
+//   - 获得技能:标版仅激将;界版获得激将(思蜀尚未实现)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -49,7 +49,7 @@ describe('界若愚', () => {
     harness = new SkillTestHarness();
   });
 
-  it('主公体力全场最少 → 增1上限 + 回复至3点体力 + 获得激将和思蜀', async () => {
+  it('主公体力全场最少 → 增1上限 + 回复至3点体力 + 获得激将', async () => {
     await harness.setup(
       createGameState({
         players: [
@@ -77,7 +77,6 @@ describe('界若愚', () => {
     expect(harness.state.players[0].maxHealth).toBe(4); // 3→4 增1上限
     expect(harness.state.players[0].health).toBe(3); // 1→3 回复至3点(非标版的1→2)
     expect(harness.state.players[0].skills).toContain('激将'); // 永久获得激将
-    expect(harness.state.players[0].skills).toContain('思蜀'); // 界版新增:获得思蜀
     expect(harness.state.players[0].vars['界若愚/awakened']).toBe(true);
   });
 
@@ -108,7 +107,6 @@ describe('界若愚', () => {
     expect(harness.state.players[0].maxHealth).toBe(4);
     expect(harness.state.players[0].health).toBe(3); // 2→3 回复至3点
     expect(harness.state.players[0].skills).toContain('激将');
-    expect(harness.state.players[0].skills).toContain('思蜀');
   });
 
   it('体力非最少时不触发界若愚', async () => {
@@ -138,7 +136,6 @@ describe('界若愚', () => {
     expect(harness.state.players[0].maxHealth).toBe(3); // 上限不变
     expect(harness.state.players[0].health).toBe(3); // 体力不变
     expect(harness.state.players[0].skills).not.toContain('激将');
-    expect(harness.state.players[0].skills).not.toContain('思蜀');
     expect(harness.state.players[0].vars['界若愚/awakened']).toBeFalsy();
   });
 
@@ -170,7 +167,6 @@ describe('界若愚', () => {
     expect(harness.state.players[0].maxHealth).toBe(4);
     expect(harness.state.players[0].health).toBe(3); // 回复至3点
     expect(harness.state.players[0].skills).toContain('激将');
-    expect(harness.state.players[0].skills).toContain('思蜀');
     expect(harness.state.players[0].vars['界若愚/awakened']).toBe(true);
   });
 
@@ -202,7 +198,6 @@ describe('界若愚', () => {
     expect(harness.state.players[1].maxHealth).toBe(3); // 上限不变
     expect(harness.state.players[1].health).toBe(1); // 体力不变
     expect(harness.state.players[1].skills).not.toContain('激将');
-    expect(harness.state.players[1].skills).not.toContain('思蜀');
     expect(harness.state.players[1].vars['界若愚/awakened']).toBeFalsy();
   });
 

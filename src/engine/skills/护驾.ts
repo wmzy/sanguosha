@@ -17,7 +17,7 @@
 //   - execute 完成后 dispatch 自动 resolve 询问闪 slot(无需手动 resolve)
 //   - 嵌套请求回应创建的 pending slot(魏势力角色),与询问闪 slot 不同 target,不冲突
 //   - 魏势力角色出闪后,闪移入处理区;杀结算流程检查处理区有无闪
-//   - 主公技限制:仅曹操为主公时可用(前端 activeWhen 检查 isLord)
+//   - 主公技限制:曹操恒为主公(ownerId=0),无需额外 isLord 校验
 import type {
   FrontendAPI,
   GameState,

@@ -38,22 +38,13 @@ const INVALID_PREFIX = '奋威/无效/';
 const PROCESSED_PREFIX = '奋威/已处理/';
 
 // 全体锦囊(多目标,逐目标询问无懈)。键=frame.skillId,值=目标计算模式。
+// mode 用于区分 Path A(全体锦囊)与 Path B(铁索连环)的抵消逻辑。
 const MULTI_TARGET_SCROLLS: Record<string, 'allOthers' | 'allAlive'> = {
   南蛮入侵: 'allOthers',
   万箭齐发: 'allOthers',
   桃园结义: 'allAlive',
   五谷丰登: 'allAlive',
 };
-
-function computeScrollTargets(
-  state: GameState,
-  mode: string,
-  from: number,
-): number[] {
-  const alive = state.players.filter((p) => p.alive).map((p) => p.index);
-  if (mode === 'allOthers') return alive.filter((i) => i !== from);
-  return alive; // allAlive
-}
 
 /**
  * 运行奋威询问流程(确认 + 多选目标),返回被选中的无效目标集合。
@@ -188,16 +179,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (st.players[ownerId]?.vars[USED_KEY]) return; // 限定技已用
       if (!st.players[ownerId]?.alive) return;
 
-      // 计算多目标锦囊的目标集合
-      let targets: number[];
-      if (mode) {
-        targets = computeScrollTargets(st, mode, frame.from);
-      } else {
-        // 铁索连环:逐目标无絮模式下,任一目标的无絮窗口均可触发奋威
-        // (首次触发后由 PROCESSED_PREFIX 保证只触发一次)
-        const t = (frame.params?.targets as number[] | undefined) ?? [];
-        targets = t;
-      }
+      // 计算多目标锦囊的目标集合:读 frame.params.targets(已声明的目标,而非重算)
+      const targets = (frame.params?.targets as number[] | undefined) ?? [];
       if (targets.length <= 1) return; // 非多目标
 
       st.localVars[`${PROCESSED_PREFIX}${cardId}`] = true; // 标记已处理

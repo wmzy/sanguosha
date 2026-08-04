@@ -125,7 +125,7 @@ describe('界仁德', () => {
     // 询问视为使用基本牌
     expect(harness.state.pendingSlots.get(0)?.atom.type).toBe('请求回应');
     // 选杀
-    await P1.respond('界仁德', { choice: '杀' });
+    await P1.respond('界仁德', { option: '杀' });
     await harness.waitForStable();
 
     // 选目标(攻击范围 1 内一名其他角色)→ P2(座次1,相邻可攻击)
@@ -173,7 +173,7 @@ describe('界仁德', () => {
     });
 
     // 选桃
-    await P1.respond('界仁德', { choice: '桃' });
+    await P1.respond('界仁德', { option: '桃' });
     await harness.waitForStable();
 
     // 选桃目标 P2(已受伤)
@@ -211,7 +211,7 @@ describe('界仁德', () => {
     });
 
     // 选酒
-    await P1.respond('界仁德', { choice: '酒' });
+    await P1.respond('界仁德', { option: '酒' });
     await harness.waitForStable();
 
     // 自己不回血(界仁德无回血)
@@ -245,8 +245,8 @@ describe('界仁德', () => {
       targets: [{ target: 1, cardIds: ['c1', 'c2'] }],
     });
 
-    // 拒绝使用基本牌(choice=false)
-    await P1.respond('界仁德', { choice: false });
+    // 拒绝使用基本牌(option=不使用)
+    await P1.respond('界仁德', { option: '不使用' });
     await harness.waitForStable();
 
     // P2 拿到给牌
@@ -282,7 +282,7 @@ describe('界仁德', () => {
     });
 
     // 选杀
-    await P1.respond('界仁德', { choice: '杀' });
+    await P1.respond('界仁德', { option: '杀' });
     await harness.waitForStable();
 
     // 已达出杀上限 → 不发起目标询问(直接结束)
@@ -359,7 +359,7 @@ describe('界仁德', () => {
     expect(harness.state.pendingSlots.get(0)?.atom.type).toBe('请求回应');
 
     // 拒绝使用基本牌
-    await P1.respond('界仁德', { choice: false });
+    await P1.respond('界仁德', { option: '不使用' });
     await harness.waitForStable();
     expect(harness.state.pendingSlots.size).toBe(0);
   });

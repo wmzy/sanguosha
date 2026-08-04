@@ -23,6 +23,8 @@ export interface GameView {
     handCount: number;
     hand?: Card[];
     marks: Mark[];
+    /** 技能标签(公开信息,如奇才/无距离限制)。供前端 targetFilter 等查询。 */
+    tags?: string[];
     /** 武将势力(魏蜀吴群),公开信息,与 character 一并由 分配武将 atom 下发。
      *  影响激将/护驾/黄天/救援/暴虐/颂威/制霸等势力相关技能。 */
     faction?: Faction;

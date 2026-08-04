@@ -244,12 +244,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           requestType: CHOICE_RT,
           target: from,
           prompt: {
-            type: 'confirm',
-            title: '界仁德:是否视为使用一张基本牌?',
-            confirmLabel: '使用基本牌',
-            cancelLabel: '不使用',
+            type: 'chooseOption',
+            title: '界仁德:视为使用一张基本牌?',
+            options: [
+              { value: '杀', label: '杀' },
+              { value: '桃', label: '桃' },
+              { value: '酒', label: '酒' },
+              { value: '不使用', label: '不使用' },
+            ],
           },
-          defaultChoice: false,
+          defaultChoice: '不使用',
           timeout: 30,
         });
         const choice = state.localVars[BASIC_CHOICE_VAR];
@@ -312,7 +316,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           // 酒:仅对自己,标记下一张杀+1伤害
           await virtualWine(state, from);
         }
-        // choice === false / undefined / 超时 → 不使用,直接结束
+        // choice === '不使用' / 超时 → 不使用,直接结束
       }
       await popFrame(state);
     },
@@ -337,15 +341,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const slot = s.pendingSlots.get(ownerId);
       const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType ?? '';
       if (rt === CHOICE_RT) {
-        // 选择基本牌类型:'杀'/'桃'/'酒'(string),或 false 表示不使用
-        const c = params.choice;
+        // chooseOption:option 为 '杀'/'桃'/'酒'/'不使用'(参考化身.ts 的处理方式)
+        const c = params.option;
         if (c === '杀' || c === '桃' || c === '酒') {
           s.localVars[BASIC_CHOICE_VAR] = c;
-        } else if (params.confirmed === true || c === true) {
-          // 默认选杀(UI 仅 confirm 时回退杀;前端/无头客户端 confirm 发送 choice:true,须同时接受)
-          s.localVars[BASIC_CHOICE_VAR] = '杀';
         } else {
-          s.localVars[BASIC_CHOICE_VAR] = false;
+          // '不使用' / 超时 / 其他 → 不使用
+          s.localVars[BASIC_CHOICE_VAR] = '不使用';
         }
       } else if (rt === TARGET_RT) {
         const t =

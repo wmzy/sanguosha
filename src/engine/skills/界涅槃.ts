@@ -33,10 +33,7 @@ import { setChain } from '../face-down';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '界涅槃/confirm';
-const CHOOSE_RT = '界涅槃/选技能';
 const CONFIRMED_KEY = '界涅槃/confirmed';
-const SELECTED_KEY = '界涅槃/selected';
-const CANDIDATES_KEY = '界涅槃/candidates';
 const USED_KEY = '界涅槃/used';
 const TARGET_HEALTH = 3;
 

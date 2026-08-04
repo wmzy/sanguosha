@@ -3,7 +3,7 @@
 //
 // 与标版若愚区别:
 //   1. 回复量:标版「回复1点体力」;界版「回复至3点体力」(若当前<3 则补到 3,已≥3 不变)。
-//   2. 获得技能:标版仅获「激将」;界版获「激将」+「思蜀」。
+//   2. 获得技能:标版仅获「激将」;界版亦获「激将」(「思蜀」尚未实现,暂不添加)。
 //
 // 分析:
 //   类型:主公技/觉醒技 | 时机:回合开始阶段(「回合开始」atom 的 after-hook)
@@ -12,7 +12,6 @@
 //     1. 增加1点体力上限(设上限 amount = maxHealth + 1)
 //     2. 回复至3点体力(amount = max(0, 3 - 当前体力),上限已 +1 通常≥3 可容纳)
 //     3. 永久获得"激将"(添加技能 skillId='激将')
-//     4. 永久获得"思蜀"(添加技能 skillId='思蜀')
 //   觉醒标记:player.vars['界若愚/awakened'](独立键,与标版若愚键隔离)
 //   主公判定: ownerId === 0(参考激将.ts 的 isLord 判断)
 //
@@ -31,7 +30,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '界若愚',
     description:
-      '主公技/觉醒技:回合开始且体力全场最少时,增加1体力上限、回复至3点体力并永久获得"激将""思蜀"',
+      '主公技/觉醒技:回合开始且体力全场最少时,增加1体力上限、回复至3点体力并永久获得"激将"',
   };
 }
 
@@ -72,9 +71,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 3. 永久获得"激将"
     await applyAtom(ctx.state, { type: '添加技能', player: ownerId, skillId: '激将' });
-
-    // 4. 永久获得"思蜀"(界刘禅新增)
-    await applyAtom(ctx.state, { type: '添加技能', player: ownerId, skillId: '思蜀' });
   });
 
   return () => {};

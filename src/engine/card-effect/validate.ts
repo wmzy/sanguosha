@@ -73,8 +73,11 @@ export function isLegalTarget(
       return false;
     case 'inAttackRange':
       return inAttackRange(state, ownerId, target);
-    case 'distance':
+    case 'distance': {
+      // 奇才/界奇才:使用锦囊牌无距离限制(集中在此检查,各卡牌不再各自感知奇才)
+      if (state.players[ownerId]?.tags.includes('奇才/无距离限制')) return true;
       return effectiveDistance(state, ownerId, target) <= spec.dist;
+    }
     case 'allOthers':
     case 'allPlayers':
     case 'other':

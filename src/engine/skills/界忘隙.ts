@@ -145,8 +145,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     const chosen = state.localVars[PICK_KEY] as string | null;
     delete state.localVars[PICK_KEY];
-    if (typeof chosen === 'string' && state.players[other]?.alive) {
-      await applyAtom(state, { type: '给予', cardId: chosen, from: ownerId, to: other });
+    // 超时未选择:默认交出第一张(官方"交给该角色其中一张牌"为强制,不应因超时而保留双牌)
+    const giveCard = typeof chosen === 'string' ? chosen : drawn[0];
+    if (state.players[other]?.alive && state.players[ownerId]?.alive) {
+      await applyAtom(state, { type: '给予', cardId: giveCard, from: ownerId, to: other });
     }
   }
 
@@ -163,8 +165,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
   });
 
-  // 受到伤害后:owner 是目标 → other = source
-  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
+  // 受到伤害结算结束后:owner 是目标 → other = source
+  //   用 时机8「伤害结算结束后」而非 时机6「受到伤害后」:濒死检查在 时机7,
+  //   须等濒死结算(救人成功/死亡)之后再判定"该角色"存活与摸牌/给予。
+  registerAfterHook(state, skill.id, ownerId, '伤害结算结束后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const source = atom.source;

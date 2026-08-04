@@ -2,9 +2,9 @@
 //   "当一名角色的手牌被弃置或获得后,你可以失去1点体力令其摸两张牌。"
 //
 // 时机:弃置 after-hook + 获得 after-hook。
-//   - 弃置 atom:一名角色的手牌/装备被弃置后(atom.player 是被弃置者=目标)。
+//   - 弃置 atom:一名角色的手牌被弃置后(atom.player 是被弃置者=目标);装备区弃置不触发。
 //     主动弃牌(技能代价,atom.voluntary=true)不触发——如贯石斧/制衡/天香等代价弃牌。
-//   - 获得 atom:一名角色获得一张牌后(atom.from 是被获得者=失去牌的人=目标)。
+//   - 获得 atom:一名角色的手牌被获得后(atom.from 是失去牌的人=目标);装备区被获得不触发。
 //     注意获得 atom 的 player 是获得者;官方规则令失去手牌的人摸牌,故目标取 atom.from。
 //     无 from(牌凭空产生,如摸牌)不触发。
 //   弃置目标 = atom.player;获得目标 = atom.from。
@@ -31,9 +31,13 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 
 const CONFIRM_RT_PREFIX = '奋激/confirm';
+/** before-hook 快照键:弃置 atom 中来自手牌的 cardId(apply 后手牌已清空,须在 apply 前快照) */
+const DISCARD_HAND_KEY = '奋激/弃置手牌快照';
+/** before-hook 快照键:获得 atom 中被获得的牌是否来自 from 手牌 */
+const OBTAIN_HAND_KEY = '奋激/获得手牌快照';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -106,7 +110,27 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     }
   }
 
-  // ── 弃置 after-hook:一名角色的手牌/装备被弃置后 ──
+  // ── 弃置 before-hook:快照被弃置牌中来自手牌的 cardId ──
+  //   官方"当一名角色的手牌被弃置后"——仅手牌弃置触发,装备区弃置不触发。
+  //   after-hook 时手牌已被清空,故在 before-hook(apply 前)快照手牌交集。
+  const unloadDiscardBefore = registerBeforeHook(
+    state,
+    skill.id,
+    ownerId,
+    '弃置',
+    async (ctx) => {
+      const atom = ctx.atom;
+      if (atom.type !== '弃置') return;
+      if (typeof atom.player !== 'number') return;
+      const player = ctx.state.players[atom.player];
+      if (!player) return;
+      ctx.state.localVars[DISCARD_HAND_KEY] = atom.cardIds.filter((id) =>
+        player.hand.includes(id),
+      );
+    },
+  );
+
+  // ── 弃置 after-hook:一名角色的手牌被弃置后 ──
   const unloadDiscard = registerAfterHook(
     state,
     skill.id,
@@ -117,12 +141,36 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (atom.type !== '弃置') return;
       if (typeof atom.player !== 'number') return;
       // 主动弃牌(玩家自己选择弃牌作为技能代价)不触发奋激
-      if ((atom as { voluntary?: boolean }).voluntary === true) return;
+      if ((atom as { voluntary?: boolean }).voluntary === true) {
+        delete ctx.state.localVars[DISCARD_HAND_KEY];
+        return;
+      }
+      // 仅手牌弃置触发(官方"当一名角色的手牌被弃置")
+      const handCards = ctx.state.localVars[DISCARD_HAND_KEY] as string[] | undefined;
+      delete ctx.state.localVars[DISCARD_HAND_KEY];
+      if (!handCards || handCards.length === 0) return;
       await tryFenji(ctx, atom.player);
     },
   );
 
-  // ── 获得 after-hook:一名角色获得一张牌后 ──
+  // ── 获得 before-hook:快照被获得的牌是否来自手牌 ──
+  //   官方"当一名角色的手牌被获得后"——仅手牌被获得触发,装备区被获得不触发。
+  //   after-hook 时牌已转移,故在 before-hook(apply 前)快照。
+  const unloadObtainBefore = registerBeforeHook(
+    state,
+    skill.id,
+    ownerId,
+    '获得',
+    async (ctx) => {
+      const atom = ctx.atom;
+      if (atom.type !== '获得') return;
+      if (atom.from === undefined) return;
+      const fromP = ctx.state.players[atom.from];
+      ctx.state.localVars[OBTAIN_HAND_KEY] = fromP?.hand.includes(atom.cardId) ?? false;
+    },
+  );
+
+  // ── 获得 after-hook:一名角色的手牌被获得后 ──
   // 官方规则:令失去手牌的人摸牌。获得 atom 的 player 是获得者,from 是被获得者(失去牌的人)。
   // 无 from(牌凭空产生,如摸牌)不触发——那是获得者凭空获得,无人失去牌。
   const unloadObtain = registerAfterHook(
@@ -133,15 +181,22 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     async (ctx) => {
       const atom = ctx.atom;
       if (atom.type !== '获得') return;
-      if (atom.from === undefined) return;
-      if (typeof atom.from !== 'number') return;
+      if (atom.from === undefined || typeof atom.from !== 'number') {
+        delete ctx.state.localVars[OBTAIN_HAND_KEY];
+        return;
+      }
+      const fromHand = ctx.state.localVars[OBTAIN_HAND_KEY] as boolean | undefined;
+      delete ctx.state.localVars[OBTAIN_HAND_KEY];
+      if (!fromHand) return; // 非手牌获得不触发(官方"当一名角色的手牌被获得")
       await tryFenji(ctx, atom.from);
     },
   );
 
   return () => {
     unloadAction();
+    unloadDiscardBefore();
     unloadDiscard();
+    unloadObtainBefore();
     unloadObtain();
   };
 }

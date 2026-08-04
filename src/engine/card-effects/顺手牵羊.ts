@@ -10,7 +10,6 @@ import { viewEffectiveDistance } from '../viewDistance';
 import { runPickTargetCardPanel } from '../skills/选牌面板';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
-/** 顺手牵羊牌特有校验：距离 <= 1（奇才例外）、目标有牌、非自己 */
 function canUseSnatch(
   state: import('../types').GameState,
   ownerId: number,
@@ -21,6 +20,7 @@ function canUseSnatch(
   if (target === undefined) return '目标不合法';
   if (target === ownerId) return '不能对自己使用';
   if (!state.players[target]?.alive) return '目标已死亡';
+  // 距离检查:isLegalTarget 统一处理(含奇才豁免),canUse 也需检查具体目标
   const ignoreDistance = !!state.players[ownerId]?.tags.includes('奇才/无距离限制');
   if (!ignoreDistance && effectiveDistance(state, ownerId, target) > 1) return '距离太远';
   const p = state.players[target];
@@ -84,8 +84,13 @@ const snatchEffect: CardEffect = {
     targetFilter: {
       min: 1,
       max: 1,
-      filter: (view: GameView, t: number) =>
-        viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1,
+      filter: (view: GameView, t: number) => {
+        if (t === view.currentPlayerIndex) return false;
+        const tp = view.players[t];
+        if (!tp || tp.alive === false) return false;
+        if (view.players[view.currentPlayerIndex]?.tags?.includes('奇才/无距离限制')) return true;
+        return viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1;
+      },
     },
   } as ActionPrompt,
   label: '顺手牵羊',

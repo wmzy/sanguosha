@@ -246,8 +246,8 @@ describe('义绝', () => {
     // P2 被禁出牌 → 询问闪被 cancel,强制命中
     // 红桃杀 + 义绝加伤 → 2 点伤害
     expect(harness.state.players[1].health).toBe(2);
-    // 加伤标签单次消费
-    expect(harness.state.players[1].tags).not.toContain('义绝/红桃杀加伤');
+    // 加伤标签整回合持续(不再单次消费)
+    expect(harness.state.players[1].tags).toContain('义绝/红桃杀加伤');
   });
 
   // ─── 禁出牌:target 询问闪被跳过 ─────────────────────────────

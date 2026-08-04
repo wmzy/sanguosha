@@ -178,7 +178,7 @@ export async function performYinghunPrepare(
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // respond:每个座次注册一份。孙坚座次处理 confirm/target;目标座次处理 option/discard。
+  // respond:每个座次注册一份。孙坚座次处理 confirm/target/option;目标座次处理 discard。
   // 以 requestType 区分四种询问,互不冲突。
   const unloaders: Array<() => void> = [];
   for (const p of state.players) {

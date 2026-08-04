@@ -40,7 +40,7 @@ export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
-    name: '义从',
+    name: '界义从',
     description: '锁定技:你计算与其他角色的距离-1;若你的体力值不大于2,其他角色计算与你的距离+1',
     isLocked: true,
   };

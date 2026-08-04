@@ -168,16 +168,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     });
     if (!ctx.state.localVars['界集智/discard']) return;
 
-    // 弃置此牌:从 owner 手牌移到弃牌堆
+    // 弃置此牌:从 owner 手牌弃置(走「弃置」atom 以发 reason='弃置' 的「失去牌」时机标记,供连营/落英/屯田等触发)
     const self = ctx.state.players[ownerId];
     if (!self) return;
     const idx = self.hand.indexOf(drawnId!);
     if (idx < 0) return; // 卡不在手牌(已被其他效果移动),跳过
     await applyAtom(ctx.state, {
-      type: '移动牌',
-      cardId: drawnId!,
-      from: { zone: '手牌', player: ownerId },
-      to: { zone: '弃牌堆' },
+      type: '弃置',
+      player: ownerId,
+      cardIds: [drawnId!],
     });
 
     // 本回合手牌上限+1(turn.vars['手牌上限/bonus:<owner>'])

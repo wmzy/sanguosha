@@ -108,6 +108,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       } else {
         // 目标未出牌(超时):无有效拼点牌,runRankCompareFlow 无法执行(需要 targetCard 在手)。
         // 清理发起方拼点牌(手牌→弃牌堆),按发起方默认胜出处理(保留旧行为)。
+        // 理由:拼点规则中一方未出牌视为弃权,按发起方默认胜出(若发起方点数>0);
+        // 这样走"赢"分支让发起方选伤害目标,与正常拼点赢的结算一致。
         await applyAtom(state, {
           type: '移动牌',
           cardId: initiatorCardId,
@@ -143,7 +145,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
             title: `驱虎:选择 ${state.players[target].name} 攻击范围内的一名角色,其将受到1点伤害`,
             min: 1,
             max: 1,
-            filter: () => true, // 后端 validate 已校验;前端用 activeWhen 控制
+            filter: (view, t) => t !== from && view.players[t]?.alive === true, // 后端 validate 已校验攻击范围;前端排除自己与死亡角色
           },
           timeout: 30,
         });

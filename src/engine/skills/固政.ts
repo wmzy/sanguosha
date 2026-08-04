@@ -3,7 +3,7 @@
 //
 // 实现机制:
 //   1. 弃置 afterHook:当 state.phase==='弃牌' 时,记录该玩家本阶段弃置的牌到 localVars。
-//   2. 阶段结束(弃牌) afterHook:对"其他角色"(非自己)若有弃牌记录,询问是否发动固政:
+//   2. 阶段结束(弃牌) beforeHook:对"其他角色"(非自己)若有弃牌记录,询问是否发动固政:
 //      a. 请求回应(固政/确认):是否发动 → confirmed
 //      b. 若确认且弃牌 >1 张:请求回应(固政/选牌):选一张返回该角色
 //      c. 移动牌:所选牌 弃牌堆→该角色手牌;其余牌 弃牌堆→自己手牌
@@ -12,13 +12,16 @@
 // 关键点:
 //   - 触发时机依赖 阶段结束(弃牌):__弃牌 的弃置在 请求回应 pending resolve 后、
 //     阶段结束(弃牌) 触发前完成,故记录已就绪(弃置 afterHook 先于本 hook 读到数据)。
+//   - 用 before-hook 注册「阶段结束」:after-hook 会在 atom apply 及回合管理的
+//     after-hook(推进到下家回合、改写 currentPlayerIndex)之后执行,导致固政 pending
+//     被后续 slot 覆盖;before-hook 先于 atom apply,逻辑体不变(return void = 不 cancel)。
 //   - ctx.atom.phase==='弃牌' 稳定(不受 state.phase 在多 hook 间被推进影响)。
 //   - 每回合限一次:每个其他角色的弃牌阶段只有一个,自然满足。
 //   - 仅弃牌阶段弃置的牌计入("该角色弃置的牌");非弃牌阶段的弃置(制衡/寒冰剑等)被
 //     state.phase!=='弃牌' 过滤。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 
 const CONFIRM_REQUEST = '固政/确认';
 const PICK_REQUEST = '固政/选牌';
@@ -50,8 +53,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ctx.state.localVars[key] = [...(existing ?? []), ...atom.cardIds];
   });
 
-  // ── 阶段结束 afterHook:其他角色弃牌阶段结束时发动固政 ──
-  registerAfterHook(
+  // ── 阶段结束 beforeHook:其他角色弃牌阶段结束时发动固政 ──
+  //   用 before-hook 而非 after-hook:after-hook 会在「阶段结束」atom apply 及回合管理
+  //   的 after-hook(推进到下家回合、改写 currentPlayerIndex)之后执行,导致固政询问
+  //   pending 覆盖/错位;before-hook 先于 atom apply 与所有 after-hook,逻辑体不变
+  //   (返回 void = 不 cancel、正常继续)。
+  registerBeforeHook(
     state,
     skill.id,
     ownerId,

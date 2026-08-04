@@ -13,6 +13,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -293,5 +294,62 @@ describe('节命', () => {
 
     // P1 摸至 3 张(体力上限 3,当前 0 手牌)
     expect(harness.state.players[1].hand.length).toBe(3);
+  });
+
+  // ─── 每点伤害触发一次(与遗计一致) ────────────────────
+  it('受到 2 点伤害 → 触发 2 次节命(每点独立询问发动)', async () => {
+    const cardMap: Record<string, Card> = {};
+    for (let i = 0; i < 8; i++) {
+      cardMap[`dk${i}`] = makeCard(`dk${i}`, '杀', '♠', String(i + 2));
+    }
+    const deck = ['dk0', 'dk1', 'dk2', 'dk3', 'dk4', 'dk5', 'dk6', 'dk7'];
+
+    const state: GameState = createGameState({
+      players: [
+        // P0:4 血上限,0 手牌(第一次节命目标)
+        makePlayer({ index: 0, name: 'P0', character: '张飞', skills: ['杀', '闪'] }),
+        // P1:荀彜 3 血
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          skills: ['节命', '闪'],
+          health: 3,
+          maxHealth: 3,
+        }),
+      ],
+      cardMap,
+      zones: { deck, discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 直接造成 2 点伤害给荀彜(绕过杀/闪链路,聚焦节命循环)
+    const damagePromise = runDamageFlow(state, 0, 1, 2);
+    await harness.waitForStable();
+
+    // 第一次节命:确认发动 → 选 P0 → P0 摸至 4 张
+    P1.expectPending('请求回应');
+    await P1.respond('节命', { choice: true });
+    P1.expectPending('请求回应');
+    await P1.respond('节命', { target: 0 });
+    await harness.waitForStable();
+    expect(harness.state.players[0].hand.length).toBe(4);
+
+    // 第二次节命(下一轮循环):确认发动 → 选自己 P1 → P1 摸至 3 张
+    P1.expectPending('请求回应');
+    await P1.respond('节命', { choice: true });
+    P1.expectPending('请求回应');
+    await P1.respond('节命', { target: 1 });
+    await harness.waitForStable();
+    expect(harness.state.players[1].hand.length).toBe(3);
+
+    // 荀彜受到 2 点伤害:3 → 1(仍存活,故两次都触发)
+    expect(harness.state.players[1].health).toBe(1);
+
+    await damagePromise;
   });
 });

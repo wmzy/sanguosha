@@ -293,7 +293,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── before-hook on '造成伤害时':owner 红桃杀对该目标伤害+1 ──
   //    命中条件:atom.source === ownerId + 目标有 HEART_BONUS_TAG + 牌为红桃杀;
-  //    单次消费(去标签),保证同一杀只+1,且只对该义绝生效。
+  //    整回合持续(标签回合结束统一清),本回合所有红桃杀均+1。
+  //    每次伤害事件只+1(before-hook 每次伤害只执行一次,无重入风险)。
   registerBeforeHook(
     state,
     skill.id,
@@ -311,7 +312,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!card || card.name !== '杀' || card.suit !== '♥') return;
       const player = ctx.state.players[target];
       if (!player?.tags.includes(HEART_BONUS_TAG)) return;
-      await applyAtom(ctx.state, { type: '去标签', player: target, tag: HEART_BONUS_TAG });
+      // 整回合持续:不去标签(回合结束统一清)
       return {
         kind: 'modify',
         atom: { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as typeof ctx.atom,

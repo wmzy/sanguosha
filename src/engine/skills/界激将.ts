@@ -18,7 +18,9 @@
 //     ownerId===0(主公固定0号位)门槛不变;damageType 由 cardMap 自动传导(火杀/雷杀不丢)。
 //   - 新增 after-hook(指定目标):蜀角色 source 回合外用杀指定目标 → 询问是否令主公摸1。
 //     · "使用/替你使用杀" 均会触发 指定目标 atom(杀 use 流程必经),覆盖主路径。
-//     · "每回合限一次":用 state.turn.vars[PER_TURN_VAR](回合结束 atom 自动清空 turn.vars)。
+//     · "打出杀"(南蛮入侵/决斗 被询问杀后把杀移入处理区)不走指定目标,故另挂
+//       询问杀 after-hook:atom.target(打出方)为蜀角色且回合外且确实打出杀 → 触发摸牌。
+//     · "每回合限一次":用 state.turn.vars[PER_TURN_VAR](两条 hook 共享,同一回合只摸一次)。
 //   - 跨座次 respond 注册(镜像标激将):全座次注册,按 pending 内容三分支:
 //     · 询问杀(主公 seat):响应型代打出(杀/respondKill 逐个询问,杀留处理区);
 //     · 界激将/出杀(蜀角色 seat):主动型代使用(选杀+指定 killTarget → capture);
@@ -208,6 +210,73 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
         if (ctx.state.localVars[CONFIRMED_VAR] === true) {
           // 蜀角色选择发动 → 主公(刘备)摸 1 张
+          await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
+        }
+      },
+    ),
+  );
+
+  // ── 询问杀 after hook:蜀角色回合外「打出」杀(南蛮入侵/决斗)→ 询问是否令主公摸1张 ──
+  //   使用杀走 runUseFlow→「指定目标」(由上面的 hook 覆盖);打出杀(被询问后把杀移入
+  //   处理区)不走「指定目标」,故另挂「询问杀」after-hook。
+  //   · atom.target = 被询问出杀者(打出方);须确认其确实打出了一张杀(处理区有杀——
+  //     调用方的 consumePlayedSlashes 在本 after-hook 之后才清理,故 frameCards 仍含杀)。
+  //   · 与「指定目标」hook 共享 PER_TURN_VAR,同一回合只摸一次(同一张杀不可能同时触发
+  //     使用与打出两条路径,且 PER_TURN_VAR 防止多次触发)。
+  //   · 代打出(主公被询问杀,蜀盟友代打)时 atom.target=主公=ownerId,被早期 return 跳过
+  //     (本 hook 仅覆盖蜀角色本人直接打出的路径)。
+  offs.push(
+    registerAfterHook(
+      state,
+      skill.id,
+      ownerId,
+      '询问杀',
+      async (ctx): Promise<void> => {
+        if (ownerId !== 0) return;
+        const atom = ctx.atom;
+        // 打出方 = 被询问者(询问杀 atom.target)
+        const askedIdx = atom.target;
+        if (typeof askedIdx !== 'number') return;
+        if (askedIdx === ownerId) return; // 主公本人不算"其他蜀角色"
+        const asked = ctx.state.players[askedIdx];
+        if (!asked?.alive) return;
+        if (asked.faction !== '蜀') return;
+        // 必须是蜀角色"回合外"
+        if (ctx.state.currentPlayerIndex === askedIdx) return;
+        // 必须实际打出了一张杀(询问杀 resolve 后杀牌仍在处理区)
+        const playedKill = frameCards(ctx.state).some(
+          (id) => ctx.state.cardMap[id]?.name === '杀',
+        );
+        if (!playedKill) return;
+        const lord = ctx.state.players[ownerId];
+        if (!lord?.alive) return;
+        // 每回合限一次(与「指定目标」hook 共享 PER_TURN_VAR)
+        if (ctx.state.turn.vars[PER_TURN_VAR] === true) return;
+
+        ctx.state.turn.vars[PER_TURN_VAR] = true;
+        await applyAtom(ctx.state, {
+          type: '回合用量',
+          player: ownerId,
+          key: PER_TURN_VAR,
+          value: true,
+        });
+
+        delete ctx.state.localVars[CONFIRMED_VAR];
+        await applyAtom(ctx.state, {
+          type: '请求回应',
+          requestType: REQUEST_TYPE,
+          target: askedIdx,
+          prompt: {
+            type: 'confirm',
+            title: `界激将:是否令${lord.name}摸一张牌?`,
+            confirmLabel: '令主公摸牌',
+            cancelLabel: '不发动',
+          },
+          defaultChoice: false,
+          timeout: 30,
+        });
+
+        if (ctx.state.localVars[CONFIRMED_VAR] === true) {
           await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
         }
       },

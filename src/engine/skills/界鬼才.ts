@@ -6,7 +6,7 @@
 //   (与 装备通用 换装流程的 移除技能 → 卸下 序列一致。)
 //
 // 其余机制(registerJudgeModifier / respond action / frameCards 直接 mutate)与标版一致。
-//   内部标签/localVars/requestType 键名保持原前缀 '鬼才/xxx'(不改为 '界鬼才/xxx')。
+//   localVars 键名保持原前缀 '鬼才/replaceCard';requestType 用 '界鬼才/replace'。
 //
 // 触发时机:判定牌翻开(判定 atom.apply 完成)后、判定效果(闪电/兵粮寸断/乐不思蜀等
 //   消费技能的 afterHook 读取判定牌)生效前。本技能注册为判定改判钩子(registerJudgeModifier),

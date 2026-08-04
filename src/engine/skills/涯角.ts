@@ -1,6 +1,6 @@
 // 涯角(界赵云·蜀·主动技):每当你于回合外使用或打出手牌时,你可以展示牌堆顶的一张牌,
 //   若这两张牌的类别相同,你可以将牌堆顶的一张牌交给一名角色;
-//   若不同,你可以将牌堆顶的一张牌置入弃牌堆。
+//   若不同,你可以弃置攻击范围内包含你的一名角色区域里的一张牌。
 //
 // 规则来源:docs/research/武将技能/蜀国/界赵云.md
 //
@@ -10,7 +10,8 @@
 //      每张手牌的使用/打出 = 一次 移动牌(手牌→处理区),天然满足"每张手牌限一次"。
 //   2. 询问发动(请求回应·confirm) → 展示牌堆顶(展示 atom,广播身份) → 比较类别:
 //        · 相同 → 请求回应(choosePlayer)选目标 → 移动牌(牌堆顶→目标手牌)
-//        · 不同 → 请求回应(confirm)是否弃置 → 移动牌(牌堆顶→弃牌堆)
+//        · 不同 → 请求回应(choosePlayer)选攻击范围内包含自己的角色 →
+//          runPickTargetCardPanel 弃置该角色区域一张牌(discard 模式)
 //      两步"你可以"均为可选;不选则牌留在牌堆顶。
 //   3. respond action 处理三种 requestType(confirm/target/discard),按当前 pending 分支写 localVars。
 //
@@ -19,11 +20,12 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
+import { inAttackRange } from '../distance';
+import { runPickTargetCardPanel } from './选牌面板';
 
 /** localVars keys */
 const CONFIRMED_KEY = '涯角/confirmed';
 const TARGET_KEY = '涯角/target';
-const DISCARD_KEY = '涯角/discard';
 
 /** 请求回应 requestTypes */
 const CONFIRM_RT = '涯角/confirm';
@@ -43,7 +45,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '涯角',
     description:
-      '每当你于回合外使用或打出手牌时,你可以展示牌堆顶的一张牌,若这两张牌的类别相同,你可以将牌堆顶的一张牌交给一名角色;若不同,你可以将牌堆顶的一张牌置入弃牌堆。',
+      '每当你于回合外使用或打出手牌时,你可以展示牌堆顶的一张牌,若这两张牌的类别相同,你可以将牌堆顶的一张牌交给一名角色;若不同,你可以弃置攻击范围内包含你的一名角色区域里的一张牌。',
   };
 }
 
@@ -56,10 +58,22 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     'respond',
-    (st: GameState, _params: Record<string, Json>) => {
+    (st: GameState, params: Record<string, Json>) => {
       const rt = currentRequestType(st, ownerId);
       if (rt !== CONFIRM_RT && rt !== TARGET_RT && rt !== DISCARD_RT)
         return '当前不是涯角询问';
+      // DISCARD_RT = pickTargetCard 选牌面板(由 runPickTargetCardPanel 发起):
+      //   需 zone + 对应 cardId/handIndex(与界刚烈/过河拆桥选牌一致)
+      if (rt === DISCARD_RT) {
+        const zone = params.zone;
+        if (zone === 'equipment' || zone === 'judge') {
+          if (typeof params.cardId !== 'string') return 'cardId required';
+        } else if (zone === 'hand') {
+          if (typeof params.handIndex !== 'number') return 'handIndex required';
+        } else {
+          return 'zone required (equipment|judge|hand)';
+        }
+      }
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
@@ -69,7 +83,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       } else if (rt === TARGET_RT) {
         st.localVars[TARGET_KEY] = params.target ?? null;
       } else if (rt === DISCARD_RT) {
-        st.localVars[DISCARD_KEY] = params.choice === true || params.confirmed === true;
+        // pickTargetCard 选牌结果:由 选牌面板.ts 的 runPickTargetCardPanel 读取
+        st.localVars['选牌/结果'] = {
+          zone: params.zone,
+          cardId: params.cardId ?? null,
+          handIndex: params.handIndex ?? null,
+        };
       }
     },
   );
@@ -138,35 +157,40 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         await applyAtom(ctx.state, { type: '摸牌', player: giveTarget, count: 1 });
       }
     } else {
-      // 类别不同:询问是否将牌堆顶牌置入弃牌堆
-      delete ctx.state.localVars[DISCARD_KEY];
+      // 类别不同:弃置攻击范围内包含自己的一名角色区域里的一张牌
+      // 官方:"若这两张牌类型不同,你可以弃置攻击范围内包含你的一名角色区域里的一张牌"
+      delete ctx.state.localVars[TARGET_KEY];
       await applyAtom(ctx.state, {
         type: '请求回应',
-        requestType: DISCARD_RT,
+        requestType: TARGET_RT,
         target: ownerId,
         prompt: {
-          type: 'confirm',
-          title: '涯角:是否将牌堆顶牌置入弃牌堆?',
-          confirmLabel: '弃置',
-          cancelLabel: '不弃置',
+          type: 'choosePlayer',
+          title: '涯角:选择攻击范围内包含你的一名角色,弃其一张牌',
+          min: 1,
+          max: 1,
+          // "攻击范围内包含你" = 该角色能攻击到 owner(inAttackRange(target, owner))
+          filter: (_view, t) =>
+            ctx.state.players[t]?.alive === true && inAttackRange(ctx.state, t, ownerId),
         },
-        defaultChoice: false,
-        timeout: 15,
+        timeout: 20,
       });
-      if (ctx.state.localVars[DISCARD_KEY]) {
-        await applyAtom(ctx.state, {
-          type: '移动牌',
-          cardId: topCardId,
-          from: { zone: '牌堆' },
-          to: { zone: '弃牌堆' },
-        });
-      }
+      const discardTarget = ctx.state.localVars[TARGET_KEY] as number | null;
+      delete ctx.state.localVars[TARGET_KEY];
+      if (typeof discardTarget !== 'number') return;
+      const target = ctx.state.players[discardTarget];
+      if (!target?.alive) return;
+      // runPickTargetCardPanel(discard) 内部读取 选牌/结果 并 applyAtom 弃置(过河拆桥同款)
+      await runPickTargetCardPanel(ctx.state, ownerId, discardTarget, target, {
+        mode: 'discard',
+        requestType: DISCARD_RT,
+        title: `涯角:选择要从 ${target.name} 区域弃置的一张牌`,
+      });
     }
 
     // 清理
     delete ctx.state.localVars[CONFIRMED_KEY];
     delete ctx.state.localVars[TARGET_KEY];
-    delete ctx.state.localVars[DISCARD_KEY];
   });
 
   return () => {};

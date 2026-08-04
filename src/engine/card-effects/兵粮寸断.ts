@@ -15,7 +15,6 @@ import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-ef
 /** 跳过摸牌阶段的 tag 名 */
 const SKIP_TAG = '兵粮寸断/跳过摸牌';
 
-/** 兵粮寸断牌特有校验：距离 1 内的其他角色、判定区无同名 */
 function canUseSupplyShortage(
   state: import('../types').GameState,
   ownerId: number,
@@ -26,7 +25,7 @@ function canUseSupplyShortage(
   if (target === undefined) return '目标不合法';
   if (target === ownerId) return '不能对自己使用';
   if (!state.players[target]?.alive) return '目标已死亡';
-  // 奇才/界奇才:使用锦囊牌无距离限制(与顺手牵羊一致)
+  // 距离检查:isLegalTarget 统一处理(含奇才豁免),canUse 也需检查具体目标
   const ignoreDistance = !!state.players[ownerId]?.tags.includes('奇才/无距离限制');
   if (!ignoreDistance && effectiveDistance(state, ownerId, target) > 1) return '距离太远';
   if (state.players[target].pendingTricks.some((t) => t.name === '兵粮寸断'))
@@ -63,8 +62,13 @@ const supplyShortageEffect: CardEffect = {
     targetFilter: {
       min: 1,
       max: 1,
-      filter: (view: GameView, t: number) =>
-        viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1,
+      filter: (view: GameView, t: number) => {
+        if (t === view.currentPlayerIndex) return false;
+        const tp = view.players[t];
+        if (!tp || tp.alive === false) return false;
+        if (view.players[view.currentPlayerIndex]?.tags?.includes('奇才/无距离限制')) return true;
+        return viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1;
+      },
     },
   } as ActionPrompt,
   label: '兵粮寸断',

@@ -8,7 +8,7 @@
 //   - X = min(目标.maxHealth, 5),即体力上限封顶 5
 //   - 补牌数 = X - 目标.hand.length,≤0 则不摸(但技能仍算发动)
 //   - 目标可选任意存活角色,包括自己
-//   - 按一次伤害一次触发(与遗计/反馈/放逐一致)
+//   - 每点伤害触发一次(官方"当你受到1点伤害后"):受到 N 点伤害 → N 次独立询问
 import type {
   FrontendAPI,
   GameState,
@@ -65,59 +65,66 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 伤害结算结束后(时机8):与遗计一致,挂在濒死检查(时机7)之后。
+  // ── 伤害结算结束后(时机8):挂在濒死检查(时机7)之后。
   //     标版节命无"死亡时"条款,故荀彧因伤害死亡(无人救)时此处 alive=false → 不触发。
   registerAfterHook(state, skill.id, ownerId, '伤害结算结束后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
-    if ((atom.amount ?? 0) <= 0) return;
+    const amount = atom.amount ?? 0;
+    if (amount <= 0) return;
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
 
-    // 询问是否发动
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动节命?(令一名角色将手牌摸至体力上限)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
-      defaultChoice: false,
-      timeout: 10,
-    });
-    if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+    // 每点伤害触发一次节命(官方"当你受到1点伤害后"):受到 N 点伤害 → N 次独立询问发动
+    for (let i = 0; i < amount; i++) {
+      // 每次循环重新读取 state:荀彧可能在中途死亡(目标摸牌/技能连锁致死等)
+      if (!ctx.state.players[ownerId]?.alive) break;
 
-    // 选目标(任意存活角色,含自己)
-    delete ctx.state.localVars[TARGET_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: TARGET_RT,
-      target: ownerId,
-      prompt: {
-        type: 'choosePlayer',
-        title: '节命:选择一名角色(手牌摸至体力上限)',
-        min: 1,
-        max: 1,
-        filter: (_view: GameView, t: number) =>
-          ctx.state.players[t]?.alive === true,
-      },
-      timeout: 15,
-    });
-    const target = ctx.state.localVars[TARGET_KEY] as number | undefined;
-    delete ctx.state.localVars[TARGET_KEY];
-    if (typeof target !== 'number') return;
-    if (!ctx.state.players[target]?.alive) return;
+      // 询问是否发动
+      delete ctx.state.localVars[CONFIRMED_KEY];
+      await applyAtom(ctx.state, {
+        type: '请求回应',
+        requestType: CONFIRM_RT,
+        target: ownerId,
+        prompt: {
+          type: 'confirm',
+          title: '是否发动节命?(令一名角色将手牌摸至体力上限)',
+          confirmLabel: '发动',
+          cancelLabel: '不发动',
+        },
+        defaultChoice: false,
+        timeout: 10,
+      });
+      if (!ctx.state.localVars[CONFIRMED_KEY]) continue; // 本次不发动,继续下一次(每点独立可选)
 
-    // X = min(目标体力上限, 5)
-    const targetPlayer = ctx.state.players[target];
-    const x = Math.min(targetPlayer.maxHealth, 5);
-    const drawCount = x - targetPlayer.hand.length;
-    if (drawCount > 0) {
-      await applyAtom(ctx.state, { type: '摸牌', player: target, count: drawCount });
+      // 选目标(任意存活角色,含自己)
+      delete ctx.state.localVars[TARGET_KEY];
+      await applyAtom(ctx.state, {
+        type: '请求回应',
+        requestType: TARGET_RT,
+        target: ownerId,
+        prompt: {
+          type: 'choosePlayer',
+          title: '节命:选择一名角色(手牌摸至体力上限)',
+          min: 1,
+          max: 1,
+          filter: (_view: GameView, t: number) =>
+            ctx.state.players[t]?.alive === true,
+        },
+        timeout: 15,
+      });
+      const target = ctx.state.localVars[TARGET_KEY] as number | undefined;
+      delete ctx.state.localVars[TARGET_KEY];
+      if (typeof target !== 'number') continue;
+      if (!ctx.state.players[target]?.alive) continue;
+
+      // X = min(目标体力上限, 5)
+      const targetPlayer = ctx.state.players[target];
+      const x = Math.min(targetPlayer.maxHealth, 5);
+      const drawCount = x - targetPlayer.hand.length;
+      if (drawCount > 0) {
+        await applyAtom(ctx.state, { type: '摸牌', player: target, count: drawCount });
+      }
     }
   });
 

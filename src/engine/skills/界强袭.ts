@@ -15,8 +15,7 @@
 //     atom 同步 view.turnUsage 供前端 targetFilter 过滤已指定目标。
 //   - 自伤用 applyAtom(造成伤害, target=from, source=from),触发反馈/奸雄等伤害来源技能
 //     (与标版 失去体力 区别——标版不触发)。
-//   - 距离规则沿用标版 FAQ:弃装备区武器发动时,武器移除后出杀范围回到 1,
-//     故此时 target 须在距离 1 以内;弃手牌武器或自伤则用当前攻击范围。
+//   - 无距离限制:与标版强袭一致,官方未对此法提距离限制,目标可为任意其他角色。
 //
 // 命名:文件名/loader key/character skill name 均为 '界强袭'(避开标强袭冲突);
 //   内部 Skill.name = '强袭'(OL 官方技能名,玩家可见)。
@@ -25,7 +24,6 @@ import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { runDamageFlow } from '../damage-flow';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
-import { inAttackRange, effectiveDistance } from '../distance';
 
 const SKILL_ID = '界强袭';
 const DISPLAY_NAME = '强袭';
@@ -86,16 +84,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 关键去重:本回合已以此法指定过的目标不可再指定
       if (usedTargets(st, ownerId).includes(target)) return '本回合已对此角色发动过强袭';
 
-      // 攻击范围校验:弃装备区武器时,武器移除后范围回到 1(FAQ)。
-      const equippedWeaponId = self.equipment['武器'];
-      const discardingEquipped =
-        cost === 'discard' &&
-        typeof params.cardId === 'string' &&
-        equippedWeaponId === params.cardId;
-      const inRange = discardingEquipped
-        ? effectiveDistance(st, ownerId, target) <= 1
-        : inAttackRange(st, ownerId, target);
-      if (!inRange) return '目标不在攻击范围内';
+      // 无距离限制（与标版强袭一致，官方未提距离限制）
 
       if (cost === 'discard') {
         const cardId = params.cardId;
@@ -103,7 +92,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const card = st.cardMap[cardId];
         if (!isWeaponCard(card)) return '不是武器牌';
         const inHand = self.hand.includes(cardId);
-        const inEquip = equippedWeaponId === cardId;
+        const inEquip = self.equipment['武器'] === cardId;
         if (!inHand && !inEquip) return '武器不在手牌或装备区';
       }
       return null;

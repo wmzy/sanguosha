@@ -1,10 +1,10 @@
 // 涯角(界赵云·蜀·主动技):每当你于回合外使用或打出手牌时,你可以展示牌堆顶的一张牌,
 //   若这两张牌的类别相同,你可以将牌堆顶的一张牌交给一名角色;
-//   若不同,你可以将牌堆顶的一张牌置入弃牌堆。
+//   若不同,你可以弃置攻击范围内包含你的一名角色区域里的一张牌。
 //
 // 验证:
 //   1. E2E 类别相同 → 交给(自己):P0 杀 P1 → P1 出闪 → 涯角 confirm → 展示 → 同类(基本牌) → 选自己 → 获得牌
-//   2. E2E 类别不同 → 弃置:P0 杀 P1 → P1 出闪 → 涯角 confirm → 展示 → 不同类 → 弃置
+//   2. E2E 类别不同 → 弃置目标牌:P0 杀 P1 → P1 出闪 → 涯角 confirm → 展示 → 不同类 → 选 P0(攻击范围含 P1)→ 弃其一张牌
 //   3. 不发动:P0 杀 P1 → P1 出闪 → 涯角 confirm=false → 无效果
 //   4. 同类但不给:同类 → 选目标时 pass → 牌留在牌堆顶
 //   5. 回合内不触发:P1 自己回合出杀 → 涯角不触发
@@ -121,15 +121,16 @@ describe('涯角', () => {
     expect(harness.state.zones.deck.length).toBe(0);
   });
 
-  // ─── E2E:类别不同 → 弃置 ─────────────────
-  it('类别不同(基本牌 vs 锦囊牌)→ confirm → 展示 → 弃置', async () => {
+  // ─── E2E:类别不同 → 弃置目标角色区域一张牌 ─────────────────
+  it('类别不同(基本牌 vs 锦囊牌)→ confirm → 展示 → 选攻击范围内含己的角色弃其一张牌', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
+    const extra = makeCard('e1', '杀', '♣', '8'); // P0 额外手牌(被涯角弃置)
     const dodge = makeCard('s1', '闪', '♥', '5'); // 基本牌
     const deckTop = makeCard('d1', '无中生有', '♥', '7', '锦囊牌'); // 牌堆顶 → 不同类
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀'] }),
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id, extra.id], skills: ['杀'] }),
         makePlayer({
           index: 1,
           name: 'P1',
@@ -140,7 +141,7 @@ describe('涯角', () => {
           maxHealth: 4,
         }),
       ],
-      cardMap: { [slash.id]: slash, [dodge.id]: dodge, [deckTop.id]: deckTop },
+      cardMap: { [slash.id]: slash, [extra.id]: extra, [dodge.id]: dodge, [deckTop.id]: deckTop },
       zones: { deck: [deckTop.id], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -158,19 +159,26 @@ describe('涯角', () => {
     P1.expectPending('请求回应');
     await P1.respond('涯角', { choice: true });
 
-    // 不同类 → discard pending
+    // 不同类 → choosePlayer 选攻击范围内包含自己的角色(P0 距离 1 可攻击 P1)
     P1.expectPending('请求回应');
-    const discardSlot = [...harness.state.pendingSlots.values()][0];
-    expect((discardSlot.atom as { requestType?: string }).requestType).toBe('涯角/discard');
+    const chooseSlot = [...harness.state.pendingSlots.values()][0];
+    expect((chooseSlot.atom as { requestType?: string }).requestType).toBe('涯角/target');
+    await P1.respond('涯角', { target: 0 });
 
-    // P1 弃置
-    await P1.respond('涯角', { choice: true });
+    // 选 P0 区域一张牌(手牌盲选 extra = hand[0])
+    P1.expectPending('请求回应');
+    const pickSlot = [...harness.state.pendingSlots.values()][0];
+    expect((pickSlot.atom as { requestType?: string }).requestType).toBe('涯角/discard');
+    await P1.respond('涯角', { zone: 'hand', handIndex: 0 });
 
     // 杀被闪抵消,P1 不掉血
     expect(harness.state.players[1].health).toBe(4);
-    // 牌堆顶牌已置入弃牌堆
-    expect(harness.state.zones.discardPile).toContain(deckTop.id);
-    expect(harness.state.zones.deck.length).toBe(0);
+    // P0 的额外手牌被涯角弃置
+    expect(harness.state.zones.discardPile).toContain(extra.id);
+    expect(harness.state.players[0].hand).not.toContain(extra.id);
+    // 牌堆顶牌(无中生有)仍在牌堆(不同类分支不动牌堆顶)
+    expect(harness.state.zones.deck).toContain(deckTop.id);
+    expect(harness.state.zones.deck.length).toBe(1);
     // P1 手牌为空(闪已打出)
     expect(harness.state.players[1].hand.length).toBe(0);
   });

@@ -99,15 +99,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: x });
     }
 
-    // 修改"矫诏":累计次数 +1
+    // 修改"矫诏":累计次数 +1(永久跨回合计数器,存于 state.vars,不经 turnUsage)
     const nextCount = x + 1;
     ctx.state.players[ownerId].vars[MOD_COUNT_KEY] = nextCount;
-    await applyAtom(ctx.state, {
-      type: '回合用量',
-      player: ownerId,
-      key: MOD_COUNT_KEY,
-      value: nextCount,
-    });
   });
 
   return () => {};

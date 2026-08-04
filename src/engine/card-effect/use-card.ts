@@ -180,30 +180,15 @@ export async function runUseFlow(
     }
 
     if (effect.delayed) {
-      // 延迟类锦囊：展示后置入目标判定区（处理区→判定区→弃牌堆）
-      // 虚拟使用无实体牌，跳过牌移动
+      // 延迟类锦囊：先展示置入处理区（手牌→处理区）。
+      //   添加延时锦囊（置入判定区）推迟到「成为目标」之后，使帷幕/空城等 before-hook
+      //   有机会先取消非法目标，再决定是否置入其判定区。虚拟使用无实体牌，跳过牌移动。
       if (!opts?.virtual) {
         await applyAtom(state, {
           type: '移动牌',
           cardId,
           from: { zone: '手牌', player: source },
           to: { zone: '处理区' },
-        });
-      }
-      for (const target of targets) {
-        const trickCard = state.cardMap[cardId];
-        await applyAtom(state, {
-          type: '添加延时锦囊',
-          player: target,
-          trick: { name: cardName, source, card: trickCard },
-        });
-      }
-      if (!opts?.virtual) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
         });
       }
     } else if (!opts?.virtual) {
@@ -240,6 +225,31 @@ export async function runUseFlow(
       });
       if (!becameTarget) {
         (frame.params.skippedTargets as number[]).push(target);
+      }
+    }
+
+    // 延迟类锦囊：「成为目标」判定通过后，置入未被取消目标的判定区（处理区→判定区→弃牌堆）。
+    //   添加延时锦囊 必须在「成为目标」之后，使帷幕/空城 before-hook 已有机会取消非法目标；
+    //   被取消的目标（skippedTargets）跳过——其判定区不会被放入延时锦囊。
+    if (effect.delayed) {
+      const resolved = (frame.params.resolvedTargets as number[]) ?? targets;
+      const trickCard = state.cardMap[cardId];
+      for (const target of resolved) {
+        if ((frame.params.skippedTargets as number[]).includes(target)) continue;
+        await applyAtom(state, {
+          type: '添加延时锦囊',
+          player: target,
+          trick: { name: cardName, source, card: trickCard },
+        });
+      }
+      // 虚拟使用无实体牌，跳过牌移动
+      if (!opts?.virtual) {
+        await applyAtom(state, {
+          type: '移动牌',
+          cardId,
+          from: { zone: '处理区' },
+          to: { zone: '弃牌堆' },
+        });
       }
     }
 
