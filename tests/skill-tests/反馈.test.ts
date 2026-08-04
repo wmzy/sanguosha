@@ -80,6 +80,47 @@ describe('反馈', () => {
     await P1.expectRejected({ skillId: '反馈', actionType: 'respond', params: { choice: true } });
   });
 
+  // ─── respond validate:pending requestType 不匹配 ─────────────────
+  // 文件头验证点 2:pending 存在但 requestType 不属于反馈(如其他技能的 confirm)
+  //   → validate 落到 fallback 分支,返回「当前不是反馈回应」拒绝。
+  //   复用与 execute 单测相同的 fake-slot 注入模式,仅改 requestType 并断言拒绝。
+  it('respond:pending 非 反馈/* → 拒绝(fallback 分支)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', skills: ['反馈'] }),
+        makePlayer({ index: 1, name: 'P2', skills: ['杀'] }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 手工注入一个 requestType 不属于反馈的 请求回应 pending(模拟其他技能的 confirm)
+    state.pendingSlots.set(0, {
+      atom: {
+        type: '请求回应',
+        requestType: '八卦阵/confirm',
+        target: 0,
+        prompt: { type: 'confirm', title: '是否发动八卦阵?' },
+      },
+      definition: undefined as never,
+      startTime: 0,
+      deadline: 100000,
+      createdSeq: 0,
+      isBlocking: true,
+      resolve: () => {},
+      isTimeout: false,
+      isPaused: false,
+      pause() {},
+      _fireTimeoutNow: undefined,
+    });
+
+    await P1.expectRejected({ skillId: '反馈', actionType: 'respond', params: { choice: true } });
+  });
+
   // ─── respond execute ─────────────────────────
   // 直接构造「请求回应/反馈/confirm」pending,验证 respond execute 写 localVars。
 
