@@ -406,13 +406,4 @@ describe('confirm / distribute API', () => {
 
     expect(harness.state.players.find((p) => p.name === 'P2')!.health).toBe(3);
   });
-
-  it('distribute 构造正确的 dispatch params', () => {
-    const allocation = [
-      { target: 2, cardIds: ['c1'] },
-      { target: 0, cardIds: ['c2'] },
-    ];
-    expect(Array.isArray(allocation)).toBe(true);
-    expect(allocation[0].target).toBe(2);
-  });
 });
