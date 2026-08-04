@@ -57,6 +57,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!self?.alive) return;
     if (self.identity !== '主公') return;
 
+    // 造成伤害后:仅当实际造成伤害时触发(amount>0)。
+    // 时机5 atom 在扣减体力块之外,amount 被减伤技能修正为 0(非 cancel)时仍会发出,
+    // 需显式过滤,否则会在 0 伤害事件误触发(同狂骨/烈刃)。
+    if ((atom.amount ?? 0) <= 0) return;
+
     const sourceIdx = atom.source;
     if (typeof sourceIdx !== 'number') return;
     if (sourceIdx === ownerId) return; // 自己造成的伤害不触发

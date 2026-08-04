@@ -65,8 +65,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 造成伤害 after:荀彧受伤后,选目标 + 摸牌至上限 ──
-  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
+  // ── 伤害结算结束后(时机8):与遗计一致,挂在濒死检查(时机7)之后。
+  //     标版节命无"死亡时"条款,故荀彧因伤害死亡(无人救)时此处 alive=false → 不触发。
+  registerAfterHook(state, skill.id, ownerId, '伤害结算结束后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;

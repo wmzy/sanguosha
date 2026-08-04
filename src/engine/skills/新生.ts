@@ -4,7 +4,7 @@
 //   类型:被动技(被动触发)
 //   触发时机:受到 1 点伤害后(「造成伤害」atom 的 after-hook,target===ownerId)
 //   效果:从未登场武将中随机抽 1 张,加入化身牌池
-//   限制:无次数限制(每点伤害触发一次)
+//   限制:无次数限制(每次受到伤害触发一次)
 //
 // 原子操作分解:
 //   造成伤害 after(target=ownerId,amount>0):
@@ -98,38 +98,35 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const st = ctx.state;
     if (!st.players[ownerId]?.alive) return;
 
-    // 每 1 点伤害触发一次新生
-    for (let i = 0; i < amount; i++) {
-      // 先检查是否还有可抽的武将(避免无意义询问)
-      const candidate = drawNew化身CardSnapshot(st, ownerId);
-      if (candidate === null) break;
+    // 受到伤害后触发一次(每伤害事件一次,非每点伤害)
+    const candidate = drawNew化身CardSnapshot(st, ownerId);
+    if (candidate === null) return;
 
-      delete st.localVars[CHOICE_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: CONFIRM_REQUEST,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '新生:是否获得一张新的化身牌?',
-          confirmLabel: '获得',
-          cancelLabel: '不获得',
-        },
-        defaultChoice: false,
-        timeout: 30,
-      });
-      const choice = st.localVars[CHOICE_KEY];
-      delete st.localVars[CHOICE_KEY];
-      if (choice !== true) continue;
+    delete st.localVars[CHOICE_KEY];
+    await applyAtom(st, {
+      type: '请求回应',
+      requestType: CONFIRM_REQUEST,
+      target: ownerId,
+      prompt: {
+        type: 'confirm',
+        title: '新生:是否获得一张新的化身牌?',
+        confirmLabel: '获得',
+        cancelLabel: '不获得',
+      },
+      defaultChoice: false,
+      timeout: 30,
+    });
+    const choice = st.localVars[CHOICE_KEY];
+    delete st.localVars[CHOICE_KEY];
+    if (choice !== true) return;
 
-      // 确认 → 从未登场武将抽 1 张加入牌池
-      const drawn = drawNew化身Card(st, ownerId);
-      if (drawn === null) break;
-      const player = st.players[ownerId];
-      const pool = (player.vars[POOL_KEY] as string[] | undefined) ?? [];
-      pool.push(drawn);
-      player.vars[POOL_KEY] = pool;
-    }
+    // 确认 → 从未登场武将抽 1 张加入牌池
+    const drawn = drawNew化身Card(st, ownerId);
+    if (drawn === null) return;
+    const player = st.players[ownerId];
+    const pool = (player.vars[POOL_KEY] as string[] | undefined) ?? [];
+    pool.push(drawn);
+    player.vars[POOL_KEY] = pool;
   });
 
   return () => {};

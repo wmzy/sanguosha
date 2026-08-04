@@ -18,7 +18,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import type { Card, GameState, Json, PlayerState } from '../../src/engine/types';
+import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
   id: string,
@@ -240,7 +240,7 @@ describe('界秘计', () => {
 
   // ─── ⑤ 贞烈挂起 → 强制发动一次 ───────────────────────────
 
-  it('⑤:贞烈选项②挂起(turn.vars 标记)→ 结束阶段强制发动一次,然后询问主动发动', async () => {
+  it('⑤:贞烈选项②挂起(player.vars 标记)→ 结束阶段强制发动一次,然后询问主动发动', async () => {
     const draw1 = makeCard('dr1', '杀', '♠', '3');
     const draw2 = makeCard('dr2', '闪', '♥', '4');
     const draw3 = makeCard('dr3', '桃', '♦', '5');
@@ -261,12 +261,10 @@ describe('界秘计', () => {
       zones: { deck: ['dr4', 'dr3', 'dr2', 'dr1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '回合结束',
-      turn: {
-        round: 1,
-        phase: '回合结束',
-        vars: { '秘计/pendingFrom贞烈/0': true as Json },
-      },
+      turn: { round: 1, phase: '回合结束', vars: {} },
     });
+    // 挂起标志存于 player.vars(跨回合持久,由界秘计在结束阶段消费)
+    state.players[0].vars['秘计/pendingFrom贞烈/0'] = true;
     await harness.setup(state);
     const P0 = harness.player('P0');
 
@@ -295,7 +293,7 @@ describe('界秘计', () => {
     await harness.waitForStable();
 
     // 断言:挂起标记已清;P0 共摸 4 张(强制2 + 主动2)
-    expect(harness.state.turn.vars['秘计/pendingFrom贞烈/0']).toBeUndefined();
+    expect(harness.state.players[0].vars['秘计/pendingFrom贞烈/0']).toBeUndefined();
     expect(harness.state.players[0].hand).toEqual(['dr1', 'dr2', 'dr3', 'dr4']);
   });
 });

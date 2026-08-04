@@ -250,7 +250,7 @@ describe('界激将', () => {
     restoreAutoCompare();
   });
 
-  it('主动技:蜀势力角色不出杀 → 主公摸 1 张', async () => {
+  it('主动技:蜀势力角色不出杀 → 无效果(同标激将)', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
     const state: GameState = createGameState({
       players: [
@@ -272,8 +272,8 @@ describe('界激将', () => {
 
     await P1.pass(); // 不出杀
 
-    // 主公摸 1 张
-    expect(harness.state.players[0].hand.length).toBe(handBefore + 1);
+    // 主公不摸牌(不出杀无效果,同标激将;摸牌仅由被动触发 hook 负责)
+    expect(harness.state.players[0].hand.length).toBe(handBefore);
     // P1 的杀未消耗
     expect(harness.state.players[1].hand).toContain('k1');
   });

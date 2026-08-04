@@ -194,7 +194,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (handCount === 0) return;
       const discardCount = Math.min(x, handCount);
 
-      // 询问玩家选 discardCount 张手牌弃置
+      // 询问玩家选 discardCount 张手牌弃置(强制:不可跳过)
       delete ctx.state.localVars[DISCARD_KEY];
       await applyAtom(ctx.state, {
         type: '请求回应',
@@ -205,12 +205,17 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           title: `自守:本回合对其他角色造成过伤害,弃 ${discardCount} 张牌`,
           cardFilter: { filter: () => true, min: discardCount, max: discardCount },
         },
-        defaultChoice: undefined,
+        // 强制型弃牌:前端隐藏"不回应"按钮;headless 不生成 skip
+        mandatory: true,
         timeout: 30,
       });
 
-      const cardIds = ctx.state.localVars[DISCARD_KEY] as string[] | undefined;
+      let cardIds = ctx.state.localVars[DISCARD_KEY] as string[] | undefined;
       delete ctx.state.localVars[DISCARD_KEY];
+      // 强制弃牌:超时未回应 → 自动从手牌首张起补弃(不放弃弃牌义务)
+      if ((!cardIds || cardIds.length === 0) && discardCount > 0) {
+        cardIds = ctx.state.players[ownerId]?.hand.slice(0, discardCount) ?? [];
+      }
       if (cardIds && cardIds.length > 0) {
         await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds });
       }

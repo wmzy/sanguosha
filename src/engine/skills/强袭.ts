@@ -118,6 +118,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (cost === 'hp') {
         // 标版官方:"失去1点体力"——非伤害事件,不触发防具/反馈
         await applyAtom(st, { type: '失去体力', target: from, amount: 1 });
+        // 失去体力可能进入濒死(无人救援则死亡):典韦死亡则不再造成伤害
+        // (官方 FAQ),但仍需弹出本次技能结算帧(与奋激/武烈 失血致死早退一致)。
+        if (!st.players[from]?.alive) {
+          await popFrame(st);
+          return;
+        }
       } else {
         const cardId = params.cardId as string;
         // 装备区武器先卸下(清距离 vars + 回手),再弃置;手牌武器直接弃置。

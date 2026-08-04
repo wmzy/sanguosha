@@ -7,7 +7,10 @@
 //   1. 造成伤害(target=春华):X = maxHealth - health 可能因受伤增加
 //   2. 失去体力(target=春华):同上(闪电等无来源体力流失;或被绝情转化的伤害)
 //   3. 弃置(player=春华):手牌数减少
-//   4. 移动牌(from=春华手牌):打出/被偷/被拿等让手牌数减少
+//   4. 移动牌(from=春华手牌):打出/使用让手牌数减少
+//   5. 获得(from=春华)/装备(player=春华):被偷/被拿(顺手牵羊等)、
+//      装备手牌中的装备牌,均让手牌数减少
+//      (获得/装备 atom 自带 apply、不发 移动牌,故独立 hook)
 //
 // 每次任意 hook 触发,统一调 checkTrigger(state, ownerId):
 //   X = max(0, maxHealth - health); hand = hand.length
@@ -121,6 +124,23 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     if ((atom.cardIds ?? []).length === 0) return;
+    await checkTrigger(ctx.state, ownerId);
+  });
+
+  // ── 获得 after:春华的牌被他人获得(顺手牵羊等"被偷/被拿") → 手牌数减少 ──
+  // 注:获得 atom 自带 apply、不发 移动牌(仅 afterApply 发 移动到目标区域后 标记),
+  // 故 移动牌 hook 无法覆盖,需独立 hook。
+  registerAfterHook(state, skill.id, ownerId, '获得', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.from !== ownerId) return;
+    await checkTrigger(ctx.state, ownerId);
+  });
+
+  // ── 装备 after:春华装备手牌中的装备牌 → 手牌数减少 ──
+  // 注:装备 atom 自带 apply(手牌→装备区),不发 移动牌,故需独立 hook。
+  registerAfterHook(state, skill.id, ownerId, '装备', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.player !== ownerId) return;
     await checkTrigger(ctx.state, ownerId);
   });
 

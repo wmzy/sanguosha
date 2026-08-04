@@ -6,8 +6,7 @@
 //     若 effectiveDistance(owner, target) <= 1:
 //       询问 owner 二选一 —— 回复 1 点体力 / 摸 1 张牌。
 //       · choice=true(确认)→ 回复体力 1
-//       · choice=false(取消)→ 摸牌 1
-//       · 超时/无回应 → 不触发(与刚烈等二选一技能同构)
+//       · choice=false(取消)/ 超时缺省 → 摸牌 1(锁定技必触发,同狂骨已发动分支)
 //
 // 距离 1 以内:effectiveDistance 最小为 1(座位相邻或自己),<= 1 即满足。
 // 装备 -1 马(进攻修正)通过 player.vars['距离/进攻修正'] 进一步缩短距离——自动支持。
@@ -94,10 +93,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const choice = ctx.state.localVars[CHOICE_KEY] as string | undefined;
     if (choice === 'heal') {
       await applyAtom(ctx.state, { type: '回复体力', target: ownerId, amount: 1 });
-    } else if (choice === 'draw') {
+    } else {
+      // 'draw' / 超时缺省 → 摸一张牌(锁定技必触发,不可不发动;同狂骨已发动分支)
       await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
     }
-    // 超时/无回应 → 不触发
   });
 
   return () => {

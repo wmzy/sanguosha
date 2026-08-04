@@ -46,11 +46,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!ctx.state.players[ownerId]?.skills.includes('无双')) return;
 
     const target = atom.target;
+    // 无双仅对【杀】生效;万箭齐发等同样使用询问闪的牌不应触发双闪
+    const killCardId = getKillCardId(ctx.state);
+    if (ctx.state.cardMap[killCardId]?.name !== '杀') return;
     // 闪的 resolve 已设杀帧 cancelled=true;未出闪则不拦截
-    if (!isCancelled(ctx.state, getKillCardId(ctx.state), target)) return;
+    if (!isCancelled(ctx.state, killCardId, target)) return;
 
     // 计数器
-    const killCardId = getKillCardId(ctx.state);
     const countKey = dodgeCountKey(killCardId, target);
     const count = (ctx.state.localVars[countKey] as number) ?? 0;
     if (count >= 1) {

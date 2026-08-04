@@ -140,18 +140,17 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     });
     if (!ctx.state.localVars['界集智/confirmed']) return;
 
-    // ── 第二步:摸牌前 peek 牌堆顶(若牌堆非空),用于判断"是否基本牌" ──
-    // 摸牌 count=1 在 deck.length>=1 时必抽出顶牌,无重洗,故 peek 与实际摸到一致。
-    // 牌堆为空(仅弃牌堆有牌)时会触发重洗,无法预先 peek → 跳过"弃置换上限"分支。
-    const deck = ctx.state.zones.deck;
-    const peekedTopId = deck.length > 0 ? deck[deck.length - 1] : undefined;
-    const peekedTopCard = peekedTopId ? ctx.state.cardMap[peekedTopId] : undefined;
-
-    // 摸牌 1 张(对应官方"你可以摸一张牌")
+    // ── 第二步:摸牌 1 张(对应官方"你可以摸一张牌") ──
+    // 摸牌 atom 把抽到的牌 push 到手牌末尾,故摸牌后 hand[handLenBefore] 即为本次摸到的牌。
+    // 用摸牌前手牌长度定位所摸牌——无需预先 peek 牌堆顶,即使牌堆为空触发重洗也能正确定位
+    // (旧实现 peek 顶牌再摸,牌堆为空时 peek 为空而摸牌仍因重洗成功,导致跳过弃置换上限分支)。
+    const handLenBefore = ctx.state.players[ownerId].hand.length;
     await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
+    const drawnId = ctx.state.players[ownerId].hand[handLenBefore];
+    const drawnCard = drawnId ? ctx.state.cardMap[drawnId] : undefined;
 
     // ── 第三步:若摸到的是基本牌,询问是否弃之换本回合手牌上限+1 ──
-    if (!peekedTopCard || peekedTopCard.type !== '基本牌') return;
+    if (!drawnCard || drawnCard.type !== '基本牌') return;
 
     delete ctx.state.localVars['界集智/discard'];
     await applyAtom(ctx.state, {
@@ -172,11 +171,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // 弃置此牌:从 owner 手牌移到弃牌堆
     const self = ctx.state.players[ownerId];
     if (!self) return;
-    const idx = self.hand.indexOf(peekedTopId!);
+    const idx = self.hand.indexOf(drawnId!);
     if (idx < 0) return; // 卡不在手牌(已被其他效果移动),跳过
     await applyAtom(ctx.state, {
       type: '移动牌',
-      cardId: peekedTopId!,
+      cardId: drawnId!,
       from: { zone: '手牌', player: ownerId },
       to: { zone: '弃牌堆' },
     });

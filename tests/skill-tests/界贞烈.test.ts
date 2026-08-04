@@ -163,7 +163,7 @@ describe('界贞烈', () => {
     // 断言:P0 失1体;杀无效;秘计挂起标记已写
     expect(harness.state.players[0].health).toBe(2);
     expect(harness.state.zones.discardPile).toContain('k2');
-    expect(harness.state.turn.vars['秘计/pendingFrom贞烈/0']).toBe(true);
+    expect(harness.state.players[0].vars['秘计/pendingFrom贞烈/0']).toBe(true);
   });
 
   // ─── ③ 不发动贞烈 → 正常询问闪 ────────────────────────────

@@ -127,10 +127,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     for (let i = 0; i < amount; i++) {
       if (!ctx.state.players[ownerId]?.alive) break;
 
-      // 计算本次亮出张数 N = 4 + bonus(本次消费 bonus,起点删除)
+      // 计算本次亮出张数 N = 4 + bonus。bonus 仅在玩家确认发动时消费:
+      // 若选择不发动(或牌堆为空无法发动),bonus 保留至下次发动。
       const bonus = currentBonus(ctx.state, ownerId);
       const revealCount = BASE_REVEAL + bonus;
-      delete ctx.state.players[ownerId].vars[BONUS_KEY];
 
       // 牌堆不足 N 张:仅亮出可用张数;完全空则跳过本次
       const deck = ctx.state.zones.deck;
@@ -160,6 +160,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         delete ctx.state.localVars[CONFIRMED_KEY];
         continue;
       }
+      // 玩家确认发动:消费 bonus(本次已按 revealCount=4+bonus 亮出对应张数)
+      delete ctx.state.players[ownerId].vars[BONUS_KEY];
 
       // 选牌(可空=放弃获得,但已亮出 → 视为发动后未选牌;剩余牌留在牌堆原位)
       delete ctx.state.localVars[SELECTION_KEY];

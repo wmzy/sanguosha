@@ -294,6 +294,12 @@ async function offerSwitch(state: GameState, ownerId: number): Promise<void> {
   delete state.localVars[SWITCH_CHOICE_KEY];
   if (choice !== true) return;
 
+  // 另一张化身牌须有可选技能;否则放弃切换并保留当前技能
+  // (lightAndGainSkill 在无可选技能时会提前返回,若此时已卸载旧技能,玩家将彻底失去化身技能)
+  const curLit = (player.vars[LIT_KEY] as number | undefined) ?? 0;
+  const newLit = curLit === 0 ? 1 : 0;
+  if (getUsableSkills(pool[newLit]).length === 0) return;
+
   // 卸载旧化身技能
   const oldSkill = player.vars[CURRENT_KEY] as string | undefined;
   if (oldSkill) {
@@ -302,8 +308,6 @@ async function offerSwitch(state: GameState, ownerId: number): Promise<void> {
   }
 
   // 亮出另一张(切换到不同索引)
-  const curLit = (player.vars[LIT_KEY] as number | undefined) ?? 0;
-  const newLit = curLit === 0 ? 1 : 0;
   await lightAndGainSkill(state, ownerId, newLit, curLit);
 }
 

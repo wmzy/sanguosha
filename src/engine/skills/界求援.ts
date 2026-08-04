@@ -211,8 +211,8 @@ async function runQiuYuan(
     });
     let giveCardId = state.localVars[CARD_KEY] as string | undefined;
     delete state.localVars[CARD_KEY];
-    if (!giveCardId || !state.players[helperIdx]?.hand.includes(giveCardId)) {
-      giveCardId = matching[0]; // 超时兜底:给第一张符合牌
+    if (!giveCardId || !matching.includes(giveCardId)) {
+      giveCardId = matching[0]; // 超时/非法兜底:给第一张符合牌(matching 已基于手牌计算)
     }
     await applyAtom(state, {
       type: '给予',

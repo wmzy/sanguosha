@@ -172,8 +172,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
               timeout: 20,
             });
 
-            // 读选择:choice/confirmed=true → 弃武器;否则 → 令摸牌
-            const choiceDiscard = st.localVars[choiceKey(p)] === 'discard';
+            // 读选择:choice='discard' → 弃武器;choice='draw' → 令摸牌。
+            // 超时(未设 localVars)按 defaultDiscard 处理(有武器→弃武器,无武器→令摸牌):
+            // 请求回应.onTimeout 对非 __弃牌 requestType 不写 localVars,故须在此显式回退,
+            // 与 defaultChoice 语义及 制霸/洛神 的 undefined==default 模式一致。
+            const stored = st.localVars[choiceKey(p)] as string | undefined;
+            const choiceDiscard = stored === undefined ? defaultDiscard : stored === 'discard';
 
             if (choiceDiscard) {
               // 弃武器:再次校验仍有武器牌

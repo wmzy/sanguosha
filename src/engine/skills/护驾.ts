@@ -148,7 +148,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  // 曹操的护驾 action:被询问闪时激活
+  // 护驾 respond:单注册,按 pending 内容分支(镜像 激将 的单 respond 模式)。
+  //   - 曹操被询问闪(atom.type==='询问闪',target=曹操):confirm 发动护驾
+  //   - 魏势力角色收到 护驾/出闪 询问(requestType==='护驾/出闪'):出闪
+  // 注:前端 skillActionRegistry 以 `${skillId}:${ownerId}:${actionType}` 为键、
+  //   用 Map.set 覆盖;同 key 的第二次 defineAction 会覆盖第一次。故两条 respond
+  //   必须合并为一条,否则曹操的护驾按钮会被魏角色定义覆盖而无法发动护驾。
+  //   魏角色的出闪卡牌筛选由 pending 的 candidates(投影层注入)驱动,不依赖本 action。
   api.defineAction('respond', {
     label: '护驾',
     style: 'primary',
@@ -161,31 +167,14 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     activeWhen: (ctx) => {
       const slot = ctx.view.pending;
       if (!slot) return false;
-      if ((slot.atom as { type: string }).type !== '询问闪') return false;
       if (slot.target !== ctx.perspectiveIdx) return false;
-      // 势力检查由后端 validate 处理(GameView 不暴露 faction)
-      // 此处仅检查当前被询问闪,前端会渲染护驾按钮;后端拒绝无魏势力角色的场景
-      return true;
-    },
-  });
-
-  // 魏势力角色的护驾 respond(收到护驾询问时渲染出闪 UI)
-  api.defineAction('respond', {
-    label: '护驾·出闪',
-    style: 'default',
-    prompt: {
-      type: 'useCard',
-      title: '护驾:打出一张闪?',
-      cardFilter: { filter: (c) => c.name === '闪', min: 1, max: 1 },
-    },
-    activeWhen: (ctx) => {
-      const slot = ctx.view.pending;
-      if (!slot) return false;
       const atom = slot.atom as { type: string; requestType?: string };
-      if (atom.type !== '请求回应') return false;
-      if (atom.requestType !== '护驾/出闪') return false;
-      if (slot.target !== ctx.perspectiveIdx) return false;
-      return true;
+      // 曹操被询问闪 → 发动护驾(confirm)
+      if (atom.type === '询问闪') return true;
+      // 魏势力角色收到护驾/出闪询问 → 出闪(卡牌选择由 pending 驱动)
+      if (atom.type === '请求回应' && atom.requestType === '护驾/出闪') return true;
+      // 势力检查由后端 validate 处理(GameView 不暴露 faction)
+      return false;
     },
   });
 

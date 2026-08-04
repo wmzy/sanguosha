@@ -399,7 +399,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
                   type: 'distribute',
                   mode: 'select',
                   title: `界巧变:选择 ${ctx.state.players[srcPlayer]?.name ?? `P${srcPlayer}`} 场上的一张牌移动`,
-                  source: 'handAndEquip',
+                  cardIds: srcCards,
                   minTotal: 1,
                   maxTotal: 1,
                 },

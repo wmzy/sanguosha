@@ -57,6 +57,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     const damageCardId = atom.cardId;
     const hasCard = typeof damageCardId === 'string' && !!ctx.state.cardMap[damageCardId];
+    // 转化影子卡(武圣红牌当杀等):影子卡入弃牌堆时引擎用原卡(shadowOf)替换并删除影子,
+    // 须记录原卡 id 才能在弃牌堆中找到并拿取(同标奸雄/界双雄)
+    const effectiveId: string = hasCard
+      ? (ctx.state.cardMap[damageCardId as string].shadowOf ?? damageCardId)
+      : (damageCardId as string);
 
     delete ctx.state.localVars[CHOICE_KEY];
     await applyAtom(ctx.state, {
@@ -80,7 +85,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (hasCard) {
       if (choice) {
         // ② 获得伤害牌:延迟到该牌入弃牌堆时拿取(见下方 移动牌 after hook)
-        ctx.state.localVars[WANTCARD_KEY] = damageCardId;
+        ctx.state.localVars[WANTCARD_KEY] = effectiveId;
       } else {
         // ① 摸一张牌
         await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
@@ -97,11 +102,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // 移动牌 after:延迟拿取伤害牌——当 wantCard 指定的牌被移入弃牌堆时,转为曹操手牌
   registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
     const wantCard = ctx.state.localVars[WANTCARD_KEY];
-    if (!wantCard) return;
+    if (typeof wantCard !== 'string') return;
     const atom = ctx.atom;
-    if (atom.cardId !== wantCard) return;
     if (atom.to?.zone !== '弃牌堆') return;
-    // 该伤害牌刚被父结算移入弃牌堆——转给曹操
+    // 该伤害牌(或其原卡)刚被父结算移入弃牌堆——转给曹操。
+    // 用 discardPile.includes 判定而非 atom.cardId===wantCard:转化影子卡入弃牌堆时
+    // 引擎用原卡替换,atom.cardId(影子 id)≠ wantCard(原卡 id),按 cardId 匹配会漏掉。
+    // 若原卡已被其他技能拿走(不在弃牌堆)→ 跳过,不强行获取避免状态损坏。
+    if (!ctx.state.zones.discardPile.includes(wantCard)) return;
+    if (!ctx.state.cardMap[wantCard]) return;
     delete ctx.state.localVars[WANTCARD_KEY];
     await applyAtom(ctx.state, {
       type: '移动牌',

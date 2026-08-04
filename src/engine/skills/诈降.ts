@@ -84,7 +84,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const cardId = ctx.params?.cardId as string | undefined;
       if (!cardId) return;
       const card = ctx.state.cardMap[cardId];
-      if (card?.color !== '红') return;
+      // 仅红色【杀】不可抵消——万箭齐发(♥A 红)等同样使用询问闪的牌不应被波及
+      if (card?.name !== '杀') return;
+      if (card.color !== '红') return;
       return { kind: 'cancel' };
     },
   );

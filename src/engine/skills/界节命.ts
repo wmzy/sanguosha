@@ -45,6 +45,8 @@ const DISCARD_RT = '界节命/discard';
 const CONFIRMED_KEY = '节命/confirmed';
 const TARGET_KEY = '节命/target';
 const DISCARD_KEY = '节命/discardCards';
+// 标记某次伤害的节命已在「受到伤害后」触发,供「死亡时」去重(避免伤害致死双重触发)。
+const DAMAGE_HANDLED_KEY = '节命/伤害已触发';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -195,28 +197,45 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     unloaders.push(off);
   }
 
-  // ── 造成伤害 after:荀彧受伤后触发(非致死伤害)──
-  // 致死伤害(health<=0)跳过——由 死亡时 after-hook 接管,避免双重触发
-  // (造成伤害 after-hooks 在 系统规则 濒死检查 before 执行:此时 alive 仍 true,
-  //  若不按 health 过滤会先于此处触发一次,濒死求桃失败死亡时再触发一次)
+  // ── 造成伤害 after:荀彧受伤后触发(含致死伤害)──
+  // 受到伤害后(时机6)在濒死检查(时机7)之前执行:此时 health 可能 ≤0 但 alive 仍 true,
+  // 尚不知荀彧是否会被桃救活。故此处对所有伤害(含致死被救活)统一触发节命并置标记;
+  // 若随后荀彧仍死亡,死亡时 hook 见标记即跳过,避免双重触发。
+  // (旧实现按 health≤0 跳过、改由死亡时接管:会漏掉「致死伤害被桃救活」——荀彧未死,
+  //  死亡时不触发,节命整局不发动。)
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
-    if (self.health <= 0) return; // 致死伤害由死亡触发(死亡时 after-hook)接管
+    ctx.state.localVars[DAMAGE_HANDLED_KEY] = true;
     await runJieMing(ctx.state, ownerId);
   });
 
   // ── 死亡时 after:荀彧死亡时触发(系统处理牌之前)──
+  // 伤害致死的节命已在 受到伤害后(时机6)触发过——见标记则跳过,避免双重触发;
+  // 仅 非伤害致死(失去体力/减上限等)在此触发。
   registerAfterHook(state, skill.id, ownerId, '死亡时', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '死亡时') return;
     if (atom.player !== ownerId) return; // 仅荀彧本人死亡时触发
+    if (ctx.state.localVars[DAMAGE_HANDLED_KEY]) {
+      delete ctx.state.localVars[DAMAGE_HANDLED_KEY];
+      return; // 伤害致死已由 受到伤害后 触发,跳过
+    }
     // 荀彧 即将死亡(alive 仍为 true,系统处理牌随后置 false)
     // 不 cancel:让 系统处理牌 正常执行(荀彧仍死亡,技能只发挥一次最后作用)
     await runJieMing(ctx.state, ownerId);
+  });
+
+  // ── 伤害结算结束后 after:清除伤害标记 ──
+  // 荀彧受伤害但未死(非致死 或 致死被桃救活)时清除标记,避免残留导致日后
+  // 非伤害致死时 死亡时 hook 误判为「已由伤害触发」而跳过。
+  // 仅清本座次(荀彧为目标)的伤害结算,不受其他玩家伤害结算干扰。
+  registerAfterHook(state, skill.id, ownerId, '伤害结算结束后', async (ctx) => {
+    if (ctx.atom.target !== ownerId) return;
+    delete ctx.state.localVars[DAMAGE_HANDLED_KEY];
   });
 
   return () => {

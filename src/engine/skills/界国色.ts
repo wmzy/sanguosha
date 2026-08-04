@@ -6,7 +6,7 @@
 // 与标版区别:
 //   - 标版:仅"将一张方块牌当【乐不思蜀】使用"(无限次)。
 //   - 界版:限一次/回合,二选一 + 摸一张牌:
-//     ① 方片牌当乐不思蜀使用(手牌或装备区;距离≤1,不能对自己)
+//     ① 方片牌当乐不思蜀使用(手牌或装备区;不能对自己,乐无距离限制)
 //     ② 弃置一张方片牌(手牌或装备区)+ 弃置场上任意一张乐不思蜀(任意角色判定区)
 //   - "然后摸一张牌"是两选项共同的效果(选完一项后必摸一张)。
 //
@@ -28,7 +28,6 @@ import type {
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
-import { effectiveDistance } from '../distance';
 
 const TRICK_NAME = '乐不思蜀';
 
@@ -157,7 +156,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!self?.alive) return '玩家不可用';
 
       if (rt === USE_RT) {
-        // 选项①:方片牌 + 目标(≠自己,存活,距离≤1)
+        // 选项①:方片牌 + 目标(≠自己,存活)。乐不思蜀无距离限制,可对任意其他存活角色使用
         const cardId = params.cardId as string | undefined;
         if (typeof cardId !== 'string') return '请选择一张方片牌';
         if (!ownsCard(self, cardId)) return '牌不在手牌或装备区';
@@ -168,7 +167,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (typeof target !== 'number') return '请选择目标';
         if (target === ownerId) return '不能对自己使用';
         if (!st.players[target]?.alive) return '目标不存在或已死亡';
-        if (effectiveDistance(st, ownerId, target) > 1) return '目标距离超过1';
+        // 目标判定区已有乐不思蜀时不可使用(与乐不思蜀自身/国色规则一致)
+        if (st.players[target].pendingTricks.some((t) => t.name === TRICK_NAME))
+          return '目标判定区已有乐不思蜀';
         return null;
       }
 
@@ -235,10 +236,9 @@ async function executeOptionUse(st: GameState, ownerId: number): Promise<void> {
       targetFilter: {
         min: 1,
         max: 1,
+        // 乐不思蜀无距离限制:排除自己与死亡角色即可(与国色/乐不思蜀一致)
         filter: (view, t) =>
-          t !== ownerId &&
-          view.players[t]?.alive === true &&
-          effectiveDistance(st, ownerId, t) <= 1,
+          t !== ownerId && view.players[t]?.alive === true,
       },
     },
     timeout: 20,

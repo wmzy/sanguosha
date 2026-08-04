@@ -50,9 +50,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const atom = slot.atom as unknown as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
       if (atom['requestType'] !== CHOOSE_RT) return '当前不是雷击选择';
-      // 选择目标时校验:存活角色(任意角色,可含自己)
+      // 选择目标时校验:存活的「其他角色」(雷击判定目标不可为自己)
       const target = params.target;
       if (typeof target === 'number') {
+        if (target === ownerId) return '不能选择自己';
         const p = st.players[target];
         if (!p?.alive) return '目标不存在或已死亡';
       }
@@ -89,7 +90,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         title: '雷击:选择一名角色进行判定(或放弃)',
         min: 1,
         max: 1,
-        filter: (view, t) => view.players[t]?.alive === true,
+        filter: (view, t) => view.players[t]?.alive === true && t !== ownerId,
       },
       timeout: 20,
     });
@@ -140,7 +141,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       title: '雷击:选择判定目标(或放弃)',
       min: 1,
       max: 1,
-      filter: (view, t) => view.players[t]?.alive === true,
+      filter: (view, t) => view.players[t]?.alive === true && t !== _skill.ownerId,
     },
   });
 }

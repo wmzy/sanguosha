@@ -65,6 +65,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 濒死者须仍是"存活"状态(击杀未发生)。理论上 alive 此刻为 true
     const self = ctx.state.players[ownerId];
     if (!self) return;
+    // 重入保护:若其他救援技(仁心/补益等)已在本 陷入濒死 中先行救活(health>0),则跳过
+    if (self.health > 0) return;
 
     // 询问是否发动
     delete ctx.state.localVars[CONFIRMED_KEY];

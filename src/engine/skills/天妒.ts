@@ -49,6 +49,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 判定牌生效后,判定牌仍在 frameCards 末尾(尚未入弃牌堆)
     const processing = frameCards(ctx.state);
     if (processing.length === 0) return;
+    // 安全前提:frame.cards 仅含判定牌(典型场景:判定阶段/独立判定)。若 frame 还含
+    // 其他牌(如杀结算中八卦阵判定),拿走判定牌会使 runJudgeFlow 收尾 splice 误删
+    // 其他牌(判定牌的清理盲取末尾)→ 状态损坏。多牌场景跳过获取,与 界落英 一致。
+    if (processing.length > 1) return;
     const judgeCardId = processing[processing.length - 1];
     if (!ctx.state.cardMap[judgeCardId]) return;
 

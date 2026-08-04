@@ -116,12 +116,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     },
     async (st: GameState, params: Record<string, Json>) => {
       const from = ownerId;
+      // [时序修复] 限一次标记必须在第一个 await(pushFrame)之前设置:dispatch 是
+      // fire-and-forget,session 不 await → execute 内的 await 会让出事件循环,前端可能
+      // 在此期间再次点击技能按钮发 dispatch。若标记延后,第二次 validate 会通过 → 可重复发动。
+      // markOncePerTurn 同步设 vars(防重入)+ 回合用量 atom 投影 view(前端据此禁用按钮)。
+      await markOncePerTurn(st, from, '义绝');
       const target = (params.targets as number[])[0];
       const costCardId = params.cardId as string;
       await pushFrame(st, '义绝', from, { ...params });
-
-      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
-      await markOncePerTurn(st, from, '义绝');
 
       // ── 弃置代价牌 ──
       await applyAtom(st, { type: '弃置', player: from, cardIds: [costCardId], voluntary: true });

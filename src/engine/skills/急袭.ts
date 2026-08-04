@@ -93,8 +93,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const origCard = tianCardId ? st.cardMap[tianCardId] : undefined;
       const shadowId = shadowIdOf(markId);
 
-      // 1. 去标记:移除田(走 atom 管线,产生 ViewEvent)
-      await applyAtom(st, { type: '去标记', player: ownerId, markId });
+      // 1. 去标记:移除田(走 atom 管线,产生 ViewEvent)+ 同步距离修正 view
+      //    田减少 → 进攻修正 -1;必须经 distanceVars 通道同步 view(与屯田加田、
+      //    界义从去标记对称)。否则 view.distanceVars.attackMod 停在旧值,前端距离
+      //    显示/目标过滤(viewCanAttack)与后端 effectiveDistance 不一致。
+      const newCount = tianCount(st, ownerId) - 1;
+      await applyAtom(st, {
+        type: '去标记',
+        player: ownerId,
+        markId,
+        distanceVars: { attackMod: newCount > 0 ? newCount : undefined },
+      });
 
       // 2. 创建影子卡(直接 mutate:田不在手牌,不能用「当作」atom)
       const shadow: Card = {

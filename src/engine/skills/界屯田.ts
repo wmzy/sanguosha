@@ -120,7 +120,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       );
     }
 
-    // 加田标记(唯一 id,seq 单调递增避免冲突)
+    // 预计算加田后的田数量(atom apply 前尚无新田,故 +1)
+    const newCount = tianCount(ctx.state, ownerId) + 1;
+
+    // 加田标记 + 同步距离修正 view(distanceVars 通道,与屯田加田对称)
     const tianId = `${TIAN_PREFIX}${ctx.state.seq}`;
     await applyAtom(ctx.state, {
       type: '加标记',
@@ -130,9 +133,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
         scope: ownerId,
         payload: { cardId: judgeCardId },
       },
+      distanceVars: { attackMod: newCount },
     });
 
-    // 更新距离修正(每张田 -1 距离 = 进攻修正 +1)
+    // 后端 vars 同步(effectiveDistance 读取)
     syncDistanceMod(ctx.state, ownerId);
   });
 
@@ -193,6 +197,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 移到自己手牌不算失去(理论上 from===to 同一玩家不可能)
     if (atom.to.zone === '手牌' && atom.to.player === ownerId) return;
     await maybeTriggerTunTian(ctx, '移动牌');
+  });
+
+  // ── 给予 after:界邓艾给他人牌(求援/好施等给予路径,回合外失去牌)──
+  //   给予 atom(手牌→手牌)是「失去牌」的独立路径(连营亦挂此 hook)。
+  //   与 获得/移动牌/弃置 互不重叠(给予.afterApply 只发 移动到目标区域后,不发这三者)。
+  registerAfterHook(state, skill.id, ownerId, '给予', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.type !== '给予') return;
+    if (atom.from !== ownerId) return; // 界邓艾给出的牌才算"失去"
+    if (atom.to === ownerId) return; // 给自己不算失去
+    await maybeTriggerTunTian(ctx, '给予');
   });
 
   // ── 弃置 after:界邓艾被弃牌 ──

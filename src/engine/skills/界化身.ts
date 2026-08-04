@@ -360,6 +360,15 @@ async function doReplace(state: GameState, ownerId: number): Promise<void> {
   const pool = player.vars[POOL_KEY] as string[] | undefined;
   if (!pool || pool.length < 2) return;
 
+  // 亮出另一张(切换到不同索引)
+  const curLit = (player.vars[LIT_KEY] as number | undefined) ?? 0;
+  // 另一张化身牌须有可选技能;否则放弃替换并保留当前技能
+  // (lightAndGainSkill 在无可选技能时会提前返回,若此时已卸载旧技能,玩家将彻底失去化身技能)
+  const hasReplacement = pool.some(
+    (name, i) => i !== curLit && getUsableSkills(name).length > 0,
+  );
+  if (!hasReplacement) return;
+
   // 卸载旧化身技能
   const oldSkill = player.vars[CURRENT_KEY] as string | undefined;
   if (oldSkill) {
@@ -367,8 +376,6 @@ async function doReplace(state: GameState, ownerId: number): Promise<void> {
     delete player.vars[CURRENT_KEY];
   }
 
-  // 亮出另一张(切换到不同索引)
-  const curLit = (player.vars[LIT_KEY] as number | undefined) ?? 0;
   const newLit = (curLit + 1) % pool.length;
   await lightAndGainSkill(state, ownerId, newLit, curLit);
 }

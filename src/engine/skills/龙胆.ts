@@ -113,14 +113,19 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
       if (!p?.alive) return false;
       const hasKillOrDodge = p.hand?.some((c) => c.name === '杀' || c.name === '闪') ?? false;
       if (!hasKillOrDodge) return false;
-      // 两条激活路径:自己回合可出杀(闪→杀)/被询问闪(杀→闪)
+      // 三条激活路径:自己回合可出杀(闪→杀 use)/被询问闪(杀→闪)/被询问杀(闪→杀 respond)
       const ownTurnCanSlash = defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
       const slot = ctx.view.pending;
       const askedDodge =
         !!slot &&
         (slot.atom as { type?: string }).type === '询问闪' &&
         slot.target === ctx.perspectiveIdx;
-      return ownTurnCanSlash || askedDodge;
+      // 闪当杀响应路径:被询问杀(决斗/南蛮入侵)时,可把闪当杀打出
+      const askedKill =
+        !!slot &&
+        (slot.atom as { type?: string }).type === '询问杀' &&
+        slot.target === ctx.perspectiveIdx;
+      return ownTurnCanSlash || askedDodge || askedKill;
     },
   });
   return;

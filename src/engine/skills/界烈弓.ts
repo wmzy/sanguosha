@@ -114,6 +114,17 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const targetPlayer = ctx.state.players[target];
     if (!self?.alive || !targetPlayer?.alive) return;
 
+    // 清除本目标上残留的界烈弓标签:标签本应"单次杀结算",由对应 before-hook 消费,
+    // 但 TAG_BONUS 仅在 造成伤害时 消费——若本杀被闪抵消则 造成伤害不触发,标签会残留;
+    // TAG_BLOCK 也可能在 成为目标 被取消(空城/帷幕)导致 询问闪 未触发时残留。残留标签会
+    // 串扰下一次对该目标的杀(误禁闪/误加伤,即使本次未发动烈弓)。每次指定目标先清空残留。
+    if (targetPlayer.tags.includes(TAG_BLOCK)) {
+      await applyAtom(ctx.state, { type: '去标签', player: target, tag: TAG_BLOCK });
+    }
+    if (targetPlayer.tags.includes(TAG_BONUS)) {
+      await applyAtom(ctx.state, { type: '去标签', player: target, tag: TAG_BONUS });
+    }
+
     // 两条件独立判定
     const condBlock = targetPlayer.hand.length <= self.hand.length; // 效果1:手牌不大于自己
     const condBonus = targetPlayer.health >= self.health; // 效果2:体力不小于自己

@@ -219,6 +219,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             title: `甘露:两人装备数差 ${X} 大于你已损失的体力值 ${lostHp},须弃 ${X} 张手牌`,
             cardFilter: { filter: () => true, min: X, max: X },
           },
+          // 强制型弃牌:前端隐藏"不回应"按钮 + 走多牌选择 UI(发 cardIds);headless 不生成 skip。
+          // 否则前端按普通 useCard 回应走单牌路径发 cardId,与本 respond 读取 cardIds 不匹配。
+          mandatory: true,
           timeout: 30,
         });
         const discardCards = st.localVars[DISCARD_KEY] as string[] | undefined;

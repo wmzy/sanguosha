@@ -31,7 +31,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
-import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending } from '../skill';
 
 const SKILL_ID = '界制霸';
@@ -383,6 +383,34 @@ async function resolveAfterCompare(
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
+  // 方向 B:孙策(主公)出牌阶段主动发起拼点。前端按 defineAction 注册表 filter-based
+  // 查找 use action(见 gameViewHelpers),故必须声明 use,否则方向 B 无 UI 入口不可达
+  // (参考天义/制衡等自启 use 技能均声明 defineAction('use'))。前端不暴露 faction,
+  // targetFilter 仅近似过滤(非自己+存活+有手牌),吴势力由后端 validate 校验。
+  api.defineAction('use', {
+    label: DISPLAY_NAME,
+    style: 'primary',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '制霸:选择一张拼点牌和一名其他吴势力角色',
+      cardFilter: { min: 1, max: 1 },
+      targetFilter: {
+        min: 1,
+        max: 1,
+        filter: (view, t) => {
+          const me = view.currentPlayerIndex;
+          if (t === me) return false;
+          const tp = view.players[t];
+          if (!tp) return false;
+          return tp.alive !== false && (tp.handCount ?? 0) > 0;
+        },
+      },
+    },
+    activeWhen: (ctx) =>
+      activeUnlessUsedThisTurn(LORD_USED)(ctx) &&
+      (ctx.view.players[ctx.perspectiveIdx]?.hand?.length ?? 0) > 0,
+  });
+
   api.defineAction('respond', {
     label: DISPLAY_NAME,
     style: 'primary',

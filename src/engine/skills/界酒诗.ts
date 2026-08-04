@@ -68,12 +68,16 @@ function isFlipped(tags: string[]): boolean {
   return tags.some((t) => t.endsWith('/翻面'));
 }
 
-/** 翻回正面:清除所有 '/翻面' 后缀标签 */
+/** 翻回正面:清除所有 '/翻面' 后缀标签,并补发「翻面后」时机(与 flipFaceDown 对称,
+ *  供解围等消费者感知翻回正面)。 */
 async function flipBackToFaceUp(state: GameState, ownerId: number): Promise<void> {
   const tags = state.players[ownerId]?.tags ?? [];
   const flipTags = tags.filter((t) => t.endsWith('/翻面'));
   for (const tag of flipTags) {
     await applyAtom(state, { type: '去标签', player: ownerId, tag });
+  }
+  if (flipTags.length > 0) {
+    await applyAtom(state, { type: '翻面后', player: ownerId, faceDown: false });
   }
 }
 
@@ -108,8 +112,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (st: GameState, _params: Record<string, Json>) => {
       await pushFrame(st, SKILL_ID, ownerId, {});
       try {
-        // 1) 翻至背面:加标签(下一回合不会因此跳过——与据守加强版一致)
+        // 1) 翻至背面:加标签 + 补发「翻面后」时机(与据守/放逐/界悲歌一致;
+        //    解围等 /翻面 hook 消费者依赖此事件,须与 flipFaceDown 等价补发)
         await applyAtom(st, { type: '加标签', player: ownerId, tag: FLIP_TAG });
+        await applyAtom(st, { type: '翻面后', player: ownerId, faceDown: true });
         // 2) 视为使用一张酒:加 mark,本回合下一张杀伤害+1
         await virtualWine(st, ownerId);
       } finally {

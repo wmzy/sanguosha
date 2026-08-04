@@ -80,7 +80,7 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
-    if (atom.source === undefined) return;
+    if (atom.source === undefined || atom.source === ownerId) return;
     const sourcePlayer = ctx.state.players[atom.source];
     if (!sourcePlayer?.alive) return;
     // 反馈(经典):仅手牌+装备,不含判定区

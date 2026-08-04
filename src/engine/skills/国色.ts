@@ -18,7 +18,7 @@
 //   (装备区→手牌,产生 ViewEvent + 清除武器距离 vars),再走标准打出流程
 //   (与奇袭处理装备牌一致)。
 //
-// 距离规则:与乐不思蜀一致,目标须在距离 1 以内(描述未提及特殊距离放宽)。
+// 距离规则:与乐不思蜀一致——乐不思蜀无距离限制,可对任意其他角色使用。
 //
 // 原牌归宿:原方块牌经 处理区→弃牌堆,进入弃牌堆(满足"使用后原牌进入弃牌堆")。
 //   乐不思蜀被无懈可击抵消或判定结束后,由 乐不思蜀.ts 的 移除延时锦囊 清 pendingTricks。
@@ -27,8 +27,6 @@ import type { Card, EquipSlot, FrontendAPI, GameView, GameState, Json, Skill } f
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { defaultPlayActive } from '../action-active';
 import { registerAction, hasBlockingPending } from '../skill';
-import { effectiveDistance } from '../distance';
-import { viewEffectiveDistance } from '../viewDistance';
 
 const TRICK_NAME = '乐不思蜀';
 
@@ -77,11 +75,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (target === ownerId) return '不能对自己使用';
       const targetPlayer = state.players[target];
       if (!targetPlayer?.alive) return '目标不存在或已死亡';
+      // 目标判定区已有乐不思蜀时不可使用(与乐不思蜀自身规则一致)
+      if (targetPlayer.pendingTricks.some((t) => t.name === TRICK_NAME))
+        return '目标判定区已有乐不思蜀';
 
-      // 距离:与乐不思蜀一致,目标须在距离 1 以内
-      const inRange = effectiveDistance(state, ownerId, target) <= 1;
-
-      const ok = myTurn && inActPhase && free && inRange;
+      // 距离:与乐不思蜀一致——乐不思蜀无距离限制,可对任意其他角色使用
+      const ok = myTurn && inActPhase && free;
       return ok ? null : '国色使用条件不满足';
     },
     async (state: GameState, params: Record<string, Json>): Promise<void> => {
@@ -154,14 +153,14 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       targetFilter: {
         min: 1,
         max: 1,
-        // 距离≤1 检查:filter 仅为前端 UI 提示,后端 validate 独立校验
+        // 仅排除自己与死亡角色:乐不思蜀无距离限制,可对任意其他存活角色使用
         filter: (view: GameView, t: number) => {
           const me = view.currentPlayerIndex;
           if (t === me) return false;
           const tp = view.players[t];
           if (!tp) return false;
           if (tp.alive === false) return false;
-          return viewEffectiveDistance(view.players, me, t) <= 1;
+          return true;
         },
       },
     },

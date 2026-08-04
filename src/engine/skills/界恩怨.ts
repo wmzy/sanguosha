@@ -73,7 +73,8 @@ function gainDepthKey(from: number): string {
 
 /**
  * 记录一次"法正从 from 获得 1 张牌",返回是否触发 effect A(计数达 2)。
- * 同一 depth 内累计;跨 depth(新批次)重置。达 2 后清零(仅触发一次)。
+ * 同一 depth 内累计;跨 depth(新批次)重置。仅在恰好达到 2 时触发一次——
+ * 之后继续累加但不再触发(避免同批次≥4 张时每 2 张重复触发)。
  */
 function trackGainAndCheck(state: GameState, from: number): boolean {
   const depth = state.settlementStack.length;
@@ -88,8 +89,8 @@ function trackGainAndCheck(state: GameState, from: number): boolean {
     count = ((state.localVars[countK] as number | undefined) ?? 0) + 1;
   }
   state.localVars[countK] = count;
-  if (count >= 2) {
-    state.localVars[countK] = 0; // 清零,避免同批次重复触发
+  // 仅在恰好达到 2 时触发一次;不清零,后续累加不再命中 2(避免≥4 张重复触发)
+  if (count === 2) {
     return true;
   }
   return false;

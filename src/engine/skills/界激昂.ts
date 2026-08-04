@@ -46,12 +46,20 @@ const RECYCLE_CONFIRM_KEY = `${SKILL_ID}/recycleConfirm`;
 /** 每回合限一次标记:后缀 /usedThisTurn 由「回合结束」atom 自动清空 */
 const RECYCLE_USED_KEY = `${SKILL_ID}/recycle/usedThisTurn`;
 
-/** 判定是否为激昂可触发场景(决斗或红色杀);与标激昂同款判定 */
-function isJiangTrigger(state: GameState, cardId: string | undefined): boolean {
+/** 判定是否为激昂可触发场景(决斗或红色杀);与标激昂同款判定
+ *  allowVirtualFallback:仅「成为目标」hook 需要——虚拟决斗(离间)无实体牌,
+ *    靠 topFrame.skillId 兜底。「弃置」hook 处理的必是真实弃牌,应按牌本身身份判定,
+ *    不可用帧兜底(否则离间弃置非决斗/红杀的代价牌时会误判为触发)。*/
+function isJiangTrigger(
+  state: GameState,
+  cardId: string | undefined,
+  allowVirtualFallback = true,
+): boolean {
   const card = cardId ? state.cardMap[cardId] : undefined;
   if (card?.name === '决斗') return true;
   if (card?.name === '杀' && card.color === '红') return true;
   // 虚拟决斗(离间无实体牌):用当前结算帧兜底
+  if (!allowVirtualFallback) return false;
   const frameSkill = topFrame(state)?.skillId;
   if (frameSkill === '决斗' || frameSkill === '离间') return true;
   return false;
@@ -154,7 +162,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       const cardIds = atom.cardIds ?? [];
       // 取全部符合条件的牌(同时弃多张决斗/红杀应全部获得之;每回合限一次)
-      const targets = cardIds.filter((id) => isJiangTrigger(ctx.state, id));
+      // 弃置的必是真实牌:按牌本身身份判定,禁用虚拟决斗帧兜底
+      // (否则离间等在「弃置」时帧顶为决斗/离间,会误判代价牌为决斗/红杀)
+      const targets = cardIds.filter((id) => isJiangTrigger(ctx.state, id, false));
       if (targets.length === 0) return;
 
       // 标记本回合已用(每回合首次,无论是否发动都消耗额度)

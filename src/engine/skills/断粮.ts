@@ -58,6 +58,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (target === ownerId) return '不能对自己使用';
       const targetPlayer = state.players[target];
       if (!targetPlayer?.alive) return '目标不存在或已死亡';
+      // 目标判定区已有兵粮寸断时不可使用(与兵粮寸断自身规则一致)
+      if (targetPlayer.pendingTricks.some((t) => t.name === TRICK_NAME))
+        return '目标判定区已有兵粮寸断';
 
       // 距离规则:默认 ≤1;目标手牌数 >= 自己手牌数时无距离限制
       const handGeq = targetPlayer.hand.length >= self.hand.length;

@@ -21,11 +21,12 @@
 //                  + 回合用量 atom 同步 view(虽非 owner 主动技,但便于审计/调试)。
 //       owner 没赢 → 移动 target 拼点牌(弃牌堆 → owner 手牌) + 虚拟杀(target → owner)。
 //
-//   - 限制实现:固定注册 指定目标 before-hook,内部读 source 玩家 vars[restrictedKey()]:
-//       若 source 被限制 且 target !== source → cancel(阻止其对他人指定目标)。
-//     覆盖所有走 指定目标 atom 的牌:杀/决斗(走成为目标)、借刀杀人/激将/挑衅 的虚拟杀等。
-//     顺手牵羊/过河拆桥等单纯锦囊、AOE(南蛮/万箭)与火攻不走 指定目标 atom,本实现未覆盖
-//     (规则边界;这些锦囊需另挂 询问无懈可击/造成伤害 hook,范围较大,暂略)。
+//   - 限制实现:固定注册 成为目标 before-hook,内部读 source 玩家 vars[restrictedKey()]:
+//       若 source 被限制 且 target !== source → cancel(跳过该目标结算,与空城/帷幕同构)。
+//     必须挂「成为目标」:runUseFlow 声明阶段对 指定目标 的 applyAtom 返回值不检查(cancel 无效),
+//     只有 成为目标 cancel 才会计入 skippedTargets、跳过结算。
+//     覆盖所有走 runUseFlow 且带目标的牌:杀/决斗/顺手牽羊/过河拆桥/火攻/借刀杀人/AOE
+//     (南蛮/万箭)/激将/挑衅 的虚拟杀等(均逐目标发 成为目标)。
 //     标签 key 后缀 '/usedThisTurn' 由「回合结束」atom 自动清除,无需手动管理生命周期。
 //
 // 命名:文件名/loader key/character skill name = '界惴恐'(避标版冲突);
@@ -164,14 +165,17 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     );
   }
 
-  // ── 指定目标 before-hook:被限制玩家不能对除己以外角色用牌 ──
+  // ── 成为目标 before-hook:被限制玩家不能对除己以外角色用牌 ──
   // 永久注册,内部按 source 的 vars[RESTRICTED_KEY] 判定;key 由「回合结束」atom 自动清。
+  // 必须挂「成为目标」而非「指定目标」:runUseFlow 声明阶段对 指定目标 的 applyAtom 返回值
+  // 不检查(cancel 无效),只有 成为目标 cancel 才会把目标计入 skippedTargets、跳过结算
+  // (与空城/帷幕同构)。
   unloaders.push(
     registerBeforeHook(
       state,
       skill.id,
       ownerId,
-      '指定目标',
+      '成为目标',
       async (ctx): Promise<HookResult | void> => {
         const atom = ctx.atom;
         const source = atom.source;

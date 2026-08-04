@@ -135,6 +135,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (cost === 'damage') {
         // 界版官方:"受到1点伤害"——真实伤害事件(触发反馈/奸雄/防具等)
         await runDamageFlow(st, from, from, 1);
+        // 受到伤害可能进入濒死(无人救援则死亡):典韦死亡则不再造成伤害(官方 FAQ),
+        // 但仍需弹出本次技能结算帧(与标版 失去体力致死早退一致)。
+        if (!st.players[from]?.alive) {
+          await popFrame(st);
+          return;
+        }
       } else {
         const cardId = params.cardId as string;
         // 装备区武器先卸下(清距离 vars + 回手),再弃置;手牌武器直接弃置。

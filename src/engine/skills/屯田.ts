@@ -190,6 +190,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await maybeTriggerTunTian(ctx, '移动牌');
   });
 
+  // ── 给予 after:邓艾给他人牌(求援/好施等给予路径,回合外失去牌) ──
+  //   给予 atom(手牌→手牌)是「失去牌」的独立路径(连营亦挂此 hook)。
+  //   与 获得/移动牌/弃置 互不重叠(给予.afterApply 只发 移动到目标区域后,不发这三者)。
+  registerAfterHook(state, skill.id, ownerId, '给予', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.type !== '给予') return;
+    if (atom.from !== ownerId) return; // 邓艾给出的牌才算"失去"
+    if (atom.to === ownerId) return; // 给自己不算失去
+    await maybeTriggerTunTian(ctx, '给予');
+  });
+
   // ── 弃置 after:邓艾被弃牌(借刀杀人等回合外弃置路径) ──
   registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
     const atom = ctx.atom;

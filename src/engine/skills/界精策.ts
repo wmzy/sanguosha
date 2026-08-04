@@ -38,7 +38,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界精策';
 const DISPLAY_NAME = '精策';
@@ -161,8 +161,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     syncHandLimitBonus(ctx.state, ownerId);
   });
 
-  // ── 阶段结束 after:出牌阶段结束时询问摸 X 张 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
+  // ── 阶段结束 before:出牌阶段结束时询问摸 X 张 ──
+  //   用 before 而非 after:阶段结束 是纯 hook 标记,回合管理 的 阶段结束 after-hook 会
+  //   推进到弃牌→回合结束(清空 turn.vars),且 回合管理 先于本技注册(DEFAULT_SKILLS)。
+  //   若挂 after,等本技执行时 turn.vars 已清空 → X=0 → 永不摸牌。before 在推进前结算。
+  registerBeforeHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.phase !== '出牌') return;

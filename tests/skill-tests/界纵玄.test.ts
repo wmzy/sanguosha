@@ -238,7 +238,7 @@ describe('界纵玄(界虞翻·被动技)', () => {
     await harness.waitForStable();
 
     // 上家触发标记已置位
-    expect(harness.state.turn.vars['界纵玄/upstreamTriggeredThisTurn']).toBe(true);
+    expect(harness.state.turn.vars['界纵玄/upstreamTriggeredThisTurn:0']).toBe(true);
   });
 
   // ─── E. 上家弃牌(本回合第二次)→ 不再触发 ───────────────
@@ -271,7 +271,7 @@ describe('界纵玄(界虞翻·被动技)', () => {
     P0.expectPending('请求回应');
     await P0.respond('界纵玄', { choice: false });
     await harness.waitForStable();
-    expect(harness.state.turn.vars['界纵玄/upstreamTriggeredThisTurn']).toBe(true);
+    expect(harness.state.turn.vars['界纵玄/upstreamTriggeredThisTurn:0']).toBe(true);
 
     // 第二次:P1 弃 c2 → 不触发
     await triggerDiscard(harness, 1, ['c2']);
@@ -310,6 +310,6 @@ describe('界纵玄(界虞翻·被动技)', () => {
     await triggerDiscard(harness, 2, ['c1']);
     P0.expectNoPending();
     expect(harness.state.zones.discardPile).toContain('c1');
-    expect(harness.state.turn.vars['界纵玄/upstreamTriggeredThisTurn']).toBeUndefined();
+    expect(harness.state.turn.vars['界纵玄/upstreamTriggeredThisTurn:0']).toBeUndefined();
   });
 });

@@ -151,13 +151,19 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
         if (has('酒') && p.health < p.maxHealth) return true;
         if (has('桃')) return true;
       }
-      // 路径②:被询问闪(防御向,杀→闪)
+      // 路径②:被询问闪(防御向,杀→闪)/被询问杀(进攻向 respond,闪→杀)
       const slot = ctx.view.pending;
       const askedDodge =
         !!slot &&
         (slot.atom as { type?: string }).type === '询问闪' &&
         slot.target === ctx.perspectiveIdx;
       if (askedDodge && has('杀')) return true;
+      // 被询问杀(决斗/南蛮入侵等):可把闪当杀打出
+      const askedKill =
+        !!slot &&
+        (slot.atom as { type?: string }).type === '询问杀' &&
+        slot.target === ctx.perspectiveIdx;
+      if (askedKill && has('闪')) return true;
       return false;
     },
   });

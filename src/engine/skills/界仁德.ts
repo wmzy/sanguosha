@@ -341,8 +341,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const c = params.choice;
         if (c === '杀' || c === '桃' || c === '酒') {
           s.localVars[BASIC_CHOICE_VAR] = c;
-        } else if (params.confirmed === true) {
-          // 默认选杀(UI 仅 confirm 时回退杀)
+        } else if (params.confirmed === true || c === true) {
+          // 默认选杀(UI 仅 confirm 时回退杀;前端/无头客户端 confirm 发送 choice:true,须同时接受)
           s.localVars[BASIC_CHOICE_VAR] = '杀';
         } else {
           s.localVars[BASIC_CHOICE_VAR] = false;

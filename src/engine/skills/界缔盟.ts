@@ -25,7 +25,7 @@ import type {
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../create-engine';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
-import { registerAction, registerAfterHook, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, registerBeforeHook, hasBlockingPending, type SkillModule } from '../skill';
 
 const TARGET_RT = '界缔盟/target';
 const DISCARD_RT = '界缔盟/discard';
@@ -186,9 +186,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ),
   );
 
-  // ── 阶段结束 after hook:出牌阶段结束时,鲁肃弃 X 张牌 ──
+  // ── 阶段结束(出牌) before-hook:出牌阶段结束时,鲁肃弃 X 张牌 ──
+  //    必须用 before-hook 而非 after-hook:回合管理 的 阶段结束(出牌) after-hook 会同步推进
+  //    到弃牌阶段(阻塞等待弃牌)并连锁到回合结束、轮到下家;而 DEFAULT_SKILLS 先于角色技能
+  //    注册,after-hook 会令本弃牌发生在该回合结束之后(时机错误 + 残留 pending 污染下家回合)。
+  //    before-hook 先于 回合管理 after-hook 结算,确保在出牌阶段结束、阶段推进前完成弃牌
+  //    (与截辎「额外摸牌阶段」改用 before-hook 同因)。
   unloaders.push(
-    registerAfterHook(
+    registerBeforeHook(
       state,
       skill.id,
       ownerId,

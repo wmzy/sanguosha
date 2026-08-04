@@ -17,7 +17,7 @@
 //          a. 给目标加标签 SUPPRESSION_TAG(本回合非锁定技失效,回合结束清)
 //          b. applyAtom(判定),judgeType='铁骑'
 //   2. 判定牌生效后 after hook(judgeType==='铁骑', player===ownerId):
-//        读判定牌花色 → 写 localVars[SUIT_VAR]=花色,供阶段3消费。
+//        读判定牌花色 → 写 localVars[suitKey(target)]=花色(按目标隔离),供阶段3消费。
 //   3. 询问闪 before hook(source===ownerId 且 localVars 有花色):
 //        请求目标弃一张同花色手牌 → 弃了 → pass(询问闪正常,目标可出闪);
 //        没弃/超时/无同花色牌 → cancel(强制命中)。
@@ -39,7 +39,8 @@ import { registerSuppressionProvider } from '../skill-suppression';
 export const SUPPRESSION_TAG = '界铁骑/非锁定技失效';
 const CONFIRM = '铁骑/confirmed';
 const TARGET_VAR = '铁骑/target';
-const SUIT_VAR = '铁骑/suit';
+/** 判定花色按目标隔离存储(多目标杀时各目标的铁骑效果互不干扰) */
+const suitKey = (target: number) => `界铁骑/suit/${target}`;
 const DISCARD_CARD = '铁骑/discardCard';
 const DISCARD_REQUEST = '界铁骑/discard';
 
@@ -88,7 +89,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (typeof cardId !== 'string') return '请选择一张手牌弃置';
           if (!st.players[pid].hand.includes(cardId)) return '牌不在手牌中';
           // 花色校验:必须与判定花色相同(后端兜底)
-          const suit = st.localVars[SUIT_VAR] as string | undefined;
+          const suit = st.localVars[suitKey(pid)] as string | undefined;
           const card = st.cardMap[cardId];
           if (!suit || !card) return '无法校验花色';
           if (card.suit !== suit) return '花色与判定结果不符';
@@ -168,8 +169,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 记录花色(空花色=转化合成卡,目标无同花色牌可弃→强制命中)
     const suit = judgeCard.suit || '';
-    ctx.state.localVars[SUIT_VAR] = suit;
-    ctx.state.localVars[TARGET_VAR] = target;
+    ctx.state.localVars[suitKey(target)] = suit;
   });
 
   // ── 询问闪 before:令目标弃一张同花色手牌,否则 cancel 询问闪(强制命中) ──
@@ -184,10 +184,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const target = atom.target;
       if (target === undefined) return;
 
-      // 仅对由阶段2(判定)写入的目标 + 花色生效,且与当前询问闪目标一致
-      const suit = ctx.state.localVars[SUIT_VAR] as string | undefined;
-      const recordedTarget = ctx.state.localVars[TARGET_VAR] as number | undefined;
-      if (suit === undefined || recordedTarget !== target) return;
+      // 仅对由阶段2(判定)写入的目标花色生效(按目标隔离,多目标杀互不干扰)
+      const sKey = suitKey(target);
+      const suit = ctx.state.localVars[sKey] as string | undefined;
+      if (suit === undefined) return;
 
       const player = ctx.state.players[target];
       if (!player?.alive) return;
@@ -196,12 +196,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const hasMatching = player.hand.some((id) => ctx.state.cardMap[id]?.suit === suit);
       if (!hasMatching) {
         // 清费本次杀的 localVars
-        delete ctx.state.localVars[SUIT_VAR];
-        delete ctx.state.localVars[TARGET_VAR];
+        delete ctx.state.localVars[sKey];
         return { kind: 'cancel' };
       }
 
-      // 请求目标弃一张同花色手牌(SUIT_VAR 仍需保留供 respond validate 校验)
+      // 请求目标弃一张同花色手牌(sKey 仍需保留供 respond validate 校验)
       delete ctx.state.localVars[DISCARD_CARD];
       await applyAtom(ctx.state, {
         type: '请求回应',
@@ -216,8 +215,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       });
 
       // 弃牌询问结束后才清 Localvars(下次杀不再复用)
-      delete ctx.state.localVars[SUIT_VAR];
-      delete ctx.state.localVars[TARGET_VAR];
+      delete ctx.state.localVars[sKey];
 
       const discardCardId = ctx.state.localVars[DISCARD_CARD] as string | undefined;
       delete ctx.state.localVars[DISCARD_CARD];

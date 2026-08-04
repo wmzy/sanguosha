@@ -65,10 +65,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const from = ownerId;
       const target = (params.targets as number[])[0];
       const cardId = params.cardId as string;
-      await pushFrame(st, '界反间', from, { ...params });
-
-      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)。
+      // 必须在第一个 await(pushFrame)之前:markOncePerTurn 在函数入口同步写 vars,
+      // 若 pushFrame 先 await,其 applyAtom 会让出事件循环,dispatch 是 fire-and-forget,
+      // 前端可在 vars 写好前再次发 use → validate 的 usedThisTurn 仍为 false → 可重复发动。
       await markOncePerTurn(st, from, '反间');
+
+      await pushFrame(st, '界反间', from, { ...params });
 
       // ── 周瑜自选的手牌 → 目标手牌(明给:目标可见其牌面)──
       await applyAtom(st, {

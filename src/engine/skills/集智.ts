@@ -5,19 +5,19 @@
 //   (→ 处理区:常规锦囊;→ 弃牌堆:无懈可击)。
 //
 //   为什么挂「移动牌」而非「结算帧入栈」:无懈可击是 respond,不 pushFrame,
-//   但会 移动牌(手牌→弃牌堆)。挂移动牌可覆盖全部 10 张非延时锦囊(含无懈可击)。
+//   但会 移动牌(手牌→弃牌堆)。挂移动牌可覆盖全部 12 张非延时锦囊(含无懈可击)。
 //   过滤条件严格限定 from.zone=手牌 + from.player=owner + 卡牌为非延时锦囊,
 //   避免误触(弃置/摸牌/装备/延时锦囊/基本牌均被排除)。
 //
 //   触发后询问是否摸牌(请求回应 confirm,faithful to "可以"),确认则 摸牌 1 张。
 //
-// 非延时锦囊(10):过河拆桥/顺手牵羊/无中生有/无懈可击/借刀杀人/桃园结义/
-//                 五谷丰登/南蛮入侵/万箭齐发/决斗
+// 非延时锦囊(12):过河拆桥/顺手牵羊/无中生有/无懈可击/借刀杀人/桃园结义/
+//                 五谷丰登/南蛮入侵/万箭齐发/决斗/火攻/铁索连环
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../create-engine';
 import { registerAction, registerAfterHook } from '../skill';
 
-/** 非延时锦囊牌名集合 */
+/** 非延时锦囊牌名集合(即时锦囊,共 12 张:标准版 10 + 军争篇 火攻/铁索连环) */
 const NON_DELAY_TRICKS = new Set([
   '过河拆桥',
   '顺手牵羊',
@@ -29,6 +29,8 @@ const NON_DELAY_TRICKS = new Set([
   '南蛮入侵',
   '万箭齐发',
   '决斗',
+  '火攻',
+  '铁索连环',
 ]);
 
 const CONFIRM_REQUEST = '集智/confirm';

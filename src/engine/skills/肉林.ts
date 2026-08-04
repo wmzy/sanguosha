@@ -51,6 +51,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     const target = atom.target;
     const killCardId = getKillCardId(ctx.state);
+    // 肉林仅对【杀】生效;万箭齐发等同样使用询问闪的牌不应触发双闪(镜像无双)
+    if (ctx.state.cardMap[killCardId]?.name !== '杀') return;
     if (!isCancelled(ctx.state, killCardId, target)) return;
 
     const countKey = dodgeCountKey(killCardId, target);

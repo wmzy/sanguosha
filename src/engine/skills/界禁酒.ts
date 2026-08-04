@@ -15,7 +15,9 @@
 //     杀技能零感知界禁酒——它看到的永远是 cardMap 里的一张"杀"(点数 K)。
 //     酒的所有原本使用方式(增伤/濒死当桃)依然保留——禁酒只是"额外可用作 K 杀"。
 //   - "其他角色不能于你的回合使用【酒】":wrap 其他玩家(非 owner)的 酒.respond action。
-//     界禁酒.onInit 时,遍历所有非 owner 玩家 pid,读出其 酒:pid:respond 原始 entry,
+//     通过 回合开始 after-hook 延迟执行(registerSkillsFromState 按座次逐个实例化,
+//     界禁酒 onInit 时排在其后的玩家的 酒.respond 尚未注册;首个 回合开始 发生在
+//     全部技能实例化之后)。遍历所有非 owner 玩家 pid,读出其 酒:pid:respond 原始 entry,
 //     重新注册为 wrapped 版:validate 头部检查 state.currentPlayerIndex===ownerId → 拒绝;
 //     否则调用原 validate。execute/rollback 原样保留。unload 时恢复原始 entry。
 //     主作用场景:owner 回合内他人濒死,无法用 酒 自救(仍可用 桃)。
@@ -29,6 +31,7 @@
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import {
   registerAction,
+  registerAfterHook,
   hasBlockingPending,
   findActionEntry,
   registerActionEntry,
@@ -127,20 +130,43 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ─── wrap 其他玩家的 酒.respond:owner 回合内禁止他人用酒 ──
-  //   原 entry 由 酒 skill 在 DEFAULT_SKILLS 阶段实例化时注册(registerSkillsFromState
-  //   按 skills 数组序实例化,DEFAULT_SKILLS 含 '酒';界禁酒是角色技能,晚于 '酒' 加载)。
+  //   酒.respond 由 使用牌 skill 按座次逐个实例化时注册。registerSkillsFromState
+  //   按座次+skills 序遍历,界禁酒 onInit 运行时,排在其后的玩家的 酒.respond 尚未
+  //   注册 → 直接在 onInit 里 wrap 会漏掉这些玩家。改为延迟到首次 回合开始
+  //   after-hook 执行:首个 回合开始 发生在所有技能实例化之后(开局流程),此时
+  //   全部 酒.respond 已就绪。after-hook 在每次 回合开始 触发,wrapWineRespond 幂等。
   //   wrap 仅注入 validate 头部检查;execute/rollback 保留原引用(零行为变化)。
-  //   卸载时通过 registerActionEntry 直接写回原 entry,确保状态干净。
-  const wrappedPids: number[] = [];
+  const unloadHook = registerAfterHook(
+    state,
+    skill.id,
+    ownerId,
+    '回合开始',
+    async () => {
+      wrapWineRespond(state, ownerId);
+    },
+  );
+
+  return () => {
+    unloadHook();
+    // 恢复所有被 wrap 的原始 酒:pid:respond entry
+    const map = getWrappedOriginalsMap(state);
+    for (const [, original] of map) {
+      registerActionEntry(state, original);
+    }
+    map.clear();
+  };
+}
+
+/** 遍历所有非 owner 玩家,wrap 其 酒.respond(幂等)。
+ *  wrap 后 validate 头部检查:owner 回合内拒绝他人用酒,否则委托原 validate。 */
+function wrapWineRespond(state: GameState, ownerId: number): void {
   for (const p of state.players) {
     if (p.index === ownerId) continue;
     const pid = p.index;
+    if (getWrappedOriginalsMap(state).has(pid)) continue;
     const original = findActionEntry(state, '酒', pid, 'respond');
     if (!original) continue;
-    // 已被 wrap(幂等保护:理论不会触发,因为 instantiateSkill 先 unload 再 onInit)
-    if (getWrappedOriginalsMap(state).has(pid)) continue;
     getWrappedOriginalsMap(state).set(pid, { ...original });
-    wrappedPids.push(pid);
     const originalValidate = original.validate;
     registerAction(
       state,
@@ -157,18 +183,6 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       original.rollback,
     );
   }
-
-  return () => {
-    // 恢复所有被 wrap 的原始 酒:pid:respond entry
-    const map = getWrappedOriginalsMap(state);
-    for (const pid of wrappedPids) {
-      const original = map.get(pid);
-      if (original) {
-        registerActionEntry(state, original);
-        map.delete(pid);
-      }
-    }
-  };
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {

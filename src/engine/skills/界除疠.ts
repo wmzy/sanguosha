@@ -13,7 +13,7 @@
 //   - 目标校验:1+ 名其他存活角色,势力各不相同(player.faction 字段)。"势力各不相同"
 //     约束仅在选定目标之间(self 不参与——"其他角色"已排除 self)。
 //   - 自身弃牌:ownerId 手牌或装备区一张(任意花色,由 active player 选择)。
-//   - 目标弃牌:engine 用 state.rngSeed 派生 RNG 从目标区域(手牌+装备+判定)等概率抽一张,
+//   - 目标弃牌:engine 用 state.rngSeed 派生 RNG 从目标区域(手牌+装备)等概率抽一张,
 //     推进后写回,保证重放确定性。等价于"使用者盲选"(目标手牌对使用者不可见,数字实现用
 //     随机替代盲选;装备/判定区虽对使用者可见,本实现不区分明/暗选,统一等概率抽)。
 //   - 黑桃补偿:遍历所有被弃的牌(自身+目标),若 suit==='♠',其所有者摸 1 张。
@@ -42,16 +42,15 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 列出玩家区域内所有可弃置的 cardId(手牌 + 装备 + 判定区)。 */
+/** 列出玩家区域内所有可弃置的 cardId(手牌 + 装备区)。
+ *  不含判定区:弃置 atom 仅从手牌/装备区移除并推入弃牌堆,传入判定区牌会导致
+ *  牌被加入弃牌堆却未从判定区移除(状态重复)。 */
 function listDiscardable(state: GameState, player: number): string[] {
   const p = state.players[player];
   if (!p) return [];
   const cards: string[] = [...p.hand];
   for (const id of Object.values(p.equipment)) {
     if (id) cards.push(id);
-  }
-  if (p.judgeZone) {
-    for (const id of p.judgeZone) cards.push(id);
   }
   return cards;
 }
@@ -120,8 +119,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 记录所有被弃的牌及其所有者(用于黑桃补偿)
       const discarded: Array<{ cardId: string; owner: number }> = [];
 
-      // 弃置自身一张牌
-      await applyAtom(st, { type: '弃置', player: from, cardIds: [cardId] });
+      // 弃置自身一张牌(voluntary:true——玩家自选代价弃牌,与制衡/天香/义绝等一致,
+      // 不触发奋激等「失去牌」被动技;下方目标弃牌为强制,不带 voluntary 以正常触发反馈等)
+      await applyAtom(st, { type: '弃置', player: from, cardIds: [cardId], voluntary: true });
       discarded.push({ cardId, owner: from });
 
       // 对每个目标:随机选一张牌弃置

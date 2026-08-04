@@ -32,7 +32,8 @@ function hasHeartInEquipment(state: GameState, player: number): boolean {
   for (const id of Object.values(equip)) {
     if (!id) continue;
     const card = state.cardMap[id];
-    if (card?.suit === '♥') return true;
+    // 界红颜使黑桃牌视为红桃牌,故黑桃装备也计入红桃
+    if (card?.suit === '♥' || card?.suit === '♠') return true;
   }
   return false;
 }

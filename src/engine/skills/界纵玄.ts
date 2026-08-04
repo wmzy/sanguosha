@@ -31,8 +31,9 @@ const AGAIN_RT = '界纵玄/again'; // 是否继续选
 const CONFIRM_KEY = '界纵玄/confirmed';
 const PICK_KEY = '界纵玄/cardId';
 const AGAIN_KEY = '界纵玄/again';
-/** turn.vars key:本回合上家弃牌触发已用过一次(回合结束 atom 自动清空 turn.vars) */
-const UPSTREAM_TRIGGERED_KEY = '界纵玄/upstreamTriggeredThisTurn';
+/** turn.vars key 前缀:本回合上家弃牌触发已用过一次。实际 key 附 :ownerId 以
+ *  支持同局多个界虞翻互不干扰(回合结束 atom 自动清空 turn.vars)。 */
+const UPSTREAM_TRIGGERED_PREFIX = '界纵玄/upstreamTriggeredThisTurn';
 
 /** 从 fromIndex 之后找下一个存活玩家索引;全死亡时返回 fromIndex */
 function findNextAlive(state: { players: { alive: boolean }[] }, fromIndex: number): number {
@@ -62,6 +63,8 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
+  // 每玩家独立的上家触发标记 key(防同局多界虞翻共享全局标记)
+  const upstreamKey = `${UPSTREAM_TRIGGERED_PREFIX}:${ownerId}`;
 
   // ── 弃置 after-hook:自己弃置(任意次)或上家弃置(每回合首次)──
   registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
@@ -76,8 +79,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 自己弃置——任意次触发
     } else if (isUpstreamOf(st, discarder, ownerId)) {
       // 上家弃置——每回合首次
-      if (st.turn.vars[UPSTREAM_TRIGGERED_KEY]) return;
-      st.turn.vars[UPSTREAM_TRIGGERED_KEY] = true;
+      if (st.turn.vars[upstreamKey]) return;
+      st.turn.vars[upstreamKey] = true;
       isUpstream = true;
     } else {
       // 非自己非上家——不触发

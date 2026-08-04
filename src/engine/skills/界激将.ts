@@ -138,14 +138,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         delete state.localVars[USE_CHOICE_VAR];
         delete state.localVars[USE_KILL_TARGET_VAR];
 
+        // 官方:出杀 → 走完整杀结算(runUseFlow→杀.resolveSlash),
+        //      damageType 由 cardMap 自动传导(火杀/雷杀不再丢);
+        //      不出杀无效果(同标激将)。界激将的摸牌仅由被动触发 hook 负责,
+        //      不在主动激将拒绝时摸牌(否则主公可反复激将刷牌)。
         if (choice?.cardId && Array.isArray(choice.targets) && choice.targets.length > 0) {
-          // 出杀 → 走完整杀结算(runUseFlow→杀.resolveSlash),
-          // damageType 由 cardMap 自动传导(火杀/雷杀不再丢失);
-          // 不出杀无效果。
           await runUseFlow(state, target, choice.cardId, choice.targets, '杀');
-        } else {
-          // 不出:主公摸 1 张(界激将补充规则,沿用原行为)
-          await applyAtom(state, { type: '摸牌', player: from, count: 1 });
         }
         await popFrame(state);
       },

@@ -131,9 +131,8 @@ describe('界红颜', () => {
 
   // ─── 3. 装备区无红桃牌 → 手牌上限=体力(默认) ────────────────
   it('弃牌阶段:装备区无红桃牌 → 手牌上限=体力(health=1,手牌3应弃2)', async () => {
-    // 黑桃装备(红颜下视为红桃判定牌,但装备区花色判断用原始花色?界红颜装备检查用 card.suit)
-    // 界红颜的 hasHeartInEquipment 检查 card.suit==='♥';黑桃装备不算红桃装备
-    const spadeEquip = makeCard('eq1', '寒冰剑', '♠', 'A', '装备牌');
+    // 梅花装备(界红颜下不视为红桃)→ 不满足条件
+    const clubEquip = makeCard('eq1', '寒冰剑', '♣', 'A', '装备牌');
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -151,7 +150,7 @@ describe('界红颜', () => {
         c1: makeCard('c1', '闪', '♥', '1'),
         c2: makeCard('c2', '桃', '♥', '2'),
         c3: makeCard('c3', '闪', '♦', '4'),
-        eq1: spadeEquip,
+        eq1: clubEquip,
       },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -162,7 +161,7 @@ describe('界红颜', () => {
 
     await P0.triggerAction('回合管理', 'end', {});
 
-    // 装备区只有黑桃(非红桃)→ 不满足条件 → 上限=体力=1,手牌3 → 弃2
+    // 装备区只有梅花(非红桃/黑桃)→ 不满足条件 → 上限=体力=1,手牌3 → 弃2
     const rt = [...harness.state.pendingSlots.values()].map(
       (s) => (s.atom as { requestType?: string }).requestType,
     );

@@ -98,7 +98,7 @@ async function runSlashResolution(
 ): Promise<void> {
   if (!state.players[target]?.alive) return;
   const damageType = state.cardMap[cardId]?.damageType;
-  await pushFrame(state, SKILL_ID, source, { target, cardId });
+  const frame = await pushFrame(state, SKILL_ID, source, { target, cardId });
   try {
     await applyAtom(state, {
       type: '移动牌',
@@ -122,17 +122,9 @@ async function runSlashResolution(
     });
     if (!valid) return;
     await applyAtom(state, { type: '询问闪', target, source });
-    const dodgeIds = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-    if (dodgeIds.length > 0) {
+    // 闪走 runUseFlow → resolve 设本帧 cancelled=true;闪牌已自动入弃牌堆(无需手动移牌)。
+    if (frame.cancelled) {
       await applyAtom(state, { type: '被抵消', source, target, cardId });
-      for (const dId of dodgeIds) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: dId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
     } else if (state.players[target]?.alive) {
       await runDamageFlow(state, source, target, 1, cardId, damageType);
     }

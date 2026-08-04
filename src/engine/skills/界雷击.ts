@@ -168,7 +168,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!slot) return;
       const atom = slot.atom as unknown as { requestType?: string };
       if (atom.requestType === JUDGE_RT) {
-        st.localVars[JUDGE_KEY] = params.confirmed === true;
+        st.localVars[JUDGE_KEY] = params.choice === true || params.confirmed === true;
       } else if (atom.requestType === TARGET_RT) {
         const target = params.target;
         st.localVars[TARGET_KEY] = typeof target === 'number' ? target : null;

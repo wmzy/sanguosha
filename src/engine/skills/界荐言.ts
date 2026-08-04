@@ -6,8 +6,8 @@
 // 触发时机:出牌阶段(主动技) | 限制:每回合限一次
 // 流程:
 //   1. use action(出牌阶段限一次)
-//   2. 询问声明(请求回应 requestType='界荐言/declare'):
-//      选项 = 基本牌 / 锦囊牌 / 装备牌 / 红 / 黑(由 params.declaration 提供)
+//   2. 询问声明(请求回应 requestType='界荐言/declare',prompt=chooseOption):
+//      选项 = 基本牌 / 锦囊牌 / 装备牌 / 红 / 黑(由 params.option 提供)
 //   3. 询问目标(请求回应 requestType='界荐言/target',prompt=choosePlayer,男性过滤)
 //   4. 从牌堆顶连续翻牌到处理区,直到出现符合声明的牌:
 //      - 类别声明 → card.type === declaration
@@ -97,7 +97,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const rt = (slot.atom as unknown as { requestType?: string }).requestType;
       if (rt !== DECLARE_RT && rt !== TARGET_RT) return '当前不是荐言询问';
       if (rt === DECLARE_RT) {
-        if (!isValidDeclaration(params.declaration)) {
+        const decl = params.option ?? params.declaration;
+        if (!isValidDeclaration(decl)) {
           return '声明不合法(基本牌/锦囊牌/装备牌/红/黑)';
         }
       } else if (rt === TARGET_RT) {
@@ -111,8 +112,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const slot = st.pendingSlots.get(ownerId);
       const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
       if (rt === DECLARE_RT) {
-        if (isValidDeclaration(params.declaration)) {
-          st.localVars[DECLARATION_KEY] = params.declaration;
+        const decl = params.option ?? params.declaration;
+        if (isValidDeclaration(decl)) {
+          st.localVars[DECLARATION_KEY] = decl;
         }
       } else if (rt === TARGET_RT) {
         const t = params.target ?? (Array.isArray(params.targets) ? params.targets[0] : undefined);
@@ -164,10 +166,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           requestType: DECLARE_RT,
           target: ownerId,
           prompt: {
-            type: 'confirm',
+            type: 'chooseOption',
             title: '荐言:声明一种牌的类别(基本牌/锦囊牌/装备牌)或颜色(红/黑)',
             description:
               '选择类别:基本牌、锦囊牌、装备牌;或颜色:红、黑。连续亮出牌堆顶直到出现符合声明的牌。',
+            options: VALID_DECLARATIONS.map((d) => ({ value: d, label: d })),
           },
           defaultChoice: '基本牌',
           timeout: 30,

@@ -74,9 +74,13 @@ export function viewCanAttack(
   // 后端 杀.validate 严格校验。
   if (players[fromIdx]?.turnUsage?.['将驰/choice2']) return true;
   // 界弓骑(界韩当):弃牌后本回合攻击范围无限。
-  // turnUsage 由回合用量 atom 同步;激活时前端宽松放行(UI 提示),
+  // turnUsage 由 回合用量 atom 同步;激活时前端宽松放行(UI 提示),
   // 后端 distance.ts inAttackRange 严格校验。
   if (players[fromIdx]?.turnUsage?.['界弓骑/active']) return true;
+  // 当先(界廖化):额外出牌阶段获得的该张杀无距离限制。
+  // turnUsage 由 回合用量 atom 同步;激活时前端宽松放行(所有目标可点),
+  // 后端 distance.ts 的攻击范围豁免器按 cardId 严格校验(仅该张杀放行)。
+  if (players[fromIdx]?.turnUsage?.['当先/noRangeActive']) return true;
   const range = players[fromIdx]?.distanceVars?.attackRange ?? 1;
   return viewEffectiveDistance(players, fromIdx, toIdx) <= range;
 }

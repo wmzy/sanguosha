@@ -15,7 +15,7 @@
 //   - 触发时机:移动牌 after-hook(owner 手牌→处理区,在 owner 出牌阶段)
 //     和 装备 after-hook(owner 出牌阶段装备牌)
 //     (装备也是"使用牌",需要追踪。OL 装备使用计入 渐营 触发条件)
-//   - 限一次(第二段):player.vars['界渐营/transformUsedThisTurn'](后缀 /usedThisTurn 自动清空)
+//   - 限一次(第二段):player.vars['界渐营/transform/usedThisTurn'](后缀 /usedThisTurn 自动清空)
 //   - 转化(第二段):当作 atom 创建影子卡;若上一张牌有花色,override 影子卡 suit/color
 //   - 花色继承后视图同步限制:当作 atom 的 applyView 据源卡 view.cardMap 构造影子,
 //     override 是直接 mutate state.cardMap[shadowId](applyView 看不到),故视图可能不一致。
@@ -47,7 +47,7 @@ const LAST_SUIT_KEY = `${SKILL_ID}/lastSuit`;
 /** 上一张牌点数('' = 本阶段尚未使用过牌) */
 const LAST_RANK_KEY = `${SKILL_ID}/lastRank`;
 /** 第二段"当任意基本牌使用"限一次标记(后缀 /usedThisTurn 自动清空) */
-const TRANSFORM_USED_KEY = `${SKILL_ID}/transformUsedThisTurn`;
+const TRANSFORM_USED_KEY = `${SKILL_ID}/transform/usedThisTurn`;
 /** 询问 requestType:渐营是否摸一张 */
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
 /** localVars key:owner 是否确认摸牌 */

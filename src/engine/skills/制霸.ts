@@ -70,6 +70,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
+  const unloaders: Array<() => void> = [];
 
   // ── 为每个吴势力盟友(非孙策)注册 use action ──
   for (const p of state.players) {
@@ -77,7 +78,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (allyIdx === ownerId) continue;
     if (p.faction !== '吴') continue;
 
-    registerAction(
+    const u = registerAction(
       state,
       skill.id,
       allyIdx,
@@ -225,11 +226,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
       },
     );
+    unloaders.push(u);
   }
 
   // ── respond(注册到所有玩家):孙策处理拒绝/选拼点牌/获得确认 ──
   // dispatch 按 (skillId, ownerId, actionType) 查;以 requestType 区分三种询问。
-  const unloaders: Array<() => void> = [];
   for (const p of state.players) {
     const seatId = p.index;
     const u = registerAction(

@@ -104,10 +104,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     });
 
     const rawTargets = ctx.state.localVars[TARGETS_KEY] as number[] | undefined;
-    // 仅保留存活目标,并按"至多X名"硬规则 clamp(防越权多选)
+    // 仅保留存活目标,去重(各摸一张牌 → 同一角色只摸一次),并按"至多X名"硬规则 clamp(防越权多选)
     const targets = (
       Array.isArray(rawTargets)
-        ? rawTargets.filter((t) => ctx.state.players[t]?.alive === true)
+        ? rawTargets.filter(
+            (t, i, arr) => ctx.state.players[t]?.alive === true && arr.indexOf(t) === i,
+          )
         : []
     ).slice(0, maxTargets);
 

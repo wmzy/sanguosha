@@ -26,7 +26,9 @@ function canUseSupplyShortage(
   if (target === undefined) return '目标不合法';
   if (target === ownerId) return '不能对自己使用';
   if (!state.players[target]?.alive) return '目标已死亡';
-  if (effectiveDistance(state, ownerId, target) > 1) return '距离太远';
+  // 奇才/界奇才:使用锦囊牌无距离限制(与顺手牵羊一致)
+  const ignoreDistance = !!state.players[ownerId]?.tags.includes('奇才/无距离限制');
+  if (!ignoreDistance && effectiveDistance(state, ownerId, target) > 1) return '距离太远';
   if (state.players[target].pendingTricks.some((t) => t.name === '兵粮寸断'))
     return '目标判定区已有兵粮寸断';
   return null;

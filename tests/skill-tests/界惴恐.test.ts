@@ -137,9 +137,9 @@ describe('界惴恐', () => {
     expect(harness.state.zones.discardPile).toContain('c1');
     expect(harness.state.zones.discardPile).toContain('c2');
 
-    // 指定目标 hook 生效:P1 对 P2 指定 → 被 cancel(返回 false)
+    // 成为目标 hook 生效:P1 对 P2 指定 → 被 cancel(返回 false)
     const r1 = await applyAtom(harness.state, {
-      type: '指定目标',
+      type: '成为目标',
       source: 1,
       target: 2,
       cardId: 'c1',
@@ -147,7 +147,7 @@ describe('界惴恐', () => {
     expect(r1).toBe(false);
     // P1 对自己指定 → 允许(返回 true)
     const r2 = await applyAtom(harness.state, {
-      type: '指定目标',
+      type: '成为目标',
       source: 1,
       target: 1,
       cardId: 'c1',
@@ -155,7 +155,7 @@ describe('界惴恐', () => {
     expect(r2).toBe(true);
     // P2(未被限制)对 P1 指定 → 允许(返回 true)
     const r3 = await applyAtom(harness.state, {
-      type: '指定目标',
+      type: '成为目标',
       source: 2,
       target: 1,
       cardId: 'c1',

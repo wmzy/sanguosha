@@ -30,7 +30,7 @@ export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
-    name: '酒池',
+    name: '界酒池',
     description:
       '转化技:黑桃手牌当酒使用,无次数限制;使用酒杀造成伤害后本回合崩坏失效',
   };

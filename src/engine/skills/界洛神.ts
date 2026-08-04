@@ -181,7 +181,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
         defaultChoice: true,
         timeout: 10,
       });
-      keepGoing = !!ctx.state.localVars['洛神/confirmed'];
+      // defaultChoice=true:超时(未设 localVars)应按「继续」处理,
+      // 故仅在玩家明确选择停止(confirmed===false)时退出,与 洛神/制霸 defaultChoice=true 模式一致。
+      keepGoing = (ctx.state.localVars['洛神/confirmed'] as boolean | undefined) !== false;
     }
     delete ctx.state.localVars['洛神/confirmed'];
   });

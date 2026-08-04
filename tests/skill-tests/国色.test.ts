@@ -218,7 +218,7 @@ describe('国色', () => {
 
   // ─── 6. 负面:目标距离>1 → 拒绝(3人局 P0→P2 = 2)──────────
 
-  it('目标距离>1 → 拒绝(4人局 P0→P2 = 2)', async () => {
+  it('目标距离>1 → 仍可使用(乐不思蜀无距离限制)', async () => {
     const diamond = makeCard('c1', '杀', '♦', '7');
     const state: GameState = createGameState({
       players: [
@@ -235,13 +235,12 @@ describe('国色', () => {
     await harness.setup(state);
     const P0 = harness.player('大乔');
 
-    // 4人环形座位 P0→P2 距离= min(2, 4-2)=2 > 1 → 拒绝
-    await P0.expectRejected({
-      skillId: '国色',
-      actionType: 'use',
-      params: { cardId: 'c1', target: 2 },
-    });
-    expect(harness.state.players[0].hand).toContain('c1');
+    // 4人环形座位 P0→P2 距离=2 > 1,但乐不思蜀无距离限制 → 成功
+    await P0.triggerAction('国色', 'use', { cardId: 'c1', target: 2 });
+    await waitForStable(harness.state);
+
+    expect(harness.state.players[2].pendingTricks[0].name).toBe('乐不思蜀');
+    expect(harness.state.zones.discardPile).toContain('c1');
   });
 
   // ─── 7. 负面:对自己使用 → 拒绝 ─────────────────────────────

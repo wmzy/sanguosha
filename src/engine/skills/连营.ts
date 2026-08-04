@@ -158,6 +158,27 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await maybeTriggerLianYing(ctx);
   });
 
+  // ── 移出至暂存区 before+after:陆逊的牌被移出游戏(界破军/界谦逊等) ──
+  //   通用 atom,可能作用于装备区(非手牌),before-hook 仅在涉及手牌时记录标记
+  registerBeforeHook(state, skill.id, ownerId, '移出至暂存区', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.type !== '移出至暂存区') return;
+    if (atom.target !== ownerId) return;
+    const hand = ctx.state.players[ownerId]?.hand ?? [];
+    if (atom.cardIds?.some((id) => hand.includes(id))) {
+      ctx.state.localVars[HAND_BEFORE_KEY] = hand.length;
+    }
+  });
+  registerAfterHook(state, skill.id, ownerId, '移出至暂存区', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.type !== '移出至暂存区') return;
+    if (atom.target !== ownerId) return;
+    const before = ctx.state.localVars[HAND_BEFORE_KEY];
+    delete ctx.state.localVars[HAND_BEFORE_KEY];
+    if (typeof before !== 'number') return; // 本次未涉及陆逊手牌
+    await maybeTriggerLianYing(ctx);
+  });
+
   return () => {};
 }
 

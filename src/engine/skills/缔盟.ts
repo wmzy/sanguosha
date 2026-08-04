@@ -107,9 +107,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         });
         const discardCards = st.localVars[DISCARD_KEY] as string[] | undefined;
         delete st.localVars[DISCARD_KEY];
-        if (discardCards && discardCards.length > 0) {
-          await applyAtom(st, { type: '弃置', player: ownerId, cardIds: discardCards, voluntary: true });
+        // 弃牌是交换的代价(「弃置...然后交换」);未完成弃牌(取消/超时)则中止,
+        // 不执行交换——与上方目标未选即中止的处理保持一致。
+        if (!discardCards || discardCards.length === 0) {
+          await popFrame(st);
+          return;
         }
+        await applyAtom(st, { type: '弃置', player: ownerId, cardIds: discardCards, voluntary: true });
       }
 
       // 3) 交换 A、B 手牌:记录原始手牌,逐张移动(移动牌 atom)

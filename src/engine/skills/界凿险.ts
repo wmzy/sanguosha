@@ -28,7 +28,7 @@ const TIAN_PREFIX = '屯田/田:';
 
 /** 复刻「回合结束」atom 的 per-turn 清理(cancel 回合结束后 atom.apply 不执行,需手动清理)。
  *  与 回合结束.ts apply 保持一致:清空 turn.vars、清所有玩家 duration='turn' 标记、
- *  清 /usedThisTurn|/healed|/givenCount|/givenTargets vars。 */
+ *  清 /usedThisTurn|/healed|/givenCount|/givenTargets|/basicUsed vars。 */
 function clearPerTurnState(state: GameState): void {
   state.turn.vars = {};
   for (const p of state.players) {
@@ -39,7 +39,8 @@ function clearPerTurnState(state: GameState): void {
           !k.endsWith('/usedThisTurn') &&
           !k.endsWith('/healed') &&
           !k.endsWith('/givenCount') &&
-          !k.endsWith('/givenTargets'),
+          !k.endsWith('/givenTargets') &&
+          !k.endsWith('/basicUsed'),
       ),
     );
   }

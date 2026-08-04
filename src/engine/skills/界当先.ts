@@ -51,6 +51,8 @@ const EXITING_KEY = '当先/exiting';
 const DMG_IN_PHASE_KEY = '当先/damageInPhase';
 /** turn.vars:无距离限制杀的 cardId(仅对当先获得的该张杀生效)。 */
 const NORANGE_KILL_KEY = '当先/noRangeKillCardId';
+/** turn.vars + view.turnUsage:无距离杀激活(布尔投影,供前端 viewCanAttack 宽松放行)。 */
+const NORANGE_ACTIVE_KEY = '当先/noRangeActive';
 
 /** localVars:玩家是否选择获得杀。 */
 const CONFIRMED_KEY = '当先/confirmed';
@@ -205,8 +207,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
           from: { zone: fromZone },
           to: { zone: '手牌', player: ownerId },
         });
-        // 标记此杀为无距离限制(被杀.use validate 读取)
+        // 标记此杀为无距离限制:后端攻击范围豁免器按 cardId 精确放行
         ctx.state.turn.vars[NORANGE_KILL_KEY] = killCardId;
+        // 同步投影到 view.turnUsage,供前端 viewCanAttack 宽松放行超距目标
+        // (前端无法感知具体 cardId,故宽松放行所有目标;后端豁免器按 cardId 严格校验)
+        ctx.state.turn.vars[NORANGE_ACTIVE_KEY] = true;
+        await applyAtom(ctx.state, {
+          type: '回合用量',
+          player: ownerId,
+          key: NORANGE_ACTIVE_KEY,
+          value: true,
+        });
       }
     }
 
@@ -231,10 +242,21 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
 
     // 7) 清理(turn.vars 会在 回合结束 atom 整体重置;这里显式清以保 hook 重入安全)
+    // 若无距离杀未被使用(仍在手牌),需同步清除前端 viewCanAttack 投影,
+    // 否则投影会泄漏到后续正常出牌阶段/回合(前端误放行超距目标)。
+    if (ctx.state.turn.vars[NORANGE_ACTIVE_KEY] !== undefined) {
+      await applyAtom(ctx.state, {
+        type: '回合用量',
+        player: ownerId,
+        key: NORANGE_ACTIVE_KEY,
+        value: false,
+      });
+    }
     delete ctx.state.turn.vars[ACTIVE_KEY];
     delete ctx.state.turn.vars[DMG_IN_PHASE_KEY];
     delete ctx.state.turn.vars[EXITING_KEY];
     delete ctx.state.turn.vars[NORANGE_KILL_KEY];
+    delete ctx.state.turn.vars[NORANGE_ACTIVE_KEY];
   });
 
   // ── 造成伤害 after-hook:统计额外出牌阶段内 owner 造成的伤害 ──
@@ -255,6 +277,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.cardId !== tracked) return;
     if (atom.from?.zone !== '手牌') return;
     delete ctx.state.turn.vars[NORANGE_KILL_KEY];
+    // 同步清除前端 viewCanAttack 投影,避免额外出牌阶段后续其他杀被前端误放行
+    delete ctx.state.turn.vars[NORANGE_ACTIVE_KEY];
+    await applyAtom(ctx.state, {
+      type: '回合用量',
+      player: ownerId,
+      key: NORANGE_ACTIVE_KEY,
+      value: false,
+    });
   });
 
   // ── 超时拦截:end-turn 链(阶段结束→清过期标记→下一玩家→回合结束)在额外阶段无效 ──

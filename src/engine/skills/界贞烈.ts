@@ -32,9 +32,10 @@
 //   - 来源(使用者)无牌可获时不弹面板,贞烈仍生效(只无效,不获益)
 //
 // 选项 ②(本回合结束阶段发动一次秘计):
-//   - 写 turn.vars[`秘计/pendingFrom贞烈/${ownerId}`] = true
-//   - 后缀非 /usedThisTurn,故「回合结束」atom 不会清(由 界秘计 在结束阶段消费;
-//     回合结束 atom 清 turn.vars 作兜底,跨回合不会泄漏)
+//   - 写 player.vars[`秘计/pendingFrom贞烈/${ownerId}`] = true
+//   - 用 player.vars 而非 turn.vars:贞烈常在他人的回合触发(防守),而秘计要到王异自己的
+//     结束阶段才消费;turn.vars 会被「回合结束」atom 每回合整块清空(state.turn.vars={}),
+//     跨回合会丢失。player.vars 的 key 后缀不在「回合结束」清理名单内,可持久至消费。
 //
 // 命名:文件名/loader key/character skill name 均为 '界贞烈';内部 Skill.name='贞烈'(OL 官方名)。
 import type {
@@ -69,7 +70,7 @@ const CHOOSE_KEY = '贞烈/choice';
 const INVALID_PREFIX = '贞烈/无效/';
 /** localVars 前缀:此牌对此 owner 已触发过贞烈(防同一张牌重复触发)。 */
 const PROCESSED_PREFIX = '贞烈/已处理/';
-/** turn.vars key:本回合结束阶段需发动一次秘计(由 界秘计.ts 消费)。 */
+/** player.vars key:本回合结束阶段需发动一次秘计(由 界秘计.ts 消费)。 */
 const MIJI_PENDING_PREFIX = '秘计/pendingFrom贞烈/';
 
 /** 完整无效 key */
@@ -186,8 +187,8 @@ async function runZhenlie(
       includeJudge: false,
     });
   } else {
-    // ② 本回合结束阶段发动一次秘计:写 turn.vars(回合结束 atom 自动清兜底)
-    state.turn.vars[`${MIJI_PENDING_PREFIX}${ownerId}`] = true;
+    // ② 本回合结束阶段发动一次秘计:写 player.vars(持久至王异结束阶段消费)
+    state.players[ownerId].vars[`${MIJI_PENDING_PREFIX}${ownerId}`] = true;
   }
 }
 

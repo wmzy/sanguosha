@@ -24,7 +24,7 @@ import type { Card, GameState } from '../../src/engine/types';
 
 const LAST_SUIT_KEY = '界渐营/lastSuit';
 const LAST_RANK_KEY = '界渐营/lastRank';
-const TRANSFORM_USED_KEY = '界渐营/transformUsedThisTurn';
+const TRANSFORM_USED_KEY = '界渐营/transform/usedThisTurn';
 
 function suitColor(suit: '♠' | '♥' | '♣' | '♦'): '红' | '黑' {
   return suit === '♥' || suit === '♦' ? '红' : '黑';

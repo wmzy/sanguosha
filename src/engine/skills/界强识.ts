@@ -65,6 +65,30 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
+  /** 询问 owner 是否摸一张牌(非锁定技,默认摸)——供 移动牌/装备 hook 复用。 */
+  const askDraw = async (st: GameState): Promise<void> => {
+    delete st.localVars[DRAW_KEY];
+    await applyAtom(st, {
+      type: '请求回应',
+      requestType: DRAW_RT,
+      target: ownerId,
+      prompt: {
+        type: 'confirm',
+        title: '强识:是否摸一张牌?(本阶段使用同类别的牌)',
+        confirmLabel: '摸牌',
+        cancelLabel: '不摸',
+      },
+      defaultChoice: true,
+      timeout: 15,
+    });
+    if (!st.localVars[DRAW_KEY]) {
+      delete st.localVars[DRAW_KEY];
+      return;
+    }
+    delete st.localVars[DRAW_KEY];
+    await applyAtom(st, { type: '摸牌', player: ownerId, count: 1 });
+  };
+
   // ── respond:按当前 pending requestType 分支 ──
   registerAction(
     state,
@@ -251,29 +275,33 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const card = st.cardMap[atom.cardId];
     if (!card) return;
     if (card.type !== category) return;
+    // 装备牌的使用走 装备 atom(手牌→装备区),不经 移动牌;
+    // 此处仅匹配基本/锦囊牌的使用,避免替换装备时旧牌(手牌→弃牌堆)误触发。
+    if (card.type === '装备牌') return;
     if (!st.players[ownerId]?.alive) return;
 
     // 询问是否摸一张牌(非锁定技,默认摸)
-    delete st.localVars[DRAW_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: DRAW_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '强识:是否摸一张牌?(本阶段使用同类别的牌)',
-        confirmLabel: '摸牌',
-        cancelLabel: '不摸',
-      },
-      defaultChoice: true,
-      timeout: 15,
-    });
-    if (!st.localVars[DRAW_KEY]) {
-      delete st.localVars[DRAW_KEY];
-      return;
-    }
-    delete st.localVars[DRAW_KEY];
-    await applyAtom(st, { type: '摸牌', player: ownerId, count: 1 });
+    await askDraw(st);
+  });
+
+  // ── 装备 after-hook:owner 出牌阶段内装备同类别的牌 → 询问摸一张 ──
+  // 装备 atom 直接手牌→装备区(不经 移动牌),故基本/锦囊走 移动牌 hook,装备牌走此处。
+  registerAfterHook(state, skill.id, ownerId, '装备', async (ctx) => {
+    const st = ctx.state;
+    if (st.currentPlayerIndex !== ownerId) return;
+    if (st.phase !== '出牌') return;
+    const category = st.players[ownerId]?.vars[CATEGORY_KEY];
+    if (typeof category !== 'string') return;
+
+    const atom = ctx.atom;
+    if (atom.player !== ownerId) return;
+    if (!st.players[ownerId]?.alive) return;
+
+    const card = st.cardMap[atom.cardId];
+    if (!card) return;
+    if (card.type !== category) return;
+
+    await askDraw(st);
   });
 
   // ── 阶段结束(出牌) after-hook:清除本阶段类别记录 ──

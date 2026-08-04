@@ -9,8 +9,8 @@
 // 触发时机:阶段开始(结束)after-hook(phase='回合结束')
 //   - OL 引擎"结束阶段" = phase '回合结束'(详见 勤学/崩坏/界志继 同位)
 //   - 王异存活 && X>0 时主动询问是否发动(描述"你可以")
-//   - 由 界贞烈 选项②挂起:turn.vars[`秘计/pendingFrom贞烈/${ownerId}`]=true
-//     此时强制发动一次(不询问),并消费挂起标记
+//   - 由 界贞烈 选项②挂起:player.vars[`秘计/pendingFrom贞烈/${ownerId}`]=true
+//     (跨回合持久,至王异结束阶段消费)此时强制发动一次(不询问),并消费挂起标记
 //
 // 选项"交给其他角色至多X张牌":
 //   - "其他角色" = 单一目标(官方 FAQ:秘计的分发目标为单一其他角色)
@@ -36,7 +36,7 @@ import { registerAction, registerAfterHook } from '../skill';
 const SKILL_ID = '界秘计';
 const DISPLAY_NAME = '秘计';
 
-/** turn.vars key 前缀:贞烈选项②挂起,界秘计消费(由 界贞烈.ts 写入) */
+/** player.vars key 前缀:贞烈选项②挂起,界秘计消费(由 界贞烈.ts 写入;持久至王异结束阶段) */
 const MIJI_PENDING_PREFIX = '秘计/pendingFrom贞烈/';
 /** 本次分发最大张数(供 giveCards validate 上限校验) */
 const GIVE_MAX_VAR = '界秘计/giveMax';
@@ -143,10 +143,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!st.players[ownerId]?.alive) return;
 
       //贞烈挂起的强制发动(优先于主动询问,确保 "本回合结束阶段发动一次秘计")
+      // 注意:标志须跨回合持久(贞烈常在他人的回合触发,秘计要到王异自己的结束阶段才消费),
+      // 故存于 player.vars(turn.vars 会被「回合结束」atom 每回合清空,跨回合会丢失)。
       const pendingKey = `${MIJI_PENDING_PREFIX}${ownerId}`;
-      const forced = st.turn.vars[pendingKey] === true;
+      const forced = st.players[ownerId].vars[pendingKey] === true;
       if (forced) {
-        delete st.turn.vars[pendingKey];
+        delete st.players[ownerId].vars[pendingKey];
         await runMijiOnce(st, ownerId, /*askActivate*/ false);
       }
 

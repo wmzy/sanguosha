@@ -36,10 +36,8 @@
 //   内部 Skill.name = '乱击'(OL 官方技能名,玩家可见)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
-import { applyAtom, popFrame, pushFrame, frameCards, topFrame } from '../create-engine';
-import { runDamageFlow } from '../damage-flow';
-import { 询问抵消 } from '../无懈可击';
-import { isCancelled } from '../card-effect/registry';
+import { applyAtom } from '../create-engine';
+import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';
 import { defaultPlayActive } from '../action-active';
 
 const SKILL_ID = '界乱击';
@@ -148,7 +146,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
-      await pushFrame(state, '界乱击', from, { ...params });
 
       // 计算默认目标:除使用者外所有存活角色,按座次从 from+1 顺时针
       const alivePlayers = state.players.filter((p) => p.alive);
@@ -191,51 +188,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
         }
       }
 
-      // 锦囊进处理区
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
+      // 走标准万箭齐发使用结算流程(runUseFlow):保留全部声明阶段与结算阶段时机 atom
+      // (指定目标→成为目标→成为目标后→检测有效性→生效前→无懈→生效时→生效后→
+      //   询问闪+伤害→使用结算结束时)及其 before/after hook,与标版万箭齐发.use 完全一致。
+      // 与标版唯一差异:targets 已预先排除"少选"的 1 名。
+      // (此前手写逐目标循环漏掉了 检测有效性/成为目标/生效前 等 atom,导致空城/谦逊等
+      //   "不能成为目标"锁定技对界袁绍的万箭齐发失效。)
+      await runUseFlow(state, from, cardId, targets, '万箭齐发', {
+        onSettle: chargeOnSettle(state, from, cardId),
       });
-
-      // 逐个询问无懈 + 闪 + 伤害(镜像标版万箭齐发.use)
-      try {
-        for (const target of targets) {
-          if (!state.players[target]?.alive) continue;
-          // 重置帧 cancelled（多目标独立抵消）
-          const f = state.settlementStack[state.settlementStack.length - 1];
-          if (f) f.cancelled = false;
-          const cancelled = await 询问抵消(state, { cardName: '无懈可击', broadcast: true }, from, target);
-          if (cancelled) continue;
-
-          await applyAtom(state, { type: '询问闪', target, source: from });
-          // 闪走 runUseFlow → resolve 设本帧 cancelled=true；runUseFlow finally 自动移牌。
-          if (isCancelled(state, cardId, target)) {
-            await applyAtom(state, { type: '被抵消', source: from, target, cardId });
-          } else {
-            if (!state.players[target]?.alive) continue;
-            await runDamageFlow(state, from, target, 1, cardId);
-          }
-        }
-        // 锦囊移出处理区→弃牌堆
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      } finally {
-        if (frameCards(state).includes(cardId)) {
-          await applyAtom(state, {
-            type: '移动牌',
-            cardId,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
-          });
-        }
-        await popFrame(state);
-      }
     },
   );
 

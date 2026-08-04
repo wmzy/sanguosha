@@ -37,9 +37,10 @@ const SKIP_MO_TAG = '神速/跳过摸牌';
 const SKIP_PLAY_TAG = '神速/跳过出牌';
 const FLIP_TAG = '神速/翻面'; // 翻面标签(下一回合被消费,跳过整回合)
 const SKIP_FLAG = '神速/skipAll'; // 翻面生效时跳过整回合的标志(localVars)
-const OPT1_USED_KEY = '神速/opt1Used';
-const OPT2_USED_KEY = '神速/opt2Used';
-const OPT3_USED_KEY = '神速/opt3Used';
+// per-turn 标记(后缀 /usedThisTurn 由 回合结束 atom 自动清理)
+const OPT1_USED_KEY = '神速/opt1/usedThisTurn';
+const OPT2_USED_KEY = '神速/opt2/usedThisTurn';
+const OPT3_USED_KEY = '神速/opt3/usedThisTurn';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -286,9 +287,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const target = ctx.state.localVars['神速/target'] as number | undefined;
       delete ctx.state.localVars['神速/target'];
 
-      // 标记选项2已使用 + 加跳过出牌标签
+      // 标记选项2已使用(出牌阶段由下方 skipPhase 直接跳过,无需再加标签;
+      // 否则标签残留到下回合会被「跳过出牌」hook 误消费,导致下回合出牌阶段被错误跳过)
       self.vars[OPT2_USED_KEY] = true;
-      await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_PLAY_TAG });
 
       // 弃置装备牌
       await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [equipCardId], voluntary: true });

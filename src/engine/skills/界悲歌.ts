@@ -36,6 +36,7 @@ import type {
 } from '../types';
 import { applyAtom, frameCards } from '../create-engine';
 import { runJudgeFlow } from '../judge-flow';
+import { flipFaceDown, flipFaceUp } from '../face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const START_RT = '界悲歌/chooseStart';
@@ -208,7 +209,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (sourceIdx === undefined) return;
       const source = ctx.state.players[sourceIdx];
       if (!source?.alive) return;
-      await applyAtom(ctx.state, { type: '加标签', player: sourceIdx, tag: SKIP_TAG });
+      // 翻面须经 flipFaceDown,以补发「翻面后」时机(解围等 /翻面 hook 消费者依赖此事件)
+      await flipFaceDown(ctx.state, sourceIdx, '界悲歌');
     }
 
     // 奖励:若弃置了牌,比较花色/点数获得对应牌(判定牌与弃置牌此时都在弃牌堆)
@@ -254,7 +256,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 入口:准备阶段开始 + 该玩家有翻面标签 → 启动跳过
       if (atom.phase === '准备' && p.tags.includes(SKIP_TAG)) {
-        await applyAtom(ctx.state, { type: '去标签', player, tag: SKIP_TAG });
+        // 翻回正面须经 flipFaceUp,以补发「翻面后」时机(与翻面对称)
+        await flipFaceUp(ctx.state, player, '界悲歌');
         ctx.state.localVars[SKIP_FLAG] = player;
         return { kind: 'cancel' };
       }

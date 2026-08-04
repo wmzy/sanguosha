@@ -189,6 +189,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       targetPlayer.hand.length > 0 || Object.keys(targetPlayer.equipment).length > 0;
     if (!hasCards) return;
 
+    // 清除上次杀可能残留的禁闪标签:标签本应"单次杀结算"由 询问闪 before-hook 消费,
+    // 但若本杀结算被跳过(检测有效性被仁王盾/藤甲 cancel,或 成为目標 被空城等技能 cancel),
+    // 询问闪未触发,标签会残留并串扰下一次对该目标的杀(误禁闪)。同 界烈弓,每次指定目标先清空残留。
+    if (targetPlayer.tags.includes(TAG)) {
+      await applyAtom(ctx.state, { type: '去标签', player: target, tag: TAG });
+    }
+
     // 询问庞德是否发动鞬出("你可以"——可选)
     delete ctx.state.localVars[CONFIRM];
     await applyAtom(ctx.state, {

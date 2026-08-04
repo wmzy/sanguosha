@@ -121,7 +121,7 @@ describe('神速', () => {
     // P2 受 1 点伤害(无闪可出)
     expect(harness.state.players[1].health).toBe(3);
     // 神速① 标记已用
-    expect(harness.state.players[0].vars['神速/opt1Used']).toBe(true);
+    expect(harness.state.players[0].vars['神速/opt1/usedThisTurn']).toBe(true);
     // 跳过摸牌标签存在
     expect(harness.state.players[0].tags).toContain('神速/跳过摸牌');
   });
@@ -255,7 +255,7 @@ describe('神速', () => {
     expect(harness.state.players[0].equipment['武器']).toBeUndefined();
     expect(harness.state.zones.discardPile).toContain('w1');
     expect(harness.state.players[1].health).toBe(3);
-    expect(harness.state.players[0].vars['神速/opt2Used']).toBe(true);
+    expect(harness.state.players[0].vars['神速/opt2/usedThisTurn']).toBe(true);
   });
 
   it('负面(选项2):无装备 → 不询问(直接进入出牌)', async () => {
@@ -321,7 +321,7 @@ describe('神速', () => {
     // P2 受 1 点伤害(无闪可出)
     expect(harness.state.players[1].health).toBe(3);
     // 神速③ 标记已用
-    expect(harness.state.players[0].vars['神速/opt3Used']).toBe(true);
+    expect(harness.state.players[0].vars['神速/opt3/usedThisTurn']).toBe(true);
     // 翻面标签存在(下一回合被消费)
     expect(harness.state.players[0].tags).toContain('神速/翻面');
   });

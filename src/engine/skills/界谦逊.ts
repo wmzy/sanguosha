@@ -8,15 +8,13 @@
 //   ① 触发钩点(两条路径,覆盖官方描述中"延时锦囊"与"普通锦囊"两类):
 //      路径 1「添加延时锦囊」after:延时锦囊(乐不思蜀/兵粮寸断/闪电)放置到陆逊判定区时触发。
 //        延时锦囊天然单目标,无需额外唯一目标判定。
-//      路径 2「请求回应」after(无懈窗口收敛点):所有普通锦囊(决斗/顺手牵羊/过河拆桥/火攻/
-//        借刀杀人 等)在生效前都调用 询问无懈可击(state, target);该 helper 内部循环开
-//        请求回应 atom(requestType='无懈可击', cancelTarget=本次抵消目标)。本 hook 监听该 atom:
-//          - 本窗口无人打出无懈(localVars[`无懈/已回应/${target}`]===false)→ 最后一个窗口
-//          - 累计未被抵消(localVars[`无懈/被抵消/${target}`]===false,即 0 或偶数次无懈)
-//          - frame.from≠陆逊(他人使用)+ 帧处理区有普通锦囊 + 陆逊是该锦囊唯一目标
-//        满足以上 = 该普通锦囊确定对陆逊生效,触发谦逊。
+//      路径 2「生效时」after:普通锦囊(决斗/顺手牵羊/过河拆桥/火攻/借刀杀人 等)经
+//        runSettlementPhase 结算,在无懈可击抵消判定之后、效果执行之前触发「生效时」atom
+//        (见 atoms/生效时.ts:该时机专供"若此牌未被抵消,确定将会生效"型技能,即谦逊)。
+//        故无需自行判断无懈/抵消状态——能到达此 atom 即代表该普通锦囊确定生效。
+//        条件:atom.target=陆逊 + frame.from≠陆逊(他人使用)+ 帧处理区有普通锦囊 + 陆逊是该锦囊唯一目标。
 //        该路径统一覆盖"经成为目标"(决斗)与"直接生效型"(顺手牵羊/过河拆桥/火攻/借刀杀人 等)
-//        两类普通锦囊——前者也会经过 询问无懈可击,故无需再加 成为目标 钩子。
+//        两类普通锦囊——均走 runSettlementPhase 的「生效时」时机,故无需再加 成为目标 钩子。
 //   ② 询问 confirm;确认后用「移出至暂存区」atom 把全部手牌暂存到 player.vars['界谦逊/移出']。
 //   ③ 「回合结束」after-hook:检测到移出区非空 → 用「归还暂存牌」atom 归还手牌。
 //
@@ -144,19 +142,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await maybeOfferExile(ctx, `延时锦囊${atom.trick?.name ? '「' + atom.trick.name + '」' : ''}对你生效`);
   });
 
-  // ── 普通锦囊(他人使用,陆逊为唯一目标):无懈窗口收敛点触发 ──
-  //    覆盖所有走 询问无懈可击 的普通锦囊:决斗 / 顺手牵羊 / 过河拆桥 / 火攻 / 借刀杀人 等。
-  registerAfterHook(state, skill.id, ownerId, '请求回应', async (ctx) => {
+  // ── 普通锦囊(他人使用,陆逊为唯一目标):「生效时」触发 ──
+  //    「生效时」atom 在锦囊未被无懈抵消、确定将会生效时触发(见 atoms/生效时.ts)。
+  //    覆盖所有普通锦囊:决斗 / 顺手牵羊 / 过河拆桥 / 火攻 / 借刀杀人 等。
+  registerAfterHook(state, skill.id, ownerId, '生效时', async (ctx) => {
     const atom = ctx.atom;
-    if (atom.type !== '请求回应') return;
-    if (atom.requestType !== '无懈可击') return; // 仅无懈窗口(谦逊自身 prompt 走 CONFIRM_RT,被此过滤排除)
-    if (atom.cancelTarget !== ownerId) return; // 本次抵消目标不是陆逊
-    // 本窗口无人打出无懈 = 这是 询问无懈可击 的最后一个窗口
-    const respondedKey = `无懈/已回应/${ownerId}`;
-    if (ctx.state.localVars[respondedKey] === true) return;
-    // 累计未被抵消(0 或偶数次无懈)→ 锦囊将生效
-    const cancelKey = `无懈/被抵消/${ownerId}`;
-    if (ctx.state.localVars[cancelKey] === true) return;
+    if (atom.type !== '生效时') return;
+    if (atom.target !== ownerId) return; // 目标不是陆逊
     const frame = topFrame(ctx.state);
     if (!frame) return;
     if (frame.from === ownerId) return; // 自己使用的锦囊不触发

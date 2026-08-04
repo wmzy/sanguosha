@@ -12,7 +12,7 @@
 //   1. 成为目标 before:杀/决斗 在 成为目标 atom 阶段即 cancel(杀流程检测到 false 跳过)
 //   2. 检测有效性 before:杀/决斗 的备援拦截(防其他流程绕过 成为目标)
 //   3. 询问杀 before:南蛮入侵 不询问 owner 出杀
-//   4. 造成伤害 before:南蛮/万箭/决斗/火攻/AOE 等伤害被 cancel(含 杀 备援)
+//   4. 受到伤害 before:南蛮/万箭/决斗/火攻/AOE 等伤害被 cancel(含 杀 备援)
 //   5. 获得 before:顺手牵羊/借刀杀人(获武器)不能从 owner 处获得
 //   6. 弃置 before:过河拆桥 不弃置 owner 的牌
 //   7. 设横置 before:铁索连环 不对 owner 横置
@@ -161,13 +161,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ),
   );
 
-  // ── 拦截 4:造成伤害(南蛮/万箭/决斗/火攻/AOE;含 杀 备援)──
+  // ── 拦截 4:受到伤害(南蛮/万箭/决斗/火攻/AOE;含 杀 备援)──
+  //    必须用「受到伤害时」(时机3,目标方);damage-flow 仅在 伤害结算开始时/受到伤害时
+  //    这两个时机检查 cancel 返回值,「造成伤害时」(时机2,来源方)的 cancel 会被忽略。
   unloaders.push(
     registerBeforeHook(
       state,
       skill.id,
       ownerId,
-      '造成伤害时',
+      '受到伤害时',
       async (ctx): Promise<HookResult | void> => {
         if (!isActiveFor(ctx.state, ownerId)) return;
         const atom = ctx.atom;

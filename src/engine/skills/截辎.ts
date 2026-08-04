@@ -17,15 +17,19 @@
 //
 //   故检测策略:
 //   1) 阶段开始(摸牌) after-hook:标记 normalDrawPhase=player(仅正常开始时执行;被跳过时不执行)
-//   2) 阶段结束(摸牌) after-hook:两个分支:
-//      A) 正常结束(normalDrawPhase === player):若有"辎" → 移除 + 执行额外摸牌阶段
+//   2) 阶段结束(摸牌) before-hook:两个分支(必须用 before-hook,见下):
+//      A) 正常开始(normalDrawPhase === player):若有"辎" → 移除 + 执行额外摸牌阶段
 //      B) 被跳过(normalDrawPhase !== player):触发 截辎(owner 选目标)
 //
-// 额外摸牌阶段的执行(关键设计,避免双重 出牌窗口 循环):
-//   不能在 阶段结束(摸牌) after-hook 中再 applyAtom(阶段结束,摸牌)——会触发 回合管理 的
-//   after-hook 启动第二个 出牌窗口 循环(双重 pending 损坏状态)。
-//   改用"半程"执行:applyAtom(阶段开始, 摸牌) + applyAtom(摸牌, count=2),
-//   不再 applyAtom(阶段结束, 摸牌) —— 让外层 回合管理 的 after-hook 自然推进到 出牌。
+// 额外摸牌阶段的执行(挂 阶段结束(摸牌) before-hook,而非 after-hook):
+//   回合管理 的 阶段结束(摸牌) after-hook 会把 state.phase 推进到"出牌"并启动出牌窗口循环,
+//   且其注册早于 截辎(DEFAULT_SKILLS 排在角色技能前),after-hook 中 截辎 会晚于它执行。
+//   若 截辎 用 after-hook 再 applyAtom(阶段开始,摸牌),会把 state.phase 重置回"摸牌",
+//   导致出牌窗口循环提前退出、阶段卡死。改用 before-hook:截辎 先于 回合管理 结算,执行额外摸牌
+//   (applyAtom(阶段开始,摸牌) + applyAtom(摸牌,count=2)),随后原 阶段结束(摸牌) 正常 apply,
+//   回合管理 的 after-hook 再把阶段推进到出牌。
+//   - 不能在 before-hook 中再 applyAtom(阶段结束,摸牌)——会二次触发 回合管理 after-hook,
+//     启动第二个出牌窗口循环(双重 pending 损坏状态)。
 //   - 阶段开始(摸牌) 会触发 英姿/好施 等的 before-hook(其 usedThisTurn 防重入,不会二次发动)
 //   - 完成后必须清除 normalDrawPhase 标记:额外 阶段开始(摸牌) 把它重设为 phasePlayer,
 //     若不清除,下次该玩家摸牌阶段被跳过时会误判为"正常开始"(检测失效)
@@ -45,7 +49,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 /** localVars key:最近一个正常开始的摸牌阶段所属玩家 */
 const NORMAL_KEY = '截辎/normalDrawPhase';
@@ -126,8 +130,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ctx.state.localVars[NORMAL_KEY] = atom.player;
   });
 
-  // ── 阶段结束(摸牌) after-hook:两个分支 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
+  // ── 阶段结束(摸牌) before-hook:两个分支(before 先于 回合管理 after-hook,见文件头说明) ──
+  registerBeforeHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.phase !== '摸牌') return;
@@ -148,7 +152,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         markId: ZI_MARK_ID,
       });
 
-      // 执行额外的摸牌阶段(半程:阶段开始(摸牌) + 摸牌;不再 阶段结束)
+      // 执行额外的摸牌阶段(阶段开始(摸牌) + 摸牌;不再 阶段结束 以免二次触发 回合管理)
       // 阶段开始(摸牌) 会触发 英姿/好施 等 before-hook(其 usedThisTurn 防重入不会二次发动)
       await applyAtom(ctx.state, {
         type: '阶段开始',

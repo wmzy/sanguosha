@@ -141,8 +141,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
       delete st.localVars[CONFIRMED_KEY];
 
-      // 2) 询问失去 N 点体力(1..当前体力;通过 hpCount 参数回复)
-      const maxN = self.health;
+      // 2) 询问失去 N 点体力(1..min(当前体力, 可选目标数));
+      //    X=N:失去的每点体力须对应1名获「烈」目标,故上限 clamp 到存活其他角色数。
+      const maxN = Math.min(self.health, otherAlive.length);
       delete st.localVars[HP_KEY];
       await applyAtom(st, {
         type: '请求回应',

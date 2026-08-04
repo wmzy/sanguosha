@@ -50,6 +50,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
   registerAfterHook(state, skill.id, ownerId, '成为目标', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
+    // 流离仅在成为【杀】的目标时触发(决斗/借刀杀人等其他牌同样发「成为目标」,不应触发)
+    const triggerCardId = atom.cardId;
+    if (!triggerCardId) return;
+    const triggerCard = ctx.state.cardMap[triggerCardId];
+    if (!triggerCard || triggerCard.name !== '杀') return;
     const selfPlayer = ctx.state.players[ownerId];
     if (!selfPlayer || selfPlayer.hand.length === 0) return;
 

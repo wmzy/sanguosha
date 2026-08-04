@@ -17,7 +17,7 @@
 //   6. 死亡时触发:荀彧被杀死亡 → 仍可发动节命 → 选目标摸弃
 //   7. 目标手牌已 ≤ X:摸后超 X 才弃,不超不弃
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -359,6 +359,12 @@ describe('界节命', () => {
     await P1.respond('界节命', { choice: true });
     P1.expectPending('请求回应');
     await P1.respond('界节命', { target: 0 });
+
+    // 节命在 受到伤害后 触发(修复后),先于濒死检查;
+    // 需等待濒死求桃失败 → 死亡结算完成
+    await fireTimeoutAndWait(harness.state);
+    await harness.waitForStable();
+    harness.processAllEvents();
 
     // P0 摸 4 张(X = min(4, 5) = 4),无需弃
     expect(harness.state.players[0].hand.length).toBe(4);

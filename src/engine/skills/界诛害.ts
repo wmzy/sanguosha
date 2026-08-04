@@ -18,8 +18,8 @@
 // 命名:文件名/loader key/character skill name 均为 '界诛害'(避开与未来标版冲突);
 //   内部 Skill.name = '诛害'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../create-engine';
-import { runDamageFlow } from '../damage-flow';
+import { applyAtom } from '../create-engine';
+import { runUseFlow } from '../card-effect/use-card';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界诛害';
@@ -57,9 +57,14 @@ function hasKillInHand(state: GameState, ownerId: number): boolean {
 }
 
 /**
- * 执行一次【杀】的完整结算(指定目标→成为目标→检测有效性→询问闪→伤害/抵消)。
- * 真实杀牌:移动到处理区→结算末尾入弃牌堆。不计入出杀次数(回合外触发)。
- * 无距离限制(诛害特例)。
+ * 执行一次【杀】的完整结算。走 runUseFlow('杀'),与 借刀杀人/乱武 强制出杀一致:
+ * 覆盖全部时机(选择目标时→使用时→指定目标→成为目标→指定目标后→成为目标后→
+ * 检测有效性→生效前[询问闪]→生效时→生效后[伤害]→使用结算结束时),保证 无双/贞烈/
+ * 铁骑/肉林/贯石斧/谦逊 等横切技能正确交互。此前手写实现遗漏了 指定目标后/成为目标后/
+ * 生效前/生效时/生效后 等时机,且 被抵消 后未重新检查 cancelled(贯石斧强命失效)。
+ * 不计入出杀次数(runUseFlow 不累加 quota,仅 杀.use 主动出杀时累加);
+ * 不受距离限制(距离由 杀.use validate 校验,诛害绕过主动出杀入口)。
+ * 火杀/雷杀的 damageType 由 杀.resolve 自动传导。
  */
 async function runSlashResolution(
   state: GameState,
@@ -68,49 +73,7 @@ async function runSlashResolution(
   cardId: string,
 ): Promise<void> {
   if (!state.players[target]?.alive) return;
-  const damageType = state.cardMap[cardId]?.damageType;
-  const frame = await pushFrame(state, '诛害', source, { target, cardId });
-  try {
-    // 杀牌进处理区
-    await applyAtom(state, {
-      type: '移动牌',
-      cardId,
-      from: { zone: '手牌', player: source },
-      to: { zone: '处理区' },
-    });
-
-    // 指定目标 + 成为目标
-    await applyAtom(state, { type: '指定目标', source, target, cardId });
-    const becameTarget = await applyAtom(state, { type: '成为目标', source, target, cardId });
-    if (!becameTarget) {
-      // 目标不合法(如空城):收尾,杀牌入弃牌堆
-      return;
-    }
-    const valid = await applyAtom(state, { type: '检测有效性', source, target, cardId });
-    if (!valid) return;
-
-    // 询问闪
-    await applyAtom(state, { type: '询问闪', target, source });
-
-    // 闪走 runUseFlow → resolve 设本帧 cancelled=true；闪牌已自动入弃牌堆。
-    if (frame.cancelled) {
-      await applyAtom(state, { type: '被抵消', source, target, cardId });
-    } else if (state.players[target]?.alive) {
-      await runDamageFlow(state, source, target, 1, cardId, damageType);
-    }
-  } finally {
-    // 收尾:杀牌入弃牌堆(若仍滞留处理区)
-    if (frameCards(state).includes(cardId)) {
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-    }
-    void frame;
-    await popFrame(state);
-  }
+  await runUseFlow(state, source, cardId, [target], '杀');
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {

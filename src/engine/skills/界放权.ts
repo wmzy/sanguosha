@@ -48,7 +48,7 @@ const EXTRA_TARGET_KEY = '放权/extraTarget';
 const ORIGINAL_NEXT_KEY = '放权/originalNext';
 
 /** 复刻「回合结束」atom 的 per-turn 清理(cancel 回合结束后 atom.apply 不执行,需手动清理)。
- *  清空 turn.vars、清所有玩家 duration='turn' 标记、清 /usedThisTurn|/healed|/givenCount|/givenTargets vars。
+ *  清空 turn.vars、清所有玩家 duration='turn' 标记、清 /usedThisTurn|/healed|/givenCount|/givenTargets|/basicUsed vars。
  *  marks 多数由 end action 的 清过期标记 已清(仅结束玩家),此处补全所有玩家以保持与 atom 一致。
  *  注意:不清理 state.localVars(放权内部标记 extraTarget/originalNext 须跨清理存活)。 */
 function clearPerTurnState(state: GameState): void {
@@ -61,7 +61,8 @@ function clearPerTurnState(state: GameState): void {
           !k.endsWith('/usedThisTurn') &&
           !k.endsWith('/healed') &&
           !k.endsWith('/givenCount') &&
-          !k.endsWith('/givenTargets'),
+          !k.endsWith('/givenTargets') &&
+          !k.endsWith('/basicUsed'),
       ),
     );
   }

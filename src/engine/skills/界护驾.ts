@@ -248,7 +248,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  // 曹操的护驾 action:被询问闪时激活
+  // 单 respond 注册(同界激将/标护驾)。前端 skillActionRegistry 以
+  // `${skillId}:${ownerId}:${actionType}` 为键、Map.set 后者覆盖前者;同 key 多次
+  // defineAction 仅最后一条留存。故护驾主按钮(曹操·询问闪)、出闪(魏角色·界护驾/出闪)、
+  // 摸牌(魏角色·drawChoice)三条 respond 必须合并为一条 activeWhen 分支,否则仅摸牌留存,
+  // 护驾主按钮与出闪 UI 丢失、无法发动(见标护驾.ts 同名注释)。
+  //   - 魏角色出闪的卡牌选择由 pending 的 candidates(投影层注入)驱动,不依赖本 action.prompt;
+  //   - 摸牌的 confirm 文案由 pending.prompt(请求回应 atom)驱动,AwaitingPrompt 直接读 pending。
   api.defineAction('respond', {
     label: '界护驾',
     style: 'primary',
@@ -261,52 +267,16 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     activeWhen: (ctx) => {
       const slot = ctx.view.pending;
       if (!slot) return false;
-      if ((slot.atom as { type: string }).type !== '询问闪') return false;
       if (slot.target !== ctx.perspectiveIdx) return false;
+      const atom = slot.atom as { type: string; requestType?: string };
+      // 曹操被询问闪 → 发动护驾(confirm)
+      if (atom.type === '询问闪') return true;
+      // 魏势力角色收到 护驾/出闪 询问 → 出闪(卡牌选择由 pending 驱动)
+      if (atom.type === '请求回应' && atom.requestType === '界护驾/出闪') return true;
+      // 魏势力角色收到"是否令曹操摸牌"询问 → confirm(文案由 pending.prompt 驱动)
+      if (atom.type === '请求回应' && atom.requestType === REQUEST_TYPE) return true;
       // 势力检查由后端 validate 处理(GameView 不暴露 faction)
-      // 此处仅检查当前被询问闪,前端会渲染护驾按钮;后端拒绝无魏势力角色的场景
-      return true;
-    },
-  });
-
-  // 魏势力角色的护驾 respond(收到护驾询问时渲染出闪 UI)
-  api.defineAction('respond', {
-    label: '护驾·出闪',
-    style: 'default',
-    prompt: {
-      type: 'useCard',
-      title: '护驾:打出一张闪?',
-      cardFilter: { filter: (c) => c.name === '闪', min: 1, max: 1 },
-    },
-    activeWhen: (ctx) => {
-      const slot = ctx.view.pending;
-      if (!slot) return false;
-      const atom = slot.atom as { type: string; requestType?: string };
-      if (atom.type !== '请求回应') return false;
-      if (atom.requestType !== '界护驾/出闪') return false;
-      if (slot.target !== ctx.perspectiveIdx) return false;
-      return true;
-    },
-  });
-
-  // 魏势力角色的护驾 respond(收到"是否令曹操摸牌"询问时渲染按钮)
-  api.defineAction('respond', {
-    label: '界护驾·摸牌',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '界护驾:是否令曹操摸一张牌?',
-      confirmLabel: '令曹操摸牌',
-      cancelLabel: '不发动',
-    },
-    activeWhen: (ctx) => {
-      const slot = ctx.view.pending;
-      if (!slot) return false;
-      const atom = slot.atom as { type: string; requestType?: string };
-      if (atom.type !== '请求回应') return false;
-      if (atom.requestType !== REQUEST_TYPE) return false;
-      if (slot.target !== ctx.perspectiveIdx) return false;
-      return true;
+      return false;
     },
   });
 

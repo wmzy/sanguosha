@@ -275,6 +275,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const winTarget = ctx.state.turn.vars[WIN_VAR];
       if (typeof winTarget !== 'number') return;
       if (atom.target !== winTarget) return;
+      // 无视防具仅对【杀】有意义(防具只防御杀)。非杀牌(顺手牵羊/过河拆桥等)同样触发
+      // 指定目标,但它们既不造成伤害也不会被闪抵消,会令卸载的防具永远无法恢复(永久失效)。
+      const cardId = atom.cardId;
+      if (typeof cardId !== 'string') return;
+      const card = ctx.state.cardMap[cardId];
+      if (!card || card.name !== '杀') return;
       const targetPlayer = ctx.state.players[winTarget];
       if (!targetPlayer) return;
       const armorId = targetPlayer.equipment?.['防具'];

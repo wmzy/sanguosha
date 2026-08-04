@@ -89,8 +89,11 @@ async function resolveGuSlash(
     const valid = await applyAtom(state, { type: '检测有效性', source, target, cardId });
     if (!valid) return; // 仁王盾黑杀无效等
     await applyAtom(state, { type: '询问闪', target, source });
+    // 真实闪走 runUseFlow → resolve 设杀帧 cancelled=true(牌已自动入弃牌堆,不在处理区);
+    // 八卦阵等虚拟闪直接入处理区。两者皆须检测(镜像 询问抵消 helper 的双轨逻辑)。
+    const slashFrame = state.settlementStack[state.settlementStack.length - 1];
     const dodgeIds = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-    if (dodgeIds.length > 0) {
+    if (slashFrame?.cancelled || dodgeIds.length > 0) {
       // 被抵消:触发武器技(贯石斧强命/青龙追杀,frame.skillId==='杀' 命中)
       await applyAtom(state, { type: '被抵消', source, target, cardId });
       const remaining = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');

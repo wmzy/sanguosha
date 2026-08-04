@@ -85,7 +85,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (!self.hand.includes(cardId)) return '牌不在手牌中';
         if (!isTrickCard(st.cardMap[cardId])) return '只能选择锦囊牌';
 
-        const target = params.target as number | undefined;
+        // 前端 useCardAndTarget 对普通锦囊提交 targets(数组)、对延时锦囊提交 target(单数),
+        // 两者均需兼容(与国色/顺手牵羊 等一致)。
+        const target =
+          (params.target as number | undefined) ??
+          (params.targets as number[] | undefined)?.[0];
         if (typeof target !== 'number') return '请指定一名目标';
         if (target === ownerId) return '不能以自己为目标';
         const tp = st.players[target];
@@ -95,7 +99,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       },
       async (st: GameState, params: Record<string, Json>): Promise<void> => {
         const from = ownerId;
-        const target = params.target as number;
+        const target =
+          ((params.target as number | undefined) ??
+            (params.targets as number[] | undefined)?.[0]) as number;
         const cardId = params.cardId as string;
 
         // 限一次标记:第一个 await 前设置,防 dispatch 重入
