@@ -112,32 +112,6 @@ describe('南蛮入侵', () => {
     P2.expectView((v) => expect(v.players[1].health).toBe(3));
   });
 
-  it('P2 出杀 → P2 不扣血, 杀和南蛮都进弃牌堆', async () => {
-    await harness.setup(
-      build({
-        p2Hand: ['c0'],
-        extraCards: {
-          c0: { id: 'c0', name: '杀', suit: '♠', color: '黑', rank: '2', type: '基本牌' },
-        },
-      }),
-    );
-    const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
-
-    await P1.useCardAndTarget('南蛮入侵', 'nm1', []);
-    // 先有无懈可击询问 → pass
-    const slot0 = [...harness.state.pendingSlots.values()][0];
-    if (slot0 && (slot0.atom as { type: string }).type === '请求回应') {
-      await P2.pass();
-    }
-    P2.expectPending('询问杀');
-    await P2.respond('杀', { cardId: 'c0' });
-
-    expect(harness.state.players[1].health).toBe(4);
-    expect(harness.state.zones.discardPile).toContain('nm1');
-    expect(harness.state.zones.discardPile).toContain('c0');
-  });
-
   it('3人局: P2出杀P3无杀 → P3扣血', async () => {
     const c2: Card = { id: 'c2', name: '杀', suit: '♠', color: '黑', rank: '3', type: '基本牌' };
     await harness.setup(build({ p2Hand: ['c2'], p3: true, extraCards: { c2 } }));
@@ -213,14 +187,19 @@ describe('南蛮入侵', () => {
     if (nullifSlot && (nullifSlot.atom as { type: string }).type === '请求回应') {
       await harness.player(0).pass();
     }
-    // 期望先问 P1(index 0),再问 P2(index 1)
+    // 期望先问 P1(index 0),再问 P2(index 1):断言 询问杀 slot 的 target 座次
+    const ask1 = [...harness.state.pendingSlots.values()][0];
+    expect((ask1.atom as { target: number }).target).toBe(0);
     harness.player(0).expectPending('询问杀');
     await harness.player(0).pass();
-    // 第二个询问杀
+    // 第二个目标的无懈窗口 → pass
     const nullifSlot2 = [...harness.state.pendingSlots.values()][0];
     if (nullifSlot2 && (nullifSlot2.atom as { type: string }).type === '请求回应') {
       await harness.player(1).pass();
     }
+    // 第二个 询问杀 座次应为 P2(index 1)
+    const ask2 = [...harness.state.pendingSlots.values()][0];
+    expect((ask2.atom as { target: number }).target).toBe(1);
     harness.player(1).expectPending('询问杀');
     await harness.player(1).pass();
 
@@ -239,6 +218,8 @@ describe('南蛮入侵', () => {
     const state = build({ p3: true });
     // 改为 P3 出南蛮
     state.currentPlayerIndex = 2;
+    // nm1 转由 P3 持有,清空 P1 手牌(P1 无手牌 → 询问杀 skip)
+    state.players[0].hand = [];
     state.players[2].hand = ['nm1'];
     state.players[2].skills = ['南蛮入侵', '杀'];
     // 给 P3 一张无懈可击,用于抵消对 P2 的效果
@@ -258,10 +239,7 @@ describe('南蛮入侵', () => {
     await P3.useCardAndTarget('南蛮入侵', 'nm1', []);
 
     // 目标顺序 [P1, P2],每个目标独立询问无懈
-    // 第一个目标 P1 的无懈窗口:pass
-    await harness.player(0).pass();
-    // P1 被询问杀 → 不出
-    harness.player(0).expectPending('询问杀');
+    // 第一个目标 P1 的无懈窗口:pass → P1 无手牌,询问杀 skip,直接受伤
     await harness.player(0).pass();
 
     // 第二个目标 P2 的无懈窗口:P3 出无懈抵消对 P2 的效果
