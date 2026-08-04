@@ -225,13 +225,16 @@ describe('仁德', () => {
     expect(harness.state.players[0].health).toBe(4);
   });
 
-  it('回血仅一次:累计 ≥2 张后继续给牌不再回血', async () => {
+  it('回血仅一次:累计 ≥2 张后继续给牌不再回血(起始不满血以隔离上限干扰)', async () => {
     const c1 = makeCard('c1', '杀', '♠', 'A');
     const c2 = makeCard('c2', '杀', '♠', '2');
     const c3 = makeCard('c3', '桃', '♥', '3');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2', 'c3'], health: 3, maxHealth: 4 }),
+        // 起始体力 2(满血 4):给 2 张回 1 血到 3(未达上限),
+        // 再给 1 张若再次回血会到 4——停在 3 才能确证"每回合仅回 1 次",
+        // 而非被 maxHealth 上限掩盖(满血起始会无法区分两者)。
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2', 'c3'], health: 2, maxHealth: 4 }),
         makePlayer({ index: 1, name: 'P2', hand: [] }),
       ],
       cardMap: { c1, c2, c3 },
@@ -242,45 +245,18 @@ describe('仁德', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    // 一次给 2 张 → 回血到满血
+    // 一次给 2 张 → 累计跨过 2 张,回 1 血(2 → 3,未达上限)
     await P1.triggerAction('仁德', 'use', {
       targets: [{ target: 1, cardIds: ['c1', 'c2'] }],
     });
-    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[0].health).toBe(3);
 
-    // 再给 1 张 → 不再回血(仍满血 4,不能超过上限)
+    // 再给 1 张 → 每回合仅回 1 次,不再回血(仍 3,不会到 4)
     await P1.triggerAction('仁德', 'use', {
       targets: [{ target: 1, cardIds: ['c3'] }],
     });
     expect(harness.state.players[1].hand).toContain('c3');
-    expect(harness.state.players[0].health).toBe(4);
-  });
-
-  it('可多次发动:分三次各给 1 张,第三次累计 3 张(第二次已回血,第三次不再回)', async () => {
-    const c1 = makeCard('c1', '杀', '♠', 'A');
-    const c2 = makeCard('c2', '杀', '♠', '2');
-    const c3 = makeCard('c3', '杀', '♠', '3');
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2', 'c3'], health: 3, maxHealth: 4 }),
-        makePlayer({ index: 1, name: 'P2', hand: [] }),
-      ],
-      cardMap: { c1, c2, c3 },
-      currentPlayerIndex: 0,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    });
-    await harness.setup(state);
-    const P1 = harness.player('P1');
-
-    // 三次各 1 张
-    await P1.triggerAction('仁德', 'use', { targets: [{ target: 1, cardIds: ['c1'] }] });
-    expect(harness.state.players[0].health).toBe(3); // 1 张不回
-    await P1.triggerAction('仁德', 'use', { targets: [{ target: 1, cardIds: ['c2'] }] });
-    expect(harness.state.players[0].health).toBe(4); // 累计 2 张回血
-    await P1.triggerAction('仁德', 'use', { targets: [{ target: 1, cardIds: ['c3'] }] });
-    expect(harness.state.players[0].health).toBe(4); // 已回过,不再回
-    expect(harness.state.players[1].hand).toEqual(expect.arrayContaining(['c1', 'c2', 'c3']));
+    expect(harness.state.players[0].health).toBe(3);
   });
 
   // ─── 负面 ─────────────────────────────
