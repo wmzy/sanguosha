@@ -139,6 +139,10 @@ export interface GameState {
    *  dispatch 返回时 execute 可能还在跑,广播时机由本回调驱动。 */
   onStateChange?: () => void;
 
+  /** view 缓冲模式:dispatch preceding 阶段设为 true,suppress notifyStateChange。
+   *  主 validate 通过后 flush;失败时截断 atomHistory + rollback。 */
+  viewBuffering?: boolean;
+
   /** 引擎错误回调:execute fire-and-forget 抛错时触发。
    *  session 订阅后记录完整堆栈,避免错误被静默吞掉。
    *  fire-and-forget 的 execute promise 无人 await,其 rejection 只能通过此回调暴露。 */

@@ -143,7 +143,7 @@ export interface ActionEntry {
    * 对已执行的 preceding 按逆序调用 rollback,恢复 state。
    * 普通非组合 action 不实现(undefined)。
    */
-  rollback?: (state: GameState, params: Record<string, Json>) => void;
+  rollback?: (state: GameState, params: Record<string, Json>) => void | Promise<void>;
 }
 
 export interface AtomHookEntry {

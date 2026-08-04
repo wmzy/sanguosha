@@ -120,6 +120,7 @@ function extractPendingTarget(atom: Atom): number {
 
 /** 通知 session:state 已变更(每次 applyAtom 结束后触发)。 */
 function notifyStateChange(state: GameState): void {
+  if (state.viewBuffering) return; // preceding 缓冲期:吞掉广播,由 dispatch 统一 flush
   state.onStateChange?.();
 }
 
@@ -327,6 +328,20 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
  */
 export async function dispatch(state: GameState, message: ClientMessage): Promise<boolean> {
   const rollbacks: Array<{ entry: ActionEntry; params: Record<string, Json> }> = [];
+  // ── view 缓冲:preceding 的 ViewEvent 缓冲,主 validate 失败时截断 atomHistory,不广播 ──
+  const hasPreceding = !!message.preceding?.length;
+  const bufferSnapshot = hasPreceding ? state.atomHistory.length : 0;
+  if (hasPreceding) state.viewBuffering = true;
+  // 回滚 preceding(逆序调用 rollback)+ 截断缓冲的 atomHistory + 恢复 viewBuffering
+  const rollbackPreceding = async (): Promise<void> => {
+    for (let i = rollbacks.length - 1; i >= 0; i--) {
+      await rollbacks[i].entry.rollback?.(state, rollbacks[i].params);
+    }
+    if (hasPreceding) {
+      state.atomHistory.length = bufferSnapshot;
+      state.viewBuffering = false;
+    }
+  };
   // 辅助:preceding 阶段抛错 / 失败时,清理可能由 execute 创建的残留 pending slot。
   // execute 是 fire-and-forget 风格的 applyAtom,可能在 pendingSlots 留下未 resolve 的 slot。
   // 若 main 不启动,这些 slot 的父 await 永远不返回 → 死锁。
@@ -343,7 +358,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     for (const p of message.preceding) {
       const pEntry = findActionEntry(state, p.skillId, message.ownerId, p.actionType);
       if (pEntry?.validate(state, p.params) !== null) {
-        rollbacks.reverse().forEach((r) => r.entry.rollback?.(state, r.params));
+        await rollbackPreceding();
         cleanupResidualPending();
         return false;
       }
@@ -352,7 +367,12 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     }
   }
   // skip action:玩家放弃当前 pending 的回应(不打出无懈可击等)
+  // preceding+skip 是矛盾的(skip 无转化),但安全处理:flush 缓冲
   if (message.actionType === 'skip') {
+    if (hasPreceding) {
+      state.viewBuffering = false;
+      notifyStateChange(state);
+    }
     // 优先查找广播型 slot(target<0,如无懈可击):出牌阶段 findPendingSlot 可能返回
     // 当前玩家的出牌窗口 slot(target=0),导致 skip 误匹配非广播型 pending。
     const broadcastSlot = [...state.pendingSlots.values()].find((s) => {
@@ -383,7 +403,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   }
   const entry = findActionEntry(state, message.skillId, message.ownerId, message.actionType);
   if (entry?.validate(state, message.params) !== null) {
-    rollbacks.reverse().forEach((r) => r.entry.rollback?.(state, r.params));
+    await rollbackPreceding();
     return false;
   }
   // 回应路径:定位该玩家对应的 slot。
@@ -395,7 +415,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   const oldSlot = findPendingSlot(state, targetKey);
   if (oldSlot) {
     if (oldSlot.isTimeout) {
-      rollbacks.reverse().forEach((r) => r.entry.rollback?.(state, r.params));
+      await rollbackPreceding();
       return false;
     }
     // pending-scoped 版本校验：只影响 respond 路径(阻塞型 pending 如 请求回应/询问闪)
@@ -410,10 +430,16 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
       message.pendingSeq !== undefined &&
       message.pendingSeq < oldSlot.createdSeq
     ) {
-      rollbacks.reverse().forEach((r) => r.entry.rollback?.(state, r.params));
+      await rollbackPreceding();
       return false;
     }
     oldSlot.pause();
+  }
+
+  // ── 全部校验通过:flush 缓冲的 ViewEvent(一次性广播所有积压 event) ──
+  if (hasPreceding) {
+    state.viewBuffering = false;
+    notifyStateChange(state);
   }
 
   const resolve = oldSlot?.resolve ?? (() => {});

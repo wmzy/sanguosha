@@ -23,7 +23,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../create-engine';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook, instantiateSkill } from '../skill';
 import { skillLoaders } from './index';
 
 // ── 效果①:装备→无懈可击 转化 ──
@@ -206,8 +206,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         outputName: '无懈可击',
       });
     },
-    // rollback:主 action validate 失败时,撤销转化(删影子,牌还原)
-    (state: GameState, params: Record<string, Json>) => {
+    // rollback:主 action validate 失败时,撤销转化(删影子,牌还原,重新挂载装备技能)
+    async (state: GameState, params: Record<string, Json>): Promise<void> => {
       const cardId = params.cardId as string;
       const sId = shadowIdOf(cardId);
       const self = state.players[ownerId];
@@ -226,6 +226,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (origSlot === '武器') {
             const card = state.cardMap[cardId];
             self.vars['距离/出杀范围'] = card?.range ?? 1;
+          }
+          // 重新挂载装备技能(transform execute 用 applyAtom(移除技能) 卸载了实例)。
+          // rollback 现在是 async,可以 await instantiateSkill。同时还原 player.skills。
+          const card = state.cardMap[cardId];
+          if (card?.name && skillLoaders[card.name]) {
+            if (!self.skills.includes(card.name)) {
+              self.skills.push(card.name);
+            }
+            await instantiateSkill(state, card.name, ownerId);
           }
         } else {
           // 原是手牌:影子替换回原卡
