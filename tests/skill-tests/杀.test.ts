@@ -8,12 +8,16 @@ import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
-function buildState(opts?: { p2Hand?: string[]; extraCardMap?: Record<string, Card> }): GameState {
+function buildState(opts?: {
+  p1Hand?: string[];
+  p2Hand?: string[];
+  extraCardMap?: Record<string, Card>;
+}): GameState {
   const slash: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
   const dodge: Card = { id: 'c3', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
   return createGameState({
     players: [
-      makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['杀'] }),
+      makePlayer({ index: 0, name: 'P1', hand: opts?.p1Hand ?? ['c1'], skills: ['杀'] }),
       makePlayer({ index: 1, name: 'P2', hand: opts?.p2Hand ?? [], skills: ['闪'] }),
     ],
     cardMap: { c1: slash, c3: dodge, ...opts?.extraCardMap },
@@ -82,7 +86,8 @@ describe('杀', () => {
 
   it('同回合不能出第二张杀', async () => {
     const c2: Card = { id: 'c2', name: '杀', suit: '♠', color: '黑', rank: '2', type: '基本牌' };
-    await harness.setup(buildState({ extraCardMap: { c2 } }));
+    // P1 手中持两张杀,第一张用尽回合出杀次数后,第二张应被次数上限拒绝
+    await harness.setup(buildState({ p1Hand: ['c1', 'c2'], extraCardMap: { c2 } }));
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
@@ -90,6 +95,9 @@ describe('杀', () => {
     await P1.useCardAndTarget('杀', 'c1', [1]);
     await P2.pass();
     const healthAfterFirst = harness.state.players[1].health;
+    // c2 仍在 P1 手中 → 第二刀不会被"牌不在手牌"基础校验拦下,
+    // 只能被出杀次数上限(canSlash)拒绝,这才是本用例要验证的规则。
+    expect(harness.state.players[0].hand).toContain('c2');
 
     // 第二刀:validate 失败(出杀次数已用尽)→ 静默丢弃,无副作用(P2 血量未再扣)
     await P1.useCardAndTarget('杀', 'c2', [1]);
