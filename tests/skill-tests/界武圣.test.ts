@@ -9,6 +9,7 @@
 //   4. 装备区方片牌转化杀 → 命中超距目标
 //   5. 无界武圣技能者用方片杀 → 超距仍被拒(对照)
 //   6. 正常距离内方片杀 → 命中(基础回归)
+//   7. 黑桃杀(物理) → 超距被拒(非方片不享受距离豁免)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
