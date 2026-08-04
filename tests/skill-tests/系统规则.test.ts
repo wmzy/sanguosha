@@ -210,22 +210,58 @@ describe('系统规则', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+
+    // P0 出杀后无手牌;P1 无闪(无手牌 → 询问闪 skip)→ 受伤 HP=0 → 濒死;
+    // 求桃从当前回合 P0 起逆时针,P0/P1 均无桃(全员 skip,无 pending)→ 立即击杀
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    expect(harness.state.players[1].health).toBe(0);
+    expect(harness.state.players[1].alive).toBe(false);
+    restoreAutoCompare();
+  });
+
+  // ─── 正面:濒死求桃拒绝路径(有人能救但选择不救 → 击杀)─────
+
+  it('正面:濒死有桃者拒绝救援 → 击杀(求桃拒绝路径)', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const peach = makeCard('p1', '桃', '♥', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['k1', 'p1'],
+          skills: ['杀', '桃', '闪', '酒'],
+          health: 4,
+          maxHealth: 4,
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          skills: [],
+          health: 1,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { k1: slash, p1: peach },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass(); // 不出闪 → HP=0 → 濒死 → 求桃(P1)
-
-    // P1 HP=0 → 濒死
+    // P1 无闪(无手牌 → 询问闪 skip)→ HP=0 → 濒死;求桃从当前回合 P0 起,
+    // P0 出杀后仍有桃 → 被 normal 询问(生成 pending)
     expect(harness.state.players[1].health).toBe(0);
+    expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
 
-    // 求桃循环:从濒死者(P1)开始,依次询问每个存活玩家
-    // P1 被问 → P1 pass(不救自己)
-    await P1.pass();
-    // P0 被问 → P0 pass(不救 P1)
+    // P0 有桃但拒绝救援 → 求桃循环继续(P1 无手牌 skip)→ 无人救 → 击杀
     await P0.pass();
-
-    // 无人救 → 击杀
     expect(harness.state.players[1].alive).toBe(false);
+    // 桃未使用,仍在 P0 手牌
+    expect(harness.state.players[0].hand).toEqual(['p1']);
     restoreAutoCompare();
   });
 
@@ -285,7 +321,7 @@ describe('系统规则', () => {
     restoreAutoCompare();
   });
 
-  it('Bug:无手牌玩家被求桃时,confirm choice:true 不再误触发救援', async () => {
+  it('正面:其他存活玩家出桃救援濒死者(求桃循环到达非濒死者)', async () => {
     const restoreAutoCompare = disableAutoCompare();
     const slash = makeCard('k1', '杀', '♠', '7');
     const peach = makeCard('p1', '桃', '♥', '5');
@@ -422,18 +458,11 @@ describe('系统规则', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
 
+    // P0 出杀后无手牌;P1 无闪(无手牌 → 询问闪 skip)→ HP=0 → 濒死;
+    // 求桃全员无桃(skip)→ 立即击杀;P1(反贼)死亡 → P0 摸3张奖励(牌堆顶倒序:d3 先)
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass(); // 不出闪 → HP=0 → 濒死
-
-    // 求桃循环:无人救
-    await P1.pass();
-    await P0.pass();
-
-    // P1(反贼)死亡
     expect(harness.state.players[1].alive).toBe(false);
-    // P0(击杀者)摸3张奖励(牌堆顶倒序:d3 先)
     expect(harness.state.players[0].hand).toEqual(['d3', 'd2', 'd1']);
     restoreAutoCompare();
   });
@@ -459,13 +488,10 @@ describe('系统规则', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
 
+    // P0 出杀后无手牌;P1 无闪(无手牌 → 询问闪 skip)→ HP=0 → 濒死;
+    // 求桃全员无桃(skip)→ 立即击杀;反贼杀死反贼,击杀者同样摸3张
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
-    await P1.pass();
-    await P0.pass();
-
     expect(harness.state.players[1].alive).toBe(false);
     expect(harness.state.players[0].hand).toEqual(['d3', 'd2', 'd1']);
     restoreAutoCompare();
