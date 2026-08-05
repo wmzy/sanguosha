@@ -6,8 +6,9 @@
 //   1. 准备阶段·差≥2·选摸两张牌 → 摸2 + 减1上限 + 获攻心 + 觉醒标记
 //   2. 准备阶段·选回复1点体力 → 回1 + 减1上限 + 获攻心
 //   3. 结束阶段也能触发(第二个触发点)
-//   4. 差<2 不触发
-//   5. 觉醒后不再触发(整局一次)
+//   4. 差<2 不触发(条件守卫)
+//   5. 非触发阶段(摸牌)·差≥2 不触发(阶段守卫)
+//   6. 觉醒后不再触发(整局一次)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -197,7 +198,41 @@ describe('勤学', () => {
     expect(harness.state.players[0].skills).not.toContain('攻心');
   });
 
-  // ─── 5. 觉醒后不再触发(整局一次)──────────────────────────
+  // ─── 5. 非触发阶段·不触发(阶段守卫)─────────────────────
+  it('非准备/结束阶段(摸牌)·差≥2 → 勤学不触发', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          // 体力2,手牌4 → 差=2 满足条件;但阶段为"摸牌"非触发阶段
+          mkPlayer({
+            index: 0,
+            name: '界吕蒙',
+            character: '界吕蒙',
+            hand: ['h1', 'h2', 'h3', 'h4'],
+            skills: ['勤学'],
+            health: 2,
+            maxHealth: 4,
+          }),
+          mkPlayer({ index: 1, name: 'P1', skills: [] }),
+        ],
+        cardMap: {},
+        currentPlayerIndex: 0,
+        phase: '摸牌',
+        turn: { round: 1, phase: '摸牌', vars: {} },
+      }),
+    );
+
+    await applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '摸牌' });
+    await harness.waitForStable();
+
+    expect(harness.state.pendingSlots.size).toBe(0); // 无询问(阶段守卫拦截)
+    expect(harness.state.players[0].vars['勤学/awakened']).toBeFalsy();
+    expect(harness.state.players[0].maxHealth).toBe(4); // 上限不变
+    expect(harness.state.players[0].skills).not.toContain('攻心');
+    expect(harness.state.players[0].hand.length).toBe(4); // 不摸牌
+  });
+
+  // ─── 6. 觉醒后不再触发(整局一次)──────────────────────────
   it('觉醒后再次准备阶段不再触发', async () => {
     await harness.setup(
       createGameState({
