@@ -176,6 +176,61 @@ describe('烈刃', () => {
     expect(harness.state.zones.discardPile).toContain('p2');
   });
 
+  it('拼点平局(点数相等)→ 视为没赢,不获得牌', async () => {
+    const slash = mkCard('s5', '杀', '♠', '7');
+    const ownerPd = mkCard('p1', '杀', '♠', '7'); // 祝融拼点牌:7
+    const victimPd = mkCard('p2', '闪', '♥', '7'); // 受害者拼点牌:7(相等)
+    const keep = mkCard('kp', '桃', '♣', '5'); // 受害保留的牌
+
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '祝融',
+            character: '祝融',
+            hand: [slash.id, ownerPd.id],
+            skills: ['杀', '烈刃'],
+            health: 4,
+            maxHealth: 4,
+          }),
+          mkPlayer({
+            index: 1,
+            name: '受害',
+            character: '受害',
+            hand: [victimPd.id, keep.id],
+            skills: [],
+            health: 4,
+            maxHealth: 4,
+          }),
+        ],
+        cardMap: { s5: slash, p1: ownerPd, p2: victimPd, kp: keep },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const ZR = harness.player('祝融');
+    const V = harness.player('受害');
+
+    await ZR.useCardAndTarget('杀', 's5', [1]);
+    await V.pass();
+    await harness.waitForStable();
+    await ZR.respond('烈刃', { choice: true });
+    await harness.waitForStable();
+    await ZR.respond('烈刃', { cardId: 'p1' });
+    await harness.waitForStable();
+    await V.respond('烈刃', { cardId: 'p2' });
+    await harness.waitForStable();
+
+    // 拼点:7 === 7 → 平局,严格大于才算赢 → 祝融没赢 → 不获得牌
+    expect(harness.state.players[0].hand).not.toContain('kp');
+    expect(harness.state.players[1].hand).toContain('kp'); // 受害保留
+    // 拼点牌进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('p1');
+    expect(harness.state.zones.discardPile).toContain('p2');
+  });
+
   it('不发动烈刃 → 无拼点,双方手牌不变(除杀)', async () => {
     const slash = mkCard('s3', '杀', '♠', '7');
     const ownerPd = mkCard('p1', '杀', '♠', 'K');
