@@ -9,6 +9,7 @@
 //   2. 正面:田减少后距离修正更新
 //   3. 负面:无田时 transform 被拒绝
 //   4. 负面:指定的 markId 不存在 → 拒绝
+//   5. 负面:非自己回合 → transform 被拒绝(发动时机)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -232,5 +233,42 @@ describe('急袭', () => {
 
     // 原田未被消耗
     expect(harness.state.players[0].marks.filter((m) => m.id.startsWith('屯田/田:'))).toHaveLength(1);
+  });
+
+  // ─── 负面:非自己回合 → transform 被拒绝(发动时机) ────────────
+
+  it('负面:非自己回合发动急袭 → transform 被拒绝', async () => {
+    const judgeCard = makeCard('jc1', '杀', '♣', '5');
+    const p1Card = makeCard('p1c', '闪', '♥', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: [],
+          skills: ['急袭', '顺手牵羊'],
+          marks: [{ id: '屯田/田:1', scope: 0, payload: { cardId: 'jc1' } }],
+        }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1c'], skills: [] }),
+      ],
+      cardMap: { jc1: judgeCard, p1c: p1Card },
+      currentPlayerIndex: 1, // P1 的回合 → P0 非自己回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    // 发动时机不符(transform.validate 首条分支)→ 整个组合 action 被拒绝
+    await P0.expectRejected({
+      skillId: '顺手牵羊',
+      actionType: 'use',
+      params: { cardId: '屯田/田:1#急袭', targets: [1] },
+      preceding: [{ skillId: '急袭', actionType: 'transform', params: { markId: '屯田/田:1' } }],
+    });
+
+    // 状态不变:田未被消耗、影子卡未创建
+    expect(harness.state.players[0].marks.filter((m) => m.id.startsWith('屯田/田:'))).toHaveLength(1);
+    expect(harness.state.cardMap['屯田/田:1#急袭']).toBeUndefined();
   });
 });
