@@ -168,36 +168,6 @@ describe('借刀杀人', () => {
     });
   });
 
-  // ────────────────────────────────────────────────────────────
-  // 1b. 正面:cardFilter 过滤正确 — P2 手中只有杀时,借刀杀人/出杀 窗口接受杀
-  //    (借刀杀人/出杀 由 play-card(使用牌) 按卡名注册的 respond 响应;从 slot.atom.prompt 取 cardFilter 验证)
-  // ────────────────────────────────────────────────────────────
-  it('P2 有杀时,借刀杀人/出杀 窗口的 slot.atom.prompt.cardFilter 接受 P2 手里的杀', async () => {
-    const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
-    const s2 = makeCard('p2s', '杀', '♥', '5', '基本牌');
-    const state = buildState({
-      p2Hand: ['p2s'],
-      p2Equipment: { 武器: 'wp1' },
-      p2Skills: ['杀', '无懈可击'],
-      extraCards: { wp1: weapon, p2s: s2 },
-    });
-    await harness.setup(state);
-    const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
-
-    await P1.triggerAction('借刀杀人', 'use', { cardId: 'jd1', target: 1, killTarget: 2 });
-    await P1.pass(); // 无懈窗口
-
-    P2.expectPending('请求回应');
-    const slot = harness.state.pendingSlots.get(1)!;
-    const prompt = (slot.atom as { prompt: { cardFilter?: { filter?: (c: Card) => boolean } } })
-      .prompt;
-    const filter = prompt.cardFilter?.filter;
-    expect(filter).toBeDefined();
-    // 杀牌过,p2s 应通过
-    expect(filter!(s2)).toBe(true);
-  });
-
   // ─────────────────────────────────────────────────────────────
   // 2. 正面:A 出杀 → 对 killTarget 询问闪 → killTarget 不闪 → killTarget 扣 1 血
   // ─────────────────────────────────────────────────────────────
@@ -621,6 +591,52 @@ describe('借刀杀人', () => {
     await P2.pass();
 
     // P2 武器被卸下,P1 拿到——证明借刀杀人正常结算,未静默白费
+    expect(harness.state.players[1].equipment['武器']).toBeUndefined();
+    expect(harness.state.players[0].hand).toContain('wp1');
+    // P2 的杀未被使用(仍在手)
+    expect(harness.state.players[1].hand).toContain('p2s');
+    // 借刀杀人进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('jd1');
+    expect(harness.state.zones.processing).toEqual([]);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 5c. respond 阶段拒绝:A 出杀的目标不含发起者指定的 killTarget
+  //     借刀杀人核心规则:A 必须对发起者指定的 B 出杀(可追加,但必含 B),不可借机偏移目标。
+  //     respond.validate:killTarget ∈ targets 权威校验 → 非法选择被拒,pending 仍留在 A。
+  //     此 respond 阶段负面路径此前无覆盖(所有正面用例 killTarget 都在 targets 内)。
+  // ─────────────────────────────────────────────────────────────
+  it('A 选不含 killTarget 的目标出杀 → respond 被拒(pending 仍在 A),A pass 后正常交武器', async () => {
+    const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
+    const s2 = makeCard('p2s', '杀', '♥', '5', '基本牌');
+    const state = buildState({
+      p2Hand: ['p2s'],
+      p2Equipment: { 武器: 'wp1' },
+      p3Hand: [],
+      p3Skills: ['闪'],
+      extraCards: { wp1: weapon, p2s: s2 },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // killTarget=P3(2);P2 试图改杀 P1(0),targets 不含 2 → 必含校验失败
+    await P1.triggerAction('借刀杀人', 'use', { cardId: 'jd1', target: 1, killTarget: 2 });
+    await P1.pass(); // 无懈窗口
+
+    P2.expectPending('请求回应');
+    await P2.expectRejected({
+      skillId: '借刀杀人',
+      actionType: 'respond',
+      params: { cardId: 'p2s', targets: [0] },
+    });
+
+    // pending 仍在 P2(未被消费):仍是 借刀杀人/出杀 询问
+    P2.expectPending('请求回应');
+    expect(P2.respondInfo()?.skillId).toBe('借刀杀人');
+
+    // A 放弃出杀 → 交武器(借刀杀人正常结算,未静默白费)
+    await P2.pass();
     expect(harness.state.players[1].equipment['武器']).toBeUndefined();
     expect(harness.state.players[0].hand).toContain('wp1');
     // P2 的杀未被使用(仍在手)
