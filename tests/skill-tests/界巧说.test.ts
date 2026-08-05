@@ -310,6 +310,10 @@ describe('界巧说', () => {
     const pdA = makeCard('c1', '杀', '♠', 'K');
     const pdB = makeCard('c2', '闪', '♥', '2');
     const pdC = makeCard('c3', '杀', '♣', 'Q');
+    // P1 额外保留一张手牌(c4):第一次拼点用掉 c2 后目标仍有手牌,
+    // 使第二次拒绝唯一归因于"本回合已使用过巧说",而非"目标无手牌",
+    // 避免依赖 validate 检查顺序导致限一次回归被掩盖。
+    const pdD = makeCard('c4', '闪', '♦', '5');
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -321,11 +325,11 @@ describe('界巧说', () => {
         makePlayer({
           index: 1,
           name: 'P1',
-          hand: ['c2'],
+          hand: ['c2', 'c4'],
           skills: ['回合管理'],
         }),
       ],
-      cardMap: { c1: pdA, c2: pdB, c3: pdC },
+      cardMap: { c1: pdA, c2: pdB, c3: pdC, c4: pdD },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -339,7 +343,8 @@ describe('界巧说', () => {
     await P1.respond('界巧说', { cardId: 'c2' });
     await waitForStable(harness.state);
 
-    // 第二次发动被拒(限一次)
+    // 第二次发动被拒(限一次):此时 P1 仍有手牌 c4,拒绝只能因 usedThisTurn
+    expect(harness.state.players[1].hand).toContain('c4');
     await P0.expectRejected({
       skillId: '界巧说',
       actionType: 'use',
