@@ -12,6 +12,7 @@
 //   5. 目标去重:同一目标本回合第二次发动被拒绝
 //   6. validate:不能选自己
 //   7. 非出牌阶段/非自己回合 → 拒绝
+//   8. cost=discard 但 cardId 非武器 → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -150,7 +151,7 @@ describe('界强袭', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
 
-    // P1 距离 1(双人),弃装备武器后范围回到 1,仍在范围内
+    // 武器在装备区:卸下并弃置该武器,对 P1 造成 1 点伤害(界强袭无距离限制)
     await P0.triggerAction('界强袭', 'use', { cost: 'discard', target: 1, cardId: 'w1' });
 
     expect(harness.state.players[0].health).toBe(4);
@@ -166,6 +167,7 @@ describe('界强袭', () => {
         makePlayer({ index: 0, name: 'P0', skills: ['界强袭'] }),
         makePlayer({ index: 1, name: 'P1', character: '曹操' }),
         makePlayer({ index: 2, name: 'P2', character: '刘备' }),
+        makePlayer({ index: 3, name: 'P3', character: '孙权' }),
       ],
       cardMap: {},
       currentPlayerIndex: 0,
@@ -187,13 +189,16 @@ describe('界强袭', () => {
     expect(buildCount(harness.state, 0)).toBe(2);
     expect(buildTargets(harness.state, 0)).toEqual([1, 2]);
 
-    // 第三次:已达上限 2 → 拒绝(即便有未指定目标 P3)
+    // 第三次:目标 P3 本回合未被以此法指定过(唯一合法的新目标),
+    // 纯因已达上限 2 次而被拒——隔离测试次数限制,不与目标去重混淆
     await P0.expectRejected({
       skillId: '界强袭',
       actionType: 'use',
-      params: { cost: 'damage', target: 1 },
+      params: { cost: 'damage', target: 3 },
     });
+    expect(harness.state.players[3].health).toBe(4); // P3 未受伤
     expect(buildCount(harness.state, 0)).toBe(2);
+    expect(buildTargets(harness.state, 0)).toEqual([1, 2]);
   });
 
   // ─── 目标去重:同一目标本回合第二次发动被拒绝 ────────────
