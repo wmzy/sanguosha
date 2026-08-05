@@ -207,8 +207,8 @@ describe('界樵拾(OL 界限突破版)', () => {
     await harness.waitForStable();
     expect(harness.state.localVars['界樵拾/disabledRound/0']).toBe(1);
 
-    // 同轮再次触发(模拟下家结束阶段):应跳过(无 pending)
-    await endPhaseTrigger(harness, 1);
+    // 同轮内 owner(P0)的结束阶段:本轮已失效 → 应跳过(无 pending)
+    await endPhaseTrigger(harness, 0);
     expect(harness.state.pendingSlots.size).toBe(0);
   });
 
