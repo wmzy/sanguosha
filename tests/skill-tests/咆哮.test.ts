@@ -1,7 +1,7 @@
 // 咆哮(张飞·锁定技):出牌阶段使用【杀】无次数限制。
 //
 // 验证:
-//   1. 单元:咆哮在 skills 中 → slashMax(state, 0) === Infinity
+//   1. 单元:咆哮仅对其拥有者生效 → 拥有者 slashMax=∞,无咆哮者仍=1(作用域边界)
 //   2. 单元:无咆哮 → slashMax 默认 1
 //   3. 触发(实际 dispatch):P0 连续出 2 张杀均生效,P1 受 2 点伤害
 //   4. 负面:无咆哮时第二张杀被拒(出杀次数上限 1)
@@ -55,7 +55,7 @@ describe('咆哮', () => {
     harness = new SkillTestHarness();
   });
 
-  it('单元:咆哮在 skills 中 → slashMax = Infinity', async () => {
+  it('单元:咆哮仅对其拥有者生效 → 拥有者 slashMax=∞,无咆哮者仍=1', async () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', skills: ['咆哮', '杀'] }),
@@ -68,7 +68,10 @@ describe('咆哮', () => {
     });
     await harness.setup(state);
 
+    // 拥有者:无限出杀
     expect(slashMax(harness.state, 0)).toBe(Infinity);
+    // 同局无咆哮者:作用域不泄漏,仍受默认上限 1 约束(锁定技作用域边界)
+    expect(slashMax(harness.state, 1)).toBe(1);
   });
 
   it('单元:无咆哮 → slashMax 默认 1', async () => {
