@@ -308,10 +308,10 @@ describe('界放权', () => {
     expect(harness.state.zones.discardPile).toContain('c1');
     expect(harness.state.localVars['放权/extraTarget']).toBe(2);
 
-    // 3. 界刘禅结束回合 → 回合结束 → 情况1:启动 P2 额外回合
-    await LC.triggerAction('回合管理', 'end', {});
-    await harness.waitForStable();
-    harness.processAllEvents();
+    // 3. 刘禅弃牌阶段手牌不超上限 → 回合管理 自动结束弃牌 → 链式推进到 回合结束 before-hook
+    //    → 情况1:cancel 回合结束、清理 per-turn、亲自启动 P2 额外回合。
+    //    (放权跳过出牌后无出牌窗口,弃牌阶段完成后由 回合管理 链式结束回合,故此处无需手动
+    //     end;此时已轮到 P2,若用 LC(刘禅) 手动 end 会被 validate 拒绝——此前误用便是空操作。)
     expect(harness.state.currentPlayerIndex).toBe(2);
     expect(harness.state.phase).toBe('出牌');
     // P2 的预设限一次标记已被情况1 的 per-turn 清理清空(额外回合是全新回合)
