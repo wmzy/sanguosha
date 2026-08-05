@@ -9,6 +9,9 @@
 //   4. 不能对自己使用
 //   5. 无手牌不能发动
 //   6. 目标选非法花色被拒
+//   7. 多张手牌:随机转移一张(来源-1,目标+1)
+//   8. 猜错造成的伤害来源是周瑜(用于反馈/狂骨等)
+//   9. 执行顺序:目标先选花色,后获得牌
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
