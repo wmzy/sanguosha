@@ -16,13 +16,14 @@
 //
 // 验证:
 //   1. 正面 use:蜀势力角色出杀 → 对 killTarget 造成伤害
-//   2. 正面 use:蜀势力角色不出杀 → 主公不摸牌(补充规则已移除)
-//   3. 正面 respond:主公被决斗 → 激将 → 蜀角色出杀 → 主公不受伤害
-//   4. 正面 respond:主公被决斗 → 激将 → 蜀角色拒绝 → 主公受伤害
-//   5. 负面:非主公(ownerId≠0)不能使用
-//   6. 负面:目标非蜀势力 → 拒绝
-//   7. 负面:非自己回合 use → 拒绝
-//   8. 负面 respond:无蜀势力角色 → 拒绝
+//   2. 正面 use:蜀角色用火杀 → killTarget(藤甲)受 2 点火焰伤害(damageType 传导回归)
+//   3. 正面 use:蜀势力角色不出杀 → 主公不摸牌(补充规则已移除)
+//   4. 正面 respond:主公被决斗 → 激将 → 蜀角色出杀 → 主公不受伤害
+//   5. 正面 respond:主公被决斗 → 激将 → 蜀角色拒绝 → 主公受伤害
+//   6. 负面:非主公(ownerId≠0)不能使用
+//   7. 负面:目标非蜀势力 → 拒绝
+//   8. 负面:非自己回合 use → 拒绝
+//   9. 负面 respond:无蜀势力角色 → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
