@@ -6,6 +6,8 @@
 //   2. 正面:发牌 atom 给所有玩家发 handSize 张(主公不加)
 //   3. 正面:主公先选(串行)
 //   4. 负面:playerCount < 2 → validate 拒绝
+//   5. 正面:分配武将后体力值=武将卡牌 maxHealth(2人局人数≤4,主公不+1)
+//   6. 正面:5人局(人数>4)主公体力上限=maxHealth+1,非主公不加
 import { describe, it, expect, beforeEach } from 'vitest';
 import { bootstrap, type GameConfig } from '../../src/engine/index';
 import { dispatchAndWait, waitForStable } from '../engine-harness';
