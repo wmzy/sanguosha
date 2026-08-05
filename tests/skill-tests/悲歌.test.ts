@@ -160,6 +160,79 @@ describe('悲歌', () => {
     expect(harness.state.zones.discardPile).toContain('c2');
   });
 
+  // ─── 目标合法性:对非蔡文姬的受伤角色发动 ────────────────────
+  // 触发对象是「任一角色」受杀伤害(不限于蔡文姬本人);判定与效果均作用于受伤角色。
+  // 此前四个用例蔡文姬既是拥有者又是受伤者(退化场景),无法区分效果作用于
+  // 「受伤角色」还是「拥有者」——本用例补齐该关键边界。
+  it('队友受杀伤害:悲歌发动,效果(♦)作用于受伤角色而非蔡文姬', async () => {
+    const judge = makeCard('j1', '杀', '♦', '5');
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const cost = makeCard('d1', '闪', '♦', '3'); // 蔡文姬弃置代价
+    const s1 = makeCard('s1', '闪', '♥', '6'); // P2 持有,使其有出闪选择(贴近真实对局)
+    const m1 = makeCard('m1', '杀', '♣', '2');
+    const m2 = makeCard('m2', '杀', '♣', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: '蔡文姬', hand: ['d1'], skills: ['悲歌', '断肠'] }),
+        makePlayer({ index: 1, name: 'P1', character: '张飞', hand: ['k1'], skills: ['杀'] }),
+        makePlayer({ index: 2, name: 'P2', hand: ['s1'] }),
+      ],
+      cardMap: { k1: slash, d1: cost, s1, j1: judge, m1, m2 },
+      zones: { deck: ['j1', 'm1', 'm2'], discardPile: [], processing: [] },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('蔡文姬');
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('杀', 'k1', [2]);
+    await P2.pass(); // P2 选择不出闪 → 受 1 点杀伤害
+
+    // 悲歌(拥有者 P0)询问弃牌 —— 证明触发不限于蔡文姬本人受伤
+    P0.expectPending('请求回应');
+    await P0.respond('悲歌', { cardId: 'd1' });
+
+    // ♦ → 受伤角色 P2 摸两张(手牌 3 张 = 原 s1 + m1/m2);蔡文姬仅弃代价、不摸牌
+    // (效果作用于受伤角色而非拥有者;摸牌顺序不保证字典序,故用长度+包含断言)
+    expect(harness.state.players[2].hand.length).toBe(3);
+    expect(harness.state.players[2].hand).toContain('m1');
+    expect(harness.state.players[2].hand).toContain('m2');
+    expect(harness.state.players[0].hand).toEqual([]);
+  });
+
+  // ─── 蔡文姬无手牌 → 代价不足,不询问不发动 ────────────────────
+  // 负面拒绝路径:拥有者无手牌可弃时,主 hook 提前 return,连弃牌询问都不创建。
+  // 与「不弃牌(主动放弃)」走不同的早退分支。
+  it('无手牌:蔡文姬无牌可弃,悲歌不询问、不发动', async () => {
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: '蔡文姬', hand: [], skills: ['悲歌', '断肠'] }),
+        makePlayer({ index: 1, name: 'P1', character: '张飞', hand: ['k1'], skills: ['杀'] }),
+      ],
+      cardMap: { k1: slash },
+      zones: { deck: [], discardPile: [], processing: [] },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('蔡文姬');
+    const P1 = harness.player('P1');
+
+    await P1.useCardAndTarget('杀', 'k1', [0]);
+    // P0 无手牌 → 无法出闪,自动受 1 点杀伤害;owner 又无牌可弃 → 悲歌不询问
+
+    // 无手牌 → 悲歌 early-return:不为蔡文姬创建弃牌询问
+    expect(harness.state.pendingSlots.has(0)).toBe(false);
+    // 仍受了伤(3→2),且无任何效果(未回血/未摸牌)
+    expect(harness.state.players[0].health).toBe(2);
+    expect(harness.state.players[0].hand).toEqual([]);
+  });
+
   // ─── 不弃牌 → 悲歌不发动 ────────────────────────────
   it('不弃牌:悲歌不发动,受伤角色保持受伤', async () => {
     const judge = makeCard('j1', '杀', '♠', '5');
