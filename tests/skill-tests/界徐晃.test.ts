@@ -328,8 +328,7 @@ describe('截辎', () => {
     await waitForStable(harness.state);
     P0.expectPending('请求回应');
 
-    // 选自己(徐晃)作为目标——徐晃 5 张手牌最多,不符合"全场最少" → 应摸1张
-    // 改为选 P1(目标),P1 跳过摸牌后手牌仍是 1(全场最少)→ 加"辎"
+    // 选 P1(目标):其手牌 1 张为全场最少且无"辎" → 加"辎"标记
     await P0.triggerAction('截辎', 'respond', { targets: [1] });
     await waitForStable(harness.state);
 
@@ -526,5 +525,69 @@ describe('截辎', () => {
 
     // 仅摸 2 张(默认),无额外
     expect(harness.state.players[1].hand.length).toBe(2);
+  });
+
+  // ─── 6. 目标全场最少但已有"辎" → 摸一张牌(覆盖"且没有辎"条件)──
+  //  官方"若其手牌数全场最少且没有辎→加辎,否则摸一张牌":
+  //  目标虽全场最少,但已有"辎" → 走"否则摸一张牌",不重复加辎。
+  it('目标全场最少但已有"辎" → 目标摸一张牌', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    try {
+      const state: GameState = createGameState({
+      players: [
+        // 徐晃:5 张(最多,owner)
+        makePlayer({
+          index: 0,
+          name: '徐晃',
+          hand: ['a1', 'a2', 'a3', 'a4', 'a5'],
+          skills: ['截辎', '回合管理'],
+        }),
+        // 目标:1 张(全场最少),被兵粮寸断跳过摸牌,且已有"辎"
+        makePlayer({
+          index: 1,
+          name: '目标',
+          hand: ['b1'],
+          skills: ['兵粮寸断', '回合管理'],
+          tags: ['兵粮寸断/跳过摸牌'],
+          marks: [{ id: '辎', scope: 1 }],
+        }),
+      ],
+      cardMap: {
+        a1: makeCard('a1', '杀', '♠'),
+        a2: makeCard('a2', '杀', '♠'),
+        a3: makeCard('a3', '杀', '♠'),
+        a4: makeCard('a4', '杀', '♠'),
+        a5: makeCard('a5', '杀', '♠'),
+        b1: makeCard('b1', '杀', '♠'),
+        d1: makeCard('d1', '杀', '♠'),
+      },
+      currentPlayerIndex: 1,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    state.zones = { deck: ['d1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P0 = harness.player('徐晃');
+
+    void applyAtom(harness.state, { type: '阶段结束', player: 1, phase: '判定' });
+    await waitForStable(harness.state);
+    P0.expectPending('请求回应');
+
+    // 发动 截辎
+    await P0.triggerAction('截辎', 'respond', { choice: true });
+    await waitForStable(harness.state);
+    P0.expectPending('请求回应');
+
+    // 选 P1(目标):1 张全场最少,但已有"辎" → 走"否则摸一张牌"
+    const handBefore = harness.state.players[1].hand.length;
+    await P0.triggerAction('截辎', 'respond', { targets: [1] });
+    await waitForStable(harness.state);
+
+    expect(harness.state.players[1].hand.length).toBe(handBefore + 1);
+    // 已有"辎"不重复添加(仍只有 1 枚)
+    expect(harness.state.players[1].marks.filter((m) => m.id === '辎').length).toBe(1);
+    } finally {
+      restoreAutoCompare();
+    }
   });
 });
