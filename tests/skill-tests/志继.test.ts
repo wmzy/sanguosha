@@ -1,6 +1,7 @@
 // 志继(姜维·觉醒技)行为测试:
 //   1. 无手牌准备阶段 → 选摸两张牌:摸2牌 + 减1上限 + 永久获得观星
 //   2. 无手牌准备阶段 → 选回复1点体力:回复1 + 减1上限 + 永久获得观星
+//   2b. 满血选回复(回复量0):不回复,但减1上限(体力被夹至新上限)
 //   3. 有手牌时不触发
 //   4. 觉醒后再次准备阶段不再触发(整局一次)
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -128,6 +129,46 @@ describe('志继', () => {
     expect(harness.state.players[0].health).toBe(3); // 2→3 回复1点
     expect(harness.state.players[0].hand.length).toBe(0); // 不摸牌
     expect(harness.state.players[0].maxHealth).toBe(3); // 减1上限(4→3)
+    expect(harness.state.players[0].skills).toContain('观星');
+    expect(harness.state.players[0].vars['志继/awakened']).toBe(true);
+  });
+
+  it('满血选回复(回复量为0):不回复,但减1上限并把体力夹至新上限', async () => {
+    // 满血(health===maxHealth)下选回复:amount=min(1,0)=0 → 不回复体力,
+    // 但仍减1上限;设上限会 clamp 当前体力,故 4→夹至新上限3。
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '姜维',
+            character: '姜维',
+            hand: [],
+            skills: ['志继'],
+            health: 4, // 满血
+            maxHealth: 4,
+          }),
+          mkPlayer({ index: 1, name: 'P1', skills: [] }),
+        ],
+        cardMap: {},
+        currentPlayerIndex: 0,
+        phase: '准备',
+        turn: { round: 1, phase: '准备', vars: {} },
+      }),
+    );
+    const JW = harness.player('姜维');
+
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    await harness.waitForStable();
+    JW.expectPending('请求回应');
+
+    // 满血下选回复1点体力(choice=false → heal,amount=0)
+    await JW.respond('志继', { choice: false });
+    await harness.waitForStable();
+
+    expect(harness.state.players[0].hand.length).toBe(0); // 不摸牌
+    expect(harness.state.players[0].maxHealth).toBe(3); // 减1上限(4→3)
+    expect(harness.state.players[0].health).toBe(3); // 4→被设上限 clamp 至3
     expect(harness.state.players[0].skills).toContain('观星');
     expect(harness.state.players[0].vars['志继/awakened']).toBe(true);
   });
