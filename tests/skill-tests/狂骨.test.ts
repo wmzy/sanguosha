@@ -249,38 +249,39 @@ describe('狂骨', () => {
     await P2.pass();
 
     expect(harness.state.players[2].health).toBe(3);
-    // 距离>1 → 狂骨不触发,无询问
+    // 距离>1 → 狂骨不触发:无询问、无回复、无摸牌(仅 health 未变不足以证明不触发)
     expect(harness.state.players[0].health).toBe(3);
+    expect(harness.state.players[0].hand.length).toBe(0);
+    P0.expectNoPending();
   });
 
-  // ─── 非魏延造成伤害 → 不触发 ─────────────────────────────
-  it('他人(P2)造成伤害 → 魏延(P1)狂骨不触发', async () => {
+  // ─── 非魏延造成伤害 → 不触发(伤害来源 ≠ 狂骨拥有者)─────────
+  it('他人(P0)造成伤害 → 魏延(P1)狂骨不触发', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
-    const p0shan = makeCard('sh1', '闪', '♥', '2'); // P0 含闪:走 normal 询问闪
+    const p1shan = makeCard('sh1', '闪', '♥', '2'); // P1(魏延)含闪:走 normal 询问闪
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P0', hand: ['sh1'], skills: ['闪'], health: 4 }),
-        makePlayer({ index: 1, name: 'P1', hand: ['k1'], skills: ['狂骨', '杀'], health: 3 }),
+        makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'], health: 4, character: '其他' }),
+        makePlayer({ index: 1, name: 'P1', hand: ['sh1'], skills: ['狂骨', '闪'], health: 3 }),
       ],
-      cardMap: { k1: kill, sh1: p0shan },
-      currentPlayerIndex: 1,
+      cardMap: { k1: kill, sh1: p1shan },
+      currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
     await harness.setup(state);
-    const P1 = harness.player('P1');
     const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
 
-    // P1 出杀打 P0 —— source=P1(狂骨owner)→ 触发(对照用例,确认 source 判断正确)
-    await P1.useCardAndTarget('杀', 'k1', [0]);
-    await P0.pass();
+    // P0(非狂骨拥有者)出杀打 P1(魏延)—— source=P0 ≠ 狂骨owner(P1)
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P1.pass(); // P1 不出闪 → 受伤
 
-    expect(harness.state.players[0].health).toBe(3);
-    // P1 是 source,狂骨触发:询问发动
-    P1.expectPending('请求回应');
-    await P1.respond('狂骨', { choice: true }); // 发动
-    await P1.respond('狂骨', { choice: true }); // 回复体力:3→4
-    expect(harness.state.players[1].health).toBe(4);
+    // P1 受伤(3→2),但魏延不是伤害来源 → 狂骨不触发
+    expect(harness.state.players[1].health).toBe(2);
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[1].hand.length).toBe(1); // 仅持原有闪,未摸牌
+    P1.expectNoPending();
   });
 });
 
