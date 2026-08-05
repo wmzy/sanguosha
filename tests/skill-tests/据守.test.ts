@@ -19,7 +19,6 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import { applyAtom } from '../../src/engine/index';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(
@@ -117,8 +116,8 @@ describe('据守', () => {
     await harness.waitForStable();
     harness.processAllEvents();
 
-    // 摸 4 张,但据守要求弃 1 张手牌(目前 pending 中等回应)
-    // 因初始无手牌 → 跳过弃置 → 净增 4 张
+    // 摸 4 张。实现:摸牌后手牌非空 → 创建 据守/弃牌 pending(见用例 5);
+    // 本用例不回应,故 use execute 挂在 pending 上,手牌暂保持 4(弃置尚未发生)。
     expect(harness.state.players[0].hand.length).toBe(4);
     // 无翻面标签(OL 加强版不跳过整回合)
     expect(harness.state.players[0].tags).not.toContain('据守/翻面');
@@ -348,11 +347,11 @@ describe('据守', () => {
     await P1.expectRejected({ skillId: '据守', actionType: 'use', params: {} });
   });
 
-  // ─── 8. 正面:不跳过整回合(据守发动者下回合仍正常游戏) ────────────────
-  // 验证 OL 加强版"不跳过整回合":据守不添加 据守/翻面 标签,
-  // 故据守发动者下一回合不会被 skipAll 机制跳过。
-  // 这里直接断言据守发动后无翻面相关 localVars / tags 残留。
-  it('正面:据守发动后无 skipAll/skipTag 残留 → 下一回合不被跳过', async () => {
+  // ─── 8. 正面:OL 加强版不跳过整回合(完整结算后无翻面/跳过残留) ────────
+  // 标版据守对齐 OL 加强版:不添加 据守/翻面 标签、不设 据守/skipAll 标志
+  // (跳过整回合机制仅界据守等保留)。本用例让据守完整结算(回应弃牌,
+  // 不留悬挂 frame/pending)后,断言无任何翻面/跳过相关残留作为回归守卫。
+  it('正面:据守完整结算后无 翻面/skipAll 残留(OL 加强版不跳过整回合)', async () => {
     const cardMap: Record<string, Card> = {};
     const deck = buildDeck(cardMap, 6);
     const state: GameState = createGameState({
@@ -371,22 +370,18 @@ describe('据守', () => {
 
     await P1.triggerAction('据守', 'use', {});
     await harness.waitForStable();
-    harness.processAllEvents();
 
-    // 据守发动后:无 翻面 标签(不会触发 skipAll)
-    expect(harness.state.players[0].tags).not.toContain('据守/翻面');
-    // 无 skipAll 标志(下一回合阶段 hook 不会 cancel)
-    expect(harness.state.localVars['据守/skipAll']).toBeUndefined();
-
-    // 模拟进入下一回合:P1 的准备阶段开始 → 不应被 cancel
-    // 推进到 P2 回合再回到 P1(下一轮)
-    await applyAtom(harness.state, { type: '清过期标记', player: 0 });
-    await applyAtom(harness.state, { type: '下一玩家' });
-    await applyAtom(harness.state, { type: '回合结束', player: 0 });
+    // 据守/弃牌 pending 出现 → 回应弃一张,让据守完整结算(不悬挂 frame/pending)
+    const slot = harness.state.pendingSlots.get(0);
+    expect(slot).toBeDefined();
+    expect((slot?.atom as { requestType?: string }).requestType).toBe('据守/弃牌');
+    await P1.respond('据守', { cardId: harness.state.players[0].hand[0] });
     await harness.waitForStable();
     harness.processAllEvents();
 
-    // cPI 已推进到 P2(若据守错误地跳过整回合,cPI 可能保持 0 或异常推进)
-    expect(harness.state.currentPlayerIndex).toBe(1);
+    // 完整结算后:无 据守/翻面 标签(下一回合准备阶段 before-hook 不会启动跳过)
+    expect(harness.state.players[0].tags).not.toContain('据守/翻面');
+    // 无 据守/skipAll 标志(下一回合阶段 hook 不会 cancel)
+    expect(harness.state.localVars['据守/skipAll']).toBeUndefined();
   });
 });
