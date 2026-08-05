@@ -4,8 +4,9 @@
 //   1. 黑色决斗 → 贾诩不是合法目标(成为目标被 cancel)
 //   2. 黑色顺手牵羊 → 获得被 cancel(不被取走牌)
 //   3. 黑色过河拆桥 → 弃置被 cancel(不被弃牌)
-//   4. 黑色南蛮入侵 → 贾诩不受伤害(造成伤害被 cancel)
-//   5. 负面对照:红色锦囊 → 贾诩正常受影响
+//   4. 黑色铁索连环 → 设横置被 cancel(不被横置)
+//   5. 黑色南蛮入侵 → 贾诩不受伤害(造成伤害被 cancel)
+//   6. 负面对照:红色锦囊 → 贾诩正常受影响
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -148,7 +149,38 @@ describe('帷幕', () => {
     expect(harness.state.players[1].hand).toContain('t2'); // 贾诩牌未被弃
   });
 
-  // ─── 4. 黑色南蛮入侵 → 贾诩不受伤害 ─────────────────
+  // ─── 4. 黑色铁索连环 → 设横置被 cancel ─────────────────
+  it('黑色铁索连环对贾诩设横置 → 设横置被 cancel(免疫)', async () => {
+    const blackTS = mkCard('ts1', '铁索连环', '♠', 'J', '锦囊牌');
+    const state: GameState = createGameState({
+      players: [
+        mkPlayer({ index: 0, name: 'P1', skills: [] }),
+        mkPlayer({ index: 1, name: '贾诩', character: '贾诩', skills: ['帷幕'], health: 3 }),
+      ],
+      cardMap: { ts1: blackTS },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    // 铁索连环.execute 持有结算帧,frame.params 携带 cardId
+    await pushFrame(harness.state, '铁索连环', 0, { cardId: 'ts1' });
+    const chained = await applyAtom(harness.state, {
+      type: '设横置',
+      player: 1,
+      chained: true,
+    });
+    await harness.waitForStable();
+    await popFrame(harness.state);
+
+    expect(chained).toBe(false); // 帷幕 cancel
+    expect(
+      harness.state.players[1].marks.find((m) => m.id === 'chained'),
+    ).toBeUndefined(); // 贾诩未被横置
+  });
+
+  // ─── 5. 黑色南蛮入侵 → 贾诩不受伤害 ─────────────────
   it('黑色南蛮入侵 → 贾诩免疫,不受伤', async () => {
     const blackNM = mkCard('nm1', '南蛮入侵', '♠', 'A', '锦囊牌');
     await harness.setup(
@@ -158,7 +190,7 @@ describe('帷幕', () => {
             index: 0,
             name: 'P1',
             hand: ['nm1'],
-            skills: ['南蛮入侵'],
+            skills: [],
             health: 4,
           }),
           mkPlayer({
@@ -192,7 +224,7 @@ describe('帷幕', () => {
     expect(harness.state.players[1].alive).toBe(true);
   });
 
-  // ─── 5. 负面对照:红色锦囊 → 贾诩正常受影响 ─────────────────
+  // ─── 6. 负面对照:红色锦囊 → 贾诩正常受影响 ─────────────────
   it('负面:红色决斗以贾诩为目标 → 成为目标不被 cancel', async () => {
     const redDuel = mkCard('d2', '决斗', '♥', 'A', '锦囊牌');
     const state: GameState = createGameState({
