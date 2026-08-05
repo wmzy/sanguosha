@@ -88,7 +88,6 @@ describe('万箭齐发', () => {
       turn: { round: 1, phase: '出牌', vars: {} },
     });
     await harness.setup(state);
-    const P2 = harness.player('P2');
 
     await harness.player('P1').useCardAndTarget('万箭齐发', 'wj1', []);
     await consumeNullWindow();
@@ -149,6 +148,35 @@ describe('万箭齐发', () => {
       skillId: '万箭齐发',
       actionType: 'use',
       params: { cardId: 'wj1' },
+    });
+  });
+
+  // ─── 负面:结算期间(pending)再使用 → 拒绝 ──────────────────
+  // P1 手持两张万箭,P2 有闪 → 首张结算时出现「询问闪」pending;
+  // 此时 P1 再用第二张(wj2 在手、且是 P1 回合)只能因 pending 被拒,排除其余归因。
+
+  it('负面:询问闪 pending 期间 P1 再用万箭 → 拒绝', async () => {
+    const dodge = makeCard('d1', '闪', '♦', '2');
+    const wj2 = makeCard('wj2', '万箭齐发', '♠', '4', '锦囊牌');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['wj1', 'wj2'], skills: ['万箭齐发'] }),
+        makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
+      ],
+      cardMap: { wj1: WANJIAN, wj2, d1: dodge },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.useCardAndTarget('万箭齐发', 'wj1', []);
+    // P2 有闪 → 询问闪 pending 出现;此期间 P1 用第二张万箭 → 仅因 pending 被拒
+    await P1.expectRejected({
+      skillId: '万箭齐发',
+      actionType: 'use',
+      params: { cardId: 'wj2' },
     });
   });
 });
