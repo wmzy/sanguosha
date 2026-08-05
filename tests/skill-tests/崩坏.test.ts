@@ -131,7 +131,7 @@ describe('崩坏', () => {
     expect(harness.state.players[0].maxHealth).toBe(8);
   });
 
-  it('体力3 < 最小5(并列最小即最小)→ 崩坏不触发', async () => {
+  it('体力3 为唯一最小(对方5)→ 崩坏不触发', async () => {
     // 董卓 3,对方 5 → 最小是 3,董卓==最小 → 不触发
     const state = buildState({ p0Health: 3, p1Health: 5 });
     await harness.setup(state);
