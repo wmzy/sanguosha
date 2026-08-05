@@ -4,6 +4,7 @@
 //   3. 3 人局:刘禅放权选 P2 → P2 进行额外回合 → 额外回合结束后恢复正常座次(P1 → P2)
 //      并验证额外回合是全新回合(per-turn 标记被清空)
 //   4. 2 人局:刘禅放权选对方 → 对方额外回合中使用限一次技(制衡)→ 标记清空 → 正常回合可再用
+//   5. 负面:刘禅拒绝支付放权代价(不弃牌)→ 不发动额外回合,正常切换下家
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -258,11 +259,11 @@ describe('放权', () => {
     await harness.waitForStable();
     harness.processAllEvents();
     await LC.respond('放权', { choice: true });
+    // 发动放权 → 跳过出牌 → 弃牌(无弃牌)→ 回合结束 → 放权情况1:弃牌代价 + 选目标
+    // (跳过出牌后自动级联到 回合结束 atom,无需手动 end —— 同 3 人局用例)
     await harness.waitForStable();
     harness.processAllEvents();
-
-    // 刘禅结束回合 → 情况1:弃牌 + 选目标
-    await LC.triggerAction('回合管理', 'end', {});
+    // 情况1:弃一张手牌(放权代价)
     LC.expectPending('请求回应');
     await LC.respond('放权', { cardId: 'c1' });
     await harness.waitForStable();
@@ -300,5 +301,54 @@ describe('放权', () => {
     await harness.waitForStable();
     harness.processAllEvents();
     expect(harness.state.players[1].vars['制衡/usedThisTurn']).toBe(true);
+  });
+
+  it('负面:刘禅拒绝支付放权代价(不弃牌)→ 不发动额外回合,正常切换下家', async () => {
+    // 座次 0=刘禅(放权), 1=P1, 2=P2
+    const c1 = mkCard('c1', '杀', '♠', '5');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '刘禅',
+            character: '刘禅',
+            hand: ['c1'],
+            skills: ['回合管理', '放权'],
+            health: 3,
+            maxHealth: 3,
+          }),
+          mkPlayer({ index: 1, name: 'P1' }),
+          mkPlayer({ index: 2, name: 'P2' }),
+        ],
+        cardMap: { c1 },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const LC = harness.player('刘禅');
+
+    // 发动放权(跳过出牌)→ 弃牌(无弃牌)→ 回合结束 → 情况1:要求弃一张手牌(代价)
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '出牌' });
+    await harness.waitForStable();
+    harness.processAllEvents();
+    await LC.respond('放权', { choice: true });
+    await harness.waitForStable();
+    harness.processAllEvents();
+    // 情况1:放权要求弃一张手牌(代价)
+    LC.expectPending('请求回应');
+
+    // 拒绝支付代价(超时/不弃牌)→ 未支付 → 不发动额外回合,放行正常回合结束
+    await LC.pass();
+
+    // active 标记已被消费(情况1 进入后立即删除),但未启动额外回合
+    expect(harness.state.localVars['放权/active']).toBeFalsy();
+    expect(harness.state.localVars['放权/extraTarget']).toBeFalsy();
+    // 刘禅未弃出 c1(代价未支付)
+    expect(harness.state.players[0].hand).toEqual(['c1']);
+    // 正常切换到下家 P1(而非额外回合目标 P2)→ 证明未发动额外回合
+    expect(harness.state.currentPlayerIndex).toBe(1);
+    expect(harness.state.phase).toBe('出牌');
   });
 });
