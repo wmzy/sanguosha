@@ -2,7 +2,6 @@
 //   自己的判定牌生效后,可获得该判定牌
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable, disableAutoCompare } from '../engine-harness';
-import { applyAtom } from '../../src/engine/index';
 import { runJudgeFlow } from '../../src/engine/judge-flow';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
