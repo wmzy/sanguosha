@@ -163,4 +163,41 @@ describe('仁王盾', () => {
 
     expect(harness.state.players[1].health).toBe(3);
   });
+
+  // ─── 边界:仁王盾只保护装备者(目标合法性)──────────────────
+  // 实现:before hook 内 `if (atom.target !== ownerId) return;` ——
+  // 杀指向非装备者时 hook 直接 pass,不 cancel。验证仁王盾不会越权让黑杀对他人无效。
+
+  it('边界:仁王盾不保护其他玩家——黑杀 P3,P3 正常扣血、P2 不受影响', async () => {
+    const blackKill = makeCard('k1', '杀', '♠', '7'); // 黑桃=黑色
+    const shan = makeCard('s1', '闪', '♦', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['杀'] }),
+        // P2 持仁王盾但不是本杀的目标
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          skills: ['闪', '仁王盾'],
+          equipment: { 防具: 'rw' },
+        }),
+        makePlayer({ index: 2, name: 'P3', hand: ['s1'], skills: ['闪'] }),
+      ],
+      cardMap: { rw: RENWANG, k1: blackKill, s1: shan },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P3 = harness.player('P3');
+
+    // P1 黑杀 P3(非仁王盾持有者):检测有效性 hook 因 target≠ownerId 直接 pass
+    await harness.player('P1').useCardAndTarget('杀', 'k1', [2]);
+    P3.expectPending('询问闪');
+    await P3.pass();
+
+    // P3 正常受击;仁王盾持有者 P2 完全不受影响
+    expect(harness.state.players[2].health).toBe(3);
+    expect(harness.state.players[1].health).toBe(4);
+  });
 });
