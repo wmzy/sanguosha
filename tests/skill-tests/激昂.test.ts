@@ -2,8 +2,9 @@
 //   1. 孙策使用红色杀 → 询问 → 发动 → 摸1张
 //   2. 孙策被使用红色杀 → 询问 → 发动 → 摸1张
 //   3. 孙策使用决斗 → 询问 → 发动 → 摸1张
-//   4. 黑色杀不触发(无询问)
-//   5. 不发动则不摸牌
+//   4. 孙策被使用决斗 → 询问 → 发动 → 摸1张
+//   5. 黑色杀不触发(无询问)
+//   6. 不发动则不摸牌
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -162,6 +163,42 @@ describe('激昂', () => {
     P2.expectPending('询问杀');
     await P2.pass(); // P2 不出杀 → 输 → 受伤
     expect(harness.state.players[1].health).toBe(3);
+  });
+
+  it('孙策被使用决斗 → 发动激昂 → 摸1张', async () => {
+    const duel = mkCard('jd', '决斗', '♠', 'A', '锦囊牌');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: '孙策', skills: ['激昂'], hand: [] }),
+          mkPlayer({ index: 1, name: '敌', skills: ['决斗'], hand: ['jd'] }),
+        ],
+        cardMap: { jd: duel },
+        currentPlayerIndex: 1,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const SC = harness.player('孙策');
+    const enemy = harness.player('敌');
+    const scHandBefore = harness.state.players[0].hand.length;
+
+    // 敌人对孙策使用决斗
+    await enemy.triggerAction('决斗', 'use', { cardId: 'jd', targets: [0] });
+
+    // 成为目标后触发激昂(孙策是决斗目标方)
+    SC.expectPending('请求回应');
+    await SC.respond('激昂', { choice: true });
+
+    // 激昂摸1张(牌堆牌);孙策空手 → 1 张
+    expect(harness.state.players[0].hand.length).toBe(scHandBefore + 1);
+    expect(harness.state.players[0].hand[0]).toMatch(/__test_deck_/);
+
+    // 决斗结算:无懈窗口 → 询问杀(目标孙策先出)→ 不出 → 输 → 受伤
+    await SC.pass(); // 无懈可击窗口(广播)
+    SC.expectPending('询问杀');
+    await SC.pass(); // 孙策不出杀 → 输 → 受伤
+    expect(harness.state.players[0].health).toBe(3);
   });
 
   it('黑色杀不触发激昂(无询问)', async () => {
