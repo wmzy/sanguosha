@@ -230,4 +230,92 @@ describe('护驾', () => {
     await P0.pass();
     expect(harness.state.players[0].health).toBe(3);
   });
+
+  // ─── 多魏势力角色:座次顺序逐个询问,先拒后出 ────────────────────
+  // 实现 onInit 的 execute 按 ownerId+offset 座次顺序逐个询问魏势力角色;
+  // 前一个拒绝(不出闪)时继续询问下一个,任一角色出闪即结束并抵消。
+  it('P0(曹操)被杀 → 护驾 → P2(魏)拒绝 → P3(魏)出闪 → 伤害抵消', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const dodgeP1 = makeCard('s_p1', '闪', '♥', '2');
+    const dodgeP3 = makeCard('s3', '闪', '♦', '5');
+
+    const state: GameState = createGameState({
+      players: [
+        // P0 = 曹操(主公,有护驾)
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          character: '曹操',
+          skills: ['护驾'],
+          health: 4,
+          maxHealth: 4,
+        }),
+        // P1 = 蜀势力(出杀者,与 P0 相邻→杀射程1可达;非魏→不参与护驾)
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '刘备',
+          hand: ['k1'],
+          skills: ['杀'],
+          faction: '蜀',
+        }),
+        // P2 = 魏势力(座次 owner+2,被先询问,将拒绝)
+        makePlayer({
+          index: 2,
+          name: 'P2',
+          character: '张辽',
+          hand: ['s_p1'],
+          skills: ['闪'],
+          faction: '魏',
+        }),
+        // P3 = 魏势力(被后询问,出闪抵消)
+        makePlayer({
+          index: 3,
+          name: 'P3',
+          character: '许褚',
+          hand: ['s3'],
+          skills: ['闪'],
+          faction: '魏',
+        }),
+      ],
+      cardMap: { k1: slash, s_p1: dodgeP1, s3: dodgeP3 },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P2 = harness.player('P2');
+    const P3 = harness.player('P3');
+
+    // P1 出杀指定 P0
+    await harness.player('P1').useCardAndTarget('杀', 'k1', [0]);
+    await harness.waitForStable();
+
+    // P0 被询问闪
+    P0.expectPending('询问闪');
+
+    // P0 发动护驾
+    await P0.respond('护驾', {});
+    await harness.waitForStable();
+
+    // 座次顺序(ownerId+offset):P1(蜀) 跳过 → P2(魏) 先被询问
+    expect(harness.state.pendingSlots.get(2)?.atom.type).toBe('请求回应');
+    await P2.pass(); // P2 拒绝出闪
+    await harness.waitForStable();
+
+    // P2 拒绝后,execute 继续询问下一个魏势力角色 P3
+    expect(harness.state.pendingSlots.get(3)?.atom.type).toBe('请求回应');
+    await P3.respond('护驾', { cardId: 's3' });
+    await harness.waitForStable();
+
+    // P3 出闪 → 闪移入处理区 → 杀被抵消 → P0 不受伤
+    expect(harness.state.players[0].health).toBe(4);
+    // P2 未出闪,仍持有自己的闪
+    expect(harness.state.players[2].hand).toContain('s_p1');
+    // P3 的闪已消耗
+    expect(harness.state.players[3].hand).not.toContain('s3');
+    restoreAutoCompare();
+  });
 });
