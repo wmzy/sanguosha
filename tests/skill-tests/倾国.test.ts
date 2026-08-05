@@ -247,6 +247,17 @@ describe('倾国', () => {
     expect(actions.length).toBeGreaterThan(0);
     const transformAction = actions.find((a) => a.actionType === 'transform');
     expect(transformAction).toBeDefined();
+
+    // prompt 卡过滤确实是"黑色牌":接受 ♠/♣(黑色)、拒绝 ♥/♦(红色)
+    expect(transformAction!.prompt.type).toBe('useCard');
+    const cardFilter = (transformAction!.prompt as {
+      cardFilter: { filter?: (c: Card) => boolean };
+    }).cardFilter;
+    expect(cardFilter.filter).toBeInstanceOf(Function);
+    expect(cardFilter.filter!(makeCard('bk', '杀', '♠'))).toBe(true); // 黑桃 = 黑色 → 通过
+    expect(cardFilter.filter!(makeCard('bk2', '桃', '♣'))).toBe(true); // 梅花 = 黑色 → 通过
+    expect(cardFilter.filter!(makeCard('rd', '杀', '♥'))).toBe(false); // 红桃 = 红色 → 拒绝
+    expect(cardFilter.filter!(makeCard('rd2', '桃', '♦'))).toBe(false); // 方块 = 红色 → 拒绝
   });
 
   // ─── 负面:黑色装备区牌 transform 被拒(官方仅限手牌) ─────────────
