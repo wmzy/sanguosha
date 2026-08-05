@@ -10,7 +10,7 @@
 //   3. 正面:targets 数组形式提交同样成功(与乐不思蜀前端兼容)
 //   4. 负面:非方块牌(♥/♠/♣) → 拒绝
 //   5. 负面:非自己回合 → 拒绝
-//   6. 负面:目标距离>1 → 拒绝(3人局 P0→P2 = 2)
+//   6. 正面:目标距离>1 → 仍可使用(乐不思蜀无距离限制)
 //   7. 负面:对自己使用 → 拒绝
 //   8. 负面:不在手牌也不在装备区 → 拒绝
 //   9. availableActions:声明 use action,cardFilter 仅方块牌
@@ -216,7 +216,7 @@ describe('国色', () => {
     });
   });
 
-  // ─── 6. 负面:目标距离>1 → 拒绝(3人局 P0→P2 = 2)──────────
+  // ─── 6. 正面:目标距离>1 → 仍可使用(乐不思蜀无距离限制)──────
 
   it('目标距离>1 → 仍可使用(乐不思蜀无距离限制)', async () => {
     const diamond = makeCard('c1', '杀', '♦', '7');
@@ -289,6 +289,36 @@ describe('国色', () => {
       actionType: 'use',
       params: { cardId: 'c1', target: 1 },
     });
+  });
+
+  // ─── 8b. 负面:目标判定区已有乐不思蜀 → 拒绝 ────────────────
+
+  it('目标判定区已有乐不思蜀 → 拒绝', async () => {
+    const diamond = makeCard('c1', '杀', '♦', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: '大乔', hand: ['c1'], skills: ['国色'] }),
+        makePlayer({ index: 1, name: '目标', hand: ['d1'], skills: ['回合管理'] }),
+      ],
+      cardMap: { c1: diamond, d1: makeCard('d1', '闪', '♥', '5') },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    // 目标判定区已存在一张乐不思蜀(与乐不思蜀自身规则一致:不可叠加)
+    state.players[1].pendingTricks = [
+      { name: '乐不思蜀', source: 0, card: diamond },
+    ];
+    await harness.setup(state);
+    const P0 = harness.player('大乔');
+
+    await P0.expectRejected({
+      skillId: '国色',
+      actionType: 'use',
+      params: { cardId: 'c1', target: 1 },
+    });
+    // 未消耗手牌
+    expect(harness.state.players[0].hand).toContain('c1');
   });
 
   // ─── 9. availableActions:声明 use action,cardFilter 仅方块牌 ─
