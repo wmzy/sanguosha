@@ -190,11 +190,13 @@ describe('判定阶段多延时锦囊循环', () => {
     });
     state.zones = { deck: [], discardPile: [], processing: [] };
     await harness.setup(state);
+    // harness.setup 会自动填充空牌堆（20 张测试牌），此处手动清空以还原「牌堆耗尽」前提
+    harness.state.zones.deck.length = 0;
 
     void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
     await waitForStable(harness.state);
 
-    // 牌堆空 → 无法判定，延时锦囊保留未结算（未死循环、未报错、未判定）
+    // 牌堆空 → 判定阶段 before-hook 检测到 deck.length===0 立即返回，延时锦囊保留未结算（未死循环、未报错、未判定）
     expect(harness.state.players[1].pendingTricks.length).toBe(1);
     expect(harness.state.players[1].pendingTricks[0].name).toBe('乐不思蜀');
     // 未判定 → 不应加跳过标签
