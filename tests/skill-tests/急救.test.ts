@@ -12,6 +12,7 @@
 //   4. 负面:无求桃 pending → 拒绝
 //   5. 负面:不在手牌的红色牌 → 拒绝
 //   6. 负面:装备区红色牌 → 拒绝(当前范围仅支持红色手牌)
+//   7. 负面:自己回合内求桃 → 拒绝(急救仅限回合外)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -171,14 +172,14 @@ describe('急救', () => {
     const P2 = harness.player('P2');
     const HuaTuo = harness.player('华佗');
 
-    // P0 出杀 → P2 不闪 → HP=0 → 濒死 → 求桃依次问 P2、P0、华佗
+    // P0 出杀 → P2 不闪 → HP=0 → 濒死 → 求桃从当前回合 P0 起逆时针:P0 → P2 → 华佗
     await P0.useCardAndTarget('杀', 'c1', [2]);
     await P2.pass();
     expect(harness.state.players[2].health).toBe(0);
 
-    // 求桃先问濒死者 P2(无桃跳过),再问 P0(跳过),最后问华佗
-    await P2.pass();
+    // 求桃依次问 P0、P2(均无救援 pass),最后问到华佗
     await P0.pass();
+    await P2.pass();
 
     // 此时轮到华佗被问
     const slot = [...harness.state.pendingSlots.values()][0].atom as {
@@ -282,13 +283,13 @@ describe('急救', () => {
         makePlayer({
           index: 1,
           name: '华佗',
-          hand: [],
+          hand: ['hts'], // 须持有手牌:空手会在求桃流程被自动跳过→华佗死亡,无法到达牌校验
           skills: ['急救', '桃', '闪'],
           health: 1,
           maxHealth: 3,
         }),
       ],
-      cardMap: { c1: slash, rX: redCardElsewhere },
+      cardMap: { c1: slash, rX: redCardElsewhere, hts: makeCard('hts', '闪', '♣', '5') },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -327,13 +328,13 @@ describe('急救', () => {
         makePlayer({
           index: 1,
           name: '华佗',
-          hand: [],
+          hand: ['hts'], // 须持有手牌:空手会在求桃流程被自动跳过→华佗死亡,无法到达牌校验
           skills: ['急救', '桃', '闪'],
           health: 1,
           maxHealth: 3,
         }),
       ],
-      cardMap: { c1: slash, re: redEquip },
+      cardMap: { c1: slash, re: redEquip, hts: makeCard('hts', '闪', '♣', '5') },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -353,6 +354,54 @@ describe('急救', () => {
       skillId: '急救',
       actionType: 'respond',
       params: { cardId: 're' },
+    });
+  });
+
+  // ─── 负面:发动时机(急救仅限回合外) ────────────
+
+  it('respond:华佗自己回合内求桃 → 拒绝(急救仅限回合外)', async () => {
+    const slash = makeCard('c1', '杀', '♠', 'A');
+    const redCard = makeCard('r1', '过河拆桥', '♥', 'A', '锦囊牌'); // 红色
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['p0s'],
+          skills: ['闪'],
+          health: 1,
+          maxHealth: 4,
+        }),
+        makePlayer({
+          index: 1,
+          name: '华佗',
+          hand: ['c1', 'r1'],
+          skills: ['杀', '急救', '桃'],
+          health: 3,
+          maxHealth: 3,
+        }),
+      ],
+      cardMap: { c1: slash, r1: redCard, p0s: makeCard('p0s', '闪', '♣', '3') },
+      currentPlayerIndex: 1, // 华佗回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const HuaTuo = harness.player('华佗');
+
+    // 华佗回合内出杀 → P0 不闪 → HP=0 → 濒死 → 求桃从当前回合华佗起,首问华佗自己
+    await HuaTuo.useCardAndTarget('杀', 'c1', [0]);
+    await P0.pass();
+    expect(harness.state.players[0].health).toBe(0);
+    const slot = [...harness.state.pendingSlots.values()][0].atom as { target?: number };
+    expect(slot.target).toBe(1); // 确认确实在问华佗
+
+    // 自己回合内:即便持红色手牌且确有求桃询问,急救仍被拒(仅限回合外)
+    await HuaTuo.expectRejected({
+      skillId: '急救',
+      actionType: 'respond',
+      params: { cardId: 'r1' },
     });
   });
 });
