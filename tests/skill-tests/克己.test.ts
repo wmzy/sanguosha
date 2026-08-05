@@ -156,9 +156,8 @@ describe('克己', () => {
     // 结束出牌阶段 → 进入弃牌阶段
     await P1.triggerAction('回合管理', 'end', {});
 
-    // 克己不应触发(本回合出过杀):应直接进入 __弃牌,而非 克己/confirm
+    // 克己不应触发(本回合出过杀):应直接进入 __弃牌
     expect(currentRequestType(harness.state)).toBe('__弃牌');
-    expect(currentRequestType(harness.state)).not.toBe('克己/confirm');
 
     // 弃 2 张(4 - HP2 = 2)
     await P1.respond('系统规则', { cardIds: ['c2', 'c3'] });
