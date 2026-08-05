@@ -188,11 +188,14 @@ describe('界火计', () => {
     P1.expectPending('请求回应');
     await P1.respond('界火计', { cardId: 'm1' });
     expect(harness.state.players[1].health).toBe(2);
-    // 验证展示 atom 被发出(界版随机展示机制)
+    // 验证展示 atom 被发出(界版随机展示机制),且目标仅 1 张手牌 → 必展示该牌(r1)
     const displayEvents = harness.state.atomHistory.filter(
       (e) => e.kind === 'atom' && (e.atom as { type?: string }).type === '展示',
     );
     expect(displayEvents.length).toBeGreaterThanOrEqual(1);
+    expect(
+      (displayEvents[displayEvents.length - 1] as { atom: { cardId: string } }).atom.cardId,
+    ).toBe('r1');
   });
 
   // ─── 4. 正面:无懈可击抵消 → 无随机展示/无伤害 ─────────────────────
@@ -219,7 +222,9 @@ describe('界火计', () => {
 
     // 无懈窗口:P2 出实际无懈可击抵消
     P1.expectPending('请求回应');
-    await P2.useCard('无懈可击', 'wz');
+    // 回应无懈广播须用 respond:无懈可击是「生效前」纯回应牌,无主动 use 入口,
+    // useCard(use) 会被静默拒绝(无懈未生效)。与奇袭/看破/南蛮等用例一致。
+    await P2.respond('无懈可击', { cardId: 'wz' });
     // P1 的反无懈窗口:pass
     P1.expectPending('请求回应');
     await P1.pass();
@@ -231,6 +236,11 @@ describe('界火计', () => {
       (e) => e.kind === 'atom' && (e.atom as { type?: string }).type === '受到伤害时',
     );
     expect(damageEvents.length).toBe(0);
+    // 被抵消则跳过随机展示(界版火攻在无懈生效后不进入展示阶段)
+    const displayEvents = harness.state.atomHistory.filter(
+      (e) => e.kind === 'atom' && (e.atom as { type?: string }).type === '展示',
+    );
+    expect(displayEvents.length).toBe(0);
   });
 
   // ─── 5. rollback:transform + 火攻.use 失败 → 原卡还原 ────────────
@@ -244,14 +254,16 @@ describe('界火计', () => {
     const P1 = harness.player('P1');
 
     // 火攻.use 目标自己 → validate 拒绝 → rollback 界火计 transform
+    // preceding 须在消息顶层(ClientMessage.preceding),transform 先执行建影子,
+    // 主 use validate 失败时引擎逆序 rollback(删影子、原卡还原)。
     await P1.expectRejected({
       skillId: '火攻',
       actionType: 'use',
       params: {
         cardId: 'c1#界火计',
         targets: [0],
-        preceding: [{ skillId: '界火计', actionType: 'transform', params: { cardId: 'c1' } }],
       },
+      preceding: [{ skillId: '界火计', actionType: 'transform', params: { cardId: 'c1' } }],
     });
 
     expect(harness.state.cardMap['c1'].name).toBe('桃');
