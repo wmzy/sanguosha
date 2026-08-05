@@ -15,8 +15,9 @@
 //   4. 负面:目标非蜀势力 → 拒绝
 //
 // 验证(新增被动触发):
-//   5. 正面:蜀角色回合外用杀 → 询问 → 确认 → 主公摸1张
-//   6. 正面:蜀角色回合外用杀 → 询问 → 拒绝 → 主公不摸
+//   5. 正面:蜀角色回合外用杀(使用路径) → 询问 → 确认 → 主公摸1张
+//   6. 正面:蜀角色回合外用杀(使用路径) → 询问 → 拒绝 → 主公不摸
+//   6b. 正面:蜀角色回合外于决斗中打出杀(打出路径) → 确认 → 主公摸1张
 //   7. 负面:蜀角色自己回合用杀 → 不触发(须回合外)
 //   8. 负面:非蜀角色用杀 → 不触发
 //   9. 负面:每回合限一次(第二次用杀不触发)
@@ -417,6 +418,74 @@ describe('界激将', () => {
     // 拒绝:主公不摸牌,牌堆未变
     expect(harness.state.players[0].hand).toEqual([]);
     expect(harness.state.zones.deck).toEqual(['draw1']);
+  });
+
+  // ─── 被动(打出路径):蜀角色回合外于决斗中「打出」杀 → 主公摸1张 ──
+  //   覆盖「打出杀」分支(询问杀 after-hook):蜀角色本人在回合外被询问杀
+  //   (南蛮入侵/决斗)并打出杀时触发。区别于:
+  //     · 用例 5/6 的「使用杀」路径(走 runUseFlow → 指定目标 after-hook);
+  //     · 用例 3 的「代打出」(主公被询问杀、蜀盟友代打,atom.target=主公 → 早期 return)。
+  it('被动(打出):蜀角色回合外于决斗中打出杀 → 确认 → 主公摸1张', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const duel: Card = {
+      id: 'jd1',
+      name: '决斗',
+      suit: '♠',
+      color: '黑',
+      rank: 'A',
+      type: '锦囊牌',
+    };
+    const slash = makeCard('s1', '杀', '♠', '5');
+    const draw = makeCard('draw1', '杀', '♠', '3');
+    const state: GameState = createGameState({
+      players: [
+        // P0 = 界刘备(主公,蜀,界激将)
+        makePlayer({ index: 0, name: '界刘备', skills: ['界激将'], faction: '蜀' }),
+        // P1 = 蜀角色(决斗目标,先手出杀)
+        makePlayer({ index: 1, name: '关羽', hand: ['s1'], skills: ['杀'], faction: '蜀' }),
+        // P2 = 决斗发起者(无杀,会输决斗)
+        makePlayer({ index: 2, name: '曹操', hand: ['jd1'], skills: ['决斗'], faction: '魏' }),
+      ],
+      cardMap: { jd1: duel, s1: slash, draw1: draw },
+      zones: { deck: ['draw1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 2, // P2 回合 → P1(关羽)在回合外
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('关羽');
+    const P2 = harness.player('曹操');
+
+    // P2 对 P1 出决斗(P1 是目标,先手出杀)
+    await P2.useCardAndTarget('决斗', 'jd1', [1]);
+    await harness.waitForStable();
+
+    // 无懈可击窗口(broadcast)→ pass
+    const wuxieSlot = [...harness.state.pendingSlots.values()][0];
+    expect(wuxieSlot?.atom.type).toBe('请求回应');
+    await harness.player('界刘备').pass();
+    await harness.waitForStable();
+
+    // P1(决斗目标)被询问杀
+    P1.expectPending('询问杀');
+    // P1 打出杀(杀牌移入处理区供决斗检查)
+    await P1.respond('杀', { cardId: 's1' });
+    await harness.waitForStable();
+
+    // 询问杀 after-hook 触发:询问 P1 是否令主公摸1张
+    const drawSlot = harness.state.pendingSlots.get(1);
+    expect(drawSlot?.atom.type).toBe('请求回应');
+    expect((drawSlot?.atom as { requestType?: string }).requestType).toBe('界激将/drawChoice');
+    // P1 确认 → 主公摸1张
+    await P1.respond('界激将', { choice: true });
+    await harness.waitForStable();
+
+    // 决斗结算:P1 出了杀,轮到 P2 出杀;P2 手牌已空 → 输决斗扣 1 血
+    // 主公(刘备)摸1张;打出杀的 s1 进入弃牌堆
+    expect(harness.state.players[0].hand).toEqual(['draw1']);
+    expect(harness.state.players[2].health).toBe(3);
+    expect(harness.state.zones.discardPile).toContain('s1');
+    restoreAutoCompare();
   });
 
   it('负面:蜀角色自己回合用杀 → 不触发(须回合外)', async () => {
