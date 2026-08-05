@@ -5,10 +5,11 @@
 //
 // 用例:
 //   1. 目标出杀 + 姜维不出闪(受伤)→ 免于被弃(同标版)
-//   2. 目标出杀 + 姜维出闪(未受伤)→ 关键差异:仍弃目标一张牌
-//   3. 目标无杀不出 → 弃其一张牌(同标版)
-//   4. 本阶段限两次:第二次发动可执行,第三次被拒绝
-//   5. validate:不能选自己
+//   2. 目标用火杀响应 + 姜维(藤甲)→ 受 2 点火焰伤害(damageType 传导回归)
+//   3. 目标出杀 + 姜维出闪(未受伤)→ 关键差异:仍弃目标一张牌
+//   4. 目标无杀不出 → 弃其一张牌(同标版)
+//   5. 本阶段限两次:第二次发动可执行,第三次被拒绝
+//   6. validate:不能选自己
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
