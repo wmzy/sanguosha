@@ -12,6 +12,8 @@
 //   4. 红颜联动:黑桃手牌视为红桃,可弃
 //   5. 触发条件不满足:无红桃/黑桃牌 → 不触发,界小乔正常受伤
 //   6. 不能选择自己(validate 拒绝)
+//   7. 负面拒绝:选择不发动(CONFIRM 取消)→ 界小乔正常受伤,红桃牌保留
+//   8. 摸牌封顶:选项①目标已损失体力>5 → 摸牌数封顶 5(至多5)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -344,5 +346,95 @@ describe('界天香', () => {
     await P1.respond('界天香', { choice: true }); // 选项①
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.players[2].health).toBe(3);
+  });
+
+  // ─── 7. 负面拒绝:选择不发动(CONFIRM 取消)─────────────────────
+  it('选择不发动界天香 → 界小乔正常受伤,红桃牌保留', async () => {
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const heartCard = makeCard('h1', '闪', '♥', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
+        makePlayer({
+          index: 1,
+          name: '界小乔',
+          hand: ['h1'],
+          skills: ['界天香', '界红颜'],
+          health: 3,
+          maxHealth: 3,
+        }),
+        makePlayer({ index: 2, name: 'P2', health: 4, maxHealth: 4, skills: [] }),
+      ],
+      cardMap: { k1: slash, h1: heartCard },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: [], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('界小乔');
+
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P1.pass();
+
+    // 询问是否发动 → 选择不发动(confirm=false)
+    P1.expectPending('请求回应');
+    await P1.respond('界天香', { choice: false });
+
+    // 不发动 → 界小乔正常受伤(伤害未被防止),无后续询问
+    P1.expectNoPending();
+    expect(harness.state.players[1].health).toBe(2);
+    // 红桃牌保留(未弃置)
+    expect(harness.state.players[1].hand).toContain('h1');
+  });
+
+  // ─── 8. 摸牌封顶:选项①目标已损失体力>5 → 摸牌数封顶 5 ───────
+  it('选项①:目标已损失体力>5 → 摸牌数封顶为 5(至多5)', async () => {
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const heartCard = makeCard('h1', '闪', '♥', '5');
+    // P2 maxHealth=8,health=3 → 受1伤后 2/8,已损失 6 → 封顶摸 5(非 6)
+    const drawCards = Array.from({ length: 6 }, (_, i) => makeCard(`d${i}`, '桃', '♥', '3'));
+    const cardMap: Record<string, Card> = { k1: slash, h1: heartCard };
+    for (const c of drawCards) cardMap[c.id] = c;
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
+        makePlayer({
+          index: 1,
+          name: '界小乔',
+          hand: ['h1'],
+          skills: ['界天香', '界红颜'],
+          health: 3,
+          maxHealth: 3,
+        }),
+        makePlayer({ index: 2, name: 'P2', health: 3, maxHealth: 8, skills: [] }),
+      ],
+      cardMap,
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: drawCards.map((c) => c.id), discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('界小乔');
+
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P1.pass();
+
+    P1.expectPending('请求回应');
+    await P1.respond('界天香', { choice: true });
+    P1.expectPending('请求回应');
+    await P1.respond('界天香', { cardId: 'h1', target: 2 });
+    P1.expectPending('请求回应');
+    await P1.respond('界天香', { choice: true }); // 选项①
+
+    // 界小乔未受伤(伤害被防止)
+    expect(harness.state.players[1].health).toBe(3);
+    // P2 受来源1点伤害:3 → 2
+    expect(harness.state.players[2].health).toBe(2);
+    // 已损失 = 8 - 2 = 6,但摸牌数封顶为 5
+    expect(harness.state.players[2].hand.length).toBe(5);
   });
 });
