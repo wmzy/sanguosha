@@ -288,11 +288,12 @@ describe('界伏枥', () => {
   });
 
   // ─── 4. 你造成的伤害数 >= X:不翻面 ───────────
-  it('廖化造成足够伤害 → X ≤ 伤害数 → 不翻面', async () => {
+  // 说明:伤害计数由 造成伤害后 after-hook 累计(永久 vars),限定技可能在造成伤害多轮
+  // 后才触发,故此处直接预置 damageDealt=X 模拟廖化此前已造成 X 点伤害,聚焦验证
+  // 「X ≤ 你造成的伤害数 → 不翻面」分支(对照用例 1 的 X>伤害数 → 翻面)。
+  it('X ≤ 你造成的伤害数 → 回血/摸牌但不翻面', async () => {
     const slash = mkCard('s5', '杀', '♠', '7');
-    const enemySlash = mkCard('s6', '杀', '♠', '8');
-    // 廖化手牌中一张杀,用来对 P1 造成伤害
-    const mySlash = mkCard('ms1', '杀', '♣', '5');
+    const lhShan = mkCard('sh1', '闪', '♥', '2'); // 廖化含闪:走 normal 询问闪
     await harness.setup(
       createGameState({
         players: [
@@ -300,10 +301,12 @@ describe('界伏枥', () => {
             index: 0,
             name: '界廖化',
             faction: '蜀',
-            hand: [mySlash.id],
-            skills: ['界伏枥', '杀', '闪', '回合管理'],
-            health: 4,
+            hand: ['sh1'],
+            skills: ['界伏枥', '闪', '回合管理'],
+            health: 1,
             maxHealth: 4,
+            // 模拟廖化此前已造成 X=2 点伤害(蜀+魏两势力)
+            vars: { '伏枥/damageDealt': 2 },
           }),
           mkPlayer({
             index: 1,
@@ -312,55 +315,37 @@ describe('界伏枥', () => {
             hand: [slash.id],
             skills: ['杀', '闪', '回合管理'],
           }),
-          mkPlayer({
-            index: 2,
-            name: 'P2',
-            faction: '吴',
-            hand: [enemySlash.id],
-            skills: ['杀', '闪', '回合管理'],
-          }),
         ],
-        cardMap: { s5: slash, s6: enemySlash, ms1: mySlash },
-        currentPlayerIndex: 0,
+        cardMap: { s5: slash, sh1: lhShan },
+        currentPlayerIndex: 1,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
       }),
     );
     const LH = harness.player('界廖化');
     const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
 
     const restoreAutoCompare = disableAutoCompare();
 
-    // 廖化先出杀打 P1,造成 1 点伤害
-    await LH.useCardAndTarget('杀', 'ms1', [1]);
-    await P1.pass(); // 不闪
-    await harness.waitForStable();
-    expect(harness.state.players[1].health).toBe(3);
-
-    // 廖化主动结束出牌阶段(让 P2 接管出牌)
-    await LH.tryDispatch({ skillId: '回合管理', actionType: 'end', params: {} });
-    harness.processAllEvents();
+    // P1 杀 廖化 → 廖化濒死
+    await P1.useCardAndTarget('杀', 's5', [0]);
+    await LH.pass(); // 不出闪
     await harness.waitForStable();
 
-    // 等 P2 回合开始
-    while (harness.state.currentPlayerIndex !== 2) {
-      // 任意 pass 推进
-      const slot = [...harness.state.pendingSlots.values()][0];
-      const target = (slot.atom as { target?: number }).target ?? 0;
-      await harness.player(target).pass();
-      await harness.waitForStable();
-    }
-
-    // P2 出杀打廖化
-    await P2.useCardAndTarget('杀', 's6', [0]);
-    await LH.pass();
+    // 伏枥询问 → 发动(X=2 势力)
+    expect(currentRequestType(harness.state)).toBe('界伏枥/confirm');
+    await LH.respond('界伏枥', { choice: true });
     await harness.waitForStable();
 
-    // 廖化(health 4→3,非濒死,继续推进到 1 之前不触发)
-    // 为了触发伏枥,需要廖化濒死(health ≤ 0)。改用 maxHealth=1 测试。
-    // 这里仅验证伤害计数:廖化累计造成伤害 1
-    expect(harness.state.players[0].vars['伏枥/damageDealt']).toBe(1);
+    // X=2:体力回复至 2(从濒死的 0),手牌摸至 2(原有 sh1 + 摸 1)
+    expect(harness.state.players[0].health).toBe(2);
+    expect(harness.state.players[0].hand.length).toBe(2);
+    // 限定技已用标记
+    expect(harness.state.players[0].vars['伏枥/used']).toBe(true);
+    // X=2 ≤ damageDealt=2 → 不翻面:无翻面标签
+    expect(harness.state.players[0].tags).not.toContain('伏枥/翻面');
+    // 廖化存活
+    expect(harness.state.players[0].alive).toBe(true);
 
     restoreAutoCompare();
   });
