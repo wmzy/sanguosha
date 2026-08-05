@@ -216,14 +216,15 @@ describe('界毅重', () => {
 
   // ─── ② 正面:我用黑杀打低手牌角色 → 直接命中 ───────────────
 
-  it('②正面:P0(2手牌,界毅重)用黑杀打 P1(1手牌)→ 不询问闪,直接扣血', async () => {
+  it('②正面:P0(3手牌,界毅重)用黑杀打 P1(1手牌)→ 不询问闪,直接扣血', async () => {
     const blackKill = makeCard('b1', '杀', '♣', '9');
     const state: GameState = createGameState({
       players: [
         makePlayer({
           index: 0,
           name: 'P0',
-          hand: ['b1', 'x1'],
+          // 3 张手牌:出杀后剩 2 张,严格大于 P1 的 1 张
+          hand: ['b1', 'x1', 'x2'],
           skills: ['界毅重', '杀'],
           health: 4,
           maxHealth: 4,
@@ -231,7 +232,7 @@ describe('界毅重', () => {
         makePlayer({
           index: 1,
           name: 'P1',
-          hand: ['x2'], // 1 张手牌
+          hand: ['x3'], // 1 张手牌
           skills: ['闪'],
           health: 4,
           maxHealth: 4,
@@ -241,6 +242,7 @@ describe('界毅重', () => {
         b1: blackKill,
         x1: makeCard('x1', '闪', '♥', '2'),
         x2: makeCard('x2', '闪', '♦', '3'),
+        x3: makeCard('x3', '闪', '♥', '5'),
       },
       currentPlayerIndex: 0,
       phase: '出牌',
@@ -250,7 +252,7 @@ describe('界毅重', () => {
 
     await harness.player('P0').useCardAndTarget('杀', 'b1', [1]);
 
-    // ② 生效:cancel 询问闪 → 无 pending,直接扣血
+    // ② 生效:P0 出杀后手牌(2)严格 > P1(1)→ cancel 询问闪 → 无 pending,直接扣血
     expect(harness.state.pendingSlots.size).toBe(0);
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.zones.discardPile).toContain('b1');
