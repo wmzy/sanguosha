@@ -219,6 +219,41 @@ describe('界巧变', () => {
     expect(bianMarks(harness.state.players[0]).length).toBe(1);
   });
 
+  // ─── 3b. 拒绝发动:选择不发动 → 不消耗资源(负面拒绝路径) ────────────────────
+  it('拒绝发动:选择不发动,资源不消耗且不再追问', async () => {
+    const keep = makeCard('k1', '杀', '♠', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['k1'],
+          skills: ['界巧变'],
+          marks: makeBianMarks(2),
+        }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操' }),
+      ],
+      cardMap: { k1: keep },
+      currentPlayerIndex: 0,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '判定' });
+    await harness.waitForStable();
+    // 询问发动
+    P0.expectPending('请求回应');
+    await P0.respond('界巧变', { choice: false }); // 不发动
+
+    // 不消耗手牌、不消耗变,技能不再追问方式/弃牌
+    expect(harness.state.players[0].hand).toEqual(['k1']);
+    expect(bianMarks(harness.state.players[0]).length).toBe(2);
+    expect(harness.state.zones.discardPile).toEqual([]);
+    expect(harness.state.pendingSlots.size).toBe(0);
+  });
+
   // ─── 4. 无手牌但有变 → 直接走"移除变"路径 ────────────────────
   it('无手牌但有变:不询问方式,直接移除变', async () => {
     const state: GameState = createGameState({
