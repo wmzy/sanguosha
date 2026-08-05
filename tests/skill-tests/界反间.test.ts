@@ -23,7 +23,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import type { Card, GameState } from '../../src/engine/types';
+import type { Card } from '../../src/engine/types';
 
 function makeCard(
   id: string,
@@ -137,10 +137,8 @@ describe('界反间', () => {
 
     // P2 不失体力(选了弃牌项)
     expect(harness.state.players[1].health).toBe(p2HealthBefore);
-    // P2 弃置所有♥牌:刚收到的 h1 + 原有的 h2;♠ 的 s1 保留
+    // P2 弃置所有♥牌(刚收到的 h1 + 原有的 h2);♠ 的 s1 保留
     expect(harness.state.players[1].hand).toEqual(['s1']);
-    expect(harness.state.players[1].hand).not.toContain('h1');
-    expect(harness.state.players[1].hand).not.toContain('h2');
     // 弃牌堆含两张♥
     expect(harness.state.zones.discardPile).toContain('h1');
     expect(harness.state.zones.discardPile).toContain('h2');
