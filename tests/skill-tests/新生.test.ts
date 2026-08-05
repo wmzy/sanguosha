@@ -140,6 +140,58 @@ describe('新生', () => {
     expect(new Set(poolAfter).size).toBe(3);
   });
 
+  // ─── 1b. 多点伤害仍只 +1(每伤害事件一次,非每点伤害)────
+  it('受到 2 点伤害后:确认 → 牌池仍只 +1(非每点 +1)', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '左慈',
+            character: '左慈',
+            skills: ['化身', '新生'],
+            health: 3,
+            maxHealth: 3,
+          }),
+          mkPlayer({ index: 1, name: '曹操', character: '曹操', skills: [] }),
+        ],
+        cardMap: {},
+        currentPlayerIndex: 1,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+        rngSeed: 55,
+      }),
+    );
+
+    // 先初始化化身(触发首次回合开始)
+    void applyAtom(harness.state, { type: '回合开始', player: 0 });
+    await harness.waitForStable();
+    harness.processAllEvents();
+    await autoRespond化身Skill(harness);
+
+    const poolBefore = harness.state.players[0].vars['化身/牌池'] as string[];
+    expect(poolBefore.length).toBe(2);
+
+    const ZUO = harness.player(0);
+    // 受到 2 点伤害 → 新生询问(单个伤害事件触发一次,而非每点触发一次)
+    void runDamageFlow(harness.state, 1, 0, 2);
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    ZUO.expectPending('请求回应');
+    const slot = harness.state.pendingSlots.get(0);
+    expect((slot!.atom as Record<string, unknown>).requestType).toBe('新生/confirm');
+
+    await ZUO.respond('新生', { choice: true });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    const poolAfter = harness.state.players[0].vars['化身/牌池'] as string[];
+    // 每伤害事件一次:2 点伤害仍只获得 1 张,而非 2 张
+    expect(poolAfter.length).toBe(3);
+    expect(new Set(poolAfter).size).toBe(3);
+  });
+
   // ─── 2. 取消 → 牌池不变 ───────────────────────────────
   it('受到伤害后取消:牌池不变', async () => {
     await harness.setup(
