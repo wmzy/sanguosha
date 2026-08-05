@@ -244,8 +244,8 @@ describe('凿险 + 急袭', () => {
     // 顺手牵羊执行后,P0 获得了 P1 的手牌(p1c)
     // P1 手牌被拿走
     expect(harness.state.players[1].hand).not.toContain('p1c');
-    // P0 手牌中应有 p1c(或其原卡)
-    expect(harness.state.players[0].hand.length).toBeGreaterThan(0);
+    // P0 手牌中应有 p1c(顺手牵羊获得的目标牌)
+    expect(harness.state.players[0].hand).toContain('p1c');
 
     // 田被消耗
     const remainingTian = harness.state.players[0].marks.filter(
