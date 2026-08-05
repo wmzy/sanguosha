@@ -8,12 +8,15 @@
 //   1. respond validate:无 pending → 拒绝
 //   2. respond validate:ARRANGE 下 top+bottom 非完整划分 → 拒绝
 //   3. respond validate:ARRANGE 下含观察范围外的牌 → 拒绝
-//   4. respond execute:CONFIRM choice=true → 写入 localVars
-//   5. 端到端:摸牌阶段开始 → confirm → arrange → 牌堆重排
-//   6. 端到端:confirm=false → 牌堆不变
-//   7. 端到端:牌堆不足 4 张 → 观看可用张数
-//   8. 端到端:牌堆为空 → 不触发
-//   9. 端到端:其他玩家的摸牌阶段不触发本玩家
+//   4. respond validate:ARRANGE 下 top/bottom 含重复牌 → 拒绝
+//   5. respond execute:CONFIRM choice=true → 写入 localVars
+//   6. 端到端:摸牌阶段开始 → confirm → arrange(2 顶 2 底) → 牌堆重排
+//   7. 端到端:全置顶 → 牌堆顶 4 张按指定顺序
+//   8. 端到端:全置底 → 牌堆顶为原观察范围下方的牌
+//   9. 端到端:confirm=false → 牌堆不变
+//  10. 端到端:牌堆不足 4 张 → 观看可用张数
+//  11. 端到端:牌堆为空 → 不触发
+//  12. 端到端:其他玩家的摸牌阶段不触发本玩家
 //
 // 牌堆方向:deck[0]=牌堆底(最后摸),deck[len-1]=牌堆顶(最先摸)。
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -173,6 +176,34 @@ describe('界恂恂', () => {
       skillId: '界恂恂',
       actionType: 'respond',
       params: { top: ['a', 'x'], bottom: ['b', 'c'] },
+    });
+  });
+
+  it('respond:ARRANGE 下 top/bottom 含重复牌 → 拒绝', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', skills: ['界恂恂'] }),
+        makePlayer({ index: 1, name: 'P2', skills: ['杀'] }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    injectPending(state, 0, '界恂恂/arrange', {
+      type: 'distribute',
+      mode: 'select',
+      cardIds: ['a', 'b', 'c', 'd'],
+    });
+
+    // top+bottom 共 4 张且都在范围内,但 'a' 重复 → 拒绝
+    await P1.expectRejected({
+      skillId: '界恂恂',
+      actionType: 'respond',
+      params: { top: ['a', 'a'], bottom: ['b', 'c'] },
     });
   });
 
