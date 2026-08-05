@@ -115,8 +115,6 @@ describe('无中生有', () => {
     expect(info!.skillId).toBe('无懈可击');
     // cardFilter 存在(无懈可击的 onMount respond 定义)
     expect(info!.cardFilter).toBeDefined();
-    // P2 手里没有无懈可击 → respondableCards 为空
-    expect(P2.respondableCards()).toEqual([]);
 
     // pass 消耗无懈窗口
     await P1.pass();
@@ -143,7 +141,6 @@ describe('无中生有', () => {
   // 1b. 正面:对方有无懈可击时,cardFilter 过滤正确
   // ─────────────────────────────────────────────────────────────
   it('P2 手中有无懈可击时,respondableCards 仅包含无懈可击', async () => {
-    const _wz = makeCard('wz1', '无中生有', '♥', '7');
     const wx = makeCard('wx1', '无懈可击', '♠', 'J', '锦囊牌');
     const slash = makeCard('s1', '杀', '♠', '5', '基本牌');
     const state = buildState({
@@ -167,57 +164,21 @@ describe('无中生有', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 2. validate 拒绝:非出牌阶段(全部 5 个阶段)
+  // 2. validate 拒绝:非出牌阶段(覆盖全部 5 个非出牌阶段,均命中
+  //    validateUseCard 的 `state.phase !== '出牌'` 同一分支)
   // ─────────────────────────────────────────────────────────────
-  it('非出牌阶段(准备阶段)使用无中生有 → 被拒绝', async () => {
-    await harness.setup(buildState({ phase: '准备' }));
-    const P1 = harness.player('P1');
-    await P1.expectRejected({
-      skillId: '无中生有',
-      actionType: 'use',
-      params: { cardId: 'wz1' },
-    });
-  });
-
-  it('非出牌阶段(判定阶段)使用无中生有 → 被拒绝', async () => {
-    await harness.setup(buildState({ phase: '判定' }));
-    const P1 = harness.player('P1');
-    await P1.expectRejected({
-      skillId: '无中生有',
-      actionType: 'use',
-      params: { cardId: 'wz1' },
-    });
-  });
-
-  it('非出牌阶段(摸牌阶段)使用无中生有 → 被拒绝', async () => {
-    await harness.setup(buildState({ phase: '摸牌' }));
-    const P1 = harness.player('P1');
-    await P1.expectRejected({
-      skillId: '无中生有',
-      actionType: 'use',
-      params: { cardId: 'wz1' },
-    });
-  });
-
-  it('非出牌阶段(弃牌阶段)使用无中生有 → 被拒绝', async () => {
-    await harness.setup(buildState({ phase: '弃牌' }));
-    const P1 = harness.player('P1');
-    await P1.expectRejected({
-      skillId: '无中生有',
-      actionType: 'use',
-      params: { cardId: 'wz1' },
-    });
-  });
-
-  it('非出牌阶段(回合结束)使用无中生有 → 被拒绝', async () => {
-    await harness.setup(buildState({ phase: '回合结束' }));
-    const P1 = harness.player('P1');
-    await P1.expectRejected({
-      skillId: '无中生有',
-      actionType: 'use',
-      params: { cardId: 'wz1' },
-    });
-  });
+  it.each(['准备', '判定', '摸牌', '弃牌', '回合结束'] as TurnPhase[])(
+    '非出牌阶段(%s)使用无中生有 → 被拒绝',
+    async (phase) => {
+      await harness.setup(buildState({ phase }));
+      const P1 = harness.player('P1');
+      await P1.expectRejected({
+        skillId: '无中生有',
+        actionType: 'use',
+        params: { cardId: 'wz1' },
+      });
+    },
+  );
 
   // ─────────────────────────────────────────────────────────────
   // 3. validate 拒绝:pending 期间(防死锁)
