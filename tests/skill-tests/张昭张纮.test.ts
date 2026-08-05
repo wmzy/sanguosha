@@ -125,7 +125,7 @@ describe('直谏', () => {
     expect(harness.state.players[1].equipment['武器']).toBe('w1');
   });
 
-  it('负面:可装到不同栏位(目标已有武器,给防具仍合法)', async () => {
+  it('边界:可装到不同栏位(目标已有武器,给防具仍合法)', async () => {
     const w1 = mkCard('w1', '测试武器', '♠', '5', '装备牌', '武器', 3);
     const armor = mkCard('a1', '测试防具', '♦', '7', '装备牌', '防具');
     const state: GameState = createGameState({
