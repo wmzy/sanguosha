@@ -105,15 +105,18 @@ describe('断粮', () => {
     expect(harness.state.players[1].pendingTricks[0].name).toBe('兵粮寸断');
   });
 
-  // ─── 3. 目标手牌≥自己 → 无距离限制(3人局,距离2)────────────
+  // ─── 3. 目标手牌≥自己 → 无距离限制(4人局,P0→P2 座位距离=2)──────
+  //   注:3 人环形座次 P0→P2 实际距离=1,无法验证距离放松;故用 4 人局,
+  //   使 P0→P2 座位距离=2>1,此时只有“目标手牌≥自己”才放行。
   it('目标手牌≥自己 → 距离2也合法(无距离限制)', async () => {
     const kill = makeCard('c1', '杀', '♠', '7');
     const state: GameState = createGameState({
       players: [
-        // 徐晃 1 张手牌;P2 有 2 张(≥1)→ 距离 P0→P2 = 2 但无限制
+        // 4 人局:徐晃 1 张手牌;P2 有 2 张(≥1);P0→P2 座位距离=2,因目标手牌≥自己而无限制
         makePlayer({ index: 0, name: '徐晃', hand: ['c1'], skills: ['断粮'] }),
-        makePlayer({ index: 1, name: '中间', hand: [], skills: ['回合管理'] }),
+        makePlayer({ index: 1, name: '中间A', hand: [], skills: ['回合管理'] }),
         makePlayer({ index: 2, name: '远目标', hand: ['d1', 'd2'], skills: ['回合管理'] }),
+        makePlayer({ index: 3, name: '中间B', hand: [], skills: ['回合管理'] }),
       ],
       cardMap: {
         c1: kill,
@@ -229,6 +232,33 @@ describe('断粮', () => {
       skillId: '断粮',
       actionType: 'use',
       params: { cardId: 'c1', target: 0 },
+    });
+  });
+
+  // ─── 8. 目标判定区已有兵粮寸断 → 拒绝 ────────────────────────
+  it('目标判定区已有兵粮寸断 → 拒绝', async () => {
+    const kill = makeCard('c1', '杀', '♠', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: '徐晃', hand: ['c1'], skills: ['断粮'] }),
+        makePlayer({ index: 1, name: '目标', hand: ['d1'], skills: ['回合管理'] }),
+      ],
+      cardMap: { c1: kill, d1: makeCard('d1', '闪', '♥', '5') },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    // 目标判定区预设一张兵粮寸断(实现:目标判定区已有同名延时锦囊则拒绝)
+    state.players[1].pendingTricks = [
+      { name: '兵粮寸断', source: 0, card: makeCard('t0', '兵粮寸断', '♣', 'A', '锦囊牌') },
+    ];
+    await harness.setup(state);
+    const P0 = harness.player('徐晃');
+
+    await P0.expectRejected({
+      skillId: '断粮',
+      actionType: 'use',
+      params: { cardId: 'c1', target: 1 },
     });
   });
 });
