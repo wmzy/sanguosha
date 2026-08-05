@@ -14,7 +14,8 @@
 //   7. 禁色-有非禁色闪 → 询问闪放行(目标可出非禁色闪)
 //   8. 距离 >1 不受影响:4 人局中距离 2 的目标不加标签
 //   9. 回合结束清标签
-//   10. 边界:owner 无手牌时仍可发动(摸1后必须展示,若无牌则效果落空)
+//   (注:owner 起手无手牌时仍可发动已由 1/3 覆盖——摸1后必展示该牌;
+//    "摸1后仍无牌则效果落空"为不可达分支:摸牌 count=1 成功必给≥1 张牌,空牌堆时摸牌 atom 直接抛错而非优雅落空)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
