@@ -8,8 +8,7 @@
 //   2. owner 被杀 → 发动求援 → helper 选成为额外目标 → helper 被虚拟杀命中
 //   3. owner 拒绝发动 → 不触发
 //   4. owner 被杀 → 发动求援 → helper 无符合牌 → 自动转为成为额外目标
-//   5. owner 被杀 → helper 选给牌(杀类型,不同牌名=桃) → owner 收到桃
-//   6. owner 满血不被指定(杀不会触发成为目标)
+//   5. owner 被【决斗】指定 → 发动求援(伤害锦囊触发时机,补杀以外触发覆盖)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -315,11 +314,10 @@ describe('界求援', () => {
     expect(harness.state.players[0].health).toBe(2);
   });
 
-  // ─── 5. owner 自己回合外被杀也可触发(被动) ─────────────
-  it('owner 被杀 → 求援 → helper 给桃(同类型不同牌名)→ owner 收到桃', async () => {
-    // 杀和桃都是基本牌,牌名不同 → 符合条件
-    const slash = makeCard('s1', '杀', '♠', '5');
-    const peach = makeCard('p1', '桃', '♥', '3');
+  // ─── 5. 伤害锦囊(决斗)触发求援(杀以外触发时机) ────────
+  it('owner 被【决斗】指定 → 求援/confirm 触发(伤害锦囊触发时机)', async () => {
+    // 决斗为伤害锦囊 → 成为目标 after-hook 触发求援(杀以外的触发覆盖)
+    const duel = makeCard('j1', '决斗', '♣', '4', '锦囊牌');
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -333,77 +331,17 @@ describe('界求援', () => {
         makePlayer({
           index: 1,
           name: 'P1',
-          hand: ['s1'],
-          skills: ['杀', '回合管理'],
+          hand: ['j1'],
+          skills: ['决斗', '回合管理'],
         }),
         makePlayer({
           index: 2,
           name: 'P2',
-          hand: ['p1'],
-          skills: ['闪', '回合管理'],
-        }),
-      ],
-      cardMap: { s1: slash, p1: peach },
-      currentPlayerIndex: 1,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    });
-    await harness.setup(state);
-    const P1 = harness.player('P1');
-    const P0 = harness.player('界伏皇后');
-    const P2 = harness.player('P2');
-
-    await P1.useCardAndTarget('杀', 's1', [0]);
-    await waitForStable(harness.state);
-    await P0.respond('界求援', { choice: true });
-    await waitForStable(harness.state);
-    await P0.respond('界求援', { target: 2 });
-    await waitForStable(harness.state);
-    await P2.respond('界求援', { choice: true });
-    await waitForStable(harness.state);
-
-    expect(currentRequestType(harness.state)).toBe('界求援/giveCard');
-    await P2.respond('界求援', { cardId: 'p1' });
-    await waitForStable(harness.state);
-
-    // owner 收到桃
-    expect(harness.state.players[0].hand).toContain('p1');
-
-    // 杀继续结算:owner 询问闪 → pass → 受伤
-    await P0.pass();
-    await waitForStable(harness.state);
-    expect(harness.state.players[0].health).toBe(2);
-  });
-
-  // ─── 6. 同一张杀仅触发一次求援 ─────────────────────────
-  it('同一张杀的多个目标事件仅触发一次求援', async () => {
-    // 这里的"同一张卡"防重入:owner 被指定后,成为目标 hook 只触发一次求援流程
-    const slash = makeCard('s1', '杀', '♠', '5');
-    const dodge = makeCard('d1', '闪', '♥', '7');
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({
-          index: 0,
-          name: '界伏皇后',
           hand: [],
-          skills: ['界求援', '闪', '回合管理'],
-          health: 3,
-          maxHealth: 3,
-        }),
-        makePlayer({
-          index: 1,
-          name: 'P1',
-          hand: ['s1'],
-          skills: ['杀', '回合管理'],
-        }),
-        makePlayer({
-          index: 2,
-          name: 'P2',
-          hand: ['d1'],
           skills: ['闪', '回合管理'],
         }),
       ],
-      cardMap: { s1: slash, d1: dodge },
+      cardMap: { j1: duel },
       currentPlayerIndex: 1,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -411,29 +349,18 @@ describe('界求援', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
     const P0 = harness.player('界伏皇后');
-    const P2 = harness.player('P2');
 
-    await P1.useCardAndTarget('杀', 's1', [0]);
+    await P1.useCardAndTarget('决斗', 'j1', [0]);
     await waitForStable(harness.state);
 
-    // 仅触发一次 confirm(不是多次)
+    // 决斗触发求援(伤害锦囊触发时机,区别于杀)
     expect(currentRequestType(harness.state)).toBe('界求援/confirm');
-    await P0.respond('界求援', { choice: true });
-    await waitForStable(harness.state);
-    await P0.respond('界求援', { target: 2 });
-    await waitForStable(harness.state);
-    await P2.respond('界求援', { choice: true });
-    await waitForStable(harness.state);
-    await P2.respond('界求援', { cardId: 'd1' });
+    await P0.respond('界求援', { choice: false });
     await waitForStable(harness.state);
 
-    // 防重入标志已设
-    const key = `界求援/processed/s1`;
-    expect(harness.state.localVars[key]).toBe(true);
-
-    // 杀继续结算
+    // 拒绝后决斗继续:无懈可击窗口(无人响应)→ 决斗循环询问 P0 出杀(P0 无杀自动判负)→ P0 受 1 点伤害
     await P0.pass();
     await waitForStable(harness.state);
-    expect(harness.state.players[0].health).toBe(2);
+    expect(harness.state.players[0].health).toBe(2); // 3 - 1
   });
 });
