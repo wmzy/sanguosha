@@ -1,13 +1,14 @@
 // 界姜维 志继 行为测试(界限突破版):
-//   核心差异:志继触发时机从「回合开始」改为「准备阶段 **或结束阶段**」。
+//   核心差异:界志继在原版「准备阶段」基础上,额外可在「结束阶段」触发(原版仅准备阶段)。
 //   1. 无手牌准备阶段 → 选摸两张牌:摸2牌 + 减1上限 + 获得观星
 //   2. 无手牌准备阶段 → 选回复1点体力:回复1 + 减1上限 + 获得观星
-//   3. 回合开始时不触发(原版会触发,界版不触发 — 关键差异验证)
+//   3. 回合开始时不触发(原版/界版均仅挂在「阶段开始」after-hook,非回合开始;负向边界)
 //   4. 有手牌时准备阶段不触发
 //   5. 觉醒后再次准备阶段不再触发(整局一次)
 //   6. 无手牌结束阶段(回合结束阶段) → 选摸两张牌:触发觉醒(界版新增时机)
 //   7. 准备阶段未触发(有手牌),结束阶段手牌打空 → 补触发觉醒(界版两段保险)
 //   8. 结束阶段觉醒后,后续回合准备/结束阶段均不再触发(整局一次)
+//   9. 跨时机防重入:准备阶段觉醒后,同回合结束阶段(无手牌)不再触发
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -137,7 +138,7 @@ describe('界姜维·志继', () => {
     expect(harness.state.players[0].vars['志继/awakened']).toBe(true);
   });
 
-  it('回合开始时不触发(界版差异:仅准备阶段触发)', async () => {
+  it('回合开始时不触发(志继仅挂在「阶段开始」after-hook,非回合开始)', async () => {
     await harness.setup(
       createGameState({
         players: [
@@ -159,7 +160,7 @@ describe('界姜维·志继', () => {
       }),
     );
 
-    // 回合开始:界版志继不在此触发(原版会)
+    // 回合开始:志继(原版/界版)均不在此触发 — 仅挂在「阶段开始」after-hook
     await applyAtom(harness.state, { type: '回合开始', player: 0 });
     await harness.waitForStable();
 
@@ -379,7 +380,7 @@ describe('界姜维·志继', () => {
       await applyAtom(harness.state, { type: '弃置', player: 0, cardIds: handCards });
     }
 
-    // 第二次结束阶段:已觉醒,志继不再触发(但观星可能被询问)
+    // 第二次结束阶段:已觉醒,志继不再触发(观星仅准备阶段触发,结束阶段无询问)
     void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '回合结束' });
     await harness.waitForStable();
     if (harness.state.pendingSlots.size > 0) {
@@ -389,5 +390,53 @@ describe('界姜维·志继', () => {
 
     expect(harness.state.players[0].maxHealth).toBe(maxAfterAwaken); // 上限不再减
     expect(harness.state.players[0].hand.length).toBe(0); // 没有再摸牌
+  });
+
+  // ── 跨时机防重入:界志继两段触发共用同一「整局一次」标记 ──
+
+  it('准备阶段觉醒后,同回合结束阶段(无手牌)不再触发(跨时机防重入)', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界姜维',
+            character: '界姜维',
+            hand: [],
+            skills: ['界志继'],
+            health: 2,
+            maxHealth: 4,
+          }),
+          mkPlayer({ index: 1, name: 'P1', skills: [] }),
+        ],
+        cardMap: {},
+        currentPlayerIndex: 0,
+        phase: '准备',
+        turn: { round: 1, phase: '准备', vars: {} },
+      }),
+    );
+    const JW = harness.player('界姜维');
+
+    // 准备阶段:触发觉醒,选摸两张牌
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
+    await harness.waitForStable();
+    await JW.respond('界志继', { choice: true });
+    await harness.waitForStable();
+    expect(harness.state.players[0].vars['志继/awakened']).toBe(true);
+    const maxAfterAwaken = harness.state.players[0].maxHealth; // 3
+
+    // 清空觉醒新摸的手牌,使结束阶段满足「无手牌」条件
+    const handCards = [...harness.state.players[0].hand];
+    if (handCards.length > 0) {
+      await applyAtom(harness.state, { type: '弃置', player: 0, cardIds: handCards });
+    }
+
+    // 同回合结束阶段:界版本可触发,但已觉醒 → 防重入直接返回(观星仅准备阶段触发,无询问)
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '回合结束' });
+    await harness.waitForStable();
+
+    expect(harness.state.players[0].maxHealth).toBe(maxAfterAwaken); // 上限不再减
+    expect(harness.state.players[0].hand.length).toBe(0); // 没有再摸牌
+    expect(harness.state.players[0].skills.filter((s) => s === '观星')).toHaveLength(1); // 观星只获得一次
   });
 });
