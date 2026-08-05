@@ -8,15 +8,15 @@
 // 模型:preceding=[界乱击.transform cardIds=[id1,id2]] + 主 action=万箭齐发.use
 //   (万箭齐发 cardId = `${id1}#${id2}#界乱击`,影子卡)。
 //
-// 验证:
+// 验证(与下方 9 个 it() 一一对应):
 //   1. 正面:两张♥同花色 → transformThenUse 万箭齐发 → 询问"少选一个目标" → 不排除 → P2/P3 都扣血
 //   2. 正面:排除 P2 → 仅 P3 扣血,P2 不扣
-//   3. 正面:排除所有(只剩一个目标时仍可询问;此处 3 人,排除后剩 2→1)
-//   4. 真实万箭齐发牌:界袁绍使用真实万箭齐发牌也走界版(询问少选目标)
-//   5. 负面:两张异花色(♠+♥)→ transform 被拒
-//   6. 负面:1 张牌 → 拒绝
+//   3. 正面:真实万箭齐发牌 → 界版覆盖生效(2 人局排除 P2 → 无目标 → 无人扣血)
+//   4. 负面:两张异花色(♠+♥)→ transform 被拒
+//   5. 负面:1 张牌 → 拒绝(需要 2 张)
+//   6. 负面:同一张牌 → 拒绝
 //   7. 负面:非自己回合 → transform 拒绝
-//   8. 边界:只有 1 名其他角色时,询问出现但排除后无目标,无人扣血
+//   8. rollback:万箭齐发.use validate 失败 → 两张原卡还原、影子删除
 //   9. availableActions:界乱击 transform 声明,prompt 卡过滤 min/max=2
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
