@@ -4,11 +4,12 @@
 //
 // 验证:
 //   1. 正面:目标展示♥ → 使用者弃♥ → 目标扣1血(火焰伤害 damageType='火焰')
-//   2. 正面:目标展示♥ → 使用者弃♦(不同花色)被拒;使用者pass(不弃)→ 无伤害
+//   2. 正面:目标展示♥ → 使用者 pass(不弃)→ 无伤害
 //   3. 正面:使用者无同花色手牌 → 不询问弃牌 → 无伤害
-//   4. 正面:无懈可击抵消 → 无展示/无伤害
+//   4. 正面:弃牌窗口试图弃不同花色(♦)→ 被拒
 //   5. 负面:目标无手牌 → 拒绝
 //   6. 负面:对自己使用 → 拒绝
+//   (无懈可击抵消为 runSettlementPhase 通用机制,非火攻特有,不在此单测)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
