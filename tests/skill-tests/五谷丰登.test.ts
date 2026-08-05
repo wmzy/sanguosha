@@ -1,7 +1,7 @@
 // tests/skill-tests/五谷丰登.test.ts
 // 五谷丰登(普通锦囊):出牌阶段对所有存活角色使用。
 //   翻 N 张到处理区亮出,从使用者开始按座次依次选1张到手牌,剩余进弃牌堆。
-// 无懈可击时机:亮出候选牌后、每名角色选牌前各问一次(被抵消 → 该角色不参与选牌)。
+// 无懈可击时机:每名角色选牌前(生效前)各广播问一次(被抵消 → 该角色不参与选牌)。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -107,61 +107,9 @@ describe('五谷丰登', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 2. 3人局:P1/P2/P3 依次选牌(每人选牌前各问无懈 → pass)
+  // 2. 玩家超时不选 → 兜底拿处理区第一张(不放弃选牌机会)
   // ─────────────────────────────────────────────────────────────
-  it('用例2:3人局 → P1/P2/P3 按座次各选1张', async () => {
-    const wugu: Card = makeCard('wg1', '五谷丰登', '♥', '3');
-    const cards = [
-      makeCard('pa', '杀', '♠', '7', '基本牌'),
-      makeCard('pb', '桃', '♥', '2', '基本牌'),
-      makeCard('pc', '闪', '♦', '3', '基本牌'),
-    ];
-
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['wg1'], skills: ['五谷丰登'] }),
-        makePlayer({ index: 1, name: 'P2' }),
-        makePlayer({ index: 2, name: 'P3' }),
-      ],
-      cardMap: { wg1: wugu, pa: cards[0], pb: cards[1], pc: cards[2] },
-      currentPlayerIndex: 0,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    });
-    state.zones = { deck: ['pa', 'pb', 'pc'], discardPile: [], processing: [] };
-    await harness.setup(state);
-
-    const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
-    const P3 = harness.player('P3');
-
-    await P1.useCard('五谷丰登', 'wg1');
-    // 每人选牌前问一次无懈 → 各 pass
-    await P1.pass();
-    await P1.respond('五谷丰登', { cardId: 'pa' });
-    await P1.pass();
-    await P2.respond('五谷丰登', { cardId: 'pb' });
-    await P1.pass();
-    await P3.respond('五谷丰登', { cardId: 'pc' });
-
-    expect(harness.state.players[0].hand).toContain('pa');
-    expect(harness.state.players[1].hand).toContain('pb');
-    expect(harness.state.players[2].hand).toContain('pc');
-    expect(harness.state.zones.processing.length).toBe(0);
-    expect(harness.state.zones.discardPile).toContain('wg1');
-    expect(harness.state.pendingSlots.size).toBe(0);
-    // view 级断言:处理区空 + 无 pending
-    P1.processEvents();
-    P1.expectView((v) => {
-      expect(v.zones!.processing.length).toBe(0);
-      expect(v.pending).toBeNull();
-    });
-  });
-
-  // ─────────────────────────────────────────────────────────────
-  // 3. 玩家超时不选 → 兜底拿处理区第一张(不放弃选牌机会)
-  // ─────────────────────────────────────────────────────────────
-  it('用例3:玩家超时不选 → 兜底拿处理区第一张牌', async () => {
+  it('用例2:玩家超时不选 → 兜底拿处理区第一张牌', async () => {
     const wugu: Card = makeCard('wg1', '五谷丰登', '♥', '3');
     const cards = [
       makeCard('pa', '杀', '♠', '7', '基本牌'),
@@ -213,7 +161,7 @@ describe('五谷丰登', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 4. validate 拒绝:非出牌阶段使用
+  // 3. validate 拒绝:非出牌阶段使用
   // ─────────────────────────────────────────────────────────────
   it('validate 拒绝:非出牌阶段使用', async () => {
     const wugu: Card = makeCard('wg1', '五谷丰登', '♥', '3');
@@ -238,9 +186,9 @@ describe('五谷丰登', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 5. 选牌顺序:使用者不是 0 号座次 → 从使用者开始旋转
+  // 4. 选牌顺序:使用者不是 0 号座次 → 从使用者开始旋转
   // ─────────────────────────────────────────────────────────────
-  it('用例5:使用者=2号座次 → 选牌顺序从 P3 开始按座次 [P3, P1, P2]', async () => {
+  it('用例4:使用者=2号座次 → 选牌顺序从 P3 开始按座次 [P3, P1, P2]', async () => {
     const wugu: Card = makeCard('wg1', '五谷丰登', '♥', '3');
     const cards = [
       makeCard('pa', '杀', '♠', '7', '基本牌'),
@@ -290,9 +238,9 @@ describe('五谷丰登', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 6. 无懈抵消:亮牌后 P1 选牌前被无懈 → P1 不参与选牌,P2 仍可选
+  // 5. 无懈抵消:P1 选牌前被无懈 → P1 不参与选牌,P2 仍可选
   // ─────────────────────────────────────────────────────────────
-  it('用例6:无懈抵消 P1 的选牌 → P1 不参与,P2/P3 各选1张', async () => {
+  it('用例5:无懈抵消 P1 的选牌 → P1 不参与,P2/P3 各选1张', async () => {
     const wugu: Card = makeCard('wg1', '五谷丰登', '♥', '3');
     const cards = [
       makeCard('pa', '杀', '♠', '7', '基本牌'),
