@@ -137,33 +137,8 @@ describe('界制衡', () => {
     expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['c1', 'c2']));
   });
 
-  it('use:弃 3 张手牌,其中只弃 2 张(保留 1 张) → 摸 2 张(无额外奖励)', async () => {
-    const c1 = makeCard('c1', '杀', '♠', 'A');
-    const c2 = makeCard('c2', '闪', '♥', '2');
-    const c3 = makeCard('c3', '桃', '♦', '5');
-    const d1 = makeCard('d1', '杀', '♠', '3');
-    const d2 = makeCard('d2', '闪', '♥', '7');
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2', 'c3'] }),
-        makePlayer({ index: 1, name: 'P2' }),
-      ],
-      cardMap: { c1, c2, c3, d1, d2 },
-      zones: { deck: ['d1', 'd2'], discardPile: [], processing: [] },
-      currentPlayerIndex: 0,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    });
-    await harness.setup(state);
-    const P1 = harness.player('P1');
-
-    // 弃 2 张(保留 c3),未弃"所有"手牌 → 无奖励 → 摸 2 张
-    await P1.triggerAction('界制衡', 'use', { cardIds: ['c1', 'c2'] });
-
-    expect(harness.state.players[0].hand).toHaveLength(3); // 保留 c3 + 摸 d1,d2
-    expect(harness.state.players[0].hand).toEqual(expect.arrayContaining(['c3', 'd1', 'd2']));
-    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['c1', 'c2']));
-  });
+  // 注:原"弃 2/3 张手牌未全弃"用例与"弃 1/2 张"用例同为 discardedAllHand=false 分支,
+  // 仅基数(1 vs 2)不同、不触发不同代码路径;多牌无奖励摸牌已由下方"手牌+装备混合"用例覆盖,故合并删除。
 
   // ─── 正面:装备也能界制衡 ─────────────────────────────
 
