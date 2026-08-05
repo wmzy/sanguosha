@@ -126,8 +126,8 @@ describe('界崩坏', () => {
 
     P0.expectPending('请求回应');
 
-    // pass = 减体力
-    await P0.pass();
+    // 选 cancel = 减体力(显式回应,覆盖 execute 的 false 分支)
+    await P0.respond('界崩坏', { choice: false });
     await harness.waitForStable();
 
     expect(harness.state.players[0].health).toBe(7); // 减 1 体力
