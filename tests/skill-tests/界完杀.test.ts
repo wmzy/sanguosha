@@ -3,12 +3,12 @@
 //    任意角色的濒死结算中,除你和濒死角色外的其他角色的非锁定技失效。"
 //
 // 验证:
-//   1. 标版完杀沿用:贾诩回合内,第三方求桃被 cancel
-//   2. 标版完杀沿用:贾诩本人可救援 / 濒死者本人可自救
-//   3. 标版完杀沿用:非贾诩回合不生效
-//   4. 界版新增:贾诩回合内他人濒死时,第三方非锁定技救援技(如界补益)被压制
-//   5. 界版新增:贾诩回合结束后(cleanup),tag 被清除,他人非锁定技恢复
-//   6. 界版新增:贾诩本人作为濒死者时,他人非锁定技仍被压制(贾诩=你=濒死者)
+//   1. 标版完杀沿用:贾诩回合内,第三方求桃被 cancel(跳过)→ 濒死者死亡
+//   2. 标版完杀沿用:贾诩本人可对濒死者使用桃救援
+//   3. 标版完杀沿用:非贾诩回合完杀不生效,第三方(贾诩)可正常救援
+//   4. 界版新增:贾诩回合内他人濒死,第三方非锁定救援技(界仁心)的 after-hook 被压制
+//   5. 界版新增:濒死被救活(回复体力)后,压制 tag 被 cleanup 清除
+//   6. 标版完杀沿用:濒死者本人可对自己使用桃自救
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -198,14 +198,16 @@ describe('界完杀', () => {
     expect(harness.state.players[1].alive).toBe(true);
   });
 
-  // ─── 4. 界版新增:贾诩回合内他人濒死 → 第三方非锁定技失效 ──
-  // 用一个简单的非锁定技:急救(华佗)。急救.respond 是非锁定技(描述不以"锁定技"开头)。
-  // 在贾诩回合内,P2(华佗)持有红色手牌可急救,但界完杀压制非锁定技 → 急救 hook 被跳过。
-  // 注:界完杀通过 SUPPRESSION_TAGS 机制压制,基于描述前缀判定"非锁定技"。
-  it('界版:贾诩回合内,他人非锁定技(急救)被压制,无法救援', async () => {
+  // ─── 4. 界版新增:贾诩回合内他人濒死 → 第三方非锁定救援技(界仁心)被压制 ──
+  // 界仁心是「陷入濒死 after-hook」型救援技(非锁定技):其他角色濒死时,界曹冲可弃一张
+  // 装备牌并翻面,令其回复至1体力。界完杀的 before-hook 在陷入濒死的 after-hook 运行前
+  // 给第三方(界曹冲)加 '完杀/非锁定技失效' tag,引擎 isHookSuppressed 据此过滤其非锁定技
+  // hook → 仁心不触发。
+  // 注:必须用 hook 型救援技才能验证压制。急救是 respond action(不经 hook,且其 桃/求桃
+  // 请求本就被标版完杀 cancel),无法体现界版压制,故不适用。
+  it('界版:贾诩回合内,他人非锁定救援技(界仁心)被压制,无法救援', async () => {
     const slash = mkCard('s5', '杀', '♠', '5');
-    // 急救用红色牌(华佗)
-    const redCard = mkCard('r1', '闪', '♥', '7');
+    const equip = mkCard('w5', '丈八蛇矛', '♥', 'A', '装备牌'); // 界仁心发动时弃置
     await harness.setup(
       createGameState({
         players: [
@@ -219,17 +221,17 @@ describe('界完杀', () => {
             maxHealth: 3,
           }),
           mkPlayer({ index: 1, name: 'P2', hand: ['p2sh'], skills: ['闪'], health: 1, maxHealth: 4 }),
-          // P3 = 华佗,有红色牌可急救,但被完杀压制
+          // P3 = 界曹冲,持装备牌可发动仁心,但被完杀压制
           mkPlayer({
             index: 2,
-            name: '华佗',
-            character: '华佗',
-            hand: [redCard.id],
-            skills: ['急救'],
+            name: '界曹冲',
+            character: '界曹冲',
+            hand: [equip.id],
+            skills: ['界仁心'],
             health: 4,
           }),
         ],
-        cardMap: { s5: slash, r1: redCard, p2sh: mkCard('p2sh', '闪', '♥', '2') },
+        cardMap: { s5: slash, w5: equip, p2sh: mkCard('p2sh', '闪', '♥', '2') },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -239,29 +241,30 @@ describe('界完杀', () => {
     const P2 = harness.player('P2');
 
     await JX.useCardAndTarget('杀', 's5', [1]);
-    await P2.pass();
+    await P2.pass(); // P2 不闪 → 陷入濒死
     await harness.waitForStable();
 
-    // 求桃顺序(模块 C:逆时针从贾诩起):贾诩 → P3(华佗,完杀跳过)→ P2(濒死)
-    await JX.pass(); // 贾诩无桃 pass
-    await harness.waitForStable();
-
-    // 界完杀:P3 的非锁定技失效 + 求桃被 cancel → 直接问 P2(濒死者,idx 1)
-    const slot = [...harness.state.pendingSlots.values()][0];
-    expect((slot.atom as { target: number }).target).toBe(1); // 跳过 P3,问 P2
-
-    // 验证 P3 的 tag 已设置
+    // 陷入濒死:界完杀 before-hook 先给 P3 加压制 tag,界仁心 after-hook 随后被过滤。
     expect(harness.state.players[2].tags).toContain('完杀/非锁定技失效');
 
-    // P2 也无桃 pass → P2 死亡
+    // 界仁心被压制 → 无 '界仁心/confirm' 询问;直接进入求桃循环(先问贾诩)。
+    const atoms = [...harness.state.pendingSlots.values()].map(
+      (s) => s.atom as { requestType?: string; target?: number },
+    );
+    expect(atoms.some((a) => a.requestType === '界仁心/confirm')).toBe(false);
+    expect(atoms[0]?.requestType).toBe('桃/求桃');
+    expect(atoms[0]?.target).toBe(0); // 求桃从当前回合(贾诩)起
+
+    // 求桃:贾诩无桃 pass → P3(完杀 cancel 跳过)→ P2(濒死者)无桃 pass → P2 死亡
+    await JX.pass();
+    await harness.waitForStable();
     await P2.pass();
     await harness.waitForStable();
 
     expect(harness.state.players[1].alive).toBe(false);
-    // P3 的红色牌未被使用(急救被压制)
-    expect(harness.state.players[2].hand).toContain('r1');
-
-    // cleanup:濒死结算结束后(cleanup via 击杀),tag 被清除
+    // 界仁心未发动:P3 的装备牌未被弃置
+    expect(harness.state.players[2].hand).toContain('w5');
+    // cleanup:濒死结算结束(死亡后),tag 被清除
     expect(harness.state.players[2].tags).not.toContain('完杀/非锁定技失效');
   });
 
