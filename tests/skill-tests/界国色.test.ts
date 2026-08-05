@@ -8,10 +8,11 @@
 //   1. 选项①:方片手牌当乐使用 → 放置乐 + 摸1张
 //   2. 选项①:装备区方片牌当乐使用 → 卸下转化 + 放置乐 + 摸1张
 //   3. 选项②:弃方片 + 弃场上乐 → 移除乐 + 摸1张
-//   4. 限一次:同一回合第二次使用 → 拒绝
-//   5. 负面:非方片牌 → use 触发后选牌阶段拒绝(或 use validate 拒绝)
-//   6. 负面:非自己回合 → 拒绝
-//   7. 负面:无方片牌 → use 被拒绝
+//   4. 限一次:同一回合第二次使用 → use 被拒
+//   5. 负面 use:非自己回合 → use 被拒
+//   6. 负面 use:无方片牌 → use validate 被拒
+//   7. 负面 respond:选项①选非方片牌 → respond 被拒(选牌阶段校验,pending 仍在)
+//   8. availableActions:声明 use action
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -294,7 +295,43 @@ describe('界国色', () => {
     expect(harness.state.players[0].hand).toContain('c1');
   });
 
-  // ─── 7. availableActions:声明 use action ────────────────────
+  // ─── 7. 负面 respond:选项①选非方片牌 → respond 被拒(选牌阶段校验,pending 仍在)
+  //    选项①进入 USE_RT 选牌询问后,选非方片牌应被 respond validate 拒绝,
+  //    且 pending 不被消耗(与火攻/界天香等 respond 校验惯例一致)。
+  it('选项① respond:选非方片牌 → respond 被拒,选牌 pending 仍在', async () => {
+    const diamond = makeCard('c1', '杀', '♦', '7');
+    const heart = makeCard('c2', '杀', '♥', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: '界大乔', hand: ['c1', 'c2'], skills: ['界国色'] }),
+        makePlayer({ index: 1, name: '目标', skills: ['回合管理'] }),
+      ],
+      cardMap: { c1: diamond, c2: heart },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('界大乔');
+
+    await P0.triggerAction('界国色', 'use');
+    await waitForStable(harness.state);
+    P0.expectPending('请求回应');
+    await P0.respond('界国色', { choice: true }); // 选项①
+
+    // 进入选牌 + 目标询问(USE_RT)
+    P0.expectPending('请求回应');
+
+    // 选非方片牌(♥)→ respond validate 拒绝;选牌 pending 不被消耗
+    await P0.expectRejected({
+      skillId: '界国色',
+      actionType: 'respond',
+      params: { cardId: 'c2', target: 1 },
+    });
+    P0.expectPending('请求回应');
+  });
+
+  // ─── 8. availableActions:声明 use action ────────────────────
   it('availableActions:声明 use action', async () => {
     const diamond = makeCard('c1', '杀', '♦', '7');
     const heart = makeCard('c2', '杀', '♥', '3');
