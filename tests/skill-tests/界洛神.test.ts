@@ -223,6 +223,48 @@ describe('界洛神', () => {
     expect(harness.state.zones.discardPile).toContain('j1');
   });
 
+  it('负面:获黑桃后主动停止 → 不再判定,余牌留在牌堆', async () => {
+    const j1 = makeCard('j1', '杀', '♠', '5'); // 黑桃(黑)→ 获得
+    const j2 = makeCard('j2', '杀', '♣', '7'); // 玩家停止后不再判定
+    const j3 = makeCard('j3', '桃', '♥', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['界洛神'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          skills: [],
+          character: '曹操',
+          health: 4,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { j1, j2, j3 },
+      zones: { deck: ['j1', 'j2', 'j3'], processing: [], discardPile: [] },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await triggerPreparePhase(harness);
+    await P1.respond('界洛神', { choice: true }); // 发动 → 获 j1(♠)
+    await harness.waitForStable();
+    harness.processAllEvents();
+    P1.expectPending('请求回应'); // 继续询问
+
+    await P1.respond('界洛神', { choice: false }); // 主动停止
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 仅获得 j1;j2、j3 未被判定,仍在牌堆顶;弃牌堆空
+    expect(harness.state.players[0].hand).toContain('j1');
+    expect(harness.state.players[0].hand.length).toBe(1);
+    expect(harness.state.zones.deck).toEqual(['j2', 'j3']);
+    expect(harness.state.zones.discardPile.length).toBe(0);
+  });
+
   // ─── 手牌上限豁免:以此法获得的牌本回合不计入手牌上限 ─────────────
 
   it('手牌上限豁免:获得 N 张黑牌后 handLimit = 体力 + N', async () => {
