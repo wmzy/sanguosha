@@ -9,6 +9,7 @@
 //   4. 同类但不给:同类 → 选目标时 pass → 牌留在牌堆顶
 //   5. 回合内不触发:P1 自己回合出杀 → 涯角不触发
 //   6. 龙胆转化后触发:P0 杀 P1 → P1 用龙胆杀当闪 → 涯角触发
+//   7. 不同类放弃弃牌:不同类 → 选目标时 pass → 不弃置任何牌
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -180,6 +181,61 @@ describe('涯角', () => {
     expect(harness.state.zones.deck).toContain(deckTop.id);
     expect(harness.state.zones.deck.length).toBe(1);
     // P1 手牌为空(闪已打出)
+    expect(harness.state.players[1].hand.length).toBe(0);
+  });
+
+  // ─── 不同类但放弃选目标(pass)→ 不弃牌,牌堆不变 ─────────────────
+  it('类别不同但选目标时 pass → 不弃置任何牌,牌堆顶牌留在牌堆', async () => {
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const extra = makeCard('e1', '杀', '♣', '8'); // P0 额外手牌(不应被弃置)
+    const dodge = makeCard('s1', '闪', '♥', '5'); // 基本牌
+    const deckTop = makeCard('d1', '无中生有', '♥', '7', '锦囊牌'); // 牌堆顶 → 不同类
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id, extra.id], skills: ['杀'] }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '界赵云',
+          hand: [dodge.id],
+          skills: ['龙胆', '涯角', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { [slash.id]: slash, [extra.id]: extra, [dodge.id]: dodge, [deckTop.id]: deckTop },
+      zones: { deck: [deckTop.id], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.useCardAndTarget('杀', slash.id, [1]);
+    await P1.respond('闪', { cardId: dodge.id });
+
+    // 涯角 confirm → 发动
+    P1.expectPending('请求回应');
+    await P1.respond('涯角', { choice: true });
+
+    // 不同类 → 选攻击范围内角色 pending → pass(不选目标)
+    P1.expectPending('请求回应');
+    const chooseSlot = [...harness.state.pendingSlots.values()][0];
+    expect((chooseSlot.atom as { requestType?: string }).requestType).toBe('涯角/target');
+    await P1.pass();
+
+    // 杀被闪抵消,P1 不掉血
+    expect(harness.state.players[1].health).toBe(4);
+    // P0 额外手牌未被弃置(仍持有)
+    expect(harness.state.players[0].hand).toContain(extra.id);
+    // 牌堆顶牌仍在牌堆(不同类分支 + 放弃选目标 → 不动牌堆顶)
+    expect(harness.state.zones.deck).toContain(deckTop.id);
+    expect(harness.state.zones.deck.length).toBe(1);
+    // P1 手牌为空(闪已打出,且未获得牌)
     expect(harness.state.players[1].hand.length).toBe(0);
   });
 
