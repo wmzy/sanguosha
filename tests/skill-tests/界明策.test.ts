@@ -16,6 +16,7 @@
 //   ⑤ 限一次:第二次发动被拒绝
 //   ⑥ validate:非自己回合 → 拒绝;非出牌阶段 → 拒绝
 //   ⑦ validate:给牌目标 = 自己 → 拒绝;killTarget = target → 拒绝
+//   ⑧ 给装备(装备区中) + 选项①命中 → 卸下装备移到 target + 出杀(覆盖"卸装备再给牌"分支)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -283,6 +284,7 @@ describe('界明策', () => {
 
   it('④:给手牌中的装备 + target 选①出杀 + 命中 → 装备到 target + 出杀 + 各摸 1', async () => {
     const weapon = makeCard('w1', '诸葛连弩', '♣', 'A', '装备牌', '武器');
+    const p2shan = makeCard('p4sh', '闪', '♥', '2'); // P2 含闪:走 normal 询问闪(否则空手 skip 命中)
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -304,13 +306,13 @@ describe('界明策', () => {
         makePlayer({
           index: 2,
           name: 'P2',
-          hand: [],
+          hand: ['p4sh'],
           skills: [],
           health: 4,
           maxHealth: 4,
         }),
       ],
-      cardMap: { w1: weapon },
+      cardMap: { w1: weapon, p4sh: p2shan },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -326,7 +328,8 @@ describe('界明策', () => {
     // P1 选①
     await harness.player('P1').respond('界明策', { choice: true });
     await harness.waitForStable();
-    // P2 不出闪
+    // P2 被询问出闪后选择不出闪(pass)→ 被虚拟杀命中
+    harness.player('P2').expectPending('询问闪');
     await harness.player('P2').pass();
     await harness.waitForStable();
 
@@ -534,5 +537,72 @@ describe('界明策', () => {
       params: { cardId: 'g7b', targets: [1, 1] },
     });
     expect(harness.state.players[0].hand).toContain('g7b');
+  });
+
+  // ─── ⑧ 给装备(装备区) + 选项①命中(覆盖"卸装备再给牌"分支) ──
+
+  it('⑧:给装备区中的装备 + target 选①出杀 + 命中 → 卸下并移到 target + 出杀 + 各摸 1', async () => {
+    const weapon = makeCard('w8', '诸葛连弩', '♣', 'A', '装备牌', '武器');
+    const state: GameState = createGameState({
+      players: [
+        // P0 = 界陈宫(明策 owner),诸葛连弩在装备区(非手牌)
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: [],
+          equipment: { 武器: 'w8' },
+          skills: ['界明策'],
+          health: 3,
+          maxHealth: 3,
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          skills: [],
+          health: 4,
+          maxHealth: 4,
+        }),
+        makePlayer({
+          index: 2,
+          name: 'P2',
+          hand: [],
+          skills: [],
+          health: 4,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { w8: weapon },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    await harness.player('P0').triggerAction('界明策', 'use', {
+      cardId: 'w8',
+      targets: [1, 2],
+    });
+    await harness.waitForStable();
+
+    // P1 选①
+    await harness.player('P1').respond('界明策', { choice: true });
+    await harness.waitForStable();
+    // P2 无手牌 → 询问闪 自动 skip(无 pending,不被询问)→ 直接被虚拟杀命中
+
+    // 断言:
+    // 1) w8 从 P0 装备区卸下并移到 P1 手牌(覆盖"卸装备再给牌"分支)
+    expect(harness.state.players[0].equipment.武器).toBeUndefined();
+    expect(harness.state.players[1].hand).toContain('w8');
+    expect(harness.state.players[0].hand).not.toContain('w8');
+    // 2) P2 受 1 点伤害(被虚拟杀命中)
+    expect(harness.state.players[2].health).toBe(3);
+    // 3) 命中 → 双方各摸 1
+    //    P0 hand=[](卸下的 w8 已移给 P1),摸 1 → hand=1
+    //    P1 hand=[w8](收到装备),摸 1 → hand=2
+    expect(harness.state.players[0].hand.length).toBe(1);
+    expect(harness.state.players[1].hand.length).toBe(2);
+    // 4) 限一次标记已写
+    expect(harness.state.players[0].vars['界明策/usedThisTurn']).toBe(true);
   });
 });
