@@ -78,7 +78,9 @@ describe('界灭计', () => {
   });
 
   // ─── 1. happy path:目标选 2 → 置顶锦囊 + 目标弃两张 ──────────
-  it('目标选 2:置顶锦囊 + 依次弃两张任意牌', async () => {
+  //    P1 同时持有锦囊且 ≥2 手牌 → 两项皆可选,弹 confirm;P1 选 cancelLabel=依次弃两张。
+  //    (若 P1 无锦囊则强制选 2、不弹 confirm,见用例 4。)
+  it('目标选 2(confirm):置顶锦囊 + 依次弃两张任意牌', async () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -91,15 +93,15 @@ describe('界灭计', () => {
           index: 1,
           name: 'P1',
           character: '曹操',
-          hand: ['p1a', 'p1b', 'p1c'], // 3 张基本牌
+          hand: ['t1', 'p1a', 'p1b'], // 1 锦囊 + 2 基本 → 两项皆可选
           skills: [],
         }),
       ],
       cardMap: {
         t0: trick('t0'),
+        t1: trick('t1', '无中生有'),
         p1a: basic('p1a'),
         p1b: basic('p1b', '闪'),
-        p1c: basic('p1c', '桃'),
       },
       zones: { deck: [], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
@@ -111,9 +113,9 @@ describe('界灭计', () => {
     const P1 = harness.player('P1');
 
     await P0.triggerAction('界灭计', 'use', { cardId: 't0', target: 1 });
-    P1.expectPending('请求回应'); // 选项 confirm
+    P1.expectPending('请求回应'); // confirm(两项皆可选)
 
-    // P1 选 2(cancel = false 表示选 cancelLabel='依次弃两张')
+    // P1 选 2(choice = false → cancelLabel='依次弃两张')
     await P1.respond('界灭计', { choice: false });
     P1.expectPending('请求回应'); // 第 1 张
 
@@ -126,8 +128,8 @@ describe('界灭计', () => {
     // 置顶:t0 从 P0 手牌 → 牌堆顶(deck 末尾)
     expect(harness.state.players[0].hand).toEqual([]);
     expect(harness.state.zones.deck[harness.state.zones.deck.length - 1]).toBe('t0');
-    // P1 弃了 p1a, p1b,剩 [p1c]
-    expect(harness.state.players[1].hand).toEqual(['p1c']);
+    // P1 弃了 p1a, p1b,剩 [t1](选 2 可弃任意牌,不强制弃锦囊)
+    expect(harness.state.players[1].hand).toEqual(['t1']);
     expect(harness.state.zones.discardPile).toEqual(
       expect.arrayContaining(['p1a', 'p1b']),
     );
