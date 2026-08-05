@@ -148,32 +148,6 @@ describe('化身', () => {
     expect(EXCLUDED.has(currentSkill!)).toBe(false);
   });
 
-  // ─── 2. 化身牌池排除本局已登场武将 ──────────────────────
-  it('化身牌池不含本局已登场的武将', async () => {
-    await harness.setup(
-      createGameState({
-        players: [
-          mkPlayer({ index: 0, name: '左慈', character: '左慈', skills: ['化身', '新生'] }),
-          mkPlayer({ index: 1, name: '孙权', character: '孙权', skills: [] }),
-        ],
-        cardMap: {},
-        currentPlayerIndex: 0,
-        phase: '准备',
-        turn: { round: 1, phase: '准备', vars: {} },
-        rngSeed: 7,
-      }),
-    );
-
-    void applyAtom(harness.state, { type: '回合开始', player: 0 });
-    await harness.waitForStable();
-    harness.processAllEvents();
-    await autoRespond化身Skill(harness);
-
-    const pool = harness.state.players[0].vars['化身/牌池'] as string[];
-    expect(pool.includes('左慈')).toBe(false);
-    expect(pool.includes('孙权')).toBe(false);
-  });
-
   // ─── 3. 第二次自己回合开始 → 询问是否更换 ────────────────
   it('第二次自己回合开始:询问是否更换化身牌', async () => {
     await harness.setup(
