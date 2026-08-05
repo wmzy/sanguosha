@@ -6,6 +6,7 @@
 //   2. 正面:deck=[黑桃, 黑桃, 红桃] → 两次黑桃获得 → 红桃停止(共获 2 张)
 //   3. 负面:不发动(confirm=false) → 不判定,不获得牌
 //   4. 边界:deck 顶为红色 → 发动后立即停止(获得 0 张)
+//   5. 边界:获得黑桃后选择停止(continue=false)→ 不再判定,余牌留牌堆
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -224,5 +225,48 @@ describe('洛神', () => {
     // 红色判定 → 不获得,不询问继续
     expect(harness.state.players[0].hand.length).toBe(0);
     expect(harness.state.zones.discardPile).toContain('j1');
+  });
+
+  it('边界:获得黑桃后选择停止(continue=false)→ 不再判定,余牌留牌堆', async () => {
+    const j1 = makeCard('j1', '杀', '♠', '5'); // 黑桃(黑)→ 获得
+    const j2 = makeCard('j2', '杀', '♣', '7'); // 不会被判定(玩家选择停止)
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['洛神'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          skills: [],
+          character: '曹操',
+          health: 4,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { j1, j2 },
+      zones: { deck: ['j1', 'j2'], processing: [], discardPile: [] },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await triggerPreparePhase(harness);
+    // 发动
+    await P1.respond('洛神', { choice: true });
+    await harness.waitForStable();
+    harness.processAllEvents();
+    // 第一次判定(♠黑)→ 获得 j1 → 询问是否继续
+    P1.expectPending('请求回应');
+    // 选择停止 → keepGoing=false,退出循环
+    await P1.respond('洛神', { choice: false });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 已获得 j1;j2 未被判定,仍在牌堆顶
+    expect(harness.state.players[0].hand).toContain('j1');
+    expect(harness.state.players[0].hand.length).toBe(1);
+    expect(harness.state.zones.deck).toContain('j2');
+    expect(harness.state.zones.deck.length).toBe(1);
   });
 });
