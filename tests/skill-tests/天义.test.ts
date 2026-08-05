@@ -335,7 +335,7 @@ describe('天义', () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: '太史慈', hand: ['c1'], skills: ['天义'] }),
-        makePlayer({ index: 1, name: 'P1', hand: ['c2'], skills: ['回合管理'] }),
+        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['回合管理'] }),
       ],
       cardMap: { c1: pd },
       currentPlayerIndex: 1, // P1 的回合
