@@ -74,12 +74,12 @@ describe('奇才', () => {
   });
 
   it('单元:onInit 后 owner.tags 含「奇才/无距离限制」', async () => {
-    await harness.setup(build4PlayerState(['奇才', '顺手牵羊'], ['sq1']));
+    await harness.setup(build4PlayerState(['奇才'], ['sq1']));
     expect(harness.state.players[0].tags).toContain('奇才/无距离限制');
   });
 
   it('触发:P0(奇才)对距离 2 的 P3 用顺手牵羊 → validate 通过(忽略距离)', async () => {
-    await harness.setup(build4PlayerState(['奇才', '顺手牵羊'], ['sq1']));
+    await harness.setup(build4PlayerState(['奇才'], ['sq1']));
     const P1 = harness.player('P1');
 
     // 距离 2(座位距离 2,无进攻修正),奇才忽略距离 → validate 通过
@@ -94,7 +94,7 @@ describe('奇才', () => {
   });
 
   it('负面:无奇才 → 对距离 2 的 P3 用顺手牵羊被拒(距离太远)', async () => {
-    await harness.setup(build4PlayerState(['顺手牵羊'], ['sq1']));
+    await harness.setup(build4PlayerState([], ['sq1']));
     const P1 = harness.player('P1');
 
     await P1.expectRejected({
