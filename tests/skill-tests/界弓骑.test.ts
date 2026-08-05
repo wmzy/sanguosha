@@ -367,6 +367,29 @@ describe('界弓骑', () => {
     });
   });
 
+  // ─── 非出牌阶段:拒绝(自己回合但不在出牌阶段)────────────
+  it('非出牌阶段:拒绝', async () => {
+    const card1 = makeCard('d1', '闪', '♠', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['d1'], skills: ['界弓骑'] }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操' }),
+      ],
+      cardMap: { d1: card1 },
+      currentPlayerIndex: 0, // 自己回合
+      phase: '弃牌', // 但非出牌阶段
+      turn: { round: 1, phase: '弃牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    await P0.expectRejected({
+      skillId: '界弓骑',
+      actionType: 'use',
+      params: { cardId: 'd1' },
+    });
+  });
+
   // ─── cardId 不在手牌 → 拒绝 ────────────
   it('cardId 不在手牌:拒绝', async () => {
     const card1 = makeCard('d1', '闪', '♠', '3');
