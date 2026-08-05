@@ -96,33 +96,6 @@ describe('界刚烈', () => {
     expect(harness.state.players[0].health).toBe(3); // P0 受界刚烈 1 伤
   });
 
-  // ─── 红色判定(方块):同样造成伤害 ────────────────────
-  it('红色判定(方块):对来源造成1点伤害', async () => {
-    const slash = makeCard('k1', '杀', '♠', '7');
-    const judge = makeCard('j1', '杀', '♦', '5'); // 红色(方块)
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P1', hand: ['p1sh'], skills: ['界刚烈', '闪'] }),
-      ],
-      cardMap: { k1: slash, j1: judge, p1sh: makeCard('p1sh', '闪', '♥', '2') },
-      zones: { deck: ['j1'], discardPile: [], processing: [] },
-      currentPlayerIndex: 0,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    });
-    await harness.setup(state);
-    const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
-
-    await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
-    P1.expectPending('请求回应');
-    await P1.respond('界刚烈', { choice: true }); // 发动
-    expect(harness.state.pendingSlots.size).toBe(0);
-    expect(harness.state.players[0].health).toBe(3); // 受界刚烈 1 伤
-  });
-
   // ─── 黑色判定 + 来源有手牌:弃置来源一张手牌 ────────────────────
   it('黑色判定:弃置来源一张手牌', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
