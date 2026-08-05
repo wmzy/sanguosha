@@ -9,6 +9,7 @@
 //   5. 主动弃牌不触发:周泰自己弃2张(贯石斧代价,voluntary)→ 奋激不触发
 //   6. 主动弃牌不触发:P2 主动弃牌(制衡代价,voluntary)→ 奋激不触发
 //   7. 被动弃置触发(过河拆桥):周泰被拆牌弃置(非 voluntary)→ 奋激触发 → 周泰摸2张
+//   8. 仅手牌触发:周泰装备区牌被弃置(非 voluntary)→ 奋激不触发(装备区弃置不触发)
 //
 // 触发方式:用 弃置/获得 atom 直接驱动(after-hook 挂在 弃置/获得)。
 // voluntary 字段标记主动弃牌(技能代价),奋激 弃置 hook 据此跳过。
@@ -36,6 +37,7 @@ function mkPlayer(opts: {
   name: string;
   character: string;
   hand?: string[];
+  equipment?: Record<string, string>;
   skills?: string[];
   health?: number;
   maxHealth?: number;
@@ -49,7 +51,7 @@ function mkPlayer(opts: {
     maxHealth: opts.maxHealth ?? 4,
     alive: true,
     hand: opts.hand ?? [],
-    equipment: {},
+    equipment: opts.equipment ?? {},
     skills: opts.skills ?? [],
     vars: (opts.vars ?? {}) as GameState['players'][number]['vars'],
     marks: [],
@@ -412,6 +414,51 @@ describe('奋激', () => {
     expect(harness.state.players[0].hand.length).toBe(2);
     expect(harness.state.players[0].hand).toContain('d1');
     expect(harness.state.players[0].hand).toContain('d2');
+    expect(harness.state.zones.discardPile).toContain('zc1');
+  });
+
+  // ─── 仅手牌触发:装备区弃置不触发奋激 ────────────────────────
+  // 官方"当一名角色的【手牌】被弃置后"——装备区牌被弃置不触发。
+  // 周泰装备区(武器槽)有一张牌,被弃置(非 voluntary)→ before-hook 快照手牌交集为空
+  // → after-hook 不询问 → 无触发。验证「仅手牌」这一核心边界。
+  it('周泰装备区牌被弃置(非 voluntary)→ 奋激不触发(仅手牌弃置触发)', async () => {
+    const weapon = mkCard('zc1', '贯石斧', '♣', 'A', '装备牌');
+
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界周泰',
+            character: '界周泰',
+            skills: ['奋激'],
+            health: 4,
+            maxHealth: 4,
+            equipment: { weapon: weapon.id }, // 装备区,非手牌
+          }),
+          mkPlayer({
+            index: 1,
+            name: 'P2',
+            character: '反',
+            skills: [],
+          }),
+        ],
+        cardMap: { zc1: weapon },
+        zones: { deck: [], discardPile: [], processing: [] },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+
+    // 强制弃置周泰装备区的牌(非 voluntary)
+    void applyAtom(harness.state, { type: '弃置', player: 0, cardIds: ['zc1'] });
+    await harness.waitForStable();
+
+    // 奋激不触发:无询问,周泰体力不变,装备已进弃牌堆
+    harness.player('界周泰').expectNoPending();
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[0].equipment.weapon).toBeUndefined();
     expect(harness.state.zones.discardPile).toContain('zc1');
   });
 });
