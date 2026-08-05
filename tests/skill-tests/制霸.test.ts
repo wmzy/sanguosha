@@ -5,6 +5,8 @@
 //   4. 拼点没赢但孙策不获得 → 双方牌进弃牌堆
 //   5. 非吴势力角色不能用制霸
 //   6. 孙策非主公(非0号位)时制霸不可用
+//   7. 拼点平局(点数相等)算没赢 → 孙策可获得(严格大于才算赢)
+//   8. 每回合限一次:本回合第二次拼点被拒
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -241,6 +243,58 @@ describe('制霸', () => {
       skillId: '制霸',
       actionType: 'use',
       params: { cardId: 'ac' },
+    });
+  });
+
+  it('拼点平局(点数相等)算没赢 → 孙策可获得', async () => {
+    // 盟友出 5,孙策出 5 → 5 不严格大于 5 → 盟友没赢 → 出现“是否获得”询问
+    const ac = mkCard('ac', '5');
+    const lc = mkCard('lc', '5');
+    await harness.setup(
+      buildLordState({ scHand: ['lc'], allyHand: ['ac'], extraCards: { ac, lc } }),
+    );
+    const SC = harness.player('孙策');
+    const ally = harness.player('盟友');
+
+    await ally.triggerAction('制霸', 'use', { cardId: 'ac' });
+    SC.expectPending('请求回应'); // 孙策选拼点牌
+    await SC.respond('制霸', { cardId: 'lc' });
+    // 点数相等算没赢:出现“是否获得”询问(若误用 >= 则会直接进弃牌堆,这里会断)
+    SC.expectPending('请求回应');
+    await SC.respond('制霸', { choice: true });
+
+    // 孙策获得双方拼点牌
+    expect(harness.state.players[0].hand.length).toBe(2);
+    expect(harness.state.players[0].hand).toContain('lc');
+    expect(harness.state.players[0].hand).toContain('ac');
+  });
+
+  it('每回合限一次:本回合第二次拼点被拒', async () => {
+    const ac = mkCard('ac', '2');
+    const ac2 = mkCard('ac2', '3');
+    const lc = mkCard('lc', 'K');
+    await harness.setup(
+      buildLordState({
+        scHand: ['lc'],
+        allyHand: ['ac', 'ac2'],
+        extraCards: { ac, ac2, lc },
+      }),
+    );
+    const SC = harness.player('孙策');
+    const ally = harness.player('盟友');
+
+    // 第一次拼点:盟友出 2,孙策出 K → 没赢,孙策获得(流程完整跑完,无遗留 pending)
+    await ally.triggerAction('制霸', 'use', { cardId: 'ac' });
+    SC.expectPending('请求回应');
+    await SC.respond('制霸', { cardId: 'lc' });
+    SC.expectPending('请求回应');
+    await SC.respond('制霸', { choice: true });
+
+    // 同回合第二次拼点(盟友仍有牌、孙策仍有手牌,无 pending 阻塞)→ 被拒
+    await ally.expectRejected({
+      skillId: '制霸',
+      actionType: 'use',
+      params: { cardId: 'ac2' },
     });
   });
 });
