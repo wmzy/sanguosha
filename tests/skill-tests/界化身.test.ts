@@ -1,13 +1,12 @@
 // 界化身(界左慈·群)行为测试:
-//   1. 游戏开始(首次回合开始)→ 初始化:抽 3 张未登场武将牌 + 亮出 + 获得一个技能
-//   2. 初始化抽到的武将牌均不在本局已登场武将中
-//   3. 获得的技能不是 限定技/觉醒技/主公技
-//   4. 回合开始(第二次自己回合)→ 询问选择行动(1=替换 2=移去 3=不操作)
-//   5. 回合结束 → 询问选择行动
-//   6. 选 1(替换)→ 卸载旧技能 + 亮出另一张 + 获得新技能
-//   7. 选 2(移去)count=1 → 池大小不变(移去 1 + 抽 1),展示牌与技能保留
-//   8. 选 2(移去)count=2 → 池大小不变(移去 2 + 抽 2),展示牌与技能保留
-//   9. 选 3(不操作)→ 状态不变
+//   1. 首次回合开始 → 初始化:抽 3 张未登场武将牌(排除本局已登场)+ 亮出 + 获得一个技能(非限定/觉醒/主公技)
+//   2. 第二次自己回合开始 → 询问选择行动(1=替换 2=移去 3=不操作);选 3(不操作)→ 状态不变
+//   3. 回合结束 → 询问选择行动
+//   4. 选 1(替换)→ 卸载旧技能 + 亮出另一张 + 获得新技能
+//   5. 选 2(移去)count=1 → 池大小不变(移去 1 + 抽 1),展示牌与技能保留
+//   6. 选 2(移去)count=2 → 池大小不变(移去 2 + 抽 2),展示牌与技能保留
+//   7. 简化①:界左慈非首位时,主公首回合开始即触发化身初始化
+//   8. 边界:池大小为 2 时,选 2 count=2 被拒(必须保留展示牌)
 //
 // 简化:技能选择若出现多技能候选,测试自动选第一个(任务允许的合理简化)。
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -151,33 +150,7 @@ describe('界化身', () => {
     expect(EXCLUDED.has(currentSkill!)).toBe(false);
   });
 
-  // ─── 2. 化身牌池排除本局已登场武将 ──────────────────────
-  it('化身牌池不含本局已登场的武将', async () => {
-    await harness.setup(
-      createGameState({
-        players: [
-          mkPlayer({ index: 0, name: '界左慈', character: '界左慈', skills: ['界化身', '新生'] }),
-          mkPlayer({ index: 1, name: '孙权', character: '孙权', skills: [] }),
-        ],
-        cardMap: {},
-        currentPlayerIndex: 0,
-        phase: '准备',
-        turn: { round: 1, phase: '准备', vars: {} },
-        rngSeed: 7,
-      }),
-    );
-
-    void applyAtom(harness.state, { type: '回合开始', player: 0 });
-    await harness.waitForStable();
-    harness.processAllEvents();
-    await autoRespond化身Skill(harness);
-
-    const pool = harness.state.players[0].vars['化身/牌池'] as string[];
-    expect(pool.includes('界左慈')).toBe(false);
-    expect(pool.includes('孙权')).toBe(false);
-  });
-
-  // ─── 3. 第二次自己回合开始 → 询问选择行动 ────────────────
+  // ─── 2. 第二次自己回合开始 → 询问选择行动 ────────────────
   it('第二次自己回合开始:询问选择行动(1/2/3)', async () => {
     await harness.setup(
       createGameState({
@@ -222,7 +195,7 @@ describe('界化身', () => {
     expect(pool.length).toBe(3);
   });
 
-  // ─── 4. 回合结束 → 询问选择行动 ────────────────────────
+  // ─── 3. 回合结束 → 询问选择行动 ────────────────────────
   it('回合结束:询问选择行动', async () => {
     await harness.setup(
       createGameState({
@@ -255,7 +228,7 @@ describe('界化身', () => {
     expect((slot!.atom as Record<string, unknown>).requestType).toBe('界化身/选择行动');
   });
 
-  // ─── 5. 选 1(替换)→ 卸载旧技能 + 获得新技能 ───────────────
+  // ─── 4. 选 1(替换)→ 卸载旧技能 + 获得新技能 ───────────────
   it('选 1(替换):卸载旧技能,亮出另一张并获得新技能', async () => {
     await harness.setup(
       createGameState({
@@ -312,7 +285,7 @@ describe('界化身', () => {
     expect(pool.length).toBe(3);
   });
 
-  // ─── 6. 选 2(移去)count=1 → 池大小不变,展示牌与技能保留 ──
+  // ─── 5. 选 2(移去)count=1 → 池大小不变,展示牌与技能保留 ──
   it('选 2 count=1:移去 1 张并获得 1 张新化身牌,展示牌和技能保留', async () => {
     await harness.setup(
       createGameState({
@@ -373,7 +346,7 @@ describe('界化身', () => {
     expect(harness.state.players[0].skills).toContain(skillAfter);
   });
 
-  // ─── 7. 选 2(移去)count=2 → 池大小不变,展示牌与技能保留 ──
+  // ─── 6. 选 2(移去)count=2 → 池大小不变,展示牌与技能保留 ──
   it('选 2 count=2:移去 2 张并获得 2 张新化身牌,展示牌和技能保留', async () => {
     await harness.setup(
       createGameState({
@@ -431,7 +404,7 @@ describe('界化身', () => {
     expect(harness.state.players[0].skills).toContain(skillAfter);
   });
 
-  // ─── 8. 简化①:界左慈非主公时,主公首回合开始即初始化 ─────
+  // ─── 7. 简化①:界左慈非主公时,主公首回合开始即初始化 ─────
   // 官方"游戏开始时"由"首次回合开始"近似:任意玩家的首个回合开始即触发初始化。
   it('简化①:界左慈非首位时,主公首回合开始即触发化身初始化', async () => {
     await harness.setup(
@@ -478,8 +451,8 @@ describe('界化身', () => {
     expect(harness.state.players[0].vars['化身/牌池']).toBeUndefined();
   });
 
-  // ─── 9. 选 2(移去)→ 池只剩 1 张(展示牌)时,无法再选 2 ──
-  // 边界:虽然此场景需先消耗池,但可验证 SWAP_COUNT_REQUEST 的 validate 拒绝超限 count。
+  // ─── 8. 边界:池大小为 2 时,选 2 count=2 被拒(必须保留展示牌)──
+  // doSwap 中 maxRemovable = min(2, pool.length - 1) = 1,count=2 超限 → validate 拒绝。
   it('边界:池大小为 2 时,选 2 count=2 被拒(必须保留展示牌)', async () => {
     await harness.setup(
       createGameState({
