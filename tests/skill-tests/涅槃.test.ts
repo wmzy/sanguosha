@@ -29,6 +29,7 @@ function mkPlayer(opts: {
   health?: number;
   maxHealth?: number;
   marks?: GameState['players'][number]['marks'];
+  pendingTricks?: GameState['players'][number]['pendingTricks'];
 }): GameState['players'][number] {
   return {
     index: opts.index,
@@ -42,7 +43,7 @@ function mkPlayer(opts: {
     skills: opts.skills ?? [],
     vars: {},
     marks: opts.marks ?? [],
-    pendingTricks: [],
+    pendingTricks: opts.pendingTricks ?? [],
     tags: [],
     judgeZone: [],
   };
@@ -54,10 +55,11 @@ describe('涅槃', () => {
     harness = new SkillTestHarness();
   });
 
-  it('濒死发动涅槃:弃所有牌、解除连环、摸3张、回复至3体力', async () => {
+  it('濒死发动涅槃:弃所有牌(含判定区)、解除连环、摸3张、回复至3体力', async () => {
     const slash = mkCard('s1', '杀', '♠', '7');
     const hand1 = mkCard('pt1', '闪', '♣', '2');
     const hand2 = mkCard('pt2', '杀', '♣', '3');
+    const lebu = mkCard('lebu', '乐不思蜀', '♠', '6', '锦囊牌'); // 判定区延时锦囊
 
     await harness.setup(
       createGameState({
@@ -67,10 +69,11 @@ describe('涅槃', () => {
             name: '庞统',
             character: '庞统',
             hand: [hand1.id, hand2.id],
-            skills: ['涅槃', '闪'],
+            skills: ['涅槃'],
             health: 1, // 一击即濒死
             maxHealth: 3,
             marks: [{ id: 'chained', scope: 0 }], // 处于连环状态
+            pendingTricks: [{ name: '乐不思蜀', source: 1, card: lebu }], // 判定区延时锦囊
           }),
           mkPlayer({
             index: 1,
@@ -80,7 +83,7 @@ describe('涅槃', () => {
             skills: ['杀'],
           }),
         ],
-        cardMap: { s1: slash, pt1: hand1, pt2: hand2 },
+        cardMap: { s1: slash, pt1: hand1, pt2: hand2, lebu },
         currentPlayerIndex: 1,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
@@ -111,9 +114,11 @@ describe('涅槃', () => {
     expect(harness.state.players[0].hand.length).toBe(3);
     // 解除连环:marks 不再含 chained
     expect(harness.state.players[0].marks.some((m) => m.id === 'chained')).toBe(false);
+    // 判定区延时锦囊一并弃置:pendingTricks 清空,乐不思蜀进弃牌堆
+    expect(harness.state.players[0].pendingTricks.length).toBe(0);
+    expect(harness.state.zones.discardPile).toContain('lebu');
     // 限定技标记已设
     expect(harness.state.players[0].vars['涅槃/used']).toBe(true);
-    void PT;
   });
 
   it('不发动涅槃 → 求桃无人救 → 死亡', async () => {
@@ -166,7 +171,6 @@ describe('涅槃', () => {
     expect(harness.state.players[0].alive).toBe(false);
     // 涅槃未使用
     expect(harness.state.players[0].vars['涅槃/used']).toBeFalsy();
-    void PT;
   });
 
   it('限定技:用过一次后再次濒死不再触发涅槃', async () => {
@@ -233,6 +237,5 @@ describe('涅槃', () => {
     }
     // 庞统死亡(涅槃未再次发动)
     expect(harness.state.players[0].alive).toBe(false);
-    void PT;
   });
 });
