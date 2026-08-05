@@ -3,6 +3,7 @@
 //   2. 已有创牌时再濒死,新创牌点数不同 → 回复至1体力,创牌累积至2张
 //   3. 新创牌点数与已有创牌重复 → 不屈失败,求桃无人救 → 死亡
 //   4. 不屈存活后再次受伤 → 再次触发不屈(不屈状态循环)
+//   5. 牌堆为空 → 无法置创牌 → 不屈失败,求桃无人救 → 死亡(无创牌产生)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -254,6 +255,64 @@ describe('不屈', () => {
     expect(harness.state.players[0].alive).toBe(true);
     expect(harness.state.players[0].health).toBe(1);
     expect(harness.state.players[0].vars['不屈/创牌']).toEqual(['d4', 'd5']);
+    void ZT;
+  });
+
+  it('牌堆为空 → 无法置创牌 → 不屈失败,求桃无人救 → 死亡(无创牌产生)', async () => {
+    const slash = mkCard('s6', '杀', '♠', '5');
+    // 占位牌:仅用于绕过 setup 的自动填牌(空牌堆会被填 20 张),测试中随后清空
+    const filler = mkCard('d6', '闪', '♥', '9');
+
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '周泰',
+            character: '周泰',
+            skills: ['不屈'],
+            health: 1, // 一击即濒死
+            maxHealth: 4,
+          }),
+          mkPlayer({
+            index: 1,
+            name: 'P2',
+            character: '反',
+            hand: [slash.id],
+            skills: ['杀'],
+          }),
+        ],
+        cardMap: { s6: slash, d6: filler },
+        zones: { deck: ['d6'], discardPile: [], processing: [] },
+        currentPlayerIndex: 1,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    // 清空牌堆:模拟「牌堆耗尽且弃牌堆为空」的极端局面,验证不屈的空牌堆守卫
+    // (置创牌无法翻牌 → 不屈不发动)。杀结算期间牌尚在处理区、未入弃牌堆,不会触发自动重洗。
+    harness.state.zones.deck.length = 0;
+    harness.rebuildViews();
+
+    const P2 = harness.player('P2');
+    const ZT = harness.player('周泰');
+
+    await P2.useCardAndTarget('杀', 's6', [0]);
+    await ZT.pass(); // 不出闪 → 受伤濒死 → 不屈因牌堆空而无法发动
+    await harness.waitForStable();
+
+    // 不屈失败(牌堆空)→ 进入求桃流程;两人都无桃 → pass 掉所有求桃 pending
+    while (harness.state.pendingSlots.size > 0) {
+      const slot = [...harness.state.pendingSlots.values()][0];
+      const target = (slot.atom as { target?: number }).target ?? 0;
+      await harness.player(target).pass();
+      await harness.waitForStable();
+    }
+
+    // 周泰死亡;不屈未发动(置创牌 atom 从未调用),无创牌产生
+    expect(harness.state.players[0].alive).toBe(false);
+    expect(harness.state.players[0].vars['不屈/创牌']).toBeUndefined();
+    void P2;
     void ZT;
   });
 });
