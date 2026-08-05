@@ -243,18 +243,16 @@ describe('界烈弓', () => {
   // ─── 正面·效果2(体力不小于自己 → 加伤) ─────────────────
 
   it('正面: 目标体力不小于自己 → 加伤(伤害+1)', async () => {
-    // P1 health=3 hand=[杀];P2 health=4 hand=[](空手,不可闪)
-    // 条件1: P2 手牌0 ≤ P1 手牌1(指定目标时 P1 手牌0)→ 0≤0 满足(但同时这里测加伤)
-    // 条件2: P2 health 4 ≥ P1 health 3 → 满足
-    // 为聚焦加伤,使条件1不满足:P1 让 P2 多一张手牌但不出闪——这里 P2 出闪会触发禁闪
-    // 误判。简化:本测两条件都满足,但仅断言伤害+1(=2)
+    // 仅测效果2(加伤),故令效果1不满足:P1 出杀后 hand=0,P2 hand=[桃] 长度1
+    //   条件1(目标手牌不大于自己):P2 手牌1 ≤ P1 手牌0 → 不满足
+    //   条件2(目标体力不小于自己):P2 health 4 ≥ P1 health 3 → 满足
+    //   仅 condBonus 成立 → 只加 '界烈弓/加伤' 标签,不禁闪。
+    //   P2 手牌为桃(非闪)→ 无法抵消 → 命中,加伤 → 伤害 1+1=2 → 体力 4-2=2。
     const kill = makeCard('k1', '杀', '♠', '7');
-    const cardMap: Record<string, Card> = { k1: kill };
+    const extra = makeCard('x1', '桃', '♥', '3');
+    const cardMap: Record<string, Card> = { k1: kill, x1: extra };
     const state = createGameState({
       players: [
-        // P1 health 3 < P2 health 4 → 条件2满足
-        // P1 出杀后 hand=0;P2 hand=0 → 条件1满足(0≤0)
-        // P2 无闪 → 必然命中,加伤 → -2 体力
         makePlayer({
           index: 0,
           name: 'P1',
@@ -266,7 +264,7 @@ describe('界烈弓', () => {
           index: 1,
           name: 'P2',
           character: '曹操',
-          hand: [],
+          hand: ['x1'],
           skills: [],
           health: 4,
           faction: '魏',
@@ -279,12 +277,14 @@ describe('界烈弓', () => {
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
 
     await P1.useCardAndTarget('杀', 'k1', [1]);
     P1.expectPending('请求回应');
     await P1.respond('界烈弓', { choice: true });
 
-    // P2 空 hand → 不可闪 + 加伤 → 4 - 2 = 2
+    // 未禁闪 → 正常询问闪;P2 桃非闪 → 不抵消,加伤命中 → 4 - 2 = 2
+    await P2.pass();
     expect(harness.state.players[1].health).toBe(2);
   });
 
