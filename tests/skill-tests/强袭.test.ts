@@ -139,7 +139,7 @@ describe('强袭', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
 
-    // P1 距离 1(双人),弃装备武器后范围回到 1,仍在范围内
+    // 装备区武器:卸下并弃置,造成 1 点伤害(官方无距离限制,无须校验攻击范围)
     await P0.triggerAction('强袭', 'use', { cost: 'discard', target: 1, cardId: 'w1' });
 
     expect(harness.state.players[0].health).toBe(4);
@@ -216,7 +216,7 @@ describe('强袭', () => {
     expect(buildCount(harness.state, 0)).toBe(1); // 计数未增加
     expect(buildTargets(harness.state, 0)).toEqual([1]);
 
-    // 第二次:对 P2(不同目标)— 应允许(去重不影响其他目标)
+    // 第三次:对 P2(不同目标)— 应允许(去重不影响其他目标)
     await P0.triggerAction('强袭', 'use', { cost: 'hp', target: 2 });
     expect(harness.state.players[2].health).toBe(3);
     expect(buildCount(harness.state, 0)).toBe(2);
@@ -242,6 +242,51 @@ describe('强袭', () => {
       actionType: 'use',
       params: { cost: 'hp', target: 1 },
     });
+  });
+
+  // ─── 非出牌阶段(自己回合)→ 拒绝 ────────────────────
+  it('非出牌阶段:拒绝(即便自己回合)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['强袭'] }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操' }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0, // 自己回合
+      phase: '摸牌', // 但非出牌阶段
+      turn: { round: 1, phase: '摸牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    await P0.expectRejected({
+      skillId: '强袭',
+      actionType: 'use',
+      params: { cost: 'hp', target: 1 },
+    });
+  });
+
+  // ─── 以自己为目标 → 拒绝 ────────────────────
+  it('以自己为目标:拒绝', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['强袭'] }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操' }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    await P0.expectRejected({
+      skillId: '强袭',
+      actionType: 'use',
+      params: { cost: 'hp', target: 0 }, // 自己
+    });
+    expect(harness.state.players[0].health).toBe(4); // 未失体力
   });
 
   // ─── 官方无距离限制:远距离目标仍可指定 ────────────────
@@ -288,5 +333,36 @@ describe('强袭', () => {
       actionType: 'use',
       params: { cost: 'discard', target: 1, cardId: 's1' },
     });
+  });
+
+  // ─── 失去体力致死:典韦 1 血发动 → 失血濒死(无桃)→ 死亡 → 不造成伤害 ──
+  // 官方 FAQ:失去体力致死则不再造成伤害(apply 早退,与奋激/武烈 失血致死一致)
+  it('cost=hp 典韦 1 血发动 → 失血濒死(无桃)→ 死亡 → 目标不受伤害', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['强袭'], health: 1, maxHealth: 4 }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操' }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    await P0.triggerAction('强袭', 'use', { cost: 'hp', target: 1 });
+
+    // 典韦失 1 体力 → 0 → 濒死 → 求桃;两人都无桃 → pass 掉所有求桃
+    while (harness.state.pendingSlots.size > 0) {
+      const slot = [...harness.state.pendingSlots.values()][0];
+      const target = (slot.atom as { target?: number }).target ?? 0;
+      await harness.player(target).pass();
+      await harness.waitForStable();
+    }
+
+    // 典韦死亡 → 不再造成伤害(目标体力不变)
+    expect(harness.state.players[0].alive).toBe(false);
+    expect(harness.state.players[1].health).toBe(4);
   });
 });
