@@ -9,7 +9,8 @@
 //   2. 防伤改摸牌:其他角色造成伤害 → 防止 + 来源摸 1 张
 //   3. 每种势力限一次:同势力第二次伤害不防止,照常受伤
 //   4. 自伤不触发:刘表自伤 → 照常受伤
-//   5. 无来源伤害不触发:无 source 的伤害照常生效
+//   5. 不同势力均可触发一次:魏防后蜀仍可防
+//   6. 无来源伤害不触发:闪电/系统伤害(source=TARGET_SYSTEM)照常生效
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -18,7 +19,7 @@ import { applyAtom } from '../../src/engine/index';
 import { runDamageFlow } from '../../src/engine/damage-flow';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-import { createGameState } from '../../src/engine/types';
+import { createGameState, TARGET_SYSTEM } from '../../src/engine/types';
 
 function makeCard(
   id: string,
@@ -388,6 +389,50 @@ describe('界宗室', () => {
     expect(harness.state.players[0].vars['宗室/防伤/蜀']).toBe(true);
 
     // 群(自己)势力未触发(无自伤)
+    expect(harness.state.players[0].vars['宗室/防伤/群']).toBeUndefined();
+
+    restoreAutoCompare();
+  });
+
+  // ─── 6. 无来源伤害不触发:闪电/系统伤害(source=TARGET_SYSTEM) ──
+  //    source 为系统值 TARGET_SYSTEM(-1,如闪电),无势力归属 → 不防止。
+  it('无来源伤害不触发:系统伤害(source=TARGET_SYSTEM) → 照常受伤', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          makePlayer({
+            index: 0,
+            name: '界刘表',
+            faction: '群',
+            hand: [],
+            skills: ['界宗室', '回合管理'],
+            health: 3,
+            maxHealth: 3,
+          }),
+          makePlayer({
+            index: 1,
+            name: 'P1',
+            faction: '魏',
+            skills: ['回合管理'],
+          }),
+        ],
+        cardMap: {},
+        zones: { deck: [], discardPile: [], processing: [] },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+
+    const restoreAutoCompare = disableAutoCompare();
+
+    // 无来源(系统)伤害:source=TARGET_SYSTEM(-1),无势力归属 → 不防止
+    await runDamageFlow(harness.state, TARGET_SYSTEM, 0, 1);
+
+    // 照常受伤(体力 -1)
+    expect(harness.state.players[0].health).toBe(2);
+    // 无来源无势力归属 → 任何势力均未标记
+    expect(harness.state.players[0].vars['宗室/防伤/魏']).toBeUndefined();
     expect(harness.state.players[0].vars['宗室/防伤/群']).toBeUndefined();
 
     restoreAutoCompare();
