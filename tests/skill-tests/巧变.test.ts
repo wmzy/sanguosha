@@ -123,6 +123,53 @@ describe('巧变', () => {
     expect(harness.state.zones.deck.length).toBe(4);
   });
 
+  // ─── 跳过摸牌阶段:从两名其他角色各获得 1 张(至多两名) ────────────
+  // 官方效果强调「至多两名其他角色」:可一次选 2 名目标,各盲取一张。
+  // 既有用例只选 1 名,未覆盖 2 名目标分支(targets.slice(0,2) 循环)。
+  it('跳过摸牌阶段:弃 1 + 从两名其他角色各获得 1 张手牌', async () => {
+    const discard = makeCard('d1', '杀', '♠', '5');
+    const p1c = makeCard('p1c', '闪', '♥', '3');
+    const p2c = makeCard('p2c', '桃', '♦', '2');
+    const cardMap: Record<string, Card> = { d1: discard, p1c, p2c };
+    const deck = buildDeck(cardMap, 4);
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['d1'], skills: ['巧变'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1c'], character: '曹操' }),
+        makePlayer({ index: 2, name: 'P2', hand: ['p2c'], character: '司马懿' }),
+      ],
+      cardMap,
+      zones: { deck, discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '摸牌',
+      turn: { round: 1, phase: '摸牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '摸牌' });
+    await harness.waitForStable();
+    P0.expectPending('请求回应');
+    await P0.respond('巧变', { choice: true });
+    P0.expectPending('请求回应');
+    await P0.respond('巧变', { cardIds: ['d1'] });
+    // 选两名偷牌目标(至多两名)
+    P0.expectPending('请求回应');
+    await P0.respond('巧变', { targets: [1, 2] });
+
+    // P0 弃 d1
+    expect(harness.state.zones.discardPile).toContain('d1');
+    // P0 从 P1、P2 各获得一张
+    expect(harness.state.players[0].hand).toContain('p1c');
+    expect(harness.state.players[0].hand).toContain('p2c');
+    expect(harness.state.players[0].hand).toHaveLength(2);
+    // P1、P2 手牌均空
+    expect(harness.state.players[1].hand).toEqual([]);
+    expect(harness.state.players[2].hand).toEqual([]);
+    // 摸牌阶段被跳过:未从牌堆摸牌
+    expect(harness.state.zones.deck.length).toBe(4);
+  });
+
   // ─── 跳过判定阶段:仅弃牌跳过 ────────────────────
   it('跳过判定阶段:弃 1 张,无附加效果', async () => {
     const discard = makeCard('d1', '杀', '♠', '5');
