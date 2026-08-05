@@ -194,6 +194,18 @@ describe('挑衅', () => {
     });
   });
 
+  it('validate:非出牌阶段不能发动', async () => {
+    const state = build();
+    state.phase = '弃牌';
+    await harness.setup(state);
+    const P0 = harness.player('姜维');
+    await P0.expectRejected({
+      skillId: '挑衅',
+      actionType: 'use',
+      params: { target: 1 },
+    });
+  });
+
   it('validate:不能选择自己为目标', async () => {
     await harness.setup(build());
     const P0 = harness.player('姜维');
