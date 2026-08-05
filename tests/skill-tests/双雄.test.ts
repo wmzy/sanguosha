@@ -178,45 +178,41 @@ describe('双雄', () => {
     expect(harness.state.players[0].hand).not.toContain('j1');
   });
 
-  // ─── A3. 牌堆仅 1 张也能发动(新机制只需 1 张判定牌) ────────
+  // ─── A3. 牌堆为空 → 不触发双雄(不询问) ──────────────────────
+  // 原 A3「牌堆仅 1 张」与 A1b 设置完全相同(均为 ♠ 单牌)、断言为 A1b 超集,
+  // 其独有断言「牌堆变空」又已由 A1(♥ 路径)覆盖 → 真重复,已删除。
+  // 改为补充 header 文档场景#3:牌堆为空时实现的 deck.length<1 提前 return 守卫(此前无覆盖)。
 
-  it('牌堆仅 1 张 → 发动双雄 → 翻走该张判定牌,牌堆变空', async () => {
-    const restoreAutoCompare = disableAutoCompare();
-    const j1 = makeCard('j1', '杀', '♠', '7');
+  it('牌堆为空 → 不触发双雄(不询问),无颜色标记', async () => {
     await harness.setup(
       createGameState({
         players: [
           makePlayer({ index: 0, name: '颜良文丑', hand: [], skills: ['双雄'] }),
           makePlayer({ index: 1, name: 'P2', skills: [] }),
         ],
-        cardMap: { j1 },
-        zones: { deck: ['j1'], discardPile: [], processing: [] },
+        cardMap: {},
         currentPlayerIndex: 0,
         phase: '摸牌',
         turn: { round: 1, phase: '摸牌', vars: {} },
       }),
     );
+    // harness.setup 会自动给空牌堆填充 20 张测试牌,此处手动清空以测空牌堆守卫
+    harness.state.zones.deck = [];
     const Y = harness.player('颜良文丑');
 
     void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '摸牌' });
     await harness.waitForStable();
-    Y.expectPending('请求回应');
 
-    await Y.respond('双雄', { choice: true });
-    await harness.waitForStable();
-
-    // 1 张牌被翻走作判定牌,牌堆变空
-    expect(harness.state.zones.deck).toHaveLength(0);
-    // 判定牌已入手
-    expect(harness.state.players[0].hand).toContain('j1');
-    expect(harness.state.turn.vars['双雄/color']).toBe('黑');
-    restoreAutoCompare();
+    // 实现守卫:deck.length<1 → before-hook 提前 return,不发起双雄询问
+    Y.expectNoPending();
+    // 未判定 → 无颜色标记
+    expect(harness.state.turn.vars['双雄/color']).toBeUndefined();
   });
 
   // ─── B4. transformThenUse:判定黑色→红色手牌当决斗 → P2 扣血 ────
 
   it('transformThenUse:发动双雄后(判定黑色),红色手牌当决斗 → P2 不出杀扣1血', async () => {
-    // 模拟双雄已发动:turn.vars['双雄/color']='black'(判定牌为黑色)
+    // 模拟双雄已发动:turn.vars['双雄/color']='黑'(判定牌为黑色)
     // P1 手牌:c1(♥闪,红色,异色可转化)
     // P2 有杀但不打出 → 决斗中 P2 先被询问杀 → pass → P2 输 → 扣1血
     const c1 = makeCard('c1', '闪', '♥', '2');
@@ -253,7 +249,7 @@ describe('双雄', () => {
     await P1.pass();
     // 窗口2:P2 被询问出杀(决斗目标先出杀)
     P2.expectPending('询问杀');
-    await P2.pass(); // P2 无杀 → 输
+    await P2.pass(); // P2 手中有 p2k(杀)但选择不出 → P2 输
 
     // P2 扣1血
     expect(harness.state.players[1].health).toBe(p2HealthBefore - 1);
