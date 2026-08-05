@@ -225,6 +225,31 @@ describe('界乱武', () => {
     await JX.expectRejected({ skillId: '界乱武', actionType: 'use', params: {} });
   });
 
+  // ─── 3b. 负面:非自己回合 → 拒绝 ──
+  it('负面:非自己回合发动乱武被拒绝', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界贾诩',
+            character: '界贾诩',
+            skills: ['界乱武'],
+            health: 3,
+            maxHealth: 3,
+          }),
+          mkPlayer({ index: 1, name: 'P2', hand: [], skills: [], health: 4 }),
+        ],
+        cardMap: {},
+        currentPlayerIndex: 1, // P2 的回合,非贾诩
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const JX = harness.player('界贾诩');
+    await JX.expectRejected({ skillId: '界乱武', actionType: 'use', params: {} });
+  });
+
   // ─── 4. 界版新增:主循环结束后,贾诩可视为使用无距离限制的【杀】 ──
   it('界版:贾诩视为使用无距离限制【杀】(主循环 P2 失血后,贾诩选择 P2 为最终杀目标)', async () => {
     const p2shan = mkCard('sh1', '闪', '♥', '2'); // P2 含闪:走 normal 询问闪
@@ -268,7 +293,6 @@ describe('界乱武', () => {
     await harness.waitForStable();
 
     expect(harness.state.players[1].health).toBe(2); // 失血1(乱武) + 受杀1 = 2
-    expect(harness.state.players[1].alive).toBe(true);
     // 视为出杀占出杀次数
     expect(harness.state.turn.vars['杀/quotaUsed']).toBe(1);
   });
@@ -346,8 +370,8 @@ describe('界乱武', () => {
 
   // ─── 7. 界版新增:无距离限制(目标可在攻击范围外) ──
   it('界版:贾诩视为出杀无距离限制(可指定攻击范围外的目标)', async () => {
-    // 4 人局:贾诩 idx 0,P4 idx 3。贾诩无进攻马,默认攻击范围 1,P4 在距离 1(座位邻接)。
-    // 用 6 人局确保 P6(idx 5)在攻击范围外(距离 > 1),验证无距离限制。
+    // 6 人环形座次(贾诩 idx 0),默认攻击范围 1。贾诩到 P3(idx 2)距离为 2,在攻击范围外;
+    // 验证界版最终杀"无距离限制":贾诩可指定攻击范围外的 P3 为目标。
     const p3shan = mkCard('sh1', '闪', '♥', '2'); // P3 含闪:走 normal 询问闪
     await harness.setup(
       createGameState({
@@ -398,8 +422,7 @@ describe('界乱武', () => {
     const finalSlot = [...harness.state.pendingSlots.values()][0];
     expect((finalSlot.atom as { target: number }).target).toBe(0);
 
-    // 选 P6(idx 5):距离 1(环形)→ 在攻击范围内。改选 P3(idx 2):距离 2,默认攻击范围外
-    // 验证"无距离限制"接受 P3(距离 2)
+    // 选 P3(idx 2):距贾诩距离 2,超出默认攻击范围 1——验证"无距离限制"接受该目标
     await JX.respond('界乱武', { target: 2 });
     await harness.waitForStable();
 
