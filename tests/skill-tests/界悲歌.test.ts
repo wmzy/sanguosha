@@ -149,8 +149,6 @@ describe('界悲歌', () => {
 
     // ♥ 主效果:P0 受杀 1 伤(3→2),♥ 回血 → 3
     expect(harness.state.players[0].health).toBe(3);
-    // 弃置牌 d1 进弃牌堆
-    expect(harness.state.zones.discardPile).toContain('d1');
     // 花色相同 → 获得判定牌 j1(从弃牌堆移到手牌)
     expect(harness.state.players[0].hand).toContain('j1');
     expect(harness.state.zones.discardPile).not.toContain('j1');
@@ -347,5 +345,46 @@ describe('界悲歌', () => {
     // 弃牌堆为空(两张都被拿走)
     expect(harness.state.zones.discardPile).not.toContain('j1');
     expect(harness.state.zones.discardPile).not.toContain('d1');
+  });
+
+  // ─── 10. 他人受杀伤害:界蔡文姬发动,判定与效果作用于受伤角色(非自身) ────
+  // 实现要点:触发对象为「任一角色」受杀伤害,判定与花色效果都作用于受伤角色,
+  // 拥有者界蔡文姬仅作为发动方。此前用例均为 P0=拥有者=受伤者,未覆盖目标路由。
+  it('他人受杀伤害:判定与♥回血作用于受伤角色而非界蔡文姬', async () => {
+    const judge = makeCard('j1', '杀', '♥', '5');
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const cost = makeCard('d1', '闪', '♦', '3'); // 界蔡文姬手牌(满足“若你有牌”)
+    const dodge = makeCard('s2', '闪', '♣', '4'); // P2 手牌(使其有闪可询,再 pass 不出)
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: '界蔡文姬', hand: ['d1'], skills: ['界悲歌', '断肠'] }),
+        makePlayer({ index: 1, name: 'P1', character: '张飞', hand: ['k1'], skills: ['杀'] }),
+        makePlayer({ index: 2, name: 'P2', character: '刘备', hand: ['s2'] }),
+      ],
+      cardMap: { k1: slash, d1: cost, j1: judge, s2: dodge },
+      zones: { deck: ['j1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('界蔡文姬');
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('杀', 'k1', [2]); // P1 出杀打 P2
+    await P2.pass(); // P2 不出闪 → 受 1 点杀伤害
+
+    // 受伤的是 P2,但界悲歌询问拥有者 P0 是否发动
+    P0.expectPending('请求回应');
+    await P0.respond('界悲歌', { choice: true });
+    await P0.pass(); // 不弃牌
+
+    // ♥ → 受伤角色 P2 回血(3→2→3);界蔡文姬 P0 未受伤、未弃牌
+    expect(harness.state.players[2].health).toBe(3);
+    expect(harness.state.players[0].health).toBe(3);
+    expect(harness.state.players[0].hand).toContain('d1');
+    // 判定作用于 P2:j1 已入弃牌堆
+    expect(harness.state.zones.discardPile).toContain('j1');
   });
 });
