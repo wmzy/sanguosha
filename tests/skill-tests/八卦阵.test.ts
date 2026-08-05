@@ -10,7 +10,7 @@
 //   1. 正面:装备八卦阵 → equipment.防具 = id,玩家 skills 含 '八卦阵'
 //   2. 正面:判定成功(红色)→ P2 出杀 P1 不出闪 → P1 不扣血(虚拟闪抵消)
 //   3. 正面:判定失败(黑色)→ P2 出杀 P1 不出闪 → P1 扣 1 血
-//   4. 正面:P1 有真闪 + 八卦阵判定红色 → 真闪 + 虚拟闪都进弃牌堆,无伤害
+//   4. 正面:P1 有真闪 + 八卦阵判定红色 → 不再询问出闪,真闪留在手里,无伤害
 //   5. 负面:非自己回合装八卦阵 → 拒绝
 //   6. 负面:装备不存在的牌 → 拒绝
 //   7. 负面:八卦阵判定黑色 + P1 出真闪 → 正常闪避
@@ -316,6 +316,53 @@ describe('八卦阵', () => {
     // view 级断言:health 通过 applyView 同步
     P1.processEvents();
     P1.expectView((v) => expect(v.players[0].health).toBe(4));
+  });
+
+  // ─── 正面:判定黑色 + P1 有真闪 → 八卦阵失败后仍可用真闪抵消 ────────────
+  // 与上文「判定红色 + 真闪(真闪留手)」互补:判定黑色时八卦阵不干预,
+  // 走正常询问闪 → P1 出真闪抵消杀,真闪被消耗进弃牌堆。
+  it('判定失败(黑色)+ P1 有真闪:P1 发动八卦阵判定黑 → 出真闪抵消 → 不扣血', async () => {
+    const bagua = makeEquip('b1', '八卦阵', '♣', '防具', 'A');
+    const slash = makeCard('s1', '杀', '♠', 'A');
+    const dodge = makeCard('d1', '闪', '♥', '2');
+    const judgeCard = makeCard('j1', '杀', '♠', '5'); // 黑桃黑色 → 判定失败
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['d1'],
+          skills: ['装备通用', '闪', '八卦阵'],
+          equipment: { 防具: 'b1' },
+        }),
+        makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['杀'] }),
+      ],
+      cardMap: { b1: bagua, s1: slash, d1: dodge, j1: judgeCard },
+      zones: { deck: ['j1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P2 出杀对 P1 → P1 发动八卦阵 → 判定黑色 → 不视为闪 → 正常进入询问闪
+    await P2.useCardAndTarget('杀', 's1', [0]);
+    P1.expectPending('请求回应');
+    await P1.respond('八卦阵', { choice: true });
+    // 判定黑色 → 八卦阵不干预 → 询问闪 pending
+    P1.expectPending('询问闪');
+    // P1 出真闪抵消
+    await P1.respond('闪', { cardId: 'd1' });
+
+    // 杀被真闪抵消 → P1 不扣血
+    expect(harness.state.players[0].health).toBe(4);
+    // 真闪 d1 已消耗,不在手里
+    expect(harness.state.players[0].hand).not.toContain('d1');
+    expect(harness.state.zones.discardPile).toContain('d1');
+    // 判定牌 j1 进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('j1');
   });
 
   // ─── 负面:非自己回合装八卦阵 → 拒绝 ────────────
