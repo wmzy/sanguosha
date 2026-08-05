@@ -5,8 +5,10 @@
 //   1. 被杀致死 → 杀手失去武将技(保留 DEFAULT_SKILLS)
 //   2. 杀手装备自带技能保留(FAQ)
 //   3. 未死亡(存活)→ 断肠不触发,杀手技能不变
+//   4. 体力致死(无来源 killer=undefined)→ 断肠不触发
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
+import { applyAtom } from '../../src/engine/index';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -178,5 +180,37 @@ describe('断肠', () => {
     expect(harness.state.players[0].health).toBe(2);
     expect(harness.state.players[1].skills).toContain('武圣');
     expect(harness.state.pendingSlots.size).toBe(0);
+  });
+
+  // ─── 体力致死(无来源):断肠不触发 ────────────────────
+  it('体力致死(无来源):断肠不触发,技能不变', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: '蔡文姬', hand: [], skills: ['悲歌', '断肠'], health: 1 }),
+          mkPlayer({
+            index: 1,
+            name: 'P1',
+            character: '关羽',
+            hand: [],
+            skills: ['武圣'],
+          }),
+        ],
+        cardMap: {},
+        currentPlayerIndex: 1,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+
+    // 蔡文姬失去体力致死(无伤害来源,如乱武/苦肉等体力扣除)
+    void applyAtom(harness.state, { type: '失去体力', target: 0, amount: 1 });
+    await harness.waitForStable();
+    // 求桃流程:无人救 → 死亡
+    await drainPendings(harness);
+
+    // 蔡文姬死亡,但 killer=undefined → 断肠不触发(P1 武圣保留)
+    expect(harness.state.players[0].alive).toBe(false);
+    expect(harness.state.players[1].skills).toContain('武圣');
   });
 });
