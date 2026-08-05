@@ -33,6 +33,7 @@ function mkPlayer(opts: {
   health?: number;
   maxHealth?: number;
   marks?: GameState['players'][number]['marks'];
+  pendingTricks?: GameState['players'][number]['pendingTricks'];
 }): GameState['players'][number] {
   return {
     index: opts.index,
@@ -46,7 +47,7 @@ function mkPlayer(opts: {
     skills: opts.skills ?? [],
     vars: {},
     marks: opts.marks ?? [],
-    pendingTricks: [],
+    pendingTricks: opts.pendingTricks ?? [],
     tags: [],
     judgeZone: [],
   };
@@ -125,6 +126,57 @@ describe('界涅槃', () => {
     // 获得八阵技能(三选一)
     expect(harness.state.players[0].skills).toContain('八阵');
     void PT;
+  });
+
+  it('弃置判定区延时锦囊:乐不思蜀被移除并弃入弃牌堆', async () => {
+    const slash = mkCard('s1', '杀', '♠', '7');
+    const lebu = mkCard('lebu1', '乐不思蜀', '♥', '6', '锦囊牌');
+
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界庞统',
+            character: '界庞统',
+            skills: ['界涅槃'],
+            health: 1,
+            maxHealth: 3,
+            // 判定区已有延时锦囊(乐不思蜀):界涅槃“弃置所有牌”需一并弃掉
+            pendingTricks: [{ name: '乐不思蜀', source: 1, card: lebu }],
+          }),
+          mkPlayer({
+            index: 1,
+            name: 'P1',
+            character: '反',
+            hand: [slash.id],
+            skills: ['杀'],
+          }),
+        ],
+        cardMap: { s1: slash, lebu1: lebu },
+        currentPlayerIndex: 1,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const P1 = harness.player('P1');
+    const PT = harness.player('界庞统');
+
+    await P1.useCardAndTarget('杀', 's1', [0]);
+    // 庞统 0 手牌 → 询问闪 skip → 直接受伤濒死 → 界涅槃 confirm pending
+    await harness.waitForStable();
+    await PT.respond('界涅槃', { choice: true }); // 发动
+    await harness.waitForStable();
+    await PT.respond('界涅槃', { choice: true }); // 选八阵(完成三选一)
+    await harness.waitForStable();
+
+    // 判定区延时锦囊被移除
+    expect(harness.state.players[0].pendingTricks).toHaveLength(0);
+    // 其卡牌被弃入弃牌堆
+    expect(harness.state.zones.discardPile).toContain('lebu1');
+    // 主流程照常:存活并回复至3体力
+    expect(harness.state.players[0].alive).toBe(true);
+    expect(harness.state.players[0].health).toBe(3);
   });
 
   it('三选一:选择火计 → 获得火计技能', async () => {
@@ -216,6 +268,54 @@ describe('界涅槃', () => {
     await harness.waitForStable();
 
     expect(harness.state.players[0].skills).toContain('看破');
+  });
+
+  it('三选一:全部拒绝 → 默认获得八阵', async () => {
+    const slash = mkCard('s1', '杀', '♠', '7');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界庞统',
+            character: '界庞统',
+            skills: ['界涅槃'],
+            health: 1,
+            maxHealth: 3,
+          }),
+          mkPlayer({
+            index: 1,
+            name: 'P1',
+            character: '反',
+            hand: [slash.id],
+            skills: ['杀'],
+          }),
+        ],
+        cardMap: { s1: slash },
+        currentPlayerIndex: 1,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const P1 = harness.player('P1');
+    const PT = harness.player('界庞统');
+
+    await P1.useCardAndTarget('杀', 's1', [0]);
+    // 庞统 0 手牌 → 询问闪 skip → 直接受伤濒死 → 界涅槃 confirm pending
+    await harness.waitForStable();
+    await PT.respond('界涅槃', { choice: true }); // 发动
+    await harness.waitForStable();
+    await PT.respond('界涅槃', { choice: false }); // 跳过八阵
+    await harness.waitForStable();
+    await PT.respond('界涅槃', { choice: false }); // 跳过火计
+    await harness.waitForStable();
+    await PT.respond('界涅槃', { choice: false }); // 跳过看破
+    await harness.waitForStable();
+
+    // 三项全拒 → 实现默认获得第一个(八阵)
+    expect(harness.state.players[0].skills).toContain('八阵');
+    expect(harness.state.players[0].skills).not.toContain('火计');
+    expect(harness.state.players[0].skills).not.toContain('看破');
   });
 
   it('不发动界涅槃 → 求桃无人救 → 死亡', async () => {
