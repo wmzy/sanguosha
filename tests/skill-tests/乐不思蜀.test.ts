@@ -75,6 +75,62 @@ describe('乐不思蜀', () => {
     expect(harness.state.zones.discardPile).toContain('l1');
   });
 
+  // 目标合法性(canUseIndulgence 负面路径):不能对自己使用、判定区已有同名延时锦囊时拒绝。
+  it('canUse:对自己使用被拒绝(延时锦囊不置入判定区,手牌不消耗)', async () => {
+    const card = makeCard('l1', '乐不思蜀', '♠');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['l1'], skills: ['回合管理'] }),
+        makePlayer({ index: 1, name: 'P2', skills: ['回合管理'] }),
+      ],
+      cardMap: { l1: card },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    const P1 = harness.player('P1');
+    await P1.expectRejected({
+      skillId: '乐不思蜀',
+      actionType: 'use',
+      params: { cardId: 'l1', target: 0 },
+    });
+    // 被拒绝:延时锦囊未置入、手牌仍在
+    expect(harness.state.players[0].pendingTricks.length).toBe(0);
+    expect(harness.state.players[0].hand).toContain('l1');
+  });
+
+  it('canUse:目标判定区已有乐不思蜀 → 拒绝(不可叠加)', async () => {
+    const card = makeCard('l1', '乐不思蜀', '♠');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['l1'], skills: ['回合管理'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          skills: ['回合管理'],
+          pendingTricks: [{ name: '乐不思蜀', source: 0, card }],
+        }),
+      ],
+      cardMap: { l1: card },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    const P1 = harness.player('P1');
+    await P1.expectRejected({
+      skillId: '乐不思蜀',
+      actionType: 'use',
+      params: { cardId: 'l1', target: 1 },
+    });
+    // 被拒绝:判定区仍只有 1 张,使用者手牌未消耗
+    expect(harness.state.players[1].pendingTricks.length).toBe(1);
+    expect(harness.state.players[0].hand).toContain('l1');
+  });
+
   it('判定为红桃:移除延时锦囊,不加跳过标签', async () => {
     // 牌堆顶设为红桃 → 判定牌为 ♥ → 乐不思蜀无效
     const card = makeCard('l1', '乐不思蜀', '♠');
