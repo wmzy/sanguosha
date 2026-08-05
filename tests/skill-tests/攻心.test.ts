@@ -184,4 +184,85 @@ describe('攻心', () => {
     expect(harness.state.zones.discardPile).not.toContain('h1');
     expect(harness.state.players[0].vars['攻心/usedThisTurn']).toBe(true);
   });
+
+  // ─── 5. 限一次:本回合第二次发动 → 拒绝 ─────────────────────
+  it('限一次:第一次发动后,同回合第二次 use 被拒绝', async () => {
+    const heart = mkCard('h1', '杀', '♥', '7');
+    const spade = mkCard('s1', '闪', '♠', '3');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: '界吕蒙', hand: [], skills: ['攻心'] }),
+          mkPlayer({ index: 1, name: '目标', hand: ['h1', 's1'] }),
+        ],
+        cardMap: { h1: heart, s1: spade },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const LM = harness.player('界吕蒙');
+
+    // 第一次:选♥牌弃置,成功发动
+    await LM.triggerAction('攻心', 'use', { targets: [1] });
+    await harness.waitForStable();
+    await LM.respond('攻心', { cardId: 'h1' });
+    await harness.waitForStable();
+    await LM.respond('攻心', { choice: true }); // 弃置
+    await harness.waitForStable();
+    expect(harness.state.players[0].vars['攻心/usedThisTurn']).toBe(true);
+
+    // 第二次:目标仍有手牌(s1)且其余条件均满足,但因限一次被拒
+    await LM.expectRejected({
+      skillId: '攻心',
+      actionType: 'use',
+      params: { targets: [1] },
+    });
+  });
+
+  // ─── 6. 目标合法性:负面拒绝路径 ──────────────────────────
+  it('负面:对自己使用攻心 → 拒绝', async () => {
+    const heart = mkCard('h1', '杀', '♥', '7');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: '界吕蒙', hand: [], skills: ['攻心'] }),
+          mkPlayer({ index: 1, name: '目标', hand: ['h1'] }),
+        ],
+        cardMap: { h1: heart },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const LM = harness.player('界吕蒙');
+
+    await LM.expectRejected({
+      skillId: '攻心',
+      actionType: 'use',
+      params: { targets: [0] }, // 自己
+    });
+  });
+
+  it('负面:目标无手牌 → 拒绝', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: '界吕蒙', hand: [], skills: ['攻心'] }),
+          mkPlayer({ index: 1, name: '目标', hand: [] }),
+        ],
+        cardMap: {},
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const LM = harness.player('界吕蒙');
+
+    await LM.expectRejected({
+      skillId: '攻心',
+      actionType: 'use',
+      params: { targets: [1] }, // 目标无手牌
+    });
+  });
 });
