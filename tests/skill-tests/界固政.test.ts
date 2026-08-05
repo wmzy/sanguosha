@@ -202,4 +202,25 @@ describe('界固政(OL 界限突破版)', () => {
     // 自己仍未获得
     expect(harness.state.players[0].hand.length).toBe(0);
   });
+
+  // ─── F. 仅其他角色:拥有者自己弃牌不触发(发动时机边界)──
+  it('仅其他角色:P0(界固政拥有者)自己弃[c1,c2] → 不触发(无询问)', async () => {
+    const state = buildState({ p1Hand: [] });
+    // buildState 默认 P0 手牌为空;此处让拥有者自带两张手牌用于弃置
+    state.players[0].hand = ['c1', 'c2'];
+    await harness.setup(state);
+    const P0 = harness.player('界张昭张纮');
+
+    // P0 自己弃置 [c1,c2] —— 界固政只对「其他角色」触发,拥有者自身弃牌不询问
+    await applyAtom(harness.state, { type: '弃置', player: 0, cardIds: ['c1', 'c2'] });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    P0.expectNoPending();
+    // 弃牌正常入弃牌堆
+    expect(harness.state.zones.discardPile).toContain('c1');
+    expect(harness.state.zones.discardPile).toContain('c2');
+    // 未触发询问窗口:已触发标记未置位
+    expect(harness.state.localVars['界固政/已触发']).toBeUndefined();
+  });
 });
