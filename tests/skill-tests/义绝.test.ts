@@ -201,6 +201,47 @@ describe('义绝', () => {
     expect(harness.state.players[1].health).toBe(3);
   });
 
+  // ─── 红色分支:满血目标选回血也不超上限 ─────────────────────────────
+
+  it('红色+满血:目标已满血 → owner 选回血 → target 体力不变(不超上限)', async () => {
+    const cost = makeCard('c1', '杀', '♠', '7');
+    const targetCard = makeCard('t1', '闪', '♦', '5'); // 红色
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['义绝'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          character: '曹操',
+          hand: ['t1'],
+          skills: [],
+          health: 4, // 已满血
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { c1: cost, t1: targetCard },
+      zones: { deck: [], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('义绝', 'c1', [1]);
+    await P2.respond('义绝', { cardId: 't1' });
+
+    // owner 选择回血(但目标已满血)
+    P1.expectPending('请求回应');
+    await P1.respond('义绝', { choice: true });
+
+    // owner 仍获得 t1(获得牌不受满血影响)
+    expect(harness.state.players[0].hand).toContain('t1');
+    // P2 已满血 → 不超上限,体力仍为 4
+    expect(harness.state.players[1].health).toBe(4);
+  });
+
   // ─── 红桃杀加伤:黑色分支后 owner 红桃杀 → -2 ─────────────────────────────
 
   it('黑色分支后 owner 红桃杀 → target 受 2 点伤害', async () => {
