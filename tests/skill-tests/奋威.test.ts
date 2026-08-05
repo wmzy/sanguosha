@@ -217,7 +217,7 @@ describe('奋威', () => {
 
   // ─── 铁索连环(整卡一次无懈)逐目标无效 ────────────────────────
 
-  it('铁索连环多目标 → 奋威令P3无效 → P3不横置,P2横置', async () => {
+  it('铁索连环多目标 → 奋威令P3无效 → P3不横置,P4横置', async () => {
     const chain = makeCard('chain', '铁索连环', '♣', '3', '锦囊牌');
     const state: GameState = createGameState({
       players: [
