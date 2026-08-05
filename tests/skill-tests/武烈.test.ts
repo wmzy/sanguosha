@@ -235,6 +235,40 @@ describe('武烈', () => {
     expect(harness.state.players[1].marks.length).toBe(0);
   });
 
+  // ─── 发动时机:仅「回合结束」阶段触发,其他阶段不触发 ─────────
+  it('出牌阶段开始 → 武烈不触发(仅结束阶段触发)', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界孙坚',
+            character: '界孙坚',
+            skills: ['武烈'],
+            health: 4,
+            maxHealth: 4,
+          }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', skills: [] }),
+        ],
+        cardMap: {},
+        zones: { deck: [], discardPile: [], processing: [] },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+
+    // 出牌阶段开始(非 回合结束)→ 武烈 after-hook 因 phase 不符直接返回
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '出牌' });
+    await harness.waitForStable();
+
+    // 不询问,且体力/限定技/标记均无变化
+    expect(harness.state.pendingSlots.size).toBe(0);
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[0].vars['武烈/used']).toBeUndefined();
+    expect(harness.state.players[1].marks.length).toBe(0);
+  });
+
   // ─── 失血致死:失去全部体力,无桃救援 → 死亡 → 不发标记 ──────
   it('孙坚失去全部体力 → 濒死无人救 → 死亡 → 不发标记', async () => {
     await harness.setup(
