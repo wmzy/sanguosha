@@ -158,4 +158,45 @@ describe('巨象', () => {
     // 祝融手牌不再含该南蛮入侵(已使用,未重新获得)
     expect(harness.state.players[0].hand).not.toContain('nm2');
   });
+
+  // 负面边界:巨象只免疫「南蛮入侵」造成的伤害(实现 effectA2 用 cardMap[cardId].name
+  // === '南蛮入侵' 作守卫)。普通杀仍应正常对祝融造成伤害,验证该守卫不被过度触发。
+  it('巨象只免疫南蛮入侵:普通杀仍对祝融造成伤害', async () => {
+    const kill = mkCard('sk1', '杀', '♠', '4');
+
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '祝融',
+            character: '祝融',
+            hand: [],
+            skills: ['巨象'],
+            health: 4,
+          }),
+          mkPlayer({
+            index: 1,
+            name: 'P1',
+            character: '反',
+            hand: [kill.id],
+            skills: ['杀'],
+          }),
+        ],
+        cardMap: { sk1: kill },
+        currentPlayerIndex: 1,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const P1 = harness.player('P1');
+
+    // P1 对祝融使用杀,祝融无闪 → 不出闪 → 受 1 点伤害
+    await P1.useCardAndTarget('杀', 'sk1', [0]);
+    await harness.player('祝融').pass();
+    await harness.waitForStable();
+
+    // 巨象不免疫普通杀:祝融受 1 点伤害(若守卫被去除/过度触发,此处仍为 4)
+    expect(harness.state.players[0].health).toBe(3);
+  });
 });
