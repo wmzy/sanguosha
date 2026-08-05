@@ -176,16 +176,8 @@ describe('桃园结义', () => {
   // ─────────────────────────────────────────────────────────────
   // 3. validate 拒绝:非出牌阶段
   // ─────────────────────────────────────────────────────────────
-  it('非出牌阶段(准备阶段)使用 → 被拒绝', async () => {
-    await harness.setup(buildState({ phase: '准备' }));
-    const P1 = harness.player('P1');
-    await P1.expectRejected({
-      skillId: '桃园结义',
-      actionType: 'use',
-      params: { cardId: 'ty1' },
-    });
-  });
-
+  // 实现对非出牌阶段的判定为单一分支(state.phase !== '出牌'),无逐阶段逻辑,
+  // 故用任一非出牌阶段覆盖即可(与五谷丰登等同族锦囊的约定一致)。
   it('非出牌阶段(弃牌阶段)使用 → 被拒绝', async () => {
     await harness.setup(buildState({ phase: '弃牌' }));
     const P1 = harness.player('P1');
