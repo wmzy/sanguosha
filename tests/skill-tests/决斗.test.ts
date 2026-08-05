@@ -4,8 +4,10 @@
 //
 // 完整行为测试覆盖:
 //   正面:
-//     1. P2 出杀 → P1 出杀 → P2 再被询问 → pass → P2 扣 1 血
+//     1. 轮转:P2 出杀 → P1 出杀 → P2 手牌耗尽 → 自动跳过 → P2(目标)扣 1 血
 //        每步都用 expectPending + respondInfo 验证窗口(cardFilter)
+//     2. 目标立即无杀 → 自动跳过 → 目标扣 1 血
+//     3. 发起者耗尽杀 → 发起者扣 1 血(验证伤害方向:胜者→败者)
 //   负面(expectRejected):
 //     - 非自己回合 / pending 期间 / 目标是自己 / 牌名错 / 牌不在手
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -92,7 +94,7 @@ describe('决斗', () => {
   // 1. 正面:轮转后 P2 耗尽杀 → P2 扣 1 血
   //    全程用 expectPending + respondInfo 验证 pending + cardFilter
   // ─────────────────────────────────────────────────────────────
-  it('P1 对 P2 出决斗 → expectPending(请求回应)无懈 → pass → expectPending(询问杀)P2 → respond 出杀 → expectPending(询问杀)P1 → respond 出杀 → expectPending(询问杀)P2 → pass → P2 扣血', async () => {
+  it('P1 对 P2 出决斗 → expectPending(请求回应)无懈 → pass → expectPending(询问杀)P2 → respond 出杀 → expectPending(询问杀)P1 → respond 出杀 → P2 手牌耗尽自动跳过 → P2 扣血', async () => {
     const s1 = makeCard('p1s', '杀', '♠', '5', '基本牌');
     const s2 = makeCard('p2s', '杀', '♥', '6', '基本牌');
     const state = buildState({
@@ -155,7 +157,7 @@ describe('决斗', () => {
   // ─────────────────────────────────────────────────────────────
   // 2. 正面:目标立即不出杀 → 目标扣 1 血
   // ─────────────────────────────────────────────────────────────
-  it('P1 对 P2 出决斗 → pass 无懈 → P2 expectPending(询问杀) → pass → P2 扣 1 血', async () => {
+  it('P1 对 P2 出决斗 → pass 无懈 → P2 无杀自动跳过 → P2 扣 1 血', async () => {
     const state = buildState({
       p1Hand: ['jd1'],
       p2Hand: [],
@@ -184,10 +186,46 @@ describe('决斗', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 3. validate 拒绝:非自己回合
+  // 3. 正面:发起者耗尽杀 → 发起者扣 1 血(伤害方向:胜者→败者)
+  // ─────────────────────────────────────────────────────────────
+  it('P1 出决斗 → P2 出杀 → P1 无杀 → P1(发起者)扣 1 血', async () => {
+    const p2s = makeCard('p2s', '杀', '♥', '6', '基本牌');
+    const state = buildState({
+      p1Hand: ['jd1'], // P1 只有决斗,无杀
+      p2Hand: ['p2s'],
+      extraCards: { p2s },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    const p1HealthBefore = harness.state.players[0].health;
+
+    await P1.triggerAction('决斗', 'use', { cardId: 'jd1', targets: [1] });
+    await P1.pass(); // 消耗无懈窗口
+
+    // P2 被询问出杀 → 出杀
+    P2.expectPending('询问杀');
+    await P2.respond('杀', { cardId: 'p2s' });
+
+    // 轮到 P1 → 无杀 → 自动跳过 → P1(发起者)扣血
+    expect(harness.state.pendingSlots.size).toBe(0);
+    expect(harness.state.players[0].health).toBe(p1HealthBefore - 1);
+    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['jd1', 'p2s']));
+    expect(harness.state.zones.processing).toEqual([]);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 4. validate 拒绝:非自己回合(P2 持有决斗+技能,唯一拒绝理由是回合)
   // ─────────────────────────────────────────────────────────────
   it('非自己回合出决斗 → 被拒绝', async () => {
-    await harness.setup(buildState({ p1Skills: ['杀', '决斗'] }));
+    // P2 持有决斗且拥有技能,当前是 P1 回合 → 唯一拒绝理由是"不是你的回合"
+    const state = buildState({
+      p1Hand: [],
+      p2Hand: ['jd1'],
+      p2Skills: ['杀', '决斗'],
+    });
+    await harness.setup(state);
     const P2 = harness.player('P2');
     await P2.expectRejected({
       skillId: '决斗',
@@ -197,7 +235,7 @@ describe('决斗', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 4. validate 拒绝:pending 期间
+  // 5. validate 拒绝:pending 期间
   // ─────────────────────────────────────────────────────────────
   it('pending 期间出决斗 → 被拒绝(防死锁)', async () => {
     const slash = makeCard('s1', '杀', '♠', '7', '基本牌');
@@ -220,7 +258,7 @@ describe('决斗', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 5. validate 拒绝:目标是自己
+  // 6. validate 拒绝:目标是自己
   // ─────────────────────────────────────────────────────────────
   it('对自己出决斗 → 被拒绝(不能指定自己)', async () => {
     await harness.setup(buildState({ p1Skills: ['杀', '决斗'] }));
@@ -233,7 +271,7 @@ describe('决斗', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 6. validate 拒绝:牌名不是决斗
+  // 7. validate 拒绝:牌名不是决斗
   // ─────────────────────────────────────────────────────────────
   it('用杀当决斗出 → 被拒绝(cardNameOk=false)', async () => {
     const slash = makeCard('s1', '杀', '♠', '7', '基本牌');
@@ -252,7 +290,7 @@ describe('决斗', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 7. validate 拒绝:牌不在手
+  // 8. validate 拒绝:牌不在手
   // ─────────────────────────────────────────────────────────────
   it('出不在手牌的决斗 → 被拒绝', async () => {
     const state = buildState({ p1Hand: [] });
