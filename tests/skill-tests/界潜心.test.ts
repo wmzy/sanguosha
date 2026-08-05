@@ -184,7 +184,10 @@ describe('界潜心', () => {
         makePlayer({
           index: 0,
           name: 'P0',
-          health: 3,
+          // 关键:初始 2/4。觉醒后上限 4→3、体力 clamp 为 2 → 2/3(仍受伤),
+          // 这样第二次造成伤害时不会被"未受伤(health>=maxHealth)"条件掩盖,
+          // 只能靠"已觉醒"标记阻止——真正验证觉醒技"整局一次"。
+          health: 2,
           maxHealth: 4,
           skills: ['界潜心'],
         }),
