@@ -19,7 +19,7 @@ import '../../src/engine/skills';
 import { applyAtom } from '../../src/engine/index';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import { slashMax, slashUsed } from '../../src/engine/slash-quota';
+import { slashMax, slashUsed, canSlash } from '../../src/engine/slash-quota';
 import { handLimit } from '../../src/engine/hand-limit';
 import type { Card, GameState } from '../../src/engine/types';
 
@@ -67,8 +67,9 @@ describe('界将驰', () => {
     harness = new SkillTestHarness();
   });
 
-  // ─── 选项①:摸一张牌 + 杀次数-1(阻断)+ 杀不计入手牌上限 ────────────
-  it('选项①:摸一张牌,本回合不能出杀,杀不计入手牌上限', async () => {
+  // ─── 选项①:摸一张牌 + 杀次数-1(阻断) ────────────
+  // 注:杀不计入手牌上限由后续用例(handLimit)单独覆盖。
+  it('选项①:摸一张牌,本回合不能出杀(blocker 阻断)', async () => {
     const d1 = makeCard('d1', '桃', '♥', '3');
     const state: GameState = createGameState({
       players: [
@@ -98,18 +99,13 @@ describe('界将驰', () => {
     expect(harness.state.players[0].hand).toContain('d1');
     expect(harness.state.turn.vars['将驰/choice1']).toBe(0);
 
-    // 杀次数-1:canSlash=false(默认基础1→0)
+    // 杀次数-1:选项①激活后 blocker 阻断,canSlash=false(等效基础 1→0)。
+    //   直接断言 blocker 状态而非 use 派发拒绝:本用例处于摸牌阶段(触发时机),
+    //   use 派发会被"非出牌阶段"基线校验(validateUseCard)提前拒绝,无法证明阻断生效;
+    //   出杀的端到端拒绝(出牌阶段)由"连弩"用例覆盖。
     expect(slashMax(harness.state, 0)).toBe(1); // 基础上限不变(blocker 独立)
     expect(slashUsed(harness.state)).toBe(0);
-    // 验证阻断:模拟杀牌出杀应被拒
-    const slash = makeCard('s1', '杀', '♠', '7');
-    harness.state.cardMap['s1'] = slash;
-    harness.state.players[0].hand.push('s1');
-    await P0.expectRejected({
-      skillId: '杀',
-      actionType: 'use',
-      params: { cardId: 's1', targets: [1] },
-    });
+    expect(canSlash(harness.state, 0)).toBe(false); // 阻断生效
   });
 
   // ─── 选项①杀不计入手牌上限:验证 handLimit 把杀牌加回 ────────────
@@ -118,6 +114,9 @@ describe('界将驰', () => {
     const s1 = makeCard('s1', '杀', '♠', '7');
     const s2 = makeCard('s2', '杀', '♥', '8');
     const s3 = makeCard('s3', '杀', '♣', '9');
+    // 选项①会摸一张牌;显式置顶一张非杀(闪),确保摸牌后手牌杀数仍为 3。
+    // 否则 deck 为空时 harness 会自动填充 20 张测试牌(含杀),handLimit 不可控。
+    const t1 = makeCard('t1', '闪', '♥', '5');
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -130,8 +129,8 @@ describe('界将驰', () => {
         }),
         makePlayer({ index: 1, name: 'P1', character: '曹操' }),
       ],
-      cardMap: { s1, s2, s3 },
-      zones: { deck: [], discardPile: [], processing: [] },
+      cardMap: { s1, s2, s3, t1 },
+      zones: { deck: ['t1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '摸牌',
       turn: { round: 1, phase: '摸牌', vars: {} },
@@ -205,7 +204,8 @@ describe('界将驰', () => {
 
   // ─── 选项②杀无距离限制:预置 turn.vars,3 人座次跨距出杀 ────────────
   it('选项②:杀无距离限制(可对超距目标出杀)', async () => {
-    // 3 人座次,无武器时 P0 攻击范围=1,P2(距离 2)超距
+    // 4 人座次,无武器时 P0 攻击范围=1,P2(对位距离 2)超距。
+    //   注:3 人环形座次任意两座距离均为 1,无法构造超距目标,故需 4 人。
     // 预置 turn.vars['将驰/choice2']=0 模拟选项②已发动
     const slash = makeCard('s1', '杀', '♠', '7');
     const state: GameState = createGameState({
@@ -218,6 +218,7 @@ describe('界将驰', () => {
         }),
         makePlayer({ index: 1, name: 'P1', character: '曹操' }),
         makePlayer({ index: 2, name: 'P2', character: '刘备' }),
+        makePlayer({ index: 3, name: 'P3', character: '孙权' }),
       ],
       cardMap: { s1: slash },
       zones: { deck: [], discardPile: [], processing: [] },
