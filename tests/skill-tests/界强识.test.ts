@@ -74,31 +74,45 @@ interface BuildOpts {
   round?: number;
   extraCards?: Record<string, Card>;
   deck?: string[];
+  p2Hand?: string[];
 }
 
 function buildState(opts: BuildOpts = {}): GameState {
+  const players: GameState['players'] = [
+    makePlayer({
+      index: 0,
+      name: '界张松',
+      character: '界张松',
+      health: 3,
+      maxHealth: 3,
+      alive: opts.p0Alive ?? true,
+      hand: opts.p0Hand ?? [],
+      skills: ['界强识'],
+    }),
+    makePlayer({
+      index: 1,
+      name: 'P1',
+      character: '曹操',
+      health: 4,
+      maxHealth: 4,
+      alive: opts.p1Alive ?? true,
+      hand: opts.p1HasHand === false ? [] : (opts.p1Hand ?? []),
+    }),
+  ];
+  // 可选第三人(P2):仅在传入 p2Hand 时加入(用于"无手牌目标"等边界)
+  if (opts.p2Hand !== undefined) {
+    players.push(
+      makePlayer({
+        index: 2,
+        name: 'P2',
+        character: 'P2',
+        alive: true,
+        hand: opts.p2Hand,
+      }),
+    );
+  }
   return createGameState({
-    players: [
-      makePlayer({
-        index: 0,
-        name: '界张松',
-        character: '界张松',
-        health: 3,
-        maxHealth: 3,
-        alive: opts.p0Alive ?? true,
-        hand: opts.p0Hand ?? [],
-        skills: ['界强识'],
-      }),
-      makePlayer({
-        index: 1,
-        name: 'P1',
-        character: '曹操',
-        health: 4,
-        maxHealth: 4,
-        alive: opts.p1Alive ?? true,
-        hand: opts.p1HasHand === false ? [] : (opts.p1Hand ?? []),
-      }),
-    ],
+    players,
     cardMap: opts.extraCards ?? {},
     zones: { deck: opts.deck ?? [], discardPile: [], processing: [] },
     currentPlayerIndex: opts.currentPlayer ?? 0,
@@ -332,7 +346,34 @@ describe('界强识(OL 界限突破版)', () => {
     expect(harness.state.pendingSlots.size).toBe(0);
   });
 
-  // ─── 9. 阶段结束 → 清除类别 ─────────
+  // ─── 8b. 非自己回合(他人出牌阶段)使用同类别牌 → 不触发 ─────────
+  // (补全注释项 8 "非自己回合"分支:移动牌 hook 第一个守卫 currentPlayerIndex!==owner)
+  it('非自己回合(他人出牌阶段)使用同类别牌 → 不触发摸牌', async () => {
+    const p0Card = makeCard('p0s', '杀', '♠', '2', '基本牌');
+    const p1Card = makeCard('p1s', '杀', '♠', 'A', '基本牌');
+    const state = buildState({
+      p0Hand: ['p0s'],
+      p1Hand: ['p1s'],
+      extraCards: { p0s: p0Card, p1s: p1Card },
+      deck: [],
+      currentPlayer: 1, // P1 回合(非 owner)
+      phase: '出牌',
+    });
+    // 直接预置类别(模拟上阶段已记录),当前为他人出牌阶段
+    state.players[0].vars['界强识/category'] = '基本牌';
+    await harness.setup(state);
+
+    void applyAtom(harness.state, {
+      type: '移动牌',
+      cardId: 'p0s',
+      from: { zone: '手牌', player: 0 },
+      to: { zone: '弃牌堆' },
+    });
+    await harness.waitForStable();
+    expect(harness.state.pendingSlots.size).toBe(0);
+  });
+
+  // ─── 9. 阶段结束(出牌)→ 清除类别记录 ─────────
   it('阶段结束(出牌)→ 清除类别记录', async () => {
     const p0Card = makeCard('p0s', '杀', '♠', '2', '基本牌');
     const p1Card = makeCard('p1s', '杀', '♠', 'A', '基本牌');
@@ -382,6 +423,29 @@ describe('界强识(OL 界限突破版)', () => {
       skillId: '界强识',
       actionType: 'respond',
       params: { target: 0 },
+    });
+  });
+
+  // ─── 10b. 选无手牌角色为目标 → 拒绝 ─────────
+  // (补全注释项 10 "选目标无手牌 → 拒绝"分支:TARGET_RT 校验 hand.length===0)
+  it('选无手牌角色为目标 → 拒绝', async () => {
+    const p1Card = makeCard('p1s', '杀');
+    const state = buildState({
+      p1Hand: ['p1s'],
+      p2Hand: [], // P2 无手牌(但 P1 有手牌,故仍可询问发动)
+      extraCards: { p1s: p1Card },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('界张松');
+
+    await triggerPlayPhaseStart(harness, 0);
+    await P0.respond('界强识', { choice: true });
+    await harness.waitForStable();
+    // 选目标=P2(无手牌)→ 拒绝
+    await P0.expectRejected({
+      skillId: '界强识',
+      actionType: 'respond',
+      params: { target: 2 },
     });
   });
 
