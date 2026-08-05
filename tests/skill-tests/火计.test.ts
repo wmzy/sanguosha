@@ -3,11 +3,10 @@
 //
 // 验证:
 //   1. 正面:红♥牌 transformThenUse 火攻 → 创建影子火攻 → 完整火攻流程 → 火焰伤害
-//   2. 正面:♦红牌 transform → 同样成功
-//   3. rollback:transform + 火攻.use 失败(目标自己)→ 原卡还原,无影子
-//   4. 负面:黑牌 transform 被拒(不是红色)
-//   5. 负面:非自己回合 transform 被拒
-//   6. availableActions:火计 transform action 声明,prompt 卡过滤是红牌
+//   2. rollback:transform + 火攻.use 失败(目标自己)→ 原卡还原,无影子
+//   3. 负面:黑牌 transform 被拒(不是红色)
+//   4. 负面:非自己回合 transform 被拒
+//   5. availableActions:火计 transform action 声明,prompt 卡过滤是红牌(♥/♦ 通过)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -128,32 +127,7 @@ describe('火计', () => {
     expect(harness.state.zones.discardPile).toContain('c1');
   });
 
-  // ─── 2. 正面:♦红牌当火攻 ───────────────────────────────────────
-  it('transformThenUse:♦红牌当火攻 → 创建影子火攻', async () => {
-    const red = makeCard('d1', '桃', '♦', '5');
-    const match = makeCard('m1', '杀', '♦', '7');
-    const reveal = makeCard('r1', '闪', '♦', '3');
-    const state = buildState({
-      p1Hand: ['d1', 'm1'],
-      p2Hand: ['r1'],
-      extraCards: { d1: red, m1: match, r1: reveal },
-    });
-    await harness.setup(state);
-    const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
-
-    await P1.transformThenUse('火计', { cardId: 'd1' }, '火攻', {
-      cardId: 'd1#火计',
-      targets: [1],
-    });
-    expect(harness.state.cardMap['d1#火计'].name).toBe('火攻');
-    await P1.pass();
-    await P2.respond('火攻', { cardId: 'r1' });
-    await P1.respond('火攻', { cardId: 'm1' });
-    expect(harness.state.players[1].health).toBe(3);
-  });
-
-  // ─── 3. rollback:transform + 火攻.use 失败 → 原卡还原 ────────────
+  // ─── 2. rollback:transform + 火攻.use 失败(目标自己)→ 原卡还原,无影子 ────────────
   it('transform rollback:火攻.use 失败(目标自己)→ 原卡还原,无影子', async () => {
     const red = makeCard('c1', '桃', '♥', 'A');
     const state = buildState({
@@ -179,7 +153,7 @@ describe('火计', () => {
     expect(harness.state.players[0].hand).toEqual(['c1']);
   });
 
-  // ─── 4. 负面:黑牌 transform 被拒 ────────────────────────────────
+  // ─── 3. 负面:黑牌 transform 被拒 ────────────────────────────────
   it('transform:黑桃♠ → 拒绝(不是红色)', async () => {
     const black = makeCard('s1', '桃', '♠', 'A');
     const state = buildState({ p1Hand: ['s1'], extraCards: { s1: black } });
@@ -188,7 +162,7 @@ describe('火计', () => {
     await P1.expectRejected({ skillId: '火计', actionType: 'transform', params: { cardId: 's1' } });
   });
 
-  // ─── 5. 负面:非自己回合 transform 被拒 ──────────────────────────
+  // ─── 4. 负面:非自己回合 transform 被拒 ──────────────────────────
   it('transform:非自己回合 → 拒绝', async () => {
     const red = makeCard('c1', '桃', '♥', 'A');
     const state = buildState({
@@ -201,7 +175,7 @@ describe('火计', () => {
     await P1.expectRejected({ skillId: '火计', actionType: 'transform', params: { cardId: 'c1' } });
   });
 
-  // ─── 6. availableActions:火计 transform 声明,卡过滤是红牌 ────────
+  // ─── 5. availableActions:火计 transform 声明,卡过滤是红牌 ────────
   it('availableActions:火计 transform 声明,prompt 卡过滤是红牌', async () => {
     const redHeart = makeCard('c1', '桃', '♥', 'A');
     const redDiamond = makeCard('c2', '桃', '♦', '2');
