@@ -63,11 +63,10 @@ describe('屯田', () => {
 
   // ─── 端到端:非红桃 → 加田 + 距离修正 ────────────────────
   it('回合外被获得牌 → 判定非红桃 → 加田标记 + 距离修正', async () => {
-    // 注:auto-compare 仍关闭,但原因已变(本任务修复的 distanceVars desync 已解决,见下方
-    // expectView 断言)。仍关闭是因为一个独立的、不在本 diffText 范围内的预存 desync:
-    // 「判定」atom 的 applyView 假设判定牌必然进弃牌堆(discardPileCount+1),但屯田会把
-    // 判定牌拿作"田"(不经 atom),导致 processedView.discardPileCount 比 buildView 多 1。
-    // 该 discardPile desync 属判定 atom 与屯田拿牌机制的交互问题,非本任务(distanceVars)范围。
+    // 注:auto-compare 必须关闭:屯田把判定牌拿作"田"(不经 atom),而「判定」atom 的
+    // applyView 假设判定牌必然进弃牌堆(discardPileCount+1),导致 processedView.discardPileCount
+    // 比 buildView 多 1(实测:期望 0,实际 1)。该 desync 属判定 atom 与屯田拿牌机制的交互,
+    // 与 distanceVars 通道无关;故下方 expectView 仅断言 distanceVars 单字段,绕开该 desync。
     const restoreAutoCompare = disableAutoCompare();
 
     const p0card = makeCard('p0c', '杀', '♠', '5');
@@ -114,8 +113,7 @@ describe('屯田', () => {
     // 判定牌不在弃牌堆(被拿出作为田)
     expect(harness.state.zones.discardPile).not.toContain('j1');
 
-    // ── 关键(本任务修复点):processedView 的 distanceVars 现在实时同步(经「加标记」
-    //    atom 的 distanceVars 通道)——修复了「vars 变更不经 atom、view 不同步」的限制。
+    // ── 关键:processedView 的 distanceVars 经「加标记」atom 的 distanceVars 通道实时同步。
     P0.expectView((v) => {
       expect(v.players[0].distanceVars?.attackMod).toBe(1);
     });
@@ -280,7 +278,7 @@ describe('屯田', () => {
     ).toBe(2);
     expect(harness.state.players[0].vars['距离/进攻修正']).toBe(2);
 
-    // ── 关键(本任务修复点):processedView 的 distanceVars 同步叠加到 2
+    // ── 关键:processedView 的 distanceVars 叠加同步到 2
     P0.expectView((v) => {
       expect(v.players[0].distanceVars?.attackMod).toBe(2);
     });
@@ -289,7 +287,7 @@ describe('屯田', () => {
   });
 
   // ─── 隔离验证:加标记 atom 的 distanceVars 通道(auto-compare 开启)─────
-  // 屯田端到端流程中存在一个独立的、不在本 diffText 范围内的预存 desync:
+  // 屯田端到端流程中存在一个独立的预存 desync:
   // 「判定」atom 的 applyView 假设判定牌必然进弃牌堆,但屯田把判定牌拿作"田",
   // 导致 discardPileCount 不一致——故端到端用例必须关闭 auto-compare。
   // 此用例绕开判定流程,直接走「加标记」atom + distanceVars 通道,auto-compare 全开,
