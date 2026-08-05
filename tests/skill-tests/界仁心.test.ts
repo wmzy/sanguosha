@@ -12,6 +12,7 @@
 //   5. 端到端:confirm=false → 不发动,P1 继续濒死求桃(P2 不弃牌不翻面)
 //   6. 端到端:P2 无装备牌 → 不询问仁心(P2 视角无 pending)
 //   7. 端到端:P2 装备区的装备牌可被弃(非仅手牌中的装备牌)
+//   8. 端到端:多个装备候选 → 询问选牌(selectCard)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
