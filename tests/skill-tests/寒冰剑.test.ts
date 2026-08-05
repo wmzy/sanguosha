@@ -223,7 +223,7 @@ describe('寒冰剑', () => {
           index: 0,
           name: 'P1',
           hand: ['k1'],
-          skills: ['杀'], // 无寒冰剑技能
+          skills: ['杀', '寒冰剑'], // 有寒冰剑技能但未装备武器
         }),
         makePlayer({
           index: 1,
@@ -244,7 +244,7 @@ describe('寒冰剑', () => {
     await P1.useCardAndTarget('杀', 'k1', [1]);
     await P2.pass(); // 不出闪
 
-    // 无寒冰剑 → 正常扣血
+    // 有技能但无武器装备 → hook 在 !weaponId 处提前 return,不创建 confirm,正常扣血
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.pendingSlots.size).toBe(0);
   });
