@@ -302,6 +302,59 @@ describe('界救援', () => {
     expect(harness.state.zones.deck).toEqual(['draw1']);
   });
 
+  // ─── 边界:回复者体力 == 孙权体力(≥ 的等号边界)→ 仍触发 ────────
+  // 描述为「其体力值大于等于你」,实现用 `healer.health < sunquan.health` 才跳过,
+  // 故相等(==)应触发。防御 `<` 被误改为 `<=` 的回归。
+
+  it('回复者体力 == 孙权体力 → 界救援仍触发(≥ 的等号边界)', async () => {
+    const draw = makeCard('draw1', '杀', '♠', '3');
+    const state: GameState = createGameState({
+      players: [
+        // P0 = 界孙权(主公位 0,吴),体力 2
+        makePlayer({
+          index: 0,
+          name: '界孙权',
+          character: '界孙权',
+          health: 2,
+          maxHealth: 4,
+          skills: ['界救援'],
+          faction: '吴',
+        }),
+        // P1 = 甘宁(吴),体力 2 == 孙权 2(等号边界),救援者
+        makePlayer({
+          index: 1,
+          name: '甘宁',
+          character: '甘宁',
+          health: 2,
+          maxHealth: 4,
+          skills: [],
+          faction: '吴',
+        }),
+      ],
+      cardMap: { draw1: draw },
+      zones: { deck: ['draw1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 1, // 甘宁的回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('甘宁');
+
+    // 甘宁(吴)在其回合内回复体力,体力(2)==孙权(2)→ 触发界救援询问
+    void applyAtom(harness.state, { type: '回复体力', target: 1, amount: 1, source: 1 });
+    await harness.waitForStable();
+
+    P1.expectPending('请求回应');
+    await P1.respond('界救援', { choice: true });
+    await harness.waitForStable();
+
+    // 确认 → 孙权回1血 2→3;甘宁摸1张;甘宁原回复被替代→保持 2
+    expect(harness.state.players[0].health).toBe(3);
+    expect(harness.state.players[1].hand).toEqual(['draw1']);
+    expect(harness.state.players[1].health).toBe(2);
+    expect(harness.state.zones.deck).toEqual([]);
+  });
+
   // ─── 界孙权非主公(座次≠0) → 不触发 ──────────────────
 
   it('界孙权不在主公位 → 界救援不触发(主公技限制)', async () => {
