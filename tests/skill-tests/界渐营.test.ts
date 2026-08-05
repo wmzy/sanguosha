@@ -5,8 +5,8 @@
 //   若你于本阶段使用的上一张牌有花色,则此牌的花色视为与上一张牌的花色相同。
 //
 // 用例:
-//   1. 同花色:杀♠7 → 桃♠3(自伤 P0)→ 询问 → 确认 → 摸一张
-//   2. 同点数:杀♠3 → 桃♥3(自伤 P0)→ 询问摸牌
+//   1. 同花色:杀♠7 → 桃♠3(自回血 P0)→ 询问 → 确认 → 摸一张
+//   2. 同点数:杀♠3 → 桃♥3(自回血 P0)→ 询问摸牌
 //   3. 不同花色点数:不询问
 //   4. 阶段首张牌:无"上一张",不询问
 //   5. 拒绝摸牌:不摸牌,但"上一张牌"仍更新
@@ -99,7 +99,7 @@ describe('界渐营', () => {
     harness = new SkillTestHarness();
   });
 
-  // ─── 1. 同花色:杀♠7 → 桃♠3(自伤 P0)→ 询问 → 确认 → 摸一张 ────
+  // ─── 1. 同花色:杀♠7 → 桃♠3(自回血 P0)→ 询问 → 确认 → 摸一张 ────
   it('同花色(♠→♠):询问 → 确认 → 摸一张', async () => {
     const c1 = makeCard('c1', '杀', '♠', '7');
     const c2 = makeCard('c2', '桃', '♠', '3');
@@ -163,8 +163,8 @@ describe('界渐营', () => {
     P0.expectPending('请求回应');
     await P0.respond('界渐营', { choice: true });
 
-    // 渐营触发 → 摸 1 张;桃用掉 -1 + 摸 1 = 净 0(初始 2 张)
-    expect(harness.state.players[0].hand.length).toBe(1); // 2 - 用桃 + 摸 1 = 2... 实际杀用掉 1 + 桃用掉 1 + 摸 1 = 1
+    // 渐营触发摸 1:初始 2 - 杀 - 桃 + 摸 = 1
+    expect(harness.state.players[0].hand.length).toBe(1);
   });
 
   // ─── 3. 不同花色点数:不询问,"上一张"仍更新 ────────────────────
@@ -281,6 +281,8 @@ describe('界渐营', () => {
       await P0.useCardAndTarget('杀', 'c2', [1]);
       P0.expectPending('请求回应');
       await P0.respond('界渐营', { choice: true });
+      // P1 不出闪,杀命中结算(与其它用例一致,完整结算杀)
+      await harness.player(1).pass();
 
       expect(lastSuit(harness.state)).toBe('♣');
       expect(lastRank(harness.state)).toBe('5');
