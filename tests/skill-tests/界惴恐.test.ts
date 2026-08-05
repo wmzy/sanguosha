@@ -11,7 +11,7 @@
 //   6. owner 拒绝发动 → 不触发
 //   7. owner 无手牌 → 不触发
 //   8. 目标无手牌 → 不触发
-//   9. owner 赢 → 目标可对自己使用桃(允许)
+//   9. owner 赢 → owner 不受限制(可对目标指定)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -490,9 +490,10 @@ describe('界惴恐', () => {
     // owner 赢 → P1 被限制;owner 不被限制
     expect(harness.state.players[1].vars['界惴恐/restricted/usedThisTurn']).toBe(true);
     expect(harness.state.players[0].vars['界惴恐/restricted/usedThisTurn']).toBeUndefined();
-    // owner(未受限)对 P1 指定 → 允许
+    // owner(未受限)对 P1 出牌(成为目标)→ 允许。限制 hook 挂在「成为目标」
+    // (指定目标 是声明阶段无副作用标记,不触发限制 hook),故此处用 成为目标 才能真正验证 owner 未受限。
     const r = await applyAtom(harness.state, {
-      type: '指定目标',
+      type: '成为目标',
       source: 0,
       target: 1,
       cardId: 'c1',
