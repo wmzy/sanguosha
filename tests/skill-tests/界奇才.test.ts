@@ -14,7 +14,7 @@
 //   5. 关键:过河拆桥不能弃界黄月英的防具
 //   6. 关键(界版新增):过河拆桥不能弃界黄月英的宝物
 //   7. 边界:过河拆桥仍可弃界黄月英的武器(未受保护)
-//   8. 边界:过河拆桥仍可弃界黄月英的手牌
+//   8. 边界:过河拆桥目标仅防具+宝物(均受保护)且无手牌 → 使用被拒(无可弃牌)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
