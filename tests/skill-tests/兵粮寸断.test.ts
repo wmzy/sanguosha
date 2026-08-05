@@ -169,13 +169,15 @@ describe('兵粮寸断', () => {
     state.zones = { deck: [], discardPile: [], processing: [] };
     await harness.setup(state);
 
-    const handBefore = harness.state.players[1].hand.length;
+    // 标签存在 → 阶段开始(摸牌) before-hook(skipPhase):去标签 + 阶段结束(摸牌)推进 + cancel
     await applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '摸牌' });
 
-    // 标签被清除
+    // 标签被清除(skipPhase 内 去标签)
     expect(harness.state.players[1].tags?.includes('兵粮寸断/跳过摸牌')).toBe(false);
-    // 手牌没增加(被跳过)
-    expect(harness.state.players[1].hand.length).toBe(handBefore);
+    // 摸牌阶段被 cancel 并推进到出牌:直接 apply 阶段开始(摸牌)不经 阶段结束,本身不会摸牌
+    //   (摸牌实际由 阶段结束 的 after-hook 执行,本测试不进入该路径),
+    //   故以「阶段已推进到出牌」证明 skipPhase 生效——否则阶段仍停在摸牌
+    expect(harness.state.phase).toBe('出牌');
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -206,6 +208,67 @@ describe('兵粮寸断', () => {
       actionType: 'use',
       params: { cardId: 'b1', target: 2 },
     });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 5b. validate 拒绝:对自己使用(延时锦囊不可置入自己判定区)
+  // ─────────────────────────────────────────────────────────────
+  it('validate 拒绝:对自己使用(延时锦囊不可置入自己判定区)', async () => {
+    const card = makeCard('b1', '兵粮寸断', '♣');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['b1'], skills: ['兵粮寸断', '回合管理'] }),
+        makePlayer({ index: 1, name: 'P2', skills: ['回合管理'] }),
+      ],
+      cardMap: { b1: card },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    const P1 = harness.player('P1');
+    await P1.expectRejected({
+      skillId: '兵粮寸断',
+      actionType: 'use',
+      params: { cardId: 'b1', target: 0 },
+    });
+    // 被拒绝:延时锦囊未置入自己判定区、手牌未消耗
+    expect(harness.state.players[0].pendingTricks.length).toBe(0);
+    expect(harness.state.players[0].hand).toContain('b1');
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 5c. validate 拒绝:目标判定区已有兵粮寸断(同名不可叠加)
+  // ─────────────────────────────────────────────────────────────
+  it('validate 拒绝:目标判定区已有兵粮寸断(不可叠加)', async () => {
+    const card = makeCard('b1', '兵粮寸断', '♣');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['b1'], skills: ['兵粮寸断', '回合管理'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          skills: ['回合管理'],
+          pendingTricks: [{ name: '兵粮寸断', source: 0, card }],
+        }),
+      ],
+      cardMap: { b1: card },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    const P1 = harness.player('P1');
+    await P1.expectRejected({
+      skillId: '兵粮寸断',
+      actionType: 'use',
+      params: { cardId: 'b1', target: 1 },
+    });
+    // 被拒绝:判定区仍只有 1 张,使用者手牌未消耗
+    expect(harness.state.players[1].pendingTricks.length).toBe(1);
+    expect(harness.state.players[0].hand).toContain('b1');
   });
 
   // ─────────────────────────────────────────────────────────────
