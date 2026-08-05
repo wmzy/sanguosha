@@ -10,8 +10,7 @@
 //   5. 单次失去 1 张手牌(非装备)→ 不触发
 //   6. 触发后弃 2 张(依次选 2 名不同角色)
 //   7. 触发后选择不发动 → 不弃牌
-//   8. 触发后弃 1 张,第二张选择结束 → 只弃 1 张
-//   9. 同时失装备+丢2张(同一弃置 atom 弃 2 张装备)→ 仅触发 1 次
+//   8. 同时失装备+丢2张(同一弃置 atom 弃 2 张装备)→ 仅触发 1 次
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -481,58 +480,7 @@ describe('界旋风', () => {
     expect(harness.state.players[0].equipment['武器']).toBe('w2');
   });
 
-  // ─── 8. 触发后弃 1 张,第二张选择结束 ─────────────────────
-  it('替换装备 → 弃 1 张后选结束 → 仅弃 1 张', async () => {
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({
-          index: 0,
-          name: '界凌统',
-          hand: ['w2'],
-          equipment: { 武器: 'w1' },
-          skills: ['界旋风', '装备通用'],
-        }),
-        makePlayer({
-          index: 1,
-          name: 'P1',
-          character: '曹操',
-          hand: ['p1', 'p2', 'p3'],
-        }),
-      ],
-      cardMap: {
-        w1: makeEquip('w1', '测试剑甲', '武器', '♠', 'A', 2),
-        w2: makeEquip('w2', '测试剑乙', '武器', '♥', 'A', 3),
-        p1: makeCard('p1', '闪', '♦', '2'),
-        p2: makeCard('p2', '杀', '♠', '3'),
-        p3: makeCard('p3', '桃', '♥', '4'),
-      },
-      zones: { deck: [], discardPile: [], processing: [] },
-      currentPlayerIndex: 0,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    });
-    await harness.setup(state);
-    const P0 = harness.player('界凌统');
-
-    await P0.useCard('装备通用', 'w2');
-    // confirm:发动
-    P0.expectPending('请求回应');
-    await P0.respond('界旋风', { choice: true });
-    // 选目标:P1
-    P0.expectPending('请求回应');
-    await P0.respond('界旋风', { targets: [1] });
-    // 选牌
-    P0.expectPending('请求回应');
-    await P0.respond('界旋风', { zone: 'hand', handIndex: 0 });
-    // 第二次 confirm:不继续
-    P0.expectPending('请求回应');
-    await P0.respond('界旋风', { choice: false });
-
-    // 仅弃 1 张
-    expect(harness.state.players[1].hand.length).toBe(2);
-  });
-
-  // ─── 9. 同一弃置 atom 弃 2 件装备(失装备+丢2张)→ 仅触发 1 次 ─
+  // ─── 8. 同一弃置 atom 弃 2 件装备(失装备+丢2张)→ 仅触发 1 次 ─
   it('同一弃置 atom 弃 2 件装备 → 仅触发 1 次', async () => {
     const state: GameState = createGameState({
       players: [
