@@ -3,11 +3,12 @@
 //     1. 盟友拼点没赢 → 孙策获得两张拼点牌
 //     2. 盟友拼点赢 → 双方牌进弃牌堆
 //     3. 觉醒后孙策拒绝 → 中止
+//     4. 盟友主动发起限一次
 //   方向 B(孙策发起,界新增):
-//     4. 孙策主动发起,孙策没赢 → 孙策可获得两张拼点牌
-//     5. 孙策主动发起,孙策赢 → 双方牌进弃牌堆
-//     6. 孙策主动发起限一次
-//     7. 非吴势力角色不能作为孙策主动拼点目标
+//     5. 孙策主动发起,孙策没赢 → 孙策可获得两张拼点牌
+//     6. 孙策主动发起,孙策赢 → 双方牌进弃牌堆
+//     7. 孙策主动发起限一次
+//     8. 非吴势力角色不能作为孙策主动拼点目标
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -170,6 +171,56 @@ describe('界孙策·界制霸', () => {
     expect(harness.state.pendingSlots.size).toBe(0);
     expect(harness.state.players[0].hand).toEqual(['lc']);
     expect(harness.state.players[1].hand).toEqual(['ac']);
+  });
+
+  it('方向A:盟友主动发起限一次', async () => {
+    // 孙策、盟友各持两张,保证第二次仍越过「孙策无手牌」校验,
+    // 使拒绝确由 盟友 vars['界制霸/usedThisTurn'] 触发(同标制霸限一次)。
+    const ac = mkCard('ac', '2');
+    const ac2 = mkCard('ac2', '3');
+    const lc = mkCard('lc', 'K');
+    const lc2 = mkCard('lc2', 'Q');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界孙策',
+            faction: '吴',
+            skills: ['界激昂', '界魂姿', '界制霸'],
+            hand: ['lc', 'lc2'],
+          }),
+          mkPlayer({
+            index: 1,
+            name: '盟友',
+            faction: '吴',
+            skills: [],
+            hand: ['ac', 'ac2'],
+          }),
+        ],
+        cardMap: { ac, ac2, lc, lc2 },
+        currentPlayerIndex: 1, // 盟友的回合
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const SC = harness.player('界孙策');
+    const ally = harness.player('盟友');
+
+    // 第一次:盟友发起拼点,孙策选拼点牌后不获得 → 牌进弃牌堆
+    await ally.triggerAction('界制霸', 'use', { cardId: 'ac' });
+    SC.expectPending('请求回应');
+    await SC.respond('界制霸', { cardId: 'lc' });
+    SC.expectPending('请求回应');
+    await SC.respond('界制霸', { choice: false }); // 不获得,牌进弃牌堆
+    await harness.waitForStable();
+
+    // 第二次:本回合盟友已用过制霸,应被拒
+    await ally.expectRejected({
+      skillId: '界制霸',
+      actionType: 'use',
+      params: { cardId: 'ac2' },
+    });
   });
 
   // ─── 方向 B:孙策主动发起(界新增)───
