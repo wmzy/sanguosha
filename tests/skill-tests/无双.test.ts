@@ -5,6 +5,7 @@
 // 覆盖:
 //   杀·正面:两张闪抵消 / 一张闪受伤 / 无闪受伤
 //   杀·负面:非吕布出杀,一张闪即可抵消(无双不生效)
+//   杀·边界:无双仅对杀生效 —— 吕布出万箭齐发,一张闪即抵消(无双不触发双闪)
 //   决斗·正面:吕布发起决斗,对方需双杀 / 吕布被决斗,发起者需双杀
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
@@ -195,6 +196,56 @@ describe('无双', () => {
     expect(harness.state.players[1].health).toBe(p2HealthBefore);
     expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['c1', 'd1']));
     expect(harness.state.zones.processing).toEqual([]);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 杀·边界:无双仅对【杀】生效 —— 万箭齐发同样使用询问闪,但无双不应触发双闪
+  //   实现依据(无双.ts): 询问闪 after-hook 检查「结算帧栈顶牌名===杀」,万箭齐发牌名≠杀 → 直接 return。
+  // ─────────────────────────────────────────────────────────────
+
+  it('吕布出万箭齐发 → 目标一张闪即可抵消(无双不追加第二轮)', async () => {
+    const wj1 = makeCard('wj1', '万箭齐发', '♥', 'A', '锦囊牌');
+    const d1 = makeCard('d1', '闪', '♥', '2');
+    const d2 = makeCard('d2', '闪', '♥', '3');
+    const state = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          character: '吕布',
+          hand: ['wj1'],
+          skills: ['万箭齐发', '杀', '无双'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: ['d1', 'd2'],
+          skills: ['闪'],
+        }),
+      ],
+      cardMap: { wj1, d1, d2 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    const p2HealthBefore = harness.state.players[1].health;
+
+    await P1.useCardAndTarget('万箭齐发', 'wj1', []);
+    // 无懈可击窗口
+    await P1.pass();
+
+    // 目标出一张闪即可抵消(无双不追加第二轮询问闪)
+    P2.expectPending('询问闪');
+    await P2.respond('闪', { cardId: 'd1' });
+
+    // 万箭齐发已结算完成:d2 未被打出(仍在手牌)、无双未触发第二轮
+    expect(harness.state.players[1].health).toBe(p2HealthBefore);
+    expect(harness.state.players[1].hand).toContain('d2');
+    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['wj1', 'd1']));
   });
 
   // ─────────────────────────────────────────────────────────────
