@@ -285,16 +285,16 @@ describe('桃', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    // P0 对 P1 出杀
+    // P1(idx0) 对 P2(idx1) 出杀
     await P1.useCardAndTarget('杀', 'c1', [1]);
-    // P1 询问闪 → P1 不闪(P1 手牌只有桃,没闪)
+    // P2 被询问闪 → P2 不闪(手牌只有桃,没闪)
     await P2.pass();
-    // 扣血: P1 HP=0 → 触发濒死 → 求桃 pending
+    // 扣血: P2 HP=0 → 触发濒死 → 求桃 pending
     expect(harness.state.players[1].health).toBe(0);
     // 验证 pending 存在
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
 
-    // 模块 C:逆时针从当前回合 P1(idx0)起 → P1 先被问(打出杀后无手牌)→ pass
+    // 模块 C:逆时针从当前回合 P1(idx0)起 → P1 先被问(手牌仅剩闪,无桃可救)→ pass
     let slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
       type?: string;
       requestType?: string;
@@ -313,11 +313,8 @@ describe('桃', () => {
     };
     const dyingTarget = slotAtom.target!;
     await P2.respond('桃', { cardId: 'p1' });
-    // 救回(由濒死者或被询问者出桃)
-    // 血量 +1
-    if (state.players[dyingTarget].health > 0) {
-      expect(state.players[dyingTarget].health).toBe(1);
-    }
+    // 救回(由濒死者或被询问者出桃)→ 血量 +1(0 → 1)
+    expect(state.players[dyingTarget].health).toBe(1);
     // 桃进弃牌堆
     expect(harness.state.zones.discardPile).toContain('p1');
     // view 级断言
