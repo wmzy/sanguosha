@@ -3,7 +3,7 @@
 //   2. 回合开始 → 不获得杀 → 结束额外阶段(未造成伤害)→ 自伤1点
 //   3. 当先杀无距离限制:目标超出攻击范围仍可指定
 //   4. 触发条件不满足:其他玩家的回合开始不触发 owner 的当先
-//   5. 额外阶段内 owner 主动 end → 自伤检查执行
+//   5. 从弃牌堆获取杀(来源选择=弃牌堆)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -70,7 +70,8 @@ describe('界当先', () => {
     const restoreAutoCompare = disableAutoCompare();
     // 牌堆顶一张杀(供当先获取)
     const deckKill = mkCard('dk1', '杀', '♠', '7');
-    // P1(目标)手中无闪,会被杀命中
+    // P1(目标)手中一张闪,被询问后选择不闪 → 被杀命中
+    const p1Dodge = mkCard('dg1', '闪', '♥', '3');
     await harness.setup(
       createGameState({
         players: [
@@ -87,10 +88,11 @@ describe('界当先', () => {
             index: 1,
             name: 'P1',
             faction: '魏',
+            hand: ['dg1'],
             skills: ['闪', '回合管理'],
           }),
         ],
-        cardMap: { dk1: deckKill },
+        cardMap: { dk1: deckKill, dg1: p1Dodge },
         zones: { deck: ['dk1'], discardPile: [], processing: [] },
         currentPlayerIndex: 0,
         phase: '准备',
@@ -128,7 +130,7 @@ describe('界当先', () => {
 
     const healthBefore = harness.state.players[0].health;
 
-    // 出杀指定 P1(超出徒手范围 1,但因当先杀无距离限制,合法)
+    // 出杀指定 P1(P1 在攻击范围内,本用例不验证无距离,留给用例 3)
     await LH.useCardAndTarget('杀', 'dk1', [1]);
     await harness.waitForStable();
     // P1 被询问闪
@@ -210,8 +212,10 @@ describe('界当先', () => {
   // ─── 3. 当先杀无距离限制:目标超出徒手攻击范围仍可指定 ───────────
   it('当先获得的杀无距离限制:可指定超出徒手范围的目标', async () => {
     const restoreAutoCompare = disableAutoCompare();
-    // 牌堆顶一张杀
+    // 牌堆顶一张杀(供当先获取)
     const deckKill = mkCard('dk2', '杀', '♠', '7');
+    // P2 手中一张闪(使其进入询问闪 normal 模式,验证 杀 真正进入结算)
+    const p2Dodge = mkCard('dg2', '闪', '♥', '3');
     // P2 在座次2(超出 P0 徒手攻击范围 1)
     await harness.setup(
       createGameState({
@@ -235,10 +239,11 @@ describe('界当先', () => {
             index: 2,
             name: 'P2',
             faction: '吴',
+            hand: ['dg2'],
             skills: ['闪', '回合管理'],
           }),
         ],
-        cardMap: { dk2: deckKill },
+        cardMap: { dk2: deckKill, dg2: p2Dodge },
         zones: { deck: ['dk2'], discardPile: [], processing: [] },
         currentPlayerIndex: 0,
         phase: '准备',
@@ -260,16 +265,15 @@ describe('界当先', () => {
     await LH.useCardAndTarget('杀', 'dk2', [2]);
     await harness.waitForStable();
 
-    // P2 被询问闪(说明 杀.use validate 通过了,无距离放行生效)
+    // 杀.use validate 通过(无距离放行生效)→ P2 进入询问闪
+    // (询问闪 atom 无 requestType 字段,直接校验 atom.type)
     const P2 = harness.player('P2');
-    const rt = currentRequestType(harness.state);
-    // 询问闪 or 已造成伤害
-    expect(rt === '闪/询问' || rt === null).toBe(true);
+    expect(harness.state.pendingSlots.get(2)?.atom.type).toBe('询问闪');
 
-    await P2.pass();
+    await P2.pass(); // P2 不闪
     await harness.waitForStable();
 
-    // P2 受伤
+    // P2 受伤(杀命中)
     expect(harness.state.players[2].health).toBe(3);
 
     restoreAutoCompare();
