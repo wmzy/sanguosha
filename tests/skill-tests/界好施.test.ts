@@ -3,9 +3,10 @@
 //   摸牌阶段多摸2,>5分半给最少者 + 跨回合被动(被杀/普通锦囊指定时受益者可交鲁肃1张)
 //
 // 验证:
-//   1. 基本好施:摸4张+>5给3张(与标版逻辑相同,确认界版基础功能正常)
+//   1. 基本好施:摸4张+>5给3张,被动激活(与标版逻辑相同,确认界版基础功能正常)
 //   2. 被动触发:好施给牌后,鲁肃被杀指定时,受益者可交给鲁肃1张手牌
-//   3. 被动清除:鲁肃下回合开始时被动失效
+//   3. 被动未激活:鲁肃被杀指定时不触发给牌(负面路径)
+//   4. 被动清除:鲁肃下回合开始时被动失效
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -180,7 +181,7 @@ describe('界好施', () => {
     expect(harness.state.players[0].health).toBe(2);
   });
 
-  // ─── 3. 被动未激活 → 不触发 ───────────────────────────────
+  // ─── 3. 被动未激活 → 不触发 ───────────────────────
 
   it('被动未激活时鲁肃被杀指定 → 不触发给牌', async () => {
     const state: GameState = createGameState({
@@ -235,5 +236,60 @@ describe('界好施', () => {
     expect(harness.state.players[1].hand.length).toBe(2);
     // 鲁肃受伤害
     expect(harness.state.players[0].health).toBe(2);
+  });
+
+  // ─── 4. 被动清除:鲁肃下回合开始时被动失效 ──────────────
+
+  it('鲁肃下回合开始时被动失效(被动 localVars 被清除)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '鲁肃',
+          character: '界鲁肃',
+          hand: ['l1'],
+          skills: ['界好施', '回合管理'],
+          health: 3,
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          hand: [],
+          skills: ['回合管理'],
+        }),
+        makePlayer({
+          index: 2,
+          name: 'P2',
+          character: '张飞',
+          hand: [],
+          skills: ['回合管理'],
+        }),
+      ],
+      cardMap: {
+        l1: makeCard('l1', '闪'),
+        d1: makeCard('d1', '杀', '♠'),
+        d2: makeCard('d2', '闪', '♥'),
+      },
+      zones: { deck: ['d1', 'd2'], discardPile: [], processing: [] },
+      currentPlayerIndex: 2, // P2 的回合
+      phase: '出牌',
+      turn: { round: 2, phase: '出牌', vars: {} },
+    });
+    // 预设被动已激活(模拟好施给牌后的状态)
+    state.localVars['界好施/被动激活'] = true;
+    state.localVars['界好施/受益者'] = 1; // P1
+
+    await harness.setup(state);
+    const P2 = harness.player('P2');
+
+    // P2 结束回合 → 座次推进到鲁肃 → 鲁肃回合开始的 after-hook 清除被动
+    await P2.triggerAction('回合管理', 'end');
+
+    // 被动已失效
+    expect(harness.state.localVars['界好施/被动激活']).toBeUndefined();
+    expect(harness.state.localVars['界好施/受益者']).toBeUndefined();
+    // 当前已是鲁肃的回合
+    expect(harness.state.currentPlayerIndex).toBe(0);
   });
 });
