@@ -215,22 +215,18 @@ describe('烈弓', () => {
   });
 
   // ─── 回归:旧错误条件(目标体力≥自己体力)不应再触发 ─────────────────
-  it('旧错误条件(目标体力≥自己)不再触发:P2 体力高但手牌多 → 仍按新手牌条件判断', async () => {
+  it('旧错误条件(目标体力≥自己)不再触发:P2 体力高但手牌不满足官方条件 → 不发动', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
+    const dodge = makeCard('d1', '闪', '♥', '2');
+    const extra = makeCard('x1', '杀', '♣', '5');
     const state: GameState = createGameState({
       players: [
-        // P1 体力1,徒手范围1;P2 体力4(≥P1 体力1,旧条件会触发)
-        // 但 P2 手牌3:3 ≥ 1(分支1满足)→ 应触发(此处验证条件基于手牌而非体力)
-        makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['烈弓', '杀'], health: 1 }),
-        makePlayer({
-          index: 1,
-          name: 'P2',
-          hand: ['a', 'b', 'c'],
-          skills: [],
-          health: 4,
-        }),
+        // P1 体力3,徒手攻击范围1;P2 体力4(≥P1 体力3——旧"体力≥体力"条件会触发)
+        // 但官方手牌条件:P2 手牌2 ≥ 体力3?否;2 ≤ 范围1?否 → 均不满足 → 不应触发
+        makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['烈弓', '杀'], health: 3 }),
+        makePlayer({ index: 1, name: 'P2', hand: ['d1', 'x1'], skills: ['闪'], health: 4 }),
       ],
-      cardMap: { k1: kill },
+      cardMap: { k1: kill, d1: dodge, x1: extra },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -239,34 +235,32 @@ describe('烈弓', () => {
     const P1 = harness.player('P1');
 
     await P1.useCardAndTarget('杀', 'k1', [1]);
-    // P2 手牌3 ≥ P1 体力1 → 分支1满足 → 应询问烈弓
-    P1.expectPending('请求回应');
-    await P1.respond('烈弓', { choice: true });
-    // 无闪 → 强制命中
-    expect(harness.state.players[1].health).toBe(3);
+    // 旧体力条件虽满足,但官方手牌条件均不满足 → 不询问烈弓,直接进入询问闪
+    const slot = [...harness.state.pendingSlots.values()][0];
+    expect((slot.atom as { type: string }).type).toBe('询问闪');
   });
 
   // ─── 回归:旧错误条件(目标手牌≥自己手牌)不应再触发 ─────────────────
   it('旧错误条件(目标手牌≥自己手牌)不再触发:双方手牌相同但都不满足官方条件', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
+    const peach = makeCard('p1', '桃', '♥', '3');
+    const extra = makeCard('x1', '杀', '♣', '5');
     const dodge = makeCard('d1', '闪', '♥', '2');
+    const extra2 = makeCard('e1', '杀', '♣', '8');
     const state: GameState = createGameState({
       players: [
-        // P1 体力4,徒手范围1;出杀后 P1 手牌1(桃)
-        // 设计:P2 手牌1 = P1 手牌1(旧"手牌≥自己"会触发),但官方条件:
-        //   P2 手牌1 ≥ P1 体力4? 否
-        //   P2 手牌1 ≤ 攻击范围1? 是 → 官方分支2满足
-        // 故此处实际会触发(走分支2),验证不再走旧的"手牌≥手牌"路径
+        // P1 体力4,徒手范围1;出杀后 P1 手牌2(桃+杀),P2 手牌2(闪+杀)——双方相同
+        // 旧"手牌≥手牌"(2≥2)会触发;但官方条件:P2 手牌2 ≥ 体力4?否;2 ≤ 范围1?否 → 均不满足 → 不应触发
         makePlayer({
           index: 0,
           name: 'P1',
-          hand: ['k1', 'p1'],
+          hand: ['k1', 'p1', 'x1'],
           skills: ['烈弓', '杀'],
           health: 4,
         }),
-        makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'], health: 4 }),
+        makePlayer({ index: 1, name: 'P2', hand: ['d1', 'e1'], skills: ['闪'], health: 4 }),
       ],
-      cardMap: { k1: kill, p1: makeCard('p1', '桃', '♥', '3'), d1: dodge },
+      cardMap: { k1: kill, p1: peach, x1: extra, d1: dodge, e1: extra2 },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -275,9 +269,8 @@ describe('烈弓', () => {
     const P1 = harness.player('P1');
 
     await P1.useCardAndTarget('杀', 'k1', [1]);
-    // 走分支2(目标手牌1 ≤ 徒手范围1)→ 触发
-    P1.expectPending('请求回应');
-    await P1.respond('烈弓', { choice: true });
-    expect(harness.state.players[1].health).toBe(3);
+    // 旧"手牌≥手牌"虽满足,但官方条件均不满足 → 不询问烈弓,直接进入询问闪
+    const slot = [...harness.state.pendingSlots.values()][0];
+    expect((slot.atom as { type: string }).type).toBe('询问闪');
   });
 });
