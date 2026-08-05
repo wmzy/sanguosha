@@ -9,7 +9,7 @@
 //   3. 负面:黑牌 transform 被拒(不是红色)
 //   4. 负面:非自己回合 transform 被拒
 //   5. 负面:不在手牌的卡 transform 被拒
-//   6. 负面:transform + 黑牌作为杀使用 → 杀 validate 看到原卡,失败(rollback)
+//   6. 负面:transform 后 杀.use 失败(无目标)→ 触发 rollback,原卡还原
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -101,36 +101,6 @@ describe('武圣', () => {
     // view 级断言:health 通过 applyView 同步
     P2.processEvents();
     P2.expectView((v) => expect(v.players[1].health).toBe(3));
-  });
-
-  it('transformThenUse:方块(♦)红牌当杀 → 同样成功', async () => {
-    const red = makeCard('d1', '桃', '♦', '5');
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({
-          index: 0,
-          name: 'P1',
-          hand: ['d1'],
-          skills: ['武圣', '杀', '闪'],
-          health: 4,
-          maxHealth: 4,
-        }),
-        makePlayer({ index: 1, name: 'P2', hand: [], skills: ['闪'], health: 4, maxHealth: 4 }),
-      ],
-      cardMap: { d1: red },
-      currentPlayerIndex: 0,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    });
-    await harness.setup(state);
-    const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
-
-    await P1.transformThenUse('武圣', { cardId: 'd1' }, '杀', { cardId: 'd1#武圣', targets: [1] });
-
-    expect(harness.state.cardMap['d1#武圣'].name).toBe('杀');
-    await P2.pass();
-    expect(harness.state.players[1].health).toBe(3);
   });
 
   // ─── 负面:transform ─────────────────────────────
@@ -291,7 +261,7 @@ describe('武圣', () => {
 
   // ─── color 字段:单张转化保留原花色与颜色 ──────────────────
 
-  it('transformThenUse:方块(♦)红牌当杀 → 影子卡保留 ♦ 花色与红颜色', async () => {
+  it('transformThenUse:方块(♦)红牌当杀 → 成功,影子卡保留 ♦ 花色与红颜色', async () => {
     const red = makeCard('d1', '桃', '♦', '5');
     const state: GameState = createGameState({
       players: [
@@ -312,13 +282,18 @@ describe('武圣', () => {
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
 
     await P1.transformThenUse('武圣', { cardId: 'd1' }, '杀', { cardId: 'd1#武圣', targets: [1] });
 
     const shadow = harness.state.cardMap['d1#武圣'];
+    expect(shadow.name).toBe('杀');
     // 单张转化:保留原花色(♦ 不被退化为 ♥)与颜色
     expect(shadow.suit).toBe('♦');
     expect(shadow.color).toBe('红');
     expect(shadow.shadowOf).toBe('d1');
+    // P2 不闪 → 扣血(验证 ♦ 红牌走完整出杀流程)
+    await P2.pass();
+    expect(harness.state.players[1].health).toBe(3);
   });
 });
