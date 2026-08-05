@@ -248,8 +248,7 @@ describe('界双雄', () => {
   it('transformThenUse:发动双雄(弃黑色)后,红色手牌当决斗 → P2 不出杀扣1血', async () => {
     // 模拟双雄已发动:turn.vars['界双雄/color']='黑'
     // P1 手牌:c1(♥闪,红色,异色可转化)
-    // P2 无杀 → 决斗中 P2 先被询问杀 → pass → P2 输 → 扣1血
-    // P2 含杀(走 normal 询问杀,pass 表示不出杀→输→扣血)
+    // P2 含杀(p2k):决斗中 P2 先被询问杀 → pass(不出杀)→ P2 输 → 扣1血
     const c1 = makeCard('c1', '闪', '♥', '2');
     const p2k = makeCard('p2k', '杀', '♠', '5');
     await harness.setup(
@@ -289,7 +288,7 @@ describe('界双雄', () => {
     await P1.pass();
     // P2 被询问出杀(决斗目标先出杀)
     P2.expectPending('询问杀');
-    await P2.pass(); // P2 无杀 → 输
+    await P2.pass(); // P2 有杀但不出 → 输
 
     // P2 扣1血
     expect(harness.state.players[1].health).toBe(p2HealthBefore - 1);
@@ -395,6 +394,11 @@ describe('界双雄', () => {
     expect(transform?.label).toBe('双雄');
     expect(transform?.prompt.type).toBe('useCardAndTarget');
     expect(typeof transform?.activeWhen).toBe('function');
+
+    // respond 声明(摸牌阶段发动确认/选弃牌询问复用)
+    const respond = actions.find((a) => a.skillId === '界双雄' && a.actionType === 'respond');
+    expect(respond).toBeDefined();
+    expect(respond?.label).toBe('双雄');
   });
 
   // ─── C10. 造成伤害 after-hook:杀对界颜良文丑造成伤害 → 记 cardId ─
