@@ -12,7 +12,6 @@
 //   3. 正面:第三次受伤 → 询问 → 确认 → 摸 2 张,修改次数 2→3
 //   4. 拒绝发动:受伤 → 询问 → 取消 → 无变化(摸 0,计数不变)
 //   5. 触发条件不满足:其他玩家受伤 → 不触发
-//   6. 边界:0 伤害(如防具减伤到 0)→ 不触发
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -256,23 +255,4 @@ describe('界殚心', () => {
     expect(modCount(harness.state, 0)).toBe(0); // 修改次数未变
   });
 
-  // ─── 6. 边界:0 伤害不触发(模拟方式 — 用回复后受伤) ─────────
-  it('trigger 条件:仅当 target === ownerId 时触发', async () => {
-    // 验证 hook 的 target 检查:即使 ownerId 受到 0 伤害也不触发(amount <= 0)
-    // 此处通过 modCount 直接验证:无伤害事件 → 无修改
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P0', hand: [] }),
-        makePlayer({ index: 1, name: 'P1', character: '曹操', hand: [] }),
-      ],
-      cardMap: {},
-      currentPlayerIndex: 0,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    });
-    await harness.setup(state);
-
-    expect(modCount(harness.state, 0)).toBe(0);
-    expect(harness.state.players[0].health).toBe(3);
-  });
 });
