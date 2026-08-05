@@ -288,7 +288,7 @@ describe('乱武', () => {
     expect(harness.state.zones.discardPile).toContain('sk1');
   });
 
-  // ─── 5. 负面对照:非出牌阶段 / 非自己回合 → 拒绝 ─────────────────
+  // ─── 5. 负面对照:非出牌阶段 → 拒绝 ─────────────────
   it('负面:非出牌阶段发动乱武被拒绝', async () => {
     await harness.setup(
       createGameState({
@@ -307,6 +307,32 @@ describe('乱武', () => {
         currentPlayerIndex: 0,
         phase: '摸牌', // 非出牌阶段
         turn: { round: 1, phase: '摸牌', vars: {} },
+      }),
+    );
+    const JX = harness.player('贾诩');
+    await JX.expectRejected({ skillId: '乱武', actionType: 'use', params: {} });
+  });
+
+  // ─── 5b. 负面对照:非自己回合 → 拒绝(与 5 互补,覆盖 use.validate 的
+  //    首条分支 currentPlayerIndex !== ownerId → '不是你的回合')─────────
+  it('负面:非自己回合发动乱武被拒绝', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '贾诩',
+            character: '贾诩',
+            skills: ['乱武'],
+            health: 3,
+            maxHealth: 3,
+          }),
+          mkPlayer({ index: 1, name: 'P2', hand: [], skills: [], health: 4 }),
+        ],
+        cardMap: {},
+        currentPlayerIndex: 1, // P2 的回合,非贾诩
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
       }),
     );
     const JX = harness.player('贾诩');
