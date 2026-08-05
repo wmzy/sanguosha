@@ -147,25 +147,26 @@ describe('放逐', () => {
     await P1.respond('放逐', { choice: false });
 
     expect(harness.state.players[1].health).toBe(2);
-    // 无翻面标签
+    // 不发动:目标不摸牌(P0 出杀后手牌 0)不翻面
+    expect(harness.state.players[0].hand.length).toBe(0);
     expect(harness.state.players[0].tags).not.toContain('放逐/翻面');
   });
 
   // ─── X 随已损失体力变化 ────────────────────
-  it('X = 已损失体力值:P1 残 1 血时受伤,X=2 摸 2 张', async () => {
+  it('X = 已损失体力值:P1 已损 1 血再受伤,X=2 摸 2 张', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
     const cardMap: Record<string, Card> = { k1: slash, p1s: makeCard('p1s', '闪', '♥', '2') };
     const deck = buildDeck(cardMap, 5);
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
-        // P1 曹丕 3 血上限,残 1 血(已损失 2),受伤后 X=2
+        // P1 曹丕 3 血上限,已损 1 血(health 2);受伤 1 → 残 1 血(不进濒死)
         makePlayer({
           index: 1,
           name: 'P1',
           hand: ['p1s'],
           skills: ['放逐', '闪'],
-          health: 1,
+          health: 2,
           maxHealth: 3,
         }),
       ],
@@ -187,15 +188,9 @@ describe('放逐', () => {
     P1.expectPending('请求回应');
     await P1.respond('放逐', { target: 0 });
 
-    // P0 摸 X=2 张(已损失体力 = 3-0 = 3? 不对:P1 受伤前 1 血,maxHealth 3,
-    //   已损失 = 3 - 1 = 2。受伤后 0 血濒死。但濒死会触发桃询问——这里测试关注 X 计算,
-    //   放逐在濒死前触发,使用受伤后的 health 计算 X)
-    // X = maxHealth - 受伤后 health = 3 - 0 = 3?
-    // 实际规则:X = 受伤后已损失体力值。P1 受伤后 0 血,已损失 3,X=3。
-    // 但 description 说"X 为你已损失体力值"——通常是受伤后的损失值。
-    // P0 出杀后手牌 0,放逐摸 X 张
-    const drawn = harness.state.players[0].hand.length;
-    expect(drawn).toBeGreaterThanOrEqual(2); // 至少摸 2(可能 3,取决于濒死是否先结算)
+    // X = 受伤后已损失体力 = maxHealth(3) - health(1) = 2
+    // P0 出杀后手牌 0,放逐摸 X=2 张 → 手牌 2
+    expect(harness.state.players[0].hand.length).toBe(2);
     expect(harness.state.players[0].tags).toContain('放逐/翻面');
   });
 
