@@ -301,6 +301,8 @@ describe('界暴虐', () => {
     harness.processAllEvents();
 
     expect(harness.state.pendingSlots.size).toBe(0);
+    // P1 受 1 点伤害(确认伤害已结算,避免用例空过)
+    expect(harness.state.players[1].health).toBe(3);
   });
 
   // ─── 6. 非群势力角色造成伤害 → 不触发 ─────────────────
@@ -338,6 +340,8 @@ describe('界暴虐', () => {
     harness.processAllEvents();
 
     expect(harness.state.pendingSlots.size).toBe(0);
+    // P2 受 1 点伤害(确认伤害已结算,避免用例空过)
+    expect(harness.state.players[2].health).toBe(3);
   });
 
   // ─── 7. 非主公 → 不触发 ───────────────────────────────
@@ -375,6 +379,8 @@ describe('界暴虐', () => {
     harness.processAllEvents();
 
     expect(harness.state.pendingSlots.size).toBe(0);
+    // P2 受 1 点伤害(确认伤害已结算,避免用例空过)
+    expect(harness.state.players[2].health).toBe(3);
   });
 
   // ─── 8. 系统伤害(source<0)→ 不触发 ────────────────────
@@ -411,5 +417,7 @@ describe('界暴虐', () => {
     harness.processAllEvents();
 
     expect(harness.state.pendingSlots.size).toBe(0);
+    // P1 受 1 点伤害(确认伤害已结算,避免用例空过)
+    expect(harness.state.players[1].health).toBe(3);
   });
 });
