@@ -2,12 +2,12 @@
 // 观星(诸葛亮·主动技)测试:准备阶段开始时,观看牌堆顶 X 张牌并重新排列。
 //
 // 验证:
-//   1. 正面(2 人,X=2):交换顶两张顺序 → 牌堆顶顺序翻转
+//   1. 正面(2 人,X=2):交换顶两张顺序 + 实际摸牌验证(摸 1 张 = 指定的 top[0])
 //   2. 正面:全部放牌堆底 → 原顶两张到最底,原未观察牌升到顶
-//   3. 正面:全部放牌堆顶(指定顺序)→ 顶两张按指定顺序
-//   4. 正面:实际摸牌验证顶牌(观星后摸 1 张 = 指定的 top[0])
+//   3. 边界:6 人 → X 封顶 5(至多 5 张),未观察的第 6 张升到顶
+//   4. 负面:非法排列(非完整划分)→ 牌堆保持原样
 //   5. 负面:不发动(confirm=false) → 牌堆不变
-//   6. 边界:3 人 → X=3,观察 3 张
+//   6. 边界:3 人 → X=3,观察 3 张(混合 top/bottom)
 //
 // 牌堆方向:deck[0]=牌堆底(最后摸),deck[len-1]=牌堆顶(最先摸)。
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -70,7 +70,7 @@ describe('观星', () => {
     harness = new SkillTestHarness();
   });
 
-  it('正面(2人,X=2):交换顶两张顺序 → deck 顶顺序翻转', async () => {
+  it('正面(2人,X=2):交换顶两张顺序 → deck 顶顺序翻转,且摸牌验证 top[0] 先摸', async () => {
     // deck: [m1(底), o1, o2(顶)] → 观察顶 2 张 [o1, o2]
     const m1 = makeCard('m1', '桃', '♥');
     const o1 = makeCard('o1', '杀', '♠');
@@ -116,6 +116,10 @@ describe('观星', () => {
     const deck = harness.state.zones.deck;
     expect(deck).toEqual(['m1', 'o2', 'o1']);
     expect(deck[deck.length - 1]).toBe('o1'); // o1 在顶
+
+    // 实际摸 1 张 → 应是顶牌 o1(端到端验证 top[0] 最先摸)
+    await applyAtom(harness.state, { type: '摸牌', player: 0, count: 1 });
+    expect(harness.state.players[0].hand).toContain('o1');
   });
 
   it('正面:全部放牌堆底 → 原顶两张到最底,原未观察牌升到顶', async () => {
@@ -164,11 +168,15 @@ describe('观星', () => {
     expect(deck[deck.length - 1]).toBe('m2');
   });
 
-  it('正面:全部放牌堆顶(指定顺序)→ 顶两张按指定顺序', async () => {
-    // deck: [m1, o1, o2(顶)] → 观察顶 2 张 [o1, o2]
+  it('边界:6 人 → X 封顶 5(至多 5 张),未观察的第 6 张升到顶', async () => {
+    // deck: [m1(底), o1, o2, o3, o4, o5(顶)] → 6 人, X=min(6,5)=5,观察顶 5 张 [o1..o5]
+    // m1(第 6 张)不在观察范围 → 留在 middle;5 张全放底后 m1 升到顶(若 X=6 则 m1 会被观察、无法独自到顶)
     const m1 = makeCard('m1', '桃', '♥');
     const o1 = makeCard('o1', '杀', '♠');
     const o2 = makeCard('o2', '闪', '♣');
+    const o3 = makeCard('o3', '酒', '♦');
+    const o4 = makeCard('o4', '桃', '♥');
+    const o5 = makeCard('o5', '杀', '♠');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: [], skills: ['观星'] }),
@@ -181,9 +189,45 @@ describe('观星', () => {
           health: 4,
           maxHealth: 4,
         }),
+        makePlayer({
+          index: 2,
+          name: 'P3',
+          hand: [],
+          skills: [],
+          character: '孙权',
+          health: 4,
+          maxHealth: 4,
+        }),
+        makePlayer({
+          index: 3,
+          name: 'P4',
+          hand: [],
+          skills: [],
+          character: '刘备',
+          health: 4,
+          maxHealth: 4,
+        }),
+        makePlayer({
+          index: 4,
+          name: 'P5',
+          hand: [],
+          skills: [],
+          character: '张飞',
+          health: 4,
+          maxHealth: 4,
+        }),
+        makePlayer({
+          index: 5,
+          name: 'P6',
+          hand: [],
+          skills: [],
+          character: '关羽',
+          health: 4,
+          maxHealth: 4,
+        }),
       ],
-      cardMap: { m1, o1, o2 },
-      zones: { deck: ['m1', 'o1', 'o2'], processing: [], discardPile: [] },
+      cardMap: { m1, o1, o2, o3, o4, o5 },
+      zones: { deck: ['m1', 'o1', 'o2', 'o3', 'o4', 'o5'], processing: [], discardPile: [] },
       currentPlayerIndex: 0,
       phase: '准备',
       turn: { round: 1, phase: '准备', vars: {} },
@@ -195,20 +239,21 @@ describe('观星', () => {
     await P1.respond('观星', { choice: true });
     await harness.waitForStable();
     harness.processAllEvents();
-    P1.expectPending('请求回应');
+    P1.expectPending('请求回应'); // arrange
 
-    // 全部放顶,o2 在最顶(最先摸):top=[o2, o1]
-    await P1.respond('观星', { top: ['o2', 'o1'], bottom: [] });
+    // 5 张全放底:top=[], bottom=[o1..o5]
+    await P1.respond('观星', { top: [], bottom: ['o1', 'o2', 'o3', 'o4', 'o5'] });
     await harness.waitForStable();
     harness.processAllEvents();
 
-    // 预期: [...[], ...[m1], ...[o2,o1].reverse()=[o1,o2]] = [m1, o1, o2]
-    // 顶 = o2(最先摸)
-    expect(harness.state.zones.deck).toEqual(['m1', 'o1', 'o2']);
-    expect(harness.state.zones.deck[2]).toBe('o2');
+    // 预期: [...bottom=5张, ...middle=[m1], ...top.reverse()=[]] = [o1,o2,o3,o4,o5,m1]
+    // 顶 = m1(第 6 张,未被观察)→ 证明 X=5 而非 6
+    const deck = harness.state.zones.deck;
+    expect(deck).toEqual(['o1', 'o2', 'o3', 'o4', 'o5', 'm1']);
+    expect(deck[deck.length - 1]).toBe('m1');
   });
 
-  it('正面:观星后实际摸牌,验证顶牌为指定的 top[0]', async () => {
+  it('负面:非法排列(top/bottom 非完整划分)→ 牌堆保持原样', async () => {
     // deck: [m1, o1, o2(顶)] → 观察 [o1, o2]
     const m1 = makeCard('m1', '桃', '♥');
     const o1 = makeCard('o1', '杀', '♠');
@@ -239,14 +284,16 @@ describe('观星', () => {
     await P1.respond('观星', { choice: true });
     await harness.waitForStable();
     harness.processAllEvents();
-    // top=[o1, o2] → o1 在顶(最先摸)
-    await P1.respond('观星', { top: ['o1', 'o2'], bottom: [] });
+    P1.expectPending('请求回应'); // arrange
+
+    // 非法划分:只给 o1、缺 o2 → 不构成 observed=[o1,o2] 的完整划分
+    await P1.respond('观星', { top: ['o1'], bottom: [] });
     await harness.waitForStable();
     harness.processAllEvents();
 
-    // 实际摸 1 张 → 应是 o1
-    await applyAtom(harness.state, { type: '摸牌', player: 0, count: 1 });
-    expect(harness.state.players[0].hand).toContain('o1');
+    // 实现对非法划分保持原序、不调整牌堆
+    expect(harness.state.zones.deck).toEqual(['m1', 'o1', 'o2']);
+    expect(harness.state.pendingSlots.size).toBe(0);
   });
 
   it('负面:不发动(confirm=false) → 牌堆不变', async () => {
