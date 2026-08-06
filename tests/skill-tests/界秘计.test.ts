@@ -296,4 +296,58 @@ describe('界秘计', () => {
     expect(harness.state.players[0].vars['秘计/pendingFrom贞烈/0']).toBeUndefined();
     expect(harness.state.players[0].hand).toEqual(['dr1', 'dr2', 'dr3', 'dr4']);
   });
+
+  // ─── ⑥ 分发上限:选 X+1 张(超"至多X")被拒;选恰好 X 张成功 ─────
+  // 界版"至多X张"是与标版"X张"的关键差异(界版可选 0..X 张),
+  // 实现于 giveCards validate 中校验 cardIds.length > maxN。
+  it('⑥:分发阶段选 X+1 张(超"至多X")→ 被拒绝;选恰好 X 张 → 成功', async () => {
+    const draw1 = makeCard('dr1', '杀', '♠', '3');
+    const draw2 = makeCard('dr2', '闪', '♥', '4');
+    const ownCard = makeCard('own1', '桃', '♦', '6');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['own1'],
+          skills: ['界秘计'],
+          health: 1, // 已损 2 → X=2
+          maxHealth: 3,
+        }),
+        makePlayer({ index: 1, name: 'P1', skills: [], health: 4, maxHealth: 4 }),
+      ],
+      cardMap: { dr1: draw1, dr2: draw2, own1: ownCard },
+      zones: { deck: ['dr2', 'dr1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '回合结束',
+      turn: { round: 1, phase: '回合结束', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    await triggerEndPhase(harness, 0);
+    await P0.respond('界秘计', { choice: true }); // 发动 → 摸2 → hand=[own1,dr1,dr2]
+    await P0.respond('界秘计', { choice: true }); // 分发
+    await P0.respond('界秘计', { target: 1 }); // 选 P1
+
+    // 当前为 giveCards 询问(至多 X=2 张)
+    const slot = [...harness.state.pendingSlots.values()][0];
+    expect((slot.atom as { requestType?: string }).requestType).toBe('界秘计/giveCards');
+
+    // 选 3 张(超过至多 2)→ 被拒绝,询问保持不变
+    await P0.expectRejected({
+      skillId: '界秘计',
+      actionType: 'respond',
+      params: { cardIds: ['own1', 'dr1', 'dr2'] },
+    });
+
+    // 选恰好 2 张(= X,合法上限)→ 成功
+    await P0.respond('界秘计', { cardIds: ['dr1', 'dr2'] });
+    await harness.waitForStable();
+
+    // 断言:P0 留 own1;P1 得 dr1, dr2;无 pending
+    expect(harness.state.players[0].hand).toEqual(['own1']);
+    expect(harness.state.players[1].hand).toEqual(['dr1', 'dr2']);
+    expect(harness.state.pendingSlots.size).toBe(0);
+  });
 });
