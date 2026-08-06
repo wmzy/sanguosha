@@ -294,4 +294,53 @@ describe('界纵适', () => {
     expect(harness.state.players[0].hand).toContain('c1');
     expect(harness.state.zones.discardPile).not.toContain('c1');
   });
+
+  // ─── 6. owner 作为 target 且没赢 → 获自己的牌 ──────────────
+  it('owner 作为 target 被拼点且没赢 → 获自己的牌', async () => {
+    // P1 是荀彧(驱虎), P0 是界简雍(界纵适)
+    // P0 拼点没赢(2<K),算没赢 → 纵适获自己的拼点牌 c0。
+    // P1 赢时驱虎本应让 P0 攻击范围内另一角色受伤,但 2 人局无第三者,故驱虎空结算结束。
+    const ownerLow = makeCard('c0', '闪', '♠', '2');
+    const initiatorHigh = makeCard('c1', '杀', '♥', 'K');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['c0'],
+          skills: ['界纵适'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1-荀彧',
+          hand: ['c1'],
+          skills: ['驱虎'],
+        }),
+      ],
+      cardMap: { c0: ownerLow, c1: initiatorHigh },
+      currentPlayerIndex: 1, // P1 的回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1-荀彧');
+
+    // P1 发动驱虎,target=P0;P1 用 K 拼 P0 的 2 → P0 没赢
+    await P1.triggerAction('驱虎', 'use', { cardId: 'c1', target: 0 });
+    await waitForStable(harness.state);
+    // P0 选拼点牌
+    await P0.respond('驱虎', { cardId: 'c0' });
+    await waitForStable(harness.state);
+
+    // 拼点结算后,P0 应被询问纵适
+    P0.expectPending('请求回应');
+    await P0.respond('界纵适', { choice: true });
+    await waitForStable(harness.state);
+
+    // P0 没赢(2<K)→ 获自己的牌 c0;c1 留弃牌堆
+    expect(harness.state.players[0].hand).toContain('c0');
+    expect(harness.state.zones.discardPile).not.toContain('c0');
+    expect(harness.state.zones.discardPile).toContain('c1');
+  });
 });
