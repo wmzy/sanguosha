@@ -73,14 +73,12 @@ describe('界荐言', () => {
 
   // ─── 1. 类别声明(基本牌) ─────────────────────────────
   it('类别声明(基本牌):翻到第一张基本牌给目标,其余入弃牌堆', async () => {
-    // 牌堆:deck=[锦囊, 装备, 杀(基本牌)](顶在末尾,先摸杀)
-    // 翻开顺序:杀(基本牌,匹配) → 停
-    // 翻开张数:1(只翻一张匹配的就停)
+    // deck 末尾 = 牌堆顶 = 最先翻。声明"基本牌",顶部先翻出非基本牌(装备、锦囊),
+    // 翻到最底的基本牌(杀)才匹配 → 匹配牌给目标,其余翻开牌入弃牌堆。
     const equip = makeCard('equip1', '诸葛连弩', '♣', 'A', '装备牌');
     const trick = makeCard('trick1', '过河拆桥', '♠', 'A', '锦囊牌');
     const kill = makeCard('kill1', '杀', '♦', 'A', '基本牌');
-    // 让顶部三张依次为:装备、锦囊、杀(翻牌顺序:杀→锦囊→装备? 不,从顶往下翻)
-    // deck 末尾 = 牌堆顶 = 最先翻 = 杀(基本牌)→ 停
+    // deck=[基本牌(底), 锦囊, 装备(顶)] → 翻牌顺序:装备(不匹配)→锦囊(不匹配)→杀(匹配,停)
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: [], skills: ['界荐言'] }),
@@ -94,7 +92,7 @@ describe('界荐言', () => {
         }),
       ],
       cardMap: { equip1: equip, trick1: trick, kill1: kill },
-      zones: { deck: ['equip1', 'trick1', 'kill1'], discardPile: [], processing: [] },
+      zones: { deck: ['kill1', 'trick1', 'equip1'], discardPile: [], processing: [] },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -118,12 +116,13 @@ describe('界荐言', () => {
     await harness.waitForStable();
     harness.processAllEvents();
 
-    // P1 收到杀(匹配的基本牌),其他牌未翻开
+    // P1 收到杀(第一张匹配的基本牌)
     expect(harness.state.players[1].hand).toContain('kill1');
-    // 装备和锦囊仍在牌堆(未翻开)
-    expect(harness.state.zones.deck).toContain('equip1');
-    expect(harness.state.zones.deck).toContain('trick1');
-    // 处理区清空
+    // 先翻开的装备、锦囊不匹配 → 入弃牌堆
+    expect(harness.state.zones.discardPile).toContain('equip1');
+    expect(harness.state.zones.discardPile).toContain('trick1');
+    // 牌堆已翻空,处理区清空
+    expect(harness.state.zones.deck.length).toBe(0);
     expect(harness.state.zones.processing.length).toBe(0);
     // 限一次标记
     expect(harness.state.players[0].vars['界荐言/usedThisTurn']).toBe(true);
@@ -376,5 +375,47 @@ describe('界荐言', () => {
     expect(harness.state.players[1].hand.length).toBe(0);
     // 但荐言仍算用过(限一次已计)
     expect(harness.state.players[0].vars['界荐言/usedThisTurn']).toBe(true);
+  });
+
+  // ─── 8. 声明非法 → respond 阶段拒绝 ───────────────────
+  it('声明非法(非基本牌/锦囊牌/装备牌/红/黑)→ respond 拒绝,询问仍在', async () => {
+    const kill = makeCard('kill1', '杀', '♠', 'A', '基本牌');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [], skills: ['界荐言'] }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          skills: [],
+          character: '曹操',
+          health: 4,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { kill1: kill },
+      zones: { deck: ['kill1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    await P0.useCard('界荐言', '_unused');
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 询问声明阶段
+    P0.expectPending('请求回应');
+    // 非法声明(不在五种合法值之列)→ respond 被拒,seq 不增
+    const seqBefore = harness.state.seq;
+    await P0.expectRejected({
+      skillId: '界荐言',
+      actionType: 'respond',
+      params: { declaration: '紫色' },
+    });
+    expect(harness.state.seq).toBe(seqBefore);
+    // 声明询问仍在(被拒不消耗询问,可继续合法声明)
+    P0.expectPending('请求回应');
   });
 });
