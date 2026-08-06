@@ -7,12 +7,13 @@
 //      → 设 turn.vars['崩坏/disabled']=true
 //
 // 用例:
-//   1. transform execute:黑桃手牌 → 影子酒创建(cardMap 含 shadowOf 指针)
+//   1. transform execute:黑桃手牌 → 影子酒创建,原卡移入弃牌堆(转化可观察证据)
 //   2. transform validate:红桃手牌 → 拒绝
 //   3. transform validate:非自己回合 → 拒绝
-//   4. 端到端:酒杀造成伤害 → turn.vars['崩坏/disabled']=true
-//   5. 端到端:无酒增伤的普通伤害 → var 不设置
-//   6. 端到端:酒增伤但伤害由他人造成 → var 不设置(mark 不在 owner 身上)
+//   4. transform validate:手牌中不存在的卡 → 拒绝
+//   5. 端到端:酒杀造成伤害 → turn.vars['崩坏/disabled']=true
+//   6. 端到端:无酒增伤的普通伤害 → var 不设置
+//   7. 端到端:酒增伤但伤害由他人造成 → var 不设置(mark 不在 owner 身上)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -97,11 +98,10 @@ describe('界酒池', () => {
       { cardId: 's1#界酒池' },
     );
 
-    // 酒.use 已执行,标记已加。验证酒 mark 存在(说明影子酒被酒.use 接受)
-    const hasWineMark = harness.state.players[0].marks.some(
-      (m) => m.id === '酒/nextKillDamageBonus',
-    );
-    expect(hasWineMark).toBe(true);
+    // 影子酒被酒.use 接受并消耗后,原黑桃牌随使用流程离开手牌、移入弃牌堆
+    // (转化成功的可观察证据;增伤标记的检验见用例5,此处不重复断言)
+    expect(harness.state.players[0].hand).not.toContain('s1');
+    expect(harness.state.zones.discardPile).toContain('s1');
   });
 
   // ─── 2. transform validate:非黑桃 → 拒绝 ─────────────────
@@ -166,7 +166,38 @@ describe('界酒池', () => {
     });
   });
 
-  // ─── 4. 端到端:酒杀造成伤害 → 崩坏/disabled=true ─────────
+  // ─── 4. transform validate:手牌中不存在的卡 → 拒绝 ─────────
+  it('transform:手牌中不存在的卡 → 拒绝', async () => {
+    const spadeCard = makeCard('s1', '杀', '♠', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: [], // 手牌为空:s1 不在手牌中(黑桃但非手牌,隔离 cardInHand 边界)
+          skills: ['界酒池', '酒'],
+        }),
+        makePlayer({ index: 1, name: 'P1', skills: [] }),
+      ],
+      cardMap: { s1: spadeCard },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    await P0.expectRejected({
+      skillId: '酒',
+      actionType: 'use',
+      params: { cardId: 's1#界酒池' },
+      preceding: [
+        { skillId: '界酒池', actionType: 'transform', params: { cardId: 's1' } },
+      ],
+    });
+  });
+
+  // ─── 5. 端到端:酒杀造成伤害 → 崩坏/disabled=true ─────────
   it('酒增伤生效后 → turn.vars[崩坏/disabled] = true', async () => {
     const spadeCard = makeCard('s1', '杀', '♠', '7');
     const state: GameState = createGameState({
@@ -220,7 +251,7 @@ describe('界酒池', () => {
     expect(harness.state.players[1].health).toBe(2);
   });
 
-  // ─── 5. 无酒增伤的普通伤害 → var 不设置 ─────────────────
+  // ─── 6. 无酒增伤的普通伤害 → var 不设置 ─────────────────
   it('无酒增伤的普通伤害 → turn.vars[崩坏/disabled] 不设置', async () => {
     const state: GameState = createGameState({
       players: [
@@ -250,7 +281,7 @@ describe('界酒池', () => {
     expect(harness.state.players[1].health).toBe(3);
   });
 
-  // ─── 6. 酒增伤但伤害由他人造成 → var 不设置 ─────────────
+  // ─── 7. 酒增伤但伤害由他人造成 → var 不设置 ─────────────
   it('他人造成伤害(P0 有酒 mark 但非 source)→ var 不设置', async () => {
     const spadeCard = makeCard('s1', '杀', '♠', '7');
     const state: GameState = createGameState({
