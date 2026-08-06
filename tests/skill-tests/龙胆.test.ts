@@ -170,6 +170,29 @@ describe('龙胆', () => {
     });
   });
 
+  // ─── 负面:转化方向无效 ─────────────────────────────
+  it('transform:to 不是 杀/闪 → 拒绝(无效转化方向)', async () => {
+    const kill = makeCard('k1', '杀', '♠', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['龙胆'] }),
+        makePlayer({ index: 1, name: 'P2', skills: [] }),
+      ],
+      cardMap: { k1: kill },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.expectRejected({
+      skillId: '龙胆',
+      actionType: 'transform',
+      params: { cardId: 'k1', to: '桃' },
+    });
+  });
+
   // ─── 负面:不在手牌 ─────────────────────────────
   it('transform:牌不在手牌 → 拒绝', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
