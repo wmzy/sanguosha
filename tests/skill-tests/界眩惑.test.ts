@@ -167,8 +167,9 @@ describe('界眩惑', () => {
     expect(harness.state.players[1].hand).not.toContain('xkill');
   });
 
-  // ─── 2. happy path 选项 2:被获得 ─────────────────
-  it('happy path 选项 2:法正发动 → 给 X 两张 → X 选被获得 → 法正从 X 取 2 张', async () => {
+  // ─── 2. 仅一项可选(X 无杀)→ 强制选项 2:被获得 ─────────
+  // 注:X 无杀 → optKill=false → 不询问 X,直接走选项 2(与用例 5 的「主动选 cancel」区分)
+  it('X 无杀 → 仅选项 2 可选 → 强制被获得(法正给两张后直接取 2 张,无询问)', async () => {
     const c1 = makeCard('c1', '闪', '♠');
     const c2 = makeCard('c2', '桃', '♣');
     const x1 = makeCard('x1', '桃', '♥');
