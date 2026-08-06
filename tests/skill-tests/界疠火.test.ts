@@ -312,8 +312,8 @@ describe('界疠火', () => {
     expect(harness.state.players[1].health).toBe(4); // 未扣血
     expect(harness.state.players[0].health).toBe(4); // 未失体力
     expect(harness.state.players[0].hand).toContain('c0'); // 未弃牌
-    // 无代价 pending(已经收尾)
-    expect(harness.state.pendingSlots.size).toBeLessThanOrEqual(1);
+    // 无代价 pending:转化杀未造成伤害,不触发弃牌询问,size 应为 0
+    expect(harness.state.pendingSlots.size).toBe(0);
   });
 
   // ─── 9. 代价:owner 无手牌 → 直接失去 1 体力 ─────────────────────
@@ -390,9 +390,10 @@ describe('界疠火', () => {
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.players[2].health).toBe(3);
 
-    // 代价询问(只触发 1 次,因为杀收尾只 1 次)
+    // 代价询问(只触发 1 次,因为杀收尾只 1 次):弃 c0 后不再失去体力
     await P0.respond('界疠火', { cardId: 'c0' });
     expect(harness.state.players[0].hand).not.toContain('c0');
+    expect(harness.state.players[0].health).toBe(4); // 代价仅 1 次,未额外失体力
   });
 
   // ─── 11. 原始火杀(非转化):造成伤害不触发代价 ─────────────────────
