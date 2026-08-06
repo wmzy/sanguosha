@@ -146,7 +146,7 @@ describe('顺手牵羊', () => {
   // 2. validate 拒绝:距离 > 1
   // ─────────────────────────────────────────────────────────────
   it('P1 对 P3(距离 2)出顺手牵羊 → 被拒绝(距离 > 1)', async () => {
-    // 3 个存活玩家,P1 (idx 0) → P3 (idx 2):座位距离 = 2
+    // 4 个存活玩家,P1 (idx 0) → P3 (idx 2):座位距离 = min(2, 4-2) = 2
     await harness.setup(buildState({ playerCount: 4 }));
     const P1 = harness.player('P1');
     await P1.expectRejected({
@@ -194,7 +194,7 @@ describe('顺手牵羊', () => {
   // ─────────────────────────────────────────────────────────────
   // 5. validate 拒绝:目标无手牌
   // ─────────────────────────────────────────────────────────────
-  it('目标无手牌 → 被拒绝(targetHasHand=false)', async () => {
+  it('目标无可获取的牌(无手牌且无装备) → 被拒绝(目标无可获取的牌)', async () => {
     await harness.setup(buildState({ p2Hand: [] }));
     const P1 = harness.player('P1');
     await P1.expectRejected({
@@ -237,9 +237,9 @@ describe('顺手牵羊', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 8. Bug3:顺手牵羊可拿装备区
+  // 8. Bug3:顺手牵羊可拿装备区(同时验证 validate 放行「无手牌·纯装备」目标)
   // ─────────────────────────────────────────────────────────────
-  it('Bug3:P2 无手牌只有装备(诸葛连弩) → 顺手牵羊拿到装备,装备区被卸载', async () => {
+  it('Bug3:P2 无手牌只有装备(诸葛连弩) → validate 放行并拿到装备,装备区被卸载', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♠', '1', '装备牌');
     const state = buildState({
       p2Hand: [],
@@ -270,27 +270,7 @@ describe('顺手牵羊', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 9. Bug3:validate 接受纯装备区目标(无手牌)
-  // ─────────────────────────────────────────────────────────────
-  it('Bug3:P2 无手牌只有装备 → 顺手牵羊 validate 放行(以前会被拒)', async () => {
-    const weapon = makeCard('wp1', '诸葛连弩', '♠', '1', '装备牌');
-    const state = buildState({
-      p2Hand: [],
-      extraCards: { wp1: weapon },
-    });
-    state.players[1].equipment = { 武器: 'wp1' };
-    await harness.setup(state);
-    const P1 = harness.player('P1');
-
-    await P1.triggerAction('顺手牵羊', 'use', { cardId: 'sq1', target: 1 });
-    await P1.pass();
-    // 选牌面板选装备
-    await P1.respond('顺手牵羊', { zone: 'equipment', cardId: 'wp1' });
-    expect(harness.state.players[0].hand).toContain('wp1');
-  });
-
-  // ─────────────────────────────────────────────────────────────
-  // 10. 顺手牵羊 端到端(获得 atom 验证)
+  // 9. 顺手牵羊 端到端(获得 atom 验证)
   // ─────────────────────────────────────────────────────────────
   // 来源: tests/integration/obtain-atom.test.ts test 5
   it('顺手牵羊 端到端:P0 出锦囊 → P0 拿 P1 一张手牌 → P1.hand -1,P0 拿到该牌', async () => {
