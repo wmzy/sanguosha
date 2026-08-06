@@ -252,7 +252,7 @@ describe('英魂', () => {
         makePlayer({
           index: 0,
           name: '孙坚',
-          health: 3,
+          health: 2,
           maxHealth: 4,
           hand: [],
           skills: ['英魂', '回合管理'],
@@ -270,13 +270,15 @@ describe('英魂', () => {
         p1b: makeCard('p1b', '闪'),
         p1c: makeCard('p1c', '桃', '♥'),
         d1: makeCard('d1', '酒', '♣'),
+        d2: makeCard('d2', '桃', '♥'),
       },
       currentPlayerIndex: 0,
       phase: '准备',
       turn: { round: 1, phase: '准备', vars: {} },
     });
-    // X = 4-3 = 1:选项1 摸1弃1;选项2 摸1弃1(相同)→ 用超时验证默认走选项1分支
-    state.zones = { deck: ['d1'], discardPile: [], processing: [] };
+    // X = 4-2 = 2:选项1 摸2弃1(净+1)≠ 选项2 摸1弃2(净-1),
+    // 超时默认选项1 才可被区分验证(原 health=3 即 X=1 时两选项相同,断言无法证伪)。
+    state.zones = { deck: ['d1', 'd2'], discardPile: [], processing: [] };
     await harness.setup(state);
     const 孙坚 = harness.player('孙坚');
     const P1 = harness.player('P1');
@@ -288,16 +290,18 @@ describe('英魂', () => {
     await 孙坚.respond('英魂', { targets: [1] });
     await waitForStable(harness.state); // 孙坚 option 询问
 
-    // 孙坚超时(pass)→ 默认选项1
+    // 孙坚超时(pass)→ 默认选项1(摸X弃1)
     await 孙坚.pass();
     await waitForStable(harness.state); // 弃牌询问(选项1 弃1)
     P1.expectPending('请求回应');
     await P1.respond('英魂', { cardIds: ['p1a'] });
     await harness.waitForStable();
 
-    // P1 原3张 +摸1(d1) -弃1(p1a) = 3张
-    expect(harness.state.players[1].hand.length).toBe(3);
+    // P1 原3张 +摸2(d1,d2) -弃1(p1a) = 4张(若默认选项2 则为 2 张 → 据此验证默认选项1)
+    expect(harness.state.players[1].hand.length).toBe(4);
     expect(harness.state.players[1].hand).toContain('d1');
+    expect(harness.state.players[1].hand).toContain('d2');
+    expect(harness.state.zones.deck.length).toBe(0);
     expect(harness.state.zones.discardPile).toContain('p1a');
   });
 
