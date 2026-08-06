@@ -15,7 +15,8 @@
 //   5. 边界:体力1发动→失去体力归0→诈降先摸3→濒死求桃pending(hand已+3)
 //   6. 边界:体力1→濒死→自持桃救回→体力回升至1
 //   7. 负面:已死亡→拒绝
-//   8. 副作用:发动后诈降激活(turn.vars['诈降/active']===0)
+//   8. 发动时机:非自己回合 / 非出牌阶段 → 拒绝
+//   (诈降激活副作用由用例1的 turn.vars['诈降/active'] 断言覆盖,不单列)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -290,15 +291,32 @@ describe('界苦肉', () => {
     });
   });
 
-  it('副作用: 发动后诈降激活(失去体力触发诈降,出牌阶段)', async () => {
+  // 出牌阶段限一次的主动技,必须锁定在自己出牌阶段;这两条 validate 首分支
+  // (currentPlayerIndex / phase)此前无覆盖,补齐。与 乱武/决斗 等同级技能测试一致。
+  it('负面: 非自己回合 / 非出牌阶段 → 拒绝', async () => {
     await setup(4, ['c1']);
     const P1 = harness.player('P1');
     const state = harness.state;
 
-    expect(state.turn.vars['诈降/active']).toBeUndefined();
+    // 非出牌阶段
+    state.phase = '摸牌';
+    await P1.expectRejected({
+      skillId: '界苦肉',
+      actionType: 'use',
+      params: { cardIds: ['c1'] },
+    });
+    state.phase = '出牌';
 
-    await P1.triggerAction('界苦肉', 'use', { cardIds: ['c1'] });
+    // 非自己回合
+    state.currentPlayerIndex = 1;
+    await P1.expectRejected({
+      skillId: '界苦肉',
+      actionType: 'use',
+      params: { cardIds: ['c1'] },
+    });
 
-    expect(state.turn.vars['诈降/active']).toBe(0);
+    // 状态未变:体力仍 4,c1 仍在手
+    expect(state.players[0].health).toBe(4);
+    expect(state.players[0].hand).toContain('c1');
   });
 });
