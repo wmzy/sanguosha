@@ -2,6 +2,7 @@
 // 神速(夏侯渊)测试:
 //   选项1:跳过判定+摸牌,视为对一名其他角色出杀(无距离限制)
 //   选项2:跳过出牌+弃一张装备,视为对一名其他角色出杀
+//   选项3:跳过弃牌+翻面,视为对一名其他角色出杀
 //
 // 验证:
 //   1. 正面(选项1):发动 → 选目标 → 目标受 1 点伤害(或可闪)
@@ -9,8 +10,12 @@
 //   3. 负面(选项1):不发动 → 判定/摸牌阶段正常进行
 //   4. 正面(选项2):有装备时发动 → 弃装备 + 目标受伤
 //   5. 负面(选项2):无装备 → 不询问(直接进入出牌)
+//   6. 正面(选项3):发动 → 目标受伤 + 加翻面标签
+//   7. 负面(选项3):不发动 → 无伤害、无翻面标签
+//   8. 翻面:下一回合准备阶段消费标签 + 回合推进到下家
+//   9. 出杀次数:神速虚拟杀计入出杀次数(charge),再出真杀被拒
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -62,6 +67,13 @@ async function triggerJudgePhase(harness: SkillTestHarness, player = 0): Promise
 /** 触发出牌阶段:applyAtom(阶段开始, ownerId, 出牌) → 神速② before-hook 询问 */
 async function triggerPlayPhase(harness: SkillTestHarness, player = 0): Promise<void> {
   void applyAtom(harness.state, { type: '阶段开始', player, phase: '出牌' });
+  await harness.waitForStable();
+  harness.processAllEvents();
+}
+
+/** 触发摸牌阶段:applyAtom(阶段开始, ownerId, 摸牌) → 神速① 跳过摸牌 before-hook(有标签时跳过) */
+async function triggerDrawPhase(harness: SkillTestHarness, player = 0): Promise<void> {
+  void applyAtom(harness.state, { type: '阶段开始', player, phase: '摸牌' });
   await harness.waitForStable();
   harness.processAllEvents();
 }
@@ -164,10 +176,22 @@ describe('神速', () => {
     const P2b = harness.player('P2');
     await P2b.pass();
 
-    // 神速①已发动,P2 受伤。摸牌阶段被跳过(skip 标签已加)
+    // 神速①已发动,P2 受伤。跳过摸牌标签已加
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.players[0].tags).toContain('神速/跳过摸牌');
-    // P1 手牌数量未因摸牌阶段增加(摸牌阶段尚未触发,但标签已确保会被跳过)
+
+    // 实际触发摸牌阶段:神速①的跳过摸牌 before-hook 命中标签 → 发动跳过。
+    // 本 harness 的技能隔离测试不注册 回合管理(自动摸牌/阶段推进),故此处可验证的是
+    // 跳过机制本身——skipPhase 命中标签后执行去标签(标签被消费);手牌不变为兼带不变式。
+    // 另:隔离驱动 阶段开始(摸牌) 时 state.phase 未被推进到 '摸牌',与 applyView 增量
+    // 视图的 phase 字段不可比(真实对局 state.phase 此刻已是 '摸牌'),故临时关闭视图
+    // 一致性自动对比——这是 disableAutoCompare 的既定用途。
+    const restoreCompare = disableAutoCompare();
+    await triggerDrawPhase(harness);
+    restoreCompare();
+    // 跳过摸牌标签被消费(证明 skipPhase 在摸牌阶段开始时正确发动并清理标签)
+    expect(harness.state.players[0].tags).not.toContain('神速/跳过摸牌');
+    // P1 未摸牌(deck 中有 5 张牌,无牌入手)
     expect(harness.state.players[0].hand.length).toBe(handBefore);
   });
 
@@ -194,7 +218,7 @@ describe('神速', () => {
 
     // 不发动 → 无伤害,无跳过标签
     expect(harness.state.players[1].health).toBe(4);
-    expect(harness.state.players[0].vars['神速/opt1Used']).toBeUndefined();
+    expect(harness.state.players[0].vars['神速/opt1/usedThisTurn']).toBeUndefined();
     expect(harness.state.players[0].tags).not.toContain('神速/跳过摸牌');
   });
 
@@ -349,7 +373,7 @@ describe('神速', () => {
 
     // 不发动 → 无伤害,无翻面标签
     expect(harness.state.players[1].health).toBe(4);
-    expect(harness.state.players[0].vars['神速/opt3Used']).toBeUndefined();
+    expect(harness.state.players[0].vars['神速/opt3/usedThisTurn']).toBeUndefined();
     expect(harness.state.players[0].tags).not.toContain('神速/翻面');
   });
 
