@@ -11,6 +11,7 @@
 //   5. 每回合限一次 → 第二次被拒
 //   6. 非群势力 → 不可用
 //   7. 界张角非主公 → 不可用
+//   8. 群盟友在非自己回合使用(发动时机) → 被拒
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -370,5 +371,49 @@ describe('界黄天', () => {
     // 牌未转移
     expect(harness.state.players[1].hand).not.toContain('d1');
     expect(harness.state.players[2].hand).toContain('d1');
+  });
+
+  // ─── 8. 发动时机:非自己回合 → 不可用 ────────────────────
+  it('群盟友在界张角回合(非自己回合)使用界黄天 → 被拒', async () => {
+    const dodge = makeCard('d1', '闪', '♥', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '界张角',
+          character: '界张角',
+          faction: '群',
+          hand: [],
+          skills: ['界黄天', '回合管理'],
+          health: 3,
+        }),
+        makePlayer({
+          index: 1,
+          name: '群盟友',
+          faction: '群',
+          hand: ['d1'],
+          skills: ['回合管理'],
+          health: 4,
+        }),
+      ],
+      cardMap: { d1: dodge },
+      currentPlayerIndex: 0, // 界张角回合,非群盟友回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: [], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P1 = harness.player('群盟友');
+
+    // 非自己回合 → validate 拒绝(界黄天限本角色出牌阶段)
+    await P1.expectRejected({
+      skillId: '界黄天',
+      actionType: 'use',
+      params: { cardId: 'd1' },
+    });
+
+    // 牌未转移
+    expect(harness.state.players[0].hand).not.toContain('d1');
+    expect(harness.state.players[1].hand).toContain('d1');
   });
 });
