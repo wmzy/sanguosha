@@ -9,6 +9,8 @@
 //   4. 负面:本回合已用过 → 拒绝(限一次)
 //   5. 负面:目标体力已满 → 拒绝
 //   6. 负面:不在手牌的牌 → 拒绝
+//   7. 负面:非出牌阶段 → 拒绝
+//   8. 负面:目标已死亡 → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -169,6 +171,35 @@ describe('青囊', () => {
     });
   });
 
+  it('use:非出牌阶段 → 拒绝', async () => {
+    const card = makeCard('d1', '杀', '♠', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '华佗',
+          hand: ['d1'],
+          skills: ['青囊'],
+          health: 2,
+          maxHealth: 3,
+        }),
+        makePlayer({ index: 1, name: 'P1', skills: [], health: 2, maxHealth: 4 }),
+      ],
+      cardMap: { d1: card },
+      currentPlayerIndex: 0, // 华佗回合
+      phase: '摸牌', // 但不是出牌阶段
+      turn: { round: 1, phase: '摸牌', vars: {} },
+    });
+    await harness.setup(state);
+    const HuaTuo = harness.player('华佗');
+
+    await HuaTuo.expectRejected({
+      skillId: '青囊',
+      actionType: 'use',
+      params: { cardId: 'd1', targets: [0] },
+    });
+  });
+
   it('use:本回合已用过 → 拒绝(限一次)', async () => {
     const c1 = makeCard('d1', '杀', '♠', '2');
     const c2 = makeCard('d2', '闪', '♣', '3');
@@ -227,6 +258,37 @@ describe('青囊', () => {
     const HuaTuo = harness.player('华佗');
 
     // 目标 P1 体力已满(4/4) → 拒绝
+    await HuaTuo.expectRejected({
+      skillId: '青囊',
+      actionType: 'use',
+      params: { cardId: 'd1', targets: [1] },
+    });
+  });
+
+  it('use:目标已死亡 → 拒绝', async () => {
+    const card = makeCard('d1', '杀', '♠', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '华佗',
+          hand: ['d1'],
+          skills: ['青囊'],
+          health: 2,
+          maxHealth: 3,
+        }),
+        makePlayer({ index: 1, name: 'P1', skills: [], health: 2, maxHealth: 4 }),
+      ],
+      cardMap: { d1: card },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    // P1 已阵亡(体力未满但 alive=false)
+    state.players[1].alive = false;
+    await harness.setup(state);
+    const HuaTuo = harness.player('华佗');
+
     await HuaTuo.expectRejected({
       skillId: '青囊',
       actionType: 'use',
