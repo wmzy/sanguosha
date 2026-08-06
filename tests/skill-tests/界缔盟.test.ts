@@ -7,6 +7,7 @@
 //   1. 正面:diff=2 → 先交换(不立即弃),出牌阶段结束时弃2张
 //   2. 前置条件:diff > 鲁肃牌数 → 不执行交换
 //   3. diff=0 → 交换但无需弃牌
+//   4. 限一次:本回合已使用过 → 再次发动被拒
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -246,5 +247,61 @@ describe('界缔盟', () => {
     expect(harness.state.localVars['界缔盟/待弃数']).toBeUndefined();
     // 鲁肃手牌不变
     expect(harness.state.players[0].hand.length).toBe(2);
+  });
+
+  // ─── 4. 限一次:本回合已使用过 → 再次发动被拒 ───────────
+
+  it('限一次:首次发动后,同回合第二次发动被拒', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '鲁肃',
+          hand: ['c1', 'c2'],
+          skills: ['界缔盟', '回合管理'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          hand: ['p1a', 'p1b'],
+          skills: [],
+        }),
+        makePlayer({
+          index: 2,
+          name: 'P2',
+          character: '刘备',
+          hand: ['p2a', 'p2b'],
+          skills: [],
+        }),
+      ],
+      cardMap: {
+        c1: makeCard('c1', '杀'),
+        c2: makeCard('c2', '闪'),
+        p1a: makeCard('p1a', '杀'),
+        p1b: makeCard('p1b', '闪'),
+        p2a: makeCard('p2a', '桃', '♥'),
+        p2b: makeCard('p2b', '酒', '♣'),
+      },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('鲁肃');
+
+    // 首次发动(diff=0,交换后无弃牌,流程完整结束)
+    await P0.triggerAction('界缔盟', 'use');
+    P0.expectPending('请求回应');
+    await P0.respond('界缔盟', { targets: [1, 2] });
+    // 交换已生效,确认首次发动成功
+    expect(harness.state.players[1].hand).toEqual(['p2a', 'p2b']);
+
+    // 同回合第二次发动 → validate 拒绝(本回合已使用过)
+    await P0.expectRejected({
+      skillId: '界缔盟',
+      actionType: 'use',
+      params: {},
+    });
   });
 });
