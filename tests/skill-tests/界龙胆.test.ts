@@ -396,15 +396,15 @@ describe('界龙胆', () => {
     const P1 = harness.player('P1');
 
     // 无 targets → 杀.use validate 失败 → rollback 界龙胆 transform
+    // preceding 必须在 message 顶层(ClientMessage.preceding),不能放进 params——
+    // 否则 transform 不执行,主 action 因影子卡不存在而失败,rollback 路径根本不被触发。
     await P1.expectRejected({
       skillId: '杀',
       actionType: 'use',
-      params: {
-        cardId: 'd1#界龙胆',
-        preceding: [
-          { skillId: '界龙胆', actionType: 'transform', params: { cardId: 'd1', to: '杀' } },
-        ],
-      },
+      params: { cardId: 'd1#界龙胆' },
+      preceding: [
+        { skillId: '界龙胆', actionType: 'transform', params: { cardId: 'd1', to: '杀' } },
+      ],
     });
 
     // 状态还原:d1 仍是闪,影子不存在,手牌仍是 d1
@@ -437,16 +437,14 @@ describe('界龙胆', () => {
     const P1 = harness.player('P1');
 
     // P1 满血 → 桃.use validate 失败(桃只能对受伤角色使用) → rollback
+    // preceding 必须在 message 顶层(ClientMessage.preceding),不能放进 params。
     await P1.expectRejected({
       skillId: '桃',
       actionType: 'use',
-      params: {
-        cardId: 'w1#界龙胆',
-        targets: [0],
-        preceding: [
-          { skillId: '界龙胆', actionType: 'transform', params: { cardId: 'w1', to: '桃' } },
-        ],
-      },
+      params: { cardId: 'w1#界龙胆', targets: [0] },
+      preceding: [
+        { skillId: '界龙胆', actionType: 'transform', params: { cardId: 'w1', to: '桃' } },
+      ],
     });
 
     expect(harness.state.cardMap['w1'].name).toBe('酒');
