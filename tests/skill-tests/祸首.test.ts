@@ -76,7 +76,6 @@ describe('祸首', () => {
       }),
     );
     const P1 = harness.player('P1');
-    const meng = harness.player('孟获');
 
     // P1 使用南蛮入侵(唯一其他目标 = 孟获)
     await P1.useCardAndTarget('南蛮入侵', 'nm1', []);
@@ -90,7 +89,6 @@ describe('祸首', () => {
     expect(harness.state.players[0].hand).toContain('mk1');
     // 无 询问杀 pending 残留
     expect(harness.state.pendingSlots.size).toBe(0);
-    void meng;
   });
 
   it('孟获是南蛮入侵伤害来源:其他角色受伤时来源=孟获', async () => {
