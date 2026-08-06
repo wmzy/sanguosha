@@ -6,10 +6,9 @@
 //   2. 杀命中 + 装备麒麟弓 + 询问 → 不发动 → 伤害照常 + 目标马保留
 //   3. 杀命中 + 装备麒麟弓 + 目标无马 → 不询问(直接伤害)
 //   4. 杀命中 + 无麒麟弓 → 不触发弃马
+//   5. 目标持防御马(无进攻马)→ 确认发动 → 弃防御马(进攻马优先的反面边界)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
-import { registerSkillsFromState } from '../../src/engine/index';
-import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState, Json, PlayerState } from '../../src/engine/types';
@@ -103,7 +102,7 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
     const p1HealthBefore = harness.state.players[1].health;
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    // P1 无手牌:询问闪走 skip(无 slot),直接扣血;麒麟弓(造成伤害后)询问 P0
+    // P1 无手牌:询问闪 skip(无 slot);麒麟弓(造成伤害时)询问 P0
     expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
     await P0.respond('麒麟弓', { choice: true });
 
@@ -171,28 +170,22 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
-    await registerSkillsFromState(state);
+    await harness.setup(state);
+    const P0 = harness.player('P0');
 
-    const p1HealthBefore = state.players[1].health;
+    const p1HealthBefore = harness.state.players[1].health;
 
-    await dispatchAndWait(state, {
-      skillId: '杀',
-      actionType: 'use',
-      ownerId: 0,
-      params: { cardId: slash.id, targets: [1] },
-      baseSeq: state.seq,
-    });
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    // P1 无手牌 → 询问闪 skip;麒麟弓(造成伤害时)询问 P0
+    expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
 
-    // 询问闪
-    await fireTimeoutAndWait(state);
+    // P0 不发动(pass/超时 = 不弃马,伤害照常)
+    await P0.pass();
 
-    // 麒麟弓询问 → P0 超时(等同不发动)
-    await fireTimeoutAndWait(state);
-
-    // B1 马保留 + 扣1血
-    expect(state.players[1].equipment['进攻马']).toBe(mount.id);
-    expect(state.players[1].health).toBe(p1HealthBefore - 1);
-    expect(state.pendingSlots.size).toBe(0);
+    // P1 马保留 + 扣1血
+    expect(harness.state.players[1].equipment['进攻马']).toBe(mount.id);
+    expect(harness.state.players[1].health).toBe(p1HealthBefore - 1);
+    expect(harness.state.pendingSlots.size).toBe(0);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -234,24 +227,15 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
-    await registerSkillsFromState(state);
+    await harness.setup(state);
+    const P0 = harness.player('P0');
 
-    const p1HealthBefore = state.players[1].health;
+    const p1HealthBefore = harness.state.players[1].health;
 
-    await dispatchAndWait(state, {
-      skillId: '杀',
-      actionType: 'use',
-      ownerId: 0,
-      params: { cardId: slash.id, targets: [1] },
-      baseSeq: state.seq,
-    });
-
-    // 询问闪
-    await fireTimeoutAndWait(state);
-
-    // 杀命中后无麒麟弓询问(B1 无马)→ 直接扣血
-    expect(state.players[1].health).toBe(p1HealthBefore - 1);
-    expect(state.pendingSlots.size).toBe(0);
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    // P1 无手牌 → 询问闪 skip;P1 无马 → 麒麟弓不触发 → 直接扣血
+    expect(harness.state.players[1].health).toBe(p1HealthBefore - 1);
+    expect(harness.state.pendingSlots.size).toBe(0);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -292,24 +276,82 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
-    await registerSkillsFromState(state);
+    await harness.setup(state);
+    const P0 = harness.player('P0');
 
-    const p1HealthBefore = state.players[1].health;
+    const p1HealthBefore = harness.state.players[1].health;
 
-    await dispatchAndWait(state, {
-      skillId: '杀',
-      actionType: 'use',
-      ownerId: 0,
-      params: { cardId: slash.id, targets: [1] },
-      baseSeq: state.seq,
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    // P1 无手牌 → 询问闪 skip;无麒麟弓 → 不触发 → 直接扣血,马保留
+    expect(harness.state.players[1].equipment['进攻马']).toBe(mount.id);
+    expect(harness.state.players[1].health).toBe(p1HealthBefore - 1);
+    expect(harness.state.pendingSlots.size).toBe(0);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 5. 边界:目标持防御马(无进攻马)→ 确认 → 弃防御马
+  //    实现中 ownedMounts=['进攻马','防御马'],进攻马优先;
+  //    本用例验证仅有防御马时正确弃防御马。
+  // ─────────────────────────────────────────────────────────────
+  it('用例5:P0 麒麟弓杀P1(持防御马,无进攻马)→ 确认发动 → P1 防御马被弃 + 扣1血', async () => {
+    const qilin: Card = {
+      id: 'wp-ql',
+      name: '麒麟弓',
+      suit: '♥',
+      color: '红',
+      rank: '5',
+      type: '装备牌',
+      subtype: '武器',
+      range: 5,
+    };
+    const mount: Card = {
+      id: 'mt-dilu',
+      name: '的卢',
+      suit: '♣',
+      color: '黑',
+      rank: '5',
+      type: '装备牌',
+      subtype: '防御马',
+    };
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: [slash.id],
+          equipment: { 武器: qilin.id },
+          skills: ['杀', '装备通用', '麒麟弓'],
+          vars: { '距离/出杀范围': 5 },
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          equipment: { 防御马: mount.id },
+          skills: ['闪'],
+        }),
+      ],
+      cardMap: { [qilin.id]: qilin, [mount.id]: mount, [slash.id]: slash },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
     });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
 
-    // 询问闪
-    await fireTimeoutAndWait(state);
+    const p1HealthBefore = harness.state.players[1].health;
 
-    // 杀命中 → 无麒麟弓 → 直接扣血,马保留
-    expect(state.players[1].equipment['进攻马']).toBe(mount.id);
-    expect(state.players[1].health).toBe(p1HealthBefore - 1);
-    expect(state.pendingSlots.size).toBe(0);
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    // P1 无手牌 → 询问闪 skip;麒麟弓(造成伤害时)询问 P0
+    expect(harness.state.pendingSlots.size).toBeGreaterThan(0);
+    await P0.respond('麒麟弓', { choice: true });
+
+    // 仅防御马 → 弃防御马(ownedMounts[0]='防御马')
+    expect(harness.state.players[1].equipment['防御马']).toBeUndefined();
+    expect(harness.state.zones.discardPile).toContain(mount.id);
+    expect(harness.state.players[1].health).toBe(p1HealthBefore - 1);
+    expect(harness.state.pendingSlots.size).toBe(0);
   });
 });
