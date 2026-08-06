@@ -146,7 +146,7 @@ describe('界献州', () => {
           maxHealth: 3,
           equipment: { 武器: 'w1' },
         }),
-        // P1 接收装备 + 造伤来源;P1 装备丈八蛇矛(range=3)覆盖 P2(距离 2)
+        // P1 接收装备 + 造伤来源。收到的牌进手牌(不装备),默认攻击范围 1
         makePlayer({
           index: 1,
           name: 'P1',
@@ -186,10 +186,8 @@ describe('界献州', () => {
     await harness.waitForStable();
     harness.processAllEvents();
 
-    // P1 选至多 1 名攻击范围内角色。P1 装备已含 w1(刚接收,range=2);
-    // 但描述说"其攻击范围"——P1 接收装备后,其攻击范围受该装备影响。
-    // P1 当前手中已有 w1(刚接收),但还未装备,默认 range=1。
-    // P0 距离 P1 = 1,P2 距离 P1 = 1(三人环座),都在范围内。
+    // P1 选至多 1 名攻击范围内角色(X=1)。P1 收到的 w1 进手牌、未装备,
+    // 默认攻击范围 1:三人环座下 P0/P2 距 P1 均为 1,都在范围内
     P1.expectPending('请求回应');
     // 选 P0 作为造伤目标
     await P1.respond('界献州', { targets: [0] });
@@ -255,7 +253,6 @@ describe('界献州', () => {
   // ─── 4. 限定技已使用 → 拒绝 ─────────────────────────────
   it('限定技已使用 → 第二次被拒绝', async () => {
     const weapon = makeWeapon('w1', '青釭剑', '♠', 2);
-    const weapon2 = makeWeapon('w2', '丈八蛇矛', '♠', 3);
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -274,7 +271,7 @@ describe('界献州', () => {
           maxHealth: 4,
         }),
       ],
-      cardMap: { w1: weapon, w2: weapon2 },
+      cardMap: { w1: weapon },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
