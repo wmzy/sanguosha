@@ -7,11 +7,12 @@
 //   2. execute:移动牌(自己手牌→目标手牌)→ 装备(目标)→ 添加技能(装备自带技能)→ 摸牌(1)
 //
 // 验证:
-//   1. 正面:正常使用 → 装备到他人空装备区 + 摸1张
+//   1. 正面:正常使用(防具/武器)→ 装备到他人空装备区 + 摸1张
 //   2. 负面:目标已有装备(同栏位)→ 拒绝
 //   3. 负面:对自己使用 → 拒绝
 //   4. 负面:非装备牌 → 拒绝
 //   5. 负面:非自己回合 → 拒绝
+//   6. 负面:目标已死亡 → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -48,6 +49,7 @@ function makePlayer(opts: {
   equipment?: Record<string, string>;
   health?: number;
   maxHealth?: number;
+  alive?: boolean;
 }): PlayerState {
   return {
     index: opts.index,
@@ -55,7 +57,7 @@ function makePlayer(opts: {
     character: '',
     health: opts.health ?? 4,
     maxHealth: opts.maxHealth ?? 4,
-    alive: true,
+    alive: opts.alive ?? true,
     hand: opts.hand ?? [],
     equipment: opts.equipment ?? {},
     skills: opts.skills ?? [],
@@ -227,5 +229,32 @@ describe('直谏', () => {
       actionType: 'use',
       params: { cardId: 'rw', targets: [1] },
     });
+  });
+
+  // ─── 负面:目标已死亡 → 拒绝 ─────────────────────────────────
+
+  it('负面:目标已死亡 → 拒绝', async () => {
+    const armor = makeEquip('rw', '仁王盾', '防具', '♣', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['rw'], skills: ['直谏'] }),
+        makePlayer({ index: 1, name: 'P2', skills: [], alive: false }),
+      ],
+      cardMap: { rw: armor },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.expectRejected({
+      skillId: '直谏',
+      actionType: 'use',
+      params: { cardId: 'rw', targets: [1] },
+    });
+
+    // P2 装备区仍为空(未装备)
+    expect(harness.state.players[1].equipment['防具']).toBeUndefined();
   });
 });
