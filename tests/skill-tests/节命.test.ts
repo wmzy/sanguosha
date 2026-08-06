@@ -7,6 +7,8 @@
 //   3. 手牌已满:不摸牌
 //   4. 不发动:拒绝
 //   5. 选自己:给自己补牌
+//   6. 每点伤害触发一次:受到 N 点 → N 次独立询问
+//   7. 荀彧因伤害死亡(无人救)→ alive 守卫生效 → 节命不触发
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -351,5 +353,51 @@ describe('节命', () => {
     expect(harness.state.players[1].health).toBe(1);
 
     await damagePromise;
+  });
+
+  // ─── 荀彧因伤害死亡(无人救)→ 节命不触发 ────────────────────
+  // 实现的 alive 守卫:节命挂在「伤害结算结束后」(濒死求桃之后),
+  //   荀彧因伤害死亡(无人救)时 alive=false → 不询问、不摸牌。
+  it('荀彧 1 血中杀 → 濒死无人救 → 死亡 → 节命不触发(不询问/不摸牌)', async () => {
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const cardMap: Record<string, Card> = { k1: slash };
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', character: '张飞', skills: ['杀', '闪'] }),
+        // 荀彧 1 血:中杀即濒死
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          skills: ['节命', '闪'],
+          health: 1,
+          maxHealth: 3,
+        }),
+      ],
+      cardMap,
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.players[0].hand = ['k1'];
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    // P1 无手牌:询问闪走 skip,直接扣血 → 1→0 → 濒死求桃
+    // 两人都无桃 → pass 掉所有求桃 pending → 荀彧死亡
+    while (harness.state.pendingSlots.size > 0) {
+      const slot = [...harness.state.pendingSlots.values()][0];
+      const target = (slot.atom as { target?: number }).target ?? 0;
+      await harness.player(target).pass();
+      await harness.waitForStable();
+    }
+
+    // 荀彧死亡 → 节命 alive 守卫失败 → 不触发
+    expect(harness.state.players[1].alive).toBe(false);
+    // 无节命询问 pending
+    expect(harness.state.pendingSlots.size).toBe(0);
+    // P0 出杀后无手牌,亦未被节命补牌
+    expect(harness.state.players[0].hand.length).toBe(0);
   });
 });
