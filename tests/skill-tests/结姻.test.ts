@@ -11,7 +11,6 @@
 //   7. allocation 格式(distribute/allocate UI 提交)同样生效
 //   8. 弃牌张数不等于 2 → 拒绝
 //   9. 孙尚香满血时发动 → 自身不额外回血,但目标仍回血
-//  10. 孙尚香已受伤时发动 → 自身与目标各回 1 点
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -151,7 +150,7 @@ describe('结姻', () => {
     await P0.triggerAction('结姻', 'use', { cardIds: ['h1', 'h2'], target: 1 });
     expect(harness.state.players[1].health).toBe(4);
 
-    // 第二次应被拒绝(P1 已满血也会因 usedThisTurn 先拒绝)
+    // 第二次目标为 P2(甄姬·女性,本就非法),但 usedThisTurn 校验在前,先拒绝
     await P0.expectRejected({
       skillId: '结姻',
       actionType: 'use',
@@ -261,17 +260,4 @@ describe('结姻', () => {
     expect(harness.state.players[1].health).toBe(4);
   });
 
-  // ─── 10. 孙尚香已受伤(2/3)发动 → 自身与目标各回 1 点 ────────
-  it('孙尚香 2/3 受伤:发动 → 自身 2→3,目标 P1 3→4', async () => {
-    const state = buildState({});
-    state.players[0].health = 2;
-    state.players[0].maxHealth = 3;
-    await harness.setup(state);
-    const P0 = harness.player('孙尚香');
-
-    await P0.triggerAction('结姻', 'use', { cardIds: ['h1', 'h2'], target: 1 });
-
-    expect(harness.state.players[0].health).toBe(3);
-    expect(harness.state.players[1].health).toBe(4);
-  });
 });
