@@ -209,7 +209,7 @@ describe('界铁骑', () => {
     const kill = makeCard('k1', '杀', '♠', '7');
     const judge = makeCard('j1', '桃', '♣', '5'); // 判定梅花
     // P2(司马懿)无同花色手牌(无梅花)→ 强制命中,受伤
-    // 反馈锁定技不会触发(被压制)
+    // 反馈(非锁定技)被界铁骑压制,不会触发
     const state: GameState = createGameState({
       players: [
         // P1 多一张装备可被反馈的牌,以验证反馈确实未触发
