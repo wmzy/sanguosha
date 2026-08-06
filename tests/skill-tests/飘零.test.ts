@@ -180,7 +180,7 @@ describe('飘零', () => {
   });
 
   // ─── 4. 非红桃判定 → 无效果 ──────────────────────────────────
-  it('非红桃判定(黑桃) → 无效果,判定牌留在弃牌堆', async () => {
+  it('非红桃判定(梅花) → 无效果,判定牌留在弃牌堆', async () => {
     const judgeCard = makeCard('j1', '杀', '♣', '7'); // 梅花(非红桃)
     const state: GameState = createGameState({
       players: [
