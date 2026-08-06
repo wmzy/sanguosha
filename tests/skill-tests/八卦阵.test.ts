@@ -502,10 +502,10 @@ describe('八卦阵', () => {
     expect(findActionEntry(harness.state, '八卦阵', 0, 'respond')).toBeUndefined();
   });
 
-  // ─── 候选 B:八阵(卧龙诸葛)+ 藤甲 → 被杀不询问八阵 ────────────
+  // ─── 候选 B:八阵(卧龙诸葛)+ 藤甲 → 普通杀无效(不询问八阵/闪) ───
   // 卧龙诸葛锁定技「八阵」:无防具时视为八卦阵。装备藤甲后应失效(有防具)。
-  // 验证 noArmor 检查:装备藤甲后 equipment['防具']=藤甲 cardId → 八阵不触发。
-  it('候选B:卧龙诸葛(八阵)装备藤甲后被杀 → 不询问八阵,走藤甲减伤', async () => {
+  // 且藤甲令普通杀对你无效:检测有效性 cancel → 既不询问八阵也不询问闪。
+  it('候选B:卧龙诸葛(八阵)装备藤甲后被普通杀 → 无效,不询问八阵/闪', async () => {
     const tengjia = makeEquip('tj', '藤甲', '♠', '防具', '2');
     const slash = makeCard('s1', '杀', '♠', '7'); // 普通黑杀
     const state: GameState = createGameState({
@@ -526,7 +526,6 @@ describe('八卦阵', () => {
       turn: { round: 1, phase: '出牌', vars: {} },
     });
     await harness.setup(state);
-    const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
     // 前置:藤甲在身,equipment['防具'] 正确为藤甲 cardId
@@ -535,19 +534,12 @@ describe('八卦阵', () => {
     // P2 出杀对 P1
     await P2.useCardAndTarget('杀', 's1', [0]);
 
-    // 不应出现「是否发动八阵?」询问 —— 藤甲已是当前防具,八阵应失效
-    const slot = [...harness.state.pendingSlots.values()][0];
-    const slotAtom = slot?.atom as { type: string; requestType?: string } | undefined;
-    const isBazhenPrompt =
-      slotAtom?.type === '请求回应' && slotAtom?.requestType === '八阵/confirm';
-    expect(isBazhenPrompt).toBe(false);
-
-    // 应直接进入 询问闪
-    P1.expectPending('询问闪');
-
-    // 藤甲生效:P1 不出闪 → 普通杀被藤甲减为 0 → 不扣血
-    await P1.pass();
+    // 普通杀对藤甲无效:检测有效性 cancel → 不询问八阵、不询问闪、不扣血
+    // (八阵因有防具本就不触发;藤甲令普通杀整体无效,连询问闪都跳过)
+    expect(harness.state.pendingSlots.size).toBe(0);
     expect(harness.state.players[0].health).toBe(4);
+    // 杀进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('s1');
   });
 
   // ─── 正面:询问超时 → 等同不发动 → 不判定 ────────────

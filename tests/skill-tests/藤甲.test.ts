@@ -1,13 +1,16 @@
-// 藤甲(防具):普通杀/非属性锦囊伤害 -1,火焰伤害 +1。
+// 藤甲(防具):锁定技,南蛮入侵/万箭齐发/普通杀对你无效;火焰伤害+1。
 //
-// 实现(藤甲.ts):before hook 挂「造成伤害」——target=自己时:
-//   - damageType === '火焰' → amount + 1
-//   - 否则 → amount - 1(下限 0)
+// 实现(藤甲.ts)双 hook:
+//   ① 检测有效性 before-hook:普通杀(非火/雷)/南蛮/万箭 → cancel(无效,不询问闪/杀)
+//   ② 受到伤害时 before-hook:火焰伤害 +1
 //
 // 验证:
-//   1. 正面:普通杀(1 点)→ 减为 0(不受伤害)
+//   1. 正面:普通杀 → 无效(不询问闪、不扣血)
 //   2. 正面:真实火杀('火焰')→ +1(2 点伤害)
 //   3. 分支:直接造成火焰伤害 → +1(独立验证 hook)
+//   4. 正面:南蛮入侵/万箭齐发 → 无效(不询问杀/闪、不扣血)
+//   5. 正面:雷杀(雷电)→ 穿透藤甲,正常 1 点伤害(属性杀不被无效)
+//   6. 边界:藤甲不保护其他玩家
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -70,35 +73,32 @@ describe('藤甲', () => {
     harness = new SkillTestHarness();
   });
 
-  // ─── 正面:普通杀减为 0 ───────────────────────────────────
+  // ─── 正面:普通杀对你无效(不询问闪) ──────────────────────────
 
-  it('正面:普通杀(1 点)→ 减为 0,不受伤害', async () => {
-    const kill = makeCard('k1', '杀', '♠', '7');
-    const dodge = makeCard('d1', '闪', '♥', '2');
+  it('正面:普通杀对你无效 → 不询问闪,不扣血', async () => {
+    const kill = makeCard('k1', '杀', '♠', '7'); // 普通杀(无 damageType)
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['杀'] }),
-        // P2 带一张闪:询问闪走 normal(P2 选择不出闪),藤甲将普通杀减为 0
         makePlayer({
           index: 1,
           name: 'P2',
-          hand: ['d1'],
+          hand: [],
           skills: ['闪', '藤甲'],
           equipment: { 防具: 'tj' },
         }),
       ],
-      cardMap: { tj: TENGJIA, k1: kill, d1: dodge },
+      cardMap: { tj: TENGJIA, k1: kill },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
     await harness.setup(state);
-    const P2 = harness.player('P2');
 
     await harness.player('P1').useCardAndTarget('杀', 'k1', [1]);
-    P2.expectPending('询问闪');
-    await P2.pass(); // 不出闪 → 造成 1 点伤害,藤甲减为 0
 
+    // 普通杀被藤甲无效:检测有效性 cancel → 不询问闪、不扣血
+    expect(harness.state.pendingSlots.size).toBe(0);
     expect(harness.state.players[1].health).toBe(4);
     expect(harness.state.zones.discardPile).toContain('k1');
   });
@@ -195,5 +195,116 @@ describe('藤甲', () => {
     // P3 正常受 1 点伤害;藤甲持有者 P2 完全不受影响
     expect(harness.state.players[2].health).toBe(3);
     expect(harness.state.players[1].health).toBe(4);
+  });
+
+  // ─── 正面:南蛮入侵/万箭齐发对你无效 ─────────────────────────
+
+  it('正面:南蛮入侵对你无效 → 不询问杀,不扣血', async () => {
+    const nm: Card = {
+      id: 'nm1',
+      name: '南蛮入侵',
+      suit: '♥',
+      color: suitColor('♥'),
+      rank: 'A',
+      type: '锦囊牌',
+    };
+    const p2kill = makeCard('p2k', '杀', '♠', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['nm1'], skills: ['南蛮入侵'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: ['p2k'],
+          skills: ['杀', '藤甲'],
+          equipment: { 防具: 'tj' },
+        }),
+      ],
+      cardMap: { tj: TENGJIA, nm1: nm, p2k: p2kill },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    await harness.player('P1').useCardAndTarget('南蛮入侵', 'nm1', []);
+    await harness.player('P1').pass(); // 无懈窗口
+
+    // 南蛮对藤甲无效:检测有效性 cancel → 不询问杀、不扣血(P2 手中杀未消耗)
+    expect(harness.state.pendingSlots.size).toBe(0);
+    expect(harness.state.players[1].health).toBe(4);
+    expect(harness.state.players[1].hand).toContain('p2k');
+    expect(harness.state.zones.discardPile).toContain('nm1');
+  });
+
+  it('正面:万箭齐发对你无效 → 不询问闪,不扣血', async () => {
+    const wj: Card = {
+      id: 'wj1',
+      name: '万箭齐发',
+      suit: '♥',
+      color: suitColor('♥'),
+      rank: 'A',
+      type: '锦囊牌',
+    };
+    const p2shan = makeCard('p2s', '闪', '♥', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['wj1'], skills: ['万箭齐发'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: ['p2s'],
+          skills: ['闪', '藤甲'],
+          equipment: { 防具: 'tj' },
+        }),
+      ],
+      cardMap: { tj: TENGJIA, wj1: wj, p2s: p2shan },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    await harness.player('P1').useCardAndTarget('万箭齐发', 'wj1', []);
+    await harness.player('P1').pass(); // 无懈窗口
+
+    // 万箭对藤甲无效:检测有效性 cancel → 不询问闪、不扣血
+    expect(harness.state.pendingSlots.size).toBe(0);
+    expect(harness.state.players[1].health).toBe(4);
+    expect(harness.state.zones.discardPile).toContain('wj1');
+  });
+
+  // ─── 正面:雷杀(雷电)穿透藤甲 ──────────────────────────────
+
+  it('正面:雷杀(雷电)穿透藤甲 → 正常 1 点伤害', async () => {
+    const thunderKill = makeCard('tk1', '杀', '♠', '7', '雷电'); // 雷杀
+    const shan = makeCard('s1', '闪', '♥', '2'); // P2 带闪使询问闪可观察
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['tk1'], skills: ['杀'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: ['s1'],
+          skills: ['闪', '藤甲'],
+          equipment: { 防具: 'tj' },
+        }),
+      ],
+      cardMap: { tj: TENGJIA, tk1: thunderKill, s1: shan },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P2 = harness.player('P2');
+
+    await harness.player('P1').useCardAndTarget('杀', 'tk1', [1]);
+
+    // 雷杀是属性杀,穿透藤甲(不被无效):正常询问闪
+    P2.expectPending('询问闪');
+    await P2.pass(); // 不出闪
+
+    // 雷电伤害非火焰,藤甲不减伤 → 正常 1 点(修复前错误减为 0)
+    expect(harness.state.players[1].health).toBe(3);
   });
 });
