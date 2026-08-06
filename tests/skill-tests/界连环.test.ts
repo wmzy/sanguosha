@@ -4,6 +4,8 @@
 //   3. 真实铁索连环牌:界庞统使用真实铁索连环牌,亦可指定 3 名目标(覆盖生效)
 //   4. 边界:指定 4 名目标 → 拒绝(超过界版上限)
 //   5. 非界庞统座次:仍走标版铁索连环.use,上限 2(覆盖仅作用于界庞统)
+//   6. 边界:recycle 仅限梅花手牌(非梅花 → 拒绝)
+//   7. 边界:transform 后主 use 失败 → 回滚(原卡还原,无影子)
 //
 // OL 官方(hero):"你可以将一张梅花牌当【铁索连环】使用或重铸。你使用【铁索连环】可以多指定一个目标。"
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -88,6 +90,38 @@ describe('界连环', () => {
     expect(harness.state.players[0].hand).not.toContain('c1');
     expect(harness.state.zones.discardPile).toContain('c1');
     expect(harness.state.players[0].hand).toContain('d1');
+  });
+
+  // ─── 边界:recycle 仅限梅花手牌(非梅花 → 拒绝)──────────────
+
+  it('recycle 边界:非梅花手牌 → 拒绝', async () => {
+    const heart = mkCard('h1', '杀', '♥', '5'); // 红桃(非梅花)
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界庞统',
+            character: '界庞统',
+            hand: [heart.id],
+            skills: ['界连环'],
+          }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', skills: [] }),
+        ],
+        cardMap: { h1: heart },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const PT = harness.player('界庞统');
+
+    // 非梅花牌 → recycle validate 拒绝(只能将梅花牌当铁索连环重铸)
+    await PT.triggerAction('界连环', 'recycle', { cardId: 'h1' });
+    await harness.waitForStable();
+
+    // 牌仍在手牌,未被消耗
+    expect(harness.state.players[0].hand).toContain('h1');
   });
 
   // ─── transform + 铁索连环.use:界版 3 目标 ────────────────────
@@ -208,6 +242,52 @@ describe('界连环', () => {
     }
     // 牌仍在手牌
     expect(harness.state.players[0].hand).toContain('chain1');
+  });
+
+  // ─── 边界:transform 后主 use 失败 → 回滚(原卡还原,无影子)────
+
+  it('transform 回滚:主 use 失败(4名目标)→ 原卡还原,无影子', async () => {
+    const club = mkCard('c1', '杀', '♣', '5');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界庞统',
+            character: '界庞统',
+            hand: [club.id],
+            skills: ['界连环'],
+          }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', skills: [] }),
+          mkPlayer({ index: 2, name: 'P2', character: '反', skills: [] }),
+          mkPlayer({ index: 3, name: 'P3', character: '反', skills: [] }),
+          mkPlayer({ index: 4, name: 'P4', character: '反', skills: [] }),
+        ],
+        cardMap: { c1: club },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const PT = harness.player('界庞统');
+
+    // transform 建影子后,主 use 指定 4 名目标(超过界版上限 3)→ validate 拒绝
+    // 引擎逆序回滚 preceding transform:删影子、原卡 c1 还原回手牌
+    await PT.transformThenUse(
+      '界连环',
+      { cardId: 'c1' },
+      '铁索连环',
+      { cardId: 'c1#界连环', targets: [1, 2, 3, 4] },
+    );
+    await harness.waitForStable();
+
+    // 原卡还原回手牌,影子已删除
+    expect(harness.state.players[0].hand).toContain('c1');
+    expect(harness.state.cardMap['c1#界连环']).toBeUndefined();
+    // 没人被横置(use 未结算)
+    for (let i = 1; i <= 4; i++) {
+      expect(harness.state.players[i].marks.some((m) => m.id === 'chained')).toBe(false);
+    }
   });
 
   // ─── 非界庞统座次:铁索连环.use 上限仍为 2(覆盖仅本座次) ────
