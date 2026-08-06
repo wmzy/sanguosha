@@ -24,16 +24,6 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
 function makeWeapon(
   id: string,
   name: string,
@@ -308,26 +298,20 @@ describe('界解烦', () => {
     await P4.respond('界解烦', { choice: false });
   });
 
-  // ─── 选择弃武器但无武器 → 自动改为令摸牌 ────────────
-  it('选弃武器但无武器手牌:自动改为令摸牌', async () => {
-    // P2 装武器(在范围),手中只有杀(非武器)。
-    // P2 选弃武器(choice=true)但 weaponCardsInHand 返回空 → 退回令摸牌
-    const w1 = makeWeapon('w1', '青釭剑', '♠', 3);
-    const slash = makeCard('x1', '杀', '♥', '7');
+  // ─── 选弃武器但无武器 → 自动改为令摸牌(防御性回退) ────────────
+  it('选弃武器但无武器:自动改为令摸牌', async () => {
+    // 5 人局:P0 解烦 P3。P2、P4 距 P3=1(徒手范围 1)在攻击范围内。
+    // P2 无任何武器牌却回应 choice=true(选弃武器):实现中 weaponCardsInHand 为空,
+    // 防御性回退为令目标摸牌(不产生弃置)。P0、P1 距 P3=2 不在范围,不被询问。
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', skills: ['界解烦'] }),
         makePlayer({ index: 1, name: 'P1', character: '曹操' }),
-        makePlayer({
-          index: 2,
-          name: 'P2',
-          character: '刘备',
-          equipment: { 武器: 'w1' },
-          hand: ['x1'],
-        }),
+        makePlayer({ index: 2, name: 'P2', character: '刘备' }),
         makePlayer({ index: 3, name: 'P3', character: '孙权' }),
+        makePlayer({ index: 4, name: 'P4', character: '陆逊' }),
       ],
-      cardMap: { w1, x1: slash },
+      cardMap: {},
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -335,37 +319,26 @@ describe('界解烦', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
     const P2 = harness.player('P2');
+    const P4 = harness.player('P4');
 
-    // 4 人局 P0 解烦 P2 距离 1?P0 徒手 P2 在范围 → P0 也被影响
-    // 但 P0 是 owner,先询问 P0?按座次顺序 0,1,2,3:P0(0)先于 P2(2)。
-    // P0 无武器,默认令摸牌。
-    // P1 距 P2 = 1,在范围 → P1 受影响(无武器,默认令摸牌)
-    // P2 自身不在范围(inAttackRange 排除 self)
-    // P3 距 P2 = 1,在范围 → P3 受影响
-    // 实际受影响顺序:P0, P1, P3
-    // P2 不被询问(自身不在范围)
-    await P0.triggerAction('界解烦', 'use', { target: 2 });
+    const p3Before = harness.state.players[3].hand.length;
+    const p2HandBefore = harness.state.players[2].hand.length;
 
-    // P0 被询问(自身在范围内)
-    const P0slot = harness.player('P0');
-    P0slot.expectPending('请求回应');
-    await P0slot.respond('界解烦', { choice: false }); // 令摸牌
+    await P0.triggerAction('界解烦', 'use', { target: 3 });
 
-    // P1 被询问
-    const P1 = harness.player('P1');
-    P1.expectPending('请求回应');
-    await P1.respond('界解烦', { choice: false }); // 令摸牌
+    // 座位顺序:P2 先被询问;选弃武器但无武器牌
+    P2.expectPending('请求回应');
+    await P2.respond('界解烦', { choice: true });
 
-    // P3 被询问
-    const P3 = harness.player('P3');
-    P3.expectPending('请求回应');
-    await P3.respond('界解烦', { choice: false }); // 令摸牌
+    // P4 选令摸牌
+    P4.expectPending('请求回应');
+    await P4.respond('界解烦', { choice: false });
 
-    // 注意:P2 不被询问(目标自身不在攻击范围)
-    // 此用例改验证:P2 装武器但目标是自己,P2 不被询问 → w1 仍在装备,x1 仍在手
-    expect(harness.state.players[2].equipment['武器']).toBe('w1');
-    expect(harness.state.players[2].hand).toContain('x1');
-    void P2;
+    // P2 无武器 → 回退令摸牌;P4 也令摸牌 → P3 共摸 2 张
+    expect(harness.state.players[3].hand.length).toBe(p3Before + 2);
+    // P2 未弃任何牌(防御性回退不产生弃置)
+    expect(harness.state.players[2].hand.length).toBe(p2HandBefore);
+    expect(harness.state.players[0].vars['界解烦/used']).toBe(true);
   });
 
   // ─── 第一轮发动后回合结束 → USED_KEY 被清空(限定技重置) ────────────
