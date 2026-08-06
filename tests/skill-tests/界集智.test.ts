@@ -308,10 +308,12 @@ describe('界集智', () => {
 
   // ─── 8. 集成:手牌上限 bonus 实际作用于弃牌阶段 ────────────
   it('弃置换上限后 → 弃牌阶段手牌上限+1(集成 hand-limit)', async () => {
-    // P0 界黄月英 HP=2(手牌上限默认 2),手牌 wz1
+    // P0 界黄月英 HP=1(手牌上限默认 1),手牌 wz1
     // 用无中生有 → 集智摸 d3(杀,基本牌)→ 弃之换上限+1
     // 之后无中生有还会摸 2 张(d2, d1)
-    // 最终手牌:d2 + d1 = 2 张;手牌上限 = HP(2) + bonus(1) = 3 → 无需弃牌
+    // 最终手牌:d2 + d1 = 2 张;手牌上限 = HP(1) + bonus(1) = 2 → 无需弃牌
+    // 关键:HP 取 1,使最终手牌(2)恰好 > 无 bonus 时上限(1)、≤ 有 bonus 时上限(2),
+    //       从而真正验证 bonus 在弃牌阶段生效;若 HP=2 则断言恒真、无法区分 bonus 是否生效。
     const wz = makeCard('wz1', '无中生有', '♥', '7', '锦囊牌');
     const d1 = makeCard('d1', '杀', '♠', '5', '基本牌');
     const d2 = makeCard('d2', '闪', '♥', '6', '基本牌');
@@ -322,7 +324,7 @@ describe('界集智', () => {
           index: 0,
           name: 'P1',
           hand: ['wz1'],
-          health: 2,
+          health: 1,
           maxHealth: 3,
           skills: ['界集智', '无中生有', '回合管理'],
         }),
@@ -343,11 +345,12 @@ describe('界集智', () => {
     await P1.respond('界集智', { choice: true }); // 弃 d3 换上限+1
     await P1.pass(); // 无中生有的无懈可击窗口(无人打出)
 
-    // 手牌:d2 + d1 = 2 张;bonus = 1;HP = 2;手牌上限 = 2+1 = 3 → 2 ≤ 3 无需弃
+    // 手牌:d2 + d1 = 2 张;bonus = 1;HP = 1;手牌上限 = 1+1 = 2 → 2 ≤ 2 无需弃
     expect(harness.state.players[0].hand.length).toBe(2);
     expect(harness.state.turn.vars[handLimitBonusKey(0)]).toBe(1);
 
-    // 结束出牌阶段进入弃牌阶段:手牌(2) ≤ 上限(3) → 不弹弃牌 pending
+    // 结束出牌阶段进入弃牌阶段:手牌(2) ≤ 上限(2,含 bonus)→ 不弹弃牌 pending。
+    // 若 bonus 未生效,上限=1 < 手牌 2 → 会弹出 '__弃牌',此断言即失败。
     await P1.triggerAction('回合管理', 'end', {});
     expect(currentRequestType(harness.state)).not.toBe('__弃牌');
   });
