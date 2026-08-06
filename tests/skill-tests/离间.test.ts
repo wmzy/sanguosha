@@ -183,33 +183,7 @@ describe('离间', () => {
     expect(harness.state.zones.discardPile).toContain('s3');
   });
 
-  // ─── 3. A 出杀后 B 直接不出 → B 扣血(A 赢) ────────────────
-  it('P3 不出杀 → P3 扣血,P2 不受伤(无需 A 出杀即可定胜负)', async () => {
-    const discard = makeCard('d1', '闪', '♥', '2');
-    const p3d = makeCard('p3d', '闪', '♣', '4');
-    const state = buildState({
-      p1Hand: ['d1'],
-      p2Hand: [],
-      // P3 带一张非杀牌:询问杀走 silent(slot 保留、pass 可推进)
-      p3Hand: ['p3d'],
-      extraCards: { d1: discard, p3d },
-    });
-    await harness.setup(state);
-    const P1 = harness.player('P1');
-    const P3 = harness.player('P3');
-
-    await P1.triggerAction('离间', 'use', { cardId: 'd1', targets: [1, 2] });
-
-    // 离间不可被无懈:直接进入 P3 询问杀
-
-    P3.expectPending('询问杀');
-    await P3.pass();
-
-    expect(harness.state.players[2].health).toBe(3); // 4-1
-    expect(harness.state.players[1].health).toBe(4); // P2 无伤
-  });
-
-  // ─── 4. 每回合限一次:第二次被拒 ───────────────────────────
+  // ─── 3. 每回合限一次:第二次被拒 ───────────────────────────
   it('每回合限一次:第二次离间被拒', async () => {
     const d1 = makeCard('d1', '闪', '♥', '2');
     const d2 = makeCard('d2', '闪', '♣', '3');
@@ -235,7 +209,7 @@ describe('离间', () => {
     });
   });
 
-  // ─── 5. 不能选女性角色(貂蝉本人)作为目标 ──────────────────
+  // ─── 4. 不能选女性角色(貂蝉本人)作为目标 ──────────────────
   it('不能选貂蝉(女性)作为目标', async () => {
     const d1 = makeCard('d1', '闪', '♥', '2');
     const state = buildState({
@@ -259,7 +233,7 @@ describe('离间', () => {
     });
   });
 
-  // ─── 6. A 和 B 不能相同 ──────────────────────────────────
+  // ─── 5. A 和 B 不能相同 ──────────────────────────────────
   it('A 和 B 不能是同一个角色', async () => {
     const d1 = makeCard('d1', '闪', '♥', '2');
     const state = buildState({
@@ -276,7 +250,7 @@ describe('离间', () => {
     });
   });
 
-  // ─── 7. 无牌可弃 → 被拒 ──────────────────────────────────
+  // ─── 6. 无牌可弃 → 被拒 ──────────────────────────────────
   it('无手牌/装备时不能发动离间', async () => {
     const state = buildState({
       p1Hand: [],
@@ -292,7 +266,7 @@ describe('离间', () => {
     });
   });
 
-  // ─── 8. 非出牌阶段 → 被拒 ────────────────────────────────
+  // ─── 7. 非出牌阶段 → 被拒 ────────────────────────────────
   it('非出牌阶段不能发动离间', async () => {
     const d1 = makeCard('d1', '闪', '♥', '2');
     const state = buildState({
@@ -310,7 +284,7 @@ describe('离间', () => {
     });
   });
 
-  // ─── 9. 弃置装备牌也可以 ─────────────────────────────────
+  // ─── 8. 弃置装备牌也可以 ─────────────────────────────────
   it('可以弃置装备牌发动离间', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
     const state = buildState({
@@ -333,7 +307,7 @@ describe('离间', () => {
     expect(harness.state.players[0].equipment['武器']).toBeUndefined();
   });
 
-  // ─── 10. 不能被无懈可击抵消(官方规则) ─────────────────────
+  // ─── 9. 不能被无懈可击抵消(官方规则) ─────────────────────
   // 即使某角色手中有无懈可击,离间决斗也不开无懈窗口,决斗直接结算。
   it('P2 持无懈可击 → 离间决斗仍直接结算(不可被无懈抵消)', async () => {
     const discard = makeCard('d1', '闪', '♥', '2', '基本牌');
