@@ -313,5 +313,6 @@ describe('界诛害', () => {
 
     expect(harness.state.players[1].health).toBe(4); // 闪抵消,未受伤
     expect(harness.state.players[1].hand).not.toContain('dodge1');
+    expect(harness.state.players[0].hand).not.toContain('kill1'); // 杀已被使用(被闪抵消仍计入使用)
   });
 });
