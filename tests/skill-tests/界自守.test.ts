@@ -9,7 +9,6 @@
 //   2. 不发动:不确认 → 正常摸 2 张
 //   3. 弃牌惩罚:发动 + 本回合造成过伤害 → 结束阶段弃 X 张
 //   4. 无伤害不弃:发动 + 未造成伤害 → 结束阶段不弃牌
-//   5. 自伤不算:发动 + 自伤(无目标≠自己) → 不触发弃牌
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
