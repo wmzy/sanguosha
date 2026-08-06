@@ -3,16 +3,16 @@
 //   出牌阶段限一次,令两名角色交换装备区里的牌;
 //   若两人装备数差 X > 你已损失的体力值,你须弃 X 张牌。
 //
-// 验证:
-//   1. 正面:两人装备数差=0(均1张),吴国太满血 → 直接交换,不弃牌
-//   2. 装备数差=2,吴国太已损失1 → X(2) > lostHp(1) → 弃2张牌后交换
-//   3. 装备数差=2,吴国太已损失0 → X(2) > lostHp(0) → 弃2张牌后交换
-//   4. 装备数差=2,吴国太已损失2 → X(2) <= lostHp(2) → 直接交换,不弃牌
-//   5. 不同 slot 交换:A 有武器,B 有防具 → A 得防具,B 得武器
-//   6. 同 slot 交换:双方都武器 → 武器互换
-//   7. 限一次:本回合已用过 → 拒绝
-//   8. 非出牌阶段 / 非自己回合 → 拒绝
-//   9. X > lostHp 但手牌不足 → 流程中止,不交换
+// 验证(与下方各 it() 一一对应):
+//   1. 装备数差=0(均1张),吴国太满血 → 直接交换,不弃牌(不同 slot)
+//   2. 装备数差=2 > 已损失体力=0 → 弃2张后交换
+//   3. 装备数差=2 <= 已损失体力=2 → 直接交换,不弃牌
+//   4. 同 slot 交换:双方都武器 → 武器互换
+//   5. 限一次:本回合已用过 → 拒绝
+//   6. 非自己回合 → 拒绝
+//   7. 非出牌阶段(判定阶段)→ 拒绝
+//   8. X > 已损失体力但手牌不足 → 流程中止,不交换
+//   9. respond:targets 长度≠2 或选同名 → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -342,7 +342,7 @@ describe('界甘露', () => {
     });
   });
 
-  // ─── 6. 非自己回合 / 非出牌阶段 → 拒绝 ─────────────────────
+  // ─── 6. 非自己回合 → 拒绝 ─────────────────────────────────
 
   it('非自己回合 → 拒绝', async () => {
     const state: GameState = createGameState({
@@ -386,7 +386,52 @@ describe('界甘露', () => {
     });
   });
 
-  // ─── 7. X > lostHp 但手牌不足 → 流程中止 ───────────────────
+  // ─── 7. 非出牌阶段(判定阶段)→ 拒绝 ─────────────────────────
+
+  it('非出牌阶段 → 拒绝', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '吴国太',
+          hand: [],
+          skills: ['界甘露', '回合管理'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          equipment: { 武器: 'w1' },
+          skills: [],
+        }),
+        makePlayer({
+          index: 2,
+          name: 'P2',
+          character: '刘备',
+          equipment: { 防具: 'a1' },
+          skills: [],
+        }),
+      ],
+      cardMap: {
+        w1: makeCard('w1', '诸葛连弩', '♥', 'A', '装备牌', '武器'),
+        a1: makeCard('a1', '仁王盾', '♠', '2', '装备牌', '防具'),
+      },
+      currentPlayerIndex: 0, // 吴国太的回合
+      phase: '判定', // 但处于判定阶段,非出牌阶段
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('吴国太');
+
+    // phase !== '出牌' → validate 拒绝
+    await P0.expectRejected({
+      skillId: '界甘露',
+      actionType: 'use',
+      params: {},
+    });
+  });
+
+  // ─── 8. X > lostHp 但手牌不足 → 流程中止 ───────────────────
 
   it('X=2 但吴国太仅 1 手牌 → 中止,不交换不弃牌', async () => {
     const state: GameState = createGameState({
@@ -437,7 +482,7 @@ describe('界甘露', () => {
     expect(harness.state.players[0].hand).toEqual(['c1']); // 未弃
   });
 
-  // ─── 8. respond 校验 ────────────────────────────────────
+  // ─── 9. respond 校验 ────────────────────────────────────
 
   it('respond:targets 长度 != 2 → 拒绝', async () => {
     const state: GameState = createGameState({
