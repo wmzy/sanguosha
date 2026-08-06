@@ -4,8 +4,9 @@
 // 验证:
 //   1. 正面:黑桃(♠)手牌 transformThenUse 酒 → 创建影子酒 + 酒生效(增伤标记)
 //   2. 负面:非黑桃(♥)牌 transform 被拒
-//   3. 负面:非自己回合 transform 被拒
-//   4. 负面:不在手牌的卡 transform 被拒
+//   3. 负面:梅花(♣)牌 transform 被拒(黑桃专属,黑色不算)
+//   4. 负面:非自己回合 transform 被拒
+//   5. 负面:不在手牌的卡 transform 被拒
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
