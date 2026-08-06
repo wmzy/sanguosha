@@ -9,6 +9,7 @@
 //   5. 使用闪电→触发界雷击→判定黑桃→造伤(新增触发路径)
 //   6. 未出闪→界雷击不触发
 //   7. 打闪→判定非黑桃非梅花(♥)→无伤害无回血
+//   8. 组合:打闪→界雷击→界鬼道改判为黑桃→命中2点雷电伤害+摸牌
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   SkillTestHarness,
