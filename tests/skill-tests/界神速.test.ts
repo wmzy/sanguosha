@@ -113,10 +113,7 @@ describe('界神速', () => {
     await harness.waitForStable();
     harness.processAllEvents();
 
-    // virtualKill 询问 P2 出闪 → 不闪
-    const P2 = harness.player('P2');
-    await P2.pass();
-
+    // 虚拟杀结算:P2 0 手牌 → 询问闪自动跳过(preResolve skip)→ 直接扣血
     expect(harness.state.players[1].health).toBe(3); // P2 受 1 伤
     expect(harness.state.players[0].tags).toContain('神速/跳过摸牌');
     expect(harness.state.players[0].vars['神速/usedThisTurn']).toBe(true);
@@ -154,8 +151,7 @@ describe('界神速', () => {
     await harness.waitForStable();
     harness.processAllEvents();
 
-    const P2 = harness.player('P2');
-    await P2.pass();
+    // 虚拟杀结算:P2 0 手牌 → 询问闪自动跳过(preResolve skip)→ 直接扣血
 
     // P0 体力不变(代价是翻面,不是失体力)
     expect(harness.state.players[0].health).toBe(4);
@@ -269,7 +265,7 @@ describe('界神速', () => {
       cardMap: { w1: weapon },
       currentPlayerIndex: 0,
       phase: '判定',
-      turn: { round: 1, phase: '出牌', vars: {} },
+      turn: { round: 1, phase: '判定', vars: {} },
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
@@ -301,10 +297,7 @@ describe('界神速', () => {
     await harness.waitForStable();
     harness.processAllEvents();
 
-    // P2 被杀 → 不闪
-    const P2 = harness.player('P2');
-    await P2.pass();
-
+    // 虚拟杀结算:P2 0 手牌 → 询问闪自动跳过(preResolve skip)→ 直接扣血
     expect(harness.state.players[0].equipment['武器']).toBeUndefined();
     expect(harness.state.zones.discardPile).toContain('w1');
     expect(harness.state.players[1].health).toBe(3);
