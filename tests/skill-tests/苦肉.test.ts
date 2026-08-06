@@ -9,10 +9,12 @@
 //
 // 验证:
 //   1. 正面:发动一次→体力-1,手牌+2
-//   2. 正面:连续发动两次→体力-2,手牌+4
+//   2. 正面:连续发动两次→体力-2,手牌+4(无次数限制)
 //   3. 边界:体力为1时发动→体力归0,进入濒死(求桃 pending),此时未摸牌
 //   4. 边界:体力为1时发动→濒死→自持桃救回→体力回升至1,继续摸2牌
-//   5. 负面:已死亡→不可发动(validate 拒绝)
+//   5. 边界:体力为1发动→无人救援→阵亡,后续摸牌不再执行(if alive 守卫)
+//   6. 负面:已死亡→不可发动(validate 拒绝:player is dead)
+//   7. 负面:体力为0(濒死)→不可发动(validate 拒绝:体力不足)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -203,15 +205,61 @@ describe('苦肉', () => {
     expect(state.zones.discardPile).toContain('peach');
   });
 
-  it('负面: 已死亡→不可发动(validate 拒绝)', async () => {
+  it('边界: 体力为1发动→无人救援→阵亡,后续不再摸牌', async () => {
+    const state = createGameState({
+      players: [
+        // P1(黄盖)体力 1、无手牌
+        makePlayer({ index: 0, name: 'P1', character: '黄盖', health: 1, skills: ['苦肉'] }),
+        // P2 无手牌:濒死求桃时无牌可出(响应可用性 skip),无人救援
+        makePlayer({ index: 1, name: 'P2', character: '曹操', health: 4 }),
+      ],
+      zones: { deck: [...DECK_IDS], discardPile: [], processing: [] },
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    seedDeckCards(state);
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 发动苦肉:体力 1→0 进入濒死,P1/P2 均无桃救援 → 阵亡
+    await P1.triggerAction('苦肉', 'use');
+
+    // 无人救援 → 角色阵亡(alive=false)
+    expect(state.players[0].health).toBe(0);
+    expect(state.players[0].alive).toBe(false);
+    // 阵亡后苦肉后续摸牌不再执行(if alive 守卫)
+    expect(state.players[0].hand.length).toBe(0);
+  });
+
+  it('负面: 已死亡→不可发动(validate 拒绝:player is dead)', async () => {
+    const state = createGameState({
+      players: [
+        // P1 直接以阵亡态开局(alive=false);若 setup 后再直接改 state,
+        // 会造成 buildView/processedView 不同步,故在此处直接构造
+        makePlayer({ index: 0, name: 'P1', character: '黄盖', health: 4, alive: false, skills: ['苦肉'] }),
+        makePlayer({ index: 1, name: 'P2', character: '曹操', health: 4 }),
+      ],
+      zones: { deck: [...DECK_IDS], discardPile: [], processing: [] },
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    seedDeckCards(state);
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 已阵亡 → validate 拒绝:player is dead
+    await P1.expectRejected({ skillId: '苦肉', actionType: 'use', params: {} });
+  });
+
+  it('负面: 体力为0(濒死)→不可发动(validate 拒绝:体力不足)', async () => {
     await setup(0);
     const P1 = harness.player('P1');
-    const state = harness.state;
 
-    // 体力已为0,死亡
-    state.players[0].alive = false;
-
-    // 应当抛异常(validate 拒绝触发)
-    await expect(P1.triggerAction('苦肉', 'use')).rejects.toThrow();
+    // 体力为0但仍存活(濒死态)→ validate 拒绝:体力不足,无法发动苦肉
+    await P1.expectRejected({ skillId: '苦肉', actionType: 'use', params: {} });
   });
 });
