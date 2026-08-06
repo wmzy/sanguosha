@@ -10,11 +10,12 @@
 //   2. respond validate:SELECT pending 下选牌点数和>13 → 拒绝
 //   3. respond validate:SELECT pending 下选非候选牌 → 拒绝
 //   4. respond execute:CONFIRM pending → choice 写入 localVars
-//   5. 端到端:P0 杀 P1(1伤害) → P1 confirm → 选1张 → 入手牌,剩余留牌堆
-//   6. 端到端:confirm=false → 不亮牌不取牌
-//   7. 端到端:点数和恰好=13 → 设 bonus=1(下次发动亮5张)
-//   8. 端到端:bonus=1 时亮5张(预设 vars)
-//   9. 端到端:2点伤害触发两次
+//   5. respond execute:SELECT pending 下合法选择 → cardIds 写入 localVars
+//   6. 端到端:P0 杀 P1(1伤害) → P1 confirm → 选1张 → 入手牌,剩余留牌堆
+//   7. 端到端:confirm=false → 不亮牌不取牌
+//   8. 端到端:点数和恰好=13 → 设 bonus=1(下次发动亮5张)
+//   9. 端到端:bonus=1 时亮5张(预设 vars)
+//  10. 端到端:2点伤害触发两次
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -383,8 +384,7 @@ describe('界称象', () => {
 
     await P1.respond('界称象', { choice: true });
 
-    // 选 d3(10) + d4(K=13) = 23 >13 → 必须重新组合。
-    // 改选只 d4(K=13) 单张,和=13 → bonus=1
+    // 选 d4(K=13)单张,和=13 → 触发 bonus=1
     await P1.respond('界称象', { cardIds: ['d4'] });
 
     expect(harness.state.players[1].hand).toContain('d4');
