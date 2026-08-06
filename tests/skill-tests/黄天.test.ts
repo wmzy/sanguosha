@@ -7,6 +7,8 @@
 //   3. 每回合限一次 → 第二次被拒
 //   4. 非群势力 → 不可用
 //   5. 张角非主公 → 不可用
+//   6. 非闪/闪电的牌不可交
+//   7. 非自己回合 → 不可用(发动时机)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -317,5 +319,46 @@ describe('黄天', () => {
       params: { cardId: 'k1' },
     });
     expect(harness.state.players[1].hand).toContain('k1'); // 牌未交出
+  });
+
+  // ─── 7. 非自己回合 → 不可用(发动时机) ──────────────────────
+  it('群盟友非自己回合使用黄天 → 被拒', async () => {
+    const dodge = makeCard('d1', '闪', '♥', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '张角',
+          character: '张角',
+          faction: '群',
+          hand: [],
+          skills: ['黄天', '回合管理'],
+          health: 3,
+        }),
+        makePlayer({
+          index: 1,
+          name: '群盟友',
+          faction: '群',
+          hand: ['d1'],
+          skills: ['回合管理'],
+          health: 4,
+        }),
+      ],
+      cardMap: { d1: dodge },
+      currentPlayerIndex: 0, // P0(张角)回合,非 P1 回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: [], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P1 = harness.player('群盟友');
+
+    // P1 不在自己回合 → 黄天被拒(发动时机校验:currentPlayerIndex !== allyIdx)
+    await P1.expectRejected({
+      skillId: '黄天',
+      actionType: 'use',
+      params: { cardId: 'd1' },
+    });
+    expect(harness.state.players[1].hand).toContain('d1'); // 牌未交出
   });
 });
