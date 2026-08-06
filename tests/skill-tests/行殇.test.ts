@@ -4,9 +4,10 @@
 // 验证:
 //   1. 端到端:P0(曹丕)发动行殇 → 获得 P1(死亡)的所有手牌
 //   2. 端到端:同时获得装备区牌
-//   3. 不发动:可以选择不拿牌(行殇是主动发动)
-//   4. 边界:无牌死亡角色不触发行殇
-//   5. 边界:官方为「其他角色」死亡——曹丕自己死亡不触发行殇
+//   3. 端到端:同时获得判定区牌(延时锦囊)
+//   4. 不发动:可以选择不拿牌(行殇是主动发动)
+//   5. 边界:无牌死亡角色不触发行殇
+//   6. 边界:官方为「其他角色」死亡——曹丕自己死亡不触发行殇
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -32,6 +33,7 @@ function makePlayer(opts: {
   hand?: string[];
   equipment?: PlayerState['equipment'];
   skills?: string[];
+  pendingTricks?: PlayerState['pendingTricks'];
   health?: number;
   maxHealth?: number;
 }): PlayerState {
@@ -47,7 +49,7 @@ function makePlayer(opts: {
     skills: opts.skills ?? [],
     vars: {},
     marks: [],
-    pendingTricks: [],
+    pendingTricks: opts.pendingTricks ?? [],
     tags: [],
     judgeZone: [],
   };
@@ -133,6 +135,42 @@ describe('行殇', () => {
     expect(harness.state.players[0].hand.length).toBe(2);
     // P1 装备清空
     expect(harness.state.players[1].equipment).toEqual({});
+  });
+
+  // ─── 端到端:同时获得判定区牌(延时锦囊) ────────────────────
+  it('发动行殇同时获得判定区牌(乐不思蜀)', async () => {
+    const trickCard = makeCard('t1', '乐不思蜀', '♠', 'A', '锦囊牌');
+    const hand = makeCard('h1', '杀', '♠', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['行殇'] }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: ['h1'],
+          pendingTricks: [{ name: '乐不思蜀', source: 0, card: trickCard }],
+          health: 1,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { t1: trickCard, h1: hand },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    void runDeathFlow(harness.state, 1);
+    await harness.waitForStable();
+    P0.expectPending('请求回应');
+    await P0.respond('行殇', { choice: true });
+
+    // P0 同时获得手牌 + 判定区牌(延时锦囊牌进入手牌)
+    expect(harness.state.players[0].hand).toEqual(expect.arrayContaining(['h1', 't1']));
+    expect(harness.state.players[0].hand.length).toBe(2);
+    // P1 判定区清空(移除延时锦囊)
+    expect(harness.state.players[1].pendingTricks).toEqual([]);
   });
 
   // ─── 不发动:可以选择不拿牌 ────────────────────
