@@ -1,6 +1,6 @@
 // 连环(庞统·主动技)行为测试:
-//   重点验证【重铸】:弃一张梅花手牌,摸一张牌。
-//   (转化为铁索连环【使用】部分待铁索连环技能实现,此处不测)
+//   【重铸】(recycle):弃一张梅花手牌,摸一张牌。
+//   【转化】(transform):梅花手牌当铁索连环使用(preceding + 铁索连环.use)。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -46,7 +46,7 @@ function mkPlayer(opts: {
   };
 }
 
-describe('连环·重铸', () => {
+describe('连环', () => {
   let harness: SkillTestHarness;
   beforeEach(() => {
     harness = new SkillTestHarness();
