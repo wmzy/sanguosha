@@ -12,7 +12,9 @@
 //   6. 端到端:曹植自己弃置 ♣牌 → 不触发(自己不触发)
 //   7. 端到端:其他玩家判定 ♣牌 → 询问 → confirm → 曹植获得
 //   8. 端到端:其他玩家判定 ♥牌 → 不触发(花色不符)
-//   9. 端到端:回合外累计获得 ≥ 体力上限张 ♣牌 且 背面朝上 → 触发翻回询问
+//   9. 端到端:曹植自己判定 ♣牌 → 不触发(自己不触发)
+//  10. 端到端:回合外累计获得 ≥ 体力上限张 ♣牌 且 背面朝上 → 触发翻回询问
+//  11. 端到端:正面朝上时即使外得≥上限 → 不触发翻回询问
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import { applyAtom } from '../../src/engine/index';
@@ -296,6 +298,32 @@ describe('界落英', () => {
     await harness.waitForStable();
 
     // 非梅花,不触发
+    expect(harness.state.pendingSlots.size).toBe(0);
+    expect(harness.state.players[0].hand).toEqual([]);
+    // 判定牌正常进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('j1');
+  });
+
+  it('端到端:曹植自己判定 ♣牌 → 不触发', async () => {
+    // 与“自己弃置不触发”(弃置路径)对称:判定路径同样有 atom.player === ownerId 守卫
+    const judge = makeCard('j1', '杀', '♣', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['界落英'] }),
+        makePlayer({ index: 1, name: 'P1', skills: [] }),
+      ],
+      cardMap: { j1: judge },
+      currentPlayerIndex: 0,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+
+    void runJudgeFlow(harness.state, 0, '测试');
+    await harness.waitForStable();
+
+    // 自己的判定不触发
     expect(harness.state.pendingSlots.size).toBe(0);
     expect(harness.state.players[0].hand).toEqual([]);
     // 判定牌正常进弃牌堆
