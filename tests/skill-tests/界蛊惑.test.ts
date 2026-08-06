@@ -54,11 +54,6 @@ function mkPlayer(opts: {
   };
 }
 
-/** 当前阻塞型 pending slot 列表(并行回应时多个共存)。 */
-function activeSlots(state: GameState): GameState['pendingSlots'] extends Map<infer K, infer V> ? Map<K, V> : never {
-  return state.pendingSlots;
-}
-
 /** 所有未 pause 的 slot 的 target 集合(同时只有一个活跃 slot,该 helper 兼容顺序询问)。 */
 function activeTargets(state: GameState): number[] {
   return [...state.pendingSlots.values()].filter((s) => !s.isPaused).map((s) => (s.atom as { target: number }).target);
@@ -313,9 +308,9 @@ describe('界蛊惑', () => {
 
   it('限一次:同回合再次蛊惑被拒', async () => {
     const t1 = mkCard('t1', '桃', '♥', '7');
-    const t2 = mkCard('t2', '桃', '♥', '8');
+    const s2 = mkCard('s2', '杀', '♠', '3');
     await harness.setup(
-      baseState({ yujiHand: ['t1', 't2'], yujiHealth: 2, yujiMax: 3, cardMap: { t1, t2 } }),
+      baseState({ yujiHand: ['t1', 's2'], yujiHealth: 2, yujiMax: 3, cardMap: { t1, s2 } }),
     );
     const YJ = harness.player('界于吉');
     const P1 = harness.player('P1');
@@ -328,11 +323,12 @@ describe('界蛊惑', () => {
     await harness.waitForStable();
     expect(harness.state.players[0].health).toBe(3);
 
-    // 第二次蛊惑应被拒(本回合已用过)
+    // 第二次:声明杀打 P1——本应合法(有杀、P1 在范围内、未达出杀上限),
+    // 仅因"每回合限一次"被拒(expectRejected 不区分原因,故须排除其余非法因素)
     await YJ.expectRejected({
       skillId: '界蛊惑',
       actionType: 'use',
-      params: { cardId: 't2', declaredName: '桃' },
+      params: { cardId: 's2', declaredName: '杀', target: 1 },
     });
   });
 
@@ -528,10 +524,4 @@ describe('界蛊惑', () => {
     // 假牌结果:质疑者摸一张牌(此处 P0 无牌堆,跳过摸牌效果检查,仅验证于吉受伤)
   });
 
-  // 验证 activeSlots helper 不破坏 state
-  it('activeSlots helper 仅供读,不破坏 state', () => {
-    const s1 = mkCard('s1', '杀', '♠', '7');
-    const state = baseState({ yujiHand: ['s1'], cardMap: { s1 } });
-    expect(activeSlots(state)).toBeDefined();
-  });
 });
