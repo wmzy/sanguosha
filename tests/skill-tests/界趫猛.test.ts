@@ -303,7 +303,8 @@ describe('界趫猛', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
-    await P1.pass();
+    // P1 无手牌 → 询问闪自动跳过 → 直接扣血 → 趫猛 confirm(此处不可先 pass(),
+    // 否则 fireTimeout 会按 defaultChoice=false 超时关闭趫猛 confirm,使下方 respond 沦为空操作)
     await P0.respond('界趫猛', { choice: false }); // 不发动
 
     expect(harness.state.players[1].health).toBe(3); // 仍扣 1 血(趫猛不影响伤害)
@@ -411,9 +412,7 @@ describe('界趫猛', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
-    await P1.pass();
-
-    // P1 无牌→趫猛不询问,无 pending
+    // P1 无手牌 → 询问闪自动跳过;且无任何区域牌 → 趫猛不询问,无 pending
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.pendingSlots.size).toBe(0);
   });
