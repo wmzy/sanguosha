@@ -5,7 +5,7 @@
 //
 // 验证场景:
 //   ① 杀 + 选项①(获得一张牌):失 1 体 + 杀无效 + 获得来源 1 张牌
-//   ② 杀 + 选项②(秘计挂起):失 1 体 + 杀无效 + 写 turn.vars 秘计挂起标记
+//   ② 杀 + 选项②(秘计挂起):失 1 体 + 杀无效 + 写 player.vars 秘计挂起标记
 //   ③ 杀 + 不发动:正常询问闪,不出闪扣血
 //   ④ 顺手牵羊 + 选项①:失 1 体 + 锦囊无效(不获得王异任何牌) + 获来源 1 张牌
 //   ⑤ 南蛮入侵:失 1 体 + 不询问出杀 + 不受伤害
@@ -16,7 +16,6 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
-import { topFrame } from '../../src/engine/index';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
@@ -248,16 +247,6 @@ describe('界贞烈', () => {
     await P1.triggerAction('顺手牵羊', 'use', { cardId: 't1', target: 0 });
     await harness.waitForStable();
 
-    // DEBUG: 查看 P1.triggerAction 之后的状态
-    console.log('=== DEBUG after P1.triggerAction(顺手牵羊) ===');
-    console.log('pendingSlots:', JSON.stringify([...harness.state.pendingSlots.entries()].map(([k, v]) => ({ key: k, type: v.atom.type, requestType: (v.atom as any).requestType, isBlocking: (v as any).isBlocking }))));
-    console.log('atomStack types:', harness.state.atomStack.map(a => a.type));
-    const 贞烈Vars = Object.fromEntries(Object.entries(harness.state.localVars).filter(([k]) => k.startsWith('贞烈/')));
-    console.log('localVars 贞烈/*:', 贞烈Vars);
-    const tf = topFrame(harness.state);
-    console.log('topFrame:', tf ? { skillId: tf.skillId, from: tf.from, params: tf.params } : 'undefined');
-    console.log('======================');
-
     P0.expectPending('请求回应'); // 贞烈发动确认
 
     await P0.respond('界贞烈', { choice: true });
@@ -270,34 +259,8 @@ describe('界贞烈', () => {
     await harness.waitForStable();
 
     // 无懈窗口(广播)超时
-    console.log('=== DEBUG BEFORE pass ===');
-    console.log('pendingSlots BEFORE pass:', JSON.stringify([...harness.state.pendingSlots.entries()].map(([k, v]) => ({ key: k, type: v.atom.type, requestType: (v.atom as any).requestType, isBlocking: v.isBlocking }))));
-    console.log('atomStack BEFORE pass:', harness.state.atomStack.map(a => ({ type: a.type, requestType: (a as any).requestType })));
-    console.log('settlementStack BEFORE pass:', harness.state.settlementStack.length);
-
     await P0.pass();
-
-    console.log('=== DEBUG AFTER pass (before waitForStable) ===');
-    console.log('pendingSlots AFTER pass:', JSON.stringify([...harness.state.pendingSlots.entries()].map(([k, v]) => ({ key: k, type: v.atom.type, requestType: (v.atom as any).requestType, isBlocking: v.isBlocking }))));
-    console.log('atomStack AFTER pass:', harness.state.atomStack.map(a => ({ type: a.type, requestType: (a as any).requestType })));
-    console.log('settlementStack AFTER pass:', harness.state.settlementStack.length);
-
     await harness.waitForStable();
-
-    console.log('=== DEBUG AFTER waitForStable ===');
-    console.log('pendingSlots AFTER waitForStable:', JSON.stringify([...harness.state.pendingSlots.entries()].map(([k, v]) => ({ key: k, type: v.atom.type, requestType: (v.atom as any).requestType, isBlocking: v.isBlocking }))));
-    console.log('atomStack AFTER waitForStable:', harness.state.atomStack.map(a => ({ type: a.type, requestType: (a as any).requestType })));
-    console.log('settlementStack AFTER waitForStable:', harness.state.settlementStack.length);
-    const tf2 = topFrame(harness.state);
-    console.log('topFrame AFTER waitForStable:', tf2 ? { skillId: tf2.skillId, from: tf2.from, params: tf2.params } : 'undefined');
-    console.log('localVars 贞烈/*:', Object.fromEntries(Object.entries(harness.state.localVars).filter(([k]) => k.startsWith('贞烈/'))));
-    console.log('localVars 无懈/*:', Object.fromEntries(Object.entries(harness.state.localVars).filter(([k]) => k.startsWith('无懈/'))));
-    console.log('localVars 选牌/*:', Object.fromEntries(Object.entries(harness.state.localVars).filter(([k]) => k.startsWith('选牌/'))));
-    console.log('P0 hand:', harness.state.players[0].hand);
-    console.log('P1 hand:', harness.state.players[1].hand);
-    console.log('discardPile:', harness.state.zones.discardPile);
-    console.log('processing:', harness.state.zones.processing);
-    console.log('======================');
 
     // P1 顺手牵羊选牌面板(即使贞烈已令锦囊无效,仍弹面板 — 获得 atom 会被 cancel)
     P1.expectPending('请求回应');
@@ -405,5 +368,62 @@ describe('界贞烈', () => {
     await harness.waitForStable();
 
     expect(harness.state.players[1].health).toBe(3); // P1 扣 1 血
+  });
+
+  // ─── ⑦ 1 体力发动贞烈:失体进濒死,无人救则死亡;选项不再询问;无效仍生效 ──
+
+  it('⑦:1体力发动贞烈 → 失体(1→0)进濒死;无人救则死亡,选项不再询问,无效仍生效', async () => {
+    const kill = makeCard('k7', '杀', '♠', '8');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: [],
+          skills: ['界贞烈', '界秘计'],
+          health: 1, // 失1体即0→濒死
+          maxHealth: 3,
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: ['k7'],
+          skills: ['杀'],
+          health: 4,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { k7: kill },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    await harness.player('P1').useCardAndTarget('杀', 'k7', [0]);
+    P0.expectPending('请求回应'); // 贞烈发动确认
+
+    await P0.respond('界贞烈', { choice: true }); // 发动 → 失1体(1→0)→濒死
+
+    // 失体致死:直接进入求桃,不再询问贞烈选项(下一 pending 是 桃/求桃,而非 界贞烈/choose)
+    const slot = [...harness.state.pendingSlots.values()][0];
+    expect((slot.atom as { requestType?: string }).requestType).toBe('桃/求桃');
+
+    // 无人有桃 → pass 掉所有求桃 pending(同 不屈/奋击/武烈 测试的 drain 写法)
+    while (harness.state.pendingSlots.size > 0) {
+      const s = [...harness.state.pendingSlots.values()][0];
+      const target = (s.atom as { target?: number }).target ?? 0;
+      await harness.player(target).pass();
+      await harness.waitForStable();
+    }
+
+    // 断言:P0 死亡;杀入弃牌堆;贞烈无效标记在失体后已写(无效仍生效);
+    // 且从未询问选项(localVars 无 贞烈/choice)
+    expect(harness.state.players[0].alive).toBe(false);
+    expect(harness.state.players[0].health).toBe(0);
+    expect(harness.state.zones.discardPile).toContain('k7');
+    expect(harness.state.localVars['贞烈/无效/k7/0']).toBe(true);
+    expect(harness.state.localVars['贞烈/choice']).toBeUndefined();
   });
 });
