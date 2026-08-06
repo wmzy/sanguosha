@@ -6,7 +6,7 @@
 //   2. 延时锦囊对你生效 → 不发动 → 手牌不移出
 //   3. 无手牌时延时锦囊生效 → 不触发(无询问)
 //   4. 他人普通锦囊(决斗)以你为唯一目标 → 触发 → 确认 → 手牌移出(经无懈窗口收敛点)
-//   5. 自己使用的普通锦囊不触发(frame.from===自己 + cancelTarget!==自己)
+//   5. 自己使用的普通锦囊不触发(frame.from===自己,生效时 hook 的"他人使用"条件不满足)
 //   6. 多目标普通锦囊(南蛮入侵)→ 陆逊非唯一目标 → 不触发
 //   7. 联动:谦逊移出全部手牌 → 触发界连营(X=移出手牌数)
 //   8. 他人对陆逊使用顺手牵羊 → 无懈超时 → 谦逊触发 → 确认 → 手牌移出
@@ -248,9 +248,9 @@ describe('界谦逊', () => {
     expect(harness.state.players[0].vars['界谦逊/移出']).toBeUndefined();
   });
 
-  // ─── 4. 他人对陆逊使用决斗 → 无懈超时 → 谦逊触发(经无懈窗口收敛点)─────
-  //    决斗走 runDuelResolution:成为目标 → 询问无懈可击(target=陆逊)。
-  //    新版谦逊 hook 监听 请求回应(无懈可击)atom:窗口无人打出无懈+未抵消 → 触发。
+  // ─── 4. 他人对陆逊使用决斗 → 无懈超时 → 谦逊触发(经 生效时 时机)─────
+  //    决斗走 runUseFlow:成为目标 → 生效前(无懈可击广播窗口)→ 生效时(谦逊 after-hook)。
+  //    无懈窗口无人打出无懈 → 未被抵消 → 到达 生效时 atom → 谦逊 hook 触发。
   it('他人对陆逊使用决斗 → 无懈超时 → 谦逊触发 → 确认 → 手牌移出 → 决斗继续', async () => {
     const c2 = makeCard('c2', '闪', '♥', '3'); // 陆逊手牌(将被移出)
     const p1Kill = makeCard('p1s', '杀', '♠', '5'); // P1 决斗备用杀
@@ -275,7 +275,7 @@ describe('界谦逊', () => {
     P1.expectPending('请求回应');
     await P1.pass(); // 无人打出无懈 → 谦逊 hook 触发 → 谦逊 prompt
 
-    // 谦逊 prompt(经 请求回应 无懈窗口路径触发)
+    // 谦逊 prompt(经 生效时 时机触发:无懈未抵消 → 确定生效 → 谦逊询问)
     P0.expectPending('请求回应');
     await P0.respond('界谦逊', { choice: true });
     await harness.waitForStable();
@@ -291,7 +291,7 @@ describe('界谦逊', () => {
   });
 
   // ─── 5. 自己使用的普通锦囊不触发 ────────────────────
-  it('陆逊自己使用决斗 → 谦逊不触发(cancelTarget 是对方,非陆逊)', async () => {
+  it('陆逊自己使用决斗 → 谦逊不触发(frame.from=自己,他人使用条件不满足)', async () => {
     const c2 = makeCard('c2', '闪', '♥', '3');
     const duel = makeCard('dd', '决斗', '♠', 'A', '锦囊牌');
     const state = buildState({
@@ -313,7 +313,7 @@ describe('界谦逊', () => {
     await P0.pass();
     await harness.waitForStable();
 
-    // 谦逊不触发:cancelTarget 是 P1(被决斗目标),非陆逊
+    // 谦逊不触发:frame.from=陆逊(自己使用),生效时 hook 的"他人使用"条件不满足
     expect(harness.state.players[0].vars['界谦逊/移出']).toBeUndefined();
     // 陆逊手牌未移出(dd 已被打出,剩 c2)
     expect(harness.state.players[0].hand).toEqual(['c2']);
