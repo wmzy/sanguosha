@@ -159,8 +159,8 @@ describe('过河拆桥', () => {
   // 3. 距离无限制:隔座使用仍可生效
   // ─────────────────────────────────────────────────────────────
   it('P1 对 P3(隔一存活角色)出过河拆桥 → 距离无限制,正常生效', async () => {
-    // 加 P3 让距离 = 2(顺时针跳过 P2 到 P3)
-    const base = buildState({ p2Hand: ['v1'] });
+    // 加 P3 让距离 = 2(顺时针跳过存活的 P2 到 P3);P2 仅需存活充当隔座,无需手牌
+    const base = buildState({ p2Hand: [] });
     base.players.push(makePlayer({ index: 2, name: 'P3', hand: ['v1'], skills: [] }));
     base.cardMap['v1'] = makeCard('v1', '杀', '♥', '5', '基本牌');
     await harness.setup(base);
@@ -269,7 +269,7 @@ describe('过河拆桥', () => {
   // ─────────────────────────────────────────────────────────────
   // 9. Bug2:拆判定区(延时锦囊)
   // ─────────────────────────────────────────────────────────────
-  it('Bug2:P2 判定区有乐不思蜀 → 过河拆桥出牌后选牌面板选判定区,pendingTricks 清空', async () => {
+  it('Bug2:P2 仅判定区有乐不思蜀 → validate 放行,选牌面板选判定区后 pendingTricks 清空', async () => {
     // 乐不思蜀 卡牌(判定区卡)
     const lb = makeCard('lb1', '乐不思蜀', '♠', '7');
     // 手动构造 state:P2 判定区有乐不思蜀(PendingTrick 结构)
@@ -286,24 +286,6 @@ describe('过河拆桥', () => {
     // 判定区被拆空
     expect(harness.state.players[1].pendingTricks).toEqual([]);
     // 过河拆桥进弃牌堆
-    expect(harness.state.zones.discardPile).toContain('gq1');
-  });
-
-  // ─────────────────────────────────────────────────────────────
-  // 10. Bug2:validate 接受纯判定区目标(手牌装备均无)
-  // ─────────────────────────────────────────────────────────────
-  it('Bug2:P2 只有判定区无手牌无装备 → 过河拆桥 validate 放行', async () => {
-    const lb = makeCard('lb1', '乐不思蜀', '♠', '7');
-    const state = buildState({ p2Hand: [], extraCards: { lb1: lb } });
-    state.players[1].pendingTricks = [{ name: '乐不思蜀', source: 0, card: lb }];
-    await harness.setup(state);
-    const P1 = harness.player('P1');
-
-    // 以前会被拒(只有判定区),现在放行
-    await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
-    await P1.pass();
-    // 选牌面板选判定区
-    await P1.respond('过河拆桥', { zone: 'judge', cardId: 'lb1' });
     expect(harness.state.zones.discardPile).toContain('gq1');
   });
 });
