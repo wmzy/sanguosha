@@ -9,6 +9,7 @@
 //   5. 打闪→雷击→判定梅花→张角回复1点体力+目标受1点雷电伤害
 //   6. 打闪→雷击→判定梅花(张角满血)→跳过回血,仍造成1点雷电伤害
 //   7. 组合:打闪→雷击→鬼道改判为黑桃→命中(雷击+鬼道联动)
+//   8. 目标合法性:雷击不可选自己判定→被拒绝,放弃后无副作用
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   SkillTestHarness,
@@ -416,5 +417,61 @@ describe('雷击', () => {
     } finally {
       restoreCompare();
     }
+  });
+
+  // ─── 8. 目标合法性:雷击不可选自己判定 ────────────────────
+  it('雷击选自己(目标0=张角)→被拒绝,放弃后无伤害', async () => {
+    const dodge = makeCard('d1', '闪', '♥', '2');
+    const kill = makeCard('k1', '杀', '♠', '7');
+    const judge = makeCard('j1', '杀', '♠', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '张角',
+          character: '张角',
+          faction: '群',
+          hand: ['d1'],
+          skills: ['雷击', '闪', '回合管理'],
+          health: 3,
+        }),
+        makePlayer({
+          index: 1,
+          name: '攻击者',
+          hand: ['k1'],
+          skills: ['杀', '回合管理'],
+          health: 4,
+        }),
+      ],
+      cardMap: { d1: dodge, k1: kill, j1: judge },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P0 = harness.player('张角');
+    const P1 = harness.player('攻击者');
+
+    await P1.useCardAndTarget('杀', 'k1', [0]);
+    await waitForStable(harness.state);
+    await P0.respond('闪', { cardId: 'd1' });
+    await waitForStable(harness.state);
+    P0.expectPending('请求回应'); // 雷击询问选目标
+
+    // 选自己(目标0=张角本人)→ 校验拒绝(雷击判定目标不可为自己)
+    await P0.expectRejected({
+      skillId: '雷击',
+      actionType: 'respond',
+      params: { target: 0 },
+    });
+
+    // 拒绝不改变状态:pending 仍在 → 放弃发动,确认无副作用
+    await P0.pass();
+    await waitForStable(harness.state);
+
+    expect(harness.state.zones.deck).toContain('j1');
+    expect(harness.state.players[1].health).toBe(4);
+    expect(harness.state.players[0].health).toBe(3);
   });
 });
