@@ -354,4 +354,82 @@ describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {
     expect(harness.state.players[1].health).toBe(p1HealthBefore - 1);
     expect(harness.state.pendingSlots.size).toBe(0);
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // 6. 非杀伤害不应触发麒麟弓:决斗造成的伤害,目标虽持马但麒麟弓不应询问弃马。
+  //    规则:麒麟弓仅在你使用【杀】造成伤害时触发;决斗伤害来源牌是"决斗"而非"杀"。
+  // ─────────────────────────────────────────────────────────────
+  it('用例6:P0 麒麟弓 + 决斗 P1(持进攻马)→ 决斗伤害不触发麒麟弓,马保留 + 扣1血', async () => {
+    const qilin: Card = {
+      id: 'wp-ql',
+      name: '麒麟弓',
+      suit: '♥',
+      color: '红',
+      rank: '5',
+      type: '装备牌',
+      subtype: '武器',
+      range: 5,
+    };
+    const mount: Card = {
+      id: 'mt-chitu',
+      name: '赤兔',
+      suit: '♥',
+      color: '红',
+      rank: '5',
+      type: '装备牌',
+      subtype: '进攻马',
+    };
+    const duel: Card = { id: 'jd1', name: '决斗', suit: '♠', color: '黑', rank: 'A', type: '锦囊牌' };
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: [duel.id],
+          equipment: { 武器: qilin.id },
+          skills: ['决斗', '装备通用', '麒麟弓'],
+          vars: { '距离/出杀范围': 5 },
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          equipment: { 进攻马: mount.id },
+          skills: ['杀'],
+        }),
+      ],
+      cardMap: { [qilin.id]: qilin, [mount.id]: mount, [duel.id]: duel },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    const p1HealthBefore = harness.state.players[1].health;
+
+    // P0(持麒麟弓)对 P1 使用决斗:P1 先被问无懈、再被询问杀。
+    await P0.useCardAndTarget('决斗', 'jd1', [1]);
+    await P1.pass(); // 无懈可击窗口
+    await P1.pass(); // 询问杀 → P1 无杀不出 → 决斗输,受 1 点伤害(来源牌=决斗)
+
+    // 决斗伤害来源牌非"杀" → 麒麟弓不应触发:atom 历史中不应出现 麒麟弓/confirm 询问。
+    // (麒麟弓若误触发会发出 麒麟弓/confirm 请求回应,即使超时按"不发动"处理、马未被弃,
+    //  询问本身仍是错误的——玩家不应被问及。)
+    const qilinEmitted = harness.state.atomHistory.some(
+      (e) =>
+        e.kind === 'atom' &&
+        (e.atom as { type?: string }).type === '请求回应' &&
+        ((e.atom as { requestType?: string }).requestType ?? '').startsWith('麒麟弓/'),
+    );
+    expect(qilinEmitted).toBe(false);
+    // P1 马保留(麒麟弓未弃)
+    expect(harness.state.players[1].equipment['进攻马']).toBe(mount.id);
+    expect(harness.state.zones.discardPile).not.toContain(mount.id);
+    // 决斗照常造成 1 点伤害
+    expect(harness.state.players[1].health).toBe(p1HealthBefore - 1);
+    expect(harness.state.pendingSlots.size).toBe(0);
+  });
 });

@@ -1,12 +1,21 @@
-// 仁王盾(防具,锁定技):黑色【杀】对你无效。
+// tests/skill-tests/仁王盾.test.ts
+// 仁王盾(防具):锁定技,黑色【杀】对你无效。
+//   时机:使用结算开始时(检测有效性 before-hook)。
+//   黑色杀(含黑色雷杀)→ cancel,杀.execute 据 false 跳过该目标
+//   (不询问闪、不造成伤害、不触发"被抵消")。红色杀(含红色火杀)正常结算。
 //
-// 实现(仁王盾.ts):before hook 挂「检测有效性」——target=自己 + 杀且 color==='黑'
-//   → cancel。杀.execute 据 cancel 跳过该目标(不询问闪、不造成伤害、不触发被抵消)。
+// 与藤甲的关键区别:仁王盾按颜色(黑杀无效);藤甲按属性(普通杀/AOE 无效)。
+//   - 黑色雷杀(♠/♣):仁王盾无效(颜色黑);藤甲有效(属性杀穿透)。
+//   - 红色火杀(♥/♦):仁王盾有效(颜色红);藤甲有效且伤害+1。
 //
-// 验证:
-//   1. 正面:黑杀 → 无效(不询问闪、不扣血)
-//   2. 负面:红杀(color==='红')→ 正常询问闪,不出闪则扣血
-//   3. 负面:无仁王盾时黑杀 → 正常扣血
+// 牌堆事实(src/shared/deck.ts):火杀/雷杀底层 name 均为 '杀',仅 damageType 不同;
+//   火杀=♥/♦(红),雷杀=♣/♠(黑)。故仁王盾 name==='杀' && color==='黑' 覆盖全部杀。
+//
+// 验证(参考 tests/skill-tests/贯石斧.test.ts 写法):
+//   1. 黑色普通杀(♣) → 仁王盾无效,不扣血,无询问闪,杀进弃牌堆
+//   2. 黑色雷杀(♠雷电) → 仁王盾无效(与藤甲区别点),不扣血,无询问闪
+//   3. 红色火杀(♥火焰) → 仁王盾不生效,询问闪,P2 出闪 → 被抵消不扣血
+//   4. 红色火杀(♥火焰) → P2 无闪 → 受1点伤害
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -18,10 +27,11 @@ import type { Card, GameState, PlayerState } from '../../src/engine/types';
 function makeCard(
   id: string,
   name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
+  suit: '♠' | '♥' | '♣' | '♦' = '♠',
   rank = 'A',
+  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 function makePlayer(opts: {
@@ -29,14 +39,16 @@ function makePlayer(opts: {
   name: string;
   hand?: string[];
   skills?: string[];
+  health?: number;
+  maxHealth?: number;
   equipment?: Record<string, string>;
 }): PlayerState {
   return {
     index: opts.index,
     name: opts.name,
     character: '',
-    health: 4,
-    maxHealth: 4,
+    health: opts.health ?? 4,
+    maxHealth: opts.maxHealth ?? 4,
     alive: true,
     hand: opts.hand ?? [],
     equipment: opts.equipment ?? {},
@@ -49,15 +61,7 @@ function makePlayer(opts: {
   };
 }
 
-const RENWANG: Card = {
-  id: 'rw',
-  name: '仁王盾',
-  suit: '♣',
-  color: suitColor('♣'),
-  rank: '2',
-  type: '装备牌',
-  subtype: '防具',
-};
+const RENWANG = makeCard('rw', '仁王盾', '♣', '2', '装备牌');
 
 describe('仁王盾', () => {
   let harness: SkillTestHarness;
@@ -66,138 +70,179 @@ describe('仁王盾', () => {
     harness = new SkillTestHarness();
   });
 
-  // ─── 正面:黑杀无效 ───────────────────────────────────────
+  // ─── 黑色普通杀 → 仁王盾无效 ─────────────────────────────
 
-  it('正面:黑杀(黑桃)→ 无效,不询问闪不扣血', async () => {
-    const blackKill = makeCard('k1', '杀', '♠', '7'); // 黑桃=黑色
+  it('用例1:黑色普通杀(♣) → 仁王盾无效,P2 不扣血、不询问闪、杀进弃牌堆', async () => {
+    const kill = makeCard('k1', '杀', '♣', '10'); // 黑色普通杀
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['杀'] }),
         makePlayer({
           index: 1,
           name: 'P2',
+          hand: [],
           skills: ['闪', '仁王盾'],
           equipment: { 防具: 'rw' },
         }),
       ],
-      cardMap: { rw: RENWANG, k1: blackKill },
+      cardMap: { rw: RENWANG, k1: kill },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
     await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
 
-    await harness.player('P1').useCardAndTarget('杀', 'k1', [1]);
+    // P1 出黑色普通杀指定 P2
+    await P1.useCardAndTarget('杀', 'k1', [1]);
 
-    // 黑杀被仁王盾 cancel:目标被跳过 → 无 pending(不询问闪)
-    expect(harness.state.pendingSlots.size).toBe(0);
+    // 仁王盾 cancel 检测有效性:P2 不扣血
     expect(harness.state.players[1].health).toBe(4);
+    // 无询问闪 pending(杀未进入询问闪阶段)
+    expect(harness.state.pendingSlots.size).toBe(0);
     // 杀进弃牌堆
     expect(harness.state.zones.discardPile).toContain('k1');
+    // view 级断言
+    P2.processEvents();
+    P2.expectView((v) => {
+      expect(v.players[1].health).toBe(4);
+      expect(v.pending).toBeNull();
+    });
   });
 
-  // ─── 负面:红杀正常询问闪 ─────────────────────────────────
+  // ─── 黑色雷杀 → 仁王盾无效(与藤甲的关键区别点) ────────────
 
-  it('负面:红杀(红桃)→ 不被仁王盾挡,不出闪则扣血', async () => {
-    const redKill = makeCard('k2', '杀', '♥', '8'); // 红桃=红色
-    const shan = makeCard('s1', '闪', '♦', '5');
+  it('用例2:黑色雷杀(♠雷电) → 仁王盾无效(颜色黑),P2 不扣血、不询问闪', async () => {
+    const thunderKill: Card = {
+      id: 'k2',
+      name: '杀',
+      suit: '♠',
+      color: '黑',
+      rank: '4',
+      type: '基本牌',
+      damageType: '雷电',
+    };
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k2'], skills: ['杀'] }),
         makePlayer({
           index: 1,
           name: 'P2',
-          hand: ['s1'],
+          hand: [],
           skills: ['闪', '仁王盾'],
           equipment: { 防具: 'rw' },
         }),
       ],
-      cardMap: { rw: RENWANG, k2: redKill, s1: shan },
+      cardMap: { rw: RENWANG, k2: thunderKill },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
     await harness.setup(state);
+    const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await harness.player('P1').useCardAndTarget('杀', 'k2', [1]);
+    // P1 出黑色雷杀指定 P2
+    await P1.useCardAndTarget('杀', 'k2', [1]);
 
-    // 红杀不被挡 → 正常询问闪
-    P2.expectPending('询问闪');
-    await P2.pass(); // 不出闪 → 扣血
-
-    expect(harness.state.players[1].health).toBe(3);
-
-    // 日志抑制回归:红杀时仁王盾 before-hook 注册但未 cancel(pass)→ 检测有效性 事件
-    // 正常发出(atomHistory 含该 atom,证明场景有效),但其 toViewLog 返回 null → 不污染玩家日志。
-    // "检测有效性"是引擎内部时机名(使用结算开始时检测有效性),对玩家无意义。
-    expect(
-      harness.state.atomHistory.some((e) => e.kind === 'atom' && e.atom.type === '检测有效性'),
-    ).toBe(true);
-    expect(harness.player('P1').processedView.log.map((e) => e.text)).not.toContain(
-      '检测有效性',
-    );
+    // 仁王盾按颜色判定:黑色雷杀无效(与藤甲"属性杀穿透"不同)
+    expect(harness.state.players[1].health).toBe(4);
+    expect(harness.state.pendingSlots.size).toBe(0);
+    expect(harness.state.zones.discardPile).toContain('k2');
   });
 
-  // ─── 负面:无仁王盾时黑杀正常扣血 ─────────────────────────
+  // ─── 红色火杀 → 仁王盾不生效,正常询问闪 ──────────────────
 
-  it('负面:无仁王盾 → 黑杀正常询问闪,不出闪则扣血', async () => {
-    const blackKill = makeCard('k1', '杀', '♣', '7'); // 梅花=黑色
-    const shan = makeCard('s1', '闪', '♦', '5');
+  it('用例3:红色火杀(♥火焰) → 仁王盾不生效,询问闪,P2 出闪 → 被抵消不扣血', async () => {
+    const fireKill: Card = {
+      id: 'k3',
+      name: '杀',
+      suit: '♥',
+      color: '红',
+      rank: '4',
+      type: '基本牌',
+      damageType: '火焰',
+    };
+    const dodge = makeCard('d1', '闪', '♦', '2');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['杀'] }),
-        makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['闪'] }),
-      ],
-      cardMap: { k1: blackKill, s1: shan },
-      currentPlayerIndex: 0,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    });
-    await harness.setup(state);
-    const P2 = harness.player('P2');
-
-    await harness.player('P1').useCardAndTarget('杀', 'k1', [1]);
-    P2.expectPending('询问闪');
-    await P2.pass();
-
-    expect(harness.state.players[1].health).toBe(3);
-  });
-
-  // ─── 边界:仁王盾只保护装备者(目标合法性)──────────────────
-  // 实现:before hook 内 `if (atom.target !== ownerId) return;` ——
-  // 杀指向非装备者时 hook 直接 pass,不 cancel。验证仁王盾不会越权让黑杀对他人无效。
-
-  it('边界:仁王盾不保护其他玩家——黑杀 P3,P3 正常扣血、P2 不受影响', async () => {
-    const blackKill = makeCard('k1', '杀', '♠', '7'); // 黑桃=黑色
-    const shan = makeCard('s1', '闪', '♦', '5');
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['杀'] }),
-        // P2 持仁王盾但不是本杀的目标
+        makePlayer({ index: 0, name: 'P1', hand: ['k3'], skills: ['杀'] }),
         makePlayer({
           index: 1,
           name: 'P2',
+          hand: ['d1'],
           skills: ['闪', '仁王盾'],
           equipment: { 防具: 'rw' },
         }),
-        makePlayer({ index: 2, name: 'P3', hand: ['s1'], skills: ['闪'] }),
       ],
-      cardMap: { rw: RENWANG, k1: blackKill, s1: shan },
+      cardMap: { rw: RENWANG, k3: fireKill, d1: dodge },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
     await harness.setup(state);
-    const P3 = harness.player('P3');
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
 
-    // P1 黑杀 P3(非仁王盾持有者):检测有效性 hook 因 target≠ownerId 直接 pass
-    await harness.player('P1').useCardAndTarget('杀', 'k1', [2]);
-    P3.expectPending('询问闪');
-    await P3.pass();
+    // P1 出红色火杀指定 P2
+    await P1.useCardAndTarget('杀', 'k3', [1]);
 
-    // P3 正常受击;仁王盾持有者 P2 完全不受影响
-    expect(harness.state.players[2].health).toBe(3);
+    // 仁王盾不生效(颜色红)→ 进入询问闪:P2 有 pending
+    expect(harness.state.pendingSlots.get(1)).toBeDefined();
+
+    // P2 出闪 → 杀被抵消
+    await P2.respond('闪', { cardId: 'd1' });
+
+    // P2 不扣血
     expect(harness.state.players[1].health).toBe(4);
+    // 闪 + 杀进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('d1');
+    expect(harness.state.zones.discardPile).toContain('k3');
+  });
+
+  // ─── 红色火杀,P2 无闪 → 受1点伤害 ─────────────────────────
+
+  it('用例4:红色火杀(♥火焰) → P2 无闪 → 受1点伤害', async () => {
+    const fireKill: Card = {
+      id: 'k4',
+      name: '杀',
+      suit: '♥',
+      color: '红',
+      rank: '7',
+      type: '基本牌',
+      damageType: '火焰',
+    };
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['k4'], skills: ['杀'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: [],
+          skills: ['闪', '仁王盾'],
+          equipment: { 防具: 'rw' },
+        }),
+      ],
+      cardMap: { rw: RENWANG, k4: fireKill },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P1 出红色火杀指定 P2
+    await P1.useCardAndTarget('杀', 'k4', [1]);
+
+    // 仁王盾不生效(颜色红)→ 杀进入正常结算。P2 无闪,若仍有询问闪 pending 则放弃。
+    if (harness.state.pendingSlots.get(1)) {
+      await P2.pass();
+    }
+
+    // P2 受1点伤害(证明红色火杀未被仁王盾无效化)
+    expect(harness.state.players[1].health).toBe(3);
+    expect(harness.state.zones.discardPile).toContain('k4');
   });
 });

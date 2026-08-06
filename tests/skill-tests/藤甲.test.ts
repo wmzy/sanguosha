@@ -307,4 +307,97 @@ describe('藤甲', () => {
     // 雷电伤害非火焰,藤甲不减伤 → 正常 1 点(修复前错误减为 0)
     expect(harness.state.players[1].health).toBe(3);
   });
+
+  // ─── 回归(陷阱8):装备被获得(顺手牵羊)后 hook 须动态校验防具仍在 ──
+  //   获得(steal)路径只移除装备槽,不触发 移除技能(仅 弃置/装备替换 触发),
+  //   故 藤甲 before-hook 须动态校验 防具 仍是藤甲(参考丈八蛇矛动态武器校核),
+  //   否则失主被顺走藤甲后,陈旧 hook 仍 cancel 普通杀 / 火焰伤害仍 +1 → 与规则不符。
+
+  it('回归:顺手牵羊顺走藤甲后,普通杀正常命中失主(检测有效性 hook 动态校验防具)', async () => {
+    const kill = makeCard('k3', '杀', '♠', '7');
+    const sq: Card = {
+      id: 'sq1',
+      name: '顺手牵羊',
+      suit: '♠',
+      color: suitColor('♠'),
+      rank: 'J',
+      type: '锦囊牌',
+    };
+    const p2shan = makeCard('s2', '闪', '♦', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['k3', 'sq1'], skills: ['杀', '顺手牵羊'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: ['s2'],
+          skills: ['闪', '藤甲'],
+          equipment: { 防具: 'tj' },
+        }),
+      ],
+      cardMap: { tj: TENGJIA, k3: kill, sq1: sq, s2: p2shan },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P1 顺手牵羊顺走 P2 的藤甲(2 人相邻,距离 1)
+    await P1.useCardAndTarget('顺手牵羊', 'sq1', [1]);
+    await P1.pass(); // 无懈窗口
+    await P1.respond('顺手牵羊', { zone: 'equipment', cardId: 'tj' });
+
+    // 藤甲已被顺走:P2 装备区无防具
+    expect(harness.state.players[1].equipment['防具']).toBeUndefined();
+
+    // P1 普通杀 P2:藤甲已不在,普通杀应正常询问闪并命中(不再被陈旧 hook 无效)
+    await P1.useCardAndTarget('杀', 'k3', [1]);
+    P2.expectPending('询问闪');
+    await P2.pass(); // 不出闪
+
+    // 失主被顺走藤甲后受 1 点伤害(陈旧 hook 不应再 cancel)
+    expect(harness.state.players[1].health).toBe(3);
+  });
+
+  it('回归:顺手牵羊顺走藤甲后,受到火焰伤害不再 +1(受到伤害时 hook 动态校验防具)', async () => {
+    const sq: Card = {
+      id: 'sq2',
+      name: '顺手牵羊',
+      suit: '♠',
+      color: suitColor('♠'),
+      rank: '4',
+      type: '锦囊牌',
+    };
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['sq2'], skills: ['顺手牵羊'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          skills: ['闪', '藤甲'],
+          equipment: { 防具: 'tj' },
+        }),
+      ],
+      cardMap: { tj: TENGJIA, sq2: sq },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // P1 顺手牵羊顺走 P2 的藤甲
+    await P1.useCardAndTarget('顺手牵羊', 'sq2', [1]);
+    await P1.pass(); // 无懈窗口
+    await P1.respond('顺手牵羊', { zone: 'equipment', cardId: 'tj' });
+
+    // 藤甲已被顺走,直接对 P2 造成 1 点火焰伤害 → 藤甲不再 +1 → 仅 1 点
+    await runDamageFlow(harness.state, 0, 1, 1, undefined, '火焰');
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    expect(harness.state.players[1].health).toBe(3);
+  });
 });

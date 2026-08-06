@@ -26,6 +26,14 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
+  // 动态校验防具仍在装备区(陷阱8):获得(顺手牵羊)等路径只移除装备槽、不触发
+  // 移除技能(仅 弃置/装备替换 触发),陈旧 hook 可能残留。触发前校验 防具 仍是藤甲,
+  // 否则不生效(参考丈八蛇矛动态武器校核)。
+  const armorIsTengjia = (st: GameState): boolean => {
+    const armorId = st.players[ownerId]?.equipment?.['防具'];
+    return !!armorId && st.cardMap[armorId]?.name === '藤甲';
+  };
+
   // ① 检测有效性:普通杀/南蛮入侵/万箭齐发对你无效(cancel → 跳过该目标结算)
   registerBeforeHook(
     state,
@@ -35,6 +43,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
       if (atom.target !== ownerId) return;
+      if (!armorIsTengjia(ctx.state)) return;
       const cardId = atom.cardId;
       if (!cardId) return;
       const card = ctx.state.cardMap[cardId];
@@ -58,6 +67,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
       if (atom.target !== ownerId) return;
+      if (!armorIsTengjia(ctx.state)) return;
       if (atom.damageType !== '火焰') return;
       const baseAmount = atom.amount ?? 1;
       return { kind: 'modify', atom: { ...ctx.atom, amount: baseAmount + 1 } as typeof ctx.atom };

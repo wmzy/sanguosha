@@ -365,4 +365,46 @@ describe('贯石斧', () => {
     expect(harness.state.zones.discardPile).toContain('j1'); // 判定牌
     expect(harness.state.zones.discardPile).toContain('k1'); // 原始杀
   });
+
+  // ─── 边缘:把贯石斧本身(武器)作为弃牌之一强命(官方规则允许弃发动武器本身) ──
+  it('用例8:把贯石斧本身作为弃牌之一 → 强命成功,P2 扣血', async () => {
+    const kill = makeCard('k1', '杀', '♠', '7');
+    const dodge = makeCard('d1', '闪', '♦', '2');
+    const extra = makeCard('x1', '桃', '♥', '3');
+    const state: GameState = createGameState({
+      players: [
+        // P1 出杀后剩 1 手牌(x1)+ 贯石斧(武器)= 恰好 2 张可弃
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'x1'],
+          skills: ['杀', '贯石斧'],
+          equipment: { 武器: 'gs' },
+        }),
+        makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
+      ],
+      cardMap: { gs: GUANSHI, k1: kill, d1: dodge, x1: extra },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('杀', 'k1', [1]);
+    await P2.respond('闪', { cardId: 'd1' });
+
+    // 贯石斧触发:把武器贯石斧本身 + 手牌 x1 一起弃掉强命
+    expect(harness.state.pendingSlots.get(0)).toBeDefined();
+    await P1.respond('贯石斧', { cardIds: ['gs', 'x1'] });
+
+    // 强命:P2 扣血
+    expect(harness.state.players[1].health).toBe(3);
+    // 贯石斧本身 + x1 都进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('gs');
+    expect(harness.state.zones.discardPile).toContain('x1');
+    // 武器已不在装备区
+    expect(harness.state.players[0].equipment['武器']).toBeUndefined();
+  });
 });
