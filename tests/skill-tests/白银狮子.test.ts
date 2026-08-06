@@ -153,4 +153,41 @@ describe('白银狮子', () => {
     expect(harness.state.players[1].equipment['防具']).toBeUndefined();
     expect(harness.state.players[1].hand).toContain('by');
   });
+
+  // ─── 回血(负面):卸下非白银狮子防具 → 不回血 ───────────────
+  //   before hook 以 cardMap[id].name === '白银狮子' 为门禁,卸下其他防具不记录
+  //   loseKey → after hook 不回血。补充此负面路径以防门禁被误删后任意卸装都回血。
+
+  it('回血(负面):卸下其他防具(非白银狮子) → 不回复体力', async () => {
+    const OTHER_ARMOR: Card = { ...BAIYIN, id: 'tj', name: '藤甲' };
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', skills: [] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          skills: ['白银狮子'],
+          health: 2,
+          equipment: { 防具: 'tj' },
+        }),
+      ],
+      cardMap: { tj: OTHER_ARMOR },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    expect(harness.state.players[1].health).toBe(2);
+
+    // 卸下的是藤甲(非白银狮子)→ before hook 不记录 loseKey → after hook 不回血
+    await applyAtom(harness.state, { type: '卸下', player: 1, slot: '防具' });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 体力不变(未回血)
+    expect(harness.state.players[1].health).toBe(2);
+    // 装备已卸下(移回手牌)
+    expect(harness.state.players[1].equipment['防具']).toBeUndefined();
+    expect(harness.state.players[1].hand).toContain('tj');
+  });
 });
