@@ -220,4 +220,48 @@ describe('酣战', () => {
     expect(harness.state.turn.vars['天义/win']).toBe(0); // K > 2 赢
     expect(harness.state.players[0].vars['天义/usedThisTurn']).toBe(true);
   });
+
+  // ─── 5. 两张拼点牌均含杀 → 获点数最大的杀(与输赢无关) ───
+  it('两张拼点牌均含杀 → 获点数最大的杀(此处为对方的更高点杀),拼点输赢不影响发动', async () => {
+    const tscPd = mkCard('pd0', '杀', '♠', '5'); // 太史慈拼点牌(杀5,点5)
+    const p1Card = mkCard('c2', '杀', '♥', 'K'); // 目标拼点牌(杀K,点13)
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: '界太史慈', hand: ['pd0'], skills: ['天义', '酣战'] }),
+          mkPlayer({ index: 1, name: '目标', hand: ['c2'], skills: ['回合管理'] }),
+        ],
+        cardMap: { pd0: tscPd, c2: p1Card },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const TSC = harness.player('界太史慈');
+    const P1 = harness.player('目标');
+
+    await TSC.triggerAction('天义', 'use', { cardId: 'pd0', target: 1 });
+    await harness.waitForStable();
+    // 放弃随机 → 正常询问目标出拼点牌
+    await TSC.respond('酣战', { choice: false });
+    await harness.waitForStable();
+    await P1.respond('天义', { cardId: 'c2' });
+    await harness.waitForStable();
+    // 两张拼点牌均含杀 → 询问获杀
+    expect(hasPending(harness.state, '酣战/获杀')).toBe(true);
+
+    // 确认获杀 → 取点数最大的杀(c2=杀K=13 > pd0=杀5)
+    await TSC.respond('酣战', { choice: true });
+    await harness.waitForStable();
+
+    // 太史慈 5 < K(13) → 没赢(本回合不能使用杀);但获杀与输赢无关
+    expect(harness.state.turn.vars['天义/lost']).toBe(0);
+    expect(harness.state.turn.vars['天义/win']).toBeUndefined();
+    // 获得点数最大的杀 = 对方的杀K(c2),移入太史慈手牌
+    expect(harness.state.players[0].hand).toContain('c2');
+    expect(harness.state.zones.discardPile).not.toContain('c2');
+    // 太史慈自己的杀5(pd0,点数更小)留在弃牌堆
+    expect(harness.state.zones.discardPile).toContain('pd0');
+    expect(harness.state.players[0].hand).not.toContain('pd0');
+  });
 });
