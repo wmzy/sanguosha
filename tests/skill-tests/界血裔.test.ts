@@ -12,8 +12,9 @@
 //   6. 非主公(ownerId!==0):不获得裔,不触发任何效果
 //   7. 游戏开始初始化:仅触发一次(后续回合开始不重复)
 //   8. 群角色死亡后裔数不变(游戏开始时锁定)
+//   9. 手牌上限动态:裔变动后立即反映
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
+import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { applyAtom } from '../../src/engine/index';
@@ -362,7 +363,6 @@ describe('界血裔', () => {
   // ─── 9. 手牌上限动态:裔变动后立即反映 ─────────────────
 
   it('手牌上限动态:裔变动后立即反映', async () => {
-    const restoreAutoCompare = disableAutoCompare();
     await harness.setup(
       createGameState({
         players: [
@@ -397,6 +397,5 @@ describe('界血裔', () => {
 
     expect(yiCount(harness.state, 0)).toBe(3);
     expect(handLimit(harness.state, 0)).toBe(3 + 3); // 裔减少 1,上限同步降
-    restoreAutoCompare();
   });
 });
