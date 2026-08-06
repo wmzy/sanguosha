@@ -3,10 +3,11 @@
 //
 // 验证:
 //   1. 正面:P1 出无中生有 → 无懈窗口 → P2 看破(黑牌当无懈)→ 抵消,P1 不摸牌
-//   2. 正面:验证影子卡 cardMap['c1#看破'].name==='无懈可击'
-//   3. 负面:红牌 transform 被拒(不是黑色)
-//   4. 负面:无无懈窗口时 transform 被拒
-//   5. rollback:transform + 无懈可击.respond 失败(无窗口)→ 原卡还原
+//        (含验证影子卡 cardMap['c1#看破'].name==='无懈可击')
+//   2. 负面:红牌 transform 被拒(不是黑色)
+//   3. 负面:无无懈窗口时 transform 被拒
+//   4. 负面:组合 action(transform+无懈可击.respond)无窗口 → preceding validate 拒绝,
+//      无影子卡残留、原牌还原
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -115,14 +116,14 @@ describe('看破', () => {
     expect(harness.state.cardMap['c1#看破'].name).toBe('无懈可击');
     expect(harness.state.cardMap['c1#看破'].shadowOf).toBe('c1');
 
-    // 无抵消后 开第二个无懈窗口(反无懈)→ pass(无人反无懈)
+    // 无懈抵消后 开第二个无懈窗口(反无懈)→ pass(无人反无懈)
     P1.expectPending('请求回应');
     await P1.pass();
 
-    // 无中生有被抵消 → P1 不摸牌(手牌数不变,无中生有牌已进弃牌堆)
+    // 无中生有被抵消 → P1 不摸牌:手牌仅因用掉无中生有而 -1(wz、c1 进弃牌堆)
     // 无懈窗口结束后无中生有结算跳过摸牌。等待稳定。
     await harness.waitForStable();
-    expect(harness.state.players[0].hand.length).toBe(p1HandBefore - 1); // 用掉无中生有
+    expect(harness.state.players[0].hand.length).toBe(p1HandBefore - 1); // 用掉无中生有,未发生摸牌
     expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['wz', 'c1']));
     // 关键:未发生摸牌(被抵消)。检查 atom 历史无 摸牌 atom。
     const drawEvents = harness.state.atomHistory.filter(
@@ -131,34 +132,7 @@ describe('看破', () => {
     expect(drawEvents.length).toBe(0);
   });
 
-  // ─── 2. 正面:♦红牌外的♣黑牌也可转化 ────────────────────────────
-  it('transformThenRespond:♣黑牌当无懈 → 影子卡 name=无懈可击', async () => {
-    const wzsy = makeCard('wz', '无中生有', '♥', '3', '锦囊牌');
-    const club = makeCard('c2', '杀', '♣', '8');
-    const state = buildState({
-      p1Hand: ['wz'],
-      p2Hand: ['c2'],
-      extraCards: { wz: wzsy, c2: club },
-    });
-    await harness.setup(state);
-    const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
-
-    await P1.useCard('无中生有', 'wz');
-    P1.expectPending('请求回应');
-    await P2.transformThenRespond('看破', { cardId: 'c2' }, '无懈可击', { cardId: 'c2#看破' });
-
-    expect(harness.state.cardMap['c2#看破'].name).toBe('无懈可击');
-    // pass 反无懈窗口 → 无中生有被抵消
-    await P1.pass();
-    await harness.waitForStable();
-    const drawEvents = harness.state.atomHistory.filter(
-      (e) => e.kind === 'atom' && (e.atom as { type?: string }).type === '摸牌',
-    );
-    expect(drawEvents.length).toBe(0);
-  });
-
-  // ─── 3. 负面:红牌 transform 被拒 ────────────────────────────────
+  // ─── 2. 负面:红牌 transform 被拒 ────────────────────────────────
   it('transform:红♥牌 → 拒绝(不是黑色)', async () => {
     const wzsy = makeCard('wz', '无中生有', '♥', '2', '锦囊牌');
     const red = makeCard('r1', '桃', '♥', '5');
@@ -181,7 +155,7 @@ describe('看破', () => {
     });
   });
 
-  // ─── 4. 负面:无无懈窗口时 transform 被拒 ────────────────────────
+  // ─── 3. 负面:无无懈窗口时 transform 被拒 ────────────────────────
   it('transform:无无懈窗口(出牌阶段空闲)→ 拒绝', async () => {
     const black = makeCard('c1', '杀', '♠', '5');
     const state = buildState({
@@ -198,8 +172,8 @@ describe('看破', () => {
     });
   });
 
-  // ─── 5. rollback:transform + 无懈可击.respond 失败 → 原卡还原 ────
-  it('transform rollback:无无懈窗口时 transform+respond → 主 respond 失败 → 原卡还原', async () => {
+  // ─── 4. 负面:组合 action(transform+respond)无窗口 → preceding 拒绝、无残留 ────
+  it('组合 action 无无懈窗口 → 看破.transform validate 拒绝,无影子卡残留、原牌还原', async () => {
     const black = makeCard('c1', '杀', '♠', '5');
     const state = buildState({
       p2Hand: ['c1'],
@@ -208,17 +182,16 @@ describe('看破', () => {
     await harness.setup(state);
     const P2 = harness.player('P2');
 
-    // 无无懈窗口:无懈可击.respond validate 失败 → rollback 看破 transform
+    // 出牌阶段无无懈窗口:dispatch 先跑 preceding 看破.transform 的 validate,
+    // 因 hasNullifyWindow=false 被拒 → transform 从未执行,自然无影子卡、原牌仍在手牌。
     await P2.expectRejected({
       skillId: '无懈可击',
       actionType: 'respond',
-      params: {
-        cardId: 'c1#看破',
-        preceding: [{ skillId: '看破', actionType: 'transform', params: { cardId: 'c1' } }],
-      },
+      params: { cardId: 'c1#看破' },
+      preceding: [{ skillId: '看破', actionType: 'transform', params: { cardId: 'c1' } }],
     });
 
-    // 原卡还原,无影子
+    // 被拒后无残留:无影子卡,原牌仍在手牌
     expect(harness.state.cardMap['c1'].name).toBe('杀');
     expect(harness.state.cardMap['c1#看破']).toBeUndefined();
     expect(harness.state.players[1].hand).toEqual(['c1']);
