@@ -87,20 +87,22 @@ describe('界破军', () => {
     harness = new SkillTestHarness();
   });
 
-  // ─── 1. happy path:发动破军移出手牌 + 增伤+1 ────────────────────
-  it('杀指定 → 发动破军 → 移出 X 张手牌 → 杀伤害+1(条件满足)', async () => {
+  // ─── 1. happy path:发动破军移出手牌 → 目标手牌≤自己 → 增伤+1 ────────────────────
+  it('杀指定 → 发动破军 → 移出手牌使目标手牌数≤自己 → 杀伤害+1', async () => {
     const slash = makeCard('s1', '杀', '♠', '5');
-    // P1 手牌:杀来时 X=4(满血),选 2 张移出
+    // p0e:P0 出杀后保留的 1 张手牌,使增伤条件(目标手牌≤自己)可能成立
+    const p0e = makeCard('p0e', '闪', '♥', '2');
     const t1 = makeCard('t1', '闪', '♥', '3');
     const t2 = makeCard('t2', '闪', '♦', '4');
     const t3 = makeCard('t3', '桃', '♥', '5');
     const t4 = makeCard('t4', '杀', '♠', '7');
     const state: GameState = createGameState({
       players: [
+        // P0 出杀后剩 1 张手牌(p0e),装备 0
         makePlayer({
           index: 0,
           name: 'P0',
-          hand: ['s1'],
+          hand: ['s1', 'p0e'],
           skills: ['杀', '界破军'],
           health: 4,
         }),
@@ -113,7 +115,7 @@ describe('界破军', () => {
           character: '曹操',
         }),
       ],
-      cardMap: { s1: slash, t1, t2, t3, t4 },
+      cardMap: { s1: slash, p0e, t1, t2, t3, t4 },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -126,34 +128,31 @@ describe('界破军', () => {
     // P0 使用杀指定 P1
     await P0.useCardAndTarget('杀', 's1', [1]);
 
-    // 破军询问(指定目标 after-hook)
+    // 破军询问发动(指定目标 after-hook)
     P0.expectPending('请求回应');
     await P0.respond('界破军', { choice: true });
     await harness.waitForStable();
 
-    // 选牌询问:X = P1.health = 4。选 2 张(满足增伤条件:P1 移出后手牌数 2 ≤ P0 手牌数 1?
-    //   注意:P0 已出杀,手牌=0;t1~t4 共 4 张。条件检查在造成伤害时:P1.hand 4 > P0.hand 0 →
-    //   不满足。为让增伤生效,本用例把 P0 给一张额外手牌。)
-    // —— 重新设计:把 P0 加一张保命手牌让条件可能成立 ——
-    // 此处先验证主效果(移出),增伤单列用例 1b 测。
+    // 选牌询问:X = P1.health = 4。选 3 张移出,使 P1 剩 1 张手牌 = P0 出杀后的 1 张
     P0.expectPending('请求回应');
-    await P0.respond('界破军', { cardIds: ['t1', 't2'] });
+    await P0.respond('界破军', { cardIds: ['t1', 't2', 't3'] });
     await harness.waitForStable();
 
-    // 牌已移出:hand 减少 2,vars 记录
-    expect(harness.state.players[1].hand).toEqual(['t3', 't4']);
-    expect(harness.state.players[1].vars['界破军/移出']).toEqual(['t1', 't2']);
+    // 牌已移出:hand 只剩 t4,vars 记录
+    expect(harness.state.players[1].hand).toEqual(['t4']);
+    expect(harness.state.players[1].vars['界破军/移出']).toEqual(['t1', 't2', 't3']);
     // 牌未进弃牌堆
     expect(harness.state.zones.discardPile).not.toContain('t1');
     expect(harness.state.zones.discardPile).not.toContain('t2');
+    expect(harness.state.zones.discardPile).not.toContain('t3');
 
-    // 杀结算:P1 被询问闪 → 不闪
+    // 杀结算:P1 被询问闪 → 不闪(t4 是杀,无闪可出)
     P1.expectPending('询问闪');
     await P1.pass();
     await harness.waitForStable();
 
-    // P1 受到 1 点伤害(条件不满足:移出后 P1.hand 2 > P0.hand 0)
-    expect(harness.state.players[1].health).toBe(3);
+    // 增伤条件满足:P1.hand 1 ≤ P0.hand 1(出杀后),装备皆 0 → 伤害 +1 → 受 2 点
+    expect(harness.state.players[1].health).toBe(2);
   });
 
   // ─── 1b. 增伤生效:P0 手牌 ≥ P1 手牌 且 P0 装备 ≥ P1 装备 → +1 ────────────────────
@@ -621,33 +620,26 @@ describe('界破军', () => {
     expect(harness.state.players[1].hand).toEqual(['t1']);
   });
 
-  // ─── 11. 联动:破军移出装备 → 装备数下降 → 增伤条件可能满足 ────────────────────
-  it('联动:破军移出目标装备后,目标装备数≤self → 杀伤害+1', async () => {
+  // ─── 11. 联动边界:破军只移出部分装备,目标装备数仍 > self → 不增伤 ────────────────────
+  it('联动:破军只移出目标部分装备,目标装备数仍 > self → 杀伤害不+1', async () => {
     const slash = makeCard('s1', '杀', '♠', '5');
-    const p0w = makeWeapon('p0w', '青釭剑', '♣', 2);
     const p1w = makeWeapon('p1w', '诸葛连弩', '♠', 3);
+    const p1a = makeArmor('p1a', '仁王盾', '♣');
     const state: GameState = createGameState({
       players: [
-        // P0:1 装备(武器)
-        makePlayer({
-          index: 0,
-          name: 'P0',
-          hand: ['s1'],
-          equipment: { 武器: 'p0w' },
-          skills: ['杀', '界破军'],
-          health: 4,
-        }),
-        // P1:1 装备(武器)— 装备数等于 P0,不大于;手牌 0 ≤ P0 手牌 0(出杀后)
+        // P0 无装备
+        makePlayer({ index: 0, name: 'P0', hand: ['s1'], skills: ['杀', '界破军'], health: 4 }),
+        // P1 有 2 件装备;破军只移出武器,仍剩防具(1 件) > P0 的 0 件 → 不增伤
         makePlayer({
           index: 1,
           name: 'P1',
           hand: [],
-          equipment: { 武器: 'p1w' },
+          equipment: { 武器: 'p1w', 防具: 'p1a' },
           skills: [],
           character: '曹操',
         }),
       ],
-      cardMap: { s1: slash, p0w, p1w },
+      cardMap: { s1: slash, p1w, p1a },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -655,11 +647,10 @@ describe('界破军', () => {
     state.zones = { deck: [], discardPile: [], processing: [] };
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
 
-    // 发动破军,移出 P1 武器
+    // 发动破军,只移出 P1 武器(保留防具)
     P0.expectPending('请求回应');
     await P0.respond('界破军', { choice: true });
     await harness.waitForStable();
@@ -667,11 +658,13 @@ describe('界破军', () => {
     await P0.respond('界破军', { cardIds: ['p1w'] });
     await harness.waitForStable();
     expect(harness.state.players[1].equipment['武器']).toBeUndefined();
+    expect(harness.state.players[1].equipment['防具']).toBe('p1a');
+    expect(harness.state.players[1].vars['界破军/移出']).toEqual(['p1w']);
 
-    // 杀结算 → P1 0 手牌 → 询问闪 skip → 直接受伤
-    // 增伤条件:P1.hand 0 ≤ P0.hand 0(出杀后),P1.equipCount 0 ≤ P0.equipCount 1 → 满足,+1
+    // 杀结算 → P1 0 手牌 → 询问闪 skip → 直接扣血
     await harness.waitForStable();
 
-    expect(harness.state.players[1].health).toBe(2); // 4 - 2 = 2
+    // 增伤条件不满足:P1 装备 1(防具) > P0 装备 0 → 只受 1 点
+    expect(harness.state.players[1].health).toBe(3);
   });
 });
