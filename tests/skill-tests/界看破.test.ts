@@ -127,9 +127,15 @@ describe('界看破', () => {
     expect(harness.state.cardMap['c1#界看破'].name).toBe('无懈可击');
     expect(harness.state.cardMap['c1#界看破'].shadowOf).toBe('c1');
 
-    // 界看破关键特性:不设 已回应=true → 询问无懈可击 循环 break,不开反无懈窗口。
-    // 直接进入无中生有被抵消结算(不摸牌)。
+    // 界看破关键特性:respond override 对转化无懈传 skipCancelQuery=true,
+    // 无懈结算时不再询问反无懈(不可被响应)。
     await harness.waitForStable();
+
+    // 验证「不可被响应」:全程只出现 1 个无懈询问窗口(无中生有的),无第二个反无懈窗口
+    const respondRequests = harness.state.atomHistory.filter(
+      (e) => e.kind === 'atom' && (e.atom as { type?: string }).type === '请求回应',
+    );
+    expect(respondRequests.length).toBe(1);
 
     // 无中生有被抵消 → P2 不摸牌
     const drawEvents = harness.state.atomHistory.filter(
@@ -232,30 +238,40 @@ describe('界看破', () => {
     expect(drawEvents.length).toBe(0);
   });
 
-  // ─── 5. rollback:transform + 无懈.respond 失败 → 原卡还原 ────────
-  it('transform rollback:无无懈窗口时 transform+respond → 主 respond 失败 → 原卡还原', async () => {
-    const black = makeCard('c1', '杀', '♠', '5');
+  // ─── 5. rollback:transform 成功但主 respond 失败 → 原卡还原 ─────
+  it('transform rollback:transform 成功 + respond 非无懈牌失败 → 影子删除原卡还原', async () => {
+    const wzsy = makeCard('wz', '无中生有', '♥', '2', '锦囊牌');
+    const black = makeCard('c1', '杀', '♠', '5'); // 转化为影子无懈的黑牌
+    const tao = makeCard('t1', '桃', '♥', '5'); // 非【无懈可击】,用于让主 respond 失败
     const state = buildState({
-      p1Hand: ['c1'],
-      extraCards: { c1: black },
+      p1Hand: ['c1', 't1'],
+      p2Hand: ['wz'],
+      extraCards: { wz: wzsy, c1: black, t1: tao },
+      current: 1, // P2 回合 → 出无中生有开无懈窗口,使 transform 能通过
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
 
-    // 无无懈窗口:无懈可击.respond validate 失败 → rollback 界看破 transform
+    await P2.useCard('无中生有', 'wz');
+    P2.expectPending('请求回应');
+
+    // transform c1 成功(开窗)→ 影子 c1#界看破 入手牌;
+    // 但主 respond 用非无懈牌 t1 → validate 失败 → rollback preceding transform
     await P1.expectRejected({
       skillId: '无懈可击',
       actionType: 'respond',
       params: {
-        cardId: 'c1#界看破',
+        cardId: 't1',
         preceding: [{ skillId: '界看破', actionType: 'transform', params: { cardId: 'c1' } }],
       },
     });
 
-    // 原卡还原,无影子
-    expect(harness.state.cardMap['c1'].name).toBe('杀');
+    // rollback:影子删除,原黑牌 c1 还原,t1 仍在(无中生有无懈窗口仍挂起,与本断言无关)
     expect(harness.state.cardMap['c1#界看破']).toBeUndefined();
-    expect(harness.state.players[0].hand).toEqual(['c1']);
+    expect(harness.state.cardMap['c1'].name).toBe('杀');
+    expect(harness.state.players[0].hand).toEqual(expect.arrayContaining(['c1', 't1']));
+    expect(harness.state.players[0].hand).toHaveLength(2);
   });
 
   // ─── 6. 负面:红牌 transform 被拒 ────────────────────────────────
