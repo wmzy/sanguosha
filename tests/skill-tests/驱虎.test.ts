@@ -4,9 +4,12 @@
 //
 // 覆盖:
 //   1. 荀彧赢 → 选择目标攻击范围内的角色 → 该角色受伤
-//   2. 荀彧没赢 → 荀彧受伤
-//   3. 每回合限一次(第二次被拒绝)
-//   4. 目标无手牌时被拒绝
+//   2. 荀彧没赢(输) → 荀彧受伤
+//   3. 平局(相等)→ 算没赢,荀彧受伤
+//   4. 每回合限一次(第二次被拒绝)
+//   5. 目标无手牌 → use 被拒绝
+//   6. 目标是自己 → use 被拒绝(不能与自己拼点)
+//   7. 不是自己回合 → use 被拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -213,7 +216,32 @@ describe('驱虎', () => {
     });
   });
 
-  // ─── 6. 不是自己回合 → 拒绝 ─────────────────────────────
+  // ─── 6. 目标是自己 → 拒绝(不能与自己拼点)─────────────────
+  it('目标是自己 → use 被拒绝(不能与自己拼点)', async () => {
+    const card = makeCard('c1', '杀', '♠', 'K');
+    const targetCard = makeCard('c2', '闪', '♥', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: '荀彧', hand: ['c1'], skills: ['驱虎'], health: 3, maxHealth: 3 }),
+        makePlayer({ index: 1, name: '目标', hand: ['c2'], skills: ['回合管理'] }),
+      ],
+      cardMap: { c1: card, c2: targetCard },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('荀彧');
+
+    // target === ownerId → validate 拒绝(不能与自己拼点)
+    await P0.expectRejected({
+      skillId: '驱虎',
+      actionType: 'use',
+      params: { cardId: 'c1', target: 0 },
+    });
+  });
+
+  // ─── 7. 不是自己回合 → 拒绝 ─────────────────────────────
   it('不是自己回合 → use 被拒绝', async () => {
     const card = makeCard('c1', '杀', '♠', 'K');
     const targetCard = makeCard('c2', '闪', '♥', '2');
