@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import type { Card, GameState } from '../../src/engine/types';
+import type { Card, GameState, TurnPhase } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function mkCard(
@@ -74,6 +74,7 @@ function baseState(opts: {
   yujiHealth?: number;
   yujiMax?: number;
   cardMap: Record<string, Card>;
+  phase?: TurnPhase;
 }): GameState {
   return createGameState({
     players: [
@@ -92,8 +93,8 @@ function baseState(opts: {
     cardMap: opts.cardMap,
     zones: { deck: [], discardPile: [], processing: [] },
     currentPlayerIndex: 0,
-    phase: '出牌',
-    turn: { round: 1, phase: '出牌', vars: {} },
+    phase: opts.phase ?? '出牌',
+    turn: { round: 1, phase: opts.phase ?? '出牌', vars: {} },
   });
 }
 
@@ -224,7 +225,7 @@ describe('蛊惑', () => {
     });
   });
 
-  it('非法声明/非出牌阶段/无目标 被拒', async () => {
+  it('非法声明/目标不合法 被拒', async () => {
     const s1 = mkCard('s1', '杀', '♠', '7');
     await harness.setup(baseState({ yujiHand: ['s1'], cardMap: { s1 } }));
     const YJ = harness.player('于吉');
@@ -246,6 +247,19 @@ describe('蛊惑', () => {
       skillId: '蛊惑',
       actionType: 'use',
       params: { cardId: 's1', declaredName: '杀', target: 0 },
+    });
+  });
+
+  it('发动时机:非出牌阶段被拒', async () => {
+    const s1 = mkCard('s1', '杀', '♠', '7');
+    // 弃牌阶段(activeUse 仅在出牌阶段生效)
+    await harness.setup(baseState({ yujiHand: ['s1'], cardMap: { s1 }, phase: '弃牌' }));
+    const YJ = harness.player('于吉');
+
+    await YJ.expectRejected({
+      skillId: '蛊惑',
+      actionType: 'use',
+      params: { cardId: 's1', declaredName: '杀', target: 1 },
     });
   });
 
