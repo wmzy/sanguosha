@@ -9,6 +9,7 @@
 //   5. 不发动:confirm=false → 无人摸牌
 //   6. 负面:仍有手牌时失去一张 → 不触发
 //   7. 移出游戏(界谦逊联动):一次移出 3 张整手牌 → X=3
+//   8. 负面:牌堆+弃牌堆皆空 → 无法摸牌 → 不询问(直接跳过)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -389,5 +390,55 @@ describe('界连营', () => {
     // 移出的牌在 vars 中(未进弃牌堆,未在手牌)
     expect(harness.state.zones.discardPile).toHaveLength(0);
     expect(harness.state.players[0].vars['界谦逊/移出']).toEqual(['c1', 'c2', 'c3']);
+  });
+
+  // ─── 8. 负面:牌堆+弃牌堆皆空 → 无法摸牌 → 不询问(直接跳过) ────────────────
+  //   用 移出至暂存区 清空手牌(不进弃牌堆,故可让弃牌堆保持空),
+  //   从而命中 maybeTriggerLianYing 的「牌堆+弃牌堆皆空 → 跳过询问」早退分支。
+  it('负面:牌堆与弃牌堆皆空时手牌归零 → 界连营不询问(无法摸牌,直接跳过)', async () => {
+    const c1 = makeCard('c1', '杀', '♠', '5');
+    const c2 = makeCard('c2', '闪', '♥', '3');
+    const c3 = makeCard('c3', '桃', '♦', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['c1', 'c2', 'c3'],
+          skills: ['界连营'],
+          health: 1,
+          maxHealth: 3,
+          character: '界陆逊',
+        }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操' }),
+      ],
+      cardMap: { c1, c2, c3 },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    // 关键:牌堆与弃牌堆皆为空(初始给空,harness.setup 会自动填充测试牌堆)
+    state.zones = { deck: [], discardPile: [], processing: [] };
+    await harness.setup(state);
+    // harness.setup 会给空牌堆填入 20 张测试牌;此处手动清空,
+    // 模拟「牌堆+弃牌堆皆空」的极端终局局面(摸牌无源)
+    harness.state.zones.deck = [];
+    harness.state.zones.discardPile = [];
+
+    // 移出整手牌(牌进 vars,不进弃牌堆)→ 手牌归零但无牌可摸
+    void applyAtom(harness.state, {
+      type: '移出至暂存区',
+      source: 0,
+      target: 0,
+      cardIds: ['c1', 'c2', 'c3'],
+      varsKey: '界谦逊/移出',
+    });
+    await harness.waitForStable();
+
+    // 手牌已归零、牌确已移出(证明早退是由「无牌可摸」导致,而非移出失败)
+    expect(harness.state.players[0].hand.length).toBe(0);
+    expect(harness.state.players[0].vars['界谦逊/移出']).toEqual(['c1', 'c2', 'c3']);
+    // 无牌可摸 → 界连营跳过询问(不创建任何 pending)
+    expect(harness.state.pendingSlots.size).toBe(0);
   });
 });
