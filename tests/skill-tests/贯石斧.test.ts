@@ -2,18 +2,18 @@
 // 贯石斧(武器,攻击范围 3):
 //   目标角色使用【闪】后,你可以弃置 2 张牌(手牌或装备区),令此【杀】依然造成伤害。
 //
-// 完整链路:P1 出杀 → P2 出闪 → 贯石斧 after hook:
-//   1. confirm 询问"是否弃 2 张牌强命"
-//   2. 玩家选发动 → select prompt 选 2 张牌弃置
-//   3. 弃牌 + 移走闪 → 杀.execute 检测无闪 → 造成伤害
+// 完整链路:P1 出杀 → P2 出闪 → 杀被抵消 → 贯石斧 after hook('被抵消'):
+//   直接弹 select 面板(无 confirm 步骤)让 P1 选 2 张牌(手牌/装备区)弃置;
+//   弃够 2 张 → 清除抵消标记,杀依然造成伤害;不选/超时 → 杀正常被闪抵消。
 //
 // 验证:
-//   1. 正面:P2 出闪,P1 confirm+select 弃 2 手牌 → 强命,P2 扣血
-//   2. 正面:选发动但弃牌不足 → 不强命
-//   3. 不发动:confirm=false → 正常被闪,不扣血
-//   4. 装备区弃牌:从装备区弃 2 张牌强命
-//   5. 手牌不足 2 张 → 跳过(无法强命)
-//   6. respond 校验:select 阶段必须选 2 张牌
+//   1. 正面:P2 出闪,P1 select 弃 2 手牌 → 强命,P2 扣血
+//   2. 不发动:P1 超时放弃 select → 正常被闪,不扣血
+//   3. 装备区弃牌:从装备区弃 2 张牌强命
+//   4. 可弃牌不足 2 张 → 不弹 select(直接被闪)
+//   5. respond 校验:select 阶段必须选 2 张牌
+//   6. respond 校验:select 阶段不能选同一张牌
+//   7. 八卦阵判红视为出闪 → 贯石斧可强命
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -68,9 +68,9 @@ describe('贯石斧', () => {
     harness = new SkillTestHarness();
   });
 
-  // ─── 正面:杀 → 出闪 → confirm+select → 强命 ─────────────
+  // ─── 正面:杀 → 出闪 → select 弃牌 → 强命 ─────────────
 
-  it('用例1:P2 出闪,P1 confirm+select 弃 2 手牌 → 强命,P2 扣血', async () => {
+  it('用例1:P2 出闪,P1 select 弃 2 手牌 → 强命,P2 扣血', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
     const dodge = makeCard('d1', '闪', '♦', '2');
     const discard1 = makeCard('x1', '桃', '♥', '3');
@@ -101,11 +101,8 @@ describe('贯石斧', () => {
     // P2 出闪
     await P2.respond('闪', { cardId: 'd1' });
 
-    // 贯石斧 after hook 触发:confirm 询问 P1 是否强命
+    // 贯石斧 after hook 触发:直接弹 select 面板让 P1 选 2 张牌(无 confirm 步骤)
     expect(harness.state.pendingSlots.get(0)).toBeDefined();
-    await P1.respond('贯石斧', { choice: true });
-
-    // 接着 select prompt 让 P1 选 2 张牌
     await P1.respond('贯石斧', { cardIds: ['x1', 'x2'] });
 
     // 强命:P2 扣血
@@ -126,7 +123,7 @@ describe('贯石斧', () => {
 
   // ─── 不发动 ─────────────────────────────
 
-  it('用例2:confirm=false → 正常被闪,不扣血', async () => {
+  it('用例2:P1 超时放弃 select → 正常被闪,不扣血', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
     const dodge = makeCard('d1', '闪', '♦', '2');
     const extra = makeCard('x1', '桃', '♥', '3');
@@ -153,10 +150,13 @@ describe('贯石斧', () => {
     await P1.useCardAndTarget('杀', 'k1', [1]);
     await P2.respond('闪', { cardId: 'd1' });
 
-    // 贯石斧 confirm 询问 → P1 不发动
-    await P1.respond('贯石斧', { choice: false });
+    // 贯石斧 after hook 触发:弹 select 面板(此时 x1 + 贯石斧 共 2 张可弃)
+    expect(harness.state.pendingSlots.get(0)).toBeDefined();
 
-    // 正常被闪:B2 不扣血
+    // P1 超时放弃 select(不弃牌 → 不发动)
+    await P1.pass();
+
+    // 杀正常被闪抵消:P2 不扣血
     expect(harness.state.players[1].health).toBe(4);
     expect(harness.state.players[0].hand).toContain('x1'); // P1 未弃牌
   });
@@ -192,11 +192,10 @@ describe('贯石斧', () => {
     await P1.useCardAndTarget('杀', 'k1', [1]);
     await P2.respond('闪', { cardId: 'd1' });
 
-    await P1.respond('贯石斧', { choice: true });
-    // 从装备区弃 2 张马
+    // 直接 select:从装备区弃 2 张马
     await P1.respond('贯石斧', { cardIds: ['h1', 'h2'] });
 
-    // 强命:B2 扣血
+    // 强命:P2 扣血
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.zones.discardPile).toContain('h1');
     expect(harness.state.zones.discardPile).toContain('h2');
@@ -204,7 +203,7 @@ describe('贯石斧', () => {
 
   // ─── 手牌不足 2 张(无装备)→ 跳过强命 ─────────────────
 
-  it('用例4:可弃牌不足 2 张 → 不触发 confirm(直接被闪)', async () => {
+  it('用例4:可弃牌不足 2 张 → 不弹 select 面板(直接被闪)', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
     const dodge = makeCard('d1', '闪', '♦', '2');
     const state: GameState = createGameState({
@@ -231,8 +230,8 @@ describe('贯石斧', () => {
     await P1.useCardAndTarget('杀', 'k1', [1]);
     await P2.respond('闪', { cardId: 'd1' });
 
-    // 出杀后 P1 手牌 0 + 装备 1 = 1 张可弃 < 2 → 跳过 confirm
-    // 杀正常被闪:B2 不扣血,无 pending
+    // 出杀后 P1 手牌 0 + 装备 1 = 1 张可弃 < 2 → 不弹 select 面板
+    // 杀正常被闪:P2 不扣血,无 pending
     expect(harness.state.players[1].health).toBe(4);
     expect(harness.state.pendingSlots.size).toBe(0);
   });
@@ -266,8 +265,6 @@ describe('贯石斧', () => {
 
     await P1.useCardAndTarget('杀', 'k1', [1]);
     await P2.respond('闪', { cardId: 'd1' });
-    await P1.respond('贯石斧', { choice: true });
-
     // select 阶段只给 1 张牌 → 拒绝
     await P1.expectRejected({
       skillId: '贯石斧',
@@ -308,8 +305,6 @@ describe('贯石斧', () => {
 
     await P1.useCardAndTarget('杀', 'k1', [1]);
     await P2.respond('闪', { cardId: 'd1' });
-    await P1.respond('贯石斧', { choice: true });
-
     // 选同一张牌 → 拒绝
     await P1.expectRejected({
       skillId: '贯石斧',
@@ -358,9 +353,8 @@ describe('贯石斧', () => {
     await P1.useCardAndTarget('杀', 'k1', [1]);
     await P2.respond('八卦阵', { choice: true });
 
-    // 被抵消 → 贯石斧触发:confirm 强命
+    // 被抵消 → 贯石斧触发:直接弹 select 面板
     expect(harness.state.pendingSlots.get(0)).toBeDefined();
-    await P1.respond('贯石斧', { choice: true });
     // 选 2 张牌弃置
     await P1.respond('贯石斧', { cardIds: ['x1', 'x2'] });
 
