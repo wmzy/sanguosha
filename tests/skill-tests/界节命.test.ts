@@ -3,9 +3,14 @@
 //   "当你受到1点伤害后或死亡时,你可以令一名角色摸X张牌,然后将手牌弃至X张
 //    (X为其体力上限且至多为5)。"
 //
+// 触发机制(对齐实现 src/engine/skills/界节命.ts):
+//   - 受到伤害后(after-hook,时机6,濒死检查前):任何伤害(含致死)均触发,
+//     并置「伤害已触发」标记;若随后荀彧死亡,死亡时 hook 见标记去重跳过。
+//   - 死亡时(after-hook,系统处理牌前):仅 非伤害致死(失去体力/减上限等)在此触发。
+//
 // 与标版节命关键差异(必须验证):
 //   1. 受伤后触发:先摸 X 张,然后弃至 X 张(非「摸至 X 张」)
-//   2. 死亡时触发:击杀 before-hook,选目标摸弃(标版无)
+//   2. 致死触发:伤害致死经 受到伤害后 触发(死亡时去重);非伤害致死经 死亡时 触发(标版无)
 //   3. 无额外摸牌(标版旧实现「若目标原手牌为0,你摸一张牌」已移除)
 //
 // 验证:
@@ -14,10 +19,12 @@
 //   3. 关键差异·先摸后弃:目标原有 N 手牌 → 摸 X 张 → 弃至 X 张
 //   4. 不发动:拒绝
 //   5. 选自己:给自己摸弃
-//   6. 死亡时触发:荀彧被杀死亡 → 仍可发动节命 → 选目标摸弃
-//   7. 目标手牌已 ≤ X:摸后超 X 才弃,不超不弃
+//   6. 伤害致死:被杀致死 → 受到伤害后触发(死亡时去重跳过)→ 选目标摸弃,荀彧仍死亡
+//   7. 目标手牌已 ≤ X:摸后超 X 才弃,不超不弃(maxHealth 正好=5)
+//   8. 非伤害致死:失去体力致死 → 死亡时触发 → 选目标摸弃
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, fireTimeoutAndWait } from '../engine-harness';
+import { applyAtom } from '../../src/engine/index';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -317,8 +324,8 @@ describe('界节命', () => {
     expect(harness.state.pendingSlots.size).toBe(0);
   });
 
-  // ─── 死亡时触发:界荀彧被杀致死 → 仍可发动节命 ────────────────────
-  it('P1(界荀彧,1血)被杀致死 → 濒死求桃失败 → 死亡时触发节命 → 选 P0 摸弃', async () => {
+  // ─── 伤害致死:被杀致死 → 受到伤害后触发节命(死亡时去重跳过)────
+  it('P1(界荀彧,1血)被杀致死 → 受到伤害后触发节命(死亡时去重)→ 选 P0 摸弃 → P1仍死亡', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
     const cardMap: Record<string, Card> = { k1: slash };
     // deck 供 P0 摸 X 张
@@ -352,16 +359,16 @@ describe('界节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    // P1 0 手牌 → 询问闪 skip → 直接受伤濒死;求桃目标皆 0 手牌 → 也 skip → 节命/confirm(死亡时)
+    // P1 0 手牌 → 询问闪 skip → 受 1 点伤害(1→0);受到伤害后(时机6,濒死检查前)触发节命
 
-    // 击杀前:界节命触发
+    // 节命 confirm(P1 此刻仍 alive,濒死检查在其后)
     P1.expectPending('请求回应');
     await P1.respond('界节命', { choice: true });
     P1.expectPending('请求回应');
     await P1.respond('界节命', { target: 0 });
 
-    // 节命在 受到伤害后 触发(修复后),先于濒死检查;
-    // 需等待濒死求桃失败 → 死亡结算完成
+    // 节命结算后继续:濒死检查 → 求桃(无人有桃)→ 死亡;
+    // 死亡时 hook 见「伤害已触发」标记去重跳过,不再二次触发节命
     await fireTimeoutAndWait(harness.state);
     await harness.waitForStable();
     harness.processAllEvents();
@@ -424,33 +431,25 @@ describe('界节命', () => {
     expect(harness.state.pendingSlots.size).toBe(0);
   });
 
-  // ─── 边界:目标 maxHealth < 5,X = maxHealth,先摸后弃 ────────────
-  it('P0(3血上限,已有2手牌) → 摸3张(5张) → 弃2张(回到3张)', async () => {
-    const slash = makeCard('k1', '杀', '♠', '7');
-    const cardMap: Record<string, Card> = { k1: slash };
-    const p0Cards = ['h1', 'h2'];
-    for (const id of p0Cards) cardMap[id] = makeCard(id, '闪', '♦', '2');
-    for (let i = 0; i < 4; i++) {
+  // ─── 非伤害致死:失去体力致死 → 死亡时 after-hook 触发节命 ──────────
+  it('P1(界荀彧,1血)失去体力致死 → 求桃失败 → 死亡时触发节命 → 选 P0 摸弃', async () => {
+    // 失去体力不经 造成伤害/受到伤害后,故「伤害已触发」标记未置,节命由死亡时 after-hook 触发
+    const cardMap: Record<string, Card> = {};
+    for (let i = 0; i < 6; i++) {
       cardMap[`dk${i}`] = makeCard(`dk${i}`, '杀', '♠', String(i + 2));
     }
-    const deck = ['dk0', 'dk1', 'dk2', 'dk3'];
+    const deck = ['dk0', 'dk1', 'dk2', 'dk3', 'dk4', 'dk5'];
 
     const state: GameState = createGameState({
       players: [
-        makePlayer({
-          index: 0,
-          name: 'P0',
-          character: '郭嘉',
-          skills: ['杀', '闪'],
-          hand: p0Cards,
-          health: 3,
-          maxHealth: 3,
-        }),
+        // P0:4 血上限,0 手牌(X=4),无桃 → 求桃失败
+        makePlayer({ index: 0, name: 'P0', character: '张飞', skills: ['杀'] }),
+        // P1:界荀彧 1 血(将失体力致死),3 血上限,0 手牌
         makePlayer({
           index: 1,
           name: 'P1',
           skills: ['界节命', '闪'],
-          health: 3,
+          health: 1,
           maxHealth: 3,
         }),
       ],
@@ -460,26 +459,36 @@ describe('界节命', () => {
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
-    state.players[0].hand = [...p0Cards, 'k1'];
     await harness.setup(state);
-    const P0 = harness.player('P0');
     const P1 = harness.player('P1');
 
-    await P0.useCardAndTarget('杀', 'k1', [1]);
-    // P1 0 手牌 → 询问闪 skip → 直接受伤
+    // P1 失去 1 点体力致死(非伤害:不经 受到伤害后,死亡时标记未置)
+    void applyAtom(harness.state, { type: '失去体力', target: 1, amount: 1 });
+    await harness.waitForStable();
 
+    // 排干 求桃流程(P1/P0 均无桃),直到节命 confirm 出现
+    while (harness.state.pendingSlots.size > 0) {
+      const slot = [...harness.state.pendingSlots.values()][0];
+      const rt = (slot.atom as { requestType?: string }).requestType;
+      if (rt === '界节命/confirm') break;
+      const target = (slot.atom as { target?: number }).target ?? 0;
+      await harness.player(target).pass();
+      await harness.waitForStable();
+    }
+
+    // 死亡时 after-hook 触发节命(P1 此刻仍 alive,系统处理牌在其后)
     P1.expectPending('请求回应');
     await P1.respond('界节命', { choice: true });
     P1.expectPending('请求回应');
     await P1.respond('界节命', { target: 0 });
 
-    // P0 原 2 张(杀已出)→ 摸 3 张 → 5 张 → 需弃 2 张(X=3)
-    expect(harness.state.players[0].hand.length).toBe(5);
-    P0.expectPending('请求回应');
-    const toDiscard = harness.state.players[0].hand.slice(0, 2);
-    await P0.respond('界节命', { cardIds: toDiscard });
+    // 节命结算后死亡流程继续:系统处理牌 → P1 alive=false
+    await harness.waitForStable();
+    harness.processAllEvents();
 
-    // P0 手牌 = 5 - 2 = 3 = X
-    expect(harness.state.players[0].hand.length).toBe(3);
+    // P0 摸 4 张(X = min(4, 5) = 4),无需弃
+    expect(harness.state.players[0].hand.length).toBe(4);
+    // 荀彧 死亡
+    expect(harness.state.players[1].alive).toBe(false);
   });
 });
