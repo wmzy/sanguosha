@@ -268,6 +268,60 @@ describe('界观星', () => {
     expect(harness.state.localVars['界观星/全置底']).toBeUndefined();
   });
 
+  it('界差异:结束阶段再次发动但玩家不发动 → 牌堆不变,标志仍消费(一次性)', async () => {
+    // 2 人:X=3。准备阶段全置底设标志;结束阶段触发再次发动询问,但玩家拒绝(choice=false)。
+    // 验证:一次性机会已消费(标志清除),且拒绝不改变牌堆。
+    const m1 = makeCard('m1', '桃', '♥');
+    const m2 = makeCard('m2', '酒', '♦');
+    const o1 = makeCard('o1', '杀', '♠');
+    const o2 = makeCard('o2', '闪', '♣');
+    const o3 = makeCard('o3', '杀', '♥');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['界观星'] }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: [],
+          skills: [],
+          character: '曹操',
+          health: 4,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { m1, m2, o1, o2, o3 },
+      zones: { deck: ['m1', 'm2', 'o1', 'o2', 'o3'], processing: [], discardPile: [] },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 准备阶段:全置底 → 设标志,deck=[o1,o2,o3,m1,m2]
+    await triggerPreparePhase(harness);
+    await P1.respond('界观星', { choice: true });
+    await harness.waitForStable();
+    harness.processAllEvents();
+    await P1.respond('界观星', { top: [], bottom: ['o1', 'o2', 'o3'] });
+    await harness.waitForStable();
+    harness.processAllEvents();
+    expect(harness.state.localVars['界观星/全置底']).toBe(true);
+
+    // 触发结束阶段 → 再次发动询问(confirm),玩家拒绝
+    await triggerEndPhase(harness);
+    P1.expectPending('请求回应'); // 界观星/confirm(再次发动)
+    await P1.respond('界观星', { choice: false });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 牌堆保持准备阶段后状态(拒绝不触碰牌堆)
+    expect(harness.state.zones.deck).toEqual(['o1', 'o2', 'o3', 'm1', 'm2']);
+    // 一次性机会已消费(无论是否发动,标志都清除)
+    expect(harness.state.localVars['界观星/全置底']).toBeUndefined();
+    expect(harness.state.pendingSlots.size).toBe(0);
+  });
+
   it('界差异:准备阶段非全置底 → 结束阶段不再触发', async () => {
     // 2 人:X=3。准备阶段部分置顶(非全置底) → 不设标志;结束阶段不触发。
     const m1 = makeCard('m1', '桃', '♥');
