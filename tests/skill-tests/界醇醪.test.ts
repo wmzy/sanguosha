@@ -200,6 +200,38 @@ describe('界醇醪', () => {
     expect(list).toEqual([]);
   });
 
+  // ─── 5. 存醇:重复弃同一杀 id 不重复入库 ─────────────────────────────
+
+  it('存醇:重复弃同一杀 id → 不重复入库(after-hook 去重)', async () => {
+    const slash = makeCard('s1', '杀', '♠', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['s1'],
+          skills: ['界醇醪', '杀', '闪'],
+        }),
+        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['闪'] }),
+      ],
+      cardMap: { s1: slash },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    // 预置 s1 已在醇列表(模拟此前已存入),再次弃置同一张杀 → 去重后仍只一张
+    harness.state.players[0].vars['醇醪/醇'] = ['s1'];
+    harness.rebuildViews();
+
+    await applyAtom(harness.state, { type: '弃置', player: 0, cardIds: ['s1'] });
+    await harness.waitForStable();
+
+    expect(醇列表(harness.state, 0)).toEqual(['s1']);
+    expect(harness.state.zones.discardPile).toContain('s1');
+  });
+
   // ─── 6. 用醇 X=1:首次使用 ─────────────────────────────
 
   it('用醇 X=1:首次使用移去 1 张醇 → 视为酒 → 救回濒死者', async () => {
