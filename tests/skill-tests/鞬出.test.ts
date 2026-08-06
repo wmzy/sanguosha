@@ -167,7 +167,7 @@ describe('鞬出', () => {
   });
 
   // ─── 目标无牌可弃 → 鞬出不触发,正常受伤 ─────────────────────────────
-  it('目标无牌可弃 → 鞬出不触发,直接询问闪,无闪受伤', async () => {
+  it('目标无牌可弃 → 鞬出不触发,目标无手牌不出闪,直接受伤', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
     const state: GameState = createGameState({
       players: [
