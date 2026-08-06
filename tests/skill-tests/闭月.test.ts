@@ -178,4 +178,20 @@ describe('闭月', () => {
 
     expect(harness.state.players[0].hand.length).toBe(0);
   });
+
+  // ─── 5. respond 校验:非闭月询问时拒绝 ──────────────────
+  it('respond:无闭月询问(出牌阶段)→ 拒绝,不摸牌', async () => {
+    const state = buildState({ p1Hand: [], deck: [] });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 出牌阶段当前 pending 是 出牌窗口(非 请求回应/闭月-confirm),
+    // 闭月 respond 的 validate 应拒绝,不消耗 seq、不摸牌
+    await P1.expectRejected({
+      skillId: '闭月',
+      actionType: 'respond',
+      params: { choice: true },
+    });
+    expect(harness.state.players[0].hand.length).toBe(0);
+  });
 });
