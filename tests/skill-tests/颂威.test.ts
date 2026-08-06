@@ -13,7 +13,6 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import { applyAtom } from '../../src/engine/index';
 import { runJudgeFlow } from '../../src/engine/judge-flow';
 import type { Card, Faction, GameState, PlayerState } from '../../src/engine/types';
 
@@ -65,6 +64,38 @@ function buildDeck(cardMap: Record<string, Card>, n: number): string[] {
   return ids;
 }
 
+/** 构建颂威测试的公共初始状态:P0=曹丕(颂威 owner),P1=可配置势力角色。
+ *  牌堆顶为判定牌(j1),其后接若干 dkN 牌供颂威摸牌。五个用例的差异仅在于
+ *  判定牌花色、P1 势力/角色、被判定座次,故抽出此 helper 消除重复设置。 */
+function build颂威State(opts: {
+  judgeCard: Card;
+  p1Character?: string;
+  p1Faction?: Faction;
+  judgePlayer?: number; // 被判定的座次(默认 P1);同时决定 currentPlayerIndex
+}): GameState {
+  const cardMap: Record<string, Card> = { j1: opts.judgeCard };
+  const deck = ['j1', ...buildDeck(cardMap, 5)];
+  const judgePlayer = opts.judgePlayer ?? 1;
+  return createGameState({
+    players: [
+      // P0 = 曹丕(颂威 owner)
+      makePlayer({ index: 0, name: 'P0', skills: ['颂威'], health: 3, maxHealth: 3 }),
+      // P1 = 判定来源角色(默认魏势力张辽)
+      makePlayer({
+        index: 1,
+        name: 'P1',
+        character: opts.p1Character ?? '张辽',
+        faction: opts.p1Faction ?? '魏',
+      }),
+    ],
+    cardMap,
+    zones: { deck, discardPile: [], processing: [] },
+    currentPlayerIndex: judgePlayer,
+    phase: '判定',
+    turn: { round: 1, phase: '判定', vars: {} },
+  });
+}
+
 describe('颂威', () => {
   let harness: SkillTestHarness;
 
@@ -74,26 +105,7 @@ describe('颂威', () => {
 
   // ─── happy path:黑色判定牌 → 曹丕摸牌 ────────────────────
   it('P1(魏势力)判定黑色 → P0(曹丕)确认 → P0 摸一张牌', async () => {
-    // 牌堆顶:黑桃判定牌(颂威触发)
-    const judge = makeCard('j1', '杀', '♠', '7');
-    const cardMap: Record<string, Card> = { j1: judge };
-    // deck[0]=j1(黑桃判定牌),后续 dkN 为摸牌用
-    const dk = buildDeck(cardMap, 5);
-    const deck = ['j1', ...dk];
-
-    const state: GameState = createGameState({
-      players: [
-        // P0 = 曹丕(颂威 owner)
-        makePlayer({ index: 0, name: 'P0', skills: ['颂威'], health: 3, maxHealth: 3 }),
-        // P1 = 魏势力角色(非曹丕)
-        makePlayer({ index: 1, name: 'P1', character: '张辽', faction: '魏' }),
-      ],
-      cardMap,
-      zones: { deck, discardPile: [], processing: [] },
-      currentPlayerIndex: 1,
-      phase: '判定',
-      turn: { round: 1, phase: '判定', vars: {} },
-    });
+    const state = build颂威State({ judgeCard: makeCard('j1', '杀', '♠', '7') });
     await harness.setup(state);
     const P0 = harness.player('P0');
 
@@ -111,22 +123,7 @@ describe('颂威', () => {
 
   // ─── 红色判定牌:不触发 ────────────────────
   it('P1 判定红色(♥) → 颂威不触发', async () => {
-    const judge = makeCard('j1', '杀', '♥', '7');
-    const cardMap: Record<string, Card> = { j1: judge };
-    const dk = buildDeck(cardMap, 5);
-    const deck = ['j1', ...dk];
-
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P0', skills: ['颂威'], health: 3, maxHealth: 3 }),
-        makePlayer({ index: 1, name: 'P1', character: '张辽', faction: '魏' }),
-      ],
-      cardMap,
-      zones: { deck, discardPile: [], processing: [] },
-      currentPlayerIndex: 1,
-      phase: '判定',
-      turn: { round: 1, phase: '判定', vars: {} },
-    });
+    const state = build颂威State({ judgeCard: makeCard('j1', '杀', '♥', '7') });
     await harness.setup(state);
 
     void runJudgeFlow(harness.state, 1, '乐不思蜀');
@@ -139,21 +136,10 @@ describe('颂威', () => {
 
   // ─── 非魏势力:不触发 ────────────────────
   it('P1(蜀势力)判定黑色 → 颂威不触发', async () => {
-    const judge = makeCard('j1', '杀', '♠', '7');
-    const cardMap: Record<string, Card> = { j1: judge };
-    const dk = buildDeck(cardMap, 5);
-    const deck = ['j1', ...dk];
-
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P0', skills: ['颂威'], health: 3, maxHealth: 3 }),
-        makePlayer({ index: 1, name: 'P1', character: '关羽', faction: '蜀' }),
-      ],
-      cardMap,
-      zones: { deck, discardPile: [], processing: [] },
-      currentPlayerIndex: 1,
-      phase: '判定',
-      turn: { round: 1, phase: '判定', vars: {} },
+    const state = build颂威State({
+      judgeCard: makeCard('j1', '杀', '♠', '7'),
+      p1Character: '关羽',
+      p1Faction: '蜀',
     });
     await harness.setup(state);
 
@@ -166,22 +152,7 @@ describe('颂威', () => {
 
   // ─── 自己的判定:不触发 ────────────────────
   it('P0(曹丕)自己的判定黑色 → 颂威不触发', async () => {
-    const judge = makeCard('j1', '杀', '♠', '7');
-    const cardMap: Record<string, Card> = { j1: judge };
-    const dk = buildDeck(cardMap, 5);
-    const deck = ['j1', ...dk];
-
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P0', skills: ['颂威'], health: 3, maxHealth: 3 }),
-        makePlayer({ index: 1, name: 'P1', character: '张辽', faction: '魏' }),
-      ],
-      cardMap,
-      zones: { deck, discardPile: [], processing: [] },
-      currentPlayerIndex: 0,
-      phase: '判定',
-      turn: { round: 1, phase: '判定', vars: {} },
-    });
+    const state = build颂威State({ judgeCard: makeCard('j1', '杀', '♠', '7'), judgePlayer: 0 });
     await harness.setup(state);
 
     void runJudgeFlow(harness.state, 0, '乐不思蜀');
@@ -193,22 +164,7 @@ describe('颂威', () => {
 
   // ─── 不发动:拒绝摸牌 ────────────────────
   it('P1 判定黑色 → P0 拒绝 → 不摸牌', async () => {
-    const judge = makeCard('j1', '杀', '♠', '7');
-    const cardMap: Record<string, Card> = { j1: judge };
-    const dk = buildDeck(cardMap, 5);
-    const deck = ['j1', ...dk];
-
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P0', skills: ['颂威'], health: 3, maxHealth: 3 }),
-        makePlayer({ index: 1, name: 'P1', character: '张辽', faction: '魏' }),
-      ],
-      cardMap,
-      zones: { deck, discardPile: [], processing: [] },
-      currentPlayerIndex: 1,
-      phase: '判定',
-      turn: { round: 1, phase: '判定', vars: {} },
-    });
+    const state = build颂威State({ judgeCard: makeCard('j1', '杀', '♠', '7') });
     await harness.setup(state);
     const P0 = harness.player('P0');
 
