@@ -1,6 +1,6 @@
 // 界孙策 界魂姿 行为测试(界限突破版,OL hero/452):
 //   核心差异:魂姿触发时机从「回合开始」改为「准备阶段」。
-//   1. 准备阶段体力为1 → 减1上限 + 获得英姿/英魂 + 觉醒标记,体力保持1(强制,无询问)
+//   1. 准备阶段体力为1 → 减1上限 + 获得界英姿/英魂 + 觉醒标记,体力保持1(强制,无询问)
 //   2. 回合开始时不触发(原版会触发,界版不触发 — 关键差异验证)
 //   3. 体力>1时准备阶段不触发
 //   4. 觉醒后再次准备阶段不再触发(整局一次;觉醒后获得的英魂会询问,需回应不发动)
@@ -147,12 +147,8 @@ describe('界孙策·界魂姿', () => {
     await harness.waitForStable();
 
     expect(harness.state.players[0].hand.length).toBe(handBefore + 3); // 2+1(界英姿锁定技)
-    // 锁定技不询问:无 英姿/confirm pending
-    const hasYingziConfirm = [...harness.state.pendingSlots.values()].some((s) => {
-      const rt = (s.atom as { requestType?: string }).requestType;
-      return rt === '英姿/confirm';
-    });
-    expect(hasYingziConfirm).toBe(false);
+    // 锁定技不询问玩家:摸牌阶段执行完毕后无任何 pending
+    expect(harness.state.pendingSlots.size).toBe(0);
   });
 
   it('回合开始时不触发(界版差异:仅准备阶段触发)', async () => {
