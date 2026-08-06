@@ -126,6 +126,65 @@ describe('缔盟', () => {
     expect(harness.state.players[2].hand).toEqual(['p1a', 'p1b', 'p1c']);
   });
 
+  // ─── 边界:鲁肃手牌不足 diff 时,弃光仍交换(实现用 min(diff, hand)) ──
+  it('鲁肃(1张) vs P1(3张)/P2(0张),diff=3:鲁肃仅弃1张(弃光),仍交换', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '鲁肃',
+          hand: ['c1'],
+          skills: ['缔盟'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          hand: ['p1a', 'p1b', 'p1c'],
+          skills: [],
+        }),
+        makePlayer({
+          index: 2,
+          name: 'P2',
+          character: '刘备',
+          hand: [],
+          skills: [],
+        }),
+      ],
+      cardMap: {
+        c1: makeCard('c1', '杀'),
+        p1a: makeCard('p1a', '杀'),
+        p1b: makeCard('p1b', '闪'),
+        p1c: makeCard('p1c', '桃', '♥'),
+      },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('鲁肃');
+
+    // 发动缔盟
+    await P0.triggerAction('缔盟', 'use');
+    P0.expectPending('请求回应'); // 选目标
+
+    // 选 P1 和 P2:diff = |3 - 0| = 3,但鲁肃只有 1 张 → actualDiscard = min(3,1) = 1
+    await P0.respond('缔盟', { targets: [1, 2] });
+    P0.expectPending('请求回应'); // 弃牌(min(3,1)=1)
+
+    // 弃光仅有的 1 张
+    await P0.respond('缔盟', { cardIds: ['c1'] });
+
+    // 鲁肃弃光(1 - 1 = 0),但交换仍执行
+    expect(harness.state.players[0].hand.length).toBe(0);
+    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['c1']));
+
+    // P1 原手牌 [p1a,p1b,p1c] → 交换后应等于 P2 原手牌 [](空)
+    expect(harness.state.players[1].hand).toEqual([]);
+    // P2 原手牌 [](空) → 交换后应等于 P1 原手牌 [p1a,p1b,p1c]
+    expect(harness.state.players[2].hand).toEqual(['p1a', 'p1b', 'p1c']);
+  });
+
   // ─── 2. diff = 0:无需弃牌,直接交换 ───────────────────────
   it('P1(2张) vs P2(2张),diff=0:无需弃牌,直接交换', async () => {
     const state: GameState = createGameState({
