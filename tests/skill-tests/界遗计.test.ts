@@ -15,15 +15,18 @@
 //   3. respond validate:GIVE_RT pending 下 allocation 超 2 名目标 → 拒绝
 //   4. respond validate:GIVE_RT pending 下 allocation 含自己 → 拒绝
 //   5. respond execute:GIVE_RT pending 下 allocation 写入 localVars['遗计/allocation']
-//   6. 端到端:P0 杀 P1 → P1 confirm → 摸2张 + 交2张给2人 → P1 手牌空,P2/P3 各得1
-//   7. 端到端:P0 杀 P1 → P1 confirm → 摸2张 + 只交1张给1人 → P1 留1张,P2 得1张
-//   8. 端到端:P0 杀 P1 → P1 confirm=false → 摸2张,不交牌
-//   9. 端到端:无其他存活角色 → 摸2张后跳过交牌
+//   6. respond execute:CONFIRM_RT pending 下 choice=true 写入 localVars['遗计/confirmed']
+//   7. 端到端:P0 杀 P1 → P1 confirm → 摸2张 + 交2张给2人 → P1 手牌空,P2/P3 各得1
+//   8. 端到端:P0 杀 P1 → P1 confirm → 摸2张 + 只交1张给1人 → P1 留1张,P2 得1张
+//   9. 端到端:P0 杀 P1 → P1 confirm=false → 摸2张,不交牌
+//  10. 端到端:无其他存活角色 → 摸2张后跳过交牌(不发 confirm 询问)
+//  11. 端到端:GIVE_RT prompt 为 distribute/allocate(至多 2 张 / 2 人 / 不含自己)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import { createGameState } from '../../src/engine/types';
+import { createGameState, TARGET_SYSTEM } from '../../src/engine/types';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState } from '../../src/engine/types';
 
@@ -440,9 +443,15 @@ describe('界遗计', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    await P1.pass();
+    // P1 0 手牌 → 询问闪 skip → 直接受伤 → 遗计摸2张 + giveConfirm
 
-    // P1 选择不交牌
+    // 当前 pending 应为「是否交牌」确认询问(证明已进入 confirm 路径,而非超时默认)
+    P1.expectPending('请求回应');
+    const cslot = [...harness.state.pendingSlots.values()][0];
+    const cAtom = cslot.atom as { type: string; requestType?: string };
+    expect(cAtom.requestType).toBe('界遗计/giveConfirm');
+
+    // P1 选择不交牌(confirm=false)
     await P1.respond('界遗计', { choice: false });
 
     // P1 仍保留摸到的 2 张牌
@@ -450,6 +459,40 @@ describe('界遗计', () => {
     expect(harness.state.players[1].hand).toHaveLength(2);
     // P2 没拿到牌
     expect(harness.state.players[2].hand).toEqual([]);
+  });
+
+  it('端到端:无其他存活角色 → 摸2张后跳过交牌(不发 confirm 询问)', async () => {
+    const drawn1: Card = makeCard('g1', '桃', '♥', '3');
+    const drawn2: Card = makeCard('g2', '桃', '♦', '4');
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: [], skills: ['界遗计'], health: 4, maxHealth: 4 }),
+        makePlayer({ index: 1, name: 'P2', hand: [], skills: [] }),
+      ],
+      cardMap: { g1: drawn1, g2: drawn2 },
+      zones: { deck: ['g1', 'g2'], processing: [], discardPile: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    // 模拟其余角色均已阵亡(只剩郭嘉存活)
+    harness.state.players[1].alive = false;
+
+    // 无来源伤害(模拟闪电)触发遗计:摸2张后无其他存活角色 → 跳过交牌
+    void runDamageFlow(harness.state, TARGET_SYSTEM, 0, 1);
+    await harness.waitForStable();
+
+    // 摸到 2 张牌
+    expect(harness.state.players[0].hand).toEqual(expect.arrayContaining(['g1', 'g2']));
+    expect(harness.state.players[0].hand).toHaveLength(2);
+    // 无其他存活角色 → 不发起交牌询问(无 giveConfirm / giveCard pending)
+    const hasGive = [...harness.state.pendingSlots.values()].some((s) => {
+      const rt = (s.atom as { requestType?: string }).requestType;
+      return rt === '界遗计/giveConfirm' || rt === '界遗计/giveCard';
+    });
+    expect(hasGive).toBe(false);
   });
 
   it('端到端:GIVE_RT prompt 为 distribute allocate(至多 2 张给至多 2 人, 不含自己)', async () => {
