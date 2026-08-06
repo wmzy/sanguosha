@@ -116,19 +116,23 @@ describe('铁骑', () => {
   });
 
   // ─── 不发动铁骑 → 正常询问闪 ─────────────────────────────
+  // 牌堆放红色判定牌:若误发动铁骑则会禁闪、P2 无法出闪。
+  // 这样"不发动"才是 P2 能出闪的决定性因素,避免空牌堆下恒真。
   it('不发动铁骑 → P2 正常出闪抵消', async () => {
     const kill = makeCard('k1', '杀', '♠', '7');
     const dodge = makeCard('d1', '闪', '♥', '2');
+    const judge = makeCard('j1', '桃', '♦', '5'); // 方块=红色(若发动则会禁闪)
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: ['k1'], skills: ['铁骑', '杀'] }),
         makePlayer({ index: 1, name: 'P2', hand: ['d1'], skills: ['闪'] }),
       ],
-      cardMap: { k1: kill, d1: dodge },
+      cardMap: { k1: kill, d1: dodge, j1: judge },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
+    state.zones = { deck: ['j1'], discardPile: [], processing: [] };
     await harness.setup(state);
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
