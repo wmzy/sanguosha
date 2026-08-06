@@ -3,8 +3,8 @@
 // 验证:
 //   1. 乐不思蜀对陆逊使用 → 添加延时锦囊被 cancel → 陆逊判定区无乐不思蜀(免疫)
 //   2. 顺手牵羊对陆逊使用 → 获得被 cancel → 陆逊手牌/装备不被取走(免疫)
-//   3. 负面对照:乐不思蜀/顺手牵羊对非谦逊目标 → 正常生效
-//   4. 谦逊不影响反馈/突袭等其他"获得牌"途径(仅限顺手牵羊)
+//   3. 负面对照:乐不思蜀对非谦逊目标 → 正常放入判定区
+//   4. 负面对照:谦逊不拦截反馈等非顺手牵羊发起的"获得牌"(仅限顺手牵羊)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
