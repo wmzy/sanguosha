@@ -99,12 +99,12 @@ describe('红颜', () => {
         makePlayer({
           index: 0,
           name: '小乔',
-          skills: ['红颜', '闪电', '回合管理'],
+          skills: ['红颜', '回合管理'],
           pendingTricks: [{ name: '闪电', source: 0, card: lightningCard }],
           health: 3,
           maxHealth: 3,
         }),
-        makePlayer({ index: 1, name: 'P2', skills: ['闪电', '回合管理'], health: 4 }),
+        makePlayer({ index: 1, name: 'P2', skills: ['回合管理'], health: 4 }),
       ],
       cardMap: { sd1: lightningCard, j1: judgeCard },
       currentPlayerIndex: 0,
@@ -159,8 +159,8 @@ describe('红颜', () => {
   });
 
   // ─── 4. 非黑桃判定牌不受影响 ───────────────────────
-  it('红桃判定牌 → 红颜不改变(本就是红桃)', async () => {
-    const judgeCard = makeCard('j1', '判定牌', '♥', '5');
+  it('梅花判定牌 → 红颜不改变(仅黑桃转为红桃)', async () => {
+    const judgeCard = makeCard('j1', '判定牌', '♣', '5');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: '小乔', skills: ['红颜'] }),
@@ -180,6 +180,8 @@ describe('红颜', () => {
     await waitForStable(harness.state);
     harness.player('小乔').processEvents();
 
-    expect(harness.state.cardMap['j1'].suit).toBe('♥');
+    // 梅花属非黑桃,红颜不应改花色(仅黑桃转红桃)
+    expect(harness.state.cardMap['j1'].suit).toBe('♣');
+    expect(harness.state.cardMap['j1'].color).toBe('黑');
   });
 });
