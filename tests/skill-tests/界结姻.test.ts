@@ -4,16 +4,16 @@
 //
 // 验证:
 //   1. 弃手牌代价 + owner 体力较低 → owner 回1,目标摸1
+//      (目标为满血男性,顺带覆盖【OL 差异】:界版不要求"已受伤")
 //   2. 弃手牌代价 + owner 体力较高 → owner 摸1,目标回1
 //   3. 置装备代价 + owner 体力较高 → 装备置入目标 + owner 摸1 + 目标回1
 //   4. 置装备代价·可替换原装备
 //   5. 【裁定】体力相等 → 双方均不摸牌不回血(仅消耗代价)
 //   6. 限一次:同回合第二次被拒绝
 //   7. 目标为女性 → 拒绝
-//   8. 【OL 差异】目标满血男性 → 允许(不要求"已受伤")
-//   9. 非自己回合 → 拒绝
-//  10. 置装备代价传非装备牌 → 拒绝
-//  11. 手牌为空 → 拒绝
+//   8. 非自己回合 → 拒绝
+//   9. 置装备代价传非装备牌 → 拒绝
+//  10. 手牌为空 → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -256,20 +256,7 @@ describe('界结姻(OL 界限突破版)', () => {
     expect(harness.state.players[0].hand.length).toBe(3);
   });
 
-  // ─── 8.【OL 差异】目标满血男性 → 允许(不要求"已受伤")─────
-  it('目标满血男性(曹操 4/4)→ 允许(OL 不要求已受伤)', async () => {
-    const state = buildState({ p0Health: 2, p0MaxHealth: 3, p1Health: 4, p1MaxHealth: 4 });
-    await harness.setup(state);
-    const P0 = harness.player('界孙尚香');
-
-    await P0.triggerAction('界结姻', 'use', { cost: '弃手牌', cardIds: ['h1'], target: 1 });
-
-    // owner(2)<目标(4) → owner 回1(2→3),目标摸1。发动成功(目标满血不阻止)
-    expect(harness.state.players[0].health).toBe(3);
-    expect(harness.state.players[0].vars['界结姻/usedThisTurn']).toBe(true);
-  });
-
-  // ─── 9. 非自己回合 → 拒绝 ────────────────────────────────
+  // ─── 8. 非自己回合 → 拒绝 ────────────────────────────────
   it('非自己回合 → 拒绝', async () => {
     const state = buildState({ currentPlayer: 1 });
     await harness.setup(state);
@@ -282,7 +269,7 @@ describe('界结姻(OL 界限突破版)', () => {
     });
   });
 
-  // ─── 10. 置装备代价传非装备牌 → 拒绝 ──────────────────────
+  // ─── 9. 置装备代价传非装备牌 → 拒绝 ──────────────────────
   it('置装备代价传基本牌 → 拒绝', async () => {
     const state = buildState({});
     await harness.setup(state);
@@ -295,7 +282,7 @@ describe('界结姻(OL 界限突破版)', () => {
     });
   });
 
-  // ─── 11. 手牌为空 → 拒绝 ──────────────────────────────────
+  // ─── 10. 手牌为空 → 拒绝 ──────────────────────────────────
   it('手牌为空 → 拒绝', async () => {
     const state = buildState({ p0Hand: [] });
     await harness.setup(state);
