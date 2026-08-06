@@ -9,6 +9,7 @@
 //   5. P0 手牌 0,P1 手牌 0 → 合法(等于也算)
 //   6. 选一名手牌 > 自己的目标 → 拒绝
 //   7. 选自己 → 拒绝
+//   8. 其他玩家的结束阶段 → P0 的绝策不触发(仅在本人结束阶段)
 //
 // 触发方式:applyAtom({ type: '阶段开始', player: 0, phase: '回合结束' })
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -357,5 +358,38 @@ describe('界绝策', () => {
       actionType: 'respond',
       params: { targets: [0] },
     });
+  });
+
+  // ─── 8. 其他玩家的结束阶段 → P0 的绝策不触发 ────────────
+  it('其他玩家的结束阶段 → 不触发(仅在本人结束阶段)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['c1'], // 1 张
+          skills: ['界绝策'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          hand: [], // 0 张 ≤ P0 的 1(若误触发则为合法目标)
+          skills: [],
+        }),
+      ],
+      cardMap: {
+        c1: makeCard('c1'),
+      },
+      currentPlayerIndex: 1,
+      phase: '回合结束',
+      turn: { round: 1, phase: '回合结束', vars: {} },
+    });
+    await harness.setup(state);
+
+    // P1 的结束阶段:P0 的绝策只在本人结束阶段触发,不应询问 P0
+    await triggerEndPhase(harness, 1);
+    expect(harness.state.pendingSlots.size).toBe(0);
+    expect(harness.state.players[1].health).toBe(3);
   });
 });
