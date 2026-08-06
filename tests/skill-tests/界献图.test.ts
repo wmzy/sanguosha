@@ -12,7 +12,7 @@
 //   7. 阶段结束:伤害 2 ≥ 给牌 2 → 不失血
 //   8. 阶段结束:伤害 3 > 给牌 2 → 不失血
 //   9. 给牌 0 → 阶段结束不失血
-//   10. owner 给出的牌进入 currentPlayer 手牌
+//   10. owner 自己的出牌阶段不触发(发动时机负面边界)
 //   11. owner 死亡 → 不触发
 //   12. 当前回合角色死亡 → 不触发
 //   13. 伤害统计仅在出牌阶段(模拟准备阶段伤害不计)
@@ -193,8 +193,7 @@ describe('界献图(OL 界限突破版)', () => {
     P0.expectPending('请求回应');
     await P0.respond('界献图', { choice: true });
     await harness.waitForStable();
-    // P0 手牌现为 d1 + 原 h1(无询问弹窗,因为只有 1 张时跳过?)
-    // 不,owner 有 2 张手牌,需弹窗选 1 张给
+    // owner 现有 2 张手牌(h1 + 摸到的 d1),需弹窗选 1 张给
     P0.expectPending('请求回应');
     await P0.respond('界献图', { cardIds: ['h1'] });
     await harness.waitForStable();
@@ -410,33 +409,20 @@ describe('界献图(OL 界限突破版)', () => {
     expect(harness.state.players[0].health).toBe(healthBefore);
   });
 
-  // ─── 10. 给出的牌进入 currentPlayer 手牌(已在 #1 验证,这里独立断言)─────────
-  it('给牌后:cards 进入 P1 手牌,离开 P0 手牌', async () => {
+  // ─── 10. owner 自己的出牌阶段不触发(发动时机负面边界)─────────
+  it('owner 自己的出牌阶段不触发', async () => {
     const h1 = makeCard('h1', '杀');
-    const h2 = makeCard('h2', '闪');
-    const d1 = makeCard('d1', '桃');
-    const d2 = makeCard('d2', '杀');
     const state = buildState({
-      p0Hand: ['h1', 'h2'],
-      extraCards: { h1, h2, d1, d2 },
-      deck: ['d1', 'd2'],
+      p0Hand: ['h1'],
+      extraCards: { h1 },
+      deck: [],
+      currentPlayer: 0, // owner(P0)本人是当前回合角色
     });
     await harness.setup(state);
-    const P0 = harness.player('界张松');
 
-    await triggerPlayStart(harness, 1);
-    await P0.respond('界献图', { choice: true });
-    await harness.waitForStable();
-    await P0.respond('界献图', { choice: true }); // 摸 2
-    await harness.waitForStable();
-    await P0.respond('界献图', { cardIds: ['h1', 'h2'] });
-    await harness.waitForStable();
-
-    // 验证给出牌的归属
-    expect(harness.state.players[0].hand).toEqual(expect.arrayContaining(['d1', 'd2']));
-    expect(harness.state.players[0].hand.length).toBe(2);
-    expect(harness.state.players[1].hand).toEqual(expect.arrayContaining(['h1', 'h2']));
-    expect(harness.state.players[1].hand.length).toBe(2);
+    // 仅其他角色出牌阶段触发;owner 自己回合不询问
+    await triggerPlayStart(harness, 0);
+    expect(harness.state.pendingSlots.size).toBe(0);
   });
 
   // ─── 11. owner 死亡 → 不触发 ─────────
