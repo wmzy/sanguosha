@@ -20,6 +20,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { applyAtom } from '../../src/engine/index';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(
@@ -169,6 +170,34 @@ describe('界裸衣', () => {
 
     // P1 输决斗 → 受 1(基础) + 1(界裸衣增伤) = 2 点伤害
     expect(harness.state.players[1].health).toBe(2);
+  });
+
+  it('有裸衣标签但伤害来源牌非杀/决斗(火攻)→ 不增伤(1 点)', async () => {
+    // 界裸衣仅对【杀】和【决斗】增伤;其他来源牌(如火攻)即便有标签也不 +1
+    const fire = makeTrick('f1', '火攻', '♥', 'A');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          skills: ['界裸衣'],
+          tags: ['裸衣/bonus'],
+        }),
+        makePlayer({ index: 1, name: 'P1', skills: [] }),
+      ],
+      cardMap: { f1: fire },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    // 直接走伤害结算(来源牌为火攻,非杀/决斗),不经出牌流程
+    void runDamageFlow(harness.state, 0, 1, 1, 'f1');
+    await harness.waitForStable();
+
+    // 火攻非杀/决斗 → 不触发增伤 → P1 仅受 1 点
+    expect(harness.state.players[1].health).toBe(3);
   });
 
   // ─── 不发动界裸衣 → 默认摸 2 张 ────────────────────────
@@ -323,7 +352,7 @@ describe('界裸衣', () => {
   });
 
   it('发动 + 跳过:防具/马不入手(仅武器匹配)', async () => {
-    // 牌堆顶 2 张不够 3,先填 1 张
+    // 牌堆顶 3 张:八卦阵(防具)+ 赤兔(进攻马)+ 杀(基本);仅杀入手,防具与马(非武器装备)弃置
     const armor = makeEquip('a1', '八卦阵', '♣', '防具');
     const horse = makeEquip('h1', '赤兔', '♥', '进攻马', '5');
     const slash = makeCard('s1', '杀', '♠', '2');
