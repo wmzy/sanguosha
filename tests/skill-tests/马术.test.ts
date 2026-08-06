@@ -2,8 +2,8 @@
 //
 // 验证:
 //   1. 单元:onInit 后 vars['距离/进攻修正'] = 1
-//   2. 单元:4 人局 P0→P2 座位距离 2,马术使 effectiveDistance = 1
-//   3. 触发(实际 dispatch):P0 徒手(范围 1)对距离 2 的 P2 出杀 → 命中(马术把距离缩到 1)
+//   2. 单元:4 人局 P0→P3(座次2) 座位距离 2,马术使 effectiveDistance = 1
+//   3. 触发(实际 dispatch):P0 徒手(范围 1)对距离 2 的 P3 出杀 → 命中(马术把距离缩到 1)
 //   4. 负面:无马术时同场景出杀被拒(距离 2 > 范围 1)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
@@ -76,20 +76,21 @@ describe('马术', () => {
     expect(harness.state.players[0].vars['距离/进攻修正']).toBe(1);
   });
 
-  it('单元:4 人局 P0→P2 座位距离 2,马术使 effectiveDistance = 1', async () => {
+  it('单元:4 人局 P0→P3(座次2) 座位距离 2,马术使 effectiveDistance = 1', async () => {
     await harness.setup(build4PlayerState(['马术']));
     // 座位距离 2,进攻修正 1 → 实际距离 1
     expect(effectiveDistance(harness.state, 0, 2)).toBe(1);
   });
 
-  it('单元:无马术时 P0→P2 effectiveDistance = 2', async () => {
+  it('单元:无马术时 P0→P3(座次2) effectiveDistance = 2', async () => {
     await harness.setup(build4PlayerState([]));
     expect(effectiveDistance(harness.state, 0, 2)).toBe(2);
   });
 
   it('触发:P0(徒手,范围1)对距离 2 的 P3 出杀 → 命中(马术缩距到 1)', async () => {
     const slash = makeCard('s1', '杀', '♠', 'A');
-    const state = build4PlayerState(['马术', '杀'], ['s1']);
+    // 杀是卡牌效果(经统一入口 使用牌 出),非角色技能;P0 只需拥有马术
+    const state = build4PlayerState(['马术'], ['s1']);
     state.cardMap = { s1: slash };
     await harness.setup(state);
     const P1 = harness.player('P1');
@@ -104,7 +105,8 @@ describe('马术', () => {
 
   it('负面:无马术 → 对距离 2 的 P3 出杀被拒(超出范围)', async () => {
     const slash = makeCard('s1', '杀', '♠', 'A');
-    const state = build4PlayerState(['杀'], ['s1']);
+    // P0 无任何技能(杀经统一入口 出,无需作为技能)
+    const state = build4PlayerState([], ['s1']);
     state.cardMap = { s1: slash };
     await harness.setup(state);
     const P1 = harness.player('P1');
