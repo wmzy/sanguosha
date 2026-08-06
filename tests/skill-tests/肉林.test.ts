@@ -6,6 +6,7 @@
 //   2. 董卓出杀 → 女性 target 只有一张闪 → 受伤
 //   3. 女性(孙尚香)出杀 → 董卓需双闪(镜像)
 //   4. 负面:董卓出杀 → 男性 target 一张闪即可(肉林不生效)
+//   5. 边界:董卓出万箭齐发 → 女性目标一张闪即抵消(肉林仅对杀生效,镜像无双)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -19,8 +20,9 @@ function makeCard(
   name: string,
   suit: '♠' | '♥' | '♣' | '♦' = '♠',
   rank = 'A',
+  type: '基本牌' | '锦囊牌' = '基本牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
+  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 function makePlayer(opts: {
@@ -210,5 +212,49 @@ describe('肉林', () => {
     // 男性目标:肉林不生效,不应有第二轮询问闪 → 杀已抵消
     expect(harness.state.players[1].health).toBe(hpBefore);
     expect(harness.state.pendingSlots.size).toBe(0);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 边界:肉林仅对【杀】生效 —— 万箭齐发同样使用询问闪,但肉林不应触发双闪(镜像无双)
+  //   实现依据(肉林.ts): 询问闪 after-hook 检查「结算帧栈顶牌名===杀」,万箭齐发牌名≠杀 → 直接 return。
+  // ─────────────────────────────────────────────────────────────
+
+  it('董卓出万箭齐发 → 女性目标一张闪即抵消(肉林不追加第二轮)', async () => {
+    const wj1 = makeCard('wj1', '万箭齐发', '♥', 'A', '锦囊牌');
+    const d1 = makeCard('d1', '闪', '♥', '2');
+    const d2 = makeCard('d2', '闪', '♥', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0, name: 'P0', character: '董卓',
+          hand: ['wj1'], skills: ['万箭齐发', '杀', '肉林'],
+        }),
+        makePlayer({
+          index: 1, name: 'P1', character: '孙尚香',
+          hand: ['d1', 'd2'], skills: ['闪'],
+        }),
+      ],
+      cardMap: { wj1, d1, d2 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+    const hpBefore = harness.state.players[1].health;
+
+    await P0.useCardAndTarget('万箭齐发', 'wj1', []);
+    // 无懈可击窗口(广播型,始终出现)
+    await P0.pass();
+
+    // 女性目标出一张闪即可抵消(肉林不追加第二轮询问闪)
+    P1.expectPending('询问闪');
+    await P1.respond('闪', { cardId: 'd1' });
+
+    // 万箭齐发已结算:d2 未被打出(仍在手牌)、肉林未触发第二轮
+    expect(harness.state.players[1].health).toBe(hpBefore);
+    expect(harness.state.players[1].hand).toContain('d2');
+    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['wj1', 'd1']));
   });
 });
