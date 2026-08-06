@@ -109,6 +109,36 @@ describe('界若愚', () => {
     expect(harness.state.players[0].skills).toContain('激将');
   });
 
+  it('体力已≥3(仍全场最少)→ 增上限但不回复', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界刘禅',
+            character: '界刘禅',
+            skills: ['界若愚'],
+            health: 3,
+            maxHealth: 3, // 满血,但全场最少(P1=4)
+          }),
+          mkPlayer({ index: 1, name: 'P1', health: 4, maxHealth: 4 }),
+        ],
+        cardMap: {},
+        currentPlayerIndex: 0,
+        phase: '准备',
+        turn: { round: 1, phase: '准备', vars: {} },
+      }),
+    );
+
+    await applyAtom(harness.state, { type: '回合开始', player: 0 });
+    await harness.waitForStable();
+
+    expect(harness.state.players[0].maxHealth).toBe(4); // 3→4 增1上限
+    expect(harness.state.players[0].health).toBe(3); // 已≥3,回复量为0,不回复
+    expect(harness.state.players[0].skills).toContain('激将');
+    expect(harness.state.players[0].vars['界若愚/awakened']).toBe(true);
+  });
+
   it('体力非最少时不触发界若愚', async () => {
     await harness.setup(
       createGameState({
