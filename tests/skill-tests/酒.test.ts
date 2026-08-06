@@ -267,10 +267,15 @@ describe('酒', () => {
     // P2(濒死者)→ 酒当桃自救
     const dyingTarget = slotAtom.target!;
     await P2.respond('酒', { cardId: 'w1' });
-    // 血量 +1(如果救回)
-    if (harness.state.players[dyingTarget].health > 0) {
-      expect(harness.state.players[dyingTarget].health).toBe(1);
-    }
+    // 救回:血量 +1(0 → 1)、酒进弃牌堆、求桃 pending 清除
+    expect(harness.state.players[dyingTarget].health).toBe(1);
+    expect(harness.state.zones.discardPile).toContain('w1');
+    // view 级断言
+    P2.processEvents();
+    P2.expectView((v) => {
+      expect(v.players[dyingTarget].health).toBe(1);
+      expect(v.pending).toBeNull();
+    });
   });
 
   // ─── 负面:respond ─────────────────────────
