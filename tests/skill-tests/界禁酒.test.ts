@@ -14,6 +14,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
+import { applyAtom } from '../../src/engine/index';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
@@ -207,11 +208,21 @@ describe('界禁酒', () => {
     const P0 = harness.player('P0');
     const P1 = harness.player('P1');
 
-    // P0 出杀打 P1(1 血)→ P1 濒死求桃
+    // 安装禁酒 wrap:回合开始 after-hook 在 setup 中不自动触发(无开局流程),
+    // 需手动开 P0 回合。hook 在任意「回合开始」触发,wrap 所有非 owner 的 酒.respond。
+    await applyAtom(harness.state, { type: '回合开始', player: 0 });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // P0 出杀打 P1(1 血)
     await P0.useCardAndTarget('杀', 's1', [1]);
     await waitForStable(harness.state);
+    // P1 有手牌但无闪 → silent 闪窗口;放弃 → 受伤濒死 → 求桃
+    // (P0 无救援牌被自动跳过,直接问持有酒的 P1)
+    await P1.pass();
+    await waitForStable(harness.state);
 
-    // P1 尝试用酒自救:应被禁酒拦截
+    // P1 尝试用酒自救:被禁酒 wrap 拦截(P0 回合内,currentPlayerIndex===ownerId)
     await P1.expectRejected({
       skillId: '酒',
       actionType: 'respond',
@@ -256,15 +267,23 @@ describe('界禁酒', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    // P1 出杀打 P2(1 血)→ P2 濒死求桃
+    // 安装禁酒 wrap(同用例 4):手动开 P1 回合 → wrap 非 owner 的 酒.respond。
+    await applyAtom(harness.state, { type: '回合开始', player: 1 });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // P1 出杀打 P2(1 血)
     await P1.useCardAndTarget('杀', 's1', [2]);
     await waitForStable(harness.state);
+    // P2 有手牌但无闪 → silent 闪窗口;放弃 → 受伤濒死 → 求桃
+    await P2.pass();
+    await waitForStable(harness.state);
 
-    // P2 用酒自救:应放行(P1 回合,非界高顺回合)
+    // P2 用酒自救:应放行(P1 回合,currentPlayerIndex!==界高顺 ownerId → wrap 放行)
     await P2.respond('酒', { cardId: 'w1' });
     await waitForStable(harness.state);
 
-    // P2 回血到 1(酒救 1 血,原本 1 血濒死 → 1 血)
+    // P2 回血到 1(酒当桃救 1 血,原本 1 血濒死 → 1 血)
     expect(harness.state.players[2].health).toBe(1);
     expect(harness.state.players[2].alive).toBe(true);
   });
@@ -300,11 +319,19 @@ describe('界禁酒', () => {
     const P0 = harness.player('P0');
     const P1 = harness.player('P1');
 
-    // P0 出杀打 P1(1 血)→ P1 濒死求桃
+    // 安装禁酒 wrap(同用例 4):手动开 P0 回合。
+    await applyAtom(harness.state, { type: '回合开始', player: 0 });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // P0 出杀打 P1(1 血)
     await P0.useCardAndTarget('杀', 's1', [1]);
     await waitForStable(harness.state);
+    // P1 有手牌但无闪 → silent 闪窗口;放弃 → 受伤濒死 → 求桃
+    await P1.pass();
+    await waitForStable(harness.state);
 
-    // P1 用桃自救:应放行
+    // P1 用桃自救:应放行(禁酒仅禁酒,桃.respond 不在 wrap 范围内)
     await P1.respond('桃', { cardId: 'p1' });
     await waitForStable(harness.state);
 
