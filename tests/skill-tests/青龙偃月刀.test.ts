@@ -297,6 +297,10 @@ describe('青龙偃月刀', () => {
     expect(harness.state.players[1].health).toBe(4);
     // k2 留在手中(没消耗)
     expect(harness.state.players[0].hand).toContain('k2');
+    // 原始杀 k1 进弃牌堆——证明 useKill 超时后流程正常收尾,未卡死在询问
+    expect(harness.state.zones.discardPile).toContain('k1');
+    // 无残留询问(放弃追杀后不应再卡在 useKill pending)
+    expect(harness.state.pendingSlots.has(0)).toBe(false);
   });
 
   // ─── 追杀的杀被闪抵消,不继续追杀 ─────────────────────
