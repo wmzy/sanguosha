@@ -81,7 +81,7 @@ describe('诈降', () => {
 
   // ─── 正面·摸3张(无条件) ──────────────────────────────
 
-  it('正面: 失去体力后摸3张牌(无条件,非出牌阶段也摸)', async () => {
+  it('正面: 出牌阶段失去体力→摸3张牌且激活杀增益', async () => {
     // 直接走 失去体力 atom,验证诈降 after-hook 摸3
     const state = createGameState({
       players: [
@@ -106,11 +106,13 @@ describe('诈降', () => {
 
     expect(harness.state.players[0].hand.length).toBe(0);
 
-    // 失去1点体力 → 诈降 after-hook 摸3张
+    // 失去1点体力 → 诈降 after-hook 摸3张(无条件);出牌阶段同时激活杀增益
     await applyAtom(harness.state, { type: '失去体力', target: 0, amount: 1 });
 
     expect(harness.state.players[0].health).toBe(3);
     expect(harness.state.players[0].hand).toEqual(['d6', 'd5', 'd4']);
+    // 出牌阶段失去体力→激活本回合杀增益(与下方“非出牌阶段不激活”形成对照)
+    expect(harness.state.turn.vars['诈降/active']).toBe(0);
   });
 
   it('正面: 非出牌阶段失去体力→摸3张但杀增益不激活', async () => {
