@@ -63,6 +63,8 @@ describe('马匹技能', () => {
 
     expect(harness.state.players[0].equipment['进攻马']).toBe('h1');
     expect(harness.state.players[0].vars['距离/进攻修正']).toBe(1);
+    // 马匹技能实例随装备加入 player.skills(与其他装备技能一致)
+    expect(harness.state.players[0].skills).toContain('赤兔');
     // view 级断言
     P1.processEvents();
     P1.expectView((v) => {
@@ -90,26 +92,6 @@ describe('马匹技能', () => {
 
     expect(harness.state.players[0].equipment['防御马']).toBe('h2');
     expect(harness.state.players[0].vars['距离/防御修正']).toBe(1);
-  });
-
-  it('马匹技能加入 player.skills(与其他装备技能一致)', async () => {
-    const horse = makeEquip('h1', '赤兔', '♥', '进攻马');
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['h1'] }),
-        makePlayer({ index: 1, name: 'P2' }),
-      ],
-      cardMap: { h1: horse },
-      currentPlayerIndex: 0,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    });
-    await harness.setup(state);
-    const P1 = harness.player('P1');
-
-    await P1.useCard('装备通用', 'h1');
-
-    expect(harness.state.players[0].skills).toContain('赤兔');
   });
 
   it('换装进攻马:旧马技能移除,新马技能加入,vars 仍为 1(不叠加)', async () => {
