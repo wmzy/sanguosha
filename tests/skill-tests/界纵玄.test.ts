@@ -11,6 +11,8 @@
 //   D. 上家弃牌(本回合首次)→ 触发
 //   E. 上家弃牌(本回合第二次)→ 不再触发
 //   F. 既非自己也非上家弃牌 → 不触发
+//   G. 自己弃牌两次 → 两次均触发(自己弃置无每回合次数限制)
+//   H. 界虞翻阵亡 → 弃置不触发(须存活)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -36,6 +38,7 @@ function mkPlayer(opts: {
   skills?: string[];
   health?: number;
   maxHealth?: number;
+  alive?: boolean;
 }): PlayerState {
   return {
     index: opts.index,
@@ -43,7 +46,7 @@ function mkPlayer(opts: {
     character: opts.name,
     health: opts.health ?? 4,
     maxHealth: opts.maxHealth ?? 4,
-    alive: true,
+    alive: opts.alive ?? true,
     hand: opts.hand ?? [],
     equipment: {},
     skills: opts.skills ?? [],
@@ -311,5 +314,77 @@ describe('界纵玄(界虞翻·被动技)', () => {
     P0.expectNoPending();
     expect(harness.state.zones.discardPile).toContain('c1');
     expect(harness.state.turn.vars['界纵玄/upstreamTriggeredThisTurn:0']).toBeUndefined();
+  });
+
+  // ─── G. 自己弃牌两次 → 两次均触发(无每回合次数限制)──────
+  // 区别于上家弃牌的「每回合首次」:自己弃置任意次均可触发。
+  it('自己弃牌两次 → 两次均触发(自己弃置无每回合次数限制)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        mkPlayer({
+          index: 0,
+          name: '界虞翻',
+          hand: ['c1', 'c2'],
+          skills: ['界纵玄'],
+          health: 3,
+          maxHealth: 3,
+        }),
+        mkPlayer({ index: 1, name: 'P1', hand: [] }),
+      ],
+      cardMap: {
+        c1: mkCard('c1', '杀'),
+        c2: mkCard('c2', '闪'),
+      },
+      currentPlayerIndex: 0,
+      phase: '弃牌',
+      turn: { round: 1, phase: '弃牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('界虞翻');
+
+    // 第一次:弃 c1 → 触发 → 拒绝
+    await triggerDiscard(harness, 0, ['c1']);
+    P0.expectPending('请求回应');
+    await P0.respond('界纵玄', { choice: false });
+    await harness.waitForStable();
+
+    // 第二次:弃 c2 → 仍触发(自己弃置无次数限制)
+    await triggerDiscard(harness, 0, ['c2']);
+    P0.expectPending('请求回应');
+    await P0.respond('界纵玄', { choice: false });
+    await harness.waitForStable();
+
+    // 自己弃置不走「上家」分支,上家触发标记不应被置位
+    expect(harness.state.turn.vars['界纵玄/upstreamTriggeredThisTurn:0']).toBeUndefined();
+    expect(harness.state.zones.discardPile).toContain('c1');
+    expect(harness.state.zones.discardPile).toContain('c2');
+  });
+
+  // ─── H. 界虞翻阵亡 → 弃置不触发(须存活)──────────────────
+  it('界虞翻阵亡(alive:false)→ 弃置不触发', async () => {
+    const state: GameState = createGameState({
+      players: [
+        mkPlayer({
+          index: 0,
+          name: '界虞翻',
+          hand: ['c1'],
+          skills: ['界纵玄'],
+          health: 0,
+          maxHealth: 3,
+          alive: false,
+        }),
+        mkPlayer({ index: 1, name: 'P1', hand: [] }),
+      ],
+      cardMap: { c1: mkCard('c1', '杀') },
+      currentPlayerIndex: 0,
+      phase: '弃牌',
+      turn: { round: 1, phase: '弃牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('界虞翻');
+
+    await triggerDiscard(harness, 0, ['c1']);
+    P0.expectNoPending();
+    expect(harness.state.zones.discardPile).toContain('c1');
   });
 });
