@@ -93,13 +93,11 @@ describe('界绝情', () => {
 
     // P1 体力 -1(P1 maxHealth 默认 3,故 3 - 1 = 2)
     expect(harness.state.players[1].health).toBe(2);
-    // atom 历史中应该有 失去体力,且它替代了 造成伤害
+    // atom 历史中应有 失去体力(绝情将伤害转为失去体力);
+    // 正常伤害会经 扣减体力 扣血,此处不应出现 扣减体力(证明未走正常伤害流程)
     const types = atomTypes();
     expect(types).toContain('失去体力');
-    // 在杀→询问闪→没闪之后,应有 失去体力 而非 造成伤害
-    const lastDamageish = types.filter((t) => t === '造成伤害' || t === '失去体力').pop();
-    expect(lastDamageish).toBe('失去体力');
-    void P0;
+    expect(types).not.toContain('扣减体力');
   });
 
   // ─── 2. 春华自己受伤时,正常走造成伤害 ────────────────────
@@ -158,7 +156,7 @@ describe('界绝情', () => {
           skills: ['反馈', '闪'],
         }),
       ],
-      cardMap: { k1: slash, extra: makeCard('e1', '桃', '♥', '5') },
+      cardMap: { k1: slash, extra: makeCard('extra', '桃', '♥', '5') },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
