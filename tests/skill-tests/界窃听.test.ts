@@ -18,6 +18,7 @@
 //   6. owner 选不发动 → 无事发生
 //   7. 1 项时无装备可夺 → 强制摸牌
 //   8. 夺装备替换 owner 同槽位装备(旧装备入弃牌堆)
+//   9. 2 项但目标无装备可夺 → 仅摸 1 张(选项1 缺位,不摸两张)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -413,5 +414,39 @@ describe('界窃听', () => {
     expect(harness.state.zones.discardPile).toContain('a0');
     // 摸牌(2 项的第二项)
     expect(harness.state.players[0].hand.length).toBe(1);
+  });
+
+  // ─── 9. 2 项但目标无装备可夺 → 仅摸 1 张(不摸两张) ────
+  it('2 项但 P1 无装备可夺 → 仅摸 1 张(选项1 缺位)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [] }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          health: 4,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    // P1 本回合未造伤、未用牌 → choices=2;但 P1 无装备可夺
+    await triggerTurnEnd(harness, 1);
+
+    const P0 = harness.player('P0');
+    P0.expectPending('请求回应');
+    await P0.respond('界窃听', { choice: true });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 无装备 → 跳过夺装备,仅摸 1 张(并非 2 张)
+    expect(harness.state.players[0].hand.length).toBe(1);
+    expect(harness.state.pendingSlots.size).toBe(0);
   });
 });
