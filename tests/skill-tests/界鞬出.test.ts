@@ -1,11 +1,10 @@
 // 界鞬出(界庞德·群雄·被动技)测试:
 //   1. 目标弃基本牌 → 获得此杀,杀不生效(不扣血)
 //   2. 目标弃非基本牌(装备)→ 不能抵消此杀,强制命中 + 本回合出杀次数+1
-//   3. 目标弃非基本牌(锦囊)→ 同 2(强制命中,且本回合可多出一次杀)
-//   4. 庞德不发动 → 正常询问闪,目标出闪抵消
-//   5. 目标无牌可弃 → 鞬出不触发,正常受伤
-//   6. 他人出杀 → 鞬出不触发
-//   7. 出杀次数+1 累计:连续两次非基本→上限=1+2=3(本回合共可出 3 杀)
+//   3. 庞德不发动 → 正常询问闪,目标出闪抵消
+//   4. 目标无牌可弃 → 鞬出不触发,正常受伤
+//   5. 他人出杀 → 鞬出不触发
+//   6. 出杀次数+1 累计:连续两次非基本(锦囊)→上限=1+2=3(本回合共可出 3 杀)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -144,41 +143,10 @@ describe('界鞬出', () => {
     expect(slashMax(harness.state, 0)).toBe(2);
   });
 
-  // ─── 弃非基本牌(锦囊)→ 强制命中 + 出杀次数+1 ─────────────────────
-  it('目标弃锦囊牌(非基本)→ 不能抵消,强制命中,出杀次数+1', async () => {
-    const kill = makeCard('k1', '杀', '♠', '7');
-    const trick = makeCard('t1', '无中生有', '♥', '7', '锦囊牌');
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({ index: 0, name: '界庞德', hand: ['k1'], skills: ['杀', '界鞬出'] }),
-        makePlayer({ index: 1, name: 'P2', hand: ['t1'], skills: [] }),
-      ],
-      cardMap: { k1: kill, t1: trick },
-      currentPlayerIndex: 0,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    });
-    await harness.setup(state);
-    const P0 = harness.player('界庞德');
-    const P2 = harness.player('P2');
+  // 注:弃非基本牌(锦囊,手牌区)的行为已在下方累计用例中覆盖(连续弃两张锦囊),
+  // 此处不再单列;装备区弃牌路径见上一用例。
 
-    await P0.useCardAndTarget('杀', 'k1', [1]);
-    P0.expectPending('请求回应');
-    await P0.respond('界鞬出', { choice: true });
-
-    // 目标弃锦囊(非基本牌)
-    P2.expectPending('请求回应');
-    await P2.respond('界鞬出', { zone: 'hand', handIndex: 0 });
-
-    // 强制命中
-    expect(harness.state.players[1].health).toBe(3);
-    expect(harness.state.zones.discardPile).toContain('t1');
-    expect(harness.state.zones.discardPile).toContain('k1');
-    expect(harness.state.turn.vars['界鞬出/quotaBonus']).toBe(1);
-    expect(slashMax(harness.state, 0)).toBe(2);
-  });
-
-  // ─── 出杀次数+1 累计:两次非基本 → 上限 = 1 + 2 = 3 ─────────────────────
+  // ─── 出杀次数+1 累计:两次非基本 → 上限 = 1 + 2 = 3 ─────────────────
   it('多次发动鞬出弃非基本牌 → 出杀次数累计(两次后上限=3,仍可出第三杀)', async () => {
     const k1 = makeCard('k1', '杀', '♠', '7');
     const k2 = makeCard('k2', '杀', '♠', '8');
@@ -220,9 +188,9 @@ describe('界鞬出', () => {
     // 上限 = 1 + 2 = 3,已用 2 次 → 还能再出 1 次
     expect(slashMax(harness.state, 0)).toBe(3);
 
-    // 第三杀仍可出(quotaBonus=2 弥补了基础 1 的限制)
+    // 第三杀仍可出(quotaBonus=2 弥补基础 1 的限制)
     await P0.useCardAndTarget('杀', 'k3', [1]);
-    // 目标无牌可弃 → 不触发鞬出,正常询问闪
+    // P2 仅剩闪;界庞德选择不发动鞬出 → 正常询问闪
     await P0.respond('界鞬出', { choice: false });
     P2.expectPending('询问闪');
     await P2.pass();
