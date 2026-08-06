@@ -5,10 +5,10 @@
 //
 // 验证:
 //   1. 正面:装诸葛连弩 → equipment.武器 = id,玩家 skills 含 '诸葛连弩'
-//   2. 正面:诸葛连弩已在 skills 时装备,slashMax 变 ∞
-//   3. 正面:slashMax=∞ 时连续出多张杀
-//   4. 正面:换装后 slashMax 回 1,诸葛连弩 skill 卸载
-//   5. 负面:无诸葛连弩时上限默认 1,第二张杀被拒
+//   2. 正面:出牌阶段中装备 → slashMax 变 ∞,可连续出多张杀(无次数限制)
+//   3. 正面:换装后 slashMax 回 1,诸葛连弩 skill 卸载
+//   4. 负面:无诸葛连弩时上限默认 1,第二张杀被拒
+//   5. 负面:准备阶段装备 → 拒绝(装备 validate 要求出牌阶段)
 //   6. 负面:装备不存在的牌 → 拒绝
 //   7. 负面:非装备牌(基本牌当武器装)→ 拒绝
 //   8. 负面:非自己回合 → 拒绝
@@ -110,17 +110,18 @@ describe('诸葛连弩', () => {
   // ─── 回归:出牌阶段中途装备诸葛连弩 → 本回合立即可连续出杀 ────
   // 机制:onInit 装备时注册上限提供者(() => Infinity)→ slashMax 返回 ∞ → 可连续出杀。
 
-  it('回归:出牌阶段中装备诸葛连弩 → 本回合立即可连续出 2 张杀', async () => {
+  it('回归:出牌阶段中装备诸葛连弩 → 本回合立即可连续出 3 张杀(无次数限制)', async () => {
     const crossbow = makeEquip('c1', '诸葛连弩', '♣', '武器', 'A', 1);
     const slash1 = makeCard('s1', '杀', '♠', 'A');
     const slash2 = makeCard('s2', '杀', '♠', '2');
+    const slash3 = makeCard('s3', '杀', '♠', '3');
     // 注意:player.skills 默认 ['装备通用', '杀'],不含 '诸葛连弩'——装备流程会触发 添加技能 atom。
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['c1', 's1', 's2'] }),
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 's1', 's2', 's3'] }),
         makePlayer({ index: 1, name: 'P2' }),
       ],
-      cardMap: { c1: crossbow, s1: slash1, s2: slash2 },
+      cardMap: { c1: crossbow, s1: slash1, s2: slash2, s3: slash3 },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
@@ -136,15 +137,16 @@ describe('诸葛连弩', () => {
     // 关键:装备后立即注册上限提供者 → slashMax 变 ∞
     expect(slashMax(harness.state, 0)).toBe(Infinity);
 
-    // 第一张杀
+    // 连续出 3 张杀:slashMax=∞ → 远超默认上限 1(P2 4 → 3 → 2 → 1)
     await P1.useCardAndTarget('杀', 's1', [1]);
     await P2.pass();
     expect(harness.state.players[1].health).toBe(3);
-
-    // 第二张杀:slashMax=∞ → 仍允许
     await P1.useCardAndTarget('杀', 's2', [1]);
     await P2.pass();
     expect(harness.state.players[1].health).toBe(2);
+    await P1.useCardAndTarget('杀', 's3', [1]);
+    await P2.pass();
+    expect(harness.state.players[1].health).toBe(1);
   });
 
   it('负面:准备阶段装诸葛连弩 → 装备被拒(装备validate要求出牌阶段)', async () => {
@@ -166,88 +168,6 @@ describe('诸葛连弩', () => {
     // 装备被拒 → 提供者未注册
     await P1.expectRejected({ skillId: '装备通用', actionType: 'use', params: { cardId: 'c1' } });
     expect(slashMax(harness.state, 0)).toBe(1);
-  });
-
-  // ─── 正面:装后杀 quota = Infinity(可连续出多张) ────────────
-
-  it('正面:诸葛连弩 skill 已加载 → 装备后上限变 ∞(可连续出杀)', async () => {
-    // 玩家初始 skills 已含 诸葛连弩(模拟装备技能预先挂载的场景)
-    const crossbow = makeEquip('c1', '诸葛连弩', '♣', '武器', 'A', 1);
-    const slash1 = makeCard('s1', '杀', '♠', 'A');
-    const slash2 = makeCard('s2', '杀', '♠', '2');
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({
-          index: 0,
-          name: 'P1',
-          hand: ['c1', 's1', 's2'],
-          skills: ['装备通用', '杀', '诸葛连弩'],
-        }),
-        makePlayer({ index: 1, name: 'P2' }),
-      ],
-      cardMap: { c1: crossbow, s1: slash1, s2: slash2 },
-      currentPlayerIndex: 0,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    });
-    await harness.setup(state);
-    const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
-
-    // 诸葛连弩 skill 已在 P1.skills,setup() 时 instantiateSkill 注册了 hooks
-    expect(harness.state.players[0].skills).toContain('诸葛连弩');
-
-    // 装诸葛连弩 → onInit 注册上限提供者 → slashMax=∞
-    await P1.useCard('装备通用', 'c1');
-    expect(slashMax(harness.state, 0)).toBe(Infinity);
-
-    // 第一张杀:P2 4/4 → 3/4
-    await P1.useCardAndTarget('杀', 's1', [1]);
-    await P2.pass();
-    expect(harness.state.players[1].health).toBe(3);
-
-    // 第二张杀:slashMax=∞ → 仍可出,P2 3/4 → 2/4
-    await P1.useCardAndTarget('杀', 's2', [1]);
-    await P2.pass();
-    expect(harness.state.players[1].health).toBe(2);
-  });
-
-  it('正面:slashMax=∞ 连续出 3 张杀均成功', async () => {
-    const crossbow = makeEquip('c1', '诸葛连弩', '♣', '武器', 'A', 1);
-    const slash1 = makeCard('s1', '杀', '♠', 'A');
-    const slash2 = makeCard('s2', '杀', '♠', '2');
-    const slash3 = makeCard('s3', '杀', '♠', '3');
-    const state: GameState = createGameState({
-      players: [
-        makePlayer({
-          index: 0,
-          name: 'P1',
-          hand: ['c1', 's1', 's2', 's3'],
-          skills: ['装备通用', '杀', '诸葛连弩'],
-        }),
-        makePlayer({ index: 1, name: 'P2' }),
-      ],
-      cardMap: { c1: crossbow, s1: slash1, s2: slash2, s3: slash3 },
-      currentPlayerIndex: 0,
-      phase: '出牌',
-      turn: { round: 1, phase: '出牌', vars: {} },
-    });
-    await harness.setup(state);
-    const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
-
-    await P1.useCard('装备通用', 'c1');
-    expect(slashMax(harness.state, 0)).toBe(Infinity);
-
-    // 3 张杀全部命中(P2 4 → 3 → 2 → 1)
-    await P1.useCardAndTarget('杀', 's1', [1]);
-    await P2.pass();
-    await P1.useCardAndTarget('杀', 's2', [1]);
-    await P2.pass();
-    await P1.useCardAndTarget('杀', 's3', [1]);
-    await P2.pass();
-
-    expect(harness.state.players[1].health).toBe(1);
   });
 
   // ─── 正面:换装后 quota 恢复 1(默认) ────────────
@@ -431,7 +351,6 @@ describe('诸葛连弩', () => {
           index: 0,
           name: 'P1',
           hand: ['s1', 'c1', 'w1', 's2'],
-          skills: ['装备通用', '杀', '诸葛连弩', '青釭剑'],
         }),
         makePlayer({ index: 1, name: 'P2' }),
       ],
