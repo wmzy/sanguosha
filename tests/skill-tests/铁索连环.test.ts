@@ -312,7 +312,6 @@ describe('铁索连环', () => {
     const p2HealthBefore = harness.state.players[2].health;
 
     // Step 2: 杀 P1
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     await P0.useCardAndTarget('杀', slashCard.id, [1]);
     // P1 不出闪
     await P1.pass();
@@ -329,6 +328,9 @@ describe('铁索连环', () => {
       // 普通伤害:只有 P1 掉血
       expect(harness.state.players[1].health).toBe(p1HealthBefore - 1);
       expect(harness.state.players[2].health).toBe(p2HealthBefore);
+      // 普通伤害不触发传导 hook → 连环状态不被重置(P1/P2 仍横置)
+      expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
+      expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(true);
     }
   }
 
