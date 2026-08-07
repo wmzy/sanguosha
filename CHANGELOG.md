@@ -17,6 +17,16 @@ ADR 0027 决策7 原断言“restoreFromLog 不调 bootstrap，直接返回 pers
 
 ## [Unreleased] — 2026-08-07
 
+### Changed — 武将卡片宽高比改为与武将立绘一致(15:19)
+
+全部 102 张武将立绘统一为 750×950(宽高比 15:19)，但座位卡(其他玩家)与大卡(自己面板)此前用 `object-fit:cover` 填充横向比例容器——座位卡宽矮被横向裁切、大卡 260×200 被裁掉约 40%，武将头部/下半身经常出框。现将两类卡片本身设为 `aspect-ratio: 15/19`，与立绘同比例，cover 退化为无裁切。
+
+#### Changed
+- **座位卡(`seatCard`)改竖向定比**:宽度固定 200px、`aspect-ratio: 15/19`(渲染 200×253)，去掉 `min-width/max-width` 弹性；内容层(`seatCardContent`)由 `position:relative;height:100%` 改为 `position:absolute;inset:0`，立绘填满卡片、文字浮层不再撑高容器。(`src/client/components/PlayerSeatView.tsx`)
+- **大卡(`playerCardLarge`)改定比**:`flex: 0 0 260px` 改为 `flex: 0 0 auto;aspect-ratio: 15/19`，高度跟随底栏(`align-self:stretch`,底栏 200px → 渲染 158×200)，宽度由比例推导。(`src/client/components/gameViewStyles/actionBar.ts`)
+
+## [Unreleased] — 2026-08-07
+
 ### Fixed — 服务端重启后游戏错误地回到选将阶段（持久化恢复 fire-and-forget 时序竞态）
 
 服务端重启后，已完成选将、进入出牌阶段的对局会被错误地恢复回选将界面。根因：`engine.restore` 重放 `actionLog` 时，`dispatch` 是 fire-and-forget——开局/回合推进的 `execute` 在后台异步跑到等待型 atom 才创建 pending slot。`restore` 的重放循环**无任何等待**，下一条选将 `respond` 在 slot 尚未创建时就被 dispatch，其 validate（`pendingSlots.get(ownerId)` 为空）被静默拒绝 → 选将 slot 永久挂起 → 重连客户端 `buildView` 看到 `选将询问` pending → 渲染选将界面。这与 `选将交互设计.md §8.3`、决策 0027 决策7、`index.ts:224` 注释一致要求的“restore 不应阻塞在选将”相悖。

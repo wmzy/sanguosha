@@ -312,8 +312,9 @@ const seatCard = css`
   overflow: hidden;
   background: rgba(0, 0, 0, 0.5);
   transition: all 0.25s;
-  min-width: 170px;
-  max-width: 200px;
+  /* 宽高比 = 武将立绘 750×950(15:19),立绘完整不裁切 */
+  width: 200px;
+  aspect-ratio: 15 / 19;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 `;
 // 势力色顶部条:武将名 + 身份
@@ -356,12 +357,12 @@ const seatCharImgDead = css`
 `;
 // 座位卡内容层:浮在立绘上,底部渐变蒙版保证文字可读
 const seatCardContent = css`
-  position: relative;
+  position: absolute;
+  inset: 0;
   z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 0;
-  height: 100%;
   background: linear-gradient(
     to top,
     rgba(0, 0, 0, 0.78) 0%,

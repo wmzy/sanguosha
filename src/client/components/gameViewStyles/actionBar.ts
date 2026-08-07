@@ -187,7 +187,10 @@ export const equipItemName = css`
 export const playerCardLarge = css`
   position: relative;
   box-sizing: border-box;
-  flex: 0 0 260px;
+  /* 宽高比 = 武将立绘 750×950(15:19);高度跟随底栏 stretch,
+     宽度由比例推导(200px 高 → ≈158px 宽),立绘完整不裁切 */
+  flex: 0 0 auto;
+  aspect-ratio: 15 / 19;
   border: 1px solid #444;
   border-radius: 10px;
   overflow: hidden;
