@@ -69,7 +69,7 @@ function makeBaseline(): ReplayBaseline {
     deadline: view.deadline,
     deadlineTotalMs: view.deadlineTotalMs,
     players: view.players.map((p) => {
-      const { hand, identity, identityHidden, ...pub } = p;
+      const { hand: _hand, identity: _identity, identityHidden: _identityHidden, ...pub } = p;
       return pub;
     }),
   };

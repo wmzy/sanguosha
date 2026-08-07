@@ -238,7 +238,7 @@ const lianhuanTransformAction: SkillActionDef = {
 };
 
 // 铁索连环 use action:多目标(min1/max2,含自己)
-const chainUseAction: SkillActionDef = {
+const _chainUseAction: SkillActionDef = {
   skillId: '铁索连环',
   ownerId: 0,
   actionType: 'use',

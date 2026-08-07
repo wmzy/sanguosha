@@ -212,17 +212,17 @@ describe('applyServerMessage', () => {
       timestamp: 0,
       view: { type: '加标记', player: 0, mark },
     } as ServerMessage;
-    const out1 = applyServerMessage(start.view!, start.lastSeq, evt);
+    const out1 = applyServerMessage(start.view, start.lastSeq, evt);
     expect(out1.view!.players[0].marks.length).toBe(1);
     expect(out1.lastSeq).toBe(1);
     // 同 seq 的 event 重放:必须丢弃
-    const out2 = applyServerMessage(out1.view!, out1.lastSeq, evt);
+    const out2 = applyServerMessage(out1.view, out1.lastSeq, evt);
     expect(out2.view).toBe(out1.view); // 未应用,引用不变
     expect(out2.lastSeq).toBe(1); // seq 不回退
     expect(out2.view!.players[0].marks.length).toBe(1); // 不重复
     // 更高 seq 的新 event 正常应用
     const evt2 = { ...evt, seq: 2 } as ServerMessage;
-    const out3 = applyServerMessage(out1.view!, out1.lastSeq, evt2);
+    const out3 = applyServerMessage(out1.view, out1.lastSeq, evt2);
     expect(out3.view!.players[0].marks.length).toBe(2);
   });
 });

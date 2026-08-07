@@ -114,7 +114,7 @@ function resolveParams(
     typeof params.cardId === 'string'
       ? params.cardId
       : Array.isArray(params.cardIds) && typeof params.cardIds[0] === 'string'
-        ? (params.cardIds[0] as string)
+        ? params.cardIds[0]
         : undefined;
   if (!cardId) return null;
   return { cardId, target };
