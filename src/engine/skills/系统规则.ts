@@ -227,13 +227,18 @@ export function onInit(_skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-/** 求桃救援牌判定:桃/酒(默认技能),急救红牌(华佗)。基于被问玩家技能动态判断。
- *  engine 侧 cardFilter;前端通过 respondFor='桃/求桃' 的 respond action 重建同等语义。 */
-function canRescueWith(state: GameState, playerIdx: number): (card: Card) => boolean {
+/** 求桃救援牌判定:桃/酒是基本牌,所有角色默认可用(经 CardEffect 注册表路由,
+ *  不在 player.skills 中);急救(华佗)可将红色牌当桃用,需拥有该武将技能。
+ *  engine 侧 cardFilter;前端通过 respondFor='桃/求桃' 的 respond action 重建同等语义。
+ *
+ *  ⚠ 历史 bug:旧实现检查 skills.includes('桃')/('酒'),但 DEFAULT_SKILLS 不含这两个
+ *    卡名(它们由 '使用牌'/'打出牌' 统一路由),导致对所有非华佗玩家恒返回 false →
+ *    请求回应 preResolve 误判 silent/skip → 持桃者看不到求桃窗口。 */
+export function canRescueWith(state: GameState, playerIdx: number): (card: Card) => boolean {
   const skills = state.players[playerIdx]?.skills ?? [];
   return (card) => {
-    if (card.name === '桃' && skills.includes('桃')) return true;
-    if (card.name === '酒' && skills.includes('酒')) return true;
+    if (card.name === '桃') return true;
+    if (card.name === '酒') return true; // 濒死时酒当桃用(酒.respond)
     if (card.color === '红' && skills.includes('急救')) return true;
     return false;
   };

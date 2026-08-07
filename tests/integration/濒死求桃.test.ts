@@ -22,6 +22,8 @@ import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
+import { canRescueWith } from '../../src/engine/skills/系统规则';
+import { cardResponsePreResolveForTarget } from '../../src/engine/card-response-availability';
 
 /** 返回第一个 pending slot 的 atom,无 pending 时返回 undefined */
 function firstPendingAtom(state: GameState): unknown | undefined {
@@ -735,5 +737,75 @@ describe('濒死求桃链:端到端(harness)', () => {
 
     // 关键断言:标志仍为 undefined(没被链1 的 true 残留)
     expect(harness.state.localVars['求桃/已救']).toBeUndefined();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// 求桃响应可用性预检回归:真实 DEFAULT_SKILLS 下持桃者必须走 normal(可操作),
+// 不被 silent/skip 跳过。
+//
+// 背景:canRescueWith 旧实现检查 skills.includes('桃')/'酒',但真实选将产出的
+// player.skills 不含这两个卡名(桃/酒经 CardEffect 注册表由 '使用牌'/'打出牌'
+// 统一路由),导致对所有非华佗玩家恒返回 false → 请求回应 preResolve 误判
+// silent/skip → 持桃者(如二人场主公)看不到求桃窗口。现有用例 fixture 手动塞了
+// '桃'/'酒' 到 skills 数组,掩盖了真实路径下的此 bug。
+// ─────────────────────────────────────────────────────────────
+describe('求桃响应可用性预检(真实 DEFAULT_SKILLS)', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = createGameState({
+      players: [
+        {
+          index: 0,
+          name: 'P0',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          // 真实选将流程产出的 skills —— 不含 '桃'/'酒'(经 CardEffect 注册表路由)
+          skills: ['回合管理', '装备通用', '使用牌', '打出牌', '铁索连环'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+  });
+
+  it('持桃玩家:filter 命中桃 + preResolve 返回 null(normal,可操作求桃窗口)', () => {
+    const peachId = giveCard(state, 0, '桃', 'peach');
+    const filter = canRescueWith(state, 0);
+    expect(filter(state.cardMap[peachId])).toBe(true);
+
+    const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter);
+    expect(pre).toBeNull(); // normal:非 silent({delayMs})/skip
+  });
+
+  it('持酒玩家:濒死酒当桃,filter 同样命中', () => {
+    const wineId = giveCard(state, 0, '酒', 'wine', '♦', '基本牌');
+    const filter = canRescueWith(state, 0);
+    expect(filter(state.cardMap[wineId])).toBe(true);
+  });
+
+  it('仅持杂牌(非救援牌):preResolve 走 silent(信息隐藏,有手牌但无匹配)', () => {
+    giveCard(state, 0, '杀', 'kill', '♠', '基本牌');
+    const filter = canRescueWith(state, 0);
+    const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter);
+    expect(pre).toEqual({ delayMs: 1500 });
+  });
+
+  it('无手牌:preResolve 走 skip(无牌可救,不建 slot)', () => {
+    const filter = canRescueWith(state, 0);
+    const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter);
+    expect(pre).toBe('skip');
   });
 });
