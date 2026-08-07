@@ -327,7 +327,10 @@ describe('开局', () => {
     expect(s.players[0].identity).toBe('主公');
     // 身份总数正确(4 人场:1 主 1 忠 1 反 1 内)
     const counts: Record<string, number> = {};
-    for (const p of s.players) counts[p.identity] = (counts[p.identity] ?? 0) + 1;
+    for (const p of s.players) {
+      const id = p.identity;
+      if (id) counts[id] = (counts[id] ?? 0) + 1;
+    }
     expect(counts).toEqual({ 主公: 1, 忠臣: 1, 反贼: 1, 内奸: 1 });
   });
 

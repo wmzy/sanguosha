@@ -217,7 +217,7 @@ describe('restore 重放交互式选将 actionLog', () => {
       skillId: '杀',
       actionType: 'use',
       ownerId: attacker,
-      params: { cardId: killCard, targets: [(attacker + 1) % 4] },
+      params: { cardId: killCard!, targets: [(attacker + 1) % 4] },
       baseSeq: state1.seq,
     });
     // 等询问(闪/请求回应)出现
