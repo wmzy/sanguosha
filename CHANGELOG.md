@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-07
 
+### Fixed — 服务端重启后游戏错误地回到选将阶段（持久化恢复 fire-and-forget 时序竞态）
+
+服务端重启后，已完成选将、进入出牌阶段的对局会被错误地恢复回选将界面。根因：`engine.restore` 重放 `actionLog` 时，`dispatch` 是 fire-and-forget——开局/回合推进的 `execute` 在后台异步跑到等待型 atom 才创建 pending slot。`restore` 的重放循环**无任何等待**，下一条选将 `respond` 在 slot 尚未创建时就被 dispatch，其 validate（`pendingSlots.get(ownerId)` 为空）被静默拒绝 → 选将 slot 永久挂起 → 重连客户端 `buildView` 看到 `选将询问` pending → 渲染选将界面。这与 `选将交互设计.md §8.3`、决策 0027 决策7、`index.ts:224` 注释一致要求的“restore 不应阻塞在选将”相悖。
+
+现有测试 `charselect-pending-isolation.test.ts` 等已用 `sleep` 轮询同步该时序，但生产路径 `restore` 从未处理，且无任何端到端测试覆盖 `session.restoreState`（`persistence.test.ts` 只测 pendingSlots Map 转换）——这是 bug 滑过的直接原因。
+
+#### Changed
+- **`engine.restore` 重放加 settle 同步**（根因）：respond 类 actionType（`选将`/`respond`/`skip`）重放前 `waitForResponsiveSlot` 轮询等目标 pending slot 出现；每条 action dispatch 后 `settleExecute` 等 `state.seq` 连续 3 次采样稳定（fire-and-forget execute 已推进到下一挂起点）。restore 是启动恢复路径（非热路径），轮询开销可接受。(`src/engine/index.ts`)
+
+#### 测试
+- **新建 `tests/integration/restore-replay.test.ts`**（2 例）：
+  1. engine 层——第一局完整选将得到 actionLog，第二局 `bootstrap + restore` 重放，断言选将完成、武将与第一局确定性一致、不卡在选将询问 pending。
+  2. session 层端到端（模拟服务端重启）——`session1` 开局选将 → `session2.restoreState(state, actionLog)` 重放，断言选将完成、武将一致、已推进到出牌阶段、pending 是出牌窗口而非选将询问。
+
+## [Unreleased] — 2026-08-07
+
 ### Fixed — 出牌阶段无懈可击/闪等纯回应牌不可选
 
 出牌阶段(自由出牌窗口)下,手牌中的【无懈可击】、【闪】等纯回应牌仍显示为可点击高亮,点击后会进入选中态(出现「取消选择」按钮),但选中后无「出牌」按钮——实际打不出去,误导玩家。根因:`GameView` 的 `canPlay` 判定为 `isMyTurn && canOperate && !playBlocked`,而 `playBlocked = !!useAction && !isActiveAction(useAction)`:闪/无懈可击的 `timing='生效前'`(纯回应牌),「使用牌」`onMount` 跳过不为它们注册 use action → `useAction=undefined` → `playBlocked=false` → `canPlay=true`,被误判为可主动打出。headless/AI 动作枚举 `enumeratePlayActions` 用 `if (!action) continue` 正确跳过这类牌,前端 UI 与之不一致。
