@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-07
 
+### Fixed — 界孙尚香【界结姻】发动交互改为无弹窗单步选牌+选目标
+
+原交互流程需连过 4 个弹窗：confirm（是否发动）→ choosePlayer（弹窗选目标）→ useCard（弹窗选牌）→ chooseOption（弹窗选弃置/置装备），且只能选手牌、无法把自己装备区的装备交给目标。改为 distribute/allocate 单步交互：点【界结姻】按钮直接进入分配面板，金色高亮选一张手牌或自己装备区的装备，再点击男性角色头像定为目标，最后点「确定」提交——全程无弹窗。
+
+#### Changed
+- **`界结姻` use action 改为 `distribute`/`allocate` prompt**（`src/engine/skills/界结姻.ts`）：删除 confirm use prompt 与 target/card/cost 三段顺序 `请求回应`（respond action 整体移除），改为单步 use action 直接接收 `allocation=[{target, cardIds:[id]}]`；`source:'handAndEquip'` 让手牌+装备区都纳入可选候选，`targetFilter` 圈定存活男性。前端 distribute 面板、装备区候选高亮、点目标定标均为既有能力，无需前端改动。
+- **代价改为按牌类型自动判定**（消除 chooseOption 弹窗）：所选为装备牌（无论来自手牌还是自己装备区）→ 置入目标对应栏位（可替换原装备；若来自自己装备区先卸下再移交）；所选为非装备手牌 → 弃置。
+- **新增装备区来源置入目标**（核心诉求）：选自己装备区的装备会先移除其技能、卸下回手牌，再置入目标的空/占用槽位（占用则旧装备入弃牌堆）。
+- **限一次消耗时机优化**：标记改在 use 提交后的 execute 开头设置——玩家在分配面板点「取消」未提交则不消耗限一次（原先中途放弃询问仍算已用）。
+
+#### 测试
+- **`tests/skill-tests/界结姻.test.ts` 重写**为单步 use 流程（13 例）：弃手牌双向效果、置装备（手牌/装备区两种来源）含替换原装备、体力相等裁定、限一次/非回合/空手空装备/无男性/女性目标/非法牌拒绝、allocation 格式兼容；删除已不存在的顺序 respond 用例与 pending candidates 契约用例。
+
+## [Unreleased] — 2026-08-07
+
 ### Changed — 纠正 spec：restore 必须走 bootstrap 重建运行时内存状态（推翻决策 0027 决策7）
 
 ADR 0027 决策7 原断言“restoreFromLog 不调 bootstrap，直接返回 persisted.state”——该设计被推翻。根因：JSON 反序列化得到的 state 快照**无法恢复程序内存状态**，下列运行时注册全部不可序列化（`sanitizeState` 持久化时已清除）：skill 实例（`ActionEntry` 闭包）、系统规则全局 hooks、每个玩家的选将/弃牌 respond actions、酒/延时锦囊/连环传导全局 hooks、pending slot 的 resolve/pause/定时器。游戏继续运行必须依赖这些（dispatch 查 action 表、applyAtom 跑 hooks、respond 定位 slot），直接接管快照会导致全部缺失。正确流程是 `create + bootstrap + restore` 三段式（bootstrap 重建内存注册、restore 重放 actionLog），确定性由 `config.seed = state.rngSeed` 保证。
