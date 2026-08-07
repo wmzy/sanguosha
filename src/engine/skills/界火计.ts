@@ -136,7 +136,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'use',
     (state: GameState, params: Record<string, Json>) => {
-      // 校验同标版火攻.use:火攻 + 单目标 + 非自己 + 目标有手牌
+      // 校验同标版火攻.use:火攻 + 单目标 + 目标有手牌(可对自己使用)
       if (state.currentPlayerIndex !== ownerId) return '不是你的回合';
       if (state.phase !== '出牌') return '不是出牌阶段';
       if (hasBlockingPending(state)) return '当前有等待响应';
@@ -149,7 +149,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const targets = params.targets as number[] | undefined;
       if (!Array.isArray(targets) || targets.length !== 1) return '火攻只能指定一名目标';
       const target = targets[0];
-      if (target === ownerId) return '不能对自己使用火攻';
       const targetPlayer = state.players[target];
       if (!targetPlayer?.alive) return '目标不合法';
       if (targetPlayer.hand.length === 0) return '目标必须有手牌';
@@ -303,10 +302,7 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
         min: 1,
         max: 1,
         // 目标须有手牌(前端 UI 提示用,后端 validate 独立校验)
-        filter: (view, t) => {
-          if (t === view.currentPlayerIndex) return false;
-          return (view.players[t]?.handCount ?? 0) > 0;
-        },
+        filter: (view, t) => (view.players[t]?.handCount ?? 0) > 0,
       },
     },
     transform: (card: Card) => ({ name: '火攻', sourceCardId: card.id, fromSkill: skill.id }),

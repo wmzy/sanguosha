@@ -3,7 +3,7 @@
 //
 // 验证:
 //   1. 正面:红♥牌 transformThenUse 火攻 → 创建影子火攻 → 完整火攻流程 → 火焰伤害
-//   2. rollback:transform + 火攻.use 失败(目标自己)→ 原卡还原,无影子
+//   2. rollback:transform + 火攻.use 失败(目标无手牌)→ 原卡还原,无影子
 //   3. 负面:黑牌 transform 被拒(不是红色)
 //   4. 负面:非自己回合 transform 被拒
 //   5. availableActions:火计 transform action 声明,prompt 卡过滤是红牌(♥/♦ 通过)
@@ -127,23 +127,24 @@ describe('火计', () => {
     expect(harness.state.zones.discardPile).toContain('c1');
   });
 
-  // ─── 2. rollback:transform + 火攻.use 失败(目标自己)→ 原卡还原,无影子 ────────────
-  it('transform rollback:火攻.use 失败(目标自己)→ 原卡还原,无影子', async () => {
+  // ─── 2. rollback:transform + 火攻.use 失败(目标无手牌)→ 原卡还原,无影子 ───────────
+  it('transform rollback:火攻.use 失败(目标无手牌)→ 原卡还原,无影子', async () => {
     const red = makeCard('c1', '桃', '♥', 'A');
     const state = buildState({
       p1Hand: ['c1'],
+      p2Hand: [],
       extraCards: { c1: red },
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    // 火攻.use 目标自己 → validate 拒绝 → rollback 火计 transform
+    // 火攻.use 目标 P2(无手牌)→ validate 拒绝 → rollback 火计 transform
     await P1.expectRejected({
       skillId: '火攻',
       actionType: 'use',
       params: {
         cardId: 'c1#火计',
-        targets: [0],
+        targets: [1],
         preceding: [{ skillId: '火计', actionType: 'transform', params: { cardId: 'c1' } }],
       },
     });

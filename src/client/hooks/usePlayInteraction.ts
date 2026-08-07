@@ -533,7 +533,7 @@ export function usePlayInteraction(
         return tf.filter ? tf.filter(view, i) : true;
       }
       // 单目标路径：自己仅当卡牌允许时可选（selfTarget=桃/酒自动目标；
-      // allowSelf=铁索连环含自己）。避免决斗/火攻等无 filter 卡误选自己。
+      // allowSelf=铁索连环/火攻含自己）。避免决斗等无 filter 卡误选自己。
       if (i === perspectiveIdx) {
         const allowSelf =
           selectedUseAction?.prompt.type === 'useCardAndTarget' &&

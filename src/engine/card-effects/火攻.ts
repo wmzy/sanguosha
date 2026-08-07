@@ -77,7 +77,7 @@ async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
   }
 }
 
-/** 火攻牌特有校验：目标有手牌、非自己 */
+/** 火攻牌特有校验：目标有手牌（可对自己使用火攻） */
 function canUseFireAttack(
   state: import('../types').GameState,
   ownerId: number,
@@ -86,7 +86,6 @@ function canUseFireAttack(
   const targets = params.targets as number[] | undefined;
   if (!Array.isArray(targets) || targets.length !== 1) return '火攻只能指定一名目标';
   const target = targets[0];
-  if (target === ownerId) return '不能对自己使用火攻';
   const targetPlayer = state.players[target];
   if (!targetPlayer?.alive) return '目标不合法';
   if (targetPlayer.hand.length === 0) return '目标必须有手牌';
@@ -95,7 +94,7 @@ function canUseFireAttack(
 
 const fireAttackEffect: CardEffect = {
   timing: '出牌阶段',
-  target: { kind: 'other', min: 1, max: 1 },
+  target: { kind: 'any', min: 1, max: 1 },
   canUse: canUseFireAttack,
   resolve: resolveFireAttack,
   // respond：按 requestType 分流 '火攻/展示'（目标展示手牌）和 '火攻/弃牌'（使用者弃同花色）。
@@ -138,7 +137,7 @@ const fireAttackEffect: CardEffect = {
     type: 'useCardAndTarget',
     title: '火攻',
     cardFilter: { filter: (c: Card) => c.name === '火攻', min: 1, max: 1 },
-    targetFilter: { min: 1, max: 1 },
+    targetFilter: { min: 1, max: 1, allowSelf: true },
   },
   // respond 入口 UI：展示/弃牌窗口可选任意手牌（后端 validate 严格校验花色）
   respondPrompt: {

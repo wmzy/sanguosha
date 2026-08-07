@@ -73,7 +73,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): void {
-  // 前端:火计是转化技,defineAction 声明红牌 + 目标(有手牌的其他角色)。
+  // 前端:火计是转化技,defineAction 声明红牌 + 目标(有手牌的角色,可对自己使用火攻)。
   // 前端 UI 流程:选红牌 → 选目标 → 提交 preceding=[火计.transform] + 主 action=火攻.use。
   api.defineAction('transform', {
     label: '火计',
@@ -86,10 +86,8 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
         min: 1,
         max: 1,
         // 目标须有手牌(前端 UI 提示用,后端 validate 独立校验)
-        filter: (view: GameView, t: number) => {
-          if (t === view.currentPlayerIndex) return false;
-          return (view.players[t]?.handCount ?? 0) > 0;
-        },
+        filter: (view: GameView, t: number) =>
+          (view.players[t]?.handCount ?? 0) > 0,
       },
     },
     transform: (card: Card) => ({ name: '火攻', sourceCardId: card.id, fromSkill: skill.id }),

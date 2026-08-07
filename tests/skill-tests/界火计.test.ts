@@ -8,7 +8,7 @@
 //   2. 正面:装备区红牌 transformThenUse → 卸下装备 → 创建影子火攻
 //   3. 正面:目标只有1张手牌 → 随机展示即为该牌(确定性)
 //   4. 正面:无懈可击抵消 → 无随机展示/无伤害
-//   5. rollback:transform + 火攻.use 失败(目标自己)→ 原卡还原,无影子
+//   5. rollback:transform + 火攻.use 失败(目标无手牌)→ 原卡还原,无影子
 //   6. 负面:黑牌 transform 被拒(不是红色)
 //   7. 负面:非自己回合 transform 被拒
 //   8. availableActions:界火计 transform 声明,prompt 卡过滤是红牌(手牌+装备)
@@ -244,16 +244,17 @@ describe('界火计', () => {
   });
 
   // ─── 5. rollback:transform + 火攻.use 失败 → 原卡还原 ────────────
-  it('transform rollback:火攻.use 失败(目标自己)→ 原卡还原,无影子', async () => {
+  it('transform rollback:火攻.use 失败(目标无手牌)→ 原卡还原,无影子', async () => {
     const red = makeCard('c1', '桃', '♥', 'A');
     const state = buildState({
       p1Hand: ['c1'],
+      p2Hand: [],
       extraCards: { c1: red },
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    // 火攻.use 目标自己 → validate 拒绝 → rollback 界火计 transform
+    // 火攻.use 目标 P2(无手牌)→ validate 拒绝 → rollback 界火计 transform
     // preceding 须在消息顶层(ClientMessage.preceding),transform 先执行建影子,
     // 主 use validate 失败时引擎逆序 rollback(删影子、原卡还原)。
     await P1.expectRejected({
@@ -261,7 +262,7 @@ describe('界火计', () => {
       actionType: 'use',
       params: {
         cardId: 'c1#界火计',
-        targets: [0],
+        targets: [1],
       },
       preceding: [{ skillId: '界火计', actionType: 'transform', params: { cardId: 'c1' } }],
     });

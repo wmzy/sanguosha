@@ -1,5 +1,5 @@
 // 火攻(普通锦囊)技能测试:
-//   use:出牌阶段对一名有手牌的其他角色使用。
+//   use:出牌阶段对一名有手牌的角色使用(可对自己使用火攻)。
 //   流程:目标展示一张手牌 → 使用者弃一张同花色手牌 → 造成1点火焰伤害。
 //
 // 验证:
@@ -8,7 +8,7 @@
 //   3. 正面:使用者无同花色手牌 → 不询问弃牌 → 无伤害
 //   4. 正面:弃牌窗口试图弃不同花色(♦)→ 被拒
 //   5. 负面:目标无手牌 → 拒绝
-//   6. 负面:对自己使用 → 拒绝
+//   6. 正面:对自己使用火攻 → 自扣1血(火焰伤害)
 //   (无懈可击抵消为 runSettlementPhase 通用机制,非火攻特有,不在此单测)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
@@ -235,21 +235,39 @@ describe('火攻', () => {
     });
   });
 
-  // ─── 6. 负面:对自己使用 → 拒绝 ────────────────────────────────────
-  it('对自己使用火攻 → 被拒', async () => {
+  // ─── 6. 正面:对自己使用火攻 → 自扣1血(火焰伤害) ───────────────────
+  it('P1 对自己使用火攻 → 自己展示♥ → 自己弃♥ → 自扣1血', async () => {
     const hg = makeCard('hg', '火攻', '♥', '2');
-    const other = makeCard('o1', '杀', '♥', '5');
+    const other = makeCard('o1', '杀', '♥', '5'); // P1 弃的♥
+    const reveal = makeCard('r1', '桃', '♥', '3'); // P1 展示的♥
     const state = buildState({
-      p1Hand: ['hg', 'o1'],
-      p2Hand: ['r1'],
-      extraCards: { hg, o1: other, r1: makeCard('r1', '杀', '♥', '3') },
+      p1Hand: ['hg', 'o1', 'r1'],
+      p2Hand: ['x1'],
+      extraCards: { hg, o1: other, r1: reveal, x1: makeCard('x1', '闪', '♠', '4') },
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
-    await P1.expectRejected({
-      skillId: '火攻',
-      actionType: 'use',
-      params: { cardId: 'hg', targets: [0] },
-    });
+
+    const p1HealthBefore = harness.state.players[0].health;
+
+    // 火攻目标自己(P1)
+    await P1.useCardAndTarget('火攻', 'hg', [0]);
+    // 无懈窗口 → pass
+    P1.expectPending('请求回应');
+    await P1.pass();
+
+    // P1 自己被询问展示一张手牌(火攻/展示, target=P1)
+    P1.expectPending('请求回应');
+    await P1.respond('火攻', { cardId: 'r1' });
+
+    // P1 自己被询问弃一张同花色♥手牌(火攻/弃牌, source=P1)
+    P1.expectPending('请求回应');
+    await P1.respond('火攻', { cardId: 'o1' });
+
+    // P1 自扣 1 血(火焰伤害)
+    expect(harness.state.players[0].health).toBe(p1HealthBefore - 1);
+    // 火攻牌 + 弃牌进弃牌堆;展示牌仍在 P1 手牌
+    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['hg', 'o1']));
+    expect(harness.state.players[0].hand).toContain('r1');
   });
 });
