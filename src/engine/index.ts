@@ -278,16 +278,21 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
  *
  * actionLog[0] 是 开局 start(bootstrap 重新生成),从 [1] 开始重放。
  *
- * 重放同步(settle):dispatch 是 fire-and-forget —— 开局/回合推进的 execute 在后台
- * 异步跑到等待型 atom 才创建 pending slot。若重放下一条 respond 时 slot 尚未创建,
- * 其 validate 因 pendingSlots 为空而拒绝 → 选将 slot 永久挂起 → 重启后回到选将。
- * 因此 respond 类 action 重放前等目标 slot 出现(waitForResponsiveSlot),
- * dispatch 后等 execute 推进到下一挂起点(settleExecute)。
+ * 重放同步(settle) + 超时推进(fireTimeout):
+ * dispatch 是 fire-and-forget —— execute 在后台异步跑到等待型 atom 才创建 pending slot。
+ * 1. respond 类 action(选将/respond/skip/confirm)重放前等目标 slot 出现(waitForResponsiveSlot)。
+ * 2. dispatch 后等 execute 创建 pending 或跑完(waitForPendingOrDone)。
+ * 3. isBlocking pending(询问闪/请求回应等)若不被剩余 actionLog respond,说明原对局中
+ *    是被超时处理的(fireTimeout 的扣血/弃牌副作用不在 actionLog),主动 fireTimeout
+ *    它(用 slot._fireTimeoutNow,只触发该 slot,不误伤出牌窗口等非阻塞 pending)。
+ *    fireTimeout 后等 execute resume 推进完成(waitForSeqStable)。
+ * 4. 重放完毕后 fireTimeout 残留 isBlocking pending。
+ * 不做这一步则 isBlocking pending 永不 resolve → 挂起 execute 堆积 → OOM。
  */
 const settleSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /** respond 类 actionType:重放时需要目标 pending slot 存在才能被 dispatch 接受。 */
-const RESPONSIVE_ACTION_TYPES = new Set(['选将', 'respond', 'skip']);
+const RESPONSIVE_ACTION_TYPES = new Set(['选将', 'respond', 'skip', 'confirm']);
 
 /** 等待目标玩家的 pending slot 出现(fire-and-forget execute 推进到挂起点)。 */
 async function waitForResponsiveSlot(
@@ -308,14 +313,24 @@ async function waitForResponsiveSlot(
   for (let i = 0; i < timeoutMs / 5 && !hasSlot(); i++) await settleSleep(5);
 }
 
-/** 让 fire-and-forget execute 推进到下一个挂起点(等 seq 不再增长)。
- *  respond resolve slot 后,父 execute(开局/出牌)从 await 恢复继续跑;seq 稳定说明
- *  execute 已到达下一个真正的 await(新 slot 的 promise)或彻底完成。
- *  restore 是启动恢复路径(非热路径),轮询等待开销可接受。 */
-async function settleExecute(state: GameState, timeoutMs = 2000): Promise<void> {
+/** 等 fire-and-forget execute 创建 pending(挂起点)或跑完(atomStack 空)。
+ *  用 setTimeout(0) yield 到微任务队列,让 execute 推进。 */
+async function waitForPendingOrDone(state: GameState, timeoutMs = 3000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 0));
+    if (state.pendingSlots.size > 0) return;
+    if (state.atomStack.length === 0) return;
+  }
+}
+
+/** 等 seq 稳定(连续 3 次采样不变)。fireTimeout resolve slot 后,父 execute 从 await
+ *  恢复继续跑;seq 稳定说明 execute 已到达下一个 await 或彻底完成。 */
+async function waitForSeqStable(state: GameState, timeoutMs = 3000): Promise<void> {
   let lastSeq = state.seq;
   let stable = 0;
-  for (let i = 0; i < timeoutMs / 5; i++) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
     await settleSleep(5);
     if (state.seq === lastSeq) {
       if (++stable >= 3) return;
@@ -326,20 +341,52 @@ async function settleExecute(state: GameState, timeoutMs = 2000): Promise<void> 
   }
 }
 
+/** fireTimeout 不被剩余 actionLog respond 的 isBlocking pending。
+ *  这些 pending 在原对局中是被超时处理的(fireTimeout 副作用不在 actionLog),
+ *  重放时必须主动 fireTimeout 推进 execute,否则 pending 永不 resolve → 堆积 OOM。
+ *  用 slot._fireTimeoutNow 只触发该 slot,不误伤出牌窗口等非阻塞 pending。 */
+async function drainUnresolvedBlockingSlots(
+  state: GameState,
+  remaining: ActionLogEntry[],
+): Promise<void> {
+  for (const slot of [...state.pendingSlots.values()].filter((s) => s.isBlocking)) {
+    const sp = (slot.atom as { player?: number; target?: number }).player ??
+      (slot.atom as { target?: number }).target;
+    if (typeof sp !== 'number') continue;
+    const handledLater = remaining.some(
+      (e) => RESPONSIVE_ACTION_TYPES.has(e.message.actionType) && e.message.ownerId === sp,
+    );
+    if (!handledLater) {
+      await slot._fireTimeoutNow?.();
+      await waitForSeqStable(state);
+    }
+  }
+}
+
 export async function restore(
   state: GameState,
   gameConfig: GameConfig,
   actionLog: ActionLogEntry[],
 ): Promise<GameState> {
-  for (const entry of actionLog.slice(1)) {
-    const msg = entry.message;
-    // respond 类(选将/弃牌/请求回应/skip):等 fire-and-forget execute 创建目标 slot
+  const entries = actionLog.slice(1);
+  for (let i = 0; i < entries.length; i++) {
+    const msg = entries[i].message;
+    const remaining = entries.slice(i + 1);
+    // respond 类(选将/弃牌/请求回应/skip/confirm):等 fire-and-forget execute 创建目标 slot
     if (RESPONSIVE_ACTION_TYPES.has(msg.actionType)) {
       await waitForResponsiveSlot(state, msg.ownerId);
     }
     await dispatch(state, msg);
-    // 让 execute 推进到下一个挂起点,确保下一条重放的 action 状态已就绪
-    await settleExecute(state);
+    await waitForPendingOrDone(state);
+    // isBlocking pending 不被剩余 actionLog respond → fireTimeout 推进(模拟原对局超时)
+    await drainUnresolvedBlockingSlots(state, remaining);
+  }
+  // 重放完毕:fireTimeout 残留 isBlocking pending(原对局中已被超时处理)
+  for (let guard = 0; guard < 50; guard++) {
+    const blocking = [...state.pendingSlots.values()].filter((s) => s.isBlocking);
+    if (blocking.length === 0) break;
+    for (const slot of blocking) await slot._fireTimeoutNow?.();
+    await waitForSeqStable(state);
   }
   return state;
 }

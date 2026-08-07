@@ -162,7 +162,13 @@ return { gameOver, winner };
 2. `session.restoreState(state, actionLog)` 编排恢复：`create(config)` 造骨架 → `bootstrap(fresh, config)` 重建全部运行时内存注册（含开局 dispatch）→ `restore(fresh, config, actionLog)` 重放 actionLog 把状态推进到正确位置。
 3. 确定性：`config.seed = state.rngSeed` 保证 bootstrap 重跑开局与原局一致；重放 actionLog 覆盖开局产生的状态，最终 state 与崩溃前一致。
 
-**重放同步（settle）**：dispatch 是 fire-and-forget，开局 execute 在后台异步推进，遇到等待型 atom（如选将询问）才创建 pending slot。`restore` 重放 respond 类 action 前 `waitForResponsiveSlot` 等目标 slot 出现，dispatch 后 `settleExecute` 等 seq 稳定，避免 respond 在 slot 未创建时被静默拒绝。
+**重放同步 + 超时推进（v3）**：dispatch 是 fire-and-forget，开局 execute 在后台异步推进，遇到等待型 atom（如选将询问）才创建 pending slot。`restore` 重放：
+1. respond 类 action（选将/respond/skip/confirm）前 `waitForResponsiveSlot` 等目标 slot 出现；
+2. dispatch 后 `waitForPendingOrDone` 等 execute 创建 pending 或跑完；
+3. **isBlocking pending（询问闪/请求回应等）若不被剩余 actionLog respond，主动 `slot._fireTimeoutNow` fireTimeout 推进**——因为 fireTimeout（超时不出闪→扣血/弃牌/阶段结束）的副作用不在 actionLog（`_fireTimeoutNow` 调 `onTimeout` 内部的 applyAtom，不经过 dispatch/logAction），不主动 fireTimeout 则 pending 永不 resolve → 挂起 execute 堆积 → OOM。用 `slot._fireTimeoutNow`（只触发该 slot，不误伤出牌窗口等非阻塞 pending），之后 `waitForSeqStable` 等 execute resume 完成；
+4. 重放完毕后 fireTimeout 残留 isBlocking pending。
+
+> **OOM 根因（2026-08-07）**：旧实现的 `settleExecute`（等 seq 稳定）在 fire-and-forget execute 创建询问闪 pending 后过早返回（seq 暂时稳定），不 fireTimeout 该 pending → 每条出杀 use 创建一个永不 resolve 的询问闪 slot + 挂起的 execute promise → 中盘对局（大量出牌+超时）堆积 → 4GB 堆耗尽 → 服务启动崩溃。
 
 ## 后果
 

@@ -43,6 +43,18 @@ ADR 0027 决策7 原断言“restoreFromLog 不调 bootstrap，直接返回 pers
 
 ## [Unreleased] — 2026-08-07
 
+### Fixed — restore 重放中盘对局 OOM 崩溃（fireTimeout 副作用不在 actionLog）
+
+服务端重启恢复中盘对局时 OOM 崩溃（vite 日志：恢复 1 个持久化房间时 4GB 堆耗尽）。根因：`fireTimeout`（超时不出闪→扣血、弃牌、阶段结束等）不记录在 actionLog——`_fireTimeoutNow` 调 `onTimeout` 内部的 applyAtom 推进 state，但不经过 dispatch/logAction。`engine.restore` 重放出杀 use 后，fire-and-forget execute 创建询问闪 pending（isBlocking），旧实现的 `settleExecute`（等 seq 稳定）在该 pending 创建后过早返回（seq 暂时稳定），不 fireTimeout 它 → 每条出杀创建一个永不 resolve 的询问闪 slot + 挂起的 execute promise → 中盘对局（大量出牌+超时）堆积 → OOM。
+
+#### Changed
+- **`engine.restore` 重放加 fireTimeout 推进**（根因）：dispatch 后 `waitForPendingOrDone` 等 execute 创建 pending 或跑完。isBlocking pending（询问闪/请求回应等）若不被剩余 actionLog respond（说明原对局中被超时处理），主动 `slot._fireTimeoutNow` fireTimeout 推进（只触发该 slot，不误伤出牌窗口等非阻塞 pending），之后 `waitForSeqStable` 等 execute resume 完成。重放完毕后 fireTimeout 残留 isBlocking pending。`settleExecute` 拆为 `waitForPendingOrDone` + `waitForSeqStable`，`RESPONSIVE_ACTION_TYPES` 加 `confirm`。(`src/engine/index.ts`)
+
+#### 测试
+- **`tests/integration/restore-replay.test.ts`** 新增第 3 例：第一局选将+出杀+fireTimeout（模拟超时），第二局 restore 重放，断言 seq/health 完全一致 + 无残留 isBlocking pending（防 OOM）。
+
+## [Unreleased] — 2026-08-07
+
 ### Fixed — 出牌阶段无懈可击/闪等纯回应牌不可选
 
 出牌阶段(自由出牌窗口)下,手牌中的【无懈可击】、【闪】等纯回应牌仍显示为可点击高亮,点击后会进入选中态(出现「取消选择」按钮),但选中后无「出牌」按钮——实际打不出去,误导玩家。根因:`GameView` 的 `canPlay` 判定为 `isMyTurn && canOperate && !playBlocked`,而 `playBlocked = !!useAction && !isActiveAction(useAction)`:闪/无懈可击的 `timing='生效前'`(纯回应牌),「使用牌」`onMount` 跳过不为它们注册 use action → `useAction=undefined` → `playBlocked=false` → `canPlay=true`,被误判为可主动打出。headless/AI 动作枚举 `enumeratePlayActions` 用 `if (!action) continue` 正确跳过这类牌,前端 UI 与之不一致。

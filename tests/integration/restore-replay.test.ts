@@ -7,7 +7,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import { bootstrap, dispatch, restore, type GameConfig } from '../../src/engine/index';
+import { bootstrap, dispatch, restore, fireTimeout, type GameConfig } from '../../src/engine/index';
 import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
 import { allCharacters } from '../../src/engine/cards/characters';
@@ -193,6 +193,70 @@ describe('restore 重放交互式选将 actionLog', () => {
       (s) => (s.atom as { type?: string }).type === '选将询问',
     );
     expect(hasSelectPending).toBe(false);
+  }, 30000);
+
+  it('restore 重放出杀+超时(fireTimeout)后状态一致,无 isBlocking pending 堆积', async () => {
+    // 根因:fireTimeout(超时不出闪/不发动被动技 → 扣血/弃牌)不记录在 actionLog。
+    // 旧实现重放出杀 use 后创建询问闪 pending,settleExecute 过早返回,pending 不 resolve → 堆积 OOM。
+    // v3 修复:fireTimeout 不被剩余 actionLog respond 的 isBlocking pending,等 execute resume 完成。
+    const config = makeConfig(4);
+    const state1 = makeState(4);
+    await playThroughCharSelect(state1, config);
+    // 等出牌窗口
+    for (let i = 0; i < 300 && state1.pendingSlots.size === 0; i++) await sleep(10);
+    const playSlot = [...state1.pendingSlots.values()].find(
+      (s) => (s.atom as { type?: string }).type === '出牌窗口',
+    );
+    expect(playSlot).toBeTruthy();
+    const attacker = (playSlot!.atom as { player: number }).player;
+    const killCard = state1.players[attacker].hand.find(
+      (id) => state1.cardMap[id]?.name === '杀',
+    );
+    expect(killCard).toBeTruthy();
+    void dispatch(state1, {
+      skillId: '杀',
+      actionType: 'use',
+      ownerId: attacker,
+      params: { cardId: killCard, targets: [(attacker + 1) % 4] },
+      baseSeq: state1.seq,
+    });
+    // 等询问(闪/请求回应)出现
+    for (
+      let i = 0;
+      i < 300 &&
+      [...state1.pendingSlots.values()].every(
+        (s) => (s.atom as { type?: string }).type === '出牌窗口',
+      );
+      i++
+    )
+      await sleep(10);
+    // fireTimeout 所有 isBlocking pending(超时不出闪/不发动被动技)
+    await fireTimeout(state1);
+    // 等出杀 execute resume 完成回到出牌窗口
+    for (let i = 0; i < 300; i++) {
+      await sleep(10);
+      if (
+        [...state1.pendingSlots.values()].some(
+          (s) => (s.atom as { type?: string }).type === '出牌窗口',
+        )
+      )
+        break;
+    }
+    const origSeq = state1.seq;
+    const origHealth = state1.players.map((p) => p.health);
+    const actionLog = state1.actionLog.map((e) => ({ ...e }));
+
+    // 第二局:create + bootstrap + restore 重放
+    const state2 = makeState(4);
+    await bootstrap(state2, config);
+    await restore(state2, config, actionLog);
+
+    // 状态一致(核心:fireTimeout 副作用不在 actionLog,但 v3 主动 fireTimeout 推进)
+    expect(state2.seq).toBe(origSeq);
+    expect(state2.players.map((p) => p.health)).toEqual(origHealth);
+    // 无残留 isBlocking pending(防 OOM)
+    const blockingSlots = [...state2.pendingSlots.values()].filter((s) => s.isBlocking);
+    expect(blockingSlots.length).toBe(0);
   }, 30000);
 });
 
