@@ -285,3 +285,142 @@ describe('五谷丰登选牌展示增强(被选牌禁用渲染)', () => {
     expect(pcBtn.hasAttribute('disabled')).toBe(false);
   });
 });
+
+// ── 顺手牵羊/过河拆桥盲选手牌:牌背卡片渲染 ──
+// 原先用纯数字序号按钮(handIndex),现改为牌背卡片(CardBack)+ 序号角标,
+// 视觉对应目标手牌牌背。此处验证渲染契约:每个手牌位置渲染一张牌背卡片(含 svg),
+// 点击仍以 { zone:'hand', handIndex } 提交。
+
+function makeViewWithPickTargetCard(handCount: number): GameView {
+  return {
+    viewer: 0,
+    currentPlayerIndex: 0,
+    phase: '出牌',
+    turn: { round: 1, phase: '出牌', vars: {} },
+    players: [
+      {
+        index: 0,
+        name: 'P1',
+        character: '刘备',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: ['顺手牵羊'],
+        handCount: 1,
+        hand: [makeCard('sq', '顺手牵羊', '♠', '3')],
+        marks: [],
+      },
+      {
+        index: 1,
+        name: 'P2',
+        character: '孙权',
+        health: 4,
+        maxHealth: 4,
+        alive: true,
+        equipment: {},
+        skills: [],
+        handCount,
+        marks: [],
+      },
+    ],
+    cardMap: {},
+    pending: {
+      type: 'awaits',
+      atom: {
+        type: '请求回应',
+        requestType: '顺手牵羊_选牌',
+        target: 1,
+        prompt: {
+          type: 'pickTargetCard',
+          title: '选择获得的目标牌',
+          target: 1,
+          equipment: [],
+          judge: [],
+          handCount,
+        },
+        timeout: 20,
+      },
+      prompt: {
+        type: 'pickTargetCard',
+        title: '选择获得的目标牌',
+        target: 1,
+        equipment: [],
+        judge: [],
+        handCount,
+      },
+      target: 0,
+      deadline: Date.now() + 20000,
+      totalMs: 20000,
+      startTime: Date.now(),
+    },
+    deadline: null,
+    deadlineTotalMs: 0,
+    log: [],
+    zones: { deckCount: 18, processing: [], discardPileCount: 0 },
+    settlementStack: [],
+  } as unknown as GameView;
+}
+
+describe('顺手牵羊/过河拆桥盲选手牌(牌背卡片渲染)', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('目标手牌渲染为牌背卡片(每张含 svg),而非纯数字序号', async () => {
+    const view = makeViewWithPickTargetCard(3);
+    render(<GameViewComponent view={view} onAction={() => {}} />);
+
+    // 盲选提示文案出现
+    await waitFor(() => {
+      expect(screen.getByText(/凭位置盲选/)).toBeDefined();
+    });
+
+    // 3 张牌背卡片:每张按钮内含一个 <svg>(CardBack 的 SVG fallback)。
+    // jsdom 无真实图片加载,<object> 内 fallback svg 会被渲染。
+    const handSection = screen.getByText(/凭位置盲选/).parentElement!;
+    const cardBtns = handSection.querySelectorAll('button');
+    expect(cardBtns.length).toBe(3);
+    cardBtns.forEach((btn) => {
+      expect(btn.querySelector('svg')).toBeTruthy();
+    });
+  });
+
+  it('点击牌背卡片以 { zone:"hand", handIndex } 格式提交 respond', async () => {
+    const view = makeViewWithPickTargetCard(2);
+    const onAction = vi.fn();
+    render(<GameViewComponent view={view} onAction={onAction} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/凭位置盲选/)).toBeDefined();
+    });
+    const handSection = screen.getByText(/凭位置盲选/).parentElement!;
+    const cardBtns = handSection.querySelectorAll('button');
+    // 点第 2 张(handIndex=1)
+    fireEvent.click(cardBtns[1]);
+
+    await waitFor(() => {
+      expect(onAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skillId: '顺手牵羊',
+          actionType: 'respond',
+          params: expect.objectContaining({ zone: 'hand', handIndex: 1 }),
+        }),
+      );
+    });
+  });
+
+  it('序号角标正确标注每张牌背的位置序号(1-based)', async () => {
+    const view = makeViewWithPickTargetCard(3);
+    render(<GameViewComponent view={view} onAction={() => {}} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/凭位置盲选/)).toBeDefined();
+    });
+    const handSection = screen.getByText(/凭位置盲选/).parentElement!;
+    const cardBtns = handSection.querySelectorAll('button');
+    expect(cardBtns[0].querySelector('span')?.textContent).toBe('1');
+    expect(cardBtns[1].querySelector('span')?.textContent).toBe('2');
+    expect(cardBtns[2].querySelector('span')?.textContent).toBe('3');
+  });
+});

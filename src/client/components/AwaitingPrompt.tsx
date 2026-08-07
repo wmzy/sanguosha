@@ -13,6 +13,7 @@ import type { AutoSkipPrefs } from '../utils/autoSkip';
 import { getPendingRequestType } from '../utils/pendingRespond';
 import { FACTION_BG } from './gameViewConstants';
 import { displaySkillName } from '../utils/skillDisplay';
+import { CardBack } from './CardBack';
 
 export interface AwaitingPromptProps {
   pending: PendingView;
@@ -150,19 +151,23 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                     {cardName}
                   </button>
                 ))}
-                {/* 手牌盲选 */}
+                {/* 手牌盲选:渲染目标手牌的牌背序列,使用者点击位置选择(序号作角标) */}
                 {p.handCount > 0 && (
                   <>
                     <span className={styles.promptDescFull}>手牌（凭位置盲选）:</span>
-                    {Array.from({ length: p.handCount }, (_, i) => (
-                      <button
-                        key={i}
-                        className={styles.promptBtnMin}
-                        onClick={() => onSend(skillId, 'respond', { zone: 'hand', handIndex: i })}
-                      >
-                        {i + 1}
-                      </button>
-                    ))}
+                    <div className={styles.pickHandRow}>
+                      {Array.from({ length: p.handCount }, (_, i) => (
+                        <button
+                          key={i}
+                          className={styles.pickHandCard}
+                          onClick={() => onSend(skillId, 'respond', { zone: 'hand', handIndex: i })}
+                          title={`第 ${i + 1} 张`}
+                        >
+                          <CardBack />
+                          <span className={styles.pickHandIndex}>{i + 1}</span>
+                        </button>
+                      ))}
+                    </div>
                   </>
                 )}
               </div>

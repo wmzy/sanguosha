@@ -42,3 +42,9 @@ export function getEquipCardImage(name: string): string | null {
   if (NAME_TO_SUB.get(name) !== 'equipment') return null;
   return resourceManager.get(`card/equipment/${name}`);
 }
+
+/** 牌背图 URL。优先 pack 系统注册的牌背(card/back);否则回退到 gen-card.ts 生成的
+ *  牌背(cards-ai/back.png,本地开发默认存在)。文件缺失时调用方应回退到内联 SVG 牌背。 */
+export function getCardBackImage(): string | null {
+  return resourceManager.get('card/back') ?? '/cards-ai/back.png';
+}

@@ -62,16 +62,55 @@ export const promptBtn = css`
   color: #e0e0e0;
   font-size: 13px;
 `;
-// prompt 按钮变体:手牌盲选用,保证序号按钮最小可点区域
-export const promptBtnMin = css`
-  border: 1px solid #888;
-  border-radius: 6px;
-  padding: 6px 14px;
-  min-width: 40px;
+// 选牌面板手牌盲选:牌背卡片行(替代原纯序号数字按钮,视觉对应目标手牌牌背)
+export const pickHandRow = css`
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+`;
+
+// 单张牌背卡片(可点击):固定卡片比例,内嵌 CardBack 填满;hover 上浮高亮
+export const pickHandCard = css`
+  position: relative;
+  width: 44px;
+  height: 62px;
+  padding: 0;
+  border: 1.5px solid #a8842a;
+  border-radius: 5px;
+  overflow: hidden;
   cursor: pointer;
-  background: rgba(0, 0, 0, 0.3);
-  color: #e0e0e0;
-  font-size: 13px;
+  background: #f5e6c8;
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s,
+    border-color 0.12s;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    border-color: #ffd700;
+    z-index: 1;
+  }
+`;
+
+// 牌背角标序号(左上角半透明底,金字)
+export const pickHandIndex = css`
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #ffd700;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 14px;
+  text-align: center;
+  pointer-events: none;
 `;
 export const promptBtnPrimary = css`
   border: 1px solid #27ae60;
