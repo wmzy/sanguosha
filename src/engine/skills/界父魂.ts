@@ -65,7 +65,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 // ─── A. 父魂 转化 action:2 张牌(手牌或装备区)→ 杀 ─────────────
 
 /** 父魂 影子卡 id:${id1}#${id2}#父魂 */
-function 父魂ShadowId(id1: string, id2: string): string {
+function shadowIdOf(id1: string, id2: string): string {
   return `${id1}#${id2}#父魂`;
 }
 
@@ -77,7 +77,7 @@ function cardInOwnZone(self: GameState['players'][number], cardId: string): bool
 
 // ─── B'. granted 武圣 影子卡 id:${原id}#父魂武圣 ─────────────
 
-function 武圣ShadowId(cardId: string): string {
+function grantedShadowIdOf(cardId: string): string {
   return `${cardId}#父魂武圣`;
 }
 
@@ -131,7 +131,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           await applyAtom(state, { type: '卸下', player: ownerId, slot });
         }
       }
-      const shadowId = 父魂ShadowId(id1, id2);
+      const shadowId = shadowIdOf(id1, id2);
       await applyAtom(state, {
         type: '当作',
         player: ownerId,
@@ -144,7 +144,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     (state: GameState, params: Record<string, Json>) => {
       const cardIds = params.cardIds;
       const [id1, id2] = Array.isArray(cardIds) ? (cardIds as string[]) : [];
-      const sId = id1 && id2 ? 父魂ShadowId(id1, id2) : undefined;
+      const sId = id1 && id2 ? shadowIdOf(id1, id2) : undefined;
       if (!sId) return;
       delete state.cardMap[sId];
       const self = state.players[ownerId];
@@ -195,7 +195,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
     async (state: GameState, params: Record<string, Json>) => {
       const cardId = params.cardId as string;
-      const shadowId = 武圣ShadowId(cardId);
+      const shadowId = grantedShadowIdOf(cardId);
       await applyAtom(state, {
         type: '当作',
         player: ownerId,
@@ -206,7 +206,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
     (state: GameState, params: Record<string, Json>) => {
       const cardId = params.cardId as string;
-      const sId = 武圣ShadowId(cardId);
+      const sId = grantedShadowIdOf(cardId);
       delete state.cardMap[sId];
       const self = state.players[ownerId];
       const idx = self.hand.indexOf(sId);

@@ -21,7 +21,7 @@
 import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom, frameCards, popFrame, pushFrame, topFrame } from '../index';
 import { registerAction, registerBeforeHook } from '../skill';
-import { 询问抵消 } from '../无懈可击';
+import { promptCancel } from '../无懈可击';
 import { validateCardUse, computeAutoTargets } from './validate';
 import { getCardEffect, getAllCardEffects, requireCardEffect } from './registry';
 import type { CardEffect, CancellableBy, ResolveCtx } from './registry';
@@ -79,7 +79,7 @@ async function runSettlementPhase(
         : undefined;
     const cancellable = effect.cancelledBy ?? autoCancellable;
     if (cancellable) {
-      await 询问抵消(state, cancellable, source, target);
+      await promptCancel(state, cancellable, source, target);
     }
   }
 

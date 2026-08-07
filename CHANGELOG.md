@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-07
 
+### Fixed — 命名规范违规修复（中文函数名→英文，§2）
+
+按 `CLAUDE.md` §2「函数名/变量名/常量名→英文」修复 5 处中文函数名违规，另修复 1 处英文装备槽 key（§4）。
+
+- **`界父魂.ts`**：`父魂ShadowId`→`shadowIdOf`、`武圣ShadowId`→`grantedShadowIdOf`。原命名偏离全仓库统一的 `shadowIdOf` 约定（丈八蛇矛/乱击/武圣/火计/界乱击/界双雄/界火计/界看破/界矫诏/界禁酒/界连环 等 20+ 文件均用 `shadowIdOf`），系唯一异类。
+- **`界醇醪.ts`**：`醇列表`→`getAleTokenIds`、`相邻角色`→`getNeighbors`（file-local helper，LSP 符号级重命名，注释/技能文案中的中文短语保持不变）。
+- **`无懈可击.ts`**：导出函数 `询问抵消`→`promptCancel`，LSP 跨文件重命名（`无懈可击.ts` 定义 + `use-card.ts`/`界连环.ts`/`界火计.ts` 导入调用，共 4 文件 7 处）。注释中指代游戏机制概念的「询问抵消」中文保留。
+- **`奋激.test.ts`**：`equipment.weapon`→`equipment.武器`（§4 装备字段名中文），顺带修复一处预先存在的 TS 类型错误（`EquipSlot` 为 `'武器'|'防具'|'进攻马'|'防御马'|'宝物'`）。
+
+#### 审计结论（非违规，保持现状）
+- **306 处中文常量名 = 业务标识符**（`export const 吕蒙`/`export const 伤害结算开始时`/`export const 赤兔` 等）：常量名即武将名/atom 类型/卡牌名等业务标识符，改英文会退化为拼音（违反 §1 禁拼音）且割裂常量与业务字面量的对应，属刻意设计。
+- **拼音文件名**：无（CLAUDE.md 反例 `leiji.ts`/`bagua.ts` 已修复）。
+- **snake_case 标识符**：无。
+- **中文类型/接口名**：无（23 处 grep 命中均为注释误匹配）。
+- **`EffectPrimitive` 中英字面量混用**（`damage`/`skipDraw`/`convert` 等与 `摸牌`/`回复体力` 并存）：属半废弃声明式 DSL，无解释器消费，多数字面量未使用，未纳入本次修复。
+
+验证：`tsc --noEmit` 0 错误；界父魂/界醇醪/界连环/界火计/奋激 5 文件 48 passed；卡牌效果 81 passed；integration+engine 65 文件 469 passed。
+
+## [Unreleased] — 2026-08-07
+
 ### Fixed — 卡牌图片用官方卡面+程序绘制角标,修复花色/点数错配
 
 `public/packs/base/card/`（运行时手牌大图）原本由 `sync-cards-local.ts` + `migrate-to-packs.ts` 用「每牌名一张通用图复制到所有花色点数变体」填充,导致除首张外角标全部错配(24 组同图异花色点数冲突,波及全部 136 牌面)。最严重的几组跨牌名共用一图(`大宛 = 紫骍 = 赤兔`、`爪黄飞电 = 的卢 = 绝影 = 骅骝`)。

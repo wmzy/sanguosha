@@ -458,7 +458,7 @@ describe('奋激', () => {
     // 奋激不触发:无询问,周泰体力不变,装备已进弃牌堆
     harness.player('界周泰').expectNoPending();
     expect(harness.state.players[0].health).toBe(4);
-    expect(harness.state.players[0].equipment.weapon).toBeUndefined();
+    expect(harness.state.players[0].equipment.武器).toBeUndefined();
     expect(harness.state.zones.discardPile).toContain('zc1');
   });
 });

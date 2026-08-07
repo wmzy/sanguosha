@@ -37,7 +37,7 @@ const RESPONDED_KEY = '抵消/已回应';
  * @param target  被抵消牌的目标座次（定向询问时 = 杀目标；广播时 = 锦囊目标）
  * @returns 栈顶帧是否被抵消
  */
-export async function 询问抵消(
+export async function promptCancel(
   state: GameState,
   config: CancellableBy,
   source: number,

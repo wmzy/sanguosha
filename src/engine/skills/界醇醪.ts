@@ -46,13 +46,13 @@ export function createSkill(id: string, ownerId: number): Skill {
 }
 
 /** 取 owner 当前的醇列表(可变引用,直接修改即可) */
-function 醇列表(state: GameState, ownerId: number): string[] {
+function getAleTokenIds(state: GameState, ownerId: number): string[] {
   const v = state.players[ownerId].vars[醇_KEY];
   return Array.isArray(v) ? (v as string[]) : [];
 }
 
 /** 取 owner 的相邻角色座次列表(存活) */
-function 相邻角色(state: GameState, ownerId: number): number[] {
+function getNeighbors(state: GameState, ownerId: number): number[] {
   const n = state.players.length;
   if (n <= 1) return [];
   const prev = (ownerId - 1 + n) % n;
@@ -88,7 +88,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // owner 自己弃置:符合
     } else {
       // 相邻角色弃置:符合
-      const neighbors = 相邻角色(ctx.state, ownerId);
+      const neighbors = getNeighbors(ctx.state, ownerId);
       if (!neighbors.includes(discardPlayer)) return;
     }
     // 找出被弃的杀 cardId
@@ -98,7 +98,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     });
     if (slashIds.length === 0) return;
     // 追加到醇列表(去重,避免同一 id 重复入库)
-    const list = 醇列表(ctx.state, ownerId);
+    const list = getAleTokenIds(ctx.state, ownerId);
     const existing = new Set(list);
     for (const id of slashIds) {
       if (!existing.has(id)) {
@@ -125,13 +125,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt !== '桃/求桃') return '当前不是求桃';
       // 计算 X 并校验醇数
       const x = computeX(s, ownerId);
-      const list = 醇列表(s, ownerId);
+      const list = getAleTokenIds(s, ownerId);
       if (list.length < x) return '醇数不足';
       return null;
     },
     async (s) => {
       const x = computeX(s, ownerId);
-      const list = 醇列表(s, ownerId);
+      const list = getAleTokenIds(s, ownerId);
       // 移去前 X 张醇(物理牌仍留弃牌堆,"移去"= 从醇 earmark 列表删除)
       const removed = list.splice(0, x);
       s.players[ownerId].vars[醇_KEY] = list;

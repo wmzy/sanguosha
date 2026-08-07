@@ -28,7 +28,7 @@ import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { recastCard } from '../recast';
 import { setChain } from '../face-down';
 import { registerAction, hasBlockingPending, validateUseCard } from '../skill';
-import { 询问抵消 } from '../无懈可击';
+import { promptCancel } from '../无懈可击';
 import { defaultPlayActive } from '../action-active';
 
 const CHAIN_MARK = 'chained';
@@ -160,7 +160,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         to: { zone: '处理区' },
       });
       try {
-        const cancelled = await 询问抵消(state, { cardName: '无懈可击', broadcast: true }, from, from);
+        const cancelled = await promptCancel(state, { cardName: '无懈可击', broadcast: true }, from, from);
         if (!cancelled) {
           for (const t of targets) {
             const chained = isChained(state, t);
