@@ -8,7 +8,7 @@
 //   - 黑色雷杀(♠/♣):仁王盾无效(颜色黑);藤甲有效(属性杀穿透)。
 //   - 红色火杀(♥/♦):仁王盾有效(颜色红);藤甲有效且伤害+1。
 //
-// 牌堆事实(src/shared/deck.ts):火杀/雷杀底层 name 均为 '杀',仅 damageType 不同;
+// 牌堆事实(src/engine/deck.ts):火杀/雷杀底层 name 均为 '杀',仅 damageType 不同;
 //   火杀=♥/♦(红),雷杀=♣/♠(黑)。故仁王盾 name==='杀' && color==='黑' 覆盖全部杀。
 //
 // 验证(参考 tests/skill-tests/贯石斧.test.ts 写法):
@@ -21,7 +21,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(

@@ -17,7 +17,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runDamageFlow } from '../damage-flow';
-import { createRng } from '../../shared/rng';
+import { createRng } from '../../engine/rng';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 

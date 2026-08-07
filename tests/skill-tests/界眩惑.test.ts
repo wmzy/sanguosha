@@ -19,7 +19,7 @@ import * as 界眩惑Module from '../../src/engine/skills/界眩惑';
 skillLoaders['界眩惑'] = async () => 界眩惑Module;
 
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/index';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 

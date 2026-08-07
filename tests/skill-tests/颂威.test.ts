@@ -12,7 +12,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import { runJudgeFlow } from '../../src/engine/judge-flow';
 import type { Card, Faction, GameState, PlayerState } from '../../src/engine/types';
 

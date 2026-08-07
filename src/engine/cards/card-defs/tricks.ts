@@ -1,4 +1,4 @@
-import type { CardDef } from '../types';
+import type { CardDef } from '../../types';
 
 export const 过河拆桥: CardDef = {
   name: '过河拆桥',

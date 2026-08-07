@@ -11,8 +11,10 @@
 // 归并建议:牌堆组成属引擎核心不变量,本文件为独立断言集,不并入 skill-tests。
 
 import { describe, it, expect } from 'vitest';
-import { createStandardDeck } from '../../src/shared/deck';
-import type { Suit } from '../../src/shared/types';
+import { createStandardDeck } from '../../src/engine/deck';
+import type { Card, Suit } from '../../src/engine/types';
+
+type CardSuit = Card['suit'];
 
 const FULL_DECK = createStandardDeck();
 
@@ -27,7 +29,7 @@ function countName(name: string): number {
 }
 
 /** 列出某牌名在牌堆中所有出现位置的 (花色,点数) */
-function locations(name: string): Array<{ suit: Suit; rank: string }> {
+function locations(name: string): Array<{ suit: CardSuit; rank: string }> {
   return FULL_DECK.filter((c) => c.name === name).map((c) => ({ suit: c.suit, rank: c.rank }));
 }
 
@@ -159,7 +161,7 @@ describe('军争篇关键花色点数(精确对应)', () => {
 describe('标准包 + 军争篇 EX 牌(每花色1张,共4张)', () => {
   // EX 牌:♥Q 闪电 / ♠2 寒冰剑 / ♦Q 无懈可击 / ♣2 仁王盾
   const STANDARD_ONLY = FULL_DECK.slice(0, 108);
-  function stdLocations(name: string): Array<{ suit: Suit; rank: string }> {
+  function stdLocations(name: string): Array<{ suit: CardSuit; rank: string }> {
     return STANDARD_ONLY.filter((c) => c.name === name).map((c) => ({ suit: c.suit, rank: c.rank }));
   }
   it('闪电在标准包有2张(♠A + ♥Q-EX)', () => {

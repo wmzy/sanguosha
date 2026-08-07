@@ -1,4 +1,4 @@
-import type { CardDef } from '../types';
+import type { CardDef } from '../../types';
 
 export const 杀: CardDef = {
   name: '杀',

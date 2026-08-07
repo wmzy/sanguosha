@@ -2,7 +2,7 @@
 // 卡牌元数据查询函数。供前端/工具模块复用,避免在多处重复硬编码类型/子类型判定。
 
 import type { Card } from './types';
-import { 装备牌列表 } from '../shared/cards/equipment';
+import { 装备牌列表 } from '../engine/cards/card-defs/equipment';
 import { skillLoaders } from './skills';
 
 /** 装备牌 */

@@ -22,7 +22,7 @@ import * as 界荐言Module from '../../src/engine/skills/界荐言';
 skillLoaders['界荐言'] = async () => 界荐言Module;
 
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(

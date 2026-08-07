@@ -18,7 +18,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { ActionPrompt, Card, GameState, GameView } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { DEFAULT_SKILLS } from '../../src/engine/atoms/选将';
 import { findActionEntry } from '../../src/engine/skill';

@@ -19,7 +19,7 @@ import { createLogger } from '../utils/logger';
 import { logWsMessage, logUserAction } from '../utils/debugTelemetry';
 import { getPlayerId } from '../utils/playerIdentity';
 import type { GameView } from '../../engine/types';
-import { suitColor, type Suit } from '../../shared/types';
+import { suitColor, type Suit } from '../../engine/types';
 import type { ServerMessage, ClientMessage } from '../../server/protocol';
 import type { ActionMsg } from '../types';
 import { appendIngestedEvents } from '../utils/appendIngestedEvents';

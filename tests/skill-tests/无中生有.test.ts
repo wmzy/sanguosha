@@ -18,7 +18,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState, TurnPhase } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {

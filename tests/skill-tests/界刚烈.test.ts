@@ -18,7 +18,7 @@ import * as 界刚烈Module from '../../src/engine/skills/界刚烈';
 skillLoaders['界刚烈'] = async () => 界刚烈Module;
 
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(

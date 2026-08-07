@@ -13,8 +13,8 @@ import type {
   ViewEventSplit,
 } from '../types';
 import { TARGET_SYSTEM } from '../types';
-import { createRng } from '../../shared/rng';
-import { createStandardDeck, shuffle } from '../../shared/deck';
+import { createRng } from '../../engine/rng';
+import { createStandardDeck, shuffle } from '../deck';
 import { applyAtom, resolveTimeoutMs } from '../index';
 import { registerAtom } from '../atom';
 

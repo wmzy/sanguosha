@@ -15,7 +15,7 @@ import { createGameState } from '../../src/engine/types';
 import type { Atom, Card, GameState, PlayerState } from '../../src/engine/types';
 import { runJudgeFlow } from '../../src/engine/judge-flow';
 import { applyAtom } from '../../src/engine/index';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;

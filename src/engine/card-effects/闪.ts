@@ -19,7 +19,7 @@ import {
   registerCardEffect,
   type CardEffect,
 } from '../card-effect/registry';
-import type { Color } from '../../shared/types';
+import type { Color } from '../../engine/types';
 
 const COLOR_LIMIT_VAR = '闪/色限制';
 

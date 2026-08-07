@@ -1,9 +1,36 @@
 // 引擎状态类型:基础类型/枚举/常量 + PlayerState/GameState + 工厂。
 // 详见 docs/ENGINE-DESIGN.md §3-7。原 src/engine/types.ts 按域拆分,本文件经 barrel(types/index.ts)统一导出。
 
-import type { Color, DamageType } from '../../shared/types';
 import type { Atom } from './atom';
 import type { ActionLogEntry, AppliedAtomEntry, PendingSlot, SettlementFrame } from './skill';
+
+// ─── 牌面基础类型(原 shared/types,随 shared/ 清退并入引擎) ─────────
+export type Suit = '♠' | '♥' | '♣' | '♦';
+/** 牌的颜色:♥♦→红,♠♣→黑,多牌混合转化→无色。与花色(suit)正交。 */
+export type Color = '红' | '黑' | '无色';
+/** 伤害属性:普通(默认)/火焰(火杀、火攻)/雷电(雷杀、闪电)。仅属性伤害触发铁索连环传导。 */
+export type DamageType = '普通' | '火焰' | '雷电';
+export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K';
+export type CardType = '基本牌' | '锦囊牌' | '装备牌';
+export type CardSubType =
+  | '杀'
+  | '闪'
+  | '桃'
+  | '酒'
+  | '锦囊'
+  | '武器'
+  | '防具'
+  | '马'
+  | '进攻马'
+  | '防御马';
+export type TrickSubType = '普通锦囊' | '延时锦囊' | '响应锦囊';
+
+/** 由花色派生颜色。仅用于真实花色牌(♥♦→红, ♠♣→黑);空花色(转化合成卡)→无色。 */
+export function suitColor(suit: Suit | ''): Color {
+  if (suit === '♥' || suit === '♦') return '红';
+  if (suit === '♠' || suit === '♣') return '黑';
+  return '无色';
+}
 
 /** 系统级 owner / target:不对应任何真实玩家槽位(开局 action、无来源伤害)。 */
 export const TARGET_SYSTEM = -1;

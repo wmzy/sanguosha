@@ -20,7 +20,7 @@ import { fireTimeoutAndWait, dispatchAndWait, SkillTestHarness } from '../engine
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { canRescueWith } from '../../src/engine/skills/系统规则';
 import { cardResponsePreResolveForTarget } from '../../src/engine/card-response-availability';

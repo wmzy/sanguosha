@@ -59,7 +59,7 @@ import {
   unloadSkillInstance,
 } from './skill';
 import { applyAtom as applyAtomImpl, getAtomDef, resolveViewEvents } from './atom';
-import { createStandardDeck } from '../shared/deck';
+import { createStandardDeck } from './deck';
 import { isHookSuppressed } from './skill-suppression';
 
 // slash-quota 已改为 state-bound(WeakMap 外挂),无模块级状态,无需在此清理。

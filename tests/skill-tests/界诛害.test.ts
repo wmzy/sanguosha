@@ -19,7 +19,7 @@ import * as 界诛害Module from '../../src/engine/skills/界诛害';
 skillLoaders['界诛害'] = async () => 界诛害Module;
 
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/index';
 import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';

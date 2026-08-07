@@ -10,7 +10,7 @@ import {
   getBroadcastKey,
 } from '../../src/client/utils/pendingRespond';
 import type { Card, PendingView } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 
 function mkCard(id: string, name: string): Card {
   return { id, name, suit: '♠', color: suitColor('♠'), rank: 'A', type: '基本牌' };

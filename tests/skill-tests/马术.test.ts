@@ -11,7 +11,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { effectiveDistance } from '../../src/engine/distance';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(

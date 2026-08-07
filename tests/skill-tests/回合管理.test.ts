@@ -19,7 +19,7 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
 import { findActionEntry } from '../../src/engine/skill';
 import { registerSystemRespondActions } from '../../src/engine/skills/系统规则';

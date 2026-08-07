@@ -4,7 +4,7 @@
 // 用 state.rngSeed 派生 RNG(推进后写回),保证重放确定性。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
-import { createRng } from '../../shared/rng';
+import { createRng } from '../../engine/rng';
 
 export const 重洗: AtomDefinition<Record<string, never>> = {
   type: '重洗',

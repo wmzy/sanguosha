@@ -1,4 +1,4 @@
-// src/shared/deck.ts
+// src/engine/deck.ts
 // 标准包(108) + 军争篇(52) = 160 张牌堆。
 //
 // 数据来源:三国杀WIKI_BWIKI(哔哩哔哩,官方授权社区 wiki)
@@ -26,8 +26,8 @@
 import type { Card, Suit, Rank, CardType, CardSubType, TrickSubType, DamageType } from './types';
 import { suitColor } from './types';
 import type { Rng } from './rng';
-import { 装备牌列表 } from './cards/equipment';
-import { getCardDescription } from './cards/description';
+import { 装备牌列表 } from './cards/card-defs/equipment';
+import { getCardDescription } from './cards/card-defs/description';
 
 // ─── 装备牌射程表(从 CardDef 派生) ──────────────────────────
 const equipmentRangeMap = new Map<string, number>();
@@ -231,9 +231,9 @@ const JUNZHENG_DECK: Entry[] = [
 
 // ─── 卡牌 type/subtype 推断(从牌名查 CardDef,取权威类型) ─────
 // deck.ts 只产 Card 实例(运行时数据),CardDef 是定义层。
-// 引擎的 CardDef 注册在 shared/cards/{basic,tricks,equipment}.ts,
+// 引擎的 CardDef 注册在 engine/cards/card-defs/{basic,tricks,equipment}.ts,
 // 此处复用同一份牌名→类型映射,避免维护两套。
-import { 基本牌列表, 锦囊牌列表 } from './cards';
+import { 基本牌列表, 锦囊牌列表 } from './cards/card-defs';
 
 const DEF_INDEX: Map<string, { type: CardType; subtype: CardSubType }> = new Map();
 for (const def of [...基本牌列表, ...锦囊牌列表, ...装备牌列表]) {

@@ -19,7 +19,7 @@ import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/index';
 import { validateCardUse } from '../../src/engine/card-effect/validate';
 import { slashUsed } from '../../src/engine/slash-quota';

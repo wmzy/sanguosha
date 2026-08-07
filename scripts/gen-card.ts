@@ -7,9 +7,9 @@
 //      用 sharp 合成到边框模板上。保证多张卡牌间布局/字体/边框像素级一致。
 //
 // 卡牌信息实时从源代码声明文件读取:
-//   - src/shared/deck.ts(牌堆花色点数)
-//   - src/shared/cards/{basic,equipment,tricks}.ts(CardDef 类型/range)
-//   - src/shared/cards/description.ts(技能描述原文)
+//   - src/engine/deck.ts(牌堆花色点数)
+//   - src/engine/cards/card-defs/{basic,equipment,tricks}.ts(CardDef 类型/range)
+//   - src/engine/cards/card-defs/description.ts(技能描述原文)
 //
 // 插画外形描述(纯视觉,不含典故):见 .claude/skills/card-design/illustration-history.md
 //
@@ -50,11 +50,11 @@ import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import sharp from 'sharp';
-import { createStandardDeck } from '../src/shared/deck';
-import { 基本牌列表, 锦囊牌列表 } from '../src/shared/cards';
-import { 装备牌列表 } from '../src/shared/cards/equipment';
-import { getCardDescription } from '../src/shared/cards/description';
-import type { Card, CardDef, Suit, CardType, CardSubType } from '../src/shared/types';
+import { createStandardDeck } from '../src/engine/deck';
+import { 基本牌列表, 锦囊牌列表 } from '../src/engine/cards/card-defs';
+import { 装备牌列表 } from '../src/engine/cards/card-defs/equipment';
+import { getCardDescription } from '../src/engine/cards/card-defs/description';
+import type { Card, CardDef, Suit, CardType, CardSubType } from '../src/engine/types';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -676,7 +676,7 @@ if (args['all'] === true) {
   const deck = createStandardDeck();
   // 按 name+suit+rank+damageType 去重(同组合的物理牌共享一张图)
   const seen = new Set<string>();
-  const uniq: { name: string; suit: Suit; rank: string; damageType?: string }[] = [];
+  const uniq: { name: string; suit: Card['suit']; rank: string; damageType?: string }[] = [];
   for (const c of deck) {
     const key = `${c.name}|${c.suit}|${c.rank}|${c.damageType ?? ''}`;
     if (seen.has(key)) continue;

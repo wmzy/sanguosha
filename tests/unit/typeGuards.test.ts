@@ -8,7 +8,7 @@ import {
   narrowArray,
   isStringArray,
   isRecordOf,
-} from '../../src/shared/typeGuards';
+} from '../../src/engine/typeGuards';
 
 describe('isRecord', () => {
   it('should return true for plain objects', () => {

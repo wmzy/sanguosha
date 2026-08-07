@@ -1,68 +1,14 @@
-export type Suit = '♠' | '♥' | '♣' | '♦';
+// engine/types/card-def.ts — 卡牌/技能声明式定义层(历史 DSL)。
+// 原 shared/types.ts 中的声明式描述类型,随 shared/ 清退迁入引擎。
+//
+// 说明:Effect / CharacterConfig / AbilityConfig / TriggerType 这套声明式 DSL
+// 是早期设计(见 docs/decisions/0013 Phase 4),当前引擎运行时已改用 SkillDef(命令式)为准;
+// 此处保留仅因 CardDef.effect 字段仍被卡牌定义引用。
+//
+// 注意:原 shared 的 TargetFilter 在此重命名为 CardTargetFilter,
+// 避免与 prompt.ts 的运行时 TargetFilter(min/max/filter)同名冲突(后者被前端广泛使用)。
 
-/** 牌的颜色：♥♦→红，♠♣→黑，多牌混合转化→无色。与花色(suit)正交。 */
-export type Color = '红' | '黑' | '无色';
-
-/** 伤害属性：普通(默认) / 火焰(火杀、火攻) / 雷电(雷杀、闪电)。
- *  仅属性伤害触发铁索连环传导。 */
-export type DamageType = '普通' | '火焰' | '雷电';
-
-/** 由花色派生颜色。仅用于真实花色牌(♥♦→红, ♠♣→黑)；空花色(转化合成卡)→无色。 */
-export function suitColor(suit: Suit | ''): Color {
-  if (suit === '♥' || suit === '♦') return '红';
-  if (suit === '♠' || suit === '♣') return '黑';
-  return '无色';
-}
-
-export type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K';
-
-export type CardType = '基本牌' | '锦囊牌' | '装备牌';
-
-export type CardSubType =
-  | '杀'
-  | '闪'
-  | '桃'
-  | '酒'
-  | '锦囊'
-  | '武器'
-  | '防具'
-  | '马'
-  | '进攻马'
-  | '防御马';
-
-export type TrickSubType = '普通锦囊' | '延时锦囊' | '响应锦囊';
-
-export interface Card {
-  id: string;
-  name: string;
-  type: CardType;
-  subtype: CardSubType;
-  suit: Suit;
-  /** 伤害属性(仅杀牌/伤害锦囊有意义):火焰/雷电触发铁索连环传导 */
-  damageType?: DamageType;
-  /** 颜色，独立于花色。转化合成卡可为'无色'。 */
-  color: Color;
-  rank: Rank;
-  description: string;
-  range?: number;
-  trickSubtype?: TrickSubType;
-  _original?: Card;
-  _conversion?: string;
-}
-
-export interface PendingTrick {
-  name: string;
-  source: string;
-  card: Card;
-}
-
-export type Gender = '男' | '女';
-
-export type Faction = '魏' | '蜀' | '吴' | '群';
-
-export type Role = '主公' | '忠臣' | '反贼' | '内奸';
-
-export type TurnPhase = '准备' | '判定' | '摸牌' | '出牌' | '弃牌' | '结束' | '回合结束';
+import type { CardType, CardSubType, TurnPhase, Gender, Faction } from './state';
 
 export type EffectPrimitive =
   | { type: '摸牌'; count: number | string }
@@ -105,11 +51,16 @@ export type Effect =
   | { type: 'sequence'; steps: Effect[] }
   | { type: 'conditional'; condition: Condition; then: Effect; else?: Effect };
 
+export interface CardTargetFilter {
+  type: 'self' | 'other' | 'all' | 'none' | 'inRange';
+  condition?: (player: { hand: unknown[] }) => boolean;
+}
+
 export interface CardDef {
   name: string;
   type: CardType;
   subtype: CardSubType;
-  targetFilter?: TargetFilter;
+  targetFilter?: CardTargetFilter;
   effect: Effect;
   responseWindow?: 'kill_response' | 'trick_response';
   aoeResponse?: string;
@@ -117,11 +68,6 @@ export interface CardDef {
   range?: number;
   weaponEffect?: WeaponEffect;
   armorEffect?: ArmorEffect;
-}
-
-export interface TargetFilter {
-  type: 'self' | 'other' | 'all' | 'none' | 'inRange';
-  condition?: (player: { hand: unknown[] }) => boolean;
 }
 
 export interface WeaponEffect {

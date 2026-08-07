@@ -16,7 +16,7 @@ import { getAtomDef } from '../../src/engine/atom';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState, PendingTrick } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {

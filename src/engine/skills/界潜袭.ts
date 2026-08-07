@@ -38,7 +38,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import type { Color } from '../../shared/types';
+import type { Color } from '../../engine/types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { effectiveDistance } from '../distance';
 import {

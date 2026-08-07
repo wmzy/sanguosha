@@ -11,7 +11,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
 import type { GameView, Card } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A'): Card {
   return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };

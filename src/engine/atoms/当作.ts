@@ -6,7 +6,7 @@
 // shadowId 由调用方(技能)生成并传入,atom 零感知技能名。
 // outputName 决定转化后的牌名。rollback(删影子/还原卡)由调用方技能回调负责,本 atom 不处理。
 import type { AtomDefinition, Card, ViewEventSplit, ViewEvent } from '../types';
-import type { Color } from '../../shared/types';
+import type { Color } from '../../engine/types';
 import { registerAtom } from '../atom';
 
 /** 根据转化后的牌名推断卡牌类型。

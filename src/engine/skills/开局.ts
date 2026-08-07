@@ -2,7 +2,7 @@
 //   start action:抽身份 → 选将 → 初始化洗牌 → 发牌 → 回合开始(主公) → 阶段开始(主公,准备)
 import type { ActionEntry, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { createRng } from '../../shared/rng';
+import { createRng } from '../../engine/rng';
 import { registerActionEntry, unregisterActionEntry, instantiateSkill } from '../skill';
 
 import { getCharacterBaseId, isLord } from '../character-meta';

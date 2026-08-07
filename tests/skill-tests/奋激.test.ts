@@ -19,7 +19,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/index';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
 
 function mkCard(

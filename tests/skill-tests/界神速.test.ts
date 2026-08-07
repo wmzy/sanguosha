@@ -23,7 +23,7 @@ import * as 界神速Module from '../../src/engine/skills/界神速';
 skillLoaders['界神速'] = async () => 界神速Module;
 
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function _makeCard(

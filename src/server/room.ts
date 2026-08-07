@@ -2,7 +2,7 @@
 import type { ConnectionSink } from './connection';
 import type { RoomInfo, RoomConfig, ServerMessage } from './protocol';
 import { DEFAULT_ROOM_CONFIG, normalizeRoomConfig } from './protocol';
-import { createRng } from '../shared/rng';
+import { createRng } from '../engine/rng';
 import { register } from './lifecycles';
 import { createLogger } from './logger';
 

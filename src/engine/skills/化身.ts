@@ -51,7 +51,7 @@
 //     但始终保留展示牌(避免歧义——展示牌被移去后技能归属未明确)。
 import type { Faction, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { createRng } from '../../shared/rng';
+import { createRng } from '../../engine/rng';
 import { registerAction, registerAfterHook } from '../skill';
 import { allCharacters } from '../cards/characters';
 import { getCharacterMeta } from '../character-meta';

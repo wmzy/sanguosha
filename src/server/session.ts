@@ -32,7 +32,7 @@ import type { Room } from './room';
 import { createLogger } from './logger';
 import { setRoomStatus } from './room';
 import { saveRoom, deletePersistedRoom } from './persistence';
-import { createRng } from '../shared/rng';
+import { createRng } from '../engine/rng';
 
 /** 计算座次轮转偏移:物理座位 i → 游戏座次 (i + offset) % n。
  *  用 seed 派生(确定性,持久化/恢复可复现),使主公(游戏座次 0)随机分布到各物理座位——

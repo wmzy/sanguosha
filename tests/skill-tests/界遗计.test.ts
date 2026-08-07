@@ -27,7 +27,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState, TARGET_SYSTEM } from '../../src/engine/types';
 import { runDamageFlow } from '../../src/engine/damage-flow';
-import { suitColor } from '../../src/shared/types';
+import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makePlayer(opts: {

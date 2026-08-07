@@ -1,7 +1,7 @@
 // Atom 类型:原子操作联合类型 + 定义接口 + 视图事件 + 钩子上下文。
 // 原 src/engine/types.ts 的 `==================== Atom ====================` 段及 hook 上下文。
 
-import type { DamageType } from '../../shared/types';
+import type { DamageType } from './state';
 import type { EquipSlot, GameState, Json, Mark, PendingTrick } from './state';
 import type { ActionPrompt } from './prompt';
 import type { GameView } from './view';
