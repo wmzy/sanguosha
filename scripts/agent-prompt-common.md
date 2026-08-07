@@ -35,7 +35,7 @@ joinRoom({ roomId: "__ROOM_ID__"__PLAYER_ID_PARAM__ })
 ## 提交方式
 
 下次调用 play 时传 { action: <选中的 message> }。
-若 action 有 validTargets，选一个目标填入 message.params.targets (数组)。
+若 action 有 validTargets，选 1~maxTarget 个目标填入 message.params.targets（数组，maxTarget 未设默认 1）。
 
 ## Bug 收集（重要！）
 

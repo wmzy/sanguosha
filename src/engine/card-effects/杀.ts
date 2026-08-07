@@ -16,6 +16,7 @@ import { runDamageFlow } from '../damage-flow';
 import { inAttackRange } from '../distance';
 import { viewCanAttack } from '../viewDistance';
 import { incSlashUsed, isSlashExempted, slashUsed } from '../slash-quota';
+import { slashTargetMax } from '../slash-target';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
 import {
   registerCardEffect,
@@ -41,6 +42,11 @@ function canUseSlash(
       return inAttackRange(state, ownerId, t, cardId);
     });
   if (!targetsOk) return '目标不合法';
+  // 目标数上限校验(权威):默认 1;方天画戟(最后一张手牌)/天义(拼点赢)/疠火(火杀)
+  // 等通过 slashTargetMax 放宽。此前杀不限目标数,导致无方天画戟也能多目标。
+  const targetsArr = Array.isArray(params.targets) ? (params.targets as number[]) : [];
+  const maxTargets = slashTargetMax(state, ownerId, cardId);
+  if (targetsArr.length > maxTargets) return `最多指定 ${maxTargets} 个目标`;
   return null;
 }
 

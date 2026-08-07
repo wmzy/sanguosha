@@ -17,6 +17,7 @@ import { runUseFlow } from '../card-effect/use-card';
 import { isCardBanned } from '../card-effect/validate';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 import { inAttackRange } from '../distance';
+import { slashTargetMax } from '../slash-target';
 
 /** 请求 A 出杀问询的 requestType */
 const REQUEST_TYPE = '借刀杀人/出杀';
@@ -162,6 +163,11 @@ const borrowedSwordEffect: CardEffect = {
       for (const t of targets) {
         if (!inAttackRange(state, ownerId, t, cardId)) return '目标不在攻击范围内';
       }
+      // 目标数上限校验(权威):默认 1;被借刀者装备方天画戟且此杀为最后一张手牌时放宽。
+      // forced 路径不经 杀.canUseSlash(canUseSlash 仅 mode='play' 经 validateCardUse),
+      // 故在此镜像校验,保证借刀杀人出的杀同样受方天画戟条件约束。
+      const maxTargets = slashTargetMax(state, ownerId, cardId);
+      if (targets.length > maxTargets) return `最多指定 ${maxTargets} 个目标`;
       return null;
     },
     execute: async (state, ownerId, params) => {

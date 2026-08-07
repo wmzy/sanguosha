@@ -18,6 +18,7 @@ import {
   extractCardFilter,
   type PlayRules,
 } from '../utils/gameViewHelpers';
+import { viewSlashTargetMax } from '../../engine/action-active';
 
 /** 从 use action 的 prompt 取 targetFilter（useCardAndTarget/selectTarget 才有）。 */
 function getTargetFilter(prompt: SkillActionDef['prompt']): TargetFilter | null {
@@ -89,14 +90,22 @@ function enumeratePlayActions(
       baseSeq: 0,
     };
     const cardDesc = `${card.suit}${card.rank}`;
+    // 杀受方天画戟(最后一张手牌)/天义/界疠火放宽目标数上限;其余牌默认 1。
+    const slashMax =
+      card.name === '杀' && rules.needsTarget && !rules.selfTarget
+        ? viewSlashTargetMax(view, seatIndex, card)
+        : undefined;
     result.push({
       description:
         rules.needsTarget && !rules.selfTarget
-          ? `使用【${card.name}】(${cardDesc}) 选择目标`
+          ? slashMax && slashMax > 1
+            ? `使用【${card.name}】(${cardDesc}) 选择目标(最多${slashMax}个)`
+            : `使用【${card.name}】(${cardDesc}) 选择目标`
           : `使用【${card.name}】(${cardDesc})`,
       message,
       validTargets,
       category: 'play',
+      ...(slashMax !== undefined ? { maxTarget: slashMax } : {}),
     });
   }
   return result;
@@ -163,8 +172,17 @@ function enumerateTransformActions(
       if (rules.needsTarget && !rules.selfTarget && validTargets.length === 0) continue;
 
       const cardDesc = `${card.suit}${card.rank}`;
+      // 转化杀同样受目标数上限约束(默认1;方天画戟看手牌数,天义拼点赢放宽到2)。
+      // 转化杀非火杀,不传 damageType(界疠火仅对火杀生效)。
+      const slashMax =
+        wrapperName === '杀' && rules.needsTarget && !rules.selfTarget
+          ? viewSlashTargetMax(view, seatIndex, { name: '杀' })
+          : undefined;
       result.push({
-        description: `${action.skillId}转化【${wrapperName}】(${cardDesc})`,
+        description:
+          wrapperName === '杀' && slashMax && slashMax > 1
+            ? `${action.skillId}转化【${wrapperName}】(${cardDesc}) (最多${slashMax}目标)`
+            : `${action.skillId}转化【${wrapperName}】(${cardDesc})`,
         message: {
           skillId: wrapperName,
           actionType: 'use',
@@ -181,6 +199,7 @@ function enumerateTransformActions(
         },
         validTargets,
         category: 'transform',
+        ...(slashMax !== undefined ? { maxTarget: slashMax } : {}),
       });
     }
   }

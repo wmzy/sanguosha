@@ -4,6 +4,42 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-07
 
+### Fixed — 卡牌图片用官方卡面+程序绘制角标,修复花色/点数错配
+
+`public/packs/base/card/`（运行时手牌大图）原本由 `sync-cards-local.ts` + `migrate-to-packs.ts` 用「每牌名一张通用图复制到所有花色点数变体」填充,导致除首张外角标全部错配(24 组同图异花色点数冲突,波及全部 136 牌面)。最严重的几组跨牌名共用一图(`大宛 = 紫骍 = 赤兔`、`爪黄飞电 = 的卢 = 绝影 = 骅骝`)。
+
+本次用**官方无角标卡面 + 程序绘制角标**彻底解决:
+
+- **官方底图**: 从 QSanguosha (gaodayihao/QSanguosha,项目音效同源) `image/big-card`/`image/card` 下载 41 张无角标官方卡面(200×290);QSanguosha 未上传的 14 张(装备/坐骑)从 BWIKI 官方卡面 + cards-ai 正规三国杀风格卡面补齐,共 43 个牌名底图 0 缺失。
+- **程序角标**: `scripts/build-official-cards.ts` 逐张物理牌合成——左上角 SVG 绘制半透明底块 + 点数(衬线)+ 花色(♥♦红/♠♣黑),保证同牌名变体插画相同但角标各正确。
+- 高分辨率底图(cards-ai 来源)用 `contain` 避免裁切变形,低分辨率官方底图用 `cover`。
+
+#### 验证(确定性 + 多模态)
+- **字节冲突校验**: 修正后 136 张全部独立字节、0 冲突、与 deck 真相源 1:1。
+- **多模态抽查**(sensenova-6.7): 杀 7♥/杀 4♠/火攻 Q♦/火攻 2♥(同牌名变体角标确不同)/大宛 K♠/方天画戟 Q♦/赤兔 5♥/的卢 5♣/朱雀羽扇 A♦ 角标全部正确,坐骑无变形。
+- 资源相关测试 25 passed。
+
+#### Changed
+- **重建 `public/packs/base/card/` 136 张手牌大图**(gitignored 本地资源)。
+- **新增 `scripts/build-official-cards.ts`**: 官方底图+程序角标合成脚本(替代会复现 bug 的 sync-cards-local + migrate-to-packs 链路)。底图缓存 `/tmp/qs_cards`。
+
+#### 备注
+- 调查结论:所有来源(BWIKI/QSanguosha/爱给网)均为「牌名级」一张图,无「每花色点数带角标」现成图包——这是三国杀官方设计(同牌名插画相同,角标由程序渲染),故角标必须程序绘制。
+
+## [Unreleased] — 2026-08-07
+
+### Fixed — 方天画戟「最后一张手牌」多目标条件未生效（系统性修复）
+
+方天画戟规则「使用杀时若此杀是最后一张手牌，可额外指定至多 2 个目标（最多 3 名）」此前完全未生效：`杀` 的 `canUseSlash` 不校验目标数量上限，前端 `targetFilter.max` 写死 3，导致**任何人的杀都能多目标**（无方天画戟亦然）。本次建立统一的「杀目标数上限」provider 机制彻底修复：
+
+- **新增 `src/engine/slash-target.ts`**：`slashTargetMax(state, player, cardId?)` 查询型 provider 机制（与 `slash-quota.ts` 同构，state-bound WeakMap）。默认目标上限 1；方天画戟/天义/界疠火 注册 provider 放宽。
+- **后端权威校验**：`杀.canUseSlash` 与 `借刀杀人.respond.validate` 加 `targets.length ≤ slashTargetMax` 校验。借刀杀人出的杀（forced 路径）同样受方天画戟条件约束——**被借刀者装备方天画戟且此杀为最后一张手牌时，可对多目标出杀**。
+- **方天画戟**（`skills/方天画戟.ts`）：从占位 no-op 改为 onInit 注册 provider（装备方天画戟 + 手牌仅此一张 → 3），随装备实例生命周期注册/卸载，动态校核装备仍在。
+- **天义/界疠火 兼容**：两者原有「杀可多目标」效果此前靠「杀不限目标数」的 bug 成立；现改为注册 provider（天义拼点赢 → 2；界疠火火杀 → 3），条件正确化。
+- **前端动态 max**：`action-active.ts` 新增 `viewSlashTargetMax`（与后端同源推断），`usePlayInteraction` 选目标 UI 据此动态收窄可选目标数（默认 1，条件满足时放宽），避免玩家选了却被后端拒。
+- **headless AI 目标数提示**：`AvailableAction` 新增 `maxTarget` 字段，杀牌（含武圣/丈八蛇矛转化杀）按方天画戟/天义/界疠火条件推断上限，`availableActions` 的 description 同步提示「最多 N 个」；MCP play 返回给 AI，避免 AI 误选多目标杀被后端拒。SKILL.md 与 scripts/ 下 8 个 agent prompt 模板同步更新「选 1~maxTarget 个目标」措辞。
+- 测试：方天画戟补 2 个负面用例（非最后一张手牌/无方天画戟时多目标被拒）；修正借刀杀人方天画戟测试（P2 需在 skills 声明方天画戟以实例化技能）；修正界破军多目标杀测试 setup。全套 3321 passed。
+
 ### Fixed — 装备技能逻辑审查（逐技能 subagent 审查，修复 6 处规则 bug）
 
 对全部 14 个装备技能（9 武器 + 4 防具 + 6 坐骑）逐一审查，修复 6 处与三国杀标准规则不符的真实 bug：

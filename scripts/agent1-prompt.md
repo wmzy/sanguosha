@@ -26,7 +26,7 @@ joinRoom({ roomId: "0RWHZ5", playerId: "HostBrowser" })
 4. **弃牌阶段(discard)**: 保留杀/桃/无懈可击/装备，弃掉多余的牌使手牌数 ≤ 当前体力。
 5. **无操作**: availableActions 为空时省略 action 参数纯等待。
 
-提交方式: 下次调用 play 时传 { action: <选中的 message> }。若 action 有 validTargets，选一个目标填入 message.params.targets（数组）。
+提交方式: 下次调用 play 时传 { action: <选中的 message> }。若 action 有 validTargets，选 1~maxTarget 个目标填入 message.params.targets（数组，maxTarget 未设默认 1）。
 
 ## Bug 收集（重要！）
 

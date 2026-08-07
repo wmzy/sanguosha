@@ -36,6 +36,7 @@ import {
   extractCardFilter,
 } from '../utils/gameViewHelpers';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
+import { viewSlashTargetMax } from '../../engine/action-active';
 
 /**
  * 有序选择 + FIFO 淘汰:点击一张牌 toggle 其选中状态。
@@ -521,7 +522,13 @@ export function usePlayInteraction(
       if (playRules?.multiTarget && tf) {
         const name = view.players[i]?.name;
         if (name && selectedMultiTargets.includes(name)) return true;
-        if (selectedMultiTargets.length >= tf.max) return false;
+        // 出杀时目标数上限受方天画戟/天义/疠火动态约束(与后端 slashTargetMax 同源);
+        // 其他多目标牌(铁索连环)用 prompt 静态 max。
+        const isSelectedSlash = selectedCard?.name === '杀';
+        const effMax = isSelectedSlash
+          ? viewSlashTargetMax(view, perspectiveIdx, selectedCard ?? undefined)
+          : tf.max;
+        if (selectedMultiTargets.length >= effMax) return false;
         if (i === perspectiveIdx && !tf.allowSelf) return false;
         return tf.filter ? tf.filter(view, i) : true;
       }
@@ -547,6 +554,7 @@ export function usePlayInteraction(
       selectedTarget,
       playRules,
       selectedMultiTargets,
+      selectedCard,
     ],
   );
 

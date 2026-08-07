@@ -506,8 +506,8 @@ describe('界破军', () => {
   it('多目标杀 → 每个目标独立触发破军询问', async () => {
     const slash = makeCard('s1', '杀', '♠', '5');
     const p0w = makeWeapon('p0w', '方天画戟', '♣', 4); // 攻击范围 4
-    // 给 P0 装备方天画戟让范围足够;并多准备 1 张手牌满足方天画戟条件(手牌仅 1 张时触发)
-    const p0e = makeCard('p0e', '闪', '♥', '2');
+    // P0 手牌仅此一张杀(方天画戟「最后一张手牌」多目标条件);
+    // skills 含方天画戟以实例化装备技能(注册 slashTargetMax provider)放宽目标上限。
     const t1a = makeCard('t1a', '闪', '♥', '3');
     const t2a = makeCard('t2a', '闪', '♦', '4');
     const state: GameState = createGameState({
@@ -515,9 +515,9 @@ describe('界破军', () => {
         makePlayer({
           index: 0,
           name: 'P0',
-          hand: ['s1', 'p0e'],
+          hand: ['s1'],
           equipment: { 武器: 'p0w' },
-          skills: ['杀', '界破军'],
+          skills: ['杀', '界破军', '方天画戟'],
           health: 4,
         }),
         makePlayer({
@@ -535,7 +535,7 @@ describe('界破军', () => {
           character: '刘备',
         }),
       ],
-      cardMap: { s1: slash, p0w, p0e, t1a, t2a },
+      cardMap: { s1: slash, p0w, t1a, t2a },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },

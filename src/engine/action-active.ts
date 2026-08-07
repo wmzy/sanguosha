@@ -39,6 +39,31 @@ export function viewSlashMax(view: ActionContext['view'], player: number): numbe
   return max;
 }
 
+/** 前端可计算的【杀】目标数上限(基于 view 装备/turnUsage/卡属性推断)。
+ *  与后端 slashTargetMax(state,player,cardId) 同源:默认 1;方天画戟(最后一张手牌)/
+ *  天义(拼点赢)/疠火(火杀)放宽。供前端选目标 UI 限制可选目标数,与后端 canUseSlash
+ *  权威校验对齐(后端是权威闸门,前端仅 UX 提示,避免玩家选了却被拒)。 */
+export function viewSlashTargetMax(
+  view: ActionContext['view'],
+  player: number,
+  card?: { name: string; damageType?: string },
+): number {
+  const p = view.players[player];
+  if (!p) return 1;
+  let max = 1;
+  // 方天画戟:装备方天画戟 + 手牌仅此一张(这张杀即最后一张手牌)。
+  // p.hand 仅 owner 视角可见;方天画戟多目标是自己出杀,视角为自己,故可读。
+  const weaponId = p.equipment['武器'];
+  const weapon = weaponId ? view.cardMap[weaponId] : undefined;
+  if (weapon?.name === '方天画戟' && (p.hand?.length ?? 0) === 1) max = 3;
+  // 天义(太史慈):拼点赢后本回合杀可额外指定一个目标(≤2)。
+  if (p.turnUsage?.['天义/win']) max = Math.max(max, 2);
+  // 疠火(界程普):owner 使用火杀时可多指定一个目标(≤3)。
+  if (card?.name === '杀' && card.damageType === '火焰' && p.skills?.includes('界疠火'))
+    max = Math.max(max, 3);
+  return max;
+}
+
 /** 前端视角下某玩家本回合已出杀次数(从 view.turnUsage 投影读)。
  *  turnUsage 由「回合用量」atom 实时同步,与后端 slashUsed()(额定+额外 合计)一致。 */
 export function viewSlashUsed(view: ActionContext['view'], player: number): number {

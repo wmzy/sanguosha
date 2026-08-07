@@ -23,6 +23,7 @@ import { runRankCompareFlow } from '../rank-flow';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction } from '../skill';
 import { registerSlashExtraProvider, registerSlashBlocker } from '../slash-quota';
+import { registerSlashTargetProvider } from '../slash-target';
 import { registerAttackRangeExemptor } from '../distance';
 
 /** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
@@ -73,6 +74,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     state,
     ownerId,
     (st, from, _to, _cardId) => st.turn.vars[WIN_VAR] === from,
+  );
+
+  // ─── 杀目标数提供者:拼点赢后本回合杀可额外指定一个目标(≤2) ──
+  const unloadTargetProvider = registerSlashTargetProvider(
+    state,
+    ownerId,
+    (st, player) => (st.turn.vars[WIN_VAR] === player ? 2 : 0),
   );
 
   // ─── use action:太史慈主动发动天义 ────────────────────────
@@ -199,6 +207,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     unloadProvider();
     unloadBlocker();
     unloadRangeExemptor();
+    unloadTargetProvider();
   };
 }
 

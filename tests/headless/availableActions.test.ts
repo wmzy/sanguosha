@@ -576,6 +576,73 @@ describe('enumerateAvailableActions', () => {
     expect(playDuanliang).toBeDefined();
     expect(playDuanliang!.message.params.cardId).toBe('c-blackspace');
   });
+
+  // ── maxTarget：杀目标数上限提示（方天画戟/天义/界疠火）
+  // AI 从 availableActions 读 maxTarget,据此从 validTargets 选不超过此数。
+  const fangtianCard: Card = {
+    id: 'fty',
+    name: '方天画戟',
+    suit: '♣',
+    color: '黑',
+    rank: '4',
+    type: '装备牌',
+  };
+
+  it('默认杀 maxTarget=1（无方天画戟）', () => {
+    const view = makeView3(0, '出牌', [killCard]);
+    const actions = enumerateAvailableActions(view, 0, [killUseAction]);
+    const play = actions.find((x) => x.category === 'play' && x.message.skillId === '杀');
+    expect(play).toBeDefined();
+    expect(play!.maxTarget).toBe(1);
+  });
+
+  it('方天画戟+最后一张手牌 → maxTarget=3，description 含目标数提示', () => {
+    const view = makeView3(0, '出牌', [killCard]); // 手牌仅此一张杀 = 最后一张手牌
+    view.players[0].equipment['武器'] = 'fty';
+    view.cardMap['fty'] = fangtianCard;
+    const actions = enumerateAvailableActions(view, 0, [killUseAction]);
+    const play = actions.find((x) => x.category === 'play' && x.message.skillId === '杀');
+    expect(play).toBeDefined();
+    expect(play!.maxTarget).toBe(3);
+    expect(play!.description).toContain('最多3个');
+  });
+
+  it('方天画戟但手牌>1张 → maxTarget=1（非最后一张手牌，条件不满足）', () => {
+    const view = makeView3(0, '出牌', [killCard, redCard]);
+    view.players[0].equipment['武器'] = 'fty';
+    view.cardMap['fty'] = fangtianCard;
+    const actions = enumerateAvailableActions(view, 0, [killUseAction]);
+    const play = actions.find((x) => x.category === 'play' && x.message.skillId === '杀');
+    expect(play).toBeDefined();
+    expect(play!.maxTarget).toBe(1);
+  });
+
+  it('天义拼点赢 → maxTarget=2', () => {
+    const view = makeView3(0, '出牌', [killCard, redCard]);
+    view.players[0].turnUsage = { '天义/win': true };
+    const actions = enumerateAvailableActions(view, 0, [killUseAction]);
+    const play = actions.find((x) => x.category === 'play' && x.message.skillId === '杀');
+    expect(play).toBeDefined();
+    expect(play!.maxTarget).toBe(2);
+  });
+
+  it('武圣转化杀：无装备 maxTarget=1', () => {
+    const view = makeView3(0, '出牌', [redCard]);
+    const actions = enumerateAvailableActions(view, 0, [wushengTransformAction]);
+    const tf = actions.find((x) => x.category === 'transform');
+    expect(tf).toBeDefined();
+    expect(tf!.maxTarget).toBe(1);
+  });
+
+  it('武圣转化杀：方天画戟+仅1张红牌 → maxTarget=3', () => {
+    const view = makeView3(0, '出牌', [redCard]); // 手牌仅此一张红牌
+    view.players[0].equipment['武器'] = 'fty';
+    view.cardMap['fty'] = fangtianCard;
+    const actions = enumerateAvailableActions(view, 0, [wushengTransformAction]);
+    const tf = actions.find((x) => x.category === 'transform');
+    expect(tf).toBeDefined();
+    expect(tf!.maxTarget).toBe(3);
+  });
 });
 
 // 回归测试：choosePlayer prompt（突袭/select、激将、节命、奋威 等）

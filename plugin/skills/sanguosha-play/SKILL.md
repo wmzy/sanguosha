@@ -66,6 +66,7 @@ allowed-tools: mcp__sanguosha__play, mcp__sanguosha__createRoom, mcp__sanguosha_
       "message": { "skillId": "杀", "actionType": "use", "ownerId": 0,
                    "params": { "cardId": "c1" }, "baseSeq": 0 },
       "validTargets": [1, 2, 3],
+      "maxTarget": 1,                             // 目标数上限(方天画戟/天义/界疠火放宽;未设默认 1)
       "category": "play" }
   ],
   "recentEvents": [...],                          // 上次以来的事件
@@ -80,7 +81,7 @@ allowed-tools: mcp__sanguosha__play, mcp__sanguosha__createRoom, mcp__sanguosha_
 | category | 含义 | 如何提交 |
 |---|---|---|
 | `selectChar` | 开局选将 | `message.params.character` 已填好，直接回传整个 message |
-| `play` | 主动出牌/用技 | 若 `validTargets` 非空，选一个目标填入 `message.params.targets`（数组）；否则直接回传 |
+| `play` | 主动出牌/用技 | 若 `validTargets` 非空，选 1~`maxTarget` 个目标填入 `message.params.targets`（数组，`maxTarget` 未设默认 1，如方天画戟最后一张手牌时为 3）；否则直接回传 |
 | `respond` | 回应询问（出闪等） | 直接回传 message；想放弃则不传 action（或传空 respond） |
 | `discard` | 弃牌阶段 | 选超出的牌填入 `message.params.cardIds`（数组） |
 | `transform` | 转化出牌（武圣/丈八蛇矛） | 按描述选牌回传 |

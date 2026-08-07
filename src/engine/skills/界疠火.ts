@@ -20,8 +20,8 @@
 //      + 已造成伤害 → 询问 owner 弃1手牌;若 owner 超时(选择"失去体力")或手牌为空,
 //      则失去 1 体力。
 //      询问 requestType='疠火/cost';respond 写入 COST_CARD_KEY。
-//   ④ 多目标:杀.use 的 validate 不限目标数上限,前端 targetFilter max=3 已允许,
-//      故 owner 使用任何火杀(原始或疠火转化)选 2 目标即可,无需额外改动。
+//   ④ 多目标:owner 注册 slashTargetProvider,使用火杀(原始或疠火转化)时返回 3,
+//      canUseSlash 据此放宽目标数上限。前端 targetFilter max=3 配合动态收窄。
 //
 // 命名:文件名/loader key/character skill name 均为 '界疠火'(避开标疠火冲突);
 //   内部 Skill.name = '疠火'(OL 官方技能名,玩家可见)。
@@ -40,6 +40,7 @@ import {
   hasBlockingPending,
 } from '../skill';
 import { defaultPlayActive, viewCanSlash } from '../action-active';
+import { registerSlashTargetProvider } from '../slash-target';
 
 const SKILL_ID = '界疠火';
 const DISPLAY_NAME = '疠火';
@@ -73,6 +74,14 @@ function damagedKey(shadowId: string): string {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
+
+  // ─── 杀目标数提供者:owner 的火杀可多指定一个目标(≤3) ──
+  // 原始火杀与疠火转化影子均 damageType='火焰',统一识别。
+  const unloadTarget = registerSlashTargetProvider(state, ownerId, (st, _player, cardId) => {
+    if (!cardId) return 0;
+    const card = st.cardMap[cardId];
+    return card?.name === '杀' && card.damageType === '火焰' ? 3 : 0;
+  });
 
   // ─── transform action:把非火杀转化为火杀影子(preceding,杀.use 之前) ──
   registerAction(
@@ -211,7 +220,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
   });
 
-  return () => {};
+  return () => {
+    unloadTarget();
+  };
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {

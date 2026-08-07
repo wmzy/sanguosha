@@ -64,6 +64,10 @@ export interface AvailableAction {
   message: EngineClientMessage;
   /** 合法目标座次列表（无目标操作为空）；cardFilter/targetFilter 已跑过 */
   validTargets: number[];
+  /** 目标数上限：仅杀等可多目标的操作设置（受方天画戟/天义/界疠火放宽）。
+   *  AI 据此从 validTargets 中选不超过 maxTarget 个；未设时默认 1。
+   *  后端 canUseSlash 是权威闸门，此处仅为提示，避免 AI 选了却被拒。 */
+  maxTarget?: number;
   /** 操作类别，便于 agent 分流：主动出牌 / 回应 / 弃牌 / 选将 / 转化 / 分配 */
   category: 'play' | 'respond' | 'discard' | 'selectChar' | 'transform' | 'distribute' | 'skip';
 }

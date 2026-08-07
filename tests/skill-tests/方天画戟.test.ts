@@ -142,4 +142,74 @@ describe('方天画戟', () => {
     expect(harness.state.players[1].health).toBe(3);
     expect(harness.state.zones.discardPile).toContain('k1');
   });
+
+  // ─── 负面:非最后一张手牌时多目标应被拒(核心 bug 修复) ───────────
+  // 旧实现杀不限目标数,任何情况都能多目标;现由 slashTargetMax 权威闸门强制
+  // 「仅最后一张手牌(手牌仅此一张)才允许多目标」。
+
+  it('负面:装备方天画戟但手牌>1张时,选 2 目标 → 被拒(仅最后一张手牌允许多目标)', async () => {
+    const kill = makeCard('k1', '杀', '♠', '7');
+    const spare = makeCard('x1', '闪', '♦', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1', 'x1'], // 2 张手牌 → 非最后一张,方天画戟不生效
+          skills: ['杀', '方天画戟'],
+          equipment: { 武器: 'fty' },
+        }),
+        makePlayer({ index: 1, name: 'P2', hand: ['s2'], skills: ['闪'] }),
+        makePlayer({ index: 2, name: 'P3', hand: ['s3'], skills: ['闪'] }),
+      ],
+      cardMap: {
+        fty: FANGTIAN,
+        k1: kill,
+        x1: spare,
+        s2: makeCard('s2', '闪', '♥', '4'),
+        s3: makeCard('s3', '闪', '♦', '5'),
+      },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    // 选 2 目标应被拒:默认目标上限 1,方天画戟需手牌仅此一张才放宽
+    await harness.player('P1').expectRejected({
+      skillId: '杀',
+      actionType: 'use',
+      params: { cardId: 'k1', targets: [1, 2] },
+    });
+  });
+
+  it('负面:无方天画戟时,最后一张手牌选 2 目标 → 被拒(默认目标上限 1)', async () => {
+    const kill = makeCard('k1', '杀', '♠', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['k1'], // 最后一张手牌,但无方天画戟
+          skills: ['杀'],
+        }),
+        makePlayer({ index: 1, name: 'P2', hand: ['s2'], skills: ['闪'] }),
+        makePlayer({ index: 2, name: 'P3', hand: ['s3'], skills: ['闪'] }),
+      ],
+      cardMap: {
+        k1: kill,
+        s2: makeCard('s2', '闪', '♥', '4'),
+        s3: makeCard('s3', '闪', '♦', '5'),
+      },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    // 无方天画戟:即使最后一张手牌,目标上限仍为 1
+    await harness.player('P1').expectRejected({
+      skillId: '杀',
+      actionType: 'use',
+      params: { cardId: 'k1', targets: [1, 2] },
+    });
+  });
 });
