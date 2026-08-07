@@ -32,6 +32,15 @@ import type { Room } from './room';
 import { createLogger } from './logger';
 import { setRoomStatus } from './room';
 import { saveRoom, deletePersistedRoom } from './persistence';
+import { createRng } from '../shared/rng';
+
+/** 计算座次轮转偏移:物理座位 i → 游戏座次 (i + offset) % n。
+ *  用 seed 派生(确定性,持久化/恢复可复现),使主公(游戏座次 0)随机分布到各物理座位——
+ *  房主不再恒为主公。常数偏移避免与 抽身份 的身份洗牌(同 seed)产生相关性。 */
+function computeSeatRotation(seed: number, n: number): number {
+  if (n <= 1) return 0;
+  return createRng(seed + 7919).nextInt(n);
+}
 
 /** 默认武将列表:使用引擎全量武将(allCharacters),供选将池使用。
  *  skills 字段来自武将数据(供选将 UI 显示);选完后只实例化引擎默认技能(见 系统规则·选将)。 */
@@ -111,15 +120,20 @@ export class GameSession {
     await bootstrap(fresh, config);
     await restore(fresh, config, actionLog);
     this.state = fresh;
+    // 恢复座次轮转偏移:与 startGame 一致(同 seed 派生),保证重连后视角不错位。
+    this.state.seatRotation = computeSeatRotation(config.seed, this.state.players.length);
     this.actionLog = fresh.actionLog;
     this.attachStateListener();
 
     // 从 room.seats 恢复 playerId → 座次下标映射,使重启后玩家可重连。
     // startGame 正常路径会在游戏开始时设置 playerNames;恢复路径需手动填充。
+    // 应用与 startGame 一致的座次轮转偏移(seatRotation),否则重连后视角错位。
+    const n = this.state.players.length;
+    const offset = this.state.seatRotation ?? 0;
     for (let i = 0; i < this.room.seats.length; i++) {
       const pid = this.room.seats[i];
       if (pid !== null) {
-        this.playerNames.set(pid, i);
+        this.playerNames.set(pid, (i + offset) % n);
       }
     }
   }
@@ -140,6 +154,9 @@ export class GameSession {
       timeoutScale: cfg.timeoutScale,
     };
     this.state = create(config);
+    // 座次轮转偏移:决定主公(游戏座次 0)对应哪个物理座位。在 bootstrap 之前同步设置,
+    // 供下方 playerId↔座次映射读取——房主不再恒为主公。随 seed 确定,可复现。
+    this.state.seatRotation = computeSeatRotation(config.seed, config.playerCount);
     // 挂载 state 变更回调:必须在 bootstrap 之前挂载!
     // 因为交互式选将(选将询问)会在 bootstrap 中创建 pending,
     // 需要 onStateChange 回调广播给客户端才能让玩家选将。
@@ -174,9 +191,15 @@ export class GameSession {
         if (seat < state.players.length) this.playerNames.set(playerIds[i], seat);
       }
     } else {
+      // 应用座次轮转偏移(seatRotation):物理座位 i(房主=0,其余按加入顺序)
+      // → 游戏座次 (i + seatRotation) % n。主公恒在游戏座次 0(引擎不变量),
+      // 经偏移后落到随机物理座位,房主不再恒为主公;玩家环形相对位置保持不变。
       const playerIds = [...this.room.players.keys()];
-      for (let i = 0; i < playerIds.length && i < state.players.length; i++) {
-        this.playerNames.set(playerIds[i], state.players[i].index);
+      const n = state.players.length;
+      const offset = state.seatRotation ?? 0;
+      for (let i = 0; i < playerIds.length && i < n; i++) {
+        const gameSeat = (i + offset) % n;
+        this.playerNames.set(playerIds[i], state.players[gameSeat].index);
       }
     }
 

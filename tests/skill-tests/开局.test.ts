@@ -9,7 +9,7 @@
 //   5. 正面:分配武将后体力值=武将卡牌 maxHealth(2人局人数≤4,主公不+1)
 //   6. 正面:5人局(人数>4)主公体力上限=maxHealth+1,非主公不加
 import { describe, it, expect, beforeEach } from 'vitest';
-import { bootstrap, type GameConfig } from '../../src/engine/index';
+import { bootstrap, applyAtom, type GameConfig } from '../../src/engine/index';
 import { dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -311,4 +311,34 @@ describe('开局', () => {
       if (isLord) expect(state.players.filter((p) => p.identity === '主公').length).toBe(1);
     }
   }, 30000);
+
+  // ─── 身份分配座次轮转 (rotate) ──────────────────────────
+  // 修复:房主不再恒为主公。抽身份随机洗牌后【轮转】(非交换)使主公落 index 0,
+  // 保持身份环形相对顺序;主公对应哪个物理座位由 session 层 seatRotation 决定。
+
+  it('抽身份:主公轮转到 index0,身份计数正确(轮转不变量)', async () => {
+    const s = createGameState({
+      players: [0, 1, 2, 3].map((i) => makePlayer({ index: i, name: `P${i}` })),
+      cardMap: {},
+    });
+    await applyAtom(s, { type: '抽身份', playerCount: 4, seed: 42 });
+
+    // 轮转后主公恒在 index 0(引擎不变量:游戏座次 0 = 主公 = 回合起点)
+    expect(s.players[0].identity).toBe('主公');
+    // 身份总数正确(4 人场:1 主 1 忠 1 反 1 内)
+    const counts: Record<string, number> = {};
+    for (const p of s.players) counts[p.identity] = (counts[p.identity] ?? 0) + 1;
+    expect(counts).toEqual({ 主公: 1, 忠臣: 1, 反贼: 1, 内奸: 1 });
+  });
+
+  it('抽身份:多 seed 下主公恒在 index0(轮转非交换,保持引擎不变量)', async () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const s = createGameState({
+        players: [0, 1, 2, 3].map((i) => makePlayer({ index: i, name: `P${i}` })),
+        cardMap: {},
+      });
+      await applyAtom(s, { type: '抽身份', playerCount: 4, seed });
+      expect(s.players[0].identity).toBe('主公');
+    }
+  });
 });

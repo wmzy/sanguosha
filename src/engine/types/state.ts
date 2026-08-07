@@ -113,6 +113,10 @@ export interface GameState {
   cardMap: Record<string, Card>;
   cardWrappers: Record<string, CardWrapper>;
   rngSeed: number;
+  /** 座次轮转偏移:物理座位 i → 游戏座次 (i + seatRotation) % playerCount。
+ *  由 session 在 startGame 时基于 seed 派生(确定性,恢复可复现),用于 playerId↔座次映射,
+ *  使主公(游戏座次 0)落到随机物理座位——房主不再恒为主公。0=无偏移。 */
+  seatRotation: number;
   marks: Mark[];
   localVars: Record<string, Json>;
   meta: { gameId: string; createdAt: number };
@@ -165,6 +169,7 @@ export function createGameState(
     pendingSlots: new Map(),
     cardWrappers: {},
     rngSeed: 0,
+    seatRotation: 0,
     marks: [],
     localVars: {},
     meta: { gameId: '', createdAt: 0 },

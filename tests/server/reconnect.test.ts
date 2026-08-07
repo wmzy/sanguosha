@@ -7,6 +7,7 @@ import '../../src/engine/skills';
 import { GameSession, RECONNECT_GRACE_MS } from '../../src/server/session';
 import { deletePersistedRoom } from '../../src/server/persistence';
 import { addRoom, type Room } from '../../src/server/room';
+import type { GameState } from '../../src/engine/types';
 import { gameSessions } from '../../src/server/registry';
 import type { ConnectionSink } from '../../src/server/connection';
 import type { ServerMessage } from '../../src/server/protocol';
@@ -415,5 +416,46 @@ describe('SSE onAbort session 查询时机', () => {
     expect((session as unknown as { destroyed: boolean }).destroyed).toBe(true);
     vi.useRealTimers();
     gameSessions.delete(room.id);
+  }, 15000);
+});
+
+describe('身份分配座次轮转 (multiplayer 非 debug)', () => {
+  // 修复:房主不再恒为主公。抽身份随机产生 seatRotation,session 据此映射
+  // 物理座位 i → 游戏座次 (i+seatRotation)%n,使主公(游戏座次 0)随机分布到各物理座位。
+  it('多 seed:房主(host)的游戏座次随 seatRotation 变化,不恒为 0(主公)', async () => {
+    const seeds = 12;
+    let hostIsLord = 0;
+    for (let seed = 1; seed <= seeds; seed++) {
+      const { room } = makeMultiplayerRoom(['host', 'g1', 'g2', 'g3']);
+      const session = new GameSession(room, false, seed);
+      await session.startGame();
+      const state = getState(session) as GameState;
+      const offset = state.seatRotation;
+      const hostSeat = session.getPlayerName('host');
+      // 映射正确性:物理座位 0(房主) → 游戏座次 (0+offset)%n(seatRotation 在 startGame 同步设置)
+      expect(hostSeat).toBe((0 + offset) % 4);
+      // 等 bootstrap 异步推进到抽身份完成(主公身份就绪)
+      for (let i = 0; i < 100 && state.players[0].identity !== '主公'; i++) await sleep(10);
+      expect(state.players[0].identity).toBe('主公');
+      if (hostSeat === 0) hostIsLord++;
+    }
+    // 旧 bug:房主恒为主公(hostSeat 恒 0,hostIsLord===seeds)。修复后应有 seed 让房主非主公。
+    expect(hostIsLord).toBeLessThan(seeds);
+  }, 30000);
+
+  it('4 人场:所有物理座位映射 = (i+seatRotation)%n,主公落到随机物理座位', async () => {
+    const { room } = makeMultiplayerRoom(['h', 'a', 'b', 'c']);
+    const session = new GameSession(room, false, 99);
+    await session.startGame();
+    const state = getState(session) as GameState;
+    const offset = state.seatRotation;
+    const n = 4;
+    const pids = ['h', 'a', 'b', 'c'];
+    for (let i = 0; i < n; i++) {
+      expect(session.getPlayerName(pids[i])).toBe((i + offset) % n);
+    }
+    // 主公(游戏座次 0)对应的物理座位 = (n-offset)%n,该玩家应映射到游戏座次 0
+    const lordPhysSeat = (n - offset) % n;
+    expect(session.getPlayerName(pids[lordPhysSeat])).toBe(0);
   }, 15000);
 });

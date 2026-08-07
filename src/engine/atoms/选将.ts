@@ -82,16 +82,20 @@ export const 抽身份: AtomDefinition<{
       identities[j] = tmp;
     }
 
-    // 分配身份,主公固定 0 号位
+    // 轮转身份数组使主公落到 index 0(数组首 = 游戏座次 0 = 回合起点 = 主公)。
+    // 轮转而非交换:保持身份的环形相对顺序(主公与上下家的邻接关系不被打乱),
+    // 等价于标准三国杀"谁抽到主公谁就是 1 号位,回合从主公顺时针开始"。
+    // 注:主公对应哪个"物理座位"(房主是否当主公)由 session 层的 seatRotation 决定——
+    //   在 startGame 时基于 seed 随机生成并应用于 playerId↔座次映射,与本轮转解耦。
     const lordIndex = identities.indexOf('主公');
-    if (lordIndex > 0) {
-      identities[lordIndex] = identities[0];
-      identities[0] = '主公';
-    }
+    const rotated =
+      lordIndex > 0
+        ? [...identities.slice(lordIndex), ...identities.slice(0, lordIndex)]
+        : identities;
 
     // 更新玩家身份(单一来源:identity 字段)
     for (let i = 0; i < state.players.length; i++) {
-      const id = identities[i] || '未知';
+      const id = rotated[i] || '未知';
       state.players[i].identity = id as PlayerState['identity'];
     }
   },
