@@ -1,22 +1,98 @@
 // src/client/replay/recorder.ts
-// 录制器:收集各座次的 ViewEvent,游戏结束时组装为 ReplayFile。
+// 录制器:收集各座次的 ViewEvent,游戏结束时组装为 v2 ReplayFile(baseline + delta)。
 //
 // 接入点:连接层(useDebugMultiConnection / useMultiplayerRoom)在 HGC onView
 // 回调中拿到 newEvents 后调用 record()。
 //
-// initialView 在座次首次产生非空 view 时深拷贝捕获(JSON 序列化剥离函数引用)。
+// 内部仍逐座次收集完整 initialView(深拷贝),在 finalize 时:
+//   1. 取最小座次的 initialView 提取公共 baseline(cardMap/log/turn/公开玩家信息…)
+//   2. 为每座次计算私有 delta(viewer 手牌 + 身份可见性 + 事件流[去冗余 seq])
+// 这样录制逻辑零改动,去重归并集中在 finalize 一步。
 
 import type { GameView, ViewEvent } from '../../engine/types';
-import type { ReplayFile, ReplayMeta, SeatRecording } from './types';
+import type {
+  ReplayBaseline,
+  ReplayEvent,
+  ReplayFile,
+  ReplayMeta,
+  SeatDelta,
+} from './types';
 
 /** 深拷贝 GameView(剥离函数引用,保证 JSON 可序列化) */
 function cloneView(view: GameView): GameView {
   return JSON.parse(JSON.stringify(view)) as GameView;
 }
 
+/** recorder 内部中间结构:完整 initialView + 带 seq 的 events(录制期用) */
+interface InternalSeat {
+  seatIndex: number;
+  playerName: string;
+  initialView: GameView;
+  events: Array<{ seq: number; time: number; event: ViewEvent }>;
+}
+
+/** 从某座次 initialView 提取公共 baseline(剥离 viewer-dependent 字段) */
+function extractBaseline(view: GameView): ReplayBaseline {
+  const {
+    cardMap,
+    log,
+    turn,
+    phase,
+    currentPlayerIndex,
+    zones,
+    settlementStack,
+    pending,
+    deadline,
+    deadlineTotalMs,
+    players,
+  } = view;
+  return {
+    cardMap,
+    log,
+    turn,
+    phase,
+    currentPlayerIndex,
+    zones,
+    settlementStack,
+    pending,
+    deadline,
+    deadlineTotalMs,
+    // players 剥离 hand/identity/identityHidden(这三个是 viewer-dependent)
+    players: players.map((p) => {
+      const { hand: _hand, identity: _identity, identityHidden: _hidden, ...pub } = p;
+      return pub;
+    }),
+  };
+}
+
+/** 从内部座次记录提取私有 delta */
+function extractDelta(rec: InternalSeat): SeatDelta {
+  const v = rec.initialView;
+  const privateHands: SeatDelta['privateHands'] = [];
+  const identityView: SeatDelta['identityView'] = [];
+  for (const p of v.players) {
+    if (p.hand !== undefined) {
+      privateHands.push({ index: p.index, hand: p.hand });
+    }
+    identityView.push({
+      index: p.index,
+      identity: p.identity,
+      identityHidden: p.identityHidden,
+    });
+  }
+  const events: ReplayEvent[] = rec.events.map((e) => ({ time: e.time, event: e.event }));
+  return {
+    viewer: v.viewer,
+    playerName: rec.playerName,
+    privateHands,
+    identityView,
+    events,
+  };
+}
+
 export class ReplayRecorder {
-  /** seatIndex → 录像 */
-  private seats = new Map<number, SeatRecording>();
+  /** seatIndex → 内部录像 */
+  private seats = new Map<number, InternalSeat>();
   /** 各座次内部 seq 计数器 */
   private seqCounters = new Map<number, number>();
   /** 各座次是否已捕获 initialView */
@@ -66,13 +142,41 @@ export class ReplayRecorder {
     return this.initialized.size > 0;
   }
 
-  /** 组装最终录像文件。游戏结束时调用。 */
+  /** 组装最终录像文件(v2: baseline + delta)。游戏结束时调用。 */
   finalize(meta: ReplayMeta): ReplayFile {
-    const seats: Record<number, SeatRecording> = {};
-    for (const [seat, rec] of this.seats) {
-      seats[seat] = rec;
+    const entries = [...this.seats.entries()].sort((a, b) => a[0] - b[0]);
+    if (entries.length === 0) {
+      // 无数据:返回空 baseline(调用方一般先 hasData 检查)
+      return {
+        format: 'sanguosha-replay',
+        version: 2,
+        meta,
+        baseline: {
+          cardMap: {},
+          log: [],
+          turn: { round: 0, phase: '准备', vars: {} },
+          phase: '准备',
+          currentPlayerIndex: 0,
+          zones: { deckCount: 0, discardPileCount: 0, processing: [] },
+          settlementStack: [],
+          pending: null,
+          deadline: null,
+          deadlineTotalMs: 0,
+          players: [],
+        },
+        seats: {},
+      };
     }
-    return { format: 'sanguosha-replay', version: 1, meta, seats };
+
+    // 取最小座次的 initialView 作为 baseline 基准
+    const [, base] = entries[0];
+    const baseline = extractBaseline(base.initialView);
+
+    const seats: Record<number, SeatDelta> = {};
+    for (const [seat, rec] of entries) {
+      seats[seat] = extractDelta(rec);
+    }
+    return { format: 'sanguosha-replay', version: 2, meta, baseline, seats };
   }
 
   /** 清空(新一局重置) */

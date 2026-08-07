@@ -46,13 +46,16 @@ const META: ReplayMeta = {
 };
 
 describe('ReplayRecorder', () => {
-  it('首次 record 捕获 initialView', () => {
+  it('首次 record 捕获 initialView(提取为 baseline + delta)', () => {
     const r = new ReplayRecorder();
     const view = makeView(0, '刘备');
     r.record(0, view, []);
     const file = r.finalize(META);
     expect(file.seats[0]).toBeDefined();
-    expect(file.seats[0].initialView.players[0].name).toBe('刘备');
+    // 玩家名从 delta 取
+    expect(file.seats[0].playerName).toBe('刘备');
+    // 公共玩家信息从 baseline 取
+    expect(file.baseline.players[0].name).toBe('刘备');
   });
 
   it('累积 events,seq 递增', () => {
@@ -62,7 +65,8 @@ describe('ReplayRecorder', () => {
     r.record(0, view, [makeEvent('出牌')]);
     const file = r.finalize(META);
     expect(file.seats[0].events).toHaveLength(3);
-    expect(file.seats[0].events.map((e) => e.seq)).toEqual([0, 1, 2]);
+    // v2: seq 字段已移除,数组下标即序号
+    expect(file.seats[0].events.map((e, i) => i)).toEqual([0, 1, 2]);
   });
 
   it('view 为 null 时不捕获 initialView,后续事件丢弃', () => {
@@ -86,8 +90,8 @@ describe('ReplayRecorder', () => {
     expect(r.hasData()).toBe(true);
     const file = r.finalize(META);
     expect(file.seats[0]).toBeDefined();
-    // initialView 捕获于选将完成后,武将名非空
-    expect(file.seats[0].initialView.players[0].character).toBe('刘备');
+    // initialView 捕获于选将完成后,武将名非空(从 baseline 验证)
+    expect(file.baseline.players[0].character).toBe('刘备');
     // 选将阶段的「分配武将」事件被丢弃,只记录选将完成后的「回合开始」
     expect(file.seats[0].events).toHaveLength(1);
     expect(file.seats[0].events[0].event.type).toBe('回合开始');
@@ -110,7 +114,8 @@ describe('ReplayRecorder', () => {
     // 突变原始 view
     view.players[0].health = 1;
     const file = r.finalize(META);
-    expect(file.seats[0].initialView.players[0].health).toBe(4);
+    // baseline 深拷贝,不受原始 view 突变影响
+    expect(file.baseline.players[0].health).toBe(4);
   });
 
   it('reset 清空所有座次', () => {
@@ -126,7 +131,7 @@ describe('ReplayRecorder', () => {
     const r = new ReplayRecorder();
     const file = r.finalize(META);
     expect(file.format).toBe('sanguosha-replay');
-    expect(file.version).toBe(1);
+    expect(file.version).toBe(2);
     expect(file.meta).toEqual(META);
   });
 

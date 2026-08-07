@@ -10,12 +10,12 @@
 
 // 节奏调度与事件同步是本次改造契约;view 重建(reducer 调 applyView)由
 // tests/unit/replay-engine.test.ts 专门覆盖。这里 mock 掉 replayEngine 避开
-// atom 注册表依赖,直接返回 initialView。
+// atom 注册表依赖。v2 录像不再按座次存完整初始视图,改用挂在 file.__stubView 上的
+// stub GameView(本测试只关心事件节奏,view 内容不重要,只要非 null 避免 Loading)。
 vi.mock('../../src/client/replay/replayEngine', () => ({
-  getViewAt: (file: import('../../src/client/replay/types').ReplayFile, seat: number) =>
-    file.seats[seat]?.initialView ?? null,
+  getViewAt: (file: { __stubView?: unknown }) => file.__stubView ?? null,
   totalSteps: (rec: { events?: unknown[] } | undefined) => rec?.events?.length ?? 0,
-  availableSeats: (file: import('../../src/client/replay/types').ReplayFile) =>
+  availableSeats: (file: { seats: Record<number, unknown> }) =>
     Object.keys(file.seats)
       .map(Number)
       .sort((a, b) => a - b),
@@ -24,7 +24,7 @@ vi.mock('../../src/client/replay/replayEngine', () => ({
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useReplay } from '../../src/client/hooks/useReplay';
-import type { ReplayFile, SeatRecording } from '../../src/client/replay/types';
+import type { ReplayFile, SeatDelta } from '../../src/client/replay/types';
 import type { GameView, ViewEvent } from '../../src/engine/types';
 
 // ─── 测试夹具 ───
@@ -80,22 +80,40 @@ function makeEvent(type: string, duration: number): ViewEvent {
   };
 }
 
-function makeSeat(events: ViewEvent[], seatIndex = 0): SeatRecording {
+function makeSeat(events: ViewEvent[], seatIndex = 0): SeatDelta {
   return {
-    seatIndex,
+    viewer: seatIndex,
     playerName: `P${seatIndex}`,
-    initialView: makeView(),
-    events: events.map((event, i) => ({ seq: i + 1, time: i * 100, event })),
+    privateHands: [],
+    identityView: [],
+    // v2: 数组下标即序号,事件条目不再显式存序号字段
+    events: events.map((event, i) => ({ time: i * 100, event })),
   };
 }
 
-function makeReplay(seats: Record<number, SeatRecording>): ReplayFile {
-  return {
+function makeReplay(seats: Record<number, SeatDelta>): ReplayFile & { __stubView: GameView } {
+  const file: ReplayFile & { __stubView?: GameView } = {
     format: 'sanguosha-replay',
-    version: 1,
+    version: 2,
     meta: { createdAt: 1000, playerCount: 2, characters: ['刘备', '曹操'] },
+    baseline: {
+      players: [],
+      cardMap: {},
+      log: [],
+      turn: { round: 1, phase: '出牌', vars: {} },
+      phase: '出牌',
+      currentPlayerIndex: 0,
+      zones: { deckCount: 0, discardPileCount: 0, processing: [] },
+      settlementStack: [],
+      pending: null,
+      deadline: null,
+      deadlineTotalMs: 0,
+    },
     seats,
   };
+  // mock 的 getViewAt 从这里取 stub view(非 null 即可,内容不重要)
+  file.__stubView = makeView();
+  return file as ReplayFile & { __stubView: GameView };
 }
 
 // ─── 测试 ───

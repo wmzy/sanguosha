@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
-import type { ReplayFile } from '../../src/client/replay/types';
+import type { ReplayFile, ReplayBaseline, PublicPlayerView } from '../../src/client/replay/types';
 
 const DOWNLOAD_DIR = path.join(process.cwd(), 'test-results', 'downloads');
 const LOG_DIR = path.join(process.cwd(), 'test-results', 'logs');
@@ -49,26 +49,56 @@ function createTestReplayFile(): ReplayFile {
     settlementStack: [],
   };
 
+  // v2: 去掉冗余 seq(数组下标即序号)
   const events = [
-    { seq: 0, time: 1000, event: { type: '回合开始', player: 0, round: 1 } },
-    { seq: 1, time: 1001, event: { type: '阶段开始', player: 0, phase: '摸牌' } },
-    { seq: 2, time: 1002, event: { type: '摸牌', player: 0, count: 2 } },
-    { seq: 3, time: 1003, event: { type: '阶段结束', player: 0, phase: '摸牌' } },
-    { seq: 4, time: 1004, event: { type: '阶段开始', player: 0, phase: '出牌' } },
-    { seq: 5, time: 1005, event: { type: '扣减体力', target: 1, amount: 1 } },
-    { seq: 6, time: 1006, event: { type: '阶段结束', player: 0, phase: '出牌' } },
+    { time: 1000, event: { type: '回合开始', player: 0, round: 1 } },
+    { time: 1001, event: { type: '阶段开始', player: 0, phase: '摸牌' } },
+    { time: 1002, event: { type: '摸牌', player: 0, count: 2 } },
+    { time: 1003, event: { type: '阶段结束', player: 0, phase: '摸牌' } },
+    { time: 1004, event: { type: '阶段开始', player: 0, phase: '出牌' } },
+    { time: 1005, event: { type: '扣减体力', target: 1, amount: 1 } },
+    { time: 1006, event: { type: '阶段结束', player: 0, phase: '出牌' } },
   ];
+
+  // v2: baseline = baseView 的公共部分(剥离 viewer/hand/identity)
+  const { viewer: _v, players, ...publicFields } = baseView;
+  const baseline: ReplayBaseline = {
+    ...publicFields,
+    players: players.map((p) => {
+      const { identity: _id, identityHidden: _ih, hand: _h, ...pub } = p as Record<
+        string,
+        unknown
+      >;
+      return pub as PublicPlayerView;
+    }),
+  };
 
   return {
     format: 'sanguosha-replay',
-    version: 1,
+    version: 2,
     meta: { createdAt: Date.now(), playerCount: 2, characters: ['曹操', '刘备'] },
+    baseline,
     seats: {
-      0: { seatIndex: 0, playerName: '曹操', initialView: baseView, events },
+      0: {
+        viewer: 0,
+        playerName: '曹操',
+        privateHands: [],
+        identityView: players.map((p) => ({
+          index: (p as { index: number }).index,
+          identity: (p as { identity?: string }).identity,
+          identityHidden: (p as { identityHidden?: boolean }).identityHidden,
+        })),
+        events,
+      },
       1: {
-        seatIndex: 1,
+        viewer: 1,
         playerName: '刘备',
-        initialView: { ...baseView, viewer: 1 },
+        privateHands: [],
+        identityView: players.map((p) => ({
+          index: (p as { index: number }).index,
+          identity: (p as { identity?: string }).identity,
+          identityHidden: (p as { identityHidden?: boolean }).identityHidden,
+        })),
         events,
       },
     },

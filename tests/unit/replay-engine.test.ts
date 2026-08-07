@@ -1,11 +1,16 @@
 // 回放引擎纯函数测试。
-// 验证 getViewAt 从 initialView 起步逐步 applyView 重建任意时刻视图。
+// 验证 getViewAt 从 baseline + seatDelta 重建 initialView,逐步 applyView 重建任意时刻视图。
 // 使用真实 atom 事件(摸牌/造成伤害)验证 applyView 正确应用。
 
 // @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 import { getViewAt, totalSteps, availableSeats } from '../../src/client/replay/replayEngine';
-import type { ReplayFile, SeatRecording } from '../../src/client/replay/types';
+import type {
+  ReplayFile,
+  SeatDelta,
+  ReplayBaseline,
+  ReplayEvent,
+} from '../../src/client/replay/types';
 import type { GameView } from '../../src/engine/types';
 
 function makeView(): GameView {
@@ -49,27 +54,59 @@ function makeView(): GameView {
   };
 }
 
-function makeSeat(events: SeatRecording['events']): SeatRecording {
+/** 从 makeView() 拆出跨座次共享的公共部分(players 去掉 viewer-dependent 的私有字段)。 */
+function makeBaseline(): ReplayBaseline {
+  const view = makeView();
   return {
-    seatIndex: 0,
-    playerName: '刘备',
-    initialView: makeView(),
+    cardMap: view.cardMap,
+    log: view.log,
+    turn: view.turn,
+    phase: view.phase,
+    currentPlayerIndex: view.currentPlayerIndex,
+    zones: view.zones,
+    settlementStack: view.settlementStack,
+    pending: view.pending,
+    deadline: view.deadline,
+    deadlineTotalMs: view.deadlineTotalMs,
+    players: view.players.map((p) => {
+      const { hand, identity, identityHidden, ...pub } = p;
+      return pub;
+    }),
+  };
+}
+
+/** 构造单座次私有差异。makeView() 的 players 不含 hand 字段,privateHands 为空;
+ *  identityView 全部映射(身份均为 undefined,即未分配)。 */
+function makeSeat(events: ReplayEvent[], viewer = 0): SeatDelta {
+  const view = makeView();
+  return {
+    viewer,
+    playerName: view.players[viewer]?.name ?? `P${viewer}`,
+    privateHands: view.players
+      .filter((p) => p.hand !== undefined)
+      .map((p) => ({ index: p.index, hand: p.hand! })),
+    identityView: view.players.map((p) => ({
+      index: p.index,
+      identity: p.identity,
+      identityHidden: p.identityHidden,
+    })),
     events,
   };
 }
 
-function makeReplay(seats: Record<number, SeatRecording>): ReplayFile {
+function makeReplay(seats: Record<number, SeatDelta>): ReplayFile {
   return {
     format: 'sanguosha-replay',
-    version: 1,
+    version: 2,
     meta: { createdAt: 1000, playerCount: 2, characters: ['刘备', '曹操'] },
+    baseline: makeBaseline(),
     seats,
   };
 }
 
 describe('totalSteps', () => {
   it('返回 events 长度', () => {
-    expect(totalSteps(makeSeat([{ seq: 0, time: 0, event: { type: '摸牌' } }]))).toBe(1);
+    expect(totalSteps(makeSeat([{ time: 0, event: { type: '摸牌' } }]))).toBe(1);
   });
 
   it('undefined 返回 0', () => {
@@ -98,7 +135,6 @@ describe('getViewAt', () => {
     const file = makeReplay({
       0: makeSeat([
         {
-          seq: 0,
           time: 0,
           event: { type: '扣减体力', target: 0, amount: 1 },
         },
@@ -117,7 +153,7 @@ describe('getViewAt', () => {
 
   it('step 超出范围 clamp 到 totalSteps', () => {
     const file = makeReplay({
-      0: makeSeat([{ seq: 0, time: 0, event: { type: '扣减体力', target: 0, amount: 1 } }]),
+      0: makeSeat([{ time: 0, event: { type: '扣减体力', target: 0, amount: 1 } }]),
     });
     // step=100 远超 events.length=1,应 clamp 到 1
     const view = getViewAt(file, 0, 100)!;
@@ -133,8 +169,8 @@ describe('getViewAt', () => {
   it('多步累积:连续两次伤害血量 -2', () => {
     const file = makeReplay({
       0: makeSeat([
-        { seq: 0, time: 0, event: { type: '扣减体力', target: 0, amount: 1 } },
-        { seq: 1, time: 0, event: { type: '扣减体力', target: 0, amount: 1 } },
+        { time: 0, event: { type: '扣减体力', target: 0, amount: 1 } },
+        { time: 0, event: { type: '扣减体力', target: 0, amount: 1 } },
       ]),
     });
     expect(getViewAt(file, 0, 0)!.players[0].health).toBe(4);
@@ -142,24 +178,22 @@ describe('getViewAt', () => {
     expect(getViewAt(file, 0, 2)!.players[0].health).toBe(2);
   });
 
-  it('不污染录像原始数据(initialView 保持初始值)', () => {
+  it('不污染录像原始数据(baseline 保持初始值)', () => {
     const seat = makeSeat([
-      { seq: 0, time: 0, event: { type: '扣减体力', target: 0, amount: 3 } },
+      { time: 0, event: { type: '扣减体力', target: 0, amount: 3 } },
     ]);
     const file = makeReplay({ 0: seat });
     getViewAt(file, 0, 1);
-    // 原始 initialView 不被突变
-    expect(seat.initialView.players[0].health).toBe(4);
+    // 原始 baseline 不被突变(reconstructInitialView 深拷贝 baseline)
+    expect(file.baseline.players[0].health).toBe(4);
   });
 
   it('不同座次独立重建', () => {
     const file = makeReplay({
       0: makeSeat([
-        { seq: 0, time: 0, event: { type: '扣减体力', target: 0, amount: 1 } },
+        { time: 0, event: { type: '扣减体力', target: 0, amount: 1 } },
       ]),
-      1: makeSeat([
-        { seq: 0, time: 0, event: { type: '扣减体力', target: 1, amount: 2 } },
-      ]),
+      1: makeSeat([{ time: 0, event: { type: '扣减体力', target: 1, amount: 2 } }], 1),
     });
     expect(getViewAt(file, 0, 1)!.players[0].health).toBe(3);
     expect(getViewAt(file, 1, 1)!.players[1].health).toBe(2);

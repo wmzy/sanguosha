@@ -103,7 +103,8 @@ export function useReplay(file: ReplayFile): UseReplayResult {
       const newStep = cur + 1;
       const ev = file.seats[seat].events[newStep - 1];
       if (ev) {
-        const qe: QueuedEvent = { seq: ev.seq, event: ev.event };
+        // v2: seq 字段已移除,数组下标即序号(newStep-1)
+        const qe: QueuedEvent = { seq: newStep - 1, event: ev.event };
         setCurrentEvent(qe);
         setIngestedEvents([qe]);
       }
@@ -152,7 +153,7 @@ export function useReplay(file: ReplayFile): UseReplayResult {
       const newStep = Math.max(0, cur - 1);
       const ev = newStep > 0 ? file.seats[seat].events[newStep - 1] : null;
       // prev 同步更新 currentEvent(显示当前位置的横幅),但不入历史条(避免反向污染累加)
-      setCurrentEvent(ev ? { seq: ev.seq, event: ev.event } : null);
+      setCurrentEvent(ev ? { seq: newStep - 1, event: ev.event } : null);
       setIngestedEvents([]);
       return newStep;
     });

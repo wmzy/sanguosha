@@ -81,7 +81,7 @@ describe('回放装备状态复现', () => {
     const recorder = new ReplayRecorder();
     const viewers = [0, 1];
 
-    // 捕获 initialView(空 events)
+    // 捕获 baseline 初始视图(空 events)
     for (const v of viewers) {
       recorder.record(v, buildView(h.state, v), []);
     }
@@ -133,7 +133,7 @@ describe('回放装备状态复现', () => {
     fs.writeFileSync('/tmp/sgs-replay-equip.json', JSON.stringify(file, null, 2));
     const total = file.seats[0].events.length;
     console.log('P0 总步数:', total);
-    console.log('P0 initialView equipment:', file.seats[0].initialView.players[0].equipment);
+    console.log('P0 baseline equipment:', file.baseline.players[0].equipment);
     console.log(
       'P0 final processedView equipment:',
       h.player(0).processedView.players[0].equipment,
@@ -149,7 +149,7 @@ describe('回放装备状态复现', () => {
       );
     }
 
-    // step=0:initialView,P0 无武器
+    // step=0:baseline,P0 无武器
     expect(getViewAt(file, 0, 0)!.players[0].equipment['武器']).toBeUndefined();
 
     // 找到装备事件的位置,验证之后武器存在
@@ -226,9 +226,9 @@ describe('回放装备状态复现', () => {
       characters: ['P0', 'P1'],
     });
 
-    // initialView 的 cardMap 应含武器卡
-    const initCardMap = file.seats[0].initialView.cardMap;
-    console.log('initialView cardMap has weapon?', weapon.id in initCardMap);
+    // baseline 的 cardMap 应含武器卡
+    const initCardMap = file.baseline.cardMap;
+    console.log('baseline cardMap has weapon?', weapon.id in initCardMap);
 
     // 回放视图的 cardMap 也应含武器卡
     const replayed = getViewAt(file, 0, file.seats[0].events.length)!;

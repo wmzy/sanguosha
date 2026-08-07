@@ -17,7 +17,7 @@ export function saveReplay(file: ReplayFile): void {
   URL.revokeObjectURL(url);
 }
 
-/** 校验对象是否符合 ReplayFile 结构 */
+/** 校验对象是否符合 ReplayFile 结构(v2: baseline + delta) */
 export function isReplayFile(value: unknown): value is ReplayFile {
   if (typeof value !== 'object' || value === null) return false;
   const o = value as Record<string, unknown>;
@@ -28,13 +28,19 @@ export function isReplayFile(value: unknown): value is ReplayFile {
   if (typeof meta['createdAt'] !== 'number') return false;
   if (typeof meta['playerCount'] !== 'number') return false;
   if (!Array.isArray(meta['characters'])) return false;
+  // baseline 必须存在且含 cardMap/players
+  if (typeof o['baseline'] !== 'object' || o['baseline'] === null) return false;
+  const baseline = o['baseline'] as Record<string, unknown>;
+  if (typeof baseline['cardMap'] !== 'object' || baseline['cardMap'] === null) return false;
+  if (!Array.isArray(baseline['players'])) return false;
   if (typeof o['seats'] !== 'object' || o['seats'] === null) return false;
   const seats = o['seats'] as Record<string, unknown>;
   for (const key in seats) {
     const seat = seats[key] as Record<string, unknown>;
-    if (typeof seat['seatIndex'] !== 'number') return false;
+    if (typeof seat['viewer'] !== 'number') return false;
     if (typeof seat['playerName'] !== 'string') return false;
-    if (typeof seat['initialView'] !== 'object' || seat['initialView'] === null) return false;
+    if (!Array.isArray(seat['privateHands'])) return false;
+    if (!Array.isArray(seat['identityView'])) return false;
     if (!Array.isArray(seat['events'])) return false;
   }
   return true;

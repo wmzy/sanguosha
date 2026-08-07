@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { saveReplay, loadReplay, isReplayFile } from '../../src/client/replay/replayFile';
-import type { ReplayFile } from '../../src/client/replay/types';
+import type { ReplayFile, ReplayBaseline } from '../../src/client/replay/types';
 
 const mockClick = vi.fn();
 const mockRevokeObjectURL = vi.fn();
@@ -22,29 +22,34 @@ beforeEach(() => {
   } as unknown as HTMLAnchorElement);
 });
 
+/** v2 baseline 最小结构(参考 recorder.ts 空数据兜底) */
+const baseline: ReplayBaseline = {
+  cardMap: {},
+  log: [],
+  turn: { round: 1, phase: '出牌', vars: {} },
+  phase: '出牌',
+  currentPlayerIndex: 0,
+  zones: { deckCount: 0, discardPileCount: 0, processing: [] },
+  settlementStack: [],
+  pending: null,
+  deadline: null,
+  deadlineTotalMs: 0,
+  players: [],
+};
+
 function makeReplayFile(overrides?: Partial<ReplayFile>): ReplayFile {
   return {
     format: 'sanguosha-replay',
-    version: 1,
+    version: 2,
     meta: { createdAt: 1000, playerCount: 2, characters: ['刘备', '曹操'] },
+    baseline,
     seats: {
       0: {
-        seatIndex: 0,
+        viewer: 0,
         playerName: '刘备',
-        initialView: {
-          viewer: 0,
-          currentPlayerIndex: 0,
-          phase: '出牌',
-          turn: { round: 1, phase: '出牌', vars: {} },
-          players: [],
-          cardMap: {},
-          pending: null,
-          deadline: null,
-          deadlineTotalMs: 0,
-          log: [],
-          settlementStack: [],
-        },
-        events: [{ seq: 0, time: 1000, event: { type: '摸牌' } }],
+        privateHands: [],
+        identityView: [],
+        events: [{ time: 1000, event: { type: '摸牌' } }],
       },
     },
     ...overrides,
@@ -84,12 +89,14 @@ describe('isReplayFile', () => {
   });
 
   it('缺少 meta 返回 false', () => {
-    expect(isReplayFile({ format: 'sanguosha-replay', version: 1, seats: {} })).toBe(false);
+    expect(
+      isReplayFile({ format: 'sanguosha-replay', version: 2, baseline, seats: {} }),
+    ).toBe(false);
   });
 
-  it('seats 中缺少 seatIndex 返回 false', () => {
+  it('seats 中缺少 viewer 返回 false', () => {
     const bad = makeReplayFile();
-    (bad.seats[0] as unknown as Record<string, unknown>).seatIndex = 'not-a-number';
+    (bad.seats[0] as unknown as Record<string, unknown>).viewer = 'not-a-number';
     expect(isReplayFile(bad)).toBe(false);
   });
 

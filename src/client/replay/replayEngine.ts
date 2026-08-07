@@ -1,29 +1,49 @@
 // src/client/replay/replayEngine.ts
-// 回放引擎:纯函数,从某座次的 initialView 起步,逐步 applyView 重建任意时刻 GameView。
-// 与 viewReducer 对称:实时游戏用 applyView 增量更新,回放也用 applyView 逐条重放。
+// 回放引擎:纯函数,从 baseline + seatDelta 合并出 initialView,再逐步 applyView
+// 重建任意时刻 GameView。与 viewReducer 对称:实时游戏用 applyView 增量更新,
+// 回放也用 applyView 逐条重放。
 
 import { viewReducer } from '../view/reducer';
-import type { GameView } from '../../engine/types';
-import type { ReplayFile, SeatRecording } from './types';
+import type { Card, GameView } from '../../engine/types';
+import type { ReplayBaseline, ReplayFile, SeatDelta } from './types';
 
 /** 取某座次录像的总步数(events 长度) */
-export function totalSteps(rec: SeatRecording | undefined): number {
-  return rec?.events.length ?? 0;
+export function totalSteps(delta: SeatDelta | undefined): number {
+  return delta?.events.length ?? 0;
 }
 
-/** 深拷贝(回放导航每次都从 initialView 全量重建,避免累积突变污染原录像数据) */
-function cloneView(view: GameView): GameView {
-  return JSON.parse(JSON.stringify(view)) as GameView;
+/** 合并 baseline + seatDelta,重建该座次的完整 initialView。
+ *  深拷贝 baseline,回填 viewer/手牌/身份,返回独立副本(避免污染录像原始数据)。 */
+function reconstructInitialView(baseline: ReplayBaseline, delta: SeatDelta): GameView {
+  const view: GameView = JSON.parse(JSON.stringify(baseline)) as GameView;
+  view.viewer = delta.viewer;
+  // 回填私有手牌 + 身份可见性
+  const handMap = new Map<number, Card[]>();
+  for (const { index, hand } of delta.privateHands) handMap.set(index, hand);
+  const idMap = new Map<number, { identity?: string; identityHidden?: boolean }>();
+  for (const { index, identity, identityHidden } of delta.identityView) {
+    idMap.set(index, { identity, identityHidden });
+  }
+  view.players = view.players.map((p) => {
+    const id = idMap.get(p.index);
+    return {
+      ...p,
+      hand: handMap.get(p.index),
+      identity: id?.identity,
+      identityHidden: id?.identityHidden,
+    };
+  });
+  return view;
 }
 
-/** 取某座次第 step 步的 GameView:深拷贝 initialView,applyView 前 step 个 events */
+/** 取某座次第 step 步的 GameView:重建 initialView,applyView 前 step 个 events */
 export function getViewAt(file: ReplayFile, seat: number, step: number): GameView | null {
-  const rec = file.seats[seat];
-  if (!rec) return null;
-  const view = cloneView(rec.initialView);
-  const clamped = Math.max(0, Math.min(step, rec.events.length));
+  const delta = file.seats[seat];
+  if (!delta) return null;
+  const view = reconstructInitialView(file.baseline, delta);
+  const clamped = Math.max(0, Math.min(step, delta.events.length));
   for (let i = 0; i < clamped; i++) {
-    const { event, time } = rec.events[i];
+    const { event, time } = delta.events[i];
     const type = typeof event.atomType === 'string' ? event.atomType : event.type;
     // notify 事件(pendingResolved 等):实时前端把 notify 和 atom ViewEvent 分开处理
     // (msg.notify 字段 vs msg.view 字段),viewReducer 只处理 atom ViewEvent。
@@ -59,12 +79,13 @@ export function getEventAt(
   seat: number,
   step: number,
 ): { seq: number; time: number; description: string } | null {
-  const rec = file.seats[seat];
-  if (!rec) return null;
+  const delta = file.seats[seat];
+  if (!delta) return null;
   // step 指向"即将播放的第 step 个事件";step-1 是"已播放的最后一个"
   // 返回当前步的事件(step 从1开始有意义,step=0 无事件)
   const idx = step - 1;
-  if (idx < 0 || idx >= rec.events.length) return null;
-  const e = rec.events[idx];
-  return { seq: e.seq, time: e.time, description: e.event.type };
+  if (idx < 0 || idx >= delta.events.length) return null;
+  const e = delta.events[idx];
+  // seq = 数组下标(v2 已去除冗余 seq 字段,下标即序号)
+  return { seq: idx, time: e.time, description: e.event.type };
 }
