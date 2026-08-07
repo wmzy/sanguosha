@@ -265,7 +265,7 @@ describe('GameView:distribute 外部候选区(观星类场景)', () => {
 });
 
 // ─── chooseOption 选项选择(化身:选技能/选化身牌)───
-// 覆盖技能:化身/界化身 的所有多选一交互。
+// 覆盖技能:化身(标版/界版)的所有多选一交互。
 // 修复前:化身用 confirm hack,候选技能名拼进 title,前端只渲染确定/取消两个按钮,无法选具体技能。
 // 修复后:chooseOption prompt 渲染选项按钮列表,有 characterCards 时渲染武将牌面板(势力色+武将名+技能)。
 describe('GameView:chooseOption 选项选择(化身场景)', () => {
