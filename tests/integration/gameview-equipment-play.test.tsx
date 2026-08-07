@@ -459,3 +459,72 @@ describe('GameView:出牌阶段倒计时显示(回归 isBlocking 区分)', () =>
     expect(screen.queryByText(/⏱ \d+s/)).toBeNull();
   });
 });
+
+// ─── 无 use action 的牌(闪/无懈可击)在出牌阶段不可选 ───
+// 回归根因:GameView 的 canPlay 此前为 `isMyTurn && canOperate && !playBlocked`,
+// 而 playBlocked = !!useAction && !isActiveAction(useAction)。当牌没有 use action
+// (闪/无懈可击 timing='生效前',使用牌 onMount 跳过不注册 use)时,useAction=undefined
+// → playBlocked=false → canPlay=true,这类纯回应牌在出牌阶段显示为可点击高亮,
+// 但选中后 selectedUseAction=undefined → 无"出牌"按钮,实际打不出去,误导玩家。
+// 修复:canPlay 要求 useAction 存在且激活,与 enumeratePlayActions(headless/AI 动作枚举)
+// 的 `if (!action) continue; if (!isActiveAction(...)) continue;` 对齐。
+function makeHandCard(id: string, name: string, type: Card['type']): Card {
+  return { id, name, suit: '♠', color: '黑', rank: 'A', type };
+}
+
+describe('GameView:无 use action 的牌(闪/无懈可击)在出牌阶段不可选', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('无懈可击在出牌阶段不可点击选中(不进入选中态)', async () => {
+    const slash = makeHandCard('sl1', '杀', '基本牌');
+    const wuxie = makeHandCard('wx1', '无懈可击', '锦囊牌');
+    const base = makeView();
+    const view = makeView({
+      players: [
+        { ...base.players[0], skills: ['使用牌'], hand: [slash, wuxie], handCount: 2 },
+        base.players[1],
+      ],
+      cardMap: { sl1: slash, wx1: wuxie },
+    });
+    render(<GameViewComponent view={view} onAction={() => {}} />);
+
+    // 等 使用牌 onMount 注册完毕:杀的 use action 出现即注册完成
+    await waitFor(() => {
+      expect(document.querySelector('[data-card-id="sl1"]')).toBeTruthy();
+    });
+
+    // 点击无懈可击 → 不应进入选中态(无"取消选择"按钮)
+    fireEvent.click(document.querySelector('[data-card-id="wx1"]')!);
+    expect(screen.queryByRole('button', { name: '取消选择' })).toBeNull();
+
+    // 对照:点击杀 → 进入选中态,出现"出牌"+"取消选择"按钮
+    fireEvent.click(document.querySelector('[data-card-id="sl1"]')!);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^出牌/ })).toBeDefined();
+    });
+    expect(screen.getByRole('button', { name: '取消选择' })).toBeDefined();
+  });
+
+  it('闪在出牌阶段同样不可点击选中', async () => {
+    const dodge = makeHandCard('dg1', '闪', '基本牌');
+    const slash = makeHandCard('sl2', '杀', '基本牌');
+    const base = makeView();
+    const view = makeView({
+      players: [
+        { ...base.players[0], skills: ['使用牌'], hand: [slash, dodge], handCount: 2 },
+        base.players[1],
+      ],
+      cardMap: { sl2: slash, dg1: dodge },
+    });
+    render(<GameViewComponent view={view} onAction={() => {}} />);
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-card-id="sl2"]')).toBeTruthy();
+    });
+
+    fireEvent.click(document.querySelector('[data-card-id="dg1"]')!);
+    expect(screen.queryByRole('button', { name: '取消选择' })).toBeNull();
+  });
+});

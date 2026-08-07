@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-07
 
+### Fixed — 出牌阶段无懈可击/闪等纯回应牌不可选
+
+出牌阶段(自由出牌窗口)下,手牌中的【无懈可击】、【闪】等纯回应牌仍显示为可点击高亮,点击后会进入选中态(出现「取消选择」按钮),但选中后无「出牌」按钮——实际打不出去,误导玩家。根因:`GameView` 的 `canPlay` 判定为 `isMyTurn && canOperate && !playBlocked`,而 `playBlocked = !!useAction && !isActiveAction(useAction)`:闪/无懈可击的 `timing='生效前'`(纯回应牌),「使用牌」`onMount` 跳过不为它们注册 use action → `useAction=undefined` → `playBlocked=false` → `canPlay=true`,被误判为可主动打出。headless/AI 动作枚举 `enumeratePlayActions` 用 `if (!action) continue` 正确跳过这类牌,前端 UI 与之不一致。
+
+#### Changed
+- **新增 `hasUseEntry(card)`**(根因):基于 CardEffect 注册表(静态、eager load)判断一张牌是否有主动 use 入口——`timing='生效前'` 的闪/无懈可击无主动 use,其余牌(含未注册 card-effect 的装备牌)有。不依赖动态注册的 `skillActions`,在 `useSkillActions` 异步注册间隙也能给出稳定答案,避免手牌全灰闪烁。(`src/client/utils/gameViewHelpers.ts`)
+- **GameView `canPlay` 改用 `hasUseEntry`**:`canPlay` 改为要求 `hasUseEntry(card) && (!useAction || isActiveAction(useAction))`。`useAction=undefined`(注册间隙)时乐观放行,有匹配 use action 时校验激活——消除「无 use action 的牌被误判为可点击」与「注册间隙手牌闪烁」两个问题。(`src/client/components/GameView.tsx`)
+
+#### 测试
+- **回归测试**:`tests/integration/gameview-equipment-play.test.tsx` 新增「无 use action 的牌(闪/无懈可击)在出牌阶段不可选」——点击无懈可击/闪不进入选中态(无「取消选择」按钮),对照点击杀正常选中并出现「出牌」按钮。
+
+## [Unreleased] — 2026-08-07
+
 ### Fixed — 命名规范违规修复（中文函数名→英文，§2）
 
 按 `CLAUDE.md` §2「函数名/变量名/常量名→英文」修复 5 处中文函数名违规，另修复 1 处英文装备槽 key（§4）。

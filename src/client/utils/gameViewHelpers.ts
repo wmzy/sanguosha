@@ -13,6 +13,10 @@ import type {
   DistributePrompt,
   TargetFilter,
 } from '../../engine/types';
+import { getAllCardEffects } from '../../engine/card-effect/registry';
+// 副作用 import:确保 CardEffect 注册表(闪/无懈可击等 timing)在模块加载时已填充。
+// getAllCardEffects 依赖各 card-effect 模块的 registerCardEffect 副作用,这里触发加载。
+import '../../engine/card-effects';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { defaultPlayActive } from '../../engine/action-active';
 
@@ -50,6 +54,20 @@ export function findUseActionForCard(
     const filter = extractCardFilter(a.prompt);
     return filter ? filter(card) : false;
   });
+}
+
+/** 判断一张牌是否有主动 use 入口(可否在出牌阶段主动打出)。
+ *  基于 CardEffect 注册表(静态,eager load),不依赖动态注册的 skillActions——
+ *  因此在 useSkillActions 异步注册间隙也能给出稳定答案,避免手牌闪烁。
+ *
+ *  timing='生效前' 的纯回应牌(闪/无懈可击)只有 respond 入口,无主动 use,在出牌阶段
+ *  不可主动打出;其余基本牌/锦囊(timing='出牌阶段')以及未注册 card-effect 的牌
+ *  (装备牌由「装备通用」注册 use)均有 use 入口。
+ *  与 use-card onMount 跳过 timing='生效前' 的逻辑同源。 */
+export function hasUseEntry(card: Card): boolean {
+  const effect = getAllCardEffects().get(card.name);
+  // 已注册 card-effect:看 timing;未注册(装备等):默认有 use 入口(乐观)。
+  return effect ? effect.timing !== '生效前' : true;
 }
 
 /** 不属于"出牌阶段替代出牌方式"的 actionType 集合。

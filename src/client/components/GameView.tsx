@@ -41,6 +41,7 @@ import {
   canShowCancelSelectionButton,
   canShowEndTurnButton,
   findUseActionForCard,
+  hasUseEntry,
   isActiveAction,
 } from '../utils/gameViewHelpers';
 import { SUIT_COLOR } from './gameViewConstants';
@@ -877,12 +878,16 @@ export function GameViewComponentImpl({
               const isRespondSelected =
                 isMyAwaiting && !isDistributeActive && selectedRespondCardId === card.id;
               const useAction = findUseActionForCard(skillActions, card);
-              const playBlocked =
+              // canPlay 要求该牌有主动 use 入口,且(若有匹配的 use action)当前激活。
+              // 闪/无懈可击等 timing='生效前' 的纯回应牌无主动 use 入口(hasUseEntry=false),
+              // 在出牌阶段不可选——与 enumeratePlayActions 的 `if (!action) continue` 对齐。
+              // useAction 为 undefined 时(如 useSkillActions 异步注册间隙/视角切换)乐观放行,
+              // 避免手牌全灰闪烁;hasUseEntry 基于 CardEffect 注册表给出稳定判定。
+              const canPlay =
                 isMyTurn &&
                 canOperate &&
-                !!useAction &&
-                !isActiveAction(useAction, { view, perspectiveIdx });
-              const canPlay = isMyTurn && canOperate && !playBlocked;
+                hasUseEntry(card) &&
+                (!useAction || isActiveAction(useAction, { view, perspectiveIdx }));
               const respondFilter = pendingRespondInfo?.cardFilter;
               const isAwaiting = !isDistributeActive && isMyAwaiting && !!respondFilter?.(card);
               const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
