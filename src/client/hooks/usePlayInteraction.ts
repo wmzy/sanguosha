@@ -420,7 +420,7 @@ export function usePlayInteraction(
     // 仅当 override 的 cardFilter 仍匹配当前选中牌时生效(防迷叠)。
     if (altActionOverride) {
       const filter = extractCardFilter(altActionOverride.prompt);
-      if (filter && filter(selectedCard)) return altActionOverride;
+      if (filter?.(selectedCard)) return altActionOverride;
     }
     return findUseActionForCard(skillActions, selectedCard);
   })();

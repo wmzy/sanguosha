@@ -261,7 +261,7 @@ describe('界醇醪', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     // 预置醇:把 sc 加到 P0 醇列表(模拟此前的存醇流程,避免依赖时序)
     // 先把 sc 加入 discardPile + 醇列表
@@ -312,7 +312,7 @@ describe('界醇醪', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     // 预置 3 张醇(足以 X=1 + X=2)
     harness.state.zones.discardPile.push('sc1', 'sc2', 'sc3');
@@ -365,7 +365,7 @@ describe('界醇醪', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     // 预置 1 张醇
     harness.state.zones.discardPile.push('sc');
@@ -456,7 +456,7 @@ describe('界醇醪', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     // 预置 3 张醇
     harness.state.zones.discardPile.push('sc1', 'sc2', 'sc3');

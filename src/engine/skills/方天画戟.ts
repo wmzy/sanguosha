@@ -27,7 +27,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 武圣转化杀同理——来源于最后一张手牌,亦满足「最后一张手牌出的杀」。
     // 丈八蛇矛转化用 2 张手牌(hand.length≥2),不满足,正确排除。
     const hand = st.players[ownerId]?.hand;
-    if (!hand || hand.length !== 1) return 0;
+    if (hand?.length !== 1) return 0;
     return 3;
   });
 }

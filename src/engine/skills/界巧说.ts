@@ -31,7 +31,6 @@ import type {
   GameState,
   Json,
   Skill,
-  ZoneLoc,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runRankCompareFlow } from '../rank-flow';

@@ -34,7 +34,7 @@ import { applyAtom } from '../../src/engine/index';
 import { runDamageFlow } from '../../src/engine/damage-flow';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { Card, PlayerState } from '../../src/engine/types';
 
 function makeCard(
   id: string,

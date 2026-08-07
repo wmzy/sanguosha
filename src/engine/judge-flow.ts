@@ -80,6 +80,6 @@ function cleanupJudgeCard(state: GameState): void {
   if (idx < 0) return;
   const cardId = cards[idx];
   state.localVars[JUDGE_FINAL_CARD_KEY] = cardId;
-  cards.splice(idx, 1)[0];
+  cards.splice(idx, 1);
   state.zones.discardPile.push(cardId);
 }

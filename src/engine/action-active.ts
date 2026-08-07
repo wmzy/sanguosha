@@ -81,7 +81,7 @@ export function viewCanSlash(view: ActionContext['view'], player: number): boole
   if (typeof gongqiSuit === 'string' && gongqiSuit !== '') {
     if (view.viewer === player) {
       const hand = view.players[player]?.hand;
-      if (hand && hand.some((c) => c.name === '杀' && c.suit === gongqiSuit)) {
+      if (hand?.some((c) => c.name === '杀' && c.suit === gongqiSuit)) {
         return true;
       }
     } else {

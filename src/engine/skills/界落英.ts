@@ -25,7 +25,7 @@
 //     判定阶段、独立判定技能)。若 frame 还有其他牌(如杀结算中八卦阵判定),
 //     抽取判定牌会破坏 runJudgeFlow 收尾 splice——本实现加 frame.cards.length === 1
 //     防御:多牌场景下跳过获取(让判定牌正常入弃牌堆),避免状态损坏。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom, frameCards } from '../index';
 import {
   registerAction,
@@ -34,7 +34,7 @@ import {
   type SkillModule,
 } from '../skill';
 
-const SKILL_ID = '界落英';
+const _SKILL_ID = '界落英';
 const DISPLAY_NAME = '落英';
 const CHOOSE_RT = '界落英/choose';
 const CHOICE_KEY = '落英/choice';

@@ -171,7 +171,7 @@ describe('界趫猛', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
     // P1 0 手牌 → 询问闪 skip → 直接扣血 → 趫猛 confirm
@@ -216,7 +216,7 @@ describe('界趫猛', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
     // P1 0 手牌 → 询问闪 skip → 直接扣血 → 趫猛 confirm
@@ -258,7 +258,7 @@ describe('界趫猛', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
     // P1 0 手牌 → 询问闪 skip → 直接扣血 → 趫猛 confirm
@@ -300,7 +300,7 @@ describe('界趫猛', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
     // P1 无手牌 → 询问闪自动跳过 → 直接扣血 → 趫猛 confirm(此处不可先 pass(),
@@ -409,7 +409,7 @@ describe('界趫猛', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
     // P1 无手牌 → 询问闪自动跳过;且无任何区域牌 → 趫猛不询问,无 pending
@@ -448,7 +448,7 @@ describe('界趫猛', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
     // P1 0 手牌 → 询问闪 skip → 直接扣血 → 趫猛 confirm

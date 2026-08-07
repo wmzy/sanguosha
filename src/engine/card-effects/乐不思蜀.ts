@@ -8,7 +8,6 @@
 //   判定♥   → 无效，弃置
 
 import type { Card } from '../types';
-import type { ActionPrompt } from '../types';
 import { applyAtom } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
@@ -60,7 +59,7 @@ const indulgenceEffect: CardEffect = {
     title: '乐不思蜀',
     cardFilter: { filter: (c: Card) => c.name === '乐不思蜀', min: 1, max: 1 },
     targetFilter: { min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '乐不思蜀',
   style: 'danger',
 };

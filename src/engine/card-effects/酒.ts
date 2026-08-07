@@ -5,7 +5,6 @@
 // respond: 濒死时酒当桃用（见 respond 字段）。
 
 import type { Card } from '../types';
-import type { ActionPrompt } from '../types';
 import { applyAtom } from '../index';
 import { registerBeforeHook } from '../skill';
 import { defaultPlayActive } from '../action-active';
@@ -95,12 +94,12 @@ const wineEffect: CardEffect = {
     type: 'useCard',
     title: '饮酒',
     cardFilter: { filter: (c: Card) => c.name === '酒', min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   respondPrompt: {
     type: 'useCard',
     title: '濒死:使用酒(当桃)',
     cardFilter: { filter: (c: Card) => c.name === '酒', min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '酒',
   style: 'default',
   activeWhen: (ctx) => defaultPlayActive(ctx),

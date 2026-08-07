@@ -222,7 +222,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (atom.type !== '阶段开始') return;
       if (atom.player !== ownerId) return;
       if (ctx.state.currentPlayerIndex !== ownerId) return;
-      const phase = atom.phase as string;
+      const phase = atom.phase;
       if (!SKIPPABLE_PHASES.includes(phase as (typeof SKIPPABLE_PHASES)[number])) return;
 
       const self = ctx.state.players[ownerId];

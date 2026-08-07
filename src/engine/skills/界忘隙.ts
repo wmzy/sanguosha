@@ -27,7 +27,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-const SKILL_ID = '界忘隙';
+const _SKILL_ID = '界忘隙';
 const DISPLAY_NAME = '忘隙';
 const CONFIRM_RT = '界忘隙/confirm';
 const PICK_RT = '界忘隙/pick';

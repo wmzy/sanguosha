@@ -21,7 +21,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-const SKILL_ID = '界恂恂';
+const _SKILL_ID = '界恂恂';
 const DISPLAY_NAME = '恂恂';
 const CONFIRM_RT = '界恂恂/confirm';
 const ARRANGE_RT = '界恂恂/arrange';
@@ -86,8 +86,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === ARRANGE_RT) {
         st.localVars[ARRANGE_KEY] = {
-          top: (params.top as string[]) ?? [],
-          bottom: (params.bottom as string[]) ?? [],
+          top: (params.top) ?? [],
+          bottom: (params.bottom) ?? [],
         };
       }
     },

@@ -831,7 +831,6 @@ export function GameViewComponentImpl({
               </span>
               <div className={styles.distExternalList}>
                 {distExternalCandidates.map((card) => {
-                  const isCandidate = true; // 本区的牌都是候选
                   const isSelected = distSelected.has(card.id);
                   const isAllocated = distAllocations.some((a) =>
                     a.cardIds.includes(card.id),

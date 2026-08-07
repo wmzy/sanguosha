@@ -146,7 +146,7 @@ describe('界补益', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P0.useCardAndTarget('杀', 'k1', [1]); // eslint-disable-line react-hooks/rules-of-hooks -- 测试 harness 方法非 React Hook
     if ((opts.p1Hand ?? []).length > 0) {
       // P1 有手牌但无闪 → silent 询问闪 slot,pass 推进至濒死
       await P1.pass();
@@ -331,7 +331,7 @@ describe('界补益', () => {
   // ─── 端到端:P1 无牌 → 不询问补益 ─────────────────────
 
   it('端到端:P1 濒死但无牌 → 不询问补益,直接求桃', async () => {
-    const { harness, P2 } = await setupDyingScenario({
+    const { harness } = await setupDyingScenario({
       p1Hand: [],
       p1Equipment: {},
       p0Hand: ['k1', 'tao1'],

@@ -237,7 +237,7 @@ describe('界仁心', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P0.useCardAndTarget('杀', 'k1', [1]); // eslint-disable-line react-hooks/rules-of-hooks -- 测试 harness 方法非 React Hook
     await P1.pass(); // P1 不闪 → 进入濒死(1→0 血)
 
     return { harness, P0, P1, P2 };
@@ -289,7 +289,7 @@ describe('界仁心', () => {
   });
 
   it('端到端:P2 无装备牌 → 不询问仁心(直接进入求桃)', async () => {
-    const { harness, P2 } = await setupDyingScenario({
+    const { harness, P2: _P2 } = await setupDyingScenario({
       p2Hand: ['a'], // 仅基本牌,无装备牌
     });
 

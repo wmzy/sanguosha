@@ -222,7 +222,7 @@ describe('界蛊惑', () => {
 
   it('同时质疑·假牌 → 此牌作废,质疑者摸一张牌(扣牌留弃牌堆)', async () => {
     const s1 = mkCard('s1', '闪', '♥', '7'); // 假牌(非杀)
-    const deckTop = mkCard('top', '杀', '♣', '3');
+    const _deckTop = mkCard('top', '杀', '♣', '3');
     await harness.setup(
       baseState({ yujiHand: ['s1'], cardMap: { s1 }, deck: ['top'] }),
     );

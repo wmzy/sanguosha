@@ -6,7 +6,6 @@
 // resolve 内部通过 localVars 与 respond action 通信。
 
 import type { Card } from '../types';
-import type { ActionPrompt } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
@@ -140,13 +139,13 @@ const fireAttackEffect: CardEffect = {
     title: '火攻',
     cardFilter: { filter: (c: Card) => c.name === '火攻', min: 1, max: 1 },
     targetFilter: { min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   // respond 入口 UI：展示/弃牌窗口可选任意手牌（后端 validate 严格校验花色）
   respondPrompt: {
     type: 'useCard',
     title: '火攻',
     cardFilter: { filter: () => true, min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '火攻',
   style: 'danger',
 };

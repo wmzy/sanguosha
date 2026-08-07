@@ -15,7 +15,7 @@
 // 与 life-timing / 生效前 / 使用结算结束时 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { DamageType } from '../../shared/types';
-import type { AtomDefinition, GameState, GameView, ViewEventSplit, ViewEvent } from '../types';
+import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
 import { getBeforeHooks } from '../skill';
 

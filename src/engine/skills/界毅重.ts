@@ -30,7 +30,7 @@
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
-const SKILL_ID = '界毅重';
+const _SKILL_ID = '界毅重';
 const DISPLAY_NAME = '毅重';
 
 export function createSkill(id: string, ownerId: number): Skill {

@@ -56,7 +56,7 @@ function ownsCard(
 }
 
 /** 场上是否存在乐不思蜀 */
-function anyLeOnField(state: GameState): boolean {
+function _anyLeOnField(state: GameState): boolean {
   return state.players.some((p) => p.pendingTricks.some((t) => t.name === TRICK_NAME));
 }
 
@@ -200,7 +200,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       } else if (rt === USE_RT) {
         st.localVars[CARD_KEY] = params.cardId ?? null;
         st.localVars[TARGET_KEY] =
-          (params.target as number | undefined) ??
+          (params.target) ??
           (params.targets as number[] | undefined)?.[0] ??
           null;
       } else if (rt === REMOVE_CARD_RT) {

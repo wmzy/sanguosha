@@ -796,7 +796,7 @@ describe('初始化洗牌 atom: deckCount 未同步到增量视图', () => {
     expect(def.toViewEvents).toBeDefined();
     expect(def.applyView).toBeDefined();
 
-    const split = def.toViewEvents!(state, { type: '初始化洗牌', seed: 42 } as never)!;
+    const split = def.toViewEvents!(state, { type: '初始化洗牌', seed: 42 })!;
     expect(split.othersView).toBeDefined();
     def.applyView!(view, split.othersView!);
     expect(view.zones!.deckCount).toBe(realDeckCount);

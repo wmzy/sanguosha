@@ -8,7 +8,6 @@
 // 之后每次调用处理一个目标。清理（剩余牌入弃牌堆）在 onSettle 中完成。
 
 import type { Card, SettlementFrame } from '../types';
-import type { ActionPrompt } from '../types';
 import { applyAtom, frameCards } from '../index';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
@@ -169,7 +168,7 @@ const bountifulHarvestEffect: CardEffect = {
     type: 'useCard',
     title: '五谷丰登',
     cardFilter: { filter: (c: Card) => c.name === '五谷丰登', min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '五谷丰登',
   style: 'primary',
 };

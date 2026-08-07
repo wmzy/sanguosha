@@ -84,7 +84,7 @@ function triggerForEvent(event: ViewEvent, view: GameView): boolean {
       const faces: (FlyCardFace | null)[] = cardIds.map((id, i) => {
         const f = lookupFace(view, id);
         if (f) return f;
-        if (cardNames && cardNames[i]) return { name: cardNames[i], suit: '', rank: '' };
+        if (cardNames?.[i]) return { name: cardNames[i], suit: '', rank: '' };
         return null;
       });
       flyCards(seat(player), { kind: 'discard' }, faces, cardIds.length);

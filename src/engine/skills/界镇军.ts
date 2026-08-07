@@ -132,7 +132,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const t =
           (typeof params.target === 'number' ? params.target : undefined) ??
           (Array.isArray(params.targets) && typeof params.targets[0] === 'number'
-            ? (params.targets[0] as number)
+            ? (params.targets[0])
             : undefined);
         if (t === undefined) return '需要选择目标';
         return null;
@@ -208,7 +208,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const t =
           (typeof params.target === 'number' ? params.target : undefined) ??
           (Array.isArray(params.targets) && typeof params.targets[0] === 'number'
-            ? (params.targets[0] as number)
+            ? (params.targets[0])
             : undefined);
         if (typeof t === 'number') st.localVars[LV_TARGET] = t;
       } else if (rt === RT_ASK_CARDS) {
@@ -406,7 +406,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       } else {
         // ── 选项2:记录延迟摸牌条目 ──
         if (N > 0) {
-          ctx.state.turn.vars[DEFER_KEY] = { target, count: N } as unknown as Json;
+          ctx.state.turn.vars[DEFER_KEY] = { target, count: N };
         }
       }
     } finally {

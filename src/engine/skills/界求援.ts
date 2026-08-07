@@ -186,7 +186,7 @@ async function runQiuYuan(
     // 4a) 给牌:helper 选一张同类型不同牌名的牌
     const matching = state.players[helperIdx].hand.filter((id) => {
       const c = state.cardMap[id];
-      return c && c.type === card.type && c.name !== card.name;
+      return c?.type === card.type && c.name !== card.name;
     });
     if (matching.length === 0) {
       // 无符合牌:自动转为 4b(成为额外目标)
@@ -239,7 +239,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       'respond',
       (st: GameState, params: Record<string, Json>): string | null => {
         const slot = st.pendingSlots.get(ownerId);
-        if (!slot || slot.atom.type !== '请求回应') return '当前不需要回应';
+        if (slot?.atom.type !== '请求回应') return '当前不需要回应';
         const rt = (slot.atom as unknown as { requestType?: string }).requestType;
         if (rt === CONFIRM_RT) return null;
         if (rt === CHOOSE_TARGET_RT) {
@@ -273,7 +273,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         'respond',
         (st: GameState, params: Record<string, Json>): string | null => {
           const slot = st.pendingSlots.get(pid);
-          if (!slot || slot.atom.type !== '请求回应') return '当前不需要回应';
+          if (slot?.atom.type !== '请求回应') return '当前不需要回应';
           const rt = (slot.atom as unknown as { requestType?: string }).requestType;
           if (rt === OPTION_RT) return null; // 选项 confirm
           if (rt === GIVE_CARD_RT) {

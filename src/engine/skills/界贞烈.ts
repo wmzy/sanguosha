@@ -52,7 +52,7 @@ import { registerAction, registerAfterHook, registerBeforeHook } from '../skill'
 import { isDelayedTrick } from '../card-meta';
 import { runPickTargetCardPanel } from './选牌面板';
 
-const SKILL_ID = '界贞烈';
+const _SKILL_ID = '界贞烈';
 const DISPLAY_NAME = '贞烈';
 
 /** 贞烈发动确认 requestType(yes/no) */
@@ -389,7 +389,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const atom = ctx.atom;
       if (atom.player !== ownerId) return;
       const frame = topFrame(ctx.state);
-      if (!frame || frame.skillId !== '铁索连环') return;
+      if (frame?.skillId !== '铁索连环') return;
       if (frame.from === ownerId) return; // 自己用铁索连环不触发
       const cardId = frame.params?.cardId as string | undefined;
       if (!cardId) return;

@@ -31,7 +31,6 @@ import type {
   Card,
   FrontendAPI,
   GameState,
-  Json,
   Skill,
 } from '../types';
 import { applyAtom, pushFrame, popFrame } from '../index';
@@ -159,7 +158,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       'respond',
       (s) => {
         const slot = s.pendingSlots.get(seatId);
-        if (!slot || slot.atom.type !== '请求回应') return '当前不需要回应';
+        if (slot?.atom.type !== '请求回应') return '当前不需要回应';
         const rt = (slot.atom as unknown as { requestType?: string }).requestType ?? '';
         const ownerRTs = [RT_A_CONFIRM, RT_B_CONFIRM];
         const sourceRTs = [RT_B_SOURCE, RT_B_CARD];

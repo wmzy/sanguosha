@@ -24,8 +24,8 @@ import { registerAction, registerBeforeHook } from '../skill';
 import { promptCancel } from '../无懈可击';
 import { validateCardUse, computeAutoTargets } from './validate';
 import { getCardEffect, getAllCardEffects, requireCardEffect } from './registry';
-import type { CardEffect, CancellableBy, ResolveCtx } from './registry';
-import { isCancelled, setCancelled } from './registry';
+import type { CardEffect, CancellableBy } from './registry';
+import { isCancelled } from './registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -167,6 +167,7 @@ export async function runUseFlow(
         });
       }
       await applyAtom(state, { type: '使用时', source, cardId });
+      // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- 布尔 OR 语义:false || true 必须为 true,?? 会误返回 false
       await runSettlementPhase(state, effect, source, source, cardId, 0, opts?.virtual || opts?.skipCancelQuery);
       if (!opts?.virtual && frameCards(state).includes(cardId)) {
         await applyAtom(state, {

@@ -16,18 +16,17 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
+import { applyAtom } from '../../src/engine';
 // 临时注册界神速(主 agent 会统一注册到 index.ts)
 import { skillLoaders } from '../../src/engine/skills';
 import * as 界神速Module from '../../src/engine/skills/界神速';
-import type { SkillModule } from '../../src/engine/skill';
-skillLoaders['界神速'] = async () => 界神速Module as unknown as SkillModule;
+skillLoaders['界神速'] = async () => 界神速Module;
 
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
-import { applyAtom } from '../../src/engine/index';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
+function _makeCard(
   id: string,
   name: string,
   suit: '♠' | '♥' | '♣' | '♦',

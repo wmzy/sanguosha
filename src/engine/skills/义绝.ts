@@ -255,7 +255,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const slot = st.pendingSlots.get(seatId);
         const reqType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
         if (reqType === REVEAL_REQUEST) {
-          st.localVars[REVEAL_KEY] = params.cardId as string;
+          st.localVars[REVEAL_KEY] = params.cardId;
         } else if (reqType === HEAL_REQUEST) {
           st.localVars[HEAL_KEY] = params.choice === true;
         }
@@ -309,7 +309,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const cardId = atom.cardId;
       if (typeof cardId !== 'string') return;
       const card = ctx.state.cardMap[cardId];
-      if (!card || card.name !== '杀' || card.suit !== '♥') return;
+      if (card?.name !== '杀' || card.suit !== '♥') return;
       const player = ctx.state.players[target];
       if (!player?.tags.includes(HEART_BONUS_TAG)) return;
       // 整回合持续:不去标签(回合结束统一清)

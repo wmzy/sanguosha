@@ -2,7 +2,7 @@
 // 原 src/engine/types.ts 的 `==================== Atom ====================` 段及 hook 上下文。
 
 import type { DamageType } from '../../shared/types';
-import type { EquipSlot, GameState, Json, Mark, PendingTrick, TurnPhase } from './state';
+import type { EquipSlot, GameState, Json, Mark, PendingTrick } from './state';
 import type { ActionPrompt } from './prompt';
 import type { GameView } from './view';
 import type { SettlementFrame } from './skill';

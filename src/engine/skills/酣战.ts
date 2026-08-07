@@ -151,7 +151,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     for (const id of [atom.initiatorCard, atom.targetCard]) {
       if (!id) continue;
       const card: Card | undefined = st.cardMap[id];
-      if (card && card.name === '杀') candidates.push({ id, value: rankValue(card.rank) });
+      if (card?.name === '杀') candidates.push({ id, value: rankValue(card.rank) });
     }
     if (candidates.length === 0) return; // 无杀 → 无可获
 

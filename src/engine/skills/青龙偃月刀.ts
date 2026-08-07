@@ -94,7 +94,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (weapon?.name !== '青龙偃月刀') return;
 
     // 检查是否被抵消（闪已设置标记,但闪已被 drain 到弃牌堆）
-    if (!isCancelled(ctx.state, atom.cardId, atom.target!)) return;
+    if (!isCancelled(ctx.state, atom.cardId, atom.target)) return;
 
     // owner 手牌中没有杀 → 无法追杀,直接放弃
     const hasKill = self.hand.some((id) => ctx.state.cardMap[id]?.name === '杀');
@@ -141,7 +141,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     //   被闪 → 杀帧 cancelled → 被抵消 atom → 本 hook 递归追杀
     //   未被闪 → 杀.resolve 造成伤害
     //   处理区→弃牌堆（finally 自动清理）
-    await runUseFlow(ctx.state, ownerId, killCardId, [atom.target!], '杀', {
+    await runUseFlow(ctx.state, ownerId, killCardId, [atom.target], '杀', {
       onSettle: chargeOnSettle(ctx.state, ownerId, killCardId),
     });
   });

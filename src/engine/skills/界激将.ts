@@ -174,7 +174,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const cardId = atom.cardId;
         if (!cardId) return;
         const card = ctx.state.cardMap[cardId];
-        if (!card || card.name !== '杀') return;
+        if (card?.name !== '杀') return;
         // 必须是该蜀角色"回合外"(当前回合不是其本人回合)
         if (ctx.state.currentPlayerIndex === sourceIdx) return;
         // 主公需存活(否则无人摸牌)

@@ -146,7 +146,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === TARGET_RT) {
-        st.localVars[TARGET_KEY] = params.target as number;
+        st.localVars[TARGET_KEY] = params.target;
       }
     },
   );
@@ -171,7 +171,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const cardId = atom.cardId;
     if (typeof cardId !== 'string') return;
     const card = ctx.state.cardMap[cardId];
-    if (!card || card.name !== '杀') return;
+    if (card?.name !== '杀') return;
     addLostSha(ctx.state, ownerId, 1);
   });
 

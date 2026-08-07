@@ -366,7 +366,7 @@ describe('界鬼道', () => {
     });
     state.zones = { deck: ['j1'], discardPile: [], processing: [] };
     await harness.setup(state);
-    const P0 = harness.player('界张角');
+    const _P0 = harness.player('界张角');
 
     void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
     await waitForStable(harness.state);

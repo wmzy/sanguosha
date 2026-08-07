@@ -59,7 +59,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (st: GameState, params: Record<string, Json>) => {
+    (st: GameState, _params: Record<string, Json>) => {
       const slot = st.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as Record<string, unknown>;
@@ -177,7 +177,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       delete ctx.state.localVars[CONFIRMED_KEY];
     }
     // 全部起时默认获得第一个(八阵)
-    if (!selected) selected = CHOOSABLE_SKILLS[0];
+    selected ??= CHOOSABLE_SKILLS[0];
     await applyAtom(ctx.state, { type: '添加技能', player: ownerId, skillId: selected });
   });
 

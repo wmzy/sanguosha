@@ -41,7 +41,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界利驭'(避开标版未实现的"利驭");
 //   内部 Skill.name = '利驭'(OL 官方技能名,玩家可见)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 import { runPickTargetCardPanel } from './选牌面板';
@@ -140,7 +140,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 必须是【杀】造成的伤害(转化杀的影子卡 name 仍为 '杀')
       if (typeof atom.cardId !== 'string') return;
       const srcCard = ctx.state.cardMap[atom.cardId];
-      if (!srcCard || srcCard.name !== '杀') return;
+      if (srcCard?.name !== '杀') return;
 
       const target = atom.target;
       const targetPlayer = ctx.state.players[target];

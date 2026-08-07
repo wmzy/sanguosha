@@ -7,7 +7,6 @@
 // 调用的是不含 成为目标 的 runDuelLoop。
 
 import type { Card } from '../types';
-import type { ActionPrompt } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { enforceDualKill } from '../skills/无双';
@@ -80,7 +79,7 @@ const duelEffect: CardEffect = {
     title: '决斗',
     cardFilter: { filter: (c: Card) => c.name === '决斗', min: 1, max: 1 },
     targetFilter: { min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '决斗',
   style: 'danger',
 };

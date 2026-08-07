@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
-import type { GameView, PendingView, Card } from '../../src/engine/types';
+import type { GameView, PendingView } from '../../src/engine/types';
 
 function makeView(pending: PendingView | null): GameView {
   return {
@@ -137,7 +137,7 @@ describe('GameView:广播型 pending(无懈可击)点击不回应后隐藏当前
     const view = makeView(wuxieBroadcastPending);
     // 给 P0 一张手牌(能响应,避免自动跳过直接跳过——本测试验证手动「不回应」路径)
     view.players[0].handCount = 1;
-    view.players[0].hand = [{ id: 'wx0', name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' } as Card];
+    view.players[0].hand = [{ id: 'wx0', name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' }];
     render(<GameViewComponent view={view} onAction={() => {}} currentEvent={null} />);
     // 初始:不回应按钮存在
     expect(screen.getByRole('button', { name: '不回应' })).toBeDefined();
@@ -150,7 +150,7 @@ describe('GameView:广播型 pending(无懈可击)点击不回应后隐藏当前
     const view = makeView(wuxieBroadcastPending);
     // 给 P0 一张手牌(能响应,避免自动跳过)
     view.players[0].handCount = 1;
-    view.players[0].hand = [{ id: 'wx0', name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' } as Card];
+    view.players[0].hand = [{ id: 'wx0', name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' }];
     render(<GameViewComponent view={view} onAction={() => {}} currentEvent={null} />);
     // 初始:当前用户 + P2 座次各一条倒计时
     expect(screen.getAllByText(/⏱/)).toHaveLength(2);

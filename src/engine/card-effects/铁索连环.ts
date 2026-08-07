@@ -7,8 +7,7 @@
 // 连环传导(属性伤害联动)在 face-down.ts 的 registerChainConductionHook，
 //   由 index 作为伤害结算基础设施注册。
 
-import type { Card, GameState } from '../types';
-import type { ActionPrompt } from '../types';
+import type { Card } from '../types';
 import { setChain, isChained } from '../face-down';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
@@ -46,7 +45,7 @@ const chainEffect: CardEffect = {
     title: '铁索连环',
     cardFilter: { filter: (c: Card) => c.name === '铁索连环', min: 1, max: 1 },
     targetFilter: { min: 1, max: 2, allowSelf: true },
-  } as ActionPrompt,
+  },
   label: '铁索连环',
   style: 'primary',
 };

@@ -4,7 +4,7 @@
 // target.kind='distance' dist=1: 距离 1 内的其他角色（奇才无距离限制）。
 
 import type { Card } from '../types';
-import type { ActionPrompt, GameView } from '../types';
+import type { GameView } from '../types';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
 import { runPickTargetCardPanel } from '../skills/选牌面板';
@@ -92,7 +92,7 @@ const snatchEffect: CardEffect = {
         return viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1;
       },
     },
-  } as ActionPrompt,
+  },
   label: '顺手牵羊',
   style: 'primary',
 };

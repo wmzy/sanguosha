@@ -189,7 +189,7 @@ describe('界乱击', () => {
     });
     await harness.setup(state);
     const P1 = harness.player('界袁绍');
-    const P2 = harness.player('P2');
+    const _P2 = harness.player('P2');
     const P3 = harness.player('P3');
 
     await P1.transformThenUse('界乱击', { cardIds: ['c1', 'c2'] }, '万箭齐发', {

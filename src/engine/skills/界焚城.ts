@@ -31,7 +31,6 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界焚城';内部 Skill.name = '焚城'。
 import type {
-  Card,
   FrontendAPI,
   GameState,
   Json,

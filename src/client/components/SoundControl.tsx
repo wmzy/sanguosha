@@ -55,7 +55,7 @@ const volumeLabel = css`
  * 自包含:内部使用 useSoundSettings 管理状态,不需外部 props。
  */
 export function SoundControl() {
-  const { muted, volume, setMuted, setVolume, toggleMute } = useSoundSettings();
+  const { muted, volume, setVolume, toggleMute } = useSoundSettings();
   const [expanded, setExpanded] = useState(false);
 
   const handleToggleExpand = useCallback(() => {

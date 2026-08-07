@@ -56,7 +56,7 @@ import {
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerSlashUnlimitedProvider } from '../slash-quota';
 import { registerHandLimitProvider } from '../hand-limit';
-import { registerDistanceExemptor, registerAttackRangeExemptor } from '../distance';
+import { registerDistanceExemptor } from '../distance';
 import { defaultPlayActive } from '../action-active';
 
 const SKILL_ID = '界陷阵';
@@ -280,7 +280,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const cardId = atom.cardId;
       if (typeof cardId !== 'string') return;
       const card = ctx.state.cardMap[cardId];
-      if (!card || card.name !== '杀') return;
+      if (card?.name !== '杀') return;
       const targetPlayer = ctx.state.players[winTarget];
       if (!targetPlayer) return;
       const armorId = targetPlayer.equipment?.['防具'];
@@ -337,7 +337,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const cardId = atom.cardId;
       if (typeof cardId !== 'string') return;
       const card = ctx.state.cardMap[cardId];
-      if (!card || card.name !== '杀') return;
+      if (card?.name !== '杀') return;
       return { kind: 'cancel' };
     },
   );

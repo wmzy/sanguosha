@@ -210,7 +210,7 @@ describe('救援', () => {
       turn: { round: 1, phase: '出牌', vars: {} },
     });
     await harness.setup(state);
-    const P1 = harness.player('孙权');
+    const _P1 = harness.player('孙权');
     const P0 = harness.player('甘宁');
 
     // 孙权(座次1)受伤 → 濒死;求桃(模块 C:逆时针从当前回合 P0(甘宁)起)

@@ -18,7 +18,7 @@ function readPlayerCandidates(
   const prompt = view.pending?.prompt as
     | { type?: string; candidates?: number[] }
     | undefined;
-  if (!prompt || prompt.type !== 'choosePlayer') return undefined;
+  if (prompt?.type !== 'choosePlayer') return undefined;
   const ids = prompt.candidates;
   if (!Array.isArray(ids)) return undefined;
   return ids.map((i) => ({ index: i, name: view.players[i]?.name ?? `P${i}` }));

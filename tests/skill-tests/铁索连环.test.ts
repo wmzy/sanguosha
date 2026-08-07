@@ -312,7 +312,7 @@ describe('铁索连环', () => {
     const p2HealthBefore = harness.state.players[2].health;
 
     // Step 2: 杀 P1
-    await P0.useCardAndTarget('杀', slashCard.id, [1]);
+    await P0.useCardAndTarget('杀', slashCard.id, [1]); // eslint-disable-line react-hooks/rules-of-hooks -- 测试 harness 方法非 React Hook
     // P1 不出闪
     await P1.pass();
 

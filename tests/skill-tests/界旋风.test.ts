@@ -106,7 +106,7 @@ describe('界旋风', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('界凌统');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     // 替换武器
     await P0.useCard('装备通用', 'w2');

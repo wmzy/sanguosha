@@ -59,12 +59,12 @@ function atomTypes(state: GameState): string[] {
 }
 
 /** 读取当前唯一的 桃/求桃 pending 的 target 座次。 */
-function readPeachTarget(state: GameState): number {
+function _readPeachTarget(state: GameState): number {
   const slots = [...state.pendingSlots.values()];
   if (slots.length === 0) throw new Error('无 pending');
   const atom = slots[0].atom as { type: string; requestType?: string; target?: number };
   if (atom.type !== '请求回应' || atom.requestType !== '桃/求桃') {
-    throw new Error('当前 pending 不是桃/求桃,实际是 ' + atom.type + '/' + atom.requestType);
+    throw new Error(`当前 pending 不是桃/求桃,实际是 ${  atom.type  }/${  atom.requestType}`);
   }
   return atom.target!;
 }

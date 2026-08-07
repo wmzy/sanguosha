@@ -402,8 +402,8 @@ describe('HeadlessGameClient — 自动跳过决策(通用)', () => {
     (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
     const pending: PendingView = {
       type: 'awaits',
-      atom: { type: '出牌窗口', player: 0 } as PendingView['atom'],
-      prompt: { type: 'confirm', title: '出牌阶段' } as PendingView['prompt'],
+      atom: { type: '出牌窗口', player: 0 },
+      prompt: { type: 'confirm', title: '出牌阶段' },
       target: 0,
       isBlocking: false,
       deadline: Date.now() + 30000,

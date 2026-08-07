@@ -72,7 +72,7 @@ async function applyDeathPenalty(
   } else if (dead.identity === '忠臣' && killerPlayer.identity === '主公') {
     const allCards = [
       ...killerPlayer.hand,
-      ...(Object.values(killerPlayer.equipment).filter(Boolean) as string[]),
+      ...(Object.values(killerPlayer.equipment).filter(Boolean)),
     ];
     if (allCards.length > 0) {
       await applyAtom(state, { type: '弃置', player: killer, cardIds: allCards });

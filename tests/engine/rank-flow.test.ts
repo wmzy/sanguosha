@@ -17,7 +17,6 @@ import { createGameState } from '../../src/engine/types';
 import type { Atom, Card, GameState, PlayerState, ViewEventSplit } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { runRankCompareFlow, getCardValue } from '../../src/engine/rank-flow';
-import { applyAtom } from '../../src/engine/index';
 import { getAtomDef } from '../../src/engine/atom';
 
 function makeCard(
@@ -237,7 +236,7 @@ describe('模块 G:拼点两步化 runRankCompareFlow', () => {
     const afterAtom = state.atomHistory
       .filter((e) => e.kind === 'atom')
       .map((e) => (e as { atom: Atom }).atom)
-      .find((a) => a.type === '拼点后') as Extract<Atom, { type: '拼点后' }> | undefined;
+      .find((a) => a.type === '拼点后');
     expect(afterAtom).toBeDefined();
     expect(afterAtom!.result).toBe('赢');
   });

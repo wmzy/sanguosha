@@ -26,7 +26,7 @@ import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { effectiveDistance } from '../distance';
 import { canSlash } from '../slash-quota';
 
-const SKILL_ID = '界乱武';
+const _SKILL_ID = '界乱武';
 const DISPLAY_NAME = '乱武';
 
 const USED_KEY = '乱武/used';

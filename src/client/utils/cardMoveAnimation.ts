@@ -106,7 +106,7 @@ function containerWidth(count: number): number {
 
 /** 渲染单张明牌子元素 */
 function createFaceCard(face: FlyCardFace): HTMLElement {
-  const suitColor = SUIT_COLOR[face.suit as keyof typeof SUIT_COLOR] ?? '#ccc';
+  const suitColor = SUIT_COLOR[face.suit] ?? '#ccc';
   const el = document.createElement('div');
   el.style.cssText = `
     position: absolute; width: ${CARD_W}px; height: ${CARD_H}px;

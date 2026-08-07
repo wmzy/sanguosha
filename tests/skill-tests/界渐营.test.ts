@@ -264,7 +264,7 @@ describe('界渐营', () => {
           makePlayer({ index: 0, name: 'P0', hand: ['w1', 'c2'] }),
           makePlayer({ index: 1, name: 'P1', character: '曹操' }),
         ],
-        cardMap: { w1: w1, c2 },
+        cardMap: { w1, c2 },
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },

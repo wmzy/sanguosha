@@ -35,16 +35,14 @@
 // 命名:文件名/loader key/character skill name 均为 '界破军'(避开标破军冲突,标破军尚未实现);
 //   内部 Skill.name = '破军'(OL 官方技能名,玩家可见)。
 import type {
-  Card,
   EquipSlot,
   FrontendAPI,
   GameState,
-  GameView,
   HookResult,
   Json,
   Skill,
 } from '../types';
-import { applyAtom, pushFrame, popFrame, topFrame } from '../index';
+import { applyAtom, pushFrame, popFrame } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界破军';
@@ -265,7 +263,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const amount = typeof atom.amount === 'number' ? atom.amount : 0;
       return {
         kind: 'modify',
-        atom: { ...ctx.atom, amount: amount + 1 } as unknown as typeof ctx.atom,
+        atom: { ...ctx.atom, amount: amount + 1 },
       };
     },
   );

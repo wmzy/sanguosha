@@ -200,7 +200,7 @@ describe('GameView:distribute 外部候选区(观星类场景)', () => {
       },
     });
 
-    const { container } = render(<GameViewComponent view={view} onAction={() => {}} />);
+    const { container: _container } = render(<GameViewComponent view={view} onAction={() => {}} />);
 
     // 等待外部候选区出现(标题包含 '观星')
     await waitFor(() => {

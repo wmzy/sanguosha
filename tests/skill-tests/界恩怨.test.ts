@@ -23,8 +23,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { skillLoaders } from '../../src/engine/skills';
 import * as 界恩怨Module from '../../src/engine/skills/界恩怨';
-import type { SkillModule } from '../../src/engine/skill';
-skillLoaders['界恩怨'] = async () => 界恩怨Module as unknown as SkillModule;
+skillLoaders['界恩怨'] = async () => 界恩怨Module;
 
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';

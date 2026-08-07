@@ -16,8 +16,7 @@ import '../../src/engine/skills';
 // 临时注册界诛害(主 agent 会统一注册到 index.ts)
 import { skillLoaders } from '../../src/engine/skills';
 import * as 界诛害Module from '../../src/engine/skills/界诛害';
-import type { SkillModule } from '../../src/engine/skill';
-skillLoaders['界诛害'] = async () => 界诛害Module as unknown as SkillModule;
+skillLoaders['界诛害'] = async () => 界诛害Module;
 
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';

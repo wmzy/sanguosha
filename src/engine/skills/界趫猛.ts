@@ -77,8 +77,8 @@ function buildPickOptions(
     .filter(([, id]) => typeof id === 'string')
     .map(([slot, id]) => ({
       slot,
-      cardId: id as string,
-      cardName: state.cardMap[id as string]?.name ?? '?',
+      cardId: id,
+      cardName: state.cardMap[id]?.name ?? '?',
     }));
   const judge = tp.pendingTricks.map((t) => ({
     cardId: t.card.id,
@@ -162,7 +162,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const cardId = atom.cardId;
     if (typeof cardId !== 'string') return;
     const damageCard = ctx.state.cardMap[cardId];
-    if (!damageCard || damageCard.name !== '杀') return;
+    if (damageCard?.name !== '杀') return;
 
     // 自己必须存活(描述主体是"你")
     if (!ctx.state.players[ownerId]?.alive) return;
@@ -213,13 +213,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       | undefined;
     delete ctx.state.localVars[PICK_RESULT_KEY];
 
-    const zone = (result?.zone ?? defaultZone.zone) as string;
+    const zone = (result?.zone ?? defaultZone.zone);
     let pickedCardId: string | undefined;
     if (zone === 'equipment' || zone === 'judge') {
       pickedCardId = (result?.cardId ?? (defaultZone as { cardId?: string }).cardId) ?? undefined;
     } else {
       // hand:盲选第 K 张(超时或缺省→0)
-      const handIndex = (result?.handIndex ?? (defaultZone.handIndex ?? 0)) as number;
+      const handIndex = (result?.handIndex ?? (defaultZone.handIndex ?? 0));
       const tp = ctx.state.players[target];
       pickedCardId = tp?.hand[handIndex] ?? tp?.hand[0];
     }

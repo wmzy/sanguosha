@@ -220,7 +220,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
 
       // 选项3:翻面+跳过弃牌
-      let opt3 = false;
       delete ctx.state.localVars[CONFIRMED_KEY];
       await applyAtom(ctx.state, {
         type: '请求回应',
@@ -235,7 +234,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         defaultChoice: false,
         timeout: 10,
       });
-      opt3 = ctx.state.localVars[CONFIRMED_KEY] === true;
+      const opt3 = ctx.state.localVars[CONFIRMED_KEY] === true;
 
       // 三项全否 → 未发动神速
       if (!opt1 && !opt2 && !opt3) {

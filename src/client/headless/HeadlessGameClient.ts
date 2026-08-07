@@ -609,9 +609,9 @@ export class HeadlessGameClient {
       if (pending.prompt?.type === 'choosePlayer') {
         const choosePrompt = pending.prompt;
         const filter = choosePrompt.filter;
-        const validTargets: number[] = choosePrompt.candidates
-          ? choosePrompt.candidates
-          : (() => {
+        const validTargets: number[] =
+          choosePrompt.candidates ??
+          (() => {
               const arr: number[] = [];
               for (const p of view.players) {
                 if (!p.alive) continue;
@@ -925,7 +925,7 @@ export class HeadlessGameClient {
     // canRespond:是否有非 skip 的可操作 action(含转化技)
     const actions = this.getAvailableActions();
     const canRespond = actions.some((a) => a.category !== 'skip');
-    const handCount = view!.players[this._seatIndex]?.handCount ?? 0;
+    const handCount = view.players[this._seatIndex]?.handCount ?? 0;
     const decision = decideAutoSkip({
       pending,
       canRespond,

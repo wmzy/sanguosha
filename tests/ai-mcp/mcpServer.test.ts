@@ -55,9 +55,9 @@ function makeCtx(
 ): McpHandlerContext {
   return {
     hgc,
-    doCreateRoom: handlers.doCreateRoom ?? (vi.fn(async () => {}) as never),
-    doJoinRoom: handlers.doJoinRoom ?? (vi.fn(async () => {}) as never),
-    doSpectateRoom: handlers.doSpectateRoom ?? (vi.fn(async () => {}) as never),
+    doCreateRoom: handlers.doCreateRoom ?? (vi.fn(async () => {})),
+    doJoinRoom: handlers.doJoinRoom ?? (vi.fn(async () => {})),
+    doSpectateRoom: handlers.doSpectateRoom ?? (vi.fn(async () => {})),
     advanceLobby: handlers.advanceLobby ?? vi.fn(async () => {}),
     isStarted: handlers.isStarted ?? (() => true),
     seat: 0,
@@ -187,7 +187,7 @@ describe('handleMcpRequest', () => {
     // hostId 与 playerId 不同 → guest
     const hgc = makeFakeHgc({
       playerId: 'p2',
-      roomState: { ...makeFakeHgc().roomState!, hostId: 'someone-else' } as never,
+      roomState: { ...makeFakeHgc().roomState!, hostId: 'someone-else' },
     });
     const ctx = makeCtx(hgc, { doJoinRoom });
     const res = await handleMcpRequest(

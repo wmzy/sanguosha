@@ -14,7 +14,6 @@
 //   registerChainConductionHook 是「连环状态 × 属性伤害」的传导行为——两者都与铁索连环牌
 //   解耦：任何途径置入连环状态（铁索连环牌、武将技能调 setChain）都受传导管辖。
 import type { GameState } from './types';
-import type { DamageType } from '../shared/types';
 import { TARGET_SYSTEM } from './types';
 import { applyAtom } from './index';
 import { runDamageFlow } from './damage-flow';
@@ -75,7 +74,7 @@ export function isChained(state: GameState, idx: number): boolean {
 export function registerChainConductionHook(state: GameState): void {
   registerAfterHook(state, '铁索连环', TARGET_SYSTEM, '伤害结算结束后', async (ctx) => {
     const atom = ctx.atom;
-    const dt = atom.damageType as DamageType | undefined;
+    const dt = atom.damageType;
     if (dt !== '火焰' && dt !== '雷电') return;
     const target = atom.target;
     if (typeof target !== 'number') return;

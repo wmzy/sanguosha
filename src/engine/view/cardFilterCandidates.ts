@@ -13,7 +13,6 @@
 //   - buildView(全量快照/重连路径)
 //   - 请求回应.toViewEvents
 import type { ActionPrompt, GameState } from '../types';
-import type { UseCardAndTargetPrompt, UseCardPrompt } from '../types';
 
 /**
  * 对 useCard / useCardAndTarget prompt 注入可序列化的 cardFilter.candidates。
@@ -28,7 +27,7 @@ export function resolveCardFilterCandidates(
   target: number,
 ): ActionPrompt {
   if (prompt.type !== 'useCard' && prompt.type !== 'useCardAndTarget') return prompt;
-  const p = prompt as UseCardPrompt | UseCardAndTargetPrompt;
+  const p = prompt;
   const cf = p.cardFilter;
   // 1. 技能已显式提供 candidates(含空数组,表示确无可选)→ 权威,尊重
   if (cf.candidates !== undefined) return prompt;

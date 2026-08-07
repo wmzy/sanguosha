@@ -9,7 +9,6 @@ import { useMultiplayerRoom } from '../hooks/useMultiplayerRoom';
 import { GameViewComponent } from '../components/GameView';
 import { GameResultOverlay } from '../components/GameResultOverlay';
 import { RoomListPanel } from '../components/RoomListPanel';
-import { ChatPanel } from '../components/ChatPanel';
 import { ChatConfigSection } from '../components/ChatConfigSection';
 import { colors, pageStyle, btnStyle, inputStyle, errorToastStyle } from '../theme';
 import { saveReplay } from '../replay/replayFile';

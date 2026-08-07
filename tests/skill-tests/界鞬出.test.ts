@@ -245,7 +245,7 @@ describe('界鞬出', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('界庞德');
-    const P2 = harness.player('P2');
+    const _P2 = harness.player('P2');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
     // 目标无牌 → 鞬出不询问;P2 手牌为空 → 走 skip 模式,无 pending slot,直接扣血

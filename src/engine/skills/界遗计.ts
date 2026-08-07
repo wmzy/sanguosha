@@ -74,7 +74,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === GIVE_RT) {
         st.localVars[ALLOC_KEY] =
-          (params.allocation as Allocation | undefined) ?? null;
+          (params.allocation) ?? null;
       }
     },
   );

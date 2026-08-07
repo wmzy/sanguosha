@@ -10,7 +10,6 @@
 //   出杀次数累加（slash-quota）+ 回合用量 view 同步。
 
 import type { Card, GameView, GameState, Json } from '../types';
-import type { ActionPrompt } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { inAttackRange } from '../distance';
@@ -125,12 +124,12 @@ const slashEffect: CardEffect = {
       filter: (view: GameView, t: number) =>
         viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
     },
-  } as ActionPrompt,
+  },
   respondPrompt: {
     type: 'useCard',
     title: '打出杀',
     cardFilter: { filter: (c: Card) => c.name === '杀', min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '杀',
   style: 'danger',
   activeWhen: (ctx) => defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx),

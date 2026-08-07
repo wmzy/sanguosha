@@ -34,7 +34,6 @@
 import type {
   FrontendAPI,
   GameState,
-  Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
@@ -53,7 +52,7 @@ const CONFIRMED_VAR = `${SKILL_ID}/confirmed`;
 const CONFIRM_REQUEST = `${SKILL_ID}/confirm`;
 
 /** 三国杀的牌类型(基本牌/锦囊牌/装备牌) */
-type CardType = '基本牌' | '锦囊牌' | '装备牌';
+type _CardType = '基本牌' | '锦囊牌' | '装备牌';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -89,15 +88,15 @@ function recordCardUse(state: GameState, ownerId: number, card: { suit?: string;
   const suits = usedSuits(state, ownerId);
   if (!suits.includes(card.suit)) {
     suits.push(card.suit);
-    state.turn.vars[USED_SUITS_PREFIX + ownerId] = suits as unknown as Json;
+    state.turn.vars[USED_SUITS_PREFIX + ownerId] = suits;
     changed = true;
   }
 
   // 类型集合
   const types = usedTypes(state, ownerId);
   if (!types.includes(card.type)) {
-    types.push(card.type as CardType);
-    state.turn.vars[USED_TYPES_PREFIX + ownerId] = types as unknown as Json;
+    types.push(card.type);
+    state.turn.vars[USED_TYPES_PREFIX + ownerId] = types;
     changed = true;
   }
 

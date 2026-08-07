@@ -417,7 +417,7 @@ export function registerJudgeModifier(
 ): () => void {
     const entry: AtomHookEntry = {
     skillId, ownerId, atomType: '判定', phase: 'after',
-    handler: handler as AtomHookEntry['handler'],
+    handler,
   };
   const reg = getRegistry(state);
   reg.judgeModifiers.set(ownerId, entry);

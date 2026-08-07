@@ -35,7 +35,7 @@ import { applyAtom } from '../index';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../face-down';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 
-const SKILL_ID = '界仁心';
+const _SKILL_ID = '界仁心';
 const DISPLAY_NAME = '仁心';
 /** localVars 键:玩家是否发动(confirm) */
 const CONFIRMED_KEY = '仁心/confirmed';

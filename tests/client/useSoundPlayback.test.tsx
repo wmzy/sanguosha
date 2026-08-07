@@ -8,7 +8,6 @@
 // 与 tests/client/ 下其它独立 hook 测试(useAnimationState/useReplay/…)同构。
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useState, type ReactNode } from 'react';
 import type { ViewEvent } from '../../src/engine/types';
 
 // mock audioEngine:jsdom 无 AudioContext,且要断言 play 调用次数/参数。
@@ -28,7 +27,7 @@ import type { QueuedEvent } from '../../src/client/hooks/useEventPlayback';
 
 /** 构造带 effect.sound 的 ViewEvent(extractSound 优先读 event.effect) */
 function ev(sound: string | undefined, volume?: number): ViewEvent {
-  return { type: '打出', effect: sound ? { sound, volume } : undefined } as unknown as ViewEvent;
+  return { type: '打出', effect: sound ? { sound, volume } : undefined };
 }
 
 function q(seq: number, event: ViewEvent): QueuedEvent {

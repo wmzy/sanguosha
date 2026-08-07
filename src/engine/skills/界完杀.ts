@@ -34,7 +34,7 @@ import type { HookResult, Skill, GameState } from '../types';
 import { registerBeforeHook, registerAfterHook, type SkillModule } from '../skill';
 import { registerSuppressionProvider } from '../skill-suppression';
 
-const SKILL_ID = '界完杀';
+const _SKILL_ID = '界完杀';
 const DISPLAY_NAME = '完杀';
 
 /** 非锁定技失效 tag(由 SUPPRESSION_TAGS 识别,见 index.ts) */

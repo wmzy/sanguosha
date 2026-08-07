@@ -274,7 +274,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // 该杀牌刚被父结算(杀.execute 收尾)移入弃牌堆——转给目标手牌(= 获得此杀)
     await applyAtom(ctx.state, {
       type: '移动牌',
-      cardId: atom.cardId!,
+      cardId: atom.cardId,
       from: { zone: '弃牌堆' },
       to: { zone: '手牌', player: target },
     });

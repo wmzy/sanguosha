@@ -116,7 +116,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       // ── 循环:每次选一张置于牌堆顶,玩家可选 0..N 张 ──
       const remaining = [...eligible];
-      // eslint-disable-next-line no-constant-condition
+       
       while (true) {
         const available = remaining.filter((id) => st.zones.discardPile.includes(id));
         if (available.length === 0) break;

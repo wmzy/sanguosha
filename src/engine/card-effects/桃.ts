@@ -4,7 +4,6 @@
 // target.kind='wounded': 可对包括自己在内的已受伤角色使用。
 
 import type { Card } from '../types';
-import type { ActionPrompt } from '../types';
 import { applyAtom } from '../index';
 import { defaultPlayActive } from '../action-active';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
@@ -90,12 +89,12 @@ const peachEffect: CardEffect = {
     // 出牌阶段默认自疗：前端无需手动选目标，自动以自己为目标提交。
     // 后端 canUsePeach 仍校验目标受伤；满血时 activeWhen 阻止出牌。
     selfTarget: true,
-  } as ActionPrompt,
+  },
   respondPrompt: {
     type: 'useCard',
     title: '打出桃',
     cardFilter: { filter: (c: Card) => c.name === '桃', min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '桃',
   style: 'primary',
   activeWhen: peachActiveWhen,

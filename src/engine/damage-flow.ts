@@ -50,7 +50,7 @@ export async function runDamageFlow(
     type: '伤害结算开始时', source, target, amount, cardId, damageType,
   });
   if (!startResult) return; // 被 cancel(绝情)→ 跳过整个伤害流程
-  amount = state.localVars[DAMAGE_AMOUNT_KEY] as number;
+  amount = state.localVars[DAMAGE_AMOUNT_KEY];
   source = state.localVars[DAMAGE_SOURCE_KEY] as number;
 
   // 时机2:造成伤害时(来源方加伤:裸衣/古锭刀/暗箭/酒)
@@ -58,7 +58,7 @@ export async function runDamageFlow(
   await applyAtom(state, {
     type: '造成伤害时', source, target, amount, cardId, damageType,
   });
-  amount = state.localVars[DAMAGE_AMOUNT_KEY] as number;
+  amount = state.localVars[DAMAGE_AMOUNT_KEY];
 
   // 时机3:受到伤害时(目标方减伤/防止:藤甲/白银狮子/天香/名士)
   state.localVars[DAMAGE_AMOUNT_KEY] = amount;
@@ -75,7 +75,7 @@ export async function runDamageFlow(
     });
     return;
   }
-  amount = state.localVars[DAMAGE_AMOUNT_KEY] as number;
+  amount = state.localVars[DAMAGE_AMOUNT_KEY];
 
   // 时机4:扣减体力(模块 M 的子流程,含扣减前/时/扣减/后四时机)
   // 必须在 造成伤害后/受到伤害后 之前:扣减体力 先扣血再触发 after-hook,

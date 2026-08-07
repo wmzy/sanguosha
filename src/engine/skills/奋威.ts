@@ -168,7 +168,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       // Path A(全体锦囊):当前目标已被奋威标记无效 → 设抵消标记 + 取消无懈窗口
       // 铁索连环不做目标级无懈取消(整卡一次无懈),无效由 设横置 hook 处理。
-      if (mode && invalidSet && invalidSet.includes(cancelTarget)) {
+      if (mode && invalidSet?.includes(cancelTarget)) {
         frame.cancelled = true;
         return { kind: 'cancel' };
       }
@@ -211,7 +211,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     async (ctx): Promise<{ kind: 'cancel' } | void> => {
       const st = ctx.state;
       const frame = topFrame(st);
-      if (!frame || frame.skillId !== '铁索连环') return;
+      if (frame?.skillId !== '铁索连环') return;
 
       const atom = ctx.atom;
       if (typeof atom.player !== 'number') return;
@@ -222,7 +222,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const invalidSet = st.localVars[`${INVALID_PREFIX}${cardId}`] as
         | number[]
         | undefined;
-      if (!invalidSet || !invalidSet.includes(atom.player)) return;
+      if (!invalidSet?.includes(atom.player)) return;
 
       return { kind: 'cancel' };
     },

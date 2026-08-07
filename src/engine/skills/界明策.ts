@@ -178,9 +178,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           const inEquip = Object.values(st.players[from].equipment).includes(cardId);
           if (inEquip) {
             // 找到对应槽位并卸下
-            const slot = (Object.entries(st.players[from].equipment) as Array<
-              [string, string]
-            >).find(([, id]) => id === cardId)?.[0];
+            const slot = (Object.entries(st.players[from].equipment)).find(([, id]) => id === cardId)?.[0];
             if (slot) {
               await applyAtom(st, {
                 type: '卸下',

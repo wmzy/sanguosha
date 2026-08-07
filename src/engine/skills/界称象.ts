@@ -28,7 +28,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-const SKILL_ID = '界称象';
+const _SKILL_ID = '界称象';
 const DISPLAY_NAME = '称象';
 /** localVars 键:玩家本次选择(被选中亮出牌的 cardId 列表,空数组=放弃发动) */
 const SELECTION_KEY = '称象/selection';

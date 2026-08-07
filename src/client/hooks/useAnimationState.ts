@@ -18,7 +18,7 @@ export interface AnimationState {
   discardPhase: boolean;
 }
 
-export function useAnimationState(view: GameView, perspectiveIdx: number): AnimationState {
+export function useAnimationState(view: GameView, _perspectiveIdx: number): AnimationState {
   const [state, setState] = useState<AnimationState>({
     damageFlashIndices: new Map(),
     healFlashIndices: new Map(),

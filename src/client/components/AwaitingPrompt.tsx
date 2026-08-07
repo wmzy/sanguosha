@@ -238,7 +238,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                           key={opt.value}
                           className={styles.chooseOptionCard}
                           style={{
-                            background: factionColor + '20',
+                            background: `${factionColor  }20`,
                             borderColor: factionColor,
                           }}
                           onClick={() => onSend(skillId, 'respond', { option: opt.value })}

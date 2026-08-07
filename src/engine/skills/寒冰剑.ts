@@ -70,7 +70,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!weaponId) return;
       const weapon = ctx.state.cardMap[weaponId];
       if (weapon?.name !== '寒冰剑') return;
-      const target = ctx.state.players[atom.target!];
+      const target = ctx.state.players[atom.target];
       if (!target) return;
       // 触发条件:目标有牌(手牌或装备区)
       const hasCards = target.hand.length > 0 || Object.keys(target.equipment).length > 0;
@@ -95,11 +95,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 依次弃目标最多2张牌(手牌或装备区,寒冰剑使用者逐张选择;不含判定区)
       for (let i = 0; i < 2; i++) {
-        const tp = ctx.state.players[atom.target!];
+        const tp = ctx.state.players[atom.target];
         if (!tp) break;
         const stillHas = tp.hand.length > 0 || Object.keys(tp.equipment).length > 0;
         if (!stillHas) break;
-        await runPickTargetCardPanel(ctx.state, ownerId, atom.target!, tp, {
+        await runPickTargetCardPanel(ctx.state, ownerId, atom.target, tp, {
           mode: 'discard',
           requestType: '寒冰剑/选牌',
           title: `寒冰剑:选择弃置目标的牌(第${i + 1}张)`,

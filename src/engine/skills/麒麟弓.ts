@@ -54,7 +54,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const damageCardId = atom.cardId;
       if (!damageCardId) return;
       const damageCard = ctx.state.cardMap[damageCardId];
-      if (!damageCard || damageCard.name !== '杀') return;
+      if (damageCard?.name !== '杀') return;
       const targetIdx = atom.target;
       if (typeof targetIdx !== 'number') return;
       const target = ctx.state.players[targetIdx];

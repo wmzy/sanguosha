@@ -4,7 +4,6 @@
 // target.kind='allOthers': 所有其他角色（从下家开始按座次）。
 
 import type { Card } from '../types';
-import type { ActionPrompt } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { consumePlayedSlashes } from '../card-effect/play-card';
@@ -33,7 +32,7 @@ const barbarianInvasionEffect: CardEffect = {
     type: 'useCard',
     title: '南蛮入侵',
     cardFilter: { filter: (c: Card) => c.name === '南蛮入侵', min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '南蛮入侵',
   style: 'danger',
 };

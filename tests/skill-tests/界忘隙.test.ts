@@ -360,7 +360,7 @@ describe('界忘隙', () => {
     await harness.setup(state);
 
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     // P0 杀 P1
     await P0.useCardAndTarget('杀', 'k1', [1]);

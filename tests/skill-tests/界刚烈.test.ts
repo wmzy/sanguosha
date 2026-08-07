@@ -15,8 +15,7 @@ import '../../src/engine/skills';
 // 临时注册界刚烈(主 agent 会统一注册到 index.ts)
 import { skillLoaders } from '../../src/engine/skills';
 import * as 界刚烈Module from '../../src/engine/skills/界刚烈';
-import type { SkillModule } from '../../src/engine/skill';
-skillLoaders['界刚烈'] = async () => 界刚烈Module as unknown as SkillModule;
+skillLoaders['界刚烈'] = async () => 界刚烈Module;
 
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';

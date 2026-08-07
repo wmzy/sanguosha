@@ -5,7 +5,7 @@
 //   其他结果 → 闪电传递给下家（下家的判定区）
 // 无来源伤害用 source: TARGET_SYSTEM（系统惯例，见 扣减体力 atom）。
 
-import type { Card, ActionPrompt, GameState } from '../types';
+import type { Card, GameState } from '../types';
 import { TARGET_SYSTEM } from '../types';
 import { applyAtom } from '../index';
 import { runJudgeFlow } from '../judge-flow';
@@ -111,7 +111,7 @@ const lightningEffect: CardEffect = {
     type: 'useCard',
     title: '闪电',
     cardFilter: { filter: (c: Card) => c.name === TRICK_NAME, min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '闪电',
   style: 'danger',
 };

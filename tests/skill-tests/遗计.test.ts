@@ -25,7 +25,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';
 import { runDamageFlow } from '../../src/engine/damage-flow';
-import type { Card, GameState, Json } from '../../src/engine/types';
+import type { Card, GameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;
@@ -120,7 +120,7 @@ describe('遗计', () => {
   it('P1 出杀,P2 不出闪 → P2 扣血并进入遗计分配 pending', async () => {
     await harness.setup(buildState());
     const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
+    const _P2 = harness.player('P2');
 
     await P1.useCardAndTarget('杀', 'c1', [1]);
     // P2 无手牌:询问闪走 skip(无 slot),直接扣血 → 进入遗计分配 pending

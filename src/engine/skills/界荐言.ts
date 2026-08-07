@@ -66,7 +66,7 @@ function cardMatches(card: Card, declaration: Declaration): boolean {
     return card.type === declaration;
   }
   // 颜色声明:红 / 黑(card.color 为 Color='红'|'黑'|'无色',与 declaration 字面量比较)
-  return card.color === (declaration as '红' | '黑');
+  return card.color === (declaration);
 }
 
 /** 校验某座次是否为男性存活角色 */

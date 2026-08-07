@@ -4,7 +4,6 @@
 // target.kind='other': 任意其他角色（无距离限制）。
 
 import type { Card } from '../types';
-import type { ActionPrompt } from '../types';
 import { runPickTargetCardPanel } from '../skills/选牌面板';
 import { QICAI_PROTECTED_SLOTS } from '../skills/界奇才';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
@@ -101,7 +100,7 @@ const dismantleEffect: CardEffect = {
     title: '过河拆桥',
     cardFilter: { filter: (c: Card) => c.name === '过河拆桥', min: 1, max: 1 },
     targetFilter: { min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '过河拆桥',
   style: 'primary',
 };

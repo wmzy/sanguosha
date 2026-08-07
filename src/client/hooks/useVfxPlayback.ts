@@ -29,7 +29,7 @@ function extractVfx(event: ViewEvent): string | null {
   const atomType = (event as { atomType?: string }).atomType ?? event.type;
   let staticEffect: EventEffect;
   try {
-    staticEffect = getAtomDef(atomType).effect as EventEffect;
+    staticEffect = getAtomDef(atomType).effect;
   } catch {
     staticEffect = undefined;
   }

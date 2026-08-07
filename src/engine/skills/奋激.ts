@@ -64,7 +64,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const atom = slot.atom as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
       const rt = atom['requestType'] as string;
-      if (!rt || !rt.startsWith(CONFIRM_RT_PREFIX)) return '当前不是奋激询问';
+      if (!rt?.startsWith(CONFIRM_RT_PREFIX)) return '当前不是奋激询问';
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {

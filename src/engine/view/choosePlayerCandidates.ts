@@ -17,14 +17,13 @@
 //      filter 访问未提供字段而抛错时保守纳入(后端 respond validate 拒非法目标)。
 //   3. 无 filter → 返回原样(前端 fallback 到所有存活)。
 import type { ActionPrompt, GameState, GameView } from '../types';
-import type { ChoosePlayerPrompt } from '../types';
 
 export function resolveChoosePlayerCandidates(
   prompt: ActionPrompt,
   state: GameState,
 ): ActionPrompt {
   if (prompt.type !== 'choosePlayer') return prompt;
-  const cp = prompt as ChoosePlayerPrompt;
+  const cp = prompt;
 
   // 1. 技能已显式提供 candidates(含空数组,表示确无候选)→ 权威,尊重。
   if (cp.candidates !== undefined) return prompt;
@@ -51,7 +50,7 @@ export function resolveChoosePlayerCandidates(
   const candidates: number[] = [];
   for (let i = 0; i < players.length; i++) {
     if (!players[i].alive) continue;
-    let ok = true;
+    let ok: boolean;
     try {
       ok = !!cp.filter(partialView, i);
     } catch {

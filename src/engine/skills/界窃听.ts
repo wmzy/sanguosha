@@ -89,8 +89,8 @@ async function executeStealEquip(
     .filter(([, id]) => typeof id === 'string')
     .map(([slot, id]) => ({
       slot,
-      cardId: id as string,
-      cardName: state.cardMap[id as string]?.name ?? '?',
+      cardId: id,
+      cardName: state.cardMap[id]?.name ?? '?',
     }));
   if (equipment.length === 0) return;
 
@@ -201,7 +201,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         st.localVars[PICK_RESULT_KEY] = {
           zone: params.zone,
           cardId: params.cardId ?? null,
-        } as Json;
+        };
       }
     },
   );

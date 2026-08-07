@@ -220,7 +220,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         'respond',
         (st: GameState, _params: Record<string, Json>): string | null => {
           const slot = st.pendingSlots.get(seatId);
-          if (!slot || slot.atom.type !== '请求回应') return '当前不需要回应';
+          if (slot?.atom.type !== '请求回应') return '当前不需要回应';
           const rt = (slot.atom as { requestType?: string }).requestType ?? '';
           // 解烦 CHOOSE 询问:requestType 必须是 `界解烦/choose/<seatId>`,
           // 且 target === seatId(本座次 slot)
@@ -275,7 +275,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       targetFilter: {
         min: 1,
         max: 1,
-        filter: (_view, t) => true, // 任意存活角色(后端 validate 校验)
+        filter: (_view, _t) => true, // 任意存活角色(后端 validate 校验)
       },
     },
     activeWhen: (ctx) => {

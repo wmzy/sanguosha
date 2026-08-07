@@ -23,7 +23,7 @@ import type { Card, HookResult, Skill, GameState } from '../types';
 import { applyAtom, topFrame } from '../index';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
-const SKILL_ID = '界帷幕';
+const _SKILL_ID = '界帷幕';
 const DISPLAY_NAME = '帷幕';
 
 export function createSkill(id: string, ownerId: number): Skill {

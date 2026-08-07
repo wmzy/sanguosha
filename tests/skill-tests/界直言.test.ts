@@ -65,7 +65,7 @@ function mkPlayer(opts: {
   };
 }
 
-/** 触发 player 的结束阶段(applyAtom 阶段开始 phase='回合结束')*/
+/** 触发 player 的结束阶段(applyAtom 阶段开始 phase='回合结束') */
 async function triggerEndPhase(harness: SkillTestHarness, player: number): Promise<void> {
   void applyAtom(harness.state, { type: '阶段开始', player, phase: '回合结束' });
   await harness.waitForStable();

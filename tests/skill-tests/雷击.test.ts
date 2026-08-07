@@ -246,7 +246,7 @@ describe('雷击', () => {
     });
     state.zones = { deck: ['j1'], discardPile: [], processing: [] };
     await harness.setup(state);
-    const P0 = harness.player('张角');
+    const _P0 = harness.player('张角');
     const P1 = harness.player('攻击者');
 
     await P1.useCardAndTarget('杀', 'k1', [0]);

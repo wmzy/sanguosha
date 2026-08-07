@@ -60,7 +60,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 转化影子卡(武圣红牌当杀等):影子卡入弃牌堆时引擎用原卡(shadowOf)替换并删除影子,
     // 须记录原卡 id 才能在弃牌堆中找到并拿取(同标奸雄/界双雄)
     const effectiveId: string = hasCard
-      ? (ctx.state.cardMap[damageCardId as string].shadowOf ?? damageCardId)
+      ? (ctx.state.cardMap[damageCardId].shadowOf ?? damageCardId)
       : (damageCardId as string);
 
     delete ctx.state.localVars[CHOICE_KEY];

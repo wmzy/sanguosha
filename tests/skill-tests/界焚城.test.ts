@@ -272,7 +272,7 @@ describe('界焚城', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
     const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
+    const _P2 = harness.player('P2');
 
     await P0.triggerAction('界焚城', 'use', {});
     P0.expectPending('请求回应');

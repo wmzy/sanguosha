@@ -150,7 +150,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const drawnCard = drawnId ? ctx.state.cardMap[drawnId] : undefined;
 
     // ── 第三步:若摸到的是基本牌,询问是否弃之换本回合手牌上限+1 ──
-    if (!drawnCard || drawnCard.type !== '基本牌') return;
+    if (drawnCard?.type !== '基本牌') return;
 
     delete ctx.state.localVars['界集智/discard'];
     await applyAtom(ctx.state, {
@@ -171,12 +171,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // 弃置此牌:从 owner 手牌弃置(走「弃置」atom 以发 reason='弃置' 的「失去牌」时机标记,供连营/落英/屯田等触发)
     const self = ctx.state.players[ownerId];
     if (!self) return;
-    const idx = self.hand.indexOf(drawnId!);
+    const idx = self.hand.indexOf(drawnId);
     if (idx < 0) return; // 卡不在手牌(已被其他效果移动),跳过
     await applyAtom(ctx.state, {
       type: '弃置',
       player: ownerId,
-      cardIds: [drawnId!],
+      cardIds: [drawnId],
     });
 
     // 本回合手牌上限+1(turn.vars['手牌上限/bonus:<owner>'])

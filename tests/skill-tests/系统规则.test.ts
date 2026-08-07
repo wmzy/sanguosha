@@ -313,11 +313,13 @@ describe('系统规则', () => {
     // prompt 应为 useCard(原为 confirm)
     expect(prompt.type).toBe('useCard');
     // cardFilter 匹配桃、酒;不匹配杀/闪
-    const filter = prompt.cardFilter?.filter!;
-    expect(filter(makeCard('p', '桃', '♥'))).toBe(true);
-    expect(filter(makeCard('w', '酒', '♠'))).toBe(true);
-    expect(filter(makeCard('s', '杀', '♠'))).toBe(false);
-    expect(filter(makeCard('d', '闪', '♦'))).toBe(false);
+    const filter = prompt.cardFilter?.filter;
+    expect(filter).toBeDefined();
+    const match = filter!;
+    expect(match(makeCard('p', '桃', '♥'))).toBe(true);
+    expect(match(makeCard('w', '酒', '♠'))).toBe(true);
+    expect(match(makeCard('s', '杀', '♠'))).toBe(false);
+    expect(match(makeCard('d', '闪', '♦'))).toBe(false);
     restoreAutoCompare();
   });
 
@@ -350,7 +352,7 @@ describe('系统规则', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
     // P1 无手牌:询问闪走 skip(无 slot),直接扣血濒死;P0(有桃)被求桃

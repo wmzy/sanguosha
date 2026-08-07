@@ -146,7 +146,7 @@ describe('阶段跳过 skipPhase 集成', () => {
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
+    const _P2 = harness.player('P2');
 
     const handBefore = harness.state.players[0].hand.length;
     const deckBefore = harness.state.zones.deck.length;

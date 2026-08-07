@@ -114,11 +114,7 @@ describe('急救', () => {
     await P0.pass();
 
     // 第二问 华佗(target=1)→ 急救自救
-    slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
-      type?: string;
-      requestType?: string;
-      target?: number;
-    };
+    slotAtom = [...harness.state.pendingSlots.values()][0].atom;
     expect(slotAtom.target).toBe(1);
 
     // 华佗用急救:红色手牌当桃自救

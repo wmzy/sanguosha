@@ -92,7 +92,7 @@ describe('界悲歌', () => {
     const P0 = harness.player('界蔡文姬');
     const P1 = harness.player('P1');
 
-    await P1.useCardAndTarget('杀', 'k1', [0]);
+    await P1.useCardAndTarget('杀', 'k1', [0]); // eslint-disable-line react-hooks/rules-of-hooks -- 测试 harness 方法非 React Hook
     await P0.pass(); // 不出闪
     return { P0, P1, state };
   }

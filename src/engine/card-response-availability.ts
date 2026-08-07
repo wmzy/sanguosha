@@ -129,7 +129,7 @@ function resolveCardResponseFilter(atom: Atom): ((card: Card) => boolean) | null
   if (atom.type === '请求回应') {
     if ((atom as { mandatory?: boolean }).mandatory === true) return null;
     const prompt = (atom as { prompt?: ActionPrompt }).prompt;
-    if (!prompt || prompt.type !== 'useCard') return null;
+    if (prompt?.type !== 'useCard') return null;
     const filter = prompt.cardFilter?.filter;
     if (typeof filter !== 'function') return null;
     return filter;

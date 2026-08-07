@@ -36,7 +36,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界将驰'(避开标版未实现的 将驰);
 //   内部 Skill.name = '将驰'(OL 官方技能名,玩家可见)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../index';
 import { recastCard } from '../recast';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
@@ -44,7 +44,7 @@ import { registerSlashQuotaProvider, registerSlashBlocker } from '../slash-quota
 import { registerHandLimitProvider } from '../hand-limit';
 import { registerAttackRangeExemptor } from '../distance';
 
-const SKILL_ID = '界将驰';
+const _SKILL_ID = '界将驰';
 const DISPLAY_NAME = '将驰';
 
 /** localVars key:最近一个正常开始的摸牌阶段所属玩家(被跳过时不设) */

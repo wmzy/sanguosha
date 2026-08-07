@@ -26,7 +26,7 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerAfterHook, type SkillModule } from '../skill';
 
-const SKILL_ID = '界耀武';
+const _SKILL_ID = '界耀武';
 const DISPLAY_NAME = '耀武';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -63,7 +63,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           typeof source === 'number' && ctx.state.players[source]?.alive;
         await applyAtom(ctx.state, {
           type: '摸牌',
-          player: sourceAlive ? source! : ownerId,
+          player: sourceAlive ? source : ownerId,
           count: 1,
         });
       } else {

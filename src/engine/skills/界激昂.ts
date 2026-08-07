@@ -49,7 +49,7 @@ const RECYCLE_USED_KEY = `${SKILL_ID}/recycle/usedThisTurn`;
 /** 判定是否为激昂可触发场景(决斗或红色杀);与标激昂同款判定
  *  allowVirtualFallback:仅「成为目标」hook 需要——虚拟决斗(离间)无实体牌,
  *    靠 topFrame.skillId 兜底。「弃置」hook 处理的必是真实弃牌,应按牌本身身份判定,
- *    不可用帧兜底(否则离间弃置非决斗/红杀的代价牌时会误判为触发)。*/
+ *    不可用帧兜底(否则离间弃置非决斗/红杀的代价牌时会误判为触发)。 */
 function isJiangTrigger(
   state: GameState,
   cardId: string | undefined,

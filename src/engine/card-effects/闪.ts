@@ -15,7 +15,6 @@
 // 闪的色限制（诸葛连弩等）由 effect.respond.validate 校验。
 
 import type { Card, GameState, Json } from '../types';
-import type { ActionPrompt } from '../types';
 import {
   registerCardEffect,
   type CardEffect,
@@ -66,12 +65,12 @@ const dodgeEffect: CardEffect = {
     type: 'useCard',
     title: '打出闪',
     cardFilter: { filter: (c: Card) => c.name === '闪', min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   respondPrompt: {
     type: 'useCard',
     title: '打出闪',
     cardFilter: { filter: (c: Card) => c.name === '闪', min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '闪',
   style: 'default',
 };

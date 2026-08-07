@@ -41,7 +41,7 @@
 //
 // respond(质疑)注册到每个座次(被问询者非于吉),onInit 返回合并卸载函数
 //   (unloadSkillInstance 仅按 (skillId,于吉座次) 清 action,清不到其他座次)。
-import type { ActionContext, Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { ActionContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { registerAction, hasBlockingPending } from '../skill';
@@ -56,8 +56,7 @@ const DECLARE_VAR = '蛊惑/声明';
 const RESCUED_VAR = '求桃/已救';
 /** use 主动使用可声明的牌(有主动效果);闪仅经 dodge 响应路径打出。 */
 const ACTIVE_DECLARATIONS = ['杀', '桃', '酒'] as const;
-const BASIC_CARDS = ['杀', '闪', '桃', '酒'] as const;
-type DeclaredName = (typeof BASIC_CARDS)[number];
+type DeclaredName = '杀' | '闪' | '桃' | '酒';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -335,8 +334,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const cardId = params.cardId as string;
         await markOncePerTurn(st, from, '蛊惑');
         await pushFrame(st, '蛊惑', from, { cardId, declaredName: '闪' });
-        let notVoided = false;
-        let downCard = cardId;
+        let notVoided: boolean;
+        let downCard: string;
         try {
           const result = await runQuestioning(st, from, cardId, '闪');
           notVoided = !result.voided;
@@ -381,7 +380,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const cardId = params.cardId as string;
         await markOncePerTurn(st, from, '蛊惑');
         await pushFrame(st, '蛊惑', from, { cardId, declaredName: '桃' });
-        let notVoided = false;
+        let notVoided: boolean;
         try {
           const result = await runQuestioning(st, from, cardId, '桃');
           notVoided = !result.voided;
@@ -492,8 +491,7 @@ function dodgeActive(ctx: ActionContext): boolean {
   if ((p.hand?.length ?? 0) === 0) return false;
   const pending = view.pending;
   return (
-    pending != null &&
-    pending.target === perspectiveIdx &&
+    pending?.target === perspectiveIdx &&
     (pending.atom as { type?: string } | null)?.type === '询问闪'
   );
 }
@@ -508,8 +506,7 @@ function rescueActive(ctx: ActionContext): boolean {
   const pending = view.pending;
   const atom = pending?.atom as { type?: string; requestType?: string } | null;
   return (
-    pending != null &&
-    pending.target === perspectiveIdx &&
+    pending?.target === perspectiveIdx &&
     atom?.type === '请求回应' &&
     atom?.requestType === '桃/求桃'
   );

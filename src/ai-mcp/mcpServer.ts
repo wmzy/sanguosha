@@ -236,11 +236,11 @@ function asRecord(v: unknown): Record<string, unknown> {
 }
 
 function optString(o: Record<string, unknown>, key: string): string | undefined {
-  return typeof o[key] === 'string' ? (o[key] as string) : undefined;
+  return typeof o[key] === 'string' ? (o[key]) : undefined;
 }
 
 function optNumber(o: Record<string, unknown>, key: string): number | undefined {
-  return typeof o[key] === 'number' ? (o[key] as number) : undefined;
+  return typeof o[key] === 'number' ? (o[key]) : undefined;
 }
 
 function parseCreateRoomOpts(args: unknown): CreateRoomOpts {

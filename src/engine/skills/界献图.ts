@@ -154,7 +154,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     await pushFrame(st, SKILL_ID, ownerId, { target: currentPlayer });
 
     // 2) 选摸几张(至多 2):"摸 2 张?" → 是=2 / 否→ "摸 1 张?" → 是=1 / 否=0
-    let drawN = 0;
+    let drawN: number;
     delete st.localVars[CONFIRM_KEY];
     await applyAtom(st, {
       type: '请求回应',

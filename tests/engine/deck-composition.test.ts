@@ -17,7 +17,7 @@ import type { Suit } from '../../src/shared/types';
 const FULL_DECK = createStandardDeck();
 
 /** 统计指定 (花色,点数) 在牌堆中出现的次数 */
-function countAt(suit: Suit, rank: string): number {
+function _countAt(suit: Suit, rank: string): number {
   return FULL_DECK.filter((c) => c.suit === suit && c.rank === rank).length;
 }
 
@@ -71,7 +71,7 @@ describe('标准包关键花色点数(精确对应,防退化)', () => {
   function stdCountAt(suit: Suit, rank: string): number {
     return STANDARD_ONLY.filter((c) => c.suit === suit && c.rank === rank).length;
   }
-  function junCountAt(suit: Suit, rank: string): number {
+  function _junCountAt(suit: Suit, rank: string): number {
     return JUNZHENG_ONLY.filter((c) => c.suit === suit && c.rank === rank).length;
   }
 

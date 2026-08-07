@@ -5,7 +5,7 @@
 //   1. 阶段间 atom 在 阶段结束 与 阶段开始(next) 之间发出
 //   2. 阶段间 atom 的 from/to 正确(准备→判定、判定→摸牌、摸牌→出牌、出牌→弃牌、弃牌→回合结束)
 //   3. 阶段间 before-hook cancel → 跳过下一阶段(不 apply 阶段开始(next))
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
@@ -239,7 +239,7 @@ describe('模块 J:阶段间 before-hook cancel → 跳过下一阶段', () => {
     // 阶段开始(判定) 未被 apply
     const phaseStarts = allAtoms(state).filter(
       (a) => a.type === '阶段开始',
-    ) as Extract<Atom, { type: '阶段开始' }>[];
+    );
     expect(phaseStarts.find((a) => a.phase === '判定')).toBeUndefined();
     // phase 未推进到 判定(仍停留在 准备——级联被 cancel 阻断)
     expect(state.phase).not.toBe('判定');

@@ -17,12 +17,10 @@ import '../../src/engine/skills';
 import { skillLoaders } from '../../src/engine/skills';
 import * as 界潜心Module from '../../src/engine/skills/界潜心';
 import * as 界荐言Module from '../../src/engine/skills/界荐言';
-import type { SkillModule } from '../../src/engine/skill';
-skillLoaders['界潜心'] = async () => 界潜心Module as unknown as SkillModule;
-skillLoaders['界荐言'] = async () => 界荐言Module as unknown as SkillModule;
+skillLoaders['界潜心'] = async () => 界潜心Module;
+skillLoaders['界荐言'] = async () => 界荐言Module;
 
 import { createGameState } from '../../src/engine/types';
-import { applyAtom } from '../../src/engine/index';
 import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { GameState, PlayerState } from '../../src/engine/types';
 

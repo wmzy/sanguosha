@@ -42,7 +42,6 @@ import type {
   FrontendAPI,
   HookResult,
 } from '../types';
-import type { Color } from '../../shared/types';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../skill';
 import { applyAtom, topFrame } from '../index';
 import { registerSlashUnlimitedProvider } from '../slash-quota';
@@ -126,7 +125,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (entry) equipsToUnequip.push({ slot: entry[0] as EquipSlot, cardId: cid });
       }
       if (equipsToUnequip.length > 0) {
-        params['_unequipped'] = equipsToUnequip as unknown as Json;
+        params['_unequipped'] = equipsToUnequip;
         for (const { slot } of equipsToUnequip) {
           await applyAtom(state, { type: '卸下', player: ownerId, slot });
         }
@@ -261,7 +260,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (atom.source !== ownerId) return;
       // 读 杀 帧 cardId(topFrame.params.cardId)
       const frame = topFrame(ctx.state);
-      if (!frame || frame.skillId !== '杀') return;
+      if (frame?.skillId !== '杀') return;
       const cardId = frame.params['cardId'];
       if (typeof cardId !== 'string') return;
       // 转化杀判定:影子卡 id 含 '#'(物理杀 id 不含)
@@ -269,7 +268,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!cardId.includes('#')) return;
       const slashCard = ctx.state.cardMap[cardId];
       if (!slashCard) return;
-      const color = slashCard.color as Color;
+      const color = slashCard.color;
       // 仅红/黑有同色要求;无色不限制
       if (color !== '红' && color !== '黑') return;
       ctx.state.localVars[COLOR_LIMIT_VAR] = color;

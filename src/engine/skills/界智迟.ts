@@ -38,7 +38,7 @@ import type {
 import { topFrame } from '../index';
 import { registerAfterHook, registerBeforeHook } from '../skill';
 
-const SKILL_ID = '界智迟';
+const _SKILL_ID = '界智迟';
 const DISPLAY_NAME = '智迟';
 
 /** turn.vars key:智迟激活(值=激活者 ownerId)。turn.vars 在「回合结束」atom 自动清空。 */

@@ -54,7 +54,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const triggerCardId = atom.cardId;
     if (!triggerCardId) return;
     const triggerCard = ctx.state.cardMap[triggerCardId];
-    if (!triggerCard || triggerCard.name !== '杀') return;
+    if (triggerCard?.name !== '杀') return;
     const selfPlayer = ctx.state.players[ownerId];
     if (!selfPlayer || selfPlayer.hand.length === 0) return;
 
@@ -89,7 +89,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         filter: (view, target) =>
           target !== ownerId &&
           view.players[target]?.alive === true &&
-          inAttackRange(ctx.state, atom.source!, target),
+          inAttackRange(ctx.state, atom.source, target),
       },
       timeout: 15,
     });

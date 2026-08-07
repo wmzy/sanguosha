@@ -4,7 +4,6 @@
 // target.kind='self': 目标是使用者自己。
 
 import type { Card } from '../types';
-import type { ActionPrompt } from '../types';
 import { applyAtom } from '../index';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
@@ -23,7 +22,7 @@ const exNihiloEffect: CardEffect = {
     type: 'useCard',
     title: '无中生有',
     cardFilter: { filter: (c: Card) => c.name === '无中生有', min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '无中生有',
   style: 'primary',
 };

@@ -167,7 +167,7 @@ describe('computeCanRespondForView — 前端 canRespond 计算', () => {
   it('useCard + cardFilter 匹配手牌 → true', () => {
     const view = mkView(2);
     view.players[0].hand = [
-      { id: 'w1', name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' } as Card,
+      { id: 'w1', name: '无懈可击', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌' },
     ];
     const info = { skillId: '无懈可击', cardFilter: (c: Card) => c.name === '无懈可击' };
     expect(computeCanRespondForView(view, 0, [], info, view.pending)).toBe(true);
@@ -176,7 +176,7 @@ describe('computeCanRespondForView — 前端 canRespond 计算', () => {
   it('useCard + cardFilter 不匹配 + 有激活转化技 → true(看破)', () => {
     const view = mkView(2);
     view.players[0].hand = [
-      { id: 'b1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' } as Card,
+      { id: 'b1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' },
     ];
     const transformAction = {
       skillId: '看破', ownerId: 0, actionType: 'transform', label: '看破',

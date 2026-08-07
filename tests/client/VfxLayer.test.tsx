@@ -58,7 +58,7 @@ describe('VfxLayer', () => {
     const seat = document.createElement('div');
     seat.setAttribute('data-player-name', '张角');
     seat.getBoundingClientRect = () =>
-      ({ left: 100, top: 200, width: 120, height: 160, right: 220, bottom: 360, x: 100, y: 200, toJSON: () => ({}) }) as DOMRect;
+      ({ left: 100, top: 200, width: 120, height: 160, right: 220, bottom: 360, x: 100, y: 200, toJSON: () => ({}) });
     document.body.appendChild(seat);
 
     const item: VfxPlaybackItem = { key: '1-card/damage', url: '/damage.apng', target: 1 };

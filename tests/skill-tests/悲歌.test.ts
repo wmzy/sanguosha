@@ -220,7 +220,7 @@ describe('悲歌', () => {
       turn: { round: 1, phase: '出牌', vars: {} },
     });
     await harness.setup(state);
-    const P0 = harness.player('蔡文姬');
+    const _P0 = harness.player('蔡文姬');
     const P1 = harness.player('P1');
 
     await P1.useCardAndTarget('杀', 'k1', [0]);

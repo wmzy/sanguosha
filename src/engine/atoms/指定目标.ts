@@ -33,7 +33,7 @@ export const 指定目标: AtomDefinition<{ source: number; cardId?: string; tar
     const target = event.target as number;
     const targetName = resolveName?.(target) ?? `P${target}`;
     const source = event.source as number;
-    const sourceName = resolveName?.(source) ?? `P${source}`;
+    const _sourceName = resolveName?.(source) ?? `P${source}`;
     const cardName = event.cardName ?? event.cardId;
     const cardPart = cardName ? `使用 ${cardName} ` : '';
     return {

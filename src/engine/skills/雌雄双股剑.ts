@@ -53,7 +53,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       'respond',
       (st: GameState, params: Record<string, Json>): string | null => {
         const slot = st.pendingSlots.get(pid);
-        if (!slot || slot.atom.type !== '请求回应') return '当前不需要回应';
+        if (slot?.atom.type !== '请求回应') return '当前不需要回应';
         const reqType = (slot.atom as { requestType?: string }).requestType;
         if (reqType === CONFIRM_REQUEST) {
           // owner confirm:接受任意 choice(true/false)
@@ -76,7 +76,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           st.localVars[CONFIRMED_VAR] = params.choice === true;
         } else if (reqType === CHOICE_REQUEST) {
           // cardId 缺省时写入 null,与"未设(超时)"区分仍视为让对方摸牌
-          st.localVars[CHOICE_VAR] = (params.cardId as string | undefined) ?? null;
+          st.localVars[CHOICE_VAR] = (params.cardId) ?? null;
         }
       },
     );

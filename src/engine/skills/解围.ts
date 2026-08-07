@@ -71,7 +71,7 @@ function fieldCardIds(state: GameState, player: number): string[] {
 }
 
 /** 装备牌 subtype → 装备栏位 */
-function slotOf(card: { subtype?: string } | undefined): EquipSlot | null {
+function _slotOf(card: { subtype?: string } | undefined): EquipSlot | null {
   switch (card?.subtype) {
     case '武器':
       return '武器';

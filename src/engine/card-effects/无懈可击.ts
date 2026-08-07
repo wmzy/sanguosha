@@ -10,7 +10,6 @@
 // 无懈可击本身可被无懈可击抵消（递归嵌套），由 runSettlementPhase 自动推导 cancelledBy 处理。
 
 import type { Card, GameState, Json } from '../types';
-import type { ActionPrompt } from '../types';
 import { findPendingSlot } from '../skill';
 import {
   registerCardEffect,
@@ -53,12 +52,12 @@ const nullificationEffect: CardEffect = {
     type: 'useCard',
     title: '打出无懈可击',
     cardFilter: { filter: (c: Card) => c.name === CARD_NAME, min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   respondPrompt: {
     type: 'useCard',
     title: '打出无懈可击',
     cardFilter: { filter: (c: Card) => c.name === CARD_NAME, min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: CARD_NAME,
   style: 'danger',
 };

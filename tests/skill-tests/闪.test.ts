@@ -107,7 +107,7 @@ describe('闪', () => {
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
+    const _P2 = harness.player('P2');
 
     await P1.useCardAndTarget('杀', 'k1', [1]);
     // P2 无手牌:询问闪走 skip(无 slot),直接扣血

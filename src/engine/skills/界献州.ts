@@ -240,7 +240,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (rt === OPTION_RT) {
           st.localVars[OPTION_KEY] = params.choice === true || params.confirmed === true;
         } else if (rt === TARGETS_RT) {
-          st.localVars[TARGETS_KEY] = params.targets as Json;
+          st.localVars[TARGETS_KEY] = params.targets;
         }
       },
     );

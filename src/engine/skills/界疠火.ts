@@ -26,7 +26,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界疠火'(避开标疠火冲突);
 //   内部 Skill.name = '疠火'(OL 官方技能名,玩家可见)。
 import type {
-  Card,
   FrontendAPI,
   GameState,
   GameView,
@@ -42,7 +41,7 @@ import {
 import { defaultPlayActive, viewCanSlash } from '../action-active';
 import { registerSlashTargetProvider } from '../slash-target';
 
-const SKILL_ID = '界疠火';
+const _SKILL_ID = '界疠火';
 const DISPLAY_NAME = '疠火';
 const COST_RT = '界疠火/cost';
 const COST_CARD_KEY = '疠火/costCard';
@@ -153,7 +152,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (s, params) => {
-      s.localVars[COST_CARD_KEY] = params.cardId as string;
+      s.localVars[COST_CARD_KEY] = params.cardId;
     },
   );
 

@@ -4,7 +4,6 @@
 // target.kind='allPlayers': 所有存活角色（含使用者）。
 
 import type { Card } from '../types';
-import type { ActionPrompt } from '../types';
 import { applyAtom } from '../index';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
@@ -33,7 +32,7 @@ const peachGardenEffect: CardEffect = {
     type: 'useCard',
     title: '桃园结义',
     cardFilter: { filter: (c: Card) => c.name === '桃园结义', min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '桃园结义',
   style: 'primary',
 };

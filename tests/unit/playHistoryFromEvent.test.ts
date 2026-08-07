@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { playHistoryMutationFromEvent } from '../../src/client/utils/playHistoryFromEvent';
-import type { GameView, ViewEvent } from '../../src/engine/types';
+import type { GameView } from '../../src/engine/types';
 
 function makeView(): GameView {
   return {
@@ -51,7 +51,7 @@ describe('playHistoryMutationFromEvent', () => {
         player: 1,
         cardId: 'c1',
         card: { name: '闪', suit: '♥', rank: '2' },
-      } as ViewEvent,
+      },
       makeView(),
       1000,
     );
@@ -68,7 +68,7 @@ describe('playHistoryMutationFromEvent', () => {
         player: 0,
         cardId: 'c2',
         card: { name: '杀', suit: '♠', rank: '7' },
-      } as ViewEvent,
+      },
       makeView(),
       1000,
     );
@@ -85,7 +85,7 @@ describe('playHistoryMutationFromEvent', () => {
         target: 1,
         cardId: 'c3',
         cardName: '过河拆桥',
-      } as ViewEvent,
+      },
       makeView(),
     );
     expect(m).toEqual({ kind: 'caption', cardId: 'c3', caption: '刘备→张角' });

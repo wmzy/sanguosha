@@ -37,7 +37,7 @@ import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 import { skillLoaders } from './index';
 
-const SKILL_ID = '界直言';
+const _SKILL_ID = '界直言';
 const DISPLAY_NAME = '直言';
 const CONFIRM_RT = '界直言/confirm';
 const TARGET_RT = '界直言/target';

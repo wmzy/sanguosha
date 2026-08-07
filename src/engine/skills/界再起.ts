@@ -128,7 +128,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         } else if (rt === CHOOSE_TARGETS_RT) {
           const targets = params.targets as Json[] | undefined;
           st.localVars[TARGETS_KEY] = Array.isArray(targets)
-            ? (targets.filter((t): t is number => typeof t === 'number') as number[])
+            ? (targets.filter((t): t is number => typeof t === 'number'))
             : [];
         } else if (rt === OPTION_RT_PREFIX + seatId) {
           // choice=true / confirmed=true → 选项 1(摸一张牌);否则 → 选项 2(孟获回 1 血)

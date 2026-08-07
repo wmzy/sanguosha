@@ -117,7 +117,7 @@ describe('南蛮入侵', () => {
     await harness.setup(build({ p2Hand: ['c2'], p3: true, extraCards: { c2 } }));
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
-    const P3 = harness.player('P3');
+    const _P3 = harness.player('P3');
 
     await P1.useCardAndTarget('南蛮入侵', 'nm1', []);
     // 先有无懈可击询问 → pass

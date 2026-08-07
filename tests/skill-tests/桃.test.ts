@@ -306,11 +306,7 @@ describe('桃', () => {
     await P1.pass();
 
     // 第二问 P2(idx1,濒死者)→ 有桃自救
-    slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
-      type?: string;
-      requestType?: string;
-      target?: number;
-    };
+    slotAtom = [...harness.state.pendingSlots.values()][0].atom;
     const dyingTarget = slotAtom.target!;
     await P2.respond('桃', { cardId: 'p1' });
     // 救回(由濒死者或被询问者出桃)→ 血量 +1(0 → 1)

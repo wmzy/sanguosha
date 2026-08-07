@@ -37,11 +37,11 @@ const wuxiePending = (deadline: number): PendingView => ({
 
 const killPending = (deadline: number): PendingView => ({
   type: 'awaits',
-  atom: { type: '询问杀', target: 0, source: 1 } as PendingView['atom'],
+  atom: { type: '询问杀', target: 0, source: 1 },
   prompt: {
     type: 'useCard', title: '是否出杀',
     cardFilter: { filter: (c: Card) => c.name === '杀', min: 1, max: 1 },
-  } as PendingView['prompt'],
+  },
   target: 0, isBlocking: true, deadline, totalMs: 15000,
 });
 

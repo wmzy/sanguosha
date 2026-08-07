@@ -77,7 +77,7 @@ function makeEvent(type: string, duration: number): ViewEvent {
     atomType: type,
     // ViewEvent.effect 是前端约定的可选字段,useReplay/computeEventDuration 优先读它
     effect: { duration },
-  } as unknown as ViewEvent;
+  };
 }
 
 function makeSeat(events: ViewEvent[], seatIndex = 0): SeatRecording {

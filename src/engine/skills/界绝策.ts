@@ -30,7 +30,7 @@ import { applyAtom } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-const SKILL_ID = '界绝策';
+const _SKILL_ID = '界绝策';
 const DISPLAY_NAME = '绝策';
 
 const CONFIRM_RT = '界绝策/confirm';

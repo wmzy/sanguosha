@@ -29,7 +29,7 @@ import { applyAtom } from '../../src/engine/index';
 import { runDamageFlow } from '../../src/engine/damage-flow';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
+function _makeCard(
   id: string,
   name: string,
   suit: '♠' | '♥' | '♣' | '♦' = '♠',
@@ -39,7 +39,7 @@ function makeCard(
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
-function makeWeapon(
+function _makeWeapon(
   id: string,
   name: string,
   suit: '♠' | '♥' | '♣' | '♦',

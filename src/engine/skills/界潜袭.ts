@@ -29,7 +29,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界潜袭'(避开标潜袭冲突);
 //   内部 Skill.name = '潜袭'(OL 官方技能名,玩家可见)。
 import type {
-  ActionPrompt,
   AtomBeforeContext,
   AtomOfName,
   Card,
@@ -149,7 +148,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (reqType === CONFIRM_RT) {
         st.localVars[CONFIRM_KEY] = params.choice === true;
       } else if (reqType === PICK_RT) {
-        st.localVars[PICK_KEY] = params.cardId as string;
+        st.localVars[PICK_KEY] = params.cardId;
       }
     },
   );

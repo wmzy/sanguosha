@@ -86,7 +86,7 @@ describe('runPlay', () => {
   it('joinedAs 为 guest 当 hostId 不等于 playerId', async () => {
     const fake = makeFake({
       playerId: 'p2',
-      roomState: { ...makeFake().roomState!, hostId: 'someone-else' } as never,
+      roomState: { ...makeFake().roomState!, hostId: 'someone-else' },
     });
     const res = await runPlay(fake, { waitTimeoutMs: 50 });
     expect(res.joinedAs).toBe('guest');

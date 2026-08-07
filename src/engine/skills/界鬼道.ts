@@ -13,7 +13,7 @@ import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../index';
 import { registerAction, registerJudgeModifier } from '../skill';
 
-const SKILL_ID = '界鬼道';
+const _SKILL_ID = '界鬼道';
 const DISPLAY_NAME = '鬼道';
 const REPLACE_RT = '界鬼道/replace';
 const REPLACE_CARD_KEY = '界鬼道/replaceCard';

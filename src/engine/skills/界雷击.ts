@@ -30,7 +30,7 @@ import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook } from '../skill';
 import { isCancelled } from '../card-effect/registry';
 
-const SKILL_ID = '界雷击';
+const _SKILL_ID = '界雷击';
 const DISPLAY_NAME = '雷击';
 /** 是否发动判定(yes/no) */
 const JUDGE_RT = '界雷击/judge';

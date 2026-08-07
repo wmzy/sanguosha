@@ -10,8 +10,7 @@
 // A 的「出杀」选择由本文件的 respond 字段(被 play-card 按卡名注册到每个座次)写入
 // localVars[CHOICE_VAR] = { cardId, targets }。
 
-import type { Card, GameState, GameView, Json } from '../types';
-import type { ActionPrompt } from '../types';
+import type { Card, GameState, GameView } from '../types';
 import { applyAtom } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
 import { isCardBanned } from '../card-effect/validate';
@@ -206,14 +205,14 @@ const borrowedSwordEffect: CardEffect = {
         },
       ],
     },
-  } as ActionPrompt,
+  },
   // respond 入口 UI：选一张杀 + 杀的目标(方天画戟等多目标)；后端 validate 权威校验距离/必含
   respondPrompt: {
     type: 'useCardAndTarget',
     title: '借刀杀人:对指定角色使用一张杀,或交出武器',
     cardFilter: { filter: (c: Card) => c.name === '杀', min: 1, max: 1 },
     targetFilter: { min: 1, max: 3, filter: () => true },
-  } as ActionPrompt,
+  },
   label: '借刀杀人',
   style: 'danger',
 };

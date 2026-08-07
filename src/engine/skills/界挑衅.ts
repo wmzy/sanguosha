@@ -61,8 +61,8 @@ async function pickAndDiscard(state: GameState, picker: number, victim: number):
     .filter(([, id]) => typeof id === 'string')
     .map(([slot, id]) => ({
       slot,
-      cardId: id as string,
-      cardName: state.cardMap[id as string]?.name ?? '?',
+      cardId: id,
+      cardName: state.cardMap[id]?.name ?? '?',
     }));
   const handCount = vp.hand.length;
   if (equipment.length === 0 && handCount === 0) return; // 无牌可弃

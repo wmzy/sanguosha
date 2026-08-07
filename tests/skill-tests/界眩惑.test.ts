@@ -16,8 +16,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { skillLoaders } from '../../src/engine/skills';
 import * as 界眩惑Module from '../../src/engine/skills/界眩惑';
-import type { SkillModule } from '../../src/engine/skill';
-skillLoaders['界眩惑'] = async () => 界眩惑Module as unknown as SkillModule;
+skillLoaders['界眩惑'] = async () => 界眩惑Module;
 
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/shared/types';

@@ -111,7 +111,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       'respond',
       (st: GameState, params: Record<string, Json>): string | null => {
         const slot = st.pendingSlots.get(ownerId);
-        if (!slot || slot.atom.type !== '请求回应') return '当前不需要回应';
+        if (slot?.atom.type !== '请求回应') return '当前不需要回应';
         const rt = (slot.atom as unknown as { requestType?: string }).requestType;
         if (rt === CONFIRM_RT) return null;
         if (rt === OWNER_CARD_RT) {
@@ -146,7 +146,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         'respond',
         (st: GameState, params: Record<string, Json>): string | null => {
           const slot = st.pendingSlots.get(pid);
-          if (!slot || slot.atom.type !== '请求回应') return '当前不需要回应';
+          if (slot?.atom.type !== '请求回应') return '当前不需要回应';
           const rt = (slot.atom as unknown as { requestType?: string }).requestType;
           if (rt !== TARGET_CARD_RT) return '当前不是惴恐拼点询问';
           const cardId = params.cardId as string | undefined;

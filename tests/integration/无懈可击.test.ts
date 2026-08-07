@@ -375,7 +375,7 @@ describe('无懈可击链路', () => {
     };
     state.players[0].hand.push(nullif0Id);
 
-    const p1FirstCard = state.players[1].hand[0];
+    const _p1FirstCard = state.players[1].hand[0];
 
     // P0 出过河拆桥 → P1:此时 pendingSlots 应同时含出牌窗口(0)与无懈广播(-2)
     await dispatchAndWait(state, {
@@ -446,7 +446,7 @@ describe('无懈可击链路', () => {
     };
     state.players[0].hand.push(nullif0Id);
 
-    const p1FirstCard = state.players[1].hand[0];
+    const _p1FirstCard = state.players[1].hand[0];
 
     // P0 出锦囊
     await dispatchAndWait(state, {

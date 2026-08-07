@@ -95,7 +95,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const cardId = params.cardId as string | undefined;
         if (typeof cardId !== 'string') return '需要选择一张杀';
         const card = st.cardMap[cardId];
-        if (!card || card.name !== '杀') return '不是杀牌';
+        if (card?.name !== '杀') return '不是杀牌';
         if (!st.players[ownerId]?.hand.includes(cardId)) return '杀不在你的手牌中';
       }
       return null;

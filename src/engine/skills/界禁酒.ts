@@ -41,7 +41,7 @@ import type { ActionEntry } from '../types';
 import { applyAtom } from '../index';
 import { defaultPlayActive } from '../action-active';
 
-const SKILL_ID = '界禁酒';
+const _SKILL_ID = '界禁酒';
 const DISPLAY_NAME = '禁酒';
 /** 影子卡固定点数:K(界版官方逐字"视为点数K的【杀】")。 */
 const SHADOW_RANK = 'K';

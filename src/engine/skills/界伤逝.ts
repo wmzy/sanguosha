@@ -90,7 +90,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     'respond',
-    (st: GameState, params: Record<string, Json>) => {
+    (st: GameState, _params: Record<string, Json>) => {
       const slot = st.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as { type?: string; requestType?: string };

@@ -131,7 +131,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       //     兜底)在前端 processedView 可见但 buildView 不可见 → 视图不一致。
       //     故亮出期间必须 pushFrame,使 buildView 与 processedView 都从栈顶帧读取。
       const top3 = ctx.state.zones.deck.slice(-3); // [底,中,顶],deck 末尾为顶
-      let shouldSkip = false;
+      let shouldSkip: boolean;
       await pushFrame(ctx.state, '界裸衣', ownerId, {});
       try {
         // 亮出牌堆顶3张到处理区(从顶开始倒序移入,玩家先看到顶牌)

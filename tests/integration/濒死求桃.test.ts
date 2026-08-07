@@ -557,13 +557,13 @@ describe('濒死求桃链:端到端(harness)', () => {
 
     // 第二问 P2(target=2)→ decoy 不是桃 pass
     slot = [...harness.state.pendingSlots.values()][0];
-    slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
+    slotAtom = slot.atom;
     expect(slotAtom.target).toBe(2);
     await P2.pass();
 
     // 第三问 P1(target=1,濒死者)→ 自救
     slot = [...harness.state.pendingSlots.values()][0];
-    slotAtom = slot.atom as { type: string; requestType?: string; target?: number };
+    slotAtom = slot.atom;
     expect(slotAtom.target).toBe(1);
 
     // P1 用桃救自己

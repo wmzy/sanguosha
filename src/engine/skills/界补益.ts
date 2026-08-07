@@ -29,7 +29,7 @@ import type {
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
-const SKILL_NAME = '界补益';
+const _SKILL_NAME = '界补益';
 const DISPLAY_NAME = '补益';
 const CONFIRM_RT = '界补益/confirm'; // 是否发动
 const PICK_RT = '界补益/pick'; // 选目标一张牌
@@ -186,8 +186,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       },
       defaultChoice:
         equipmentAfter.length > 0
-          ? ({ zone: 'equipment', cardId: equipmentAfter[0].cardId } as unknown as Json)
-          : ({ zone: 'hand', handIndex: 0 } as unknown as Json),
+          ? ({ zone: 'equipment', cardId: equipmentAfter[0].cardId })
+          : ({ zone: 'hand', handIndex: 0 }),
       timeout: 20,
     });
 

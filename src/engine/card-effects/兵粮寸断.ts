@@ -5,7 +5,7 @@
 //   判定♣   → 无效，弃置
 
 import type { Card } from '../types';
-import type { ActionPrompt, GameView } from '../types';
+import type { GameView } from '../types';
 import { applyAtom } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { effectiveDistance } from '../distance';
@@ -70,7 +70,7 @@ const supplyShortageEffect: CardEffect = {
         return viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1;
       },
     },
-  } as ActionPrompt,
+  },
   label: '兵粮寸断',
   style: 'danger',
 };

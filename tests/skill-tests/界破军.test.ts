@@ -265,7 +265,7 @@ describe('界破军', () => {
     state.zones = { deck: [], discardPile: [], processing: [] };
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
 
@@ -353,7 +353,7 @@ describe('界破军', () => {
     state.zones = { deck: [], discardPile: [], processing: [] };
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
 
@@ -433,7 +433,7 @@ describe('界破军', () => {
     state.zones = { deck: [], discardPile: [], processing: [] };
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
 
@@ -593,7 +593,7 @@ describe('界破军', () => {
     state.zones = { deck: [], discardPile: [], processing: [] };
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
+    const _P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 's1', [1]);
 

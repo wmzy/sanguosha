@@ -230,10 +230,7 @@ describe('模块 F:移动牌编排函数 runMoveCardFlow', () => {
     const afterMarkers = state.atomHistory
       .filter((e) => e.kind === 'atom')
       .map((e) => (e as { atom: Atom }).atom)
-      .filter((a) => a.type === '移动到目标区域后') as Extract<
-      Atom,
-      { type: '移动到目标区域后' }
-    >[];
+      .filter((a) => a.type === '移动到目标区域后');
     // 两张手牌各发一个标记
     expect(afterMarkers.length).toBe(2);
     for (const m of afterMarkers) {

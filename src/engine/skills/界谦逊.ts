@@ -139,7 +139,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const atom = ctx.atom;
     if (atom.type !== '添加延时锦囊') return;
     if (atom.player !== ownerId) return;
-    await maybeOfferExile(ctx, `延时锦囊${atom.trick?.name ? '「' + atom.trick.name + '」' : ''}对你生效`);
+    await maybeOfferExile(ctx, `延时锦囊${atom.trick?.name ? `「${  atom.trick.name  }」` : ''}对你生效`);
   });
 
   // ── 普通锦囊(他人使用,陆逊为唯一目标):「生效时」触发 ──

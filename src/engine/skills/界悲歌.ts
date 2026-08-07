@@ -154,7 +154,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     delete ctx.state.localVars[JUDGE_CARD_KEY];
     await runJudgeFlow(ctx.state, targetIdx, '界悲歌');
     const suit = ctx.state.localVars[JUDGE_SUIT_KEY] as string | undefined;
-    const rank = ctx.state.localVars[JUDGE_RANK_KEY] as string | undefined;
+    const _rank = ctx.state.localVars[JUDGE_RANK_KEY] as string | undefined;
     const judgeCardId = ctx.state.localVars[JUDGE_CARD_KEY] as string | undefined;
     delete ctx.state.localVars[JUDGE_SUIT_KEY];
     delete ctx.state.localVars[JUDGE_RANK_KEY];

@@ -202,7 +202,6 @@ import { 张飞 } from './张飞';
 import { 界张飞 } from './界张飞';
 import { 赵云 } from './赵云';
 import { 界赵云 } from './界赵云';
-import { 诸葛亮 } from './诸葛亮';
 import { 界诸葛亮 } from './界诸葛亮';
 import { 黄月英 } from './黄月英';
 import { 界黄月英 } from './界黄月英';

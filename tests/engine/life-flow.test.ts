@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import '../../src/engine/atoms'; // 注册所有 atom(含 life-timing)
 import { createGameState } from '../../src/engine/types';
-import type { Atom, GameState, Json, PlayerState } from '../../src/engine/types';
+import type { Atom, GameState, PlayerState } from '../../src/engine/types';
 import {
   runDecreaseLifeFlow,
   runRecoverLifeFlow,

@@ -251,7 +251,7 @@ export function canShowCancelSelectionButton(
 
 /** 简单 CSS escape:仅处理常见特殊字符,避免引入 full CSS.escape polyfill。 */
 function cssEscape(s: string): string {
-  return s.replace(/["\\\]\[]/g, '\\$&');
+  return s.replace(/["\\\]]/g, '\\$&');
 }
 
 /** 查询座次对应 DOM 元素:优先 data-player-name 精确匹配。

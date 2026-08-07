@@ -147,7 +147,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (source.faction !== '魏') return;
         // 必须是 闪(检测 cardMap,兼容倾国等转化后的闪卡)
         const card = ctx.state.cardMap[atom.cardId];
-        if (!card || card.name !== '闪') return;
+        if (card?.name !== '闪') return;
         // 必须是该魏角色"回合外"(当前回合不是其本人回合)
         if (ctx.state.currentPlayerIndex === sourceIdx) return;
         // 曹操需存活(否则无人摸牌)

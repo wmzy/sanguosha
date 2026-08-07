@@ -21,7 +21,7 @@
 //   带目标的事件,不会与 EventBanner 重叠渲染同一类型。
 //
 // 非阻塞:pointer-events:none。
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { css } from '@linaria/core';
 import type { GameView } from '../../engine/types';
 import type { QueuedEvent } from '../hooks/useEventPlayback';
@@ -217,7 +217,7 @@ export function ActionOverlay({ current, view }: ActionOverlayProps) {
   // 始终挂载 root(保证 rootRef 可用于箭头坐标换算);无箭头时不画内容
   // 文字浮层已由中央 PlayHistoryStrip 替代,此处只保留座位间箭头。
   return (
-    <div ref={rootRef} className={overlayRoot} style={{ pointerEvents: 'none' } as CSSProperties}>
+    <div ref={rootRef} className={overlayRoot} style={{ pointerEvents: 'none' }}>
       {info && arrow && (
         <svg className={arrowSvg} style={{ pointerEvents: 'none' }}>
           <defs>

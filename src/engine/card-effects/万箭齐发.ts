@@ -4,7 +4,6 @@
 // target.kind='allOthers': 所有其他角色（从下家开始按座次）。
 
 import type { Card } from '../types';
-import type { ActionPrompt } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { registerCardEffect, type CardEffect, type ResolveCtx, isCancelled } from '../card-effect/registry';
@@ -35,7 +34,7 @@ const arrowVolleyEffect: CardEffect = {
     type: 'useCard',
     title: '万箭齐发',
     cardFilter: { filter: (c: Card) => c.name === '万箭齐发', min: 1, max: 1 },
-  } as ActionPrompt,
+  },
   label: '万箭齐发',
   style: 'danger',
 };

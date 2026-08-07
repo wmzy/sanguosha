@@ -51,7 +51,7 @@ import {
 } from '../skill';
 import { defaultPlayActive } from '../action-active';
 
-const SKILL_ID = '界双雄';
+const _SKILL_ID = '界双雄';
 const DISPLAY_NAME = '双雄';
 
 /** localVars key:正常开始的摸牌阶段所属玩家(被跳过时不设,镜像 界将驰/截辎) */

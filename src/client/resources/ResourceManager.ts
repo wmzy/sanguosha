@@ -102,8 +102,8 @@ class ResourceManagerClass {
     } catch {
       /* 损坏数据忽略 */
     }
-    if (enabled === null) enabled = [BASE_PACK_ID]; // 首次默认启 base
-    this.enabledSet = new Set(enabled.filter((id) => this.packs.has(id)));
+    enabled ??= [BASE_PACK_ID]; // 首次默认启 base
+    this.enabledSet = new Set((enabled ?? []).filter((id) => this.packs.has(id)));
     this.persistSettings();
   }
 

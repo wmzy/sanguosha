@@ -230,7 +230,7 @@ describe('雌雄双股剑', () => {
     });
     await harness.setup(state);
     const P1 = harness.player('P1');
-    const P2 = harness.player('P2');
+    const _P2 = harness.player('P2');
 
     await P1.useCardAndTarget('杀', 'k1', [1]);
     // owner 放弃发动(confirm 超时)

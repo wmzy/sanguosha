@@ -380,14 +380,14 @@ function ChatTab({
   );
 }
 
-export const InfoDock = memo(function InfoDock({
+export const InfoDock = memo(({
   view,
   chatMessages,
   chatConfig,
   onSendChat,
   mySeatIndex,
   embedded = false,
-}: InfoDockProps) {
+}: InfoDockProps) => {
   const hasChat = !!chatMessages;
   const [tab, setTab] = useState<TabKey>(hasChat ? 'chat' : 'log');
   // 默认折叠:避免初始就遮挡操作区;玩家有新聊天/日志时自动展开。
