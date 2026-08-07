@@ -219,6 +219,38 @@ const zhangbaTransformAction: SkillActionDef = {
   transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: '丈八蛇矛' }),
 };
 
+// 梅花牌(连环/界连环转化原料)
+const clubCard: Card = { id: 'c4', name: '杀', suit: '♣', color: '黑', rank: '5', type: '基本牌' };
+
+// 连环的 transform action:梅花牌当铁索连环。镜像 engine/skills/连环.ts onMount。
+const lianhuanTransformAction: SkillActionDef = {
+  skillId: '连环',
+  ownerId: 0,
+  actionType: 'transform',
+  label: '连环',
+  prompt: {
+    type: 'useCardAndTarget',
+    title: '连环:将一张梅花手牌当铁索连环使用',
+    cardFilter: { filter: (c: Card) => c.suit === '♣', min: 1, max: 1 },
+    targetFilter: { min: 1, max: 2, allowSelf: true },
+  },
+  transform: (card: Card) => ({ name: '铁索连环', sourceCardId: card.id, fromSkill: '连环' }),
+};
+
+// 铁索连环 use action:多目标(min1/max2,含自己)
+const chainUseAction: SkillActionDef = {
+  skillId: '铁索连环',
+  ownerId: 0,
+  actionType: 'use',
+  label: '铁索连环',
+  prompt: {
+    type: 'useCardAndTarget',
+    title: '铁索连环',
+    cardFilter: { filter: (c: Card) => c.name === '铁索连环', min: 1, max: 1 },
+    targetFilter: { min: 1, max: 2, allowSelf: true },
+  },
+};
+
 // 制衡的 distribute action（select 模式）
 const zhihengDistributeAction: SkillActionDef = {
   skillId: '制衡',
@@ -328,6 +360,28 @@ describe('enumerateAvailableActions', () => {
     expect(tf!.message.skillId).toBe('杀');
     expect(tf!.validTargets).toHaveLength(0);
     expect(tf!.description).toContain('丈八蛇矛');
+  });
+
+  // 回归:连环/界连环转化铁索连环。transform action 缺 transform 字段时,
+  // enumerateTransformActions 的 wrapperName 退化为 '杀'(默认),主 action 误成杀.use。
+  // 补 transform 字段后:主 action=铁索连环.use + preceding=连环.transform。
+  it('连环转化:梅花牌生成 transform action,主 action 为铁索连环.use', () => {
+    const view = makeView(0, '出牌', [clubCard]);
+    const actions = enumerateAvailableActions(view, 0, [
+      chainUseAction,
+      lianhuanTransformAction,
+    ]);
+    const tf = actions.find((x) => x.category === 'transform');
+    expect(tf).toBeDefined();
+    expect(tf!.message.skillId).toBe('铁索连环');
+    expect(tf!.message.actionType).toBe('use');
+    expect(tf!.message.params).toHaveProperty('cardId', 'c4#连环');
+    expect(tf!.message.preceding).toHaveLength(1);
+    expect(tf!.message.preceding![0].skillId).toBe('连环');
+    expect(tf!.message.preceding![0].actionType).toBe('transform');
+    // allowSelf:合法目标含自己(P0=0)与 P1
+    expect(tf!.validTargets).toContain(0);
+    expect(tf!.validTargets).toContain(1);
   });
 
   // ─── distribute 类（制衡/仁德） ───

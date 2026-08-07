@@ -217,6 +217,9 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       // 界版目标上限 3(标版铁索连环 2)
       targetFilter: { min: 1, max: MAX_TARGETS, allowSelf: true },
     },
+    // transform 字段:前端据此进入转化模式,组合 preceding=[界连环.transform]
+    // + 主 action=铁索连环.use(wrapperName='铁索连环')。缺失则前端无法发动。
+    transform: (card: Card) => ({ name: '铁索连环', sourceCardId: card.id, fromSkill: skill.id }),
     activeWhen: (ctx) => {
       if (!defaultPlayActive(ctx)) return false;
       const p = ctx.view.players[ctx.perspectiveIdx];

@@ -255,6 +255,7 @@ const CHAIN_CARD = makeCard({
 });
 const RED_CARD_A = makeCard({ id: 'c-red-a', name: '闪', color: '红' });
 const RED_CARD_B = makeCard({ id: 'c-red-b', name: '火杀', color: '红', subtype: '杀' });
+const CLUB_CARD = makeCard({ id: 'c-club', name: '杀', suit: '♣', color: '黑' });
 
 /** 杀 use action:需选存活目标 */
 function killUseAction(ownerId = 0): SkillActionDef {
@@ -356,6 +357,24 @@ function chainUseAction(ownerId = 0): SkillActionDef {
       cardFilter: { filter: (c) => c.name === '铁索连环', min: 1, max: 1 },
       targetFilter: { min: 1, max: 2, allowSelf: true },
     },
+  };
+}
+
+/** 连环(单卡转化)transform action:梅花牌当铁索连环。镜像引擎 skills/连环.ts onMount。 */
+function lianhuanTransformAction(ownerId = 0): SkillActionDef {
+  return {
+    skillId: '连环',
+    ownerId,
+    actionType: 'transform',
+    label: '连环',
+    style: 'primary',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '连环:将一张梅花手牌当铁索连环使用',
+      cardFilter: { filter: (c) => c.suit === '♣', min: 1, max: 1 },
+      targetFilter: { min: 1, max: 2, allowSelf: true },
+    },
+    transform: (card) => ({ name: '铁索连环', sourceCardId: card.id, fromSkill: '连环' }),
   };
 }
 
@@ -1254,6 +1273,40 @@ describe('usePlayInteraction · 转化模式(transformMode)', () => {
       { skillId: '武圣', actionType: 'use', params: { cardId: 'c-red-a' } },
     ]);
     // 提交后退出转化模式
+    expect(result.current.transformMode).toBeNull();
+  });
+
+  // 回归:庞统/界庞统出牌阶段连环无法发动。连环/界连环的 transform action 缺 transform 字段,
+  // 前端 handleSkillAction 不进 transformMode(wrapperName 缺失),无法组合 preceding + 铁索连环.use。
+  // 补 transform 字段后:进 transformMode + 发送铁索连环.use + preceding=连环.transform。
+  it('连环转化(梅花→铁索连环):进 transformMode + 发送铁索连环.use + preceding', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      makePlayParams({
+        view: makePlayView(),
+        skillActions: [lianhuanTransformAction(), chainUseAction()],
+        perspectiveHand: [CLUB_CARD],
+        send,
+      }),
+    );
+    act(() => result.current.handleSkillAction(lianhuanTransformAction()));
+    // 关键:wrapperName=铁索连环(来自 transform 字段);缺失时 transformMode 不进入
+    expect(result.current.transformMode).not.toBeNull();
+    expect(result.current.transformMode?.wrapperName).toBe('铁索连环');
+    act(() => result.current.handleCardClick(CLUB_CARD)); // 选中梅花牌
+    act(() => result.current.handleTransformPlay('P1'));
+    // 主 action=铁索连环.use + preceding=连环.transform
+    expect(send.mock.calls[0][0]).toBe('铁索连环');
+    expect(send.mock.calls[0][1]).toBe('use');
+    expect(send.mock.calls[0][2]).toEqual({ cardId: 'c-club#连环', targets: [1] });
+    const preceding = send.mock.calls[0][3] as Array<{
+      skillId: string;
+      actionType: string;
+      params: Record<string, Json>;
+    }>;
+    expect(preceding).toEqual([
+      { skillId: '连环', actionType: 'transform', params: { cardId: 'c-club' } },
+    ]);
     expect(result.current.transformMode).toBeNull();
   });
 
