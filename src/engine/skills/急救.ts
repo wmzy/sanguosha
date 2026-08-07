@@ -14,7 +14,7 @@
 //   - 与 酒.respond 同构:移动牌 手牌→弃牌堆 + 设 localVars['求桃/已救']。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction } from '../skill';
+import { registerAction, declareAlternativeResponse } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -27,6 +27,10 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
+
+  // 声明替代回应能力:急救可在桃/求桃时用红色牌当桃(非字面牌),
+  // preResolve 须走 normal 询问——否则持红牌但无字面桃时会走 silent/skip 被剥夺技能。
+  const unloadDecl = declareAlternativeResponse(state, ownerId, '请求回应', '桃/求桃');
 
   // respond:濒死求桃时,将一张红色手牌当桃救援
   registerAction(
@@ -68,7 +72,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  return () => {};
+  return () => {
+    unloadDecl();
+  };
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {

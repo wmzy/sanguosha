@@ -24,6 +24,7 @@ import { suitColor } from '../../src/shared/types';
 import { createGameState } from '../../src/engine/types';
 import { canRescueWith } from '../../src/engine/skills/系统规则';
 import { cardResponsePreResolveForTarget } from '../../src/engine/card-response-availability';
+import { declareAlternativeResponse } from '../../src/engine/skill';
 
 /** 返回第一个 pending slot 的 atom,无 pending 时返回 undefined */
 function firstPendingAtom(state: GameState): unknown | undefined {
@@ -773,6 +774,22 @@ describe('求桃响应可用性预检(真实 DEFAULT_SKILLS)', () => {
           tags: [],
           judgeZone: [],
         },
+        {
+          index: 1,
+          name: 'P1',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: ['回合管理', '装备通用', '使用牌', '打出牌', '铁索连环'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
       ],
       cardMap: {},
       currentPlayerIndex: 0,
@@ -781,31 +798,63 @@ describe('求桃响应可用性预检(真实 DEFAULT_SKILLS)', () => {
     });
   });
 
-  it('持桃玩家:filter 命中桃 + preResolve 返回 null(normal,可操作求桃窗口)', () => {
+  it('持桃:filter 命中 + preResolve normal(可操作求桃窗口)', () => {
     const peachId = giveCard(state, 0, '桃', 'peach');
-    const filter = canRescueWith(state, 0);
+    const filter = canRescueWith(state, 0, 0); // P0 自救
     expect(filter(state.cardMap[peachId])).toBe(true);
 
-    const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter);
-    expect(pre).toBeNull(); // normal:非 silent({delayMs})/skip
+    const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter, '桃/求桃');
+    expect(pre).toBeNull(); // normal
   });
 
-  it('持酒玩家:濒死酒当桃,filter 同样命中', () => {
+  it('持酒自救(dyingIdx===playerIdx):filter 命中 + preResolve normal', () => {
     const wineId = giveCard(state, 0, '酒', 'wine', '♦', '基本牌');
-    const filter = canRescueWith(state, 0);
+    const filter = canRescueWith(state, 0, 0); // P0 自救
     expect(filter(state.cardMap[wineId])).toBe(true);
+
+    const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter, '桃/求桃');
+    expect(pre).toBeNull();
   });
 
-  it('仅持杂牌(非救援牌):preResolve 走 silent(信息隐藏,有手牌但无匹配)', () => {
+  it('持酒救他人(dyingIdx!==playerIdx):filter 不命中 + preResolve silent', () => {
+    const wineId = giveCard(state, 0, '酒', 'wine', '♦', '基本牌');
+    const filter = canRescueWith(state, 0, 1); // P0 救 P1 → 酒不可用
+    expect(filter(state.cardMap[wineId])).toBe(false);
+
+    const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter, '桃/求桃');
+    expect(pre).toEqual({ delayMs: 1500 }); // silent:有手牌但无匹配救援牌
+  });
+
+  it('仅持杂牌:preResolve silent(信息隐藏)', () => {
     giveCard(state, 0, '杀', 'kill', '♠', '基本牌');
-    const filter = canRescueWith(state, 0);
-    const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter);
+    const filter = canRescueWith(state, 0, 1);
+    const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter, '桃/求桃');
     expect(pre).toEqual({ delayMs: 1500 });
   });
 
-  it('无手牌:preResolve 走 skip(无牌可救,不建 slot)', () => {
-    const filter = canRescueWith(state, 0);
-    const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter);
+  it('无手牌:preResolve skip(不建 slot)', () => {
+    const filter = canRescueWith(state, 0, 0);
+    const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter, '桃/求桃');
     expect(pre).toBe('skip');
+  });
+
+  // ── 替代救援技能:急救/蛊惑/界龙胆 等转化型技能 ──
+  it('持急救技能+红牌(无字面桃):preResolve normal(hasAlternativeResponse 门控)', () => {
+    state.players[0].skills.push('急救');
+    declareAlternativeResponse(state, 0, '请求回应', '桃/求桃'); // 模拟急救 onInit 声明
+    giveCard(state, 0, '杀', 'kill', '♥', '基本牌'); // 红色杀,非桃
+    const filter = canRescueWith(state, 0, 1); // P0 救 P1
+    // filter 对红色杀返回 false(字面牌过滤器不含急救转化)
+    expect(filter(state.cardMap[Object.keys(state.cardMap)[0]])).toBe(false);
+    // 但 preResolve 经 hasAlternativeResponse 门控 → normal(不剥夺急救)
+    const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter, '桃/求桃');
+    expect(pre).toBeNull();
+  });
+
+  it('无急救技能+红牌:preResolve silent(对照,确认是急救技能触发 normal)', () => {
+    giveCard(state, 0, '杀', 'kill', '♥', '基本牌');
+    const filter = canRescueWith(state, 0, 1);
+    const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter, '桃/求桃');
+    expect(pre).toEqual({ delayMs: 1500 }); // silent,非 normal
   });
 });

@@ -227,19 +227,22 @@ export function onInit(_skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-/** 求桃救援牌判定:桃/酒是基本牌,所有角色默认可用(经 CardEffect 注册表路由,
- *  不在 player.skills 中);急救(华佗)可将红色牌当桃用,需拥有该武将技能。
- *  engine 侧 cardFilter;前端通过 respondFor='桃/求桃' 的 respond action 重建同等语义。
+/** 求桃救援牌判定(字面牌):桃任何人可用;酒仅自救(dyingIdx===playerIdx)。
  *
- *  ⚠ 历史 bug:旧实现检查 skills.includes('桃')/('酒'),但 DEFAULT_SKILLS 不含这两个
- *    卡名(它们由 '使用牌'/'打出牌' 统一路由),导致对所有非华佗玩家恒返回 false →
- *    请求回应 preResolve 误判 silent/skip → 持桃者看不到求桃窗口。 */
-export function canRescueWith(state: GameState, playerIdx: number): (card: Card) => boolean {
-  const skills = state.players[playerIdx]?.skills ?? [];
+ *  仅判定手牌中的字面 桃/酒。转化型救援技能(急救/蛊惑/界龙胆 等)不在此判定——
+ *  它们注册独立的 respond/rescue action,由 hasAlternativeResponse 的 RESCUE_ALTERNATIVE_SKILLS
+ *  在 preResolve 阶段门控(确保持转化牌的玩家也能看到求桃窗口,不被误判 silent/skip)。
+ *
+ *  engine 侧 cardFilter;前端通过 respondFor='桃/求桃' 的 respond action 重建同等语义。 */
+export function canRescueWith(
+  state: GameState,
+  playerIdx: number,
+  dyingIdx: number,
+): (card: Card) => boolean {
+  const isSelf = playerIdx === dyingIdx;
   return (card) => {
-    if (card.name === '桃') return true;
-    if (card.name === '酒') return true; // 濒死时酒当桃用(酒.respond)
-    if (card.color === '红' && skills.includes('急救')) return true;
+    if (card.name === '桃') return true; // 桃:任何人可用救援
+    if (card.name === '酒' && isSelf) return true; // 酒:仅自救(濒死时酒当桃)
     return false;
   };
 }
@@ -296,7 +299,7 @@ async function runDyingFlow(state: GameState, targetIdx: number): Promise<void> 
         prompt: {
           type: 'useCard',
           title: `${state.players[targetIdx].name} 濒死,使用桃/酒救援`,
-          cardFilter: { filter: canRescueWith(state, playerIdx), min: 1, max: 1 },
+          cardFilter: { filter: canRescueWith(state, playerIdx, targetIdx), min: 1, max: 1 },
         },
         timeout: 15,
       });

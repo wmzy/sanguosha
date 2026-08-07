@@ -19,7 +19,7 @@
 // 主 action(闪/杀/桃/酒)零感知界龙胆——它们看到的永远是 cardMap 里的目标牌。
 // transform validate 不限定回合/阶段:由主 action(杀.use/桃.use/酒.use/respond 等)校验。
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
-import { registerAction } from '../skill';
+import { registerAction, declareAlternativeResponse } from '../skill';
 import { applyAtom } from '../index';
 import { viewCanSlash, defaultPlayActive } from '../action-active';
 
@@ -99,7 +99,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (idx >= 0) self.hand[idx] = cardId;
     },
   );
-  return () => {};
+  const unloadDodge = declareAlternativeResponse(state, ownerId, '询问闪');
+  const unloadSlash = declareAlternativeResponse(state, ownerId, '询问杀');
+  const unloadRescue = declareAlternativeResponse(state, ownerId, '请求回应', '桃/求桃');
+  return () => { unloadDodge(); unloadSlash(); unloadRescue(); };
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): void {

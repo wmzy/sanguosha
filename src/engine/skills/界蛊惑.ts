@@ -59,7 +59,7 @@
 import type { ActionContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runDamageFlow } from '../damage-flow';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../skill';
 import { inAttackRange } from '../distance';
 import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
 import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
@@ -331,6 +331,8 @@ function cleanupVars(state: GameState): void {
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
   const unloaders: Array<() => void> = [];
+  unloaders.push(declareAlternativeResponse(state, ownerId, '询问闪'));
+  unloaders.push(declareAlternativeResponse(state, ownerId, '请求回应', '桃/求桃'));
 
   // ── use(界于吉主动发动:杀/桃/酒)──
   unloaders.push(

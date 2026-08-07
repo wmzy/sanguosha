@@ -25,7 +25,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction } from '../skill';
+import { registerAction, declareAlternativeResponse } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -144,7 +144,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     );
   }
 
-  return () => {};
+  const unloadDecl = declareAlternativeResponse(state, ownerId, '询问闪');
+  return () => { unloadDecl(); };
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {

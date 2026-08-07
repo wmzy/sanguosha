@@ -23,7 +23,7 @@ metadata:
 3. **钩子挂载时机**:需要注册的 before/after hook,挂在哪个 atomType,触发条件
 4. **缺失 atom 检查**:对比 `src/engine/atoms/index.ts`,缺失的标注"需要先添加 atom"
 5. **契约清单(关键!)**:列出本技能读/写的所有跨 atom 通信通道(标签/localVars/turn.vars),标注**生产者和消费者**,以及对端是否已实现。对端未实现的标注"需要协调"。
-6. **是否涉及通用机制**:出杀次数→用 `turn.vars['杀/quota']`;装备技能→确认加载/卸载已由装备通用处理;横切规则(防具穿透等)→报给主 agent
+6. **是否涉及通用机制**:出杀次数→用 `turn.vars['杀/quota']`;装备技能→确认加载/卸载已由装备通用处理;横切规则(防具穿透等)→报给主 agent;**非字面牌回应/救援**(转化当闪/杀/桃/酒,如龙胆/急救/蛊惑)→需在 `onInit` 调 `declareAlternativeResponse` 声明(见 §1.6.5)
 
 ### 步骤 2:实现(基于分析报告写代码)
 
@@ -35,6 +35,7 @@ metadata:
 - 出杀次数限制/突破:读写 `state.turn.vars['杀/quota']`(详见 docs/guides/添加技能.md §1.6.1)
 - 装备技能加载/卸载:装备通用已处理,不要重复
 - 横切规则:用标签(`tag:技能名/效果`),所有相关技能统一检查
+- **非字面牌回应/救援**:转化型技能(能将非闪/杀/桃/酒牌当对应牌使用/打出,或声明牌名)必须在 `onInit` 中调 `declareAlternativeResponse(state, ownerId, atomType, requestType?)` 声明替代回应能力,否则 preResolve 会误判 silent/skip 导致持牌者看不到询问窗口。`atomType` 为 `'询问闪'`/`'询问杀'`/`'请求回应'`(后者带 `requestType='桃/求桃'`)。返回 unloader 需收集。详见 docs/guides/添加技能.md §1.6.5
 
 **编辑安全(防中断损坏)**:
 - 先读完整文件再编辑。用 write 覆盖整个文件,或 edit 小范围

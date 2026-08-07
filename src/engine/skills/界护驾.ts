@@ -28,7 +28,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, declareAlternativeResponse, type SkillModule } from '../skill';
 
 // localVars keys(标护驾主技路径)
 const DODGE_PLAYED_VAR = '界护驾/闪出';
@@ -51,6 +51,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
   const offs: Array<() => void> = [];
+  offs.push(declareAlternativeResponse(state, ownerId, '询问闪'));
 
   // ── 主技 respond:曹操在询问闪时选择护驾 ──
   offs.push(

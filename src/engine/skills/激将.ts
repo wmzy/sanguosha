@@ -18,7 +18,7 @@
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../skill';
 import { inAttackRange } from '../distance';
 
 // use(代使用)路径的 localVars 键 / requestType 常量(对齐 乱武/借刀杀人 风格)
@@ -136,6 +136,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   //     (代使用:走 runUseFlow 完整杀结算,damageType 自动传导)
   //   一个座次仅能有一个 respond action(registerAction 按座次去重),故合并到同一注册。
   const unloaders: Array<() => void> = [];
+  unloaders.push(declareAlternativeResponse(state, ownerId, '询问杀'));
   for (const pl of state.players) {
     const seat = pl.index;
     unloaders.push(

@@ -34,7 +34,7 @@ import type {
 } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
-import { registerAction, registerAfterHook, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, hasBlockingPending, declareAlternativeResponse, type SkillModule } from '../skill';
 import { inAttackRange } from '../distance';
 
 // localVars keys(界激将新增被动触发)
@@ -60,6 +60,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
   const offs: Array<() => void> = [];
+  offs.push(declareAlternativeResponse(state, ownerId, '询问杀'));
 
   // ── use:主动激将(沿用标激将机制) ──
   offs.push(

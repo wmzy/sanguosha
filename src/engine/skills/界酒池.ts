@@ -20,7 +20,7 @@
 //   - "酒杀造成伤害"= 酒/nextKillDamageBonus mark 被消耗(由 酒.ts before-hook on 造成伤害 触发)
 //   - turn.vars['崩坏/disabled'] 随「回合结束」atom 自动清空(语义贴合"本回合")
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction, registerAfterHook, hasBlockingPending } from '../skill';
+import { registerAction, registerAfterHook, hasBlockingPending, declareAlternativeResponse } from '../skill';
 import { applyAtom } from '../index';
 import { defaultPlayActive } from '../action-active';
 
@@ -101,7 +101,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ctx.state.turn.vars[DISABLE_BENGHUAI_VAR] = true;
   });
 
-  return () => {};
+  const unloadDecl = declareAlternativeResponse(state, ownerId, '请求回应', '桃/求桃');
+  return () => { unloadDecl(); };
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): void {

@@ -8,7 +8,7 @@
 // 描述:"你可以将一张黑桃手牌当【酒】使用。" 黑桃 = ♠(仅黑桃,非黑色)。
 // 无次数限制。
 import type { Card, GameState, Json, Skill, FrontendAPI } from '../types';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../skill';
 import { applyAtom } from '../index';
 import { defaultPlayActive } from '../action-active';
 
@@ -71,7 +71,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (idx >= 0) self.hand[idx] = cardId;
     },
   );
-  return () => {};
+  const unloadDecl = declareAlternativeResponse(state, ownerId, '请求回应', '桃/求桃');
+  return () => { unloadDecl(); };
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): void {

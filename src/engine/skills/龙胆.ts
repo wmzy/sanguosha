@@ -7,7 +7,7 @@
 // 闪/杀 零感知龙胆——它们看到的永远是 cardMap 里的一张"闪"/"杀"。
 // transform validate 不限定回合/阶段:杀当闪是防御向(非自己回合),闪当杀的回合/次数由 杀.use/respond 校验。
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
-import { registerAction } from '../skill';
+import { registerAction, declareAlternativeResponse } from '../skill';
 import { applyAtom } from '../index';
 import { viewCanSlash, defaultPlayActive } from '../action-active';
 
@@ -76,7 +76,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (idx >= 0) self.hand[idx] = cardId;
     },
   );
-  return () => {};
+  const unloadDodge = declareAlternativeResponse(state, ownerId, '询问闪');
+  const unloadSlash = declareAlternativeResponse(state, ownerId, '询问杀');
+  return () => { unloadDodge(); unloadSlash(); };
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): void {

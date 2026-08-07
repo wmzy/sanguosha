@@ -27,7 +27,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界醇醪'(避开标醇醪冲突);
 //   内部 Skill.name = '醇醪'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Skill } from '../types';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook, declareAlternativeResponse } from '../skill';
 
 const _SKILL_ID = '界醇醪';
 const DISPLAY_NAME = '醇醪';
@@ -144,7 +144,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  return () => {};
+  const unloadDecl = declareAlternativeResponse(state, ownerId, '请求回应', '桃/求桃');
+  return () => { unloadDecl(); };
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {

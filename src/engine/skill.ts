@@ -144,14 +144,27 @@ export async function getSkillDescriptionAsync(id: string): Promise<string | und
 
 // ─── state-bound 注册表(WeakMap 外挂) ────────────────────────
 
+/** 替代回应能力声明:技能在 onInit 中通过 declareAlternativeResponse 注册,
+ *  声明其拥有者能在指定 atom 类型(可选 requestType)下用非字面牌回应。
+ *  hasAlternativeResponse 查此表(替代旧的硬编码技能名单)。
+ *  与 before-hook 型替代(八卦阵/八阵)互补:hook 型自动检测,声明型用于 action/转化型技能。 */
+export interface AltResponseDecl {
+  ownerId: number;
+  atomType: string;
+  /** 仅 '请求回应' 时有意义,如 '桃/求桃'。缺省=匹配该 atomType 的所有 requestType。 */
+  requestType?: string;
+}
+
 interface SkillRegistry {
   actions: Map<string, ActionEntry>;
   beforeHooks: Map<string, AtomHookEntry[]>;
   afterHooks: Map<string, AtomHookEntry[]>;
   /** 判定改判钩子:key=ownerId(座次),每玩家至多一个改判能力(鬼才/鬼道)。
-   *  由 判定 atom 的 afterApply 阶段逆时针遍历触发,与普通 after hook 解耦。 */
+   *  由 判定 atom 的 afterApply 阶段遍历触发,与普通 after hook 解耦。 */
   judgeModifiers: Map<number, AtomHookEntry>;
   instanceUnloads: Map<string, () => void>;
+  /** 替代回应能力声明表(技能就近注册)。 */
+  altResponseDecls: AltResponseDecl[];
 }
 
 /** state → 注册表的外挂映射。WeakMap 随 state 自动 GC,无需手动清理。 */
@@ -167,6 +180,7 @@ function getRegistry(state: GameState): SkillRegistry {
       afterHooks: new Map(),
       judgeModifiers: new Map(),
       instanceUnloads: new Map(),
+      altResponseDecls: [],
     };
     registries.set(state, r);
   }
@@ -318,6 +332,50 @@ export function getAfterHooks(state: GameState, atomType: string): AtomHookEntry
 /** 取判定改判钩子表(key=ownerId 座次)。由 判定 atom 的 afterApply 阶段遍历调用。 */
 export function getJudgeModifierMap(state: GameState): Map<number, AtomHookEntry> {
   return getRegistry(state).judgeModifiers;
+}
+
+// ─── 替代回应能力声明(技能 onInit 内就近注册) ───────────────
+
+/**
+ * 声明 ownerId 拥有者在指定 atomType(+可选 requestType)下的「替代回应能力」:
+ * 能用非字面响应牌的方式回应(如龙胆杀当闪、急救红牌当桃、蛊惑声明当桃)。
+ *
+ * 卡牌回应预检(card-response-availability)据此决定是否走 normal 询问——
+ * 拥有替代能力的 target 即使手牌中无字面匹配牌,也必须正常询问(skip/silent 会错误剥夺技能)。
+ *
+ * 与 before-hook 型替代(八卦阵/八阵自动检测)互补:本 API 用于 action/转化型技能。
+ * 返回 unloader,随技能卸载自动清理(与 registerAction/registerBeforeHook 一致)。
+ */
+export function declareAlternativeResponse(
+  state: GameState,
+  ownerId: number,
+  atomType: string,
+  requestType?: string,
+): () => void {
+  const decl: AltResponseDecl = { ownerId, atomType, requestType };
+  const reg = getRegistry(state);
+  reg.altResponseDecls.push(decl);
+  return () => {
+    const idx = reg.altResponseDecls.indexOf(decl);
+    if (idx >= 0) reg.altResponseDecls.splice(idx, 1);
+  };
+}
+
+/** 查询 target 是否声明了指定 atomType(+可选 requestType)的替代回应能力。 */
+export function hasDeclaredAlternativeResponse(
+  state: GameState,
+  atomType: string,
+  target: number,
+  requestType?: string,
+): boolean {
+  const list = getRegistry(state).altResponseDecls;
+  for (const d of list) {
+    if (d.ownerId !== target) continue;
+    if (d.atomType !== atomType) continue;
+    if (d.requestType && requestType && d.requestType !== requestType) continue;
+    return true;
+  }
+  return false;
 }
 
 // ─── 顶层注册 helper(skill 在 onInit 内直接调用) ─────────────

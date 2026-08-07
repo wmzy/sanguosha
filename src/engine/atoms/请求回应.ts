@@ -89,7 +89,7 @@ export const 请求回应: AtomDefinition<{
       if (atom.target < 0) return null;
       const filter = responseCardFilter(atom);
       if (!filter) return null;
-      return cardResponsePreResolveForTarget(state, '请求回应', atom.target, filter);
+      return cardResponsePreResolveForTarget(state, '请求回应', atom.target, filter, atom.requestType);
     },
   },
   effect: { blockUntilDone: true, duration: 200 },
@@ -103,7 +103,7 @@ export const 请求回应: AtomDefinition<{
     const cardFilter = responseCardFilter(atom);
     const mode =
       cardFilter && atom.target >= 0
-        ? evaluateCardResponseModeForTarget(state, '请求回应', atom.target, cardFilter)
+        ? evaluateCardResponseModeForTarget(state, '请求回应', atom.target, cardFilter, atom.requestType)
         : 'normal';
     const timeoutMs =
       mode === 'silent' ? SHORT_DELAY_MS : resolveTimeoutMs(state, timeoutSec, isBroadcast);

@@ -18,7 +18,7 @@
 // 保证后端 slot 决策与前端投影口径一致。
 
 import type { ActionPrompt, Atom, Card, GameState } from './types';
-import { getBeforeHooks } from './skill';
+import { getBeforeHooks, hasDeclaredAlternativeResponse } from './skill';
 
 /** silent 模式的短延时毫秒数。固定值,不走房间 timeoutScale 缩放。 */
 export const SHORT_DELAY_MS = 1500;
@@ -38,39 +38,24 @@ export const SILENT_RESPONSE_PROMPT: ActionPrompt = {
   cancelLabel: '',
 };
 
-/** target 可能用「非字面响应牌」的方式回应 询问闪/询问杀 的 action 型技能(转化/转交防御技)。
- *  这些技能的 activeWhen 检查 atom.type==='询问X' 且 target=owner,使其在被询问时能不依赖字面闪/杀
- *  回应(如龙胆杀当闪、激将转交蜀角色、倾国黑牌当闪、护驾转交魏角色)。
- *  ⚠️ 引擎侧无法评估 activeWhen,故用显式名单;新增此类防御技时需同步补全。
- *  before-hook 型替代(八卦阵/八阵)由 hasAlternativeResponse 的 hook 检查自动捕获,无需在此列举。 */
-const ALTERNATIVE_RESPONSE_SKILLS = new Set([
-  '倾国', '护驾', '界护驾', // 询问闪:转化/转交出闪
-  '激将', '界激将', // 询问杀:转交出杀
-  '龙胆', '界龙胆', // 询问闪/询问杀双向转化(杀↔闪)
-]);
-
 /** target 是否拥有「不依赖字面响应牌」的替代回应能力。有则必须走正常询问(skip/silent 会错误剥夺技能)。
- *  - before-hook 型(八卦阵/八阵):检查 target 自己注册在 atomType 上的 before-hook。
+ *  - before-hook 型(八卦阵/八阵):检查 target 自己注册在 atomType 上的 before-hook(自动检测)。
  *    攻击方拥有的 hook(界潜袭/义绝)ownerId≠target,正确排除(且它们 cancel 在 preResolve 之前处理)。
- *  - action 型(龙胆/激将/...):仅 询问闪/询问杀 检查显式名单(这些技能 activeWhen 检查 atom.type==='询问X')。 */
+ *  - 声明型(龙胆/急救/蛊惑/...):查技能 onInit 中通过 declareAlternativeResponse 注册的声明表。
+ *    涵盖转化/转交/action 型技能,无需维护硬编码技能名单——新增技能在其 onInit 中声明即可。 */
 export function hasAlternativeResponse(
   state: GameState,
   atomType: string,
   target: number,
+  requestType?: string,
 ): boolean {
   // before-hook 型替代:target 自己注册在该 atom 上的 before-hook(如八卦阵/八阵判定闪)
   const hooks = getBeforeHooks(state, atomType);
   for (const h of hooks) {
     if (h.ownerId === target) return true;
   }
-  // action 型替代:仅 询问闪/询问杀 有此类转化/转交防御技
-  if (atomType === '询问闪' || atomType === '询问杀') {
-    const skills = state.players[target]?.skills ?? [];
-    for (const s of skills) {
-      if (ALTERNATIVE_RESPONSE_SKILLS.has(s)) return true;
-    }
-  }
-  return false;
+  // 声明型替代:技能 onInit 中通过 declareAlternativeResponse 就近注册
+  return hasDeclaredAlternativeResponse(state, atomType, target, requestType);
 }
 
 /** 由可用性推导回应模式。 */
@@ -155,7 +140,12 @@ export function evaluateCardResponse(
  *  供 buildView 使用(slot.atom 是完整 Atom)。应用 hasAlternativeResponse 门控。 */
 export function getCardResponseMode(state: GameState, atom: Atom): CardResponseMode {
   const target = (atom as { target?: number }).target;
-  if (typeof target === 'number' && target >= 0 && hasAlternativeResponse(state, atom.type, target)) {
+  const requestType = (atom as { requestType?: string }).requestType;
+  if (
+    typeof target === 'number' &&
+    target >= 0 &&
+    hasAlternativeResponse(state, atom.type, target, requestType)
+  ) {
     return 'normal';
   }
   const avail = evaluateCardResponse(state, atom);
@@ -164,14 +154,15 @@ export function getCardResponseMode(state: GameState, atom: Atom): CardResponseM
 }
 
 /** 给定 atomType + target + 匹配 filter,得到门控后的回应模式(供 atom 的 toViewEvents 使用)。
- *  target 有替代回应能力(转化/转交/判定防御技)时返回 'normal'(不剥夺其技能)。 */
+ *  target 有替代回应能力(转化/转交/判定防御技/救援转化技)时返回 'normal'(不剥夺其技能)。 */
 export function evaluateCardResponseModeForTarget(
   state: GameState,
   atomType: string,
   target: number,
   filter: (card: Card) => boolean,
+  requestType?: string,
 ): CardResponseMode {
-  if (hasAlternativeResponse(state, atomType, target)) return 'normal';
+  if (hasAlternativeResponse(state, atomType, target, requestType)) return 'normal';
   return resolveCardResponseMode(evaluateCardResponseForTarget(state, target, filter));
 }
 
@@ -182,7 +173,8 @@ export function cardResponsePreResolveForTarget(
   atomType: string,
   target: number,
   filter: (card: Card) => boolean,
+  requestType?: string,
 ): 'skip' | { delayMs: number } | null {
-  if (hasAlternativeResponse(state, atomType, target)) return null;
+  if (hasAlternativeResponse(state, atomType, target, requestType)) return null;
   return availabilityToPreResolve(evaluateCardResponseForTarget(state, target, filter));
 }
