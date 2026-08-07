@@ -62,3 +62,4 @@ export function formatTime(ms: number): string {
   const m = Math.floor(s / 60);
   return m > 0 ? `${m}:${String(s % 60).padStart(2, '0')}` : `${s}s`;
 }
+

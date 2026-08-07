@@ -53,6 +53,11 @@ export function applyServerMessage(
     }
     case 'event': {
       if (!prev) return base;
+      // seq 去重:重连/EventSource 自动重连/HMR 等场景下,服务端可能重放已处理过的 event
+      // (seq<=prevSeq)。viewReducer 的 applyView 会原地突变(hand/marks/processing 等 push),
+      // 重复应用会让手牌等数组累积重复。initialView 已是全量基线,后续 event 应 seq>lastSeq
+      // 单调递增;过时/重复 event 整条丢弃(notify/deadline 亦如此——最新状态由更高 seq 决定)。
+      if (msg.seq <= prevSeq) return base;
       let view = prev;
       const newEvents: ViewEvent[] = [];
       if (msg.notify) {

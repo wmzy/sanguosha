@@ -198,4 +198,31 @@ describe('applyServerMessage', () => {
     // prev 未被污染——viewReducer 突变的是新副本,不会回写 baseline
     expect(prevP0.health).toBe(4);
   });
+
+  it('重复 event(seq<=prevSeq)被丢弃,applyView 不重复应用', () => {
+    // 回归:重连/EventSource 自动重连/HMR 时服务端可能重放已处理的 event。
+    // viewReducer 的 applyView 原地突变(marks/hand push),重复应用导致数组累积重复
+    // (典型表现:热重载后前端手牌显示重复)。event case 必须按 seq 去重。
+    const baseline = makeBaseline(0);
+    const start = applyServerMessage(null, 0, { type: 'initialView', state: baseline, lastSeq: 0 });
+    const mark = { type: 'chain', source: -1 } as never;
+    const evt = {
+      type: 'event',
+      seq: 1,
+      timestamp: 0,
+      view: { type: '加标记', player: 0, mark },
+    } as ServerMessage;
+    const out1 = applyServerMessage(start.view!, start.lastSeq, evt);
+    expect(out1.view!.players[0].marks.length).toBe(1);
+    expect(out1.lastSeq).toBe(1);
+    // 同 seq 的 event 重放:必须丢弃
+    const out2 = applyServerMessage(out1.view!, out1.lastSeq, evt);
+    expect(out2.view).toBe(out1.view); // 未应用,引用不变
+    expect(out2.lastSeq).toBe(1); // seq 不回退
+    expect(out2.view!.players[0].marks.length).toBe(1); // 不重复
+    // 更高 seq 的新 event 正常应用
+    const evt2 = { ...evt, seq: 2 } as ServerMessage;
+    const out3 = applyServerMessage(out1.view!, out1.lastSeq, evt2);
+    expect(out3.view!.players[0].marks.length).toBe(2);
+  });
 });
