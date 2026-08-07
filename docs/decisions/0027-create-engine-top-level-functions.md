@@ -16,9 +16,9 @@
 
 旧 `开局.onInit(skill, api: BackendAPI)` 走 `api.registerAction(entry)` 把开局流程挂进 action 表。但开局的"玩家"是"主公"这个虚拟身份，跟 BackendAPI 提供的"当前 self"语义对不上；`BackendAPI` 又携带 `_runtimeApi` 之类的 engine-私有字段，开局不得不学着普通技能的样子去申请一个 `api.runtimeApi`，把"系统一次性 bootstrap"硬塞进了"玩家技能实例"模型。
 
-### 3. restore 路径被迫重跑开局
+### 3. restore 路径的内存状态丢失问题
 
-旧 `restoreFromLog` 反序列化得到 state 后，还得 `createEngine()` 起一个闭包、调一次 `bootstrap`，dispatch 一条 `start` 让 `开局` 跑过完整的 抽身份/选将/洗牌/发牌/启动第一回合。但日志里这些动作都已经记录了 —— 重新跑一遍既慢又可能因为 `seed` 不一致产生不同结果。
+旧 `restoreFromLog` 反序列化得到 state 后，还得 `createEngine()` 起一个闭包、调一次 `bootstrap`，dispatch 一条 `start` 让 `开局` 跑过完整流程。原 ADR 据此认为“日志里这些动作都已记录，重跑既慢又可能 seed 不一致”，从而得出“restore 不应调 bootstrap”的结论——**该结论已被推翻**（见决策 7 修订）。真正的问题是：JSON 快照丢失了所有不可序列化的运行时内存状态（skill 实例、全局 hooks、respond action、pending slot 的函数/定时器），恢复时必须重建这些，而 `bootstrap` 正是重建它们的唯一入口。确定性 RNG（`config.seed = state.rngSeed`）保证重跑结果一致。
 
 ### 4. dispatch 阻塞 executeP 整段
 
@@ -74,7 +74,7 @@ buildView(this.state, idx);
 3. `await dispatch(state, { skillId:'开局', actionType:'start', ownerId:'主公', params: config })` 跑完整开局
 4. `skillRebootstrap(state)` 给每个 player 的 skills 注册实例
 
-**为什么这样拆**：restore-from-log 路径不需要 bootstrap —— replay 出来的 state 已经完成开局，直接用即可。同步 create + 异步 bootstrap 让 server `startGame` 和 `restoreFromLog` 用同一种 `create` 出 state，但只有前者 `await bootstrap` 跑开局，后者直接走 session 启动。
+**为什么这样拆**：把状态构造（同步、无 IO）和开局执行（异步、动态 import、交互式选将可能挂起在 pending）分离。**两条路径都需要 bootstrap**（见决策 7 修订）：`startGame` 用 `create + bootstrap` 开局；`restoreState` 用 `create + bootstrap + restore` 先重建内存注册再重放 actionLog。解耦的价值在于让 session 能在 bootstrap 之前挂好 `onStateChange` 回调——交互式选将的 pending 需通过该回调广播给客户端。
 
 ### 决策 3：系统技能（如 `开局`）走特殊 `onInit(skill, state: GameState)` 接口
 
@@ -145,9 +145,24 @@ return { gameOver, winner };
 
 **测试用 `TestEngine.dispatchAndWait(state, msg)`**：在 `engine-helpers.ts` 里加一个 helper，主动 `await activeExecuteP`（如果存在）等 execute 真跑完，给单元测试一个"全跑完才看结果"的同步语义。
 
-### 决策 7：restoreFromLog 不调 bootstrap
+### 决策 7：restore 路径必须走 create + bootstrap + restore 重建运行时内存状态
 
-`src/server/persistence.ts::restoreFromLog(persisted)` 直接返回 `persisted.state`，不调 `create` / `bootstrap`。`session.startGame` 检测到是 restore 路径时只把 state 挂到 session，不重复开局。
+> **修订（2026-08-07）**：原决策“restoreFromLog 不调 bootstrap，直接返回 persisted.state”被推翻。实践证明 JSON 反序列化得到的 state 快照**无法恢复程序内存状态**——下列运行时注册全部不可序列化（`sanitizeState` 持久化时已清除），无法从快照恢复：
+> - skill 实例（`ActionEntry`：validate/execute/rollback 闭包）—— 由 `instantiateSkill` 注册到 state-bound 注册表
+> - 系统规则全局 hooks（添加技能/移除技能/弃置/濒死检查）
+> - 每个玩家的选将/弃牌 respond action entries（`registerSystemRespondActions`）
+> - 酒的造成伤害 before-hook、延时锦囊判定/跳过 hooks、连环传导全局 after-hook
+> - pending slot 的 resolve/pause/`_fireTimeoutNow`/setTimeout 定时器
+>
+> 游戏继续运行必须依赖这些内存注册（dispatch 查 action 表、applyAtom 跑 hooks、respond 定位 slot）。直接接管快照会导致这些全部缺失，游戏无法继续。
+
+因此 restore 走完整三段式：
+
+1. `persistence.ts::restoreFromLog(persisted)` 返回 JSON 快照 state（含 rngSeed/players/actionLog 等**可序列化**数据），供下游读取 seed/config。
+2. `session.restoreState(state, actionLog)` 编排恢复：`create(config)` 造骨架 → `bootstrap(fresh, config)` 重建全部运行时内存注册（含开局 dispatch）→ `restore(fresh, config, actionLog)` 重放 actionLog 把状态推进到正确位置。
+3. 确定性：`config.seed = state.rngSeed` 保证 bootstrap 重跑开局与原局一致；重放 actionLog 覆盖开局产生的状态，最终 state 与崩溃前一致。
+
+**重放同步（settle）**：dispatch 是 fire-and-forget，开局 execute 在后台异步推进，遇到等待型 atom（如选将询问）才创建 pending slot。`restore` 重放 respond 类 action 前 `waitForResponsiveSlot` 等目标 slot 出现，dispatch 后 `settleExecute` 等 seq 稳定，避免 respond 在 slot 未创建时被静默拒绝。
 
 ## 后果
 
@@ -155,7 +170,7 @@ return { gameOver, winner };
 
 - **EngineInstance 类型消失**：所有 API 签名显式带 state，调用方无法误用（"用错 engine" 类 bug 静态可查）
 - **开局解耦 BackendAPI**：开局面板只读 state、注册 action entry、返回 unregister 函数；不申请任何 engine 私有 API
-- **restore 路径快**：replay 出来的 state 直接用，省一次 dispatch 开局的全流程（~30 个 atom apply 加上 4 个 player 的 skillRebootstrap）
+- **restore 路径确定性重放**：bootstrap 重建内存注册 + restore 重放 actionLog，保证崩溃前后状态一致（代价是重跑一次开局，~30 个 atom apply + skill 实例化；确定性由 rngSeed 保证）
 - **dispatch 不再假阻塞**：主动方 await 到 `fireDispatchReady` 立刻返回，client ws 可以继续收 message；游戏内在 `activeExecuteP` 上异步推进
 - **state 字段访问更顺手**：测试 fixture 和技能代码都可以直接改 `state.players[i].hand`，不再 spread 半天
 - **引擎状态统一在模块级**：进程内一套注册表 + reset；不需要为多 engine 维护多份 Map
@@ -197,8 +212,8 @@ return { gameOver, winner };
 
 ### Phase 4：restore 路径（已完成）
 
-10. `persistence.ts::restoreFromLog` 直接返回 persisted.state，不调 bootstrap
-11. `app.ts` 调 `restoreFromLog` 拿到 state 后挂到 session
+10. `persistence.ts::restoreFromLog` 返回 JSON 快照 state（可序列化数据：rngSeed/players/actionLog）
+11. `session.restoreState` 编排 create + bootstrap + restore 三段式重建（含内存注册）
 12. `tests/integration/restore-from-log.test.ts` 验证往返
 
 ### Phase 5：测试 harness 适配（已完成）
@@ -251,14 +266,16 @@ it('出杀:无回应 → 目标扣 1 血', async () => {
 });
 ```
 
-### restore-from-log
+### restore-from-log（重建内存状态 + 重放）
 
 ```ts
 // src/server/session.ts
-async restoreFromLog(persisted: PersistedState): Promise<void> {
-  resetForTest();
-  this.state = restoreFromLog(persisted);  // 直接返回 persisted.state,不调 bootstrap
-  rebootstrap(this.state);                  // 重新挂 skill 实例(因为模块级表被 reset 清空)
+async restoreState(state: GameState, actionLog: ActionLogEntry[]): Promise<void> {
+  const config: GameConfig = { seed: state.rngSeed, playerCount: state.players.length, ... };
+  const fresh = create(config);
+  await bootstrap(fresh, config);          // 重建全部运行时内存注册(开局 dispatch + skill 实例 + 全局 hooks + respond actions)
+  await restore(fresh, config, actionLog); // 重放 actionLog 推进到正确状态(settle 同步)
+  this.state = fresh;
   this.broadcastView();
 }
 ```

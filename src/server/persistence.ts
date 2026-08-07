@@ -290,10 +290,12 @@ export function _pendingWriteCount(): number {
   return pendingTimers.size;
 }
 
-/** 从持久化日志恢复 state:返回最新一份 state 快照。
+/** 从持久化日志恢复 state:返回最新一份 state 快照(可序列化部分)。
  * 持久化文件里 actionLog 与 state 都被保存 —— state 是 actionLog replay 出来的最终结果。
- * 这里返回 state 即可,GameSession 会用 state.seed / state.players 等直接接管。
- * (未来若需要"从头 replay 验证"再扩展:用 create + bootstrap + 逐条 dispatch。) */
+ * 这里只返回 JSON 快照(含 rngSeed/players/actionLog 等),供 session.restoreState 读取
+ * seed/config。运行时内存状态(skill 实例/hooks/respond actions/pending slot 函数)无法
+ * 从快照恢复,必须由 session.restoreState 走 create + bootstrap + restore 重建
+ * (见 ADR 0027 决策 7 修订)。 */
 export function restoreFromLog(persisted: PersistedRoom): GameState {
   const state = persisted.state;
   // JSON 反序列化后 pendingSlots 可能是普通对象,转回 Map

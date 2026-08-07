@@ -8,9 +8,11 @@
 //   - buildView(state, viewer): 接受 state,返回 view
 //   - fireTimeout(state): 触发 pending slot 的 onTimeout
 //
-// create 是同步的(不依赖任何 IO),bootstrap 是异步的(可能要动态 import 模块)。
-// 两者解耦是为了让 restoreFromLog 的路径可以跳过 bootstrap —— 恢复出来的 state 已经
-// 完成了开局,不需要再 dispatch 开局 start。
+// create 是同步的(不依赖任何 IO),bootstrap 是异步的(可能要动态 import 模块、
+// 交互式选将可能挂起在 pending)。两者解耦的价值是让 session 能在 bootstrap 之前
+// 挂好 onStateChange 回调(选将 pending 需通过该回调广播给客户端)。
+// 注意:startGame 和 restoreState 两条路径都需要 bootstrap——后者靠 bootstrap 重建
+// 全部运行时内存注册(skill 实例/全局 hooks/respond actions),JSON 快照无法恢复这些。
 //
 // dispatch 路径(Promise<boolean>):
 //   同步跑 preceding/validate;通过则启动 fire-and-forget execute 并返回 true,
@@ -221,7 +223,9 @@ export function create(gameConfig: GameConfig): GameState {
  *   3. dispatch 开局 start → 跑完抽身份/选将/洗牌/发牌/启动第一回合
  *   4. registerSkillsFromState(state) 给每个 player 的 skills 注册实例
  *
- * restore 路径不调 bootstrap —— 直接用 replay 出来的 state 即可。
+ * restore 路径同样调 bootstrap —— JSON 快照无法恢复运行时内存状态(skill 实例/hooks/
+ * respond actions/pending slot 函数),必须靠 bootstrap 重建,再由 restore 重放 actionLog
+ * 推进到正确状态。见 ADR 0027 决策 7 修订。
  */
 export async function bootstrap(state: GameState, gameConfig: GameConfig): Promise<void> {
   // 防重入:开局已执行过(玩家已发牌)→ 抛错。不是"幂等"——状态变更不可回滚。

@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-08-07
 
+### Changed — 纠正 spec：restore 必须走 bootstrap 重建运行时内存状态（推翻决策 0027 决策7）
+
+ADR 0027 决策7 原断言“restoreFromLog 不调 bootstrap，直接返回 persisted.state”——该设计被推翻。根因：JSON 反序列化得到的 state 快照**无法恢复程序内存状态**，下列运行时注册全部不可序列化（`sanitizeState` 持久化时已清除）：skill 实例（`ActionEntry` 闭包）、系统规则全局 hooks、每个玩家的选将/弃牌 respond actions、酒/延时锦囊/连环传导全局 hooks、pending slot 的 resolve/pause/定时器。游戏继续运行必须依赖这些（dispatch 查 action 表、applyAtom 跑 hooks、respond 定位 slot），直接接管快照会导致全部缺失。正确流程是 `create + bootstrap + restore` 三段式（bootstrap 重建内存注册、restore 重放 actionLog），确定性由 `config.seed = state.rngSeed` 保证。
+
+#### 文档纠正
+- **ADR 0027 决策7**（`docs/decisions/0027-create-engine-top-level-functions.md`）：从“不调 bootstrap”改为“必须走 create + bootstrap + restore”，加修订记录列举不可序列化的内存状态，并说明重放 settle 同步机制。同步纠正问题 3、决策 2“为什么这样拆”、后果“正面”、Phase 4 步骤、restore-from-log 代码示例。
+- **选将交互设计 §8.3**（`docs/design/选将交互设计.md`）：从“restore 不调 bootstrap、不注册选将 respond”改为“bootstrap 注册选将 respond + 重跑开局，restore 重放选将 respond”。
+- **代码注释**（`src/engine/index.ts`、`src/server/persistence.ts`）：删除“restore 路径不调 bootstrap / 直接接管 state”等过时描述，改为说明 restore 必须靠 bootstrap 重建内存状态。
+
+历史计划文档（`docs/superpowers/plans`、`docs/superpowers/specs` 下的 2026-06-12-*）是历史实施快照，保留原样不改写历史。
+
+## [Unreleased] — 2026-08-07
+
 ### Fixed — 服务端重启后游戏错误地回到选将阶段（持久化恢复 fire-and-forget 时序竞态）
 
 服务端重启后，已完成选将、进入出牌阶段的对局会被错误地恢复回选将界面。根因：`engine.restore` 重放 `actionLog` 时，`dispatch` 是 fire-and-forget——开局/回合推进的 `execute` 在后台异步跑到等待型 atom 才创建 pending slot。`restore` 的重放循环**无任何等待**，下一条选将 `respond` 在 slot 尚未创建时就被 dispatch，其 validate（`pendingSlots.get(ownerId)` 为空）被静默拒绝 → 选将 slot 永久挂起 → 重连客户端 `buildView` 看到 `选将询问` pending → 渲染选将界面。这与 `选将交互设计.md §8.3`、决策 0027 决策7、`index.ts:224` 注释一致要求的“restore 不应阻塞在选将”相悖。
