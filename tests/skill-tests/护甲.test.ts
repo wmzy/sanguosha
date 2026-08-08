@@ -10,7 +10,7 @@
 //   5. 边界:有护甲时出闪仍可正常抵消杀(护甲不干扰闪)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
-import { runDamageFlow } from '../../src/engine/damage-flow';
+import { runDamageFlow } from '../../src/engine/flows/damage';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';

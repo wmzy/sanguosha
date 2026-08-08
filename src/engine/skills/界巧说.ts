@@ -33,7 +33,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { runRankCompareFlow } from '../rank-flow';
+import { runRankCompareFlow } from '../flows/rank';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 import { registerTrickBlocker } from '../rules/trick-quota';

@@ -6,7 +6,7 @@ import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, instantiateSkill, unloadSkillInstance } from '../skill';
 import { DEFAULT_SKILLS } from '../atoms/选将';
 import { skillLoaders } from './index';
-import { runDeathFlow } from '../death-flow';
+import { runDeathFlow } from '../flows/death';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '系统规则', description: '引擎级规则(判定清理/技能生命周期/濒死)' };

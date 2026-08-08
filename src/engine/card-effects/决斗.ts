@@ -8,7 +8,7 @@
 
 import type { Card } from '../types';
 import { applyAtom } from '../index';
-import { runDamageFlow } from '../damage-flow';
+import { runDamageFlow } from '../flows/damage';
 import { consumePlayedSlashes } from '../card-effect/play-card';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 

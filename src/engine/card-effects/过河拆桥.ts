@@ -4,7 +4,7 @@
 // target.kind='other': 任意其他角色（无距离限制）。
 
 import type { Card } from '../types';
-import { runPickTargetCardPanel } from '../pick-card-panel';
+import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
 /** 过河拆桥牌特有校验：目标有牌、非自己 */

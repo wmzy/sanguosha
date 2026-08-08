@@ -19,7 +19,7 @@
 //   - 拼点流程参考驱虎.ts;获得牌参考反馈.ts
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { runRankCompareFlow } from '../rank-flow';
+import { runRankCompareFlow } from '../flows/rank';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '烈刃/confirm';

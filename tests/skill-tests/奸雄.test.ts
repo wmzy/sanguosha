@@ -4,7 +4,7 @@
 //   获得伤害牌采用延迟拿取,避免父结算重复入弃牌堆。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
-import { runDamageFlow } from '../../src/engine/damage-flow';
+import { runDamageFlow } from '../../src/engine/flows/damage';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';

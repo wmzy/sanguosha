@@ -13,7 +13,7 @@
 // 判定牌移入弃牌堆。洛神主循环在 runJudgeFlow 返回后,从弃牌堆顶读判定牌。
 import type { FrontendAPI, Skill, GameState, Card } from '../types';
 import { applyAtom, frameCards } from '../index';
-import { runJudgeFlow } from '../judge-flow';
+import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

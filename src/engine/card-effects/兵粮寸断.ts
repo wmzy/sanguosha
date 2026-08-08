@@ -7,7 +7,7 @@
 import type { Card } from '../types';
 import type { GameView } from '../types';
 import { applyAtom } from '../index';
-import { runJudgeFlow } from '../judge-flow';
+import { runJudgeFlow } from '../flows/judge';
 import { effectiveDistance } from '../rules/distance';
 import { viewEffectiveDistance } from '../rules/viewDistance';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';

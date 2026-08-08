@@ -37,7 +37,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { runDamageFlow } from '../damage-flow';
+import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../skill';
 import { registerAttackRangeExemptor } from '../rules/distance';
 

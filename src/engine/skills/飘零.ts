@@ -22,7 +22,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { runJudgeFlow } from '../judge-flow';
+import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '飘零/confirm';

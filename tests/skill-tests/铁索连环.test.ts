@@ -7,7 +7,7 @@ import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { DEFAULT_SKILLS } from '../../src/engine/atoms/选将';
-import { runDamageFlow } from '../../src/engine/damage-flow';
+import { runDamageFlow } from '../../src/engine/flows/damage';
 
 function mkCard(
   id: string,

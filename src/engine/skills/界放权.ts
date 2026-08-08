@@ -31,7 +31,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { startTurn } from '../turn-flow';
+import { startTurn } from '../flows/turn';
 import { registerAction, registerBeforeHook } from '../skill';
 
 // requestType 前缀必须等于技能 id('界放权'):前端 resolvePendingRespond 按

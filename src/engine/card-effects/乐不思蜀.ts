@@ -9,7 +9,7 @@
 
 import type { Card } from '../types';
 import { applyAtom } from '../index';
-import { runJudgeFlow } from '../judge-flow';
+import { runJudgeFlow } from '../flows/judge';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 import { registerDelayedTrick } from '../card-effect/delayed-trick-registry';
 

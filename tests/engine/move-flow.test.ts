@@ -17,7 +17,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import '../../src/engine/atoms'; // 注册所有 atom(含 move-timing)
 import { createGameState } from '../../src/engine/types';
 import type { Atom, Card, GameState, PlayerState, ZoneLoc } from '../../src/engine/types';
-import { runMoveCardFlow } from '../../src/engine/move-flow';
+import { runMoveCardFlow } from '../../src/engine/flows/move';
 import { applyAtom } from '../../src/engine/index';
 import { registerBeforeHook, registerAfterHook } from '../../src/engine/skill';
 

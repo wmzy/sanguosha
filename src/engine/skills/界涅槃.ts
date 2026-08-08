@@ -29,7 +29,7 @@
 //   三选一参考 化身.ts 的 respond{skill} 模式(prompt=confirm + 候选暂存 localVars)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { setChain } from '../face-down';
+import { setChain } from '../flows/face-down';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '界涅槃/confirm';

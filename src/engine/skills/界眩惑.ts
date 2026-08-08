@@ -30,7 +30,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
-import { runDamageFlow } from '../damage-flow';
+import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const SKILL_ID = '界眩惑';

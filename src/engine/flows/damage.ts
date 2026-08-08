@@ -13,11 +13,11 @@
 //   state.localVars[DAMAGE_AMOUNT_KEY],编排函数在 applyAtom 返回后读取该值作为后续伤害值。
 //   cancel 语义:伤害结算开始时 cancel → 跳过整个伤害流程;受到伤害时 cancel → 防止伤害,
 //   跳到伤害结算结束时(仍发 结束时/结束后 时机,amount=0)。
-import type { GameState } from './types';
-import type { DamageType } from '../engine/types';
-import { applyAtom } from './index';
-import { runDecreaseLifeFlow } from './life-flow';
-import { DAMAGE_AMOUNT_KEY, DAMAGE_SOURCE_KEY } from './atoms/damage-timing';
+import type { GameState } from '../types';
+import type { DamageType } from '../types';
+import { applyAtom } from '../index';
+import { runDecreaseLifeFlow } from './life';
+import { DAMAGE_AMOUNT_KEY, DAMAGE_SOURCE_KEY } from '../atoms/damage-timing';
 
 /** 伤害结算编排函数——对齐 damage.md 8 时机。
  *

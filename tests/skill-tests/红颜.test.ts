@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import { applyAtom, pushFrame, popFrame } from '../../src/engine/index';
-import { runJudgeFlow } from '../../src/engine/judge-flow';
+import { runJudgeFlow } from '../../src/engine/flows/judge';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';

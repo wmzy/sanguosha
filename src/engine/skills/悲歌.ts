@@ -24,8 +24,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, frameCards } from '../index';
-import { runJudgeFlow } from '../judge-flow';
-import { flipFaceDown, flipFaceUp, performSkipTurn } from '../face-down';
+import { runJudgeFlow } from '../flows/judge';
+import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const DISCARD_RT = '悲歌/discard';

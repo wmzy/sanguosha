@@ -21,7 +21,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 import { inAttackRange } from '../rules/distance';
-import { runPickTargetCardPanel } from '../pick-card-panel';
+import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 
 /** localVars keys */
 const CONFIRMED_KEY = '涯角/confirmed';

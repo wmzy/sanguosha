@@ -27,7 +27,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { runDamageFlow } from '../damage-flow';
+import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
 const _SKILL_ID = '界绝策';

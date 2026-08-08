@@ -8,8 +8,8 @@
 import type { Card, GameState } from '../types';
 import { TARGET_SYSTEM } from '../types';
 import { applyAtom } from '../index';
-import { runJudgeFlow } from '../judge-flow';
-import { runDamageFlow } from '../damage-flow';
+import { runJudgeFlow } from '../flows/judge';
+import { runDamageFlow } from '../flows/damage';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 import { registerDelayedTrick } from '../card-effect/delayed-trick-registry';
 

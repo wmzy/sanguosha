@@ -17,8 +17,8 @@
 // killer 传递:runDyingFlow 调用前,runDecreaseLifeFlow 已把致死来源写入
 // state.localVars['死亡/killer'](伤害有来源;失去体力/减上限无来源→undefined)。
 // runDyingFlow 读取该值并作为参数传入,runDeathFlow 不再读写 localVars。
-import type { GameState } from './types';
-import { applyAtom } from './index';
+import type { GameState } from '../types';
+import { applyAtom } from '../index';
 
 /** 死亡结算编排函数——对齐 death.md 5 时机。
  *

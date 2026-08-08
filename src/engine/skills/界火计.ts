@@ -38,8 +38,8 @@
 import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
-import { runDamageFlow } from '../damage-flow';
-import { promptCancel } from '../无懈可击';
+import { runDamageFlow } from '../flows/damage';
+import { promptCancel } from '../flows/cancel';
 import { defaultPlayActive } from '../rules/action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {

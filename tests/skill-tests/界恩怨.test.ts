@@ -28,7 +28,7 @@ skillLoaders['界恩怨'] = async () => 界恩怨Module;
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/index';
-import { runDamageFlow } from '../../src/engine/damage-flow';
+import { runDamageFlow } from '../../src/engine/flows/damage';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(

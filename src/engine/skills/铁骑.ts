@@ -18,7 +18,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, frameCards } from '../index';
-import { runJudgeFlow } from '../judge-flow';
+import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const TAG = '铁骑/禁闪';

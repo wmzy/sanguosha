@@ -45,7 +45,7 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { runRankCompareFlow } from '../rank-flow';
+import { runRankCompareFlow } from '../flows/rank';
 import {
   registerAction,
   registerAfterHook,

@@ -13,8 +13,8 @@
 //
 // 判定结果回传:收尾步骤把最终判定牌 cardId 写入
 // state.localVars['判定/finalJudgeCardId'],调用方据此读取判定结果。runJudgeFlow 返回该 cardId。
-import type { GameState } from './types';
-import { applyAtom } from './index';
+import type { GameState } from '../types';
+import { applyAtom } from '../index';
 
 /** runJudgeFlow 收尾回写最终判定牌 cardId 的 localVars 键(与 cleanupJudgeCard 一致)。 */
 const JUDGE_FINAL_CARD_KEY = '判定/finalJudgeCardId';

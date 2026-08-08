@@ -35,7 +35,7 @@
 //   - 获得判定牌:在 await applyAtom(判定) 完成后,从 discardPile 末尾拿
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { runJudgeFlow } from '../judge-flow';
+import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_RT = '界暴虐/confirm';

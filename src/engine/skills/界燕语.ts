@@ -27,7 +27,7 @@
 //   内部 Skill.name = '燕语'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { recastCard } from '../recast';
+import { recastCard } from '../flows/recast';
 import {
   registerAction,
   registerAfterHook,

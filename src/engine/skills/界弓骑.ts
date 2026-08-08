@@ -36,7 +36,7 @@ import {
   type SkillModule,
 } from '../skill';
 import { defaultPlayActive } from '../rules/action-active';
-import { runPickTargetCardPanel } from '../pick-card-panel';
+import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import { registerSlashExemptor } from '../rules/slash-quota';
 

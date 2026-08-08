@@ -26,7 +26,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { startTurn } from '../turn-flow';
+import { startTurn } from '../flows/turn';
 import { registerAction, registerBeforeHook } from '../skill';
 
 const TRIGGER_RT = '放权/trigger';

@@ -25,10 +25,10 @@
 // 模式参考:标连环.ts(转化/重铸)、界火计.ts(覆盖 DEFAULT_SKILLS 中 card skill 的 use)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
-import { recastCard } from '../recast';
-import { setChain } from '../face-down';
+import { recastCard } from '../flows/recast';
+import { setChain } from '../flows/face-down';
 import { registerAction, hasBlockingPending, validateUseCard } from '../skill';
-import { promptCancel } from '../无懈可击';
+import { promptCancel } from '../flows/cancel';
 import { defaultPlayActive } from '../rules/action-active';
 
 const CHAIN_MARK = 'chained';

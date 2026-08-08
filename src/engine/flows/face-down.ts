@@ -13,11 +13,11 @@
 // 连环状态（横置的语义层）：CHAIN_MARK/isChained 是横置状态的查询面，
 //   registerChainConductionHook 是「连环状态 × 属性伤害」的传导行为——两者都与铁索连环牌
 //   解耦：任何途径置入连环状态（铁索连环牌、武将技能调 setChain）都受传导管辖。
-import type { GameState } from './types';
-import { TARGET_SYSTEM } from './types';
-import { applyAtom } from './index';
-import { runDamageFlow } from './damage-flow';
-import { registerAfterHook } from './skill';
+import type { GameState } from '../types';
+import { TARGET_SYSTEM } from '../types';
+import { applyAtom } from '../index';
+import { runDamageFlow } from './damage';
+import { registerAfterHook } from '../skill';
 
 /** 连环（横置）状态的 mark id。 */
 export const CHAIN_MARK = 'chained';

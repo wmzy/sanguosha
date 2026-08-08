@@ -21,7 +21,7 @@
 //   内部 Skill.name = '强袭'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { runDamageFlow } from '../damage-flow';
+import { runDamageFlow } from '../flows/damage';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 

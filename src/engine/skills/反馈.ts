@@ -16,7 +16,7 @@
 import type { FrontendAPI, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
-import { runPickTargetCardPanel } from '../pick-card-panel';
+import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

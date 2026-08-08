@@ -19,7 +19,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { startTurn } from '../turn-flow';
+import { startTurn } from '../flows/turn';
 import { registerAfterHook, registerBeforeHook } from '../skill';
 
 const AWAKENED_KEY = '凿险/awakened';

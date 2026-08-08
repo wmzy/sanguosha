@@ -43,7 +43,7 @@
 //   (unloadSkillInstance 仅按 (skillId,于吉座次) 清 action,清不到其他座次)。
 import type { ActionContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
-import { runDamageFlow } from '../damage-flow';
+import { runDamageFlow } from '../flows/damage';
 import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../skill';
 import { inAttackRange } from '../rules/distance';
 import { canSlash, incSlashUsed, slashUsed } from '../rules/slash-quota';

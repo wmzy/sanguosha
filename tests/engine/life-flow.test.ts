@@ -19,7 +19,7 @@ import {
   runRecoverLifeFlow,
   runLoseLifeFlow,
   runSetMaxHealthFlow,
-} from '../../src/engine/life-flow';
+} from '../../src/engine/flows/life';
 import { registerBeforeHook } from '../../src/engine/skill';
 import { applyAtom, registerSkillsFromState } from '../../src/engine/index';
 

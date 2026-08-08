@@ -22,7 +22,7 @@
 import type { FrontendAPI, Skill, GameState, Card } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom, frameCards } from '../index';
-import { runJudgeFlow } from '../judge-flow';
+import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 

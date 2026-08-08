@@ -27,7 +27,7 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
-import { flipFaceDown, flipFaceUp, performSkipTurn } from '../face-down';
+import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const CONFIRM_RT = '放逐/confirm';

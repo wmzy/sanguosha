@@ -4,7 +4,7 @@
 import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerBeforeHook } from '../skill';
-import { runPickTargetCardPanel } from '../pick-card-panel';
+import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '寒冰剑', description: '武器:杀造成伤害时可改为依次弃目标2张牌', isLocked: true };

@@ -27,7 +27,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { startTurn } from '../turn-flow';
+import { startTurn } from '../flows/turn';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 
 const BASE_VAR = '博图/base'; // turn.vars:本回合弃牌堆基线长度

@@ -10,7 +10,7 @@
 //   4. 重复添加去重、重新装备、validate 校验
 import { describe, it, expect, beforeEach } from 'vitest';
 import { registerSkillsFromState, applyAtom } from '../../src/engine/index';
-import { runJudgeFlow } from '../../src/engine/judge-flow';
+import { runJudgeFlow } from '../../src/engine/flows/judge';
 import { SkillTestHarness } from '../engine-harness';
 import { getAtomDef } from '../../src/engine/atom';
 import '../../src/engine/atoms';

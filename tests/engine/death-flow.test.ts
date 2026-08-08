@@ -17,7 +17,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import '../../src/engine/atoms'; // 注册所有 atom(含 death-timing)
 import { createGameState } from '../../src/engine/types';
 import type { Atom, GameState, PlayerState } from '../../src/engine/types';
-import { runDeathFlow } from '../../src/engine/death-flow';
+import { runDeathFlow } from '../../src/engine/flows/death';
 
 function makePlayer(opts: {
   index: number;

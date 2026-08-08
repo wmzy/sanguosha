@@ -8,7 +8,7 @@
 //   由 index 作为伤害结算基础设施注册。
 
 import type { Card } from '../types';
-import { setChain } from '../face-down';
+import { setChain } from '../flows/face-down';
 import { applyAtom } from '../index';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 

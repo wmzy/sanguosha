@@ -21,7 +21,7 @@
 import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom, frameCards, popFrame, pushFrame, topFrame } from '../index';
 import { registerAction, registerBeforeHook, registerAfterHook } from '../skill';
-import { promptCancel } from '../无懈可击';
+import { promptCancel } from '../flows/cancel';
 import { validateCardUse, computeAutoTargets } from './validate';
 import { getCardEffect, getAllCardEffects, requireCardEffect } from './registry';
 import type { CardEffect, CancellableBy } from './registry';

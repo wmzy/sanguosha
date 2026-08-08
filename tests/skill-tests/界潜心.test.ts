@@ -21,7 +21,7 @@ skillLoaders['界潜心'] = async () => 界潜心Module;
 skillLoaders['界荐言'] = async () => 界荐言Module;
 
 import { createGameState } from '../../src/engine/types';
-import { runDamageFlow } from '../../src/engine/damage-flow';
+import { runDamageFlow } from '../../src/engine/flows/damage';
 import type { GameState, PlayerState } from '../../src/engine/types';
 
 function makePlayer(opts: {

@@ -12,7 +12,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import type { Atom, Card, GameState, PlayerState } from '../../src/engine/types';
 import { registerBeforeHook } from '../../src/engine/skill';
-import { flipFaceDown, flipFaceUp, setChain } from '../../src/engine/face-down';
+import { flipFaceDown, flipFaceUp, setChain } from '../../src/engine/flows/face-down';
 import { SkillTestHarness, waitForStable, fireTimeoutAndWait } from '../engine-harness';
 import { suitColor } from '../../src/engine/types';
 

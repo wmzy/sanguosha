@@ -19,10 +19,10 @@
 //   - judgeType='界刚烈' 与标版 '刚烈' 区分(日志/调试用,不影响机制)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../index';
-import { runJudgeFlow } from '../judge-flow';
-import { runDamageFlow } from '../damage-flow';
+import { runJudgeFlow } from '../flows/judge';
+import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../skill';
-import { runPickTargetCardPanel } from '../pick-card-panel';
+import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 
 const CONFIRM_REQUEST = '界刚烈/confirm';
 const PICK_REQUEST = '界刚烈/选牌';

@@ -11,7 +11,7 @@
 //   use 由「使用牌」按卡名注册路由到 CardEffect.resolve。
 //   recast 实质效果(弃牌+摸一张)复用通用 recastCard helper。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { recastCard } from '../recast';
+import { recastCard } from '../flows/recast';
 import { registerAction, validateUseCard, type SkillModule } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

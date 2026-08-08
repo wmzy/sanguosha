@@ -12,8 +12,8 @@
 //   - 来源手牌不足两张时只能选择受到伤害(规则 FAQ)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../index';
-import { runJudgeFlow } from '../judge-flow';
-import { runDamageFlow } from '../damage-flow';
+import { runJudgeFlow } from '../flows/judge';
+import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../skill';
 
 const CONFIRM_REQUEST = '刚烈/confirm';

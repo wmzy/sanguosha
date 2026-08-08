@@ -12,7 +12,7 @@ import '../../src/engine/skills';
 import type { GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/index';
-import { runDamageFlow } from '../../src/engine/damage-flow';
+import { runDamageFlow } from '../../src/engine/flows/damage';
 
 // 已知引擎局限:化身动态添加武将技能时,其 onInit 设置的距离 vars(如马术)
 // 不会被「添加技能」atom 的 toViewEvents 同步,导致 buildView 与 processedView 不收敛。

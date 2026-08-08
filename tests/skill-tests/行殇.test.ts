@@ -14,7 +14,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
-import { runDeathFlow } from '../../src/engine/death-flow';
+import { runDeathFlow } from '../../src/engine/flows/death';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(

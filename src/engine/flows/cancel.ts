@@ -18,10 +18,10 @@
 //   if (cancellable) await 询问抵消(state, cancellable, source, target);
 //
 // 延时锦囊场景：判定阶段 before-hook 中 pushFrame 后调用本函数。
-import type { GameState, Json } from './types';
-import { TARGET_BROADCAST } from './types';
-import { applyAtom } from './index';
-import type { CancellableBy } from './card-effect/registry';
+import type { GameState, Json } from '../types';
+import { TARGET_BROADCAST } from '../types';
+import { applyAtom } from '../index';
+import type { CancellableBy } from '../card-effect/registry';
 
 const RESPONDED_KEY = '抵消/已回应';
 

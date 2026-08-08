@@ -11,7 +11,7 @@
 
 import type { Card, GameView, GameState, Json } from '../types';
 import { applyAtom } from '../index';
-import { runDamageFlow } from '../damage-flow';
+import { runDamageFlow } from '../flows/damage';
 import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';
 import { incSlashUsed, isSlashExempted, slashUsed } from '../rules/slash-quota';

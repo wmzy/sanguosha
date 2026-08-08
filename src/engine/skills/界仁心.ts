@@ -32,7 +32,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { flipFaceDown, flipFaceUp, performSkipTurn } from '../face-down';
+import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 
 const _SKILL_ID = '界仁心';

@@ -10,7 +10,7 @@
 //     模式参考 龙胆.ts / 武圣.ts。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { recastCard } from '../recast';
+import { recastCard } from '../flows/recast';
 import { registerAction, hasBlockingPending } from '../skill';
 import { defaultPlayActive } from '../rules/action-active';
 

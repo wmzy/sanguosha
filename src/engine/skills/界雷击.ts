@@ -25,8 +25,8 @@
 //   内部 Skill.name = '雷击'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { runJudgeFlow } from '../judge-flow';
-import { runDamageFlow } from '../damage-flow';
+import { runJudgeFlow } from '../flows/judge';
+import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../skill';
 import { isCancelled } from '../card-effect/registry';
 

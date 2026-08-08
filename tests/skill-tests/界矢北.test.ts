@@ -19,7 +19,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/index';
-import { runDamageFlow } from '../../src/engine/damage-flow';
+import { runDamageFlow } from '../../src/engine/flows/damage';
 import type { GameState, PlayerState } from '../../src/engine/types';
 
 const ARMOR_PREFIX = '界矢北/护甲:';

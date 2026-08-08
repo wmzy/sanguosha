@@ -19,8 +19,8 @@
 // 死亡中拼点:
 //   扣置与亮出之间不插入任何询问,无死亡窗口。若一方在选牌阶段死亡,调用方应自行检查存活
 //   (编排函数前置保证双方手牌中持有拼点牌)。
-import type { Card, GameState } from './types';
-import { applyAtom } from './index';
+import type { Card, GameState } from '../types';
+import { applyAtom } from '../index';
 
 /** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13(与各拼点技的 rankValue 一致)。
  *  card 为 undefined 时返回 0(编排函数前置保证牌存在,此处仅防御)。 */

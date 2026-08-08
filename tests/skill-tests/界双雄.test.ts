@@ -31,7 +31,7 @@ import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { applyAtom } from '../../src/engine/index';
-import { runDamageFlow } from '../../src/engine/damage-flow';
+import { runDamageFlow } from '../../src/engine/flows/damage';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, PlayerState } from '../../src/engine/types';

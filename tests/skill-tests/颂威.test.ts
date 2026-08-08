@@ -13,7 +13,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
-import { runJudgeFlow } from '../../src/engine/judge-flow';
+import { runJudgeFlow } from '../../src/engine/flows/judge';
 import type { Card, Faction, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(

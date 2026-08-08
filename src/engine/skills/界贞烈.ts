@@ -50,7 +50,7 @@ import type {
 import { applyAtom, topFrame } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 import { isDelayedTrick } from '../data/card-meta';
-import { runPickTargetCardPanel } from '../pick-card-panel';
+import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 
 const _SKILL_ID = '界贞烈';
 const DISPLAY_NAME = '贞烈';

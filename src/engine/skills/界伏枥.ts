@@ -31,7 +31,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { flipFaceDown, flipFaceUp, isFaceDown, performSkipTurn } from '../face-down';
+import { flipFaceDown, flipFaceUp, isFaceDown, performSkipTurn } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const DISPLAY_NAME = '伏枥';

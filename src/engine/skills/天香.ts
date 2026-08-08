@@ -31,7 +31,7 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
-import { runDamageFlow } from '../damage-flow';
+import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerBeforeHook } from '../skill';
 
 const CONFIRM_RT = '天香/confirm';

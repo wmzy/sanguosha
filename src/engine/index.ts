@@ -261,7 +261,7 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   const { registerDelayedTrickHooks } = await import('./card-effect/use-card');
   registerDelayedTrickHooks(state);
   // 注册连环传导全局 after-hook（属性伤害联动横置状态）
-  const { registerChainConductionHook } = await import('./face-down');
+  const { registerChainConductionHook } = await import('./flows/face-down');
   registerChainConductionHook(state);
   await dispatch(state, {
     skillId: '开局',
@@ -419,7 +419,7 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
   const { registerDelayedTrickHooks } = await import('./card-effect/use-card');
   registerDelayedTrickHooks(state);
   // 注册连环传导全局 after-hook（属性伤害联动横置状态）
-  const { registerChainConductionHook } = await import('./face-down');
+  const { registerChainConductionHook } = await import('./flows/face-down');
   registerChainConductionHook(state);
 }
 

@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import '../../src/engine/atoms';
 import { createGameState, getHealthValue } from '../../src/engine/types';
 import type { GameState, PlayerState } from '../../src/engine/types';
-import { runDecreaseLifeFlow, runRecoverLifeFlow, runLoseLifeFlow } from '../../src/engine/life-flow';
+import { runDecreaseLifeFlow, runRecoverLifeFlow, runLoseLifeFlow } from '../../src/engine/flows/life';
 
 function mkPlayer(hp: number, max: number): PlayerState {
   return {

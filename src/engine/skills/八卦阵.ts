@@ -12,7 +12,7 @@
 // atom after(非询问闪 after),故不受询问闪 cancel 影响。
 import type { Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../index';
-import { runJudgeFlow } from '../judge-flow';
+import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerBeforeHook } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

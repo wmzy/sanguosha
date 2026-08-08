@@ -9,8 +9,8 @@
 //   需手动复刻其 per-turn 清理）。由于各技能 clearPerTurnState 清理的 vars 后缀集合
 //   存在差异（放权 较其余少清 /givenTargets），按模块 N「不改行为」约束，保留各文件
 //   本地 clearPerTurnState 实现，不并入本公共函数（否则会改动放权的可观察行为）。
-import type { GameState } from './types';
-import { applyAtom } from './index';
+import type { GameState } from '../types';
+import { applyAtom } from '../index';
 
 /** 亲自启动 player 的一个完整回合（额外回合入口）：
  *  回合开始 → 准备阶段开始 → 准备阶段结束。
