@@ -32,7 +32,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 
 const TRIGGER_RT = '界连营/trigger';
 const SELECT_RT = '界连营/select';

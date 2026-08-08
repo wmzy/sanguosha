@@ -18,7 +18,7 @@ import type { Card, GameState, Json } from '../types';
 import {
   registerCardEffect,
   type CardEffect,
-} from '../card-effect/registry';
+} from '../core/card-effect/registry';
 import type { Color } from '../../engine/types';
 
 const COLOR_LIMIT_VAR = '闪/色限制';

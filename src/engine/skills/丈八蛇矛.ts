@@ -39,7 +39,7 @@
 // handleTransformPlay 提交 preceding params.cardIds=[id1,id2] + 主 action
 // cardId = ${id1}#${id2}#丈八蛇矛。
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { applyAtom } from '../index';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';

@@ -57,10 +57,10 @@ import {
   getJudgeModifierMap,
   setSkillInstanceUnload,
   unloadSkillInstance,
-} from './skill';
-import { applyAtom as applyAtomImpl, getAtomDef, resolveViewEvents } from './atom';
-import { createStandardDeck } from './deck';
-import { isHookSuppressed } from './skill-suppression';
+} from './core/skill';
+import { applyAtom as applyAtomImpl, getAtomDef, resolveViewEvents } from './core/atom';
+import { createStandardDeck } from './core/deck';
+import { isHookSuppressed } from './core/skill-suppression';
 
 // slash-quota 已改为 state-bound(WeakMap 外挂),无模块级状态,无需在此清理。
 // 必须 import 来注册所有 atom 定义 —— 否则 dispatch 开局会失败("atom type not found")
@@ -258,7 +258,7 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   const { registerWineHook } = await import('./card-effects/酒');
   registerWineHook(state);
   // 注册延时锦囊（乐不思蜀/兵粮寸断/闪电）的判定阶段 + 跳过阶段 before-hook
-  const { registerDelayedTrickHooks } = await import('./card-effect/use-card');
+  const { registerDelayedTrickHooks } = await import('./core/card-effect/use-card');
   registerDelayedTrickHooks(state);
   // 注册连环传导全局 after-hook（属性伤害联动横置状态）
   const { registerChainConductionHook } = await import('./flows/face-down');
@@ -404,7 +404,7 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
       ...p.skills,
     ];
   }
-  const { registerSkillsFromState: registerSkills } = await import('./skill');
+  const { registerSkillsFromState: registerSkills } = await import('./core/skill');
   await registerSkills(state);
   // 注册系统规则全局 hooks + 为每个玩家注册选将/弃牌 respond action(与 bootstrap 一致)
   // 系统规则mod 为模块顶部静态导入(见文件头)
@@ -416,7 +416,7 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
   const { registerWineHook } = await import('./card-effects/酒');
   registerWineHook(state);
   // 注册延时锦囊（乐不思蜀/兵粮寸断/闪电）的判定阶段 + 跳过阶段 before-hook
-  const { registerDelayedTrickHooks } = await import('./card-effect/use-card');
+  const { registerDelayedTrickHooks } = await import('./core/card-effect/use-card');
   registerDelayedTrickHooks(state);
   // 注册连环传导全局 after-hook（属性伤害联动横置状态）
   const { registerChainConductionHook } = await import('./flows/face-down');

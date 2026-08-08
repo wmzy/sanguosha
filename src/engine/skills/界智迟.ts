@@ -36,7 +36,7 @@ import type {
   SkillModule,
 } from '../types';
 import { topFrame } from '../index';
-import { registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
 
 const _SKILL_ID = '界智迟';
 const DISPLAY_NAME = '智迟';

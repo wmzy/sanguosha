@@ -17,7 +17,7 @@
 //        source 是其他玩家,故 respond 需为所有玩家注册(参考驱虎)。
 import type { FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerBeforeHook } from '../skill';
+import { registerAction, registerBeforeHook } from '../core/skill';
 
 /** 是否基本牌(杀/闪/桃) */
 function isBasicCard(state: GameState, cardId: string): boolean {

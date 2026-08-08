@@ -15,8 +15,8 @@
 //
 // 与使用牌（use-card）并存：使用牌走 runUseFlow 编排完整目标结算，打出牌仅声明+置入。
 
-import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
-import { applyAtom, frameCards } from '../index';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../../types';
+import { applyAtom, frameCards } from '../../index';
 import { registerAction } from '../skill';
 import { getAllCardEffects } from './registry';
 import { runUseFlow } from './use-card';

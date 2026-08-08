@@ -4,7 +4,7 @@
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, type SkillModule } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

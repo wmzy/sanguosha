@@ -10,8 +10,8 @@
 //   - onInit(添加技能时):立即设 vars(装备当帧生效)
 //   - 返回的卸载函数(移除技能/卸下时):清 vars
 import type { GameState, Skill } from '../types';
-import type { SkillModule } from '../skill';
-import { registerSkillViewDelta } from '../skill-view-meta';
+import type { SkillModule } from '../core/skill';
+import { registerSkillViewDelta } from '../core/skill-view-meta';
 
 /** 距离修正类型:进攻(缩短你到他人的距离)/防御(增加他人到你的距离) */
 type MountKind = '进攻' | '防御';

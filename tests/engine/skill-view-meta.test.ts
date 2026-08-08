@@ -10,8 +10,8 @@ import { describe, it, expect } from 'vitest';
 // (触发 registerSkillViewDelta),还原真实运行时的模块加载顺序。
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import { getAtomDef } from '../../src/engine/atom';
-import { getSkillViewDelta } from '../../src/engine/skill-view-meta';
+import { getAtomDef } from '../../src/engine/core/atom';
+import { getSkillViewDelta } from '../../src/engine/core/skill-view-meta';
 import { createGameState } from '../../src/engine/types';
 import type { GameState, GameView } from '../../src/engine/types';
 

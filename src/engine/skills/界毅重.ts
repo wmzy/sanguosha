@@ -29,7 +29,7 @@
 //   内部 Skill.name = '毅重'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { getHealthValue } from '../types';
-import { registerBeforeHook, type SkillModule } from '../skill';
+import { registerBeforeHook, type SkillModule } from '../core/skill';
 
 const _SKILL_ID = '界毅重';
 const DISPLAY_NAME = '毅重';

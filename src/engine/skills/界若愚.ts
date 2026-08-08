@@ -20,7 +20,7 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
-import { registerAfterHook } from '../skill';
+import { registerAfterHook } from '../core/skill';
 
 const AWAKENED_KEY = '界若愚/awakened';
 const TARGET_HEALTH = 3;

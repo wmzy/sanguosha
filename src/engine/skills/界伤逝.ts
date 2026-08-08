@@ -26,7 +26,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const CONFIRM_RT = '界伤逝/confirm';
 const CONFIRM_KEY = '伤逝/confirmed';

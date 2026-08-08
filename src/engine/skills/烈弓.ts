@@ -22,7 +22,7 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 
 const TAG = '烈弓/禁闪';
 const CONFIRM = '烈弓/confirmed';

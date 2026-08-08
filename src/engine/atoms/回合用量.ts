@@ -16,7 +16,7 @@
 //   - 通用 key:value 约定:数字 key 表示已用次数('杀/usedCount'),
 //     真值 key 表示限一次标记('* /usedThisTurn')。前端 activeWhen 按需读取。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent, Json } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 回合用量: AtomDefinition<{ player: number; key: string; value: Json }> = {
   type: '回合用量',

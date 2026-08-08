@@ -17,7 +17,7 @@
 // toViewEvents(决定 event.responseMode)、applyView、buildView(视图一致性)共用,
 // 保证后端 slot 决策与前端投影口径一致。
 
-import type { ActionPrompt, Atom, Card, GameState } from './types';
+import type { ActionPrompt, Atom, Card, GameState } from '../types';
 import { getBeforeHooks, hasDeclaredAlternativeResponse } from './skill';
 
 /** silent 模式的短延时毫秒数。固定值,不走房间 timeoutScale 缩放。 */

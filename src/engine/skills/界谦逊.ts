@@ -28,7 +28,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, topFrame } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const CONFIRM_RT = '界谦逊/trigger';
 const CONFIRMED_KEY = '界谦逊/confirmed';

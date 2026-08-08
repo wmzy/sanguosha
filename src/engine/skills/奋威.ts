@@ -27,7 +27,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, topFrame } from '../index';
-import { registerAction, registerBeforeHook, type SkillModule } from '../skill';
+import { registerAction, registerBeforeHook, type SkillModule } from '../core/skill';
 
 const USED_KEY = '奋威/used';
 const CONFIRM_RT = '奋威/confirm';

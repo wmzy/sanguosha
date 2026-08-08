@@ -32,8 +32,8 @@ import type {
 } from '../types';
 import { applyAtom, frameCards } from '../index';
 import { runJudgeFlow } from '../flows/judge';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
-import { registerSuppressionProvider } from '../skill-suppression';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { registerSuppressionProvider } from '../core/skill-suppression';
 
 /** 标签:目标本回合非锁定技失效(index.runBeforeHooks/runAfterHooks 读取) */
 export const SUPPRESSION_TAG = '界铁骑/非锁定技失效';

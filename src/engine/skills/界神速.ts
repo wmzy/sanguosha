@@ -23,9 +23,9 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { registerAction, registerBeforeHook } from '../skill';
+import { registerAction, registerBeforeHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
-import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';
+import { runUseFlow, chargeOnSettle } from '../core/card-effect/use-card';
 
 // 请求类型(requestType)——保持 神速/ 前缀(界版键名约定)
 const OPT1_RT = '界神速/opt1'; // 选项1 confirm

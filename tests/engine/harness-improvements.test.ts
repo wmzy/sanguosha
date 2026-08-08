@@ -7,7 +7,7 @@ import { SkillTestHarness, assertNoEngineErrors } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
-import { registerAtom } from '../../src/engine/atom';
+import { registerAtom } from '../../src/engine/core/atom';
 import type { Atom, Card, GameState, ViewEvent } from '../../src/engine/types';
 
 function build(): GameState {

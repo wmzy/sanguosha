@@ -27,7 +27,7 @@
 //   - 自己不存活则不触发;目标(弃牌者)死亡仍可正常结算(牌已入弃牌堆)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const SKILL_NAME = '界固政';
 const CONFIRM_REQUEST = '界固政/确认';

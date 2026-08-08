@@ -5,7 +5,7 @@
 
 import type { Card } from '../types';
 import { applyAtom } from '../index';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 
 /** 无中生有的结算：目标角色摸牌(2) */
 async function resolveExNihilo(ctx: ResolveCtx): Promise<void> {

@@ -11,8 +11,8 @@
 // 与 生效前/使用结算结束时 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
-import { getBeforeHooks } from '../skill';
+import { registerAtom } from '../core/atom';
+import { getBeforeHooks } from '../core/skill';
 
 // ── 扣减体力:底层实质 atom ──────────────────────────────────
 // 扣减体力(可负——濒死时 health ≤ 0),不在此处触发濒死/死亡——由编排函数或系统规则现有 after-hook 决定。

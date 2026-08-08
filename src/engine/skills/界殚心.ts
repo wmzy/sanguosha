@@ -16,7 +16,7 @@
 //   内部 Skill.name = '殚心'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const SKILL_ID = '界殚心';
 const DISPLAY_NAME = '殚心';

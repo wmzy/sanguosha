@@ -21,8 +21,8 @@
 import type { Card, FrontendAPI, GameState, GameView, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { defaultPlayActive } from '../rules/action-active';
-import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
+import { runUseFlow, chargeOnSettle } from '../core/card-effect/use-card';
+import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';
 import { canSlash } from '../rules/slash-quota';
 

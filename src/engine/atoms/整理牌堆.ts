@@ -5,7 +5,7 @@
 // 其他玩家应看到"X 张放牌堆顶,Y 张放牌堆底"。具体牌内容不广播(只对操作者可见)。
 // topCount/bottomCount 由调用方(观星)传入,反映操作者选择的划分。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 整理牌堆: AtomDefinition<{
   cards: string[];

@@ -5,7 +5,7 @@ import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
 import { resolveChoosePlayerCandidates } from './choosePlayerCandidates';
 import { resolveCardFilterCandidates } from './cardFilterCandidates';
 import { slashUsed } from '../rules/slash-quota';
-import { getCardResponseMode, SILENT_RESPONSE_PROMPT } from '../card-response-availability';
+import { getCardResponseMode, SILENT_RESPONSE_PROMPT } from '../core/card-response-availability';
 
 /** 从 ClientMessage 生成可读日志文本(不含玩家名——player 字段单独携带,由展示层映射) */
 export function formatLogEntry(msg: ClientMessage): string {

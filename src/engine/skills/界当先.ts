@@ -38,7 +38,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../flows/damage';
-import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { registerAttackRangeExemptor } from '../rules/distance';
 
 const DISPLAY_NAME = '当先';

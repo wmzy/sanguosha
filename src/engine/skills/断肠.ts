@@ -16,7 +16,7 @@ import type {
   GameState,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAfterHook } from '../skill';
+import { registerAfterHook } from '../core/skill';
 import { DEFAULT_SKILLS } from '../atoms/选将';
 
 const DEFAULT_SKILLS_SET = new Set<string>(DEFAULT_SKILLS);

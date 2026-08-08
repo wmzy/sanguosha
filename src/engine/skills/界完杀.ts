@@ -31,8 +31,8 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界完杀';内部 Skill.name='完杀'。
 import type { HookResult, Skill, GameState } from '../types';
-import { registerBeforeHook, registerAfterHook, type SkillModule } from '../skill';
-import { registerSuppressionProvider } from '../skill-suppression';
+import { registerBeforeHook, registerAfterHook, type SkillModule } from '../core/skill';
+import { registerSuppressionProvider } from '../core/skill-suppression';
 
 const _SKILL_ID = '界完杀';
 const DISPLAY_NAME = '完杀';

@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { ViewEvent } from '../../engine/types';
-import { getAtomDef } from '../../engine/atom';
+import { getAtomDef } from '../../engine/core/atom';
 
 /** 最小可见时长(ms),保证事件能被看清,即便 effect.duration 偏短 */
 const MIN_VISIBLE_MS = 400;

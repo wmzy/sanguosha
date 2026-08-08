@@ -4,8 +4,8 @@
 // 为完整性保留,供未来技能挂载。当前无 hook 消费。
 // 事件标记型——apply 无副作用。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
-import { getBeforeHooks } from '../skill';
+import { registerAtom } from '../core/atom';
+import { getBeforeHooks } from '../core/skill';
 
 export const 使用结算结束时: AtomDefinition<{ source: number; target: number; cardId: string }> = {
   type: '使用结算结束时',

@@ -43,7 +43,7 @@ import type {
   GameView,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 
 const _SKILL_ID = '界旋风';

@@ -18,8 +18,8 @@
 // 与 damage-timing / life-timing / statechange-timing 一致。atom 本身仍走完整 pipeline
 // (apply + after hooks),编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameState, MoveReason, ViewEventSplit, ViewEvent, ZoneLoc } from '../types';
-import { registerAtom } from '../atom';
-import { getBeforeHooks } from '../skill';
+import { registerAtom } from '../core/atom';
+import { getBeforeHooks } from '../core/skill';
 
 // ── before-hook modify to 的回传通道 ─────────────────────────
 // 移动到目标区域前 的 before-hook 可 modify to(纵玄/章武②);afterApply 把折叠后的

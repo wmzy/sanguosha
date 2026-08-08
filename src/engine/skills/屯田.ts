@@ -28,7 +28,7 @@ import type {
 } from '../types';
 import { applyAtom, frameCards } from '../index';
 import { runJudgeFlow } from '../flows/judge';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const CONFIRM_RT = '屯田/confirm';
 const CONFIRMED_KEY = '屯田/confirmed';

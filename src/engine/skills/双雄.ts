@@ -37,7 +37,7 @@ import {
   registerAfterHook,
   registerBeforeHook,
   hasBlockingPending,
-} from '../skill';
+} from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 import { defaultPlayActive } from '../rules/action-active';
 

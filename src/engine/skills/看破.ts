@@ -10,7 +10,7 @@
 // 关键:看破不受自己回合限制(无懈可击任意时机可打)。activeWhen 检测无懈可击
 // 广播窗口(requestType='无懈可击',target<0)且有黑牌。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction } from '../skill';
+import { registerAction } from '../core/skill';
 import { applyAtom } from '../index';
 
 export function createSkill(id: string, ownerId: number): Skill {

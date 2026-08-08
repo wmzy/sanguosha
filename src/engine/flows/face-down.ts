@@ -17,7 +17,7 @@ import type { GameState } from '../types';
 import { TARGET_SYSTEM } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from './damage';
-import { registerAfterHook } from '../skill';
+import { registerAfterHook } from '../core/skill';
 
 /** 连环（横置）状态的 mark id。 */
 export const CHAIN_MARK = 'chained';

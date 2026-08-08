@@ -19,7 +19,7 @@ import type {
 } from '../types';
 import { applyAtom, frameCards } from '../index';
 import { runJudgeFlow } from '../flows/judge';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 
 const TAG = '铁骑/禁闪';
 const CONFIRM = '铁骑/confirmed';

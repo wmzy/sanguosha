@@ -15,7 +15,7 @@ import { applyAtom, popFrame, pushFrame } from '../index';
 import { runDamageFlow } from '../flows/damage';
 import { runRankCompareFlow } from '../flows/rank';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction } from '../skill';
+import { registerAction } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 
 /** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */

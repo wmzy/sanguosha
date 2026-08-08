@@ -10,7 +10,7 @@
 //   (结算阶段入口)天然满足:此时手牌状态即结算时状态。
 import type { HookResult, Skill, GameState } from '../types';
 import { topFrame } from '../index';
-import { registerBeforeHook } from '../skill';
+import { registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

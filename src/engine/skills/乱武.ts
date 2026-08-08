@@ -23,9 +23,9 @@
 //   - 限定技标记用 player.vars(整局永久),非 turn.vars。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { runUseFlow } from '../card-effect/use-card';
+import { runUseFlow } from '../core/card-effect/use-card';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';
 
 const USED_KEY = '乱武/used';

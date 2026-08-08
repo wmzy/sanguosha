@@ -37,7 +37,7 @@ import {
   registerAction,
   registerAfterHook,
   hasBlockingPending,
-} from '../skill';
+} from '../core/skill';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
 import { registerSlashTargetProvider } from '../rules/slash-target';
 

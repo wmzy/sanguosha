@@ -1,6 +1,6 @@
 // 护甲(项目自定义锁定技):当你受到【杀】造成的伤害时,若此杀为黑色,伤害 -1。
 import type { HookResult, Skill, GameState } from '../types';
-import { registerBeforeHook } from '../skill';
+import { registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

@@ -48,7 +48,7 @@ import {
   registerAfterHook,
   hasBlockingPending,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 
 const _SKILL_ID = '界双雄';

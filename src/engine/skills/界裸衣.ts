@@ -26,7 +26,7 @@ import type {
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 
 const BONUS_TAG = '裸衣/bonus';

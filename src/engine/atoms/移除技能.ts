@@ -1,8 +1,8 @@
 // src/engine/atoms/移除技能.ts
 // 移除技能:从玩家移除 skillId
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
-import { getSkillViewDelta } from '../skill-view-meta';
+import { registerAtom } from '../core/atom';
+import { getSkillViewDelta } from '../core/skill-view-meta';
 
 export const 移除技能: AtomDefinition<{ player: number; skillId: string }> = {
   type: '移除技能',

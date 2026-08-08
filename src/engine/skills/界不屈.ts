@@ -31,7 +31,7 @@
 //     | player.vars['不屈/创牌'] | 读 | 置创牌 atom(写)              | ✅ 已实现 |
 import type { GameState, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAfterHook } from '../skill';
+import { registerAfterHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 
 const SURVIVE_KEY = '不屈/存活';

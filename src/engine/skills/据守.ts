@@ -22,7 +22,7 @@
 import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { skillLoaders } from './index';
 
 const USED_KEY = '据守/usedThisTurn';

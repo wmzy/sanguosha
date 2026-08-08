@@ -1,7 +1,7 @@
 // src/engine/atoms/回合开始.ts
 // 回合开始:事件标记(具体状态变更由前置 apply 处理)
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 回合开始: AtomDefinition<{ player: number }> = {
   type: '回合开始',

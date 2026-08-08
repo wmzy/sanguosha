@@ -27,7 +27,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, frameCards } from '../index';
-import { registerAction, registerJudgeModifier } from '../skill';
+import { registerAction, registerJudgeModifier } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

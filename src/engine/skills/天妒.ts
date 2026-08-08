@@ -6,7 +6,7 @@
 //   拿走后 frame 空,runJudgeFlow 收尾 splice 末尾为 no-op。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom, frameCards } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const CHOOSE_RT = '天妒/choose';
 const CHOICE_KEY = '天妒/choice';

@@ -11,7 +11,7 @@
 //   内部 Skill.name = '鬼道'(OL 官方技能名,玩家可见)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../index';
-import { registerAction, registerJudgeModifier } from '../skill';
+import { registerAction, registerJudgeModifier } from '../core/skill';
 
 const _SKILL_ID = '界鬼道';
 const DISPLAY_NAME = '鬼道';

@@ -18,7 +18,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 
 const PICK_REQUEST = '攻心/选牌';
 const PICK_KEY = '攻心/cardId';

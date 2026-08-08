@@ -19,7 +19,7 @@
 //   防重入:AWAKENED_KEY 在 awaken() 入口即设,准备阶段触发后即使结束阶段无手牌也不会再触发。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const CHOOSE_RT = '界志继/choose';
 const CHOICE_KEY = '志继/choice';

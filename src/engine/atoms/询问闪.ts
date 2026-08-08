@@ -1,14 +1,14 @@
 // src/engine/atoms/询问闪.ts
 // 询问闪:等待型 atom — 等待 target 出闪
 import type { ActionPrompt, AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 import { resolveTimeoutMs } from '../index';
 import {
   SHORT_DELAY_MS,
   SILENT_RESPONSE_PROMPT,
   cardResponsePreResolveForTarget,
   evaluateCardResponseModeForTarget,
-} from '../card-response-availability';
+} from '../core/card-response-availability';
 
 const TIMEOUT_SEC = 15;
 const PROMPT: ActionPrompt = {

@@ -21,7 +21,7 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom, frameCards } from '../index';
-import { registerAction, registerBeforeHook } from '../skill';
+import { registerAction, registerBeforeHook } from '../core/skill';
 
 const TRIGGER_RT = '再起/trigger';
 const TRIGGERED_KEY = '再起/triggered';

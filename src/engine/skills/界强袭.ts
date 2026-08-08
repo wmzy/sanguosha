@@ -23,7 +23,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runDamageFlow } from '../flows/damage';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 
 const SKILL_ID = '界强袭';
 const DISPLAY_NAME = '强袭';

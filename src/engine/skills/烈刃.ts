@@ -20,7 +20,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runRankCompareFlow } from '../flows/rank';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const CONFIRM_RT = '烈刃/confirm';
 const CONFIRMED_KEY = '烈刃/confirmed';

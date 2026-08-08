@@ -22,7 +22,7 @@
 //       之前就地过滤 prompt.equipment 中的防具/宝物 → 前端不展示、不可选。
 //       选牌面板/过河拆桥 不再 import 本模块(解耦),保护逻辑收敛到本 hook。
 import type { Skill, GameState } from '../types';
-import { registerBeforeHook } from '../skill';
+import { registerBeforeHook } from '../core/skill';
 
 /** 奇才横切标签:持有者使用锦囊牌时忽略距离限制(由 顺手牵羊 validate 消费) */
 export const QICAI_TAG = '奇才/无距离限制';

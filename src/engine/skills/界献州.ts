@@ -28,7 +28,7 @@ import {
   registerAction,
   hasBlockingPending,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 import { skillLoaders } from './index';
 import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';

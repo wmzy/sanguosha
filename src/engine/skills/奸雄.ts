@@ -9,7 +9,7 @@
 // 在该伤害牌被移入弃牌堆的瞬间再 移动牌(弃牌堆→手牌)。此时父收尾已完成、无重复。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const CHOOSE_RT = '奸雄/choose';
 const WANTCARD_KEY = '奸雄/wantCard';

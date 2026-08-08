@@ -18,10 +18,10 @@
 // 与现有卡牌技能并存：现有杀/决斗等仍各自注册 action。
 // 迁移后，卡牌只需 registerCardEffect，不再注册 action。
 
-import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
-import { applyAtom, frameCards, popFrame, pushFrame, topFrame } from '../index';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../../types';
+import { applyAtom, frameCards, popFrame, pushFrame, topFrame } from '../../index';
 import { registerAction, registerBeforeHook, registerAfterHook } from '../skill';
-import { promptCancel } from '../flows/cancel';
+import { promptCancel } from '../../flows/cancel';
 import { validateCardUse, computeAutoTargets } from './validate';
 import { getCardEffect, getAllCardEffects, requireCardEffect } from './registry';
 import type { CardEffect, CancellableBy } from './registry';
@@ -432,7 +432,7 @@ export function registerDelayedTrickHooks(state: GameState): void {
       if (!sp) continue;
       if (sp.phase !== atom.phase) continue;
       if (self.tags.includes(sp.tag)) {
-        const { skipPhase: doSkip } = await import('../rules/skip-phase');
+        const { skipPhase: doSkip } = await import('../../rules/skip-phase');
         return doSkip(ctx.state, atom, sp.tag);
       }
     }

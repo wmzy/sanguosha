@@ -3,7 +3,7 @@
 //   若装备牌自带技能(以 card.name 作 skillId),动态挂载技能实例。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { skillLoaders } from './index';
 
 export function createSkill(id: string, ownerId: number): Skill {

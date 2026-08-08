@@ -21,7 +21,7 @@
 // provider 随技能实例生命周期注册/卸载(返回的 unload 由 setSkillInstanceUnload 清理)。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerBeforeHook, registerAfterHook, type SkillModule } from '../skill';
+import { registerBeforeHook, registerAfterHook, type SkillModule } from '../core/skill';
 import { registerSlashExtraProvider } from '../rules/slash-quota';
 import { registerAttackRangeExemptor } from '../rules/distance';
 

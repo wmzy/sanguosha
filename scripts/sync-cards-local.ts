@@ -13,7 +13,7 @@
 
 import { existsSync, mkdirSync, statSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createStandardDeck } from '../src/engine/deck';
+import { createStandardDeck } from '../src/engine/core/deck';
 import type { Card } from '../src/engine/types';
 
 const CARDS_DIR = join(import.meta.dirname, '..', 'public', 'cards');

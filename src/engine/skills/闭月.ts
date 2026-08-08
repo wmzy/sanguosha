@@ -19,7 +19,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const CONFIRM_REQUEST = '闭月/confirm';
 const CONFIRMED_KEY = '闭月/confirmed';

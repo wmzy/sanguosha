@@ -21,7 +21,7 @@
 //   - "酒杀造成伤害"= 酒/nextKillDamageBonus mark 被消耗(由 酒.ts before-hook on 造成伤害 触发)
 //   - turn.vars['崩坏/disabled'] 随「回合结束」atom 自动清空(语义贴合"本回合")
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction, registerAfterHook, hasBlockingPending, declareAlternativeResponse } from '../skill';
+import { registerAction, registerAfterHook, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { applyAtom } from '../index';
 import { defaultPlayActive } from '../rules/action-active';
 

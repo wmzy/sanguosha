@@ -10,8 +10,8 @@ import { TARGET_SYSTEM } from '../types';
 import { applyAtom } from '../index';
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
-import { registerDelayedTrick } from '../card-effect/delayed-trick-registry';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
+import { registerDelayedTrick } from '../core/card-effect/delayed-trick-registry';
 
 const TRICK_NAME = '闪电';
 

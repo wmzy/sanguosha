@@ -14,7 +14,7 @@
 //   - 无次数限制。
 import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 import { skillLoaders } from './index';
 
 /** 装备牌 subtype → 装备栏位(与 装备 atom 的 inferSlot 一致) */

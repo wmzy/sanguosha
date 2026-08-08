@@ -13,7 +13,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const CHOOSE_RT = '崩坏/choose';
 const CHOICE_KEY = '崩坏/choice'; // 'maxHealth' | 'health'

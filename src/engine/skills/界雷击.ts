@@ -27,8 +27,8 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
-import { registerAction, registerAfterHook } from '../skill';
-import { isCancelled } from '../card-effect/registry';
+import { registerAction, registerAfterHook } from '../core/skill';
+import { isCancelled } from '../core/card-effect/registry';
 
 const _SKILL_ID = '界雷击';
 const DISPLAY_NAME = '雷击';

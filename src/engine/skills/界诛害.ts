@@ -19,8 +19,8 @@
 //   内部 Skill.name = '诛害'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { runUseFlow } from '../card-effect/use-card';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { runUseFlow } from '../core/card-effect/use-card';
+import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const SKILL_ID = '界诛害';
 const DISPLAY_NAME = '诛害';

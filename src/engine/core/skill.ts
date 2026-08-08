@@ -23,9 +23,9 @@ import type {
   Json,
   PendingSlot,
   Skill,
-} from './types';
-import { TARGET_SYSTEM } from './types';
-import { isTrickBlocked } from './rules/trick-quota';
+} from '../types';
+import { TARGET_SYSTEM } from '../types';
+import { isTrickBlocked } from '../rules/trick-quota';
 
 /** 卡名检查器（由 card-effect/registry.ts 设置）：判断某 id 是否是已注册的卡牌名。
  *  用于 unloadSkillInstance 跳过卡名同名技能的前缀清理。 */

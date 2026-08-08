@@ -9,8 +9,8 @@
 import type { Card } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../flows/damage';
-import { consumePlayedSlashes } from '../card-effect/play-card';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { consumePlayedSlashes } from '../core/card-effect/play-card';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 
 /** 决斗牌特有校验：不能对自己使用 */
 function canUseDuel(

@@ -15,7 +15,7 @@
 // 白银狮子的"失去装备回血"监听 卸下 atom,不会被 移除技能 触发——正确。
 import type { Skill, GameState } from '../types';
 
-import { registerAfterHook, unloadSkillInstance, instantiateSkill } from '../skill';
+import { registerAfterHook, unloadSkillInstance, instantiateSkill } from '../core/skill';
 
 /**
  * state-bound:记录当前被青釭剑临时卸载的防具,供 造成伤害 after hook 恢复。

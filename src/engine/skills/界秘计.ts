@@ -32,7 +32,7 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const _SKILL_ID = '界秘计';
 const DISPLAY_NAME = '秘计';

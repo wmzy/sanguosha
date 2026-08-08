@@ -20,10 +20,10 @@
 
 import type { GameState, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAfterHook } from '../skill';
-import { isCancelled, clearCancelled } from '../card-effect/registry';
-import { consumePlayedSlashes } from '../card-effect/play-card';
-import type { SkillModule } from '../skill';
+import { registerAfterHook } from '../core/skill';
+import { isCancelled, clearCancelled } from '../core/card-effect/registry';
+import { consumePlayedSlashes } from '../core/card-effect/play-card';
+import type { SkillModule } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

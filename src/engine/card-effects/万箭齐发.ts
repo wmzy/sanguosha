@@ -6,7 +6,7 @@
 import type { Card } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../flows/damage';
-import { registerCardEffect, type CardEffect, type ResolveCtx, isCancelled } from '../card-effect/registry';
+import { registerCardEffect, type CardEffect, type ResolveCtx, isCancelled } from '../core/card-effect/registry';
 
 /** 万箭齐发的逐目标结算：询问闪 → 检查帧 cancelled → 伤害/抵消。
  *  闪走 runUseFlow，resolve 设万箭齐发帧 cancelled=true；此处检查该字段。 */

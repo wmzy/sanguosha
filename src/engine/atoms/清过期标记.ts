@@ -1,7 +1,7 @@
 // src/engine/atoms/清过期标记.ts
 // 清过期标记:清除玩家所有 duration='turn' 的 mark(回合结束自动清理)
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 清过期标记: AtomDefinition<{ player: number }> = {
   type: '清过期标记',

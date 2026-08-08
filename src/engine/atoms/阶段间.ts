@@ -13,8 +13,8 @@
 // 与 damage-timing / move-timing / life-timing / statechange-timing 一致。atom 本身仍走完整
 // pipeline(apply + after hooks),编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
-import { getBeforeHooks } from '../skill';
+import { registerAtom } from '../core/atom';
+import { getBeforeHooks } from '../core/skill';
 
 /** 阶段间时机 atom 的形状。 */
 type PhaseBetweenAtom = {

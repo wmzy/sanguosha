@@ -18,7 +18,7 @@
 //   - 官方无体力条件:即使满血也可选择摸牌(回复体力则被上限截断,无溢出)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';
 
 /** 是否发动狂骨的 requestType */

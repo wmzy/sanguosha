@@ -27,7 +27,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, topFrame } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const SKILL_ID = '界激昂';
 const DISPLAY_NAME = '激昂';

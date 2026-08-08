@@ -29,7 +29,7 @@
 //     故 confirm 与选牌合并为单 respond 按 requestType 分支(同狂骨/反馈/制霸模式)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 /** 是否发动趫猛的 requestType */
 const CONFIRM_REQUEST = '界趫猛/confirm';

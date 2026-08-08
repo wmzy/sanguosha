@@ -10,9 +10,9 @@
 
 import type { Card } from '../types';
 import { applyAtom } from '../index';
-import { registerBeforeHook } from '../skill';
+import { registerBeforeHook } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import type { HookResult } from '../types';
 

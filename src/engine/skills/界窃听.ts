@@ -26,7 +26,7 @@
 //   内部 Skill.name = '窃听'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
 import { skillLoaders } from './index';
 
 const SKILL_ID = '界窃听';

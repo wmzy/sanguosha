@@ -16,7 +16,7 @@
 //   与空城"杀牌仍进弃牌堆、诸葛亮不受伤害"行为一致。
 import type { HookResult, Skill, GameState } from '../types';
 import { topFrame } from '../index';
-import { registerBeforeHook } from '../skill';
+import { registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

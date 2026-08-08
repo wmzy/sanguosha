@@ -32,7 +32,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 
 const TAG = '鞬出/禁闪';
 const CONFIRM = '鞬出/confirmed';

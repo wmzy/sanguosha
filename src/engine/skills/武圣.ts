@@ -6,7 +6,7 @@
 // 后端 dispatch 先执行 武圣.transform(创建影子杀),再 杀.use validate 看到"杀"通过。
 // 杀技能零感知武圣——它看到的永远是 cardMap 里的一张“杀”。
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { applyAtom } from '../index';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';

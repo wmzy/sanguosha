@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/index';
 import { applyAtom } from '../../src/engine/index';
-import { findActionEntry } from '../../src/engine/skill';
+import { findActionEntry } from '../../src/engine/core/skill';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';

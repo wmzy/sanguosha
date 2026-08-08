@@ -23,7 +23,7 @@ import type { FrontendAPI, Skill, GameState, Card } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom, frameCards } from '../index';
 import { runJudgeFlow } from '../flows/judge';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 
 /** turn.vars key:本回合经洛神获得的判定牌 id 列表(随「回合结束」自动清空) */

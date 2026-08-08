@@ -1,6 +1,6 @@
 // src/engine/atoms/移动牌.ts
 import type { AtomDefinition, ZoneLoc, ViewEventSplit, ViewEvent, Card } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: ZoneLoc }> = {
   type: '移动牌',

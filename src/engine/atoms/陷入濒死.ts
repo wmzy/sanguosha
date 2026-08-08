@@ -1,7 +1,7 @@
 // src/engine/atoms/陷入濒死.ts
 // 陷入濒死:标记目标进入濒死状态(体力 ≤ 0,等待求桃)。纯事件标记——不修改 state。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 /** 女性武将名集合——用于濒死求救音效选择(sos_female vs sos_male)。
  *  含标准包+军争篇+界武将中的女性武将。 */

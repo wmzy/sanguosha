@@ -21,7 +21,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Atom, Card, GameState } from '../../src/engine/types';
-import { findActionEntry } from '../../src/engine/skill';
+import { findActionEntry } from '../../src/engine/core/skill';
 import { registerSystemRespondActions } from '../../src/engine/skills/系统规则';
 
 function makeCard(

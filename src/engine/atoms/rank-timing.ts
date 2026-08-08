@@ -13,8 +13,8 @@
 //   拼点后(纯标记 atom):validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
 //     无 before hook 时 toViewEvents 返回 null(与 damage-timing / move-timing 一致)。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent, Card } from '../types';
-import { registerAtom } from '../atom';
-import { getBeforeHooks } from '../skill';
+import { registerAtom } from '../core/atom';
+import { getBeforeHooks } from '../core/skill';
 
 /** 拼点时机 atom 的公共形状(扣置/亮出)。 */
 type RankCompareAtom = {

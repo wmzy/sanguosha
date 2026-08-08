@@ -33,7 +33,7 @@ import {
   registerAfterHook,
   hasBlockingPending,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 import { getGender } from '../data/character-meta';
 
 const SKILL_ID = '界燕语';

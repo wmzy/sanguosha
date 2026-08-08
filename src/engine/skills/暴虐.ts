@@ -13,7 +13,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../index';
 import { runJudgeFlow } from '../flows/judge';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const CONFIRM_RT = '暴虐/confirm';
 const CONFIRMED_KEY = '暴虐/confirmed';

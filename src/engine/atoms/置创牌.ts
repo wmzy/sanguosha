@@ -20,7 +20,7 @@
 //
 // 注意:牌堆顶 = zones.deck 末尾元素,与「摸牌」语义一致(slice(-n)/pop)。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 置创牌: AtomDefinition<{
   player: number;

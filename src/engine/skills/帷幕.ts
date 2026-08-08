@@ -12,7 +12,7 @@
 //   顶帧 frame.params.cardId 给出(各锦囊 use execute pushFrame 时把 cardId 带入 params)。
 import type { HookResult, Skill, GameState, Card } from '../types';
 import { topFrame } from '../index';
-import { registerBeforeHook } from '../skill';
+import { registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

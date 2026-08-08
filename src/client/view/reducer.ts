@@ -12,7 +12,7 @@
 
 // 引入 atoms 触发注册(前端构建 tree-shake 后端 validate/apply,保留 applyView)
 import '../engine-imports';
-import { getAtomDef } from '../../engine/atom';
+import { getAtomDef } from '../../engine/core/atom';
 import type { GameView, ViewEvent } from '../../engine/types';
 import type { PlayerNameResolver } from '../../engine/types';
 

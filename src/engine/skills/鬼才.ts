@@ -17,7 +17,7 @@
 //   无现成 atom 承载"替换判定牌"操作)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, frameCards } from '../index';
-import { registerAction, registerJudgeModifier } from '../skill';
+import { registerAction, registerJudgeModifier } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

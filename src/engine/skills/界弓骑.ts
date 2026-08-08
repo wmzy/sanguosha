@@ -34,7 +34,7 @@ import {
   registerAction,
   hasBlockingPending,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { registerAttackRangeExemptor } from '../rules/distance';

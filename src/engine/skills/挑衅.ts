@@ -18,9 +18,9 @@
 //   距离:inAttackRange(state, 目标, 姜维)—— 目标的杀能攻击到姜维
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { runUseFlow } from '../card-effect/use-card';
+import { runUseFlow } from '../core/card-effect/use-card';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 
 // localVars 键 / requestType 常量(对齐 乱武/借刀杀人 风格)

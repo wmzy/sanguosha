@@ -18,7 +18,7 @@ import { useState, useCallback, useRef, memo, type ReactNode } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import type { GameView as EngineGameView, Card, Json } from '../../engine/types';
-import { getAtomDef } from '../../engine/atom';
+import { getAtomDef } from '../../engine/core/atom';
 import { CountdownBar, DEFAULT_COUNTDOWN_TOTAL_MS } from './CountdownBar';
 import { PlayerCardLarge } from './PlayerCardLarge';
 import { EventBanner } from './EventBanner';

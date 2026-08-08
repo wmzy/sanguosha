@@ -40,7 +40,7 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { recastCard } from '../flows/recast';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 import { registerSlashQuotaProvider, registerSlashBlocker } from '../rules/slash-quota';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import { registerAttackRangeExemptor } from '../rules/distance';

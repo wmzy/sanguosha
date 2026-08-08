@@ -20,7 +20,7 @@ import {
   runLoseLifeFlow,
   runSetMaxHealthFlow,
 } from '../../src/engine/flows/life';
-import { registerBeforeHook } from '../../src/engine/skill';
+import { registerBeforeHook } from '../../src/engine/core/skill';
 import { applyAtom, registerSkillsFromState } from '../../src/engine/index';
 
 function makePlayer(opts: {

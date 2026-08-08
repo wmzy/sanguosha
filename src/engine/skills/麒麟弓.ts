@@ -6,7 +6,7 @@
 //   不防止伤害——只是额外弃马(与寒冰剑的关键区别)。
 import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerBeforeHook } from '../skill';
+import { registerAction, registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '麒麟弓', description: '武器:杀造成伤害时可弃目标1匹马', isLocked: true };

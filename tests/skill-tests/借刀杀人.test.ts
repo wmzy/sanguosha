@@ -21,8 +21,8 @@ import type { ActionPrompt, Card, GameState, GameView } from '../../src/engine/t
 import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { DEFAULT_SKILLS } from '../../src/engine/atoms/选将';
-import { findActionEntry } from '../../src/engine/skill';
-import { getCardEffect } from '../../src/engine/card-effect/registry';
+import { findActionEntry } from '../../src/engine/core/skill';
+import { getCardEffect } from '../../src/engine/core/card-effect/registry';
 
 function makePlayer(opts: {
   index: number;

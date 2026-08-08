@@ -7,8 +7,8 @@
 //   不选/超时 → 贯石斧不发动(杀正常被闪抵消)
 import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
-import { isCancelled, clearCancelled } from '../card-effect/registry';
+import { registerAction, registerAfterHook } from '../core/skill';
+import { isCancelled, clearCancelled } from '../core/card-effect/registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

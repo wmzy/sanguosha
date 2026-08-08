@@ -1,7 +1,7 @@
 // src/engine/atoms/阶段结束.ts
 // 阶段结束:事件标记
 import type { AtomDefinition, GameView, TurnPhase, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 阶段结束: AtomDefinition<{ player: number; phase: string }> = {
   type: '阶段结束',

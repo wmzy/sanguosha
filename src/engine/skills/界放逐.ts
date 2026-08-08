@@ -25,7 +25,7 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const CONFIRM_RT = '界放逐/confirm';
 const TARGET_RT = '界放逐/target';

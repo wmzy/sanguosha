@@ -13,7 +13,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { GameView, ViewEvent } from '../../engine/types';
 import type { ReplayFile } from '../replay/types';
 import { getViewAt, totalSteps, availableSeats } from '../replay/replayEngine';
-import { getAtomDef } from '../../engine/atom';
+import { getAtomDef } from '../../engine/core/atom';
 import type { QueuedEvent } from './useEventPlayback';
 
 export type ReplaySpeed = 0.5 | 1 | 2 | 4;

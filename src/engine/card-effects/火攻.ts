@@ -8,7 +8,7 @@
 import type { Card } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../flows/damage';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 
 /** 火攻的结算：展示手牌 → 弃同花色 → 火焰伤害 */
 async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {

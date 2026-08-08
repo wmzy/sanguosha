@@ -2,7 +2,7 @@
 // 选将完成时分配武将给玩家(主动选将/超时自动分配共用)。
 // 走 atom 管线:toViewEvents 携带角色信息,applyView 更新前端 view。
 import type { AtomDefinition, ViewEventSplit, ViewEvent, Faction } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 import { getCharacterMeta } from '../data/character-meta';
 
 /** 计算分配武将后的体力上限:基础值=武将卡牌 maxHealth。

@@ -27,7 +27,7 @@
 //   两者写入同一 key,后写覆盖前写。这是 engine 距离修正的既有约定,本技能不单独解决。
 import type { Skill, GameState } from '../types';
 import { applyAtom } from '../index';
-import { registerAfterHook } from '../skill';
+import { registerAfterHook } from '../core/skill';
 
 const ATTACK_KEY = '距离/进攻修正';
 const DEFENSE_KEY = '距离/防御修正';

@@ -4,7 +4,7 @@ import {
   applyAtom,
   registerSkillsFromState,
 } from '../../src/engine/index';
-import { registerAction } from '../../src/engine/skill';
+import { registerAction } from '../../src/engine/core/skill';
 import { createGameState } from '../../src/engine/types';
 
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';

@@ -26,7 +26,7 @@
 import type { Card, EquipSlot, FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 
 const TRICK_NAME = '乐不思蜀';
 
@@ -181,4 +181,4 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   });
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../skill').SkillModule;
+export default { createSkill, onInit, onMount } satisfies import('../core/skill').SkillModule;

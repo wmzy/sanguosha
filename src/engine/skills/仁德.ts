@@ -3,7 +3,7 @@
 //   无发动次数限制(可多次使用,但回血每回合仅一次)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

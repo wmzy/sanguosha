@@ -37,13 +37,13 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, topFrame } from '../index';
-import { runUseFlow } from '../card-effect/use-card';
+import { runUseFlow } from '../core/card-effect/use-card';
 import {
   registerAction,
   registerAfterHook,
   registerBeforeHook,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 
 const SKILL_ID = '界求援';
 const DISPLAY_NAME = '求援';

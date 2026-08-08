@@ -25,7 +25,7 @@ import type {
   GameView,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { registerAction, registerBeforeHook, hasBlockingPending } from '../skill';
+import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 
 const CONFIRM_RT = '巧变/confirm';

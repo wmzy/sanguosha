@@ -3,7 +3,7 @@
 // 反向检查暂不做(等 PR-A:给所有 backend-only skill 补 onMount 之后)。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
-import { findActionEntry } from '../../src/engine/skill';
+import { findActionEntry } from '../../src/engine/core/skill';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';

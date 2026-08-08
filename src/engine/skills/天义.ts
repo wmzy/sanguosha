@@ -21,7 +21,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runRankCompareFlow } from '../flows/rank';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction } from '../skill';
+import { registerAction } from '../core/skill';
 import { registerSlashExtraProvider, registerSlashBlocker } from '../rules/slash-quota';
 import { registerSlashTargetProvider } from '../rules/slash-target';
 import { registerAttackRangeExemptor } from '../rules/distance';

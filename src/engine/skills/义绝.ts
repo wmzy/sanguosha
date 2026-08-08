@@ -34,8 +34,8 @@ import type {
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, type SkillModule } from '../skill';
-import { registerSuppressionProvider } from '../skill-suppression';
+import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerSuppressionProvider } from '../core/skill-suppression';
 
 /** 请求类型:目标展示一张手牌。 */
 const REVEAL_REQUEST = '义绝/reveal';

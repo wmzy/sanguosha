@@ -11,7 +11,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-import { registerBeforeHook } from '../../src/engine/skill';
+import { registerBeforeHook } from '../../src/engine/core/skill';
 import { SkillTestHarness } from '../engine-harness';
 
 function makeCard(

@@ -6,8 +6,8 @@
 // 仅在 生效前 未被 cancel 时到达(runUseFlow 在 生效前 返回 false 时跳过)。
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
-import { getBeforeHooks } from '../skill';
+import { registerAtom } from '../core/atom';
+import { getBeforeHooks } from '../core/skill';
 
 export const 生效时: AtomDefinition<{ source: number; target: number; cardId: string }> = {
   type: '生效时',

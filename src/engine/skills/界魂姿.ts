@@ -29,7 +29,7 @@
 //   - 英姿/英魂 已实现(周瑜·英姿、孙坚·英魂),直接挂载
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { performYinghunPrepare } from './英魂';
 
 // 觉醒标记:沿用标版键名 '魂姿/awakened',供复用的标 制霸/界制霸 读取觉醒状态。

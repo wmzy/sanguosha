@@ -20,8 +20,8 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
-import { registerAction, registerAfterHook } from '../skill';
-import { isCancelled } from '../card-effect/registry';
+import { registerAction, registerAfterHook } from '../core/skill';
+import { isCancelled } from '../core/card-effect/registry';
 
 const CHOOSE_RT = '雷击/chooseTarget';
 const TARGET_KEY = '雷击/target';

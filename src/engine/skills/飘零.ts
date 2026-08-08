@@ -23,7 +23,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../index';
 import { runJudgeFlow } from '../flows/judge';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const CONFIRM_RT = '飘零/confirm';
 const GIVE_RT = '飘零/give';

@@ -18,7 +18,7 @@
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../rules/once-per-turn';
-import { registerAction, type SkillModule } from '../skill';
+import { registerAction, type SkillModule } from '../core/skill';
 
 /** skillId / loader key / once-per-turn key(与标苦肉隔离)。 */
 const SKILL_ID = '界苦肉';

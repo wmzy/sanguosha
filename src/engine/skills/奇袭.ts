@@ -17,7 +17,7 @@
 // 奇袭出过河拆桥可被无懈可击抵消——由 过河拆桥.use 自身的 询问无懈可击 流程保证,
 // 与转化来源无关。
 import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { applyAtom } from '../index';
 import { defaultPlayActive } from '../rules/action-active';
 
@@ -152,4 +152,4 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../skill').SkillModule;
+export default { createSkill, onInit, onMount } satisfies import('../core/skill').SkillModule;

@@ -27,7 +27,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { createRng } from '../util/rng';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 
 const SKILL_ID = '界除疠';
 const DISPLAY_NAME = '除疠';

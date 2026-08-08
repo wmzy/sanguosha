@@ -48,7 +48,7 @@ import type {
   SkillModule,
 } from '../types';
 import { applyAtom, topFrame } from '../index';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { isDelayedTrick } from '../data/card-meta';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 

@@ -16,7 +16,7 @@
 //       改用「移动牌」(弃牌堆→手牌),其 default applyView 正确同步 discardPileCount-1 与 handCount+1。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom, topFrame } from '../index';
-import { registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

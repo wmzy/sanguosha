@@ -21,7 +21,7 @@
 //     早退条件会阻止再次触发(桃/救援加成的区分依据)。
 import type { Skill, GameState } from '../types';
 import { applyAtom } from '../index';
-import { registerAfterHook } from '../skill';
+import { registerAfterHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

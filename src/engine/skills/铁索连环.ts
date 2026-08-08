@@ -12,7 +12,7 @@
 //   recast 实质效果(弃牌+摸一张)复用通用 recastCard helper。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { recastCard } from '../flows/recast';
-import { registerAction, validateUseCard, type SkillModule } from '../skill';
+import { registerAction, validateUseCard, type SkillModule } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

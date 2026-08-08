@@ -11,7 +11,7 @@
 //   - 急袭技能模块需在 skills/index.ts 注册
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAfterHook } from '../skill';
+import { registerAfterHook } from '../core/skill';
 
 const AWAKENED_KEY = '凿险/awakened';
 const TIAN_PREFIX = '屯田/田:';

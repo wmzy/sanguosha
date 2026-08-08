@@ -10,7 +10,7 @@
 // useSyncExternalStore 触发的重渲染不受 React.memo 阻止(memo 只拦截 props 变化)。
 
 import { useSyncExternalStore } from 'react';
-import { subscribeModuleCache, getModuleCacheVersion } from '../../engine/skill';
+import { subscribeModuleCache, getModuleCacheVersion } from '../../engine/core/skill';
 
 export function useSkillDescReady(): void {
   useSyncExternalStore(subscribeModuleCache, getModuleCacheVersion);

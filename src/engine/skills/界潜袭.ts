@@ -46,7 +46,7 @@ import {
   registerAfterHook,
   registerBeforeHook,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 
 const SKILL_ID = '界潜袭';
 const DISPLAY_NAME = '潜袭';

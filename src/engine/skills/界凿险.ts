@@ -20,7 +20,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../index';
 import { startTurn } from '../flows/turn';
-import { registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
 
 const AWAKENED_KEY = '凿险/awakened';
 const EXTRA_TURN_KEY = '凿险/extraTurn'; // localVars:本回合结束时应启动额外回合

@@ -25,7 +25,7 @@
 //   内部 Skill.name = '荐言'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill, Card } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 import { getGender } from '../data/character-meta';
 import { defaultPlayActive } from '../rules/action-active';
 import type { GameView } from '../types';

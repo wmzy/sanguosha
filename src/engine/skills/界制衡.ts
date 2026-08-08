@@ -12,7 +12,7 @@
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction } from '../skill';
+import { registerAction } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

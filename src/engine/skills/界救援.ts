@@ -29,7 +29,7 @@
 import type { GameState, HookResult, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerBeforeHook } from '../skill';
+import { registerAction, registerBeforeHook } from '../core/skill';
 
 /** 界救援问询的 requestType(隔离 respond 路由) */
 const REQUEST_TYPE = '界救援/choose';

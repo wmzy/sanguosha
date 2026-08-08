@@ -15,7 +15,7 @@ import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
-import { registerAction, registerBeforeHook, hasBlockingPending } from '../skill';
+import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { skillLoaders } from './index';
 
 const SKIP_TAG = '据守/翻面';

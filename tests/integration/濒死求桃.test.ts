@@ -23,8 +23,8 @@ import type { Card, GameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { canRescueWith } from '../../src/engine/skills/系统规则';
-import { cardResponsePreResolveForTarget } from '../../src/engine/card-response-availability';
-import { declareAlternativeResponse } from '../../src/engine/skill';
+import { cardResponsePreResolveForTarget } from '../../src/engine/core/card-response-availability';
+import { declareAlternativeResponse } from '../../src/engine/core/skill';
 
 /** 返回第一个 pending slot 的 atom,无 pending 时返回 undefined */
 function firstPendingAtom(state: GameState): unknown | undefined {

@@ -8,7 +8,7 @@
 //   交牌是可选的:confirm 询问;无其他存活角色或自己无手牌时跳过交牌环节。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 // 内部 requestType/localVars 键名保持原前缀「遗计/」,不改为「界遗计/」
 const CONFIRM_RT = '界遗计/giveConfirm'; // 界郭嘉:是否交牌

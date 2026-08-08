@@ -38,7 +38,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 // 内部 requestType/localVars 键名保持原前缀「节命/」,不改为「界节命/」
 const CONFIRM_RT = '界节命/confirm';

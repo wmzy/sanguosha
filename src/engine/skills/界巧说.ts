@@ -35,7 +35,7 @@ import type {
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runRankCompareFlow } from '../flows/rank';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 import { registerTrickBlocker } from '../rules/trick-quota';
 
 const SKILL_ID = '界巧说';

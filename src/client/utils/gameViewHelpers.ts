@@ -13,7 +13,7 @@ import type {
   DistributePrompt,
   TargetFilter,
 } from '../../engine/types';
-import { getAllCardEffects } from '../../engine/card-effect/registry';
+import { getAllCardEffects } from '../../engine/core/card-effect/registry';
 // 副作用 import:确保 CardEffect 注册表(闪/无懈可击等 timing)在模块加载时已填充。
 // getAllCardEffects 依赖各 card-effect 模块的 registerCardEffect 副作用,这里触发加载。
 import '../../engine/card-effects';

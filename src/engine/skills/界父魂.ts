@@ -42,7 +42,7 @@ import type {
   FrontendAPI,
   HookResult,
 } from '../types';
-import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { applyAtom, topFrame } from '../index';
 import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
 import { viewCanAttack } from '../rules/viewDistance';

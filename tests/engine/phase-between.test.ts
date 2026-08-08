@@ -11,7 +11,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import type { Atom, GameState, PlayerState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/index';
-import { registerBeforeHook } from '../../src/engine/skill';
+import { registerBeforeHook } from '../../src/engine/core/skill';
 import { SkillTestHarness } from '../engine-harness';
 
 // ─── 直测辅助:最小 2 人 state ───────────────────────────────

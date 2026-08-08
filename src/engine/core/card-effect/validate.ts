@@ -7,9 +7,9 @@
 //
 // 检测合法性 = 距离合法性 + 选择目标合法性。
 
-import type { GameState, Json } from '../types';
-import { effectiveDistance, inAttackRange } from '../rules/distance';
-import { canSlash } from '../rules/slash-quota';
+import type { GameState, Json } from '../../types';
+import { effectiveDistance, inAttackRange } from '../../rules/distance';
+import { canSlash } from '../../rules/slash-quota';
 import { validateUseCard } from '../skill';
 import type { CardTargetSpec } from './registry';
 import { getCardEffect } from './registry';

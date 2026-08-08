@@ -19,7 +19,7 @@
 //   - 英姿/英魂 已实现(周瑜·英姿、孙坚·英魂),直接挂载
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAfterHook } from '../skill';
+import { registerAfterHook } from '../core/skill';
 import { performYinghunPrepare } from './英魂';
 
 const AWAKENED_KEY = '魂姿/awakened';

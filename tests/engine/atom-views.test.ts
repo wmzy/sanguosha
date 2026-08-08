@@ -2,7 +2,7 @@
 // atom 视图层覆盖率补充:并行回应 / 移除延时锦囊 的 toViewEvents + applyView
 import { describe, it, expect } from 'vitest';
 import { createGameState } from '../../src/engine/types';
-import { getAtomDef } from '../../src/engine/atom';
+import { getAtomDef } from '../../src/engine/core/atom';
 import type { GameState, GameView, Card, PendingTrick } from '../../src/engine/types';
 
 // 导入以注册所有 atom

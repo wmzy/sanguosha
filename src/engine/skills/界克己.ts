@@ -24,7 +24,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 
 /** turn.vars key:本回合【出牌阶段】是否使用/打出过杀。
  *  随「回合结束」atom 的 state.turn.vars = {} 自动清空。 */

@@ -30,7 +30,7 @@ import type {
   SkillModule,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const SKILL_ID = '界强识';
 const DISPLAY_NAME = '强识';

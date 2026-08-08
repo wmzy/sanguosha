@@ -19,7 +19,7 @@
 //   - top 倒序后追加到末尾,使 top[0] 落到 deck[len-1]=最先摸。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

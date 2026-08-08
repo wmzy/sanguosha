@@ -17,7 +17,7 @@
 //   - 系统规则的濒死检查同时挂在 造成伤害 与 失去体力 上,故目标体力归零仍走求桃流程。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerBeforeHook, type SkillModule } from '../skill';
+import { registerBeforeHook, type SkillModule } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

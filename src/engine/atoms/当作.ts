@@ -7,7 +7,7 @@
 // outputName 决定转化后的牌名。rollback(删影子/还原卡)由调用方技能回调负责,本 atom 不处理。
 import type { AtomDefinition, Card, ViewEventSplit, ViewEvent } from '../types';
 import type { Color } from '../../engine/types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../data/card-defs';
 
 /** 牌名→类型映射(从卡牌定义派生,数据驱动,不硬编码牌名)。

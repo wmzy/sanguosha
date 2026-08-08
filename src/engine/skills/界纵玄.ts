@@ -19,7 +19,7 @@
 // "任意张":玩家可选 0..N 张(任意子集)。实现用循环 pickProcessingCard(单选)+ 询问是否继续。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const SKILL_ID = '界纵玄';
 const DISPLAY_NAME = '纵玄';

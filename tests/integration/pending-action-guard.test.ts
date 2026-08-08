@@ -7,7 +7,7 @@ import {
   dispatch as engineDispatch,
   registerSkillsFromState,
 } from '../../src/engine/index';
-import { findActionEntry } from '../../src/engine/skill';
+import { findActionEntry } from '../../src/engine/core/skill';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';

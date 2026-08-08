@@ -17,7 +17,7 @@
 //   适用范围:桃/酒.respond/急救.respond 等"用桃救援"均通过 桃/求桃 pending 触发,
 //   被 cancel 的请求直接跳过该角色,这些 respond action 无从对该角色发起 → 完杀生效。
 import type { HookResult, Skill, GameState } from '../types';
-import { registerBeforeHook } from '../skill';
+import { registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

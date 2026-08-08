@@ -40,13 +40,13 @@ import type {
 } from '../types';
 import { applyAtom } from '../index';
 import { runRankCompareFlow } from '../flows/rank';
-import { runUseFlow } from '../card-effect/use-card';
+import { runUseFlow } from '../core/card-effect/use-card';
 import {
   registerAction,
   registerAfterHook,
   registerBeforeHook,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 
 const SKILL_ID = '界惴恐';
 const DISPLAY_NAME = '惴恐';

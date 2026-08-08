@@ -25,7 +25,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, declareAlternativeResponse } from '../skill';
+import { registerAction, declareAlternativeResponse } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

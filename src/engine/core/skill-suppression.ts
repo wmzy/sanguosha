@@ -22,7 +22,7 @@
 //   每次 isHookSuppressed 遍历所有 provider,由 provider 自行在 predicate 内
 //   判定是否命中。数量极少(全局几个技能),遍历成本可忽略。
 
-import type { GameState } from './types';
+import type { GameState } from '../types';
 import { getCachedSkillModule } from './skill';
 
 /**

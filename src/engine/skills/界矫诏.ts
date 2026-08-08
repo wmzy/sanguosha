@@ -31,7 +31,7 @@ import {
   registerAfterHook,
   hasBlockingPending,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 
 const SKILL_ID = '界矫诏';

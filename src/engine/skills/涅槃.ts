@@ -18,7 +18,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { setChain } from '../flows/face-down';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const CONFIRM_RT = '涅槃/confirm';
 const CONFIRMED_KEY = '涅槃/confirmed';

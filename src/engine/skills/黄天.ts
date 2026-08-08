@@ -15,7 +15,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 
 /** 判断一张牌是否为黄天可交的牌(闪或闪电) */
 function isGiveableCard(state: GameState, cardId: string): boolean {

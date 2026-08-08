@@ -37,7 +37,7 @@ import type {
 import { applyAtom, frameCards } from '../index';
 import { runJudgeFlow } from '../flows/judge';
 import { flipFaceDown, flipFaceUp } from '../flows/face-down';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 
 const START_RT = '界悲歌/chooseStart';
 const DISCARD_RT = '界悲歌/chooseDiscard';

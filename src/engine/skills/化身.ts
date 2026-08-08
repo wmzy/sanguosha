@@ -52,7 +52,7 @@
 import type { Faction, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { createRng } from '../util/rng';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
 import { getCharacterMeta } from '../data/character-meta';
 

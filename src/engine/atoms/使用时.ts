@@ -2,7 +2,7 @@
 // after hook 触发"使用时"摸牌类技能(集智/强识等):使用一张非延时锦囊后摸一牌。
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 使用时: AtomDefinition<{ source: number; cardId: string }> = {
   type: '使用时',

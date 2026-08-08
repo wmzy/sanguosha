@@ -5,7 +5,7 @@
 // isBlocking=false 让 hasBlockingPending / 前端 isPerspectiveAwaiting 跳过它。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { applyAtom, resolveTimeoutMs } from '../index';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 const DEFAULT_TIMEOUT_SEC = 50;
 

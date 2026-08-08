@@ -23,15 +23,15 @@ import {
   getCardEffect,
   hasCardEffect,
   requireCardEffect,
-} from '../../src/engine/card-effect/registry';
-import type { CardEffect } from '../../src/engine/card-effect/registry';
+} from '../../src/engine/core/card-effect/registry';
+import type { CardEffect } from '../../src/engine/core/card-effect/registry';
 import {
   isLegalTarget,
   findLegalTargets,
   validateCardUse,
-} from '../../src/engine/card-effect/validate';
-import { runUseFlow } from '../../src/engine/card-effect/use-card';
-import { runPlayFlow } from '../../src/engine/card-effect/play-card';
+} from '../../src/engine/core/card-effect/validate';
+import { runUseFlow } from '../../src/engine/core/card-effect/use-card';
+import { runPlayFlow } from '../../src/engine/core/card-effect/play-card';
 
 // ─── 测试用牌效果（模块级，只注册一次） ──────────────────────
 

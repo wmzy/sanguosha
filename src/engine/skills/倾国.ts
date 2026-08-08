@@ -6,7 +6,7 @@
 // 后端 dispatch 先执行 倾国.transform(创建影子闪),再 闪.respond validate 看到"闪"通过。
 // 闪技能零感知倾国——它看到的永远是 cardMap 里的一张"闪"。
 import type { Card, GameState, Json, Skill, FrontendAPI } from '../types';
-import { registerAction, declareAlternativeResponse } from '../skill';
+import { registerAction, declareAlternativeResponse } from '../core/skill';
 import { applyAtom } from '../index';
 
 export function createSkill(id: string, ownerId: number): Skill {

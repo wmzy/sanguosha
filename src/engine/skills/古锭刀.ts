@@ -8,7 +8,7 @@
 //   - 目标没有手牌
 // 锁定技,无需询问玩家,无需 onMount(无 respond 窗口)。
 import type { HookResult, Skill, GameState } from '../types';
-import { registerBeforeHook } from '../skill';
+import { registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

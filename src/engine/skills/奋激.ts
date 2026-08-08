@@ -31,7 +31,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
 
 const CONFIRM_RT_PREFIX = '奋激/confirm';
 /** before-hook 快照键:弃置 atom 中来自手牌的 cardId(apply 后手牌已清空,须在 apply 前快照) */

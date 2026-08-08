@@ -16,7 +16,7 @@
 import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 
 const TARGET_RT = '缔盟/target'; // 鲁肃:选两名目标
 const DISCARD_RT = '缔盟/discard'; // 鲁肃:选弃牌

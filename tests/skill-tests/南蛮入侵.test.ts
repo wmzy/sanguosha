@@ -5,7 +5,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
-import { registerAfterHook } from '../../src/engine/skill';
+import { registerAfterHook } from '../../src/engine/core/skill';
 import { frameCards } from '../../src/engine/index';
 
 function build(opts?: {

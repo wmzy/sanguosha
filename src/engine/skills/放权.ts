@@ -27,7 +27,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../index';
 import { startTurn } from '../flows/turn';
-import { registerAction, registerBeforeHook } from '../skill';
+import { registerAction, registerBeforeHook } from '../core/skill';
 
 const TRIGGER_RT = '放权/trigger';
 const DISCARD_RT = '放权/discard';

@@ -15,7 +15,7 @@
 //   - 装备到目标的 装备 atom player=目标,不会触发任何"自己使用装备"的被动(本技能也无此被动)。
 import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 import { skillLoaders } from './index';
 
 const SKILL_NAME = '界直谏';

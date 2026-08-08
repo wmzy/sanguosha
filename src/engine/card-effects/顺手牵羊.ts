@@ -8,7 +8,7 @@ import type { GameView } from '../types';
 import { effectiveDistance } from '../rules/distance';
 import { viewEffectiveDistance } from '../rules/viewDistance';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 
 function canUseSnatch(
   state: import('../types').GameState,

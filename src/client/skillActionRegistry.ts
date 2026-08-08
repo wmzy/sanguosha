@@ -10,7 +10,7 @@ import type {
   FrontendAPI,
   Skill,
 } from '../engine/types';
-import { getSkillModule } from '../engine/skill';
+import { getSkillModule } from '../engine/core/skill';
 
 export interface SkillActionDef {
   skillId: string;

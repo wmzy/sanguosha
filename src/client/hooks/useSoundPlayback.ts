@@ -21,7 +21,7 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 import type { ViewEvent } from '../../engine/types';
-import { getAtomDef } from '../../engine/atom';
+import { getAtomDef } from '../../engine/core/atom';
 import { audioEngine } from '../sounds/audioEngine';
 import type { QueuedEvent } from './useEventPlayback';
 

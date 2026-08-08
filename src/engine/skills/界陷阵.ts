@@ -53,7 +53,7 @@ import {
   unloadSkillInstance,
   instantiateSkill,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
 import { registerHandLimitProvider } from '../rules/hand-limit';

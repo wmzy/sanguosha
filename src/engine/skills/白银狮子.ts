@@ -3,7 +3,7 @@
 //   (官方文案见 src/cards/description.ts)
 import type { HookResult, Skill, GameState } from '../types';
 import { applyAtom } from '../index';
-import { registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '白银狮子', description: '防具:每次受伤最多1点', isLocked: true };

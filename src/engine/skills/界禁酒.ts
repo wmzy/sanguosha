@@ -36,7 +36,7 @@ import {
   findActionEntry,
   registerActionEntry,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 import type { ActionEntry } from '../types';
 import { applyAtom } from '../index';
 import { defaultPlayActive } from '../rules/action-active';

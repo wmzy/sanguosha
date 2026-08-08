@@ -3,7 +3,7 @@
 //   改为依次弃置其两张牌(手牌或装备区,由你逐张选择)。
 import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerBeforeHook } from '../skill';
+import { registerAction, registerBeforeHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 
 export function createSkill(id: string, ownerId: number): Skill {

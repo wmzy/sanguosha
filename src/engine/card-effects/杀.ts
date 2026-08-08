@@ -21,7 +21,7 @@ import {
   registerCardEffect,
   type CardEffect,
   type ResolveCtx,
-} from '../card-effect/registry';
+} from '../core/card-effect/registry';
 
 /** 杀的合法性追加检测：仅校验目标在攻击范围内。
  *  出杀次数限制（slash-quota）不由此处检查——由 validateCardUse.checkUsageLimit

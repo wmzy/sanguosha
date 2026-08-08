@@ -17,8 +17,8 @@
 //     走完整杀结算,damageType 由 cardMap 自动传导(火杀/雷杀不丢)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
-import { runUseFlow } from '../card-effect/use-card';
-import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../skill';
+import { runUseFlow } from '../core/card-effect/use-card';
+import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 
 // use(代使用)路径的 localVars 键 / requestType 常量(对齐 乱武/借刀杀人 风格)

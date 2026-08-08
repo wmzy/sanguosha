@@ -36,8 +36,8 @@ import type {
   SkillModule,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { runUseFlow } from '../card-effect/use-card';
-import { registerAction, hasBlockingPending } from '../skill';
+import { runUseFlow } from '../core/card-effect/use-card';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../rules/once-per-turn';
 

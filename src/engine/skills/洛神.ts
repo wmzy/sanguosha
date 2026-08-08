@@ -14,7 +14,7 @@
 import type { FrontendAPI, Skill, GameState, Card } from '../types';
 import { applyAtom, frameCards } from '../index';
 import { runJudgeFlow } from '../flows/judge';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

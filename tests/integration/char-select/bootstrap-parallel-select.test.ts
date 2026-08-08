@@ -11,7 +11,7 @@ import '../../../src/engine/skills';
 import { bootstrap, dispatch } from '../../../src/engine/index';
 import { createGameState } from '../../../src/engine/types';
 import type { GameState } from '../../../src/engine/types';
-import { hasBlockingPending } from '../../../src/engine/skill';
+import { hasBlockingPending } from '../../../src/engine/core/skill';
 
 // 复刻 session.ts 的默认武将列表(测试独立,避免 import server)
 const CHARACTERS: Array<{ name: string; skills: string[] }> = [

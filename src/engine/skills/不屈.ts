@@ -21,7 +21,7 @@
 //   二者共用 置创牌 atom(重复时移去此牌——对两版本语义一致)。
 import type { GameState, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAfterHook } from '../skill';
+import { registerAfterHook } from '../core/skill';
 
 const SURVIVE_KEY = '不屈/存活';
 // 置创牌 atom 的 vars key(创牌列表存储键 + 重复判定结果键),与 atom 参数对齐

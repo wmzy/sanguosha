@@ -29,7 +29,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
 import { createRng } from '../util/rng';
 
 const TIAN_YI_PD_RT = '天义/拼点'; // 天义询问目标出拼点牌的 requestType

@@ -32,7 +32,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerBeforeHook, registerAfterHook, type SkillModule } from '../skill';
+import { registerBeforeHook, registerAfterHook, type SkillModule } from '../core/skill';
 
 const SKILL_ID = '界矢北';
 const DISPLAY_NAME = '矢北';

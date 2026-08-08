@@ -24,7 +24,7 @@ import {
   registerBeforeHook,
   registerAfterHook,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 
 const CONFIRM_RT = '好施/confirm'; // 鲁肃:是否发动好施
 const CHOOSE_TARGET_RT = '好施/target'; // 鲁肃:并列时选目标

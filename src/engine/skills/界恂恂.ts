@@ -19,7 +19,7 @@
 //   内部 Skill.name = '恂恂'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const _SKILL_ID = '界恂恂';
 const DISPLAY_NAME = '恂恂';

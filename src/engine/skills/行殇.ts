@@ -17,7 +17,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const CONFIRM_RT = '行殇/confirm';
 const CONFIRMED_KEY = '行殇/confirmed';

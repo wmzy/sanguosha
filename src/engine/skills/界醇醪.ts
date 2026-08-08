@@ -27,7 +27,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界醇醪'(避开标醇醪冲突);
 //   内部 Skill.name = '醇醪'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Skill } from '../types';
-import { registerAction, registerAfterHook, declareAlternativeResponse } from '../skill';
+import { registerAction, registerAfterHook, declareAlternativeResponse } from '../core/skill';
 
 const _SKILL_ID = '界醇醪';
 const DISPLAY_NAME = '醇醪';

@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/index';
-import { registerBeforeHook } from '../../src/engine/skill';
+import { registerBeforeHook } from '../../src/engine/core/skill';
 import type { Card, GameState, PlayerState, HookResult } from '../../src/engine/types';
 
 function makeCard(id: string): Card {

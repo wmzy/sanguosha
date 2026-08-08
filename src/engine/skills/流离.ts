@@ -6,7 +6,7 @@
 // 时机:成为目标 after hook(结算阶段),修改杀帧的 resolvedTargets。
 import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 
 export function createSkill(id: string, ownerId: number): Skill {

@@ -15,9 +15,9 @@
 // 与 damage-timing / life-timing / statechange-timing 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 import { runJudgeModifiers } from '../index';
-import { getBeforeHooks } from '../skill';
+import { getBeforeHooks } from '../core/skill';
 
 /** 判定时机 atom 的公共形状。cardId 仅 生效前/生效后 携带(翻出的判定牌)。 */
 type JudgeTimingAtom = {

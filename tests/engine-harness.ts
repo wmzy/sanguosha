@@ -41,8 +41,8 @@ import {
   registerSkillsFromState,
 } from '../src/engine/index';
 
-import { getAtomDef } from '../src/engine/atom';
-import { getSkillModule, isSkillModuleRegistered } from '../src/engine/skill';
+import { getAtomDef } from '../src/engine/core/atom';
+import { getSkillModule, isSkillModuleRegistered } from '../src/engine/core/skill';
 
 // ─── 引擎异常收集器(消灭盲区 2)──────────────────────────────
 // dispatch 的 execute 是 fire-and-forget:其 .catch 调 state.onError?.(e) 后 throw,

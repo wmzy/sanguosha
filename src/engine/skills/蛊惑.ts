@@ -44,7 +44,7 @@
 import type { ActionContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runDamageFlow } from '../flows/damage';
-import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../skill';
+import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { canSlash, incSlashUsed, slashUsed } from '../rules/slash-quota';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';

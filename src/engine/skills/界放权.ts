@@ -32,7 +32,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../index';
 import { startTurn } from '../flows/turn';
-import { registerAction, registerBeforeHook } from '../skill';
+import { registerAction, registerBeforeHook } from '../core/skill';
 
 // requestType 前缀必须等于技能 id('界放权'):前端 resolvePendingRespond 按
 // requestType 前缀解析 skillId 后提交 respond,前缀≠技能 id 则 dispatch 找不到

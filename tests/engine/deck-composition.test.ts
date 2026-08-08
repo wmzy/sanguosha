@@ -11,7 +11,7 @@
 // 归并建议:牌堆组成属引擎核心不变量,本文件为独立断言集,不并入 skill-tests。
 
 import { describe, it, expect } from 'vitest';
-import { createStandardDeck } from '../../src/engine/deck';
+import { createStandardDeck } from '../../src/engine/core/deck';
 import type { Card, Suit } from '../../src/engine/types';
 
 type CardSuit = Card['suit'];

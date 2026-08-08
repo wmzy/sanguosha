@@ -29,7 +29,7 @@
 //     谦逊 source===target(自己选自己的牌);破军 source≠target(徐盛选目标牌)。
 //   - varsKey: 暂存键名,由调用方技能自行定义(如 '界破军/移出'),归还方须用同一键。
 import type { AtomDefinition, Card, EquipSlot, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 移出至暂存区: AtomDefinition<{
   source: number;

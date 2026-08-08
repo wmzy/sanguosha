@@ -4,7 +4,7 @@
 //   动态距离修正按能(如 界义从:体力变化触发防御修正 ±)在去标记时也需要同步 view,
 //   故此处复用 distanceVars 通道。apply 不触碰 vars(state 侧由技能维护),仅 view 增量同步。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 去标记: AtomDefinition<{
   player: number;

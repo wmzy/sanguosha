@@ -3,7 +3,7 @@
 import type { ActionEntry, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { createRng } from '../util/rng';
-import { registerActionEntry, unregisterActionEntry, instantiateSkill } from '../skill';
+import { registerActionEntry, unregisterActionEntry, instantiateSkill } from '../core/skill';
 
 import { getCharacterBaseId, isLord } from '../data/character-meta';
 

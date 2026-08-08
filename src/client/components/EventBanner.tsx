@@ -17,7 +17,7 @@ import * as styles from './gameViewStyles';
 import { SUIT_COLOR } from './gameViewConstants';
 import { CardFace } from './CardFace';
 import type { GameView, Card } from '../../engine/types';
-import { getAtomDef } from '../../engine/atom';
+import { getAtomDef } from '../../engine/core/atom';
 import type { QueuedEvent } from '../hooks/useEventPlayback';
 
 /** ViewEvent 自带的 effect 片段(移动牌等派生事件携带;静态 atom 走 getAtomDef) */

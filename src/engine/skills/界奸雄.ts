@@ -13,7 +13,7 @@
 // 选项①(摸一张牌)无此问题,直接 摸牌 count=1。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 const CHOOSE_RT = '界奸雄/choose';
 const WANTCARD_KEY = '奸雄/wantCard';

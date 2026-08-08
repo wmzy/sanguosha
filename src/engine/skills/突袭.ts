@@ -18,7 +18,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerBeforeHook } from '../skill';
+import { registerAction, registerBeforeHook } from '../core/skill';
 
 const TRIGGER_RT = '突袭/trigger';
 const SELECT_RT = '突袭/select';

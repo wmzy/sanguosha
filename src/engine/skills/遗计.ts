@@ -13,7 +13,7 @@
 //   - **可选**:玩家可 pass(空 allocation)放弃发动,牌留在牌堆顶。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const DISTRIBUTE_RT = '遗计/distribute';
 const ALLOC_KEY = '遗计/allocation';

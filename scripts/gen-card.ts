@@ -50,7 +50,7 @@ import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import sharp from 'sharp';
-import { createStandardDeck } from '../src/engine/deck';
+import { createStandardDeck } from '../src/engine/core/deck';
 import { 基本牌列表, 锦囊牌列表 } from '../src/engine/data/card-defs';
 import { 装备牌列表 } from '../src/engine/data/card-defs/equipment';
 import { getCardDescription } from '../src/engine/data/card-defs/description';

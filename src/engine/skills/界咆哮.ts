@@ -11,7 +11,7 @@
 //      + atom.source===ownerId 精准定位"自己主动使用的杀被闪抵消"。
 import type { Skill, GameState } from '../types';
 import { applyAtom } from '../index';
-import { registerAfterHook } from '../skill';
+import { registerAfterHook } from '../core/skill';
 import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
 
 export function createSkill(id: string, ownerId: number): Skill {

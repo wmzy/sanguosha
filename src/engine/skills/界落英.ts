@@ -32,7 +32,7 @@ import {
   registerAfterHook,
   registerBeforeHook,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 
 const _SKILL_ID = '界落英';
 const DISPLAY_NAME = '落英';

@@ -7,7 +7,7 @@
 //   5. GameLog 「（我）」标志由渲染层处理，这里只验证 log.player 正确
 import { describe, it, expect } from 'vitest';
 import '../../src/engine/atoms';
-import { getAtomDef } from '../../src/engine/atom';
+import { getAtomDef } from '../../src/engine/core/atom';
 import type { ViewEvent, Card } from '../../src/engine/types';
 
 const CARD_KILL: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };

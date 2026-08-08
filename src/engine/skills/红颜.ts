@@ -13,7 +13,7 @@
 // 联动:天香发动条件("弃一张红桃手牌")由天香自身检查玩家是否拥有红颜来判定
 //   黑桃手牌是否合法,不依赖本文件。本文件负责判定牌的花色转换。
 import type { Card, FrontendAPI, HookResult, Skill } from '../types';
-import { registerBeforeHook } from '../skill';
+import { registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

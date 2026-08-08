@@ -21,7 +21,7 @@
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerAction } from '../skill';
+import { registerAction } from '../core/skill';
 
 const TIAN_PREFIX = '屯田/田:';
 

@@ -6,8 +6,8 @@
 import type { Card } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../flows/damage';
-import { consumePlayedSlashes } from '../card-effect/play-card';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { consumePlayedSlashes } from '../core/card-effect/play-card';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 
 /** 南蛮入侵的逐目标结算：询问杀 → 统一清理打出杀 → 伤害 */
 async function resolveBarbarianInvasion(ctx: ResolveCtx): Promise<void> {

@@ -38,7 +38,7 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { registerAction, registerAfterHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const SKILL_ID = '界镇军';
 const DISPLAY_NAME = '镇军';

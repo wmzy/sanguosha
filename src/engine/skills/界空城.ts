@@ -13,7 +13,7 @@
 //      实现模式与界张飞咆哮(界咆哮.ts)完全一致。
 import type { HookResult, Skill, GameState } from '../types';
 import { applyAtom, topFrame } from '../index';
-import { registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

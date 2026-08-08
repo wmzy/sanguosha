@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { viewReducer } from '../../src/client/view/reducer';
-import { getAtomDef } from '../../src/engine/atom';
+import { getAtomDef } from '../../src/engine/core/atom';
 import { applyAtom } from '../../src/engine/index';
 import { buildView } from '../../src/engine/view/buildView';
 import { createGameState } from '../../src/engine/types';

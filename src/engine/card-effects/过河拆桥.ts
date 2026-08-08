@@ -5,7 +5,7 @@
 
 import type { Card } from '../types';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 
 /** 过河拆桥牌特有校验：目标有牌、非自己 */
 function canUseDismantle(

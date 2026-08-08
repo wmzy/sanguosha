@@ -1,7 +1,7 @@
 // src/engine/atoms/下一玩家.ts
 // 下一玩家:currentPlayerIndex 移到下一个存活玩家
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 /** 计算下一个存活玩家的索引(apply 和 toViewEvents 共用) */
 function calcNextPlayer(state: { players: { alive: boolean }[]; currentPlayerIndex: number }): {

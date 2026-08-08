@@ -29,7 +29,7 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
-import { registerBeforeHook, type SkillModule } from '../skill';
+import { registerBeforeHook, type SkillModule } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 
 const DISPLAY_NAME = '宗室';

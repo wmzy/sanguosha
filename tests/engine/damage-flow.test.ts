@@ -14,7 +14,7 @@ import '../../src/engine/atoms'; // 注册所有 atom(含 damage-timing)
 import { createGameState } from '../../src/engine/types';
 import type { Atom, GameState, PlayerState } from '../../src/engine/types';
 import { runDamageFlow } from '../../src/engine/flows/damage';
-import { registerBeforeHook } from '../../src/engine/skill';
+import { registerBeforeHook } from '../../src/engine/core/skill';
 
 function makePlayer(opts: {
   index: number;

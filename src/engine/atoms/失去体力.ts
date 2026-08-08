@@ -3,7 +3,7 @@
 // 与 造成伤害时 一致:只扣体力,不在此处置 alive——体力归零时由 系统规则 的
 // '失去体力' after-hook 触发 濒死(求桃)流程,无人救援才由 系统处理牌 置 alive=false。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 失去体力: AtomDefinition<{ target: number; amount: number }> = {
   type: '失去体力',

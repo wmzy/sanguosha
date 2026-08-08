@@ -38,8 +38,8 @@ import {
   registerAfterHook,
   hasBlockingPending,
   type SkillModule,
-} from '../skill';
-import { runUseFlow } from '../card-effect/use-card';
+} from '../core/skill';
+import { runUseFlow } from '../core/card-effect/use-card';
 
 const SKILL_ID = '界酒诗';
 const DISPLAY_NAME = '酒诗';

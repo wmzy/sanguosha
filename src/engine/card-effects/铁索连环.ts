@@ -10,7 +10,7 @@
 import type { Card } from '../types';
 import { setChain } from '../flows/face-down';
 import { applyAtom } from '../index';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 
 /** 目标选择横置/重置的 requestType（resolve 发出 → respond 写回 localVars）。 */
 const CHOOSE_RT = '铁索连环/choose';

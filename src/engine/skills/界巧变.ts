@@ -38,7 +38,7 @@ import type {
   GameView,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { registerAction, registerBeforeHook, registerAfterHook, hasBlockingPending } from '../skill';
+import { registerAction, registerBeforeHook, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 
 // ── requestType 常量(用于 请求回应 atom 的 requestType 字段) ──

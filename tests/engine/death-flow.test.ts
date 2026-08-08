@@ -255,7 +255,7 @@ describe('模块 B:死亡编排函数 runDeathFlow', () => {
     state.cardMap.c1 = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
     let handAtDeathTiming: string[] | null = null;
     // 注册一个 死亡时 after-hook(座次 -1 系统级,确保在断肠类技能同时机)
-    const { registerAfterHook } = await import('../../src/engine/skill');
+    const { registerAfterHook } = await import('../../src/engine/core/skill');
     registerAfterHook(state, 'mockObserve', -1, '死亡时', async (ctx) => {
       const atom = ctx.atom;
       if (atom.type !== '死亡时') return;

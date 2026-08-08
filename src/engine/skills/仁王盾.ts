@@ -7,7 +7,7 @@
 // 八卦阵是"视为出闪"(杀被抵消,触发武器技)。两者由时机 atom 天然区分,
 // 不再共用 询问闪 的 cancel。
 import type { HookResult, Skill, GameState } from '../types';
-import { registerBeforeHook } from '../skill';
+import { registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '仁王盾', description: '防具:黑色杀对你无效', isLocked: true };

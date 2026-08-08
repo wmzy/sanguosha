@@ -27,7 +27,7 @@ import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { recastCard } from '../flows/recast';
 import { setChain } from '../flows/face-down';
-import { registerAction, hasBlockingPending, validateUseCard } from '../skill';
+import { registerAction, hasBlockingPending, validateUseCard } from '../core/skill';
 import { promptCancel } from '../flows/cancel';
 import { defaultPlayActive } from '../rules/action-active';
 

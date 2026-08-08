@@ -1,8 +1,8 @@
 // src/engine/skills/index.ts
 // 技能模块懒加载表：通过 import() 按需加载。
 // 动态加载是合理的：每局游戏只选 4 个武将 +部分装备，不需要全量加载 37 个模块。
-import type { SkillModule } from '../skill';
-import { setSkillModuleResolver, setSkillModuleChecker } from '../skill';
+import type { SkillModule } from '../core/skill';
+import { setSkillModuleResolver, setSkillModuleChecker } from '../core/skill';
 
 // Eager load：注册所有 CardEffect（杀/闪/桃 等），副作用 import
 import '../card-effects';
@@ -30,9 +30,9 @@ export const skillLoaders: Record<string, Loader> = {
   // 基础
   开局: load(() => import('./开局')),
   // 使用牌:统一的卡牌使用入口技能(配合 CardEffect 注册表路由)
-  使用牌: load(() => import('../card-effect/use-card')),
+  使用牌: load(() => import('../core/card-effect/use-card')),
   // 打出牌:统一的卡牌打出入口技能(无目标选择/无效果结算,仅声明+置入处理区)
-  打出牌: load(() => import('../card-effect/play-card')),
+  打出牌: load(() => import('../core/card-effect/play-card')),
   仁德: load(() => import('./仁德')),
   激将: load(() => import('./激将')),
   护甲: load(() => import('./护甲')),

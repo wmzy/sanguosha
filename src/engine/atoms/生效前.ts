@@ -10,8 +10,8 @@
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
 // 噪声抑制:无 before hook 时整个 atom 是 no-op,不发 ViewEvent。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
-import { getBeforeHooks } from '../skill';
+import { registerAtom } from '../core/atom';
+import { getBeforeHooks } from '../core/skill';
 
 export const 生效前: AtomDefinition<{ source: number; target: number; cardId: string }> = {
   type: '生效前',

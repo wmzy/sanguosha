@@ -23,10 +23,10 @@
 //   - 转化卡:用 `仁德:杀:${source}:${target}:${seq}` 等虚拟卡 id,无实体;不入弃牌堆。
 import type { GameState, FrontendAPI, GameView, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { canSlash } from '../rules/slash-quota';
-import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';
+import { runUseFlow, chargeOnSettle } from '../core/card-effect/use-card';
 
 // localVars keys(界刘备视为使用基本牌流程)
 const BASIC_CHOICE_VAR = '仁德/basicChoice';

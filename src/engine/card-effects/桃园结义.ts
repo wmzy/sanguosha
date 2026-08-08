@@ -5,7 +5,7 @@
 
 import type { Card } from '../types';
 import { applyAtom } from '../index';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 
 /** 桃园结义的逐目标结算：满血跳过 → 回复体力 */
 async function resolvePeachGarden(ctx: ResolveCtx): Promise<void> {

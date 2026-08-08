@@ -20,7 +20,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
-import { findActionEntry, getBeforeHooks } from '../../src/engine/skill';
+import { findActionEntry, getBeforeHooks } from '../../src/engine/core/skill';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeEquip(

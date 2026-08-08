@@ -38,7 +38,7 @@ import {
   registerBeforeHook,
   hasBlockingPending,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
 

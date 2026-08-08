@@ -15,7 +15,7 @@
 //        分支处理(target=孟获→cancel;否则→modify source)。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { topFrame } from '../index';
-import { registerBeforeHook } from '../skill';
+import { registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

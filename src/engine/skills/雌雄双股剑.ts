@@ -15,7 +15,7 @@
 //      target 的选择由 target 座次回应(可能任意座次),按 requestType 分流。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { getGender } from '../data/character-meta';
 
 /** owner 是否发动的确认询问 requestType */

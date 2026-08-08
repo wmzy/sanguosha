@@ -5,7 +5,7 @@
 // 后端 dispatch 先执行 火计.transform(创建影子火攻),再 火攻.use validate
 // 看到"火攻"通过。火攻技能零感知火计——它看到的永远是 cardMap 里的"火攻"。
 import type { Card, FrontendAPI, GameView, GameState, Json, Skill } from '../types';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { applyAtom } from '../index';
 import { defaultPlayActive } from '../rules/action-active';
 

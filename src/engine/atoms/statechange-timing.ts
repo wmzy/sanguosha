@@ -14,8 +14,8 @@
 // 与 damage-timing / life-timing 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
-import { getBeforeHooks } from '../skill';
+import { registerAtom } from '../core/atom';
+import { getBeforeHooks } from '../core/skill';
 
 /** 校验 player 存在(纯标记,不校验存活——编排函数前置保证)。 */
 function validatePlayer(state: GameState, player: number): string | null {

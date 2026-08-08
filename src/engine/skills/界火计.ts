@@ -36,7 +36,7 @@
 // 关键:界版的"随机展示"由本技能直接选牌 + 展示 atom 广播,不经 请求回应(目标无选择权)。
 // "同颜色"判定用 card.color(红/黑);标版用 card.suit(花色)。
 import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runDamageFlow } from '../flows/damage';
 import { promptCancel } from '../flows/cancel';

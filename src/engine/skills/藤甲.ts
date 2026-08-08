@@ -11,7 +11,7 @@
 // 与仁王盾的区别:仁王盾按颜色(黑杀无效);藤甲按属性(普通杀/AOE 无效)。
 // 火杀/雷杀对藤甲有效(属性杀穿透),火杀额外 +1。
 import type { HookResult, Skill, GameState } from '../types';
-import { registerBeforeHook } from '../skill';
+import { registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

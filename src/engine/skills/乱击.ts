@@ -20,7 +20,7 @@
 // cardMap 但已不在任何手牌区(与丈八蛇矛一致)。rollback 路径自行完成删影子/还原配对。
 // 乱击出的万箭齐发可被无懈可击抵消——由 万箭齐发.use 自身的 询问无懈可击 流程保证。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { applyAtom } from '../index';
 import { defaultPlayActive } from '../rules/action-active';
 
@@ -136,4 +136,4 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../skill').SkillModule;
+export default { createSkill, onInit, onMount } satisfies import('../core/skill').SkillModule;

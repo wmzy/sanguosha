@@ -14,7 +14,7 @@ import { FACTION_BG } from './gameViewConstants';
 import { getCharacterMeta } from '../../engine/data/character-meta';
 import { getCharacterImage } from '../assets/imageAssets';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
-import { getSkillDescription } from '../../engine/skill';
+import { getSkillDescription } from '../../engine/core/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { SkillTag } from './SkillTooltip';
 import * as styles from './gameViewStyles';

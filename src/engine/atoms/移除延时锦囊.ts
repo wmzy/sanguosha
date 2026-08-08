@@ -1,7 +1,7 @@
 // src/engine/atoms/移除延时锦囊.ts
 // 移除延时锦囊:从玩家判定区移除指定延时锦囊
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 移除延时锦囊: AtomDefinition<{ player: number; trickName: string }> = {
   type: '移除延时锦囊',

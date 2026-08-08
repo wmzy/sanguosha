@@ -1,7 +1,7 @@
 // src/engine/atoms/去标签.ts
 // 去标签:移除玩家的 tag(从 player.tags 数组)
 import type { AtomDefinition } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 去标签: AtomDefinition<{ player: number; tag: string }> = {
   type: '去标签',

@@ -22,8 +22,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerBeforeHook } from '../skill';
-import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';
+import { registerAction, registerBeforeHook } from '../core/skill';
+import { runUseFlow, chargeOnSettle } from '../core/card-effect/use-card';
 import { skipPhase } from '../rules/skip-phase';
 
 const OPT1_TRIGGER_RT = '神速/opt1-trigger';

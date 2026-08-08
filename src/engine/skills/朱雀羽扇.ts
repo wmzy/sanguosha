@@ -21,7 +21,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
 
 /** 是否为普通杀(damageType 为空或 '普通',即非火杀/雷杀) */

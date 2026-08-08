@@ -21,7 +21,7 @@
 //     state.phase!=='弃牌' 过滤。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
 
 const CONFIRM_REQUEST = '固政/确认';
 const PICK_REQUEST = '固政/选牌';

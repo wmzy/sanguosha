@@ -32,7 +32,7 @@ import type {
 import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../flows/damage';
-import { registerAction, registerBeforeHook } from '../skill';
+import { registerAction, registerBeforeHook } from '../core/skill';
 
 const CONFIRM_RT = '界天香/confirm';
 const CHOOSE_RT = '界天香/choose';

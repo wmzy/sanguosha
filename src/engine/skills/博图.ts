@@ -28,7 +28,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../index';
 import { startTurn } from '../flows/turn';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
 
 const BASE_VAR = '博图/base'; // turn.vars:本回合弃牌堆基线长度
 const LAST_ROUND_KEY = '博图/lastRound'; // player.vars:计数所在轮次

@@ -23,11 +23,11 @@
 //   EX 与同点数的另一张牌共存(如 ♠2 有 雌雄双股剑、八卦阵 + EX 寒冰剑 共 3 张),
 //   故 (花色,点数) 在标准包内不唯一 —— 牌 id 须用牌名区分,不能仅靠花色点数。
 
-import type { Card, Suit, Rank, CardType, CardSubType, TrickSubType, DamageType } from './types';
-import { suitColor } from './types';
-import type { Rng } from './util/rng';
-import { 装备牌列表 } from './data/card-defs/equipment';
-import { getCardDescription } from './data/card-defs/description';
+import type { Card, Suit, Rank, CardType, CardSubType, TrickSubType, DamageType } from '../types';
+import { suitColor } from '../types';
+import type { Rng } from '../util/rng';
+import { 装备牌列表 } from '../data/card-defs/equipment';
+import { getCardDescription } from '../data/card-defs/description';
 
 // ─── 装备牌射程表(从 CardDef 派生) ──────────────────────────
 const equipmentRangeMap = new Map<string, number>();
@@ -233,7 +233,7 @@ const JUNZHENG_DECK: Entry[] = [
 // deck.ts 只产 Card 实例(运行时数据),CardDef 是定义层。
 // 引擎的 CardDef 注册在 engine/data/card-defs/{basic,tricks,equipment}.ts,
 // 此处复用同一份牌名→类型映射,避免维护两套。
-import { 基本牌列表, 锦囊牌列表 } from './data/card-defs';
+import { 基本牌列表, 锦囊牌列表 } from '../data/card-defs';
 
 const DEF_INDEX: Map<string, {
   type: CardType;

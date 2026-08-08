@@ -5,7 +5,7 @@
 import type { ActionPrompt, AtomDefinition, Card, Json, ViewEventSplit, ViewEvent } from '../types';
 
 import { applyAtom, resolveTimeoutMs } from '../index';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 import { handLimit } from '../rules/hand-limit';
 import { resolveChoosePlayerCandidates } from '../view/choosePlayerCandidates';
 import { resolveCardFilterCandidates } from '../view/cardFilterCandidates';
@@ -14,7 +14,7 @@ import {
   SILENT_RESPONSE_PROMPT,
   cardResponsePreResolveForTarget,
   evaluateCardResponseModeForTarget,
-} from '../card-response-availability';
+} from '../core/card-response-availability';
 
 /** 请求回应 的卡牌回应 filter:仅 useCard+cardFilter.filter 的非 mandatory 回应。
  *  其他(confirm / choosePlayer / distribute / pickTargetCard / mandatory 等)返回 null → 正常询问。

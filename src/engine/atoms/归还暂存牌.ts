@@ -17,7 +17,7 @@
 // 触发时机:具体技能(界破军/界谦逊)注册的 回合结束 after-hook 检测到
 //   对应 vars[varsKey] 非空时调用本 atom。
 import type { AtomDefinition, Card, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 归还暂存牌: AtomDefinition<{ player: number; varsKey: string }> = {
   type: '归还暂存牌',

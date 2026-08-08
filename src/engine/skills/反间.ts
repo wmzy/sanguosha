@@ -19,7 +19,7 @@ import { applyAtom, popFrame, pushFrame } from '../index';
 import { runDamageFlow } from '../flows/damage';
 import { createRng } from '../util/rng';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 
 const SUIT_REQUEST = '反间/选花色';
 const SUIT_KEY = '反间/suit';

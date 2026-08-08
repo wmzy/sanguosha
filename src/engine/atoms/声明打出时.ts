@@ -4,7 +4,7 @@
 // 仅经过声明→生效两步;本时机是声明阶段的转化/替换点。
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 export const 声明打出时: AtomDefinition<{ player: number; cardId: string }> = {
   type: '声明打出时',

@@ -4,8 +4,8 @@
 //   2. 合法性检测:canUse(追加牌特有校验)
 //   3. 使用结算:resolve(生效后效果)
 
-import type { ActionContext, ActionPrompt, GameState, Json } from '../types';
-import type { SettlementFrame } from '../types';
+import type { ActionContext, ActionPrompt, GameState, Json } from '../../types';
+import type { SettlementFrame } from '../../types';
 import { setCardNameChecker } from '../skill';
 
 // ── 抵消配置 ──

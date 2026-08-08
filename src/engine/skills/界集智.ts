@@ -36,7 +36,7 @@
 //                 五谷丰登/南蛮入侵/万箭齐发/决斗
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook } from '../skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 
 /** 非延时锦囊牌名集合 */
 const NON_DELAY_TRICKS = new Set([

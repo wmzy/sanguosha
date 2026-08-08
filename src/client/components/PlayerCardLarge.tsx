@@ -10,7 +10,7 @@ import { isActiveAction } from '../utils/gameViewHelpers';
 import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES } from './gameViewConstants';
 import { getCharacterMeta, LORD_SKILLS } from '../../engine/data/character-meta';
 import { getCharacterImage } from '../assets/imageAssets';
-import { getSkillDescription } from '../../engine/skill';
+import { getSkillDescription } from '../../engine/core/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { SkillTag } from './SkillTooltip';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';

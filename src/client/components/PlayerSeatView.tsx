@@ -5,7 +5,7 @@ import { css, cx } from '@linaria/core';
 import type { EquipSlot, GameView } from '../../engine/types';
 import { shallowArrayEqual, playerVisibleEqual } from '../utils/memo';
 import type { SkillActionDef } from '../skillActionRegistry';
-import { getSkillDescription } from '../../engine/skill';
+import { getSkillDescription } from '../../engine/core/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { SkillTag } from './SkillTooltip';
 import {

@@ -1,7 +1,7 @@
 // src/engine/atoms/阶段开始.ts
 // 阶段开始:更新 state.phase
 import type { AtomDefinition, GameView, TurnPhase, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
+import { registerAtom } from '../core/atom';
 
 const VALID_PHASES: TurnPhase[] = ['准备', '判定', '摸牌', '出牌', '弃牌', '回合结束'];
 

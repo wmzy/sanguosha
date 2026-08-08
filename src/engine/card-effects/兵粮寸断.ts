@@ -10,8 +10,8 @@ import { applyAtom } from '../index';
 import { runJudgeFlow } from '../flows/judge';
 import { effectiveDistance } from '../rules/distance';
 import { viewEffectiveDistance } from '../rules/viewDistance';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
-import { registerDelayedTrick } from '../card-effect/delayed-trick-registry';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
+import { registerDelayedTrick } from '../core/card-effect/delayed-trick-registry';
 
 /** 跳过摸牌阶段的 tag 名 */
 const SKIP_TAG = '兵粮寸断/跳过摸牌';

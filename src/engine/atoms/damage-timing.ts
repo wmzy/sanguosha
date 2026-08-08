@@ -16,8 +16,8 @@
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { DamageType } from '../../engine/types';
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
-import { getBeforeHooks } from '../skill';
+import { registerAtom } from '../core/atom';
+import { getBeforeHooks } from '../core/skill';
 
 // ── before-hook modify amount 的回传通道 ────────────────────
 // 伤害结算开始时/造成伤害时/受到伤害时 的 before-hook 可 modify amount;afterApply 把最终

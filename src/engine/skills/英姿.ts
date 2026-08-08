@@ -14,7 +14,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../index';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
-import { registerAction, registerBeforeHook } from '../skill';
+import { registerAction, registerBeforeHook } from '../core/skill';
 
 const CONFIRM_REQUEST = '英姿/confirm';
 

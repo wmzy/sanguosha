@@ -19,9 +19,9 @@
 //   内部 Skill.name = '挑衅'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { runUseFlow } from '../card-effect/use-card';
+import { runUseFlow } from '../core/card-effect/use-card';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
+import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 
 const SKILL_ID = '界挑衅';

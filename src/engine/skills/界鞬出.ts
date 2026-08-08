@@ -45,7 +45,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerSlashExtraProvider } from '../rules/slash-quota';
 
 const TAG = '界鞬出/禁闪';

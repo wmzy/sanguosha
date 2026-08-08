@@ -35,9 +35,9 @@
 // 命名:文件名/loader key/character skill name 均为 '界乱击'(避开标乱击冲突);
 //   内部 Skill.name = '乱击'(OL 官方技能名,玩家可见)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction, hasBlockingPending } from '../skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { applyAtom } from '../index';
-import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';
+import { runUseFlow, chargeOnSettle } from '../core/card-effect/use-card';
 import { defaultPlayActive } from '../rules/action-active';
 
 const SKILL_ID = '界乱击';
@@ -279,7 +279,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   return;
 }
 
-const _skillModule: import('../skill').SkillModule = {
+const _skillModule: import('../core/skill').SkillModule = {
   createSkill,
   onInit,
   onMount,

@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ViewEvent, Card } from '../../engine/types';
-import { getAtomDef } from '../../engine/atom';
+import { getAtomDef } from '../../engine/core/atom';
 import { resourceManager } from '../resources';
 import { getCardVfx } from '../cardVfx';
 import type { QueuedEvent } from './useEventPlayback';

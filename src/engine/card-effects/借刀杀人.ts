@@ -12,9 +12,9 @@
 
 import type { Card, GameState, GameView } from '../types';
 import { applyAtom } from '../index';
-import { runUseFlow } from '../card-effect/use-card';
-import { isCardBanned } from '../card-effect/validate';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { runUseFlow } from '../core/card-effect/use-card';
+import { isCardBanned } from '../core/card-effect/validate';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 import { inAttackRange } from '../rules/distance';
 import { slashTargetMax } from '../rules/slash-target';
 

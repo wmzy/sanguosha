@@ -19,7 +19,7 @@ import { createGameState } from '../../src/engine/types';
 import type { Atom, Card, GameState, PlayerState, ZoneLoc } from '../../src/engine/types';
 import { runMoveCardFlow } from '../../src/engine/flows/move';
 import { applyAtom } from '../../src/engine/index';
-import { registerBeforeHook, registerAfterHook } from '../../src/engine/skill';
+import { registerBeforeHook, registerAfterHook } from '../../src/engine/core/skill';
 
 function makePlayer(opts: {
   index: number;

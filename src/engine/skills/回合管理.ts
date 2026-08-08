@@ -6,7 +6,7 @@
 //   4) 主动 start action:仅主公位首次开局触发
 import type { GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { registerAction, registerAfterHook, hasBlockingPending } from '../skill';
+import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { handLimit } from '../rules/hand-limit';
 import { isFaceDown, flipFaceUpAll } from '../flows/face-down';
 

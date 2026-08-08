@@ -28,9 +28,9 @@
 //   界看破 respond execute 不设 respondedKey(保持 false)→ 循环 break(无新窗口)。
 //   翻转 cancelKey(抵消状态)的逻辑两者一致;差异仅在是否触发 close-reopen。
 import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction, findPendingSlot } from '../skill';
+import { registerAction, findPendingSlot } from '../core/skill';
 import { applyAtom } from '../index';
-import { runUseFlow } from '../card-effect/use-card';
+import { runUseFlow } from '../core/card-effect/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

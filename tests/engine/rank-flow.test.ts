@@ -17,7 +17,7 @@ import { createGameState } from '../../src/engine/types';
 import type { Atom, Card, GameState, PlayerState, ViewEventSplit } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { runRankCompareFlow, getCardValue } from '../../src/engine/flows/rank';
-import { getAtomDef } from '../../src/engine/atom';
+import { getAtomDef } from '../../src/engine/core/atom';
 
 function makeCard(
   id: string,

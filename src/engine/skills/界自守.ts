@@ -33,7 +33,7 @@ import {
   registerAfterHook,
   registerBeforeHook,
   type SkillModule,
-} from '../skill';
+} from '../core/skill';
 
 const DISPLAY_NAME = '自守';
 
