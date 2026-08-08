@@ -18,6 +18,8 @@ export interface PlayState {
 export interface PlayInput {
   /** 要执行的操作；省略=纯等待。 */
   action?: { message: EngineClientMessage };
+  /** 等待上限(ms)，默认 Infinity（无限阻塞直到 needsAction/gameOver）。
+   *  服务端自有 pending 超时推进状态；仅在需要主动上限保护时传有限值。 */
   waitTimeoutMs?: number;
   /** play 状态引用；提供时计算 stateDiff 并更新 lastView。 */
   state?: PlayState;
@@ -59,8 +61,9 @@ export interface PlayResult {
   lastActionResult: 'accepted' | 'rejected' | 'timeout' | 'not-applicable';
 }
 
-// 25s: 低于 MCP 客户端默认 30s 超时，避免 play 调用在等待 needsAction 时被客户端截断。
-const DEFAULT_WAIT_MS = 25000;
+// 默认无限等待：服务端自有 pending 超时（30~50s × timeoutScale）推进状态，
+// runPlay 的 tick 每 TICK_MS 检查即可在 ended/needsAction 时返回。固定 deadline
+// 只在异常兜底时有意义——默认不设，由调用方按需传 waitTimeoutMs 设上限。
 const TICK_MS = 20;
 
 export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promise<PlayResult> {
@@ -79,7 +82,7 @@ export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promis
       }
     }
   }
-  const timeoutMs = input.waitTimeoutMs ?? DEFAULT_WAIT_MS;
+  const timeoutMs = input.waitTimeoutMs ?? Infinity;
   const deadline = Date.now() + timeoutMs;
   return new Promise<PlayResult>((resolve) => {
     const snapshot = (): PlayResult => {
@@ -137,12 +140,13 @@ export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promis
       if (hgc.phase === 'ended' || hgc.gameOverWinner !== null) return settle();
       // lobby/connecting 阶段：周期推进（房主开局）并阻塞等待进入 playing，
       // 而非立即返回——避免 agent 在游戏未开始时空轮询浪费 token。
-      // deadline（默认 25s）低于 MCP 客户端 30s 超时；超时返回 lobby 状态让调用方重试。
       if (hgc.phase === 'connecting' || hgc.phase === 'lobby') {
         input.lobbyAdvance?.();
       } else if (hgc.needsAction()) {
         return settle();
       }
+      // 兜底 deadline：默认 Infinity（Date.now() < Infinity 恒成立，永不触发），
+      // 仅当调用方显式传 waitTimeoutMs 时生效，作为极端卡死的上限保护。
       if (Date.now() >= deadline) {
         if (lastActionResult === 'accepted') lastActionResult = 'timeout';
         return settle();

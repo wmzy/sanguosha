@@ -196,6 +196,27 @@ describe('handleMcpRequest', () => {
     expect(lobbyAdvance).toHaveBeenCalled();
   });
 
+  it('tools/call play 默认无限等待：lobby 永不推进时阻塞，传 waitTimeoutMs 才兜底返回', async () => {
+    // phase 永远停在 lobby，needsAction 永远 false —— 模拟等人未开局
+    const hgc = makeLobbyAdvancingHgc(10 ** 9);
+    const ctx = makeCtx(hgc, { lobbyAdvance: vi.fn(() => {}) });
+    // 传短 waitTimeoutMs：应在 ~timeoutMs 后兜底返回，phase 仍 lobby
+    const t0 = Date.now();
+    const res = await handleMcpRequest(
+      {
+        jsonrpc: '2.0',
+        id: 32,
+        method: 'tools/call',
+        params: { name: 'play', arguments: { waitTimeoutMs: 80 } },
+      },
+      ctx,
+    );
+    const elapsed = Date.now() - t0;
+    expect(elapsed).toBeGreaterThanOrEqual(70);
+    const sc = (res!.result as { structuredContent: { phase: string } }).structuredContent;
+    expect(sc.phase).toBe('lobby');
+  });
+
   it('tools/call play 未启动时返回 -32602 引导用启动工具', async () => {
     const ctx = makeCtx(makeFakeHgc(), { isStarted: () => false });
     const res = await handleMcpRequest(

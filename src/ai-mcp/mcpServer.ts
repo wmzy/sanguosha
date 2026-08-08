@@ -103,6 +103,7 @@ export const PLAY_TOOL = {
     '执行一个操作并阻塞等待直到轮到本座次决策或游戏结束。' +
     '首次调用前必须先用 createRoom / joinRoom / spectateRoom 启动；' +
     '启动后持续调用 play（不带 action = 纯等待 / 推进 lobby→playing）。' +
+    '默认无限等待（不轮询）；可选 waitTimeoutMs 设等待上限。' +
     'action 从上次返回的 availableActions 取一条。',
   inputSchema: {
     type: 'object' as const,
@@ -118,7 +119,10 @@ export const PLAY_TOOL = {
           baseSeq: { type: 'number' },
         },
       },
-      waitTimeoutMs: { type: 'number', description: '本次等待总超时(ms)，默认 25000' },
+      waitTimeoutMs: {
+        type: 'number',
+        description: '本次等待上限(ms)，默认 Infinity（无限等待直到 needsAction/gameOver）。',
+      },
     },
   },
 };
