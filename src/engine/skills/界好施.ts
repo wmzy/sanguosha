@@ -33,7 +33,7 @@ import type {
 } from '../types';
 import { applyAtom, topFrame } from '../index';
 import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
-import { isDelayedTrick } from '../card-meta';
+import { isDelayedTrick } from '../data/card-meta';
 import {
   registerAction,
   registerBeforeHook,

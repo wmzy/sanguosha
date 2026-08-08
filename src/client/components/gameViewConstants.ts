@@ -3,7 +3,7 @@
 // 所有「会重复出现的魔法字符串/颜色/图标」集中在此,前端组件不得自带副本。
 
 import type { EquipSlot } from '../../engine/types';
-import { getEquipmentSkillNames } from '../../engine/card-meta';
+import { getEquipmentSkillNames } from '../../engine/data/card-meta';
 
 /** 回合阶段中文名(渲染时把引擎 phase 翻译人类可读文案) */
 export const PHASE_LABELS: Record<string, string> = {

@@ -11,7 +11,7 @@ import type { ReactNode } from 'react';
 import type { GameView } from '../../engine/types';
 import { CountdownBar } from './CountdownBar';
 import { FACTION_BG } from './gameViewConstants';
-import { getCharacterMeta } from '../../engine/character-meta';
+import { getCharacterMeta } from '../../engine/data/character-meta';
 import { getCharacterImage } from '../assets/imageAssets';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 import { getSkillDescription } from '../../engine/skill';

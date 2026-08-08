@@ -1,4 +1,4 @@
-// src/engine/cards/characters/index.ts — 武将定义汇总
+// src/engine/data/characters/index.ts — 武将定义汇总
 
 // 魏
 export { 曹操 } from './曹操';

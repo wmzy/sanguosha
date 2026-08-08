@@ -8,7 +8,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
-import { allCharacters } from '../../src/engine/cards/characters';
+import { allCharacters } from '../../src/engine/data/characters';
 
 const CHARACTERS = allCharacters.map((c) => ({
   name: c.name,

@@ -40,7 +40,7 @@
 //   | player.vars['化身/亮出']      | player.vars | 写/读 | 本文件      | ✅     |
 //   | player.vars['化身/当前技能']  | player.vars | 写/读 | 本文件      | ✅     |
 //   | localVars['化身/init/<id>']   | localVars   | 写/读 | 本文件      | ✅     |
-//   | allCharacters / getCharacterMeta | 静态导入 | 读     | cards/characters | ✅ |
+//   | allCharacters / getCharacterMeta | 静态导入 | 读     | data/characters | ✅ |
 //
 // 简化标注:
 //   - "游戏开始时":引擎无 per-player 的开局 hook,采用"首次任意玩家 回合开始 时初始化"
@@ -53,8 +53,8 @@ import type { Faction, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { createRng } from '../util/rng';
 import { registerAction, registerAfterHook } from '../skill';
-import { allCharacters } from '../cards/characters';
-import { getCharacterMeta } from '../character-meta';
+import { allCharacters } from '../data/characters';
+import { getCharacterMeta } from '../data/character-meta';
 
 // ── 角色分派 ──
 const JIE_CHAR = '界左慈';

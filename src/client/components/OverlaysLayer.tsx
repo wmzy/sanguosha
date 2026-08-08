@@ -5,7 +5,7 @@ import { type ReactNode } from 'react';
 import { CharSelectOverlay } from './CharSelectOverlay';
 import { CharSelectWaitingOverlay } from './CharSelectWaitingOverlay';
 import { IdentityRevealOverlay } from './IdentityRevealOverlay';
-import { getCharacterMeta } from '../../engine/character-meta';
+import { getCharacterMeta } from '../../engine/data/character-meta';
 import type { GameView, PendingView, Json } from '../../engine/types';
 
 export interface OverlaysLayerProps {

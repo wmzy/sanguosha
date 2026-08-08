@@ -10,7 +10,7 @@ import '../../src/engine/skills';
 import { bootstrap, dispatch, restore, fireTimeout, type GameConfig } from '../../src/engine/index';
 import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
-import { allCharacters } from '../../src/engine/cards/characters';
+import { allCharacters } from '../../src/engine/data/characters';
 import { GameSession } from '../../src/server/session';
 import { deletePersistedRoom } from '../../src/server/persistence';
 import type { Room } from '../../src/server/room';

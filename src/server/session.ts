@@ -23,7 +23,7 @@ import {
   shuCharacters,
   wuCharacters,
   qunCharacters,
-} from '../engine/cards/characters';
+} from '../engine/data/characters';
 
 import '../engine/atoms';
 import '../engine/skills';

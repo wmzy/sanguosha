@@ -3,7 +3,7 @@
 // 走 atom 管线:toViewEvents 携带角色信息,applyView 更新前端 view。
 import type { AtomDefinition, ViewEventSplit, ViewEvent, Faction } from '../types';
 import { registerAtom } from '../atom';
-import { getCharacterMeta } from '../character-meta';
+import { getCharacterMeta } from '../data/character-meta';
 
 /** 计算分配武将后的体力上限:基础值=武将卡牌 maxHealth。
  *  主公加成:标准身份局(玩家数>4,即 5 人起)主公体力上限 +1。

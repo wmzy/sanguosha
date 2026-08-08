@@ -7,7 +7,7 @@ import {
   isRespondOnly,
   getWeaponRange,
   getEquipmentSkillNames,
-} from '../../src/engine/card-meta';
+} from '../../src/engine/data/card-meta';
 import type { Card } from '../../src/engine/types';
 
 function makeCard(overrides: Partial<Card> = {}): Card {

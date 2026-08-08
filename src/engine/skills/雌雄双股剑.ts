@@ -16,7 +16,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
-import { getGender } from '../character-meta';
+import { getGender } from '../data/character-meta';
 
 /** owner 是否发动的确认询问 requestType */
 const CONFIRM_REQUEST = '雌雄双股剑/confirm';

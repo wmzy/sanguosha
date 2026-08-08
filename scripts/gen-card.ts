@@ -8,8 +8,8 @@
 //
 // 卡牌信息实时从源代码声明文件读取:
 //   - src/engine/deck.ts(牌堆花色点数)
-//   - src/engine/cards/card-defs/{basic,equipment,tricks}.ts(CardDef 类型/range)
-//   - src/engine/cards/card-defs/description.ts(技能描述原文)
+//   - src/engine/data/card-defs/{basic,equipment,tricks}.ts(CardDef 类型/range)
+//   - src/engine/data/card-defs/description.ts(技能描述原文)
 //
 // 插画外形描述(纯视觉,不含典故):见 .claude/skills/card-design/illustration-history.md
 //
@@ -51,9 +51,9 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import sharp from 'sharp';
 import { createStandardDeck } from '../src/engine/deck';
-import { 基本牌列表, 锦囊牌列表 } from '../src/engine/cards/card-defs';
-import { 装备牌列表 } from '../src/engine/cards/card-defs/equipment';
-import { getCardDescription } from '../src/engine/cards/card-defs/description';
+import { 基本牌列表, 锦囊牌列表 } from '../src/engine/data/card-defs';
+import { 装备牌列表 } from '../src/engine/data/card-defs/equipment';
+import { getCardDescription } from '../src/engine/data/card-defs/description';
 import type { Card, CardDef, Suit, CardType, CardSubType } from '../src/engine/types';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

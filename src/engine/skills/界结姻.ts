@@ -40,7 +40,7 @@ import type { GameView } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
-import { getGender } from '../character-meta';
+import { getGender } from '../data/character-meta';
 import { skillLoaders } from './index';
 
 const SKILL_NAME = '界结姻';

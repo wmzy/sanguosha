@@ -49,7 +49,7 @@ import type {
 } from '../types';
 import { applyAtom, topFrame } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
-import { isDelayedTrick } from '../card-meta';
+import { isDelayedTrick } from '../data/card-meta';
 import { runPickTargetCardPanel } from '../pick-card-panel';
 
 const _SKILL_ID = '界贞烈';

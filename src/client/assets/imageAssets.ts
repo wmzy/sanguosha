@@ -11,7 +11,7 @@
 //   - 武将：<img onError> fallback 到势力色背景
 
 import { resourceManager } from '../resources';
-import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../../engine/cards/card-defs';
+import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../../engine/data/card-defs';
 import type { CardType } from '../../engine/types';
 
 const NAME_TO_SUB: ReadonlyMap<string, 'basic' | 'equipment' | 'trick'> = (() => {

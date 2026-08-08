@@ -12,7 +12,7 @@ import { bootstrap, dispatch } from '../../../src/engine/index';
 import { createGameState } from '../../../src/engine/types';
 import type { GameState } from '../../../src/engine/types';
 import { DEFAULT_SKILLS } from '../../../src/engine/atoms/选将';
-import { isLord, LORD_CANDIDATES } from '../../../src/engine/character-meta';
+import { isLord, LORD_CANDIDATES } from '../../../src/engine/data/character-meta';
 
 /** 造一个足够大的武将池(>= 7+5+4+5=21,覆盖 4 人局独占模式总需求) */
 function makeBigCharPool(n: number): Array<{ name: string; skills: string[] }> {

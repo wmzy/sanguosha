@@ -1,4 +1,4 @@
-// engine/cards/card-defs/index.ts — barrel 转发现同目录 CardDef 定义（basic / tricks / equipment）
+// engine/data/card-defs/index.ts — barrel 转发现同目录 CardDef 定义（basic / tricks / equipment）
 export { 基本牌列表, 杀, 闪, 桃, 酒 } from './basic';
 export {
   锦囊牌列表,

@@ -19,7 +19,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
-import { getGender } from '../character-meta';
+import { getGender } from '../data/character-meta';
 import { runUseFlow } from '../card-effect/use-card';
 
 /** 校验某座次是否为男性存活角色 */

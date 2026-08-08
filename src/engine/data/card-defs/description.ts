@@ -1,4 +1,4 @@
-// src/engine/cards/card-defs/description.ts
+// src/engine/data/card-defs/description.ts
 // 卡牌中文描述(供 hover tooltip / 文档展示)。
 // 来源:原 src/client/components/GameView.tsx 的 CARD_DESCRIPTIONS,提升到 shared 层,
 // 让 server / 测试 / 工具脚本都能复用。

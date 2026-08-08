@@ -8,7 +8,7 @@
 import type { AtomDefinition, Card, ViewEventSplit, ViewEvent } from '../types';
 import type { Color } from '../../engine/types';
 import { registerAtom } from '../atom';
-import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../cards/card-defs';
+import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../data/card-defs';
 
 /** 牌名→类型映射(从卡牌定义派生,数据驱动,不硬编码牌名)。
  *  模块加载时构建一次,覆盖所有标准卡牌(基本/锦囊/装备)。 */

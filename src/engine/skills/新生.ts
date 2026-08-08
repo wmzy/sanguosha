@@ -24,7 +24,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
-import { allCharacters } from '../cards/characters';
+import { allCharacters } from '../data/characters';
 import { createRng } from '../util/rng';
 
 const CONFIRM_REQUEST = '新生/confirm';

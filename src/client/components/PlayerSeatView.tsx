@@ -14,7 +14,7 @@ import {
   EQUIPMENT_SKILL_NAMES,
   EQUIP_SLOT_ICON,
 } from './gameViewConstants';
-import { getCharacterMeta, LORD_SKILLS } from '../../engine/character-meta';
+import { getCharacterMeta, LORD_SKILLS } from '../../engine/data/character-meta';
 import { getCharacterImage } from '../assets/imageAssets';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 import { displaySkillName } from '../utils/skillDisplay';

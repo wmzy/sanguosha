@@ -8,7 +8,7 @@ import type { GameView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { isActiveAction } from '../utils/gameViewHelpers';
 import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES } from './gameViewConstants';
-import { getCharacterMeta, LORD_SKILLS } from '../../engine/character-meta';
+import { getCharacterMeta, LORD_SKILLS } from '../../engine/data/character-meta';
 import { getCharacterImage } from '../assets/imageAssets';
 import { getSkillDescription } from '../../engine/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';

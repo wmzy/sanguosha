@@ -15,7 +15,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import type { GameState, PlayerState } from '../../src/engine/types';
-import { allCharacters } from '../../src/engine/cards/characters';
+import { allCharacters } from '../../src/engine/data/characters';
 
 function makePlayer(opts: { index: number; name: string }): PlayerState {
   return {
