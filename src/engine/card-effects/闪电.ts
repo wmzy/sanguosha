@@ -11,6 +11,7 @@ import { applyAtom } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { runDamageFlow } from '../damage-flow';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { registerDelayedTrick } from '../card-effect/delayed-trick-registry';
 
 const TRICK_NAME = '闪电';
 
@@ -117,3 +118,6 @@ const lightningEffect: CardEffect = {
 };
 
 registerCardEffect(TRICK_NAME, lightningEffect);
+
+// 自注册延时锦囊:闪电判定不跳过阶段(无 skipPhase)
+registerDelayedTrick({ name: TRICK_NAME });

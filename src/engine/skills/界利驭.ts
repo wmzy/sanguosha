@@ -44,7 +44,7 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
-import { runPickTargetCardPanel } from './选牌面板';
+import { runPickTargetCardPanel } from '../pick-card-panel';
 import { runUseFlow } from '../card-effect/use-card';
 
 const SKILL_ID = '界利驭';

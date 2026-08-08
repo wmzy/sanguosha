@@ -216,8 +216,8 @@ describe('界奇才', () => {
     expect(harness.state.zones.discardPile).toContain('wp1');
   });
 
-  // ─── 8. 边界:过河拆桥目标只有防具+宝物时被拒(无可弃牌)────
-  it('过河拆桥目标 P2(界奇才)装备区仅防具+宝物 → validate 拒绝(无可弃牌)', async () => {
+  // ─── 8. 边界:仅防具+宝物时使用通过,选牌面板过滤后均不可弃 ──
+  it('过河拆桥目标 P2(界奇才)装备区仅防具+宝物 → 使用通过(不再预检保护),选牌面板过滤后均不可弃', async () => {
     const gq = makeCard('gq1', '过河拆桥', '♠', '3');
     const armor = makeCard('ar1', '八卦阵', '♠', '2', '装备牌');
     const treasure = makeCard('tr1', '木牛流马', '♦', 'A', '装备牌');
@@ -240,11 +240,20 @@ describe('界奇才', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    // P2 装备区仅防具+宝物(均受保护)+ 无手牌 + 无判定 → 过河拆桥无牌可弃
+    // canUseDismantle 不再检查保护(只检查目标有牌)→ 目标有装备,使用通过
+    await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
+    await P1.pass(); // 无懈窗口
+
+    // 选牌面板:界奇才 before-hook 已过滤防具/宝物 → 均不可选
     await P1.expectRejected({
       skillId: '过河拆桥',
-      actionType: 'use',
-      params: { cardId: 'gq1', targets: [1] },
+      actionType: 'respond',
+      params: { zone: 'equipment', cardId: 'ar1' },
     });
+
+    // 无可弃牌 → 超时后防具/宝物仍在装备区(过河拆桥落空,不弃置受保护装备)
+    await P1.pass(); // 选牌面板超时
+    expect(harness.state.players[1].equipment['防具']).toBe('ar1');
+    expect(harness.state.players[1].equipment['宝物']).toBe('tr1');
   });
 });

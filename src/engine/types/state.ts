@@ -61,6 +61,10 @@ export type Card = {
    * name/suit/rank 是转化后的视图;原卡仍在 cardMap[shadowOf]。
    * 影子离开结算(入弃牌堆)时,引擎用 shadowOf 还原为原卡。 */
   shadowOf?: string;
+  /** 武器效果:出杀无次数限制(诸葛连弩) */
+  slashUnlimited?: boolean;
+  /** 武器效果:最后一张手牌出杀时的额外目标上限(方天画戟) */
+  slashTargetBonusWhenLastCard?: number;
 };
 
 export type CardWrapper = {

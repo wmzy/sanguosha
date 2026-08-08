@@ -2,7 +2,7 @@
 // 添加技能:为玩家添加 skillId(实际 registerAction/onInit 由 skill-loader 监听此 atom 触发)
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
-import { MOUNT_DISTANCE_VARS } from '../skills/马匹技能';
+import { getSkillViewDelta } from '../skill-view-meta';
 
 export const 添加技能: AtomDefinition<{ player: number; skillId: string }> = {
   type: '添加技能',
@@ -24,7 +24,7 @@ export const 添加技能: AtomDefinition<{ player: number; skillId: string }> =
     };
     // 马匹技能的 onInit 通过 after hook 设 vars,不在 apply 内。
     // include mount distanceVars delta so applyView can sync before after hook runs.
-    const mountVars = MOUNT_DISTANCE_VARS[atom.skillId];
+    const mountVars = getSkillViewDelta(atom.skillId)?.mountDistanceVars;
     if (mountVars) {
       view.mountDistanceVars = mountVars;
     }

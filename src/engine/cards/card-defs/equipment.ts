@@ -8,6 +8,7 @@ export const 诸葛连弩: CardDef = {
   effect: { type: 'sequence', steps: [] },
   range: 1,
   weaponEffect: { type: '诸葛连弩' },
+  slashUnlimited: true,
 };
 
 export const 青釭剑: CardDef = {
@@ -76,6 +77,7 @@ export const 方天画戟: CardDef = {
   targetFilter: { type: 'none' },
   effect: { type: 'sequence', steps: [] },
   range: 4,
+  slashTargetBonusWhenLastCard: 3,
 };
 
 export const 麒麟弓: CardDef = {

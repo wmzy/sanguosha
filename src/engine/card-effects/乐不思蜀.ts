@@ -11,6 +11,7 @@ import type { Card } from '../types';
 import { applyAtom } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { registerDelayedTrick } from '../card-effect/delayed-trick-registry';
 
 /** 跳过出牌阶段的 tag 名 */
 const SKIP_TAG = '乐不思蜀/跳过出牌';
@@ -65,3 +66,6 @@ const indulgenceEffect: CardEffect = {
 };
 
 registerCardEffect('乐不思蜀', indulgenceEffect);
+
+// 自注册延时锦囊:判定非♥生效后跳过出牌阶段
+registerDelayedTrick({ name: '乐不思蜀', skipPhase: { tag: SKIP_TAG, phase: '出牌' } });

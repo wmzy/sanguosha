@@ -104,12 +104,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // 2. 若处于 owner 的出牌阶段:激活本回合红色杀增益(次数+1 / 红杀无距离 / 红杀不可抵消)
     if (inOwnerPlayPhase(ctx.state, ownerId)) {
       ctx.state.turn.vars[ACTIVE_VAR] = ownerId;
-      // 投影到 view.turnUsage,供前端 viewSlashMax / viewCanAttack 判定
+      // 投影到 view.turnUsage,供前端 viewSlashMax/viewDistance 推断(通用前缀 key)
       await applyAtom(ctx.state, {
         type: '回合用量',
         player: ownerId,
-        key: ACTIVE_VAR,
-        value: true,
+        key: '杀/extra/诈降',
+        value: 1,
       });
     }
   });

@@ -11,12 +11,12 @@
 //     合并为单 respond 按 requestType 分支(同固政/双雄模式)。
 //   - requestType '反馈/选牌' 经 resolvePendingRespond 按 [/_] 分割得 skillId='反馈',
 //     前端 pickTargetCard 渲染与无头客户端 availableActions 自动路由(不再硬编码)。
-//   - 选牌面板逻辑与过河拆桥/顺手牵羊共用(见 ./选牌面板.ts);反馈为 obtain 模式,
+//   - 选牌面板逻辑与过河拆桥/顺手牵羊共用(见 ../pick-card-panel.ts);反馈为 obtain 模式,
 //     includeJudge=false(经典规则仅手牌+装备)。
 import type { FrontendAPI, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
-import { runPickTargetCardPanel } from './选牌面板';
+import { runPickTargetCardPanel } from '../pick-card-panel';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

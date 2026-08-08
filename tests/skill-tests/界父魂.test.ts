@@ -329,7 +329,7 @@ describe('界父魂', () => {
     // view 侧同步
     P1.processEvents();
     P1.expectView((v) => {
-      expect(v.players[0].turnUsage?.['父魂/granted']).toBe(true);
+      expect(v.players[0].turnUsage?.['杀/unlimited/父魂']).toBe(true);
     });
   });
 

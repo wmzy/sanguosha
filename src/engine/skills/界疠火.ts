@@ -74,6 +74,13 @@ function damagedKey(shadowId: string): string {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
+  // 添加持久 tag:火杀多目标(供前端 viewSlashTargetMax 推断,替代 skills.includes 检查)
+  const owner = state.players[ownerId];
+  const FIRE_TAG = '杀/火杀多目标';
+  if (!owner.tags.includes(FIRE_TAG)) {
+    owner.tags.push(FIRE_TAG);
+  }
+
   // ─── 杀目标数提供者:owner 的火杀可多指定一个目标(≤3) ──
   // 原始火杀与疠火转化影子均 damageType='火焰',统一识别。
   const unloadTarget = registerSlashTargetProvider(state, ownerId, (st, _player, cardId) => {
@@ -221,6 +228,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   return () => {
     unloadTarget();
+    owner.tags = owner.tags.filter((t) => t !== '杀/火杀多目标');
   };
 }
 

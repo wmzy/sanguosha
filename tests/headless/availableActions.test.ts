@@ -640,6 +640,7 @@ describe('enumerateAvailableActions', () => {
     color: '黑',
     rank: '4',
     type: '装备牌',
+    slashTargetBonusWhenLastCard: 3,
   };
 
   it('默认杀 maxTarget=1（无方天画戟）', () => {
@@ -673,7 +674,7 @@ describe('enumerateAvailableActions', () => {
 
   it('天义拼点赢 → maxTarget=2', () => {
     const view = makeView3(0, '出牌', [killCard, redCard]);
-    view.players[0].turnUsage = { '天义/win': true };
+    view.players[0].turnUsage = { '杀/target/天义': 1 };
     const actions = enumerateAvailableActions(view, 0, [killUseAction]);
     const play = actions.find((x) => x.category === 'play' && x.message.skillId === '杀');
     expect(play).toBeDefined();

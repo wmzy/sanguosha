@@ -11,6 +11,7 @@
 //   - 返回的卸载函数(移除技能/卸下时):清 vars
 import type { GameState, Skill } from '../types';
 import type { SkillModule } from '../skill';
+import { registerSkillViewDelta } from '../skill-view-meta';
 
 /** 距离修正类型:进攻(缩短你到他人的距离)/防御(增加他人到你的距离) */
 type MountKind = '进攻' | '防御';
@@ -28,6 +29,12 @@ const VAR_KEY: Record<MountKind, string> = {
  */
 export function createMountSkill(name: string, kind: MountKind, desc: string): SkillModule {
   const key = VAR_KEY[kind];
+  // 注册视图元数据:马匹技能的 distanceVars 在 onInit(after-hook)里设置,
+  // 但 添加技能/移除技能 的 toViewEvents 早于 after-hook 执行,无法读取运行时 vars。
+  // 故在此预注册静态增量供通用 atom 查询(进攻马=attackMod,防御马=defenseMod)。
+  registerSkillViewDelta(name, {
+    mountDistanceVars: kind === '进攻' ? { attackMod: 1 } : { defenseMod: 1 },
+  });
   return {
     createSkill(id: string, ownerId: number): Skill {
       return { id, ownerId, name, description: desc };
@@ -43,18 +50,6 @@ export function createMountSkill(name: string, kind: MountKind, desc: string): S
     },
   };
 }
-
-/** Mount skill IDs → distanceVars delta (for view sync in 添加技能/移除技能 atoms).
- * Mount skills set/clear vars via onInit (after hook), not via atom apply,
- * so the atoms must include this info in ViewEvents for applyView to sync. */
-export const MOUNT_DISTANCE_VARS: Record<string, { attackMod?: number; defenseMod?: number }> = {
-  赤兔: { attackMod: 1 },
-  紫骍: { attackMod: 1 },
-  大宛: { attackMod: 1 },
-  的卢: { defenseMod: 1 },
-  绝影: { defenseMod: 1 },
-  爪黄飞电: { defenseMod: 1 },
-};
 
 // ─── 进攻马 ───
 export const 赤兔 = createMountSkill('赤兔', '进攻', '进攻马:你与其他角色的距离-1');

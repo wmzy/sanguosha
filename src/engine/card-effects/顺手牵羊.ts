@@ -7,7 +7,7 @@ import type { Card } from '../types';
 import type { GameView } from '../types';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
-import { runPickTargetCardPanel } from '../skills/选牌面板';
+import { runPickTargetCardPanel } from '../pick-card-panel';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
 function canUseSnatch(

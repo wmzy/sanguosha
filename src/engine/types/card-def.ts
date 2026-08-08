@@ -68,6 +68,10 @@ export interface CardDef {
   range?: number;
   weaponEffect?: WeaponEffect;
   armorEffect?: ArmorEffect;
+  /** 武器效果:出杀无次数限制(诸葛连弩) */
+  slashUnlimited?: boolean;
+  /** 武器效果:最后一张手牌出杀时的额外目标上限(方天画戟) */
+  slashTargetBonusWhenLastCard?: number;
 }
 
 export interface WeaponEffect {

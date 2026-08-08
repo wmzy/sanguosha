@@ -3,7 +3,7 @@ import { arcLayout } from '../../src/client/utils/gameViewHelpers';
 
 describe('arcLayout', () => {
   it('places single opponent at top center', () => {
-    expect(arcLayout(1, 0)).toEqual({ leftPct: 50, topPct: 6 });
+    expect(arcLayout(1, 0)).toEqual({ leftPct: 50, topPct: 1 });
   });
 
   it('keeps 2–3 opponents on upper arc within battlefield', () => {
@@ -12,7 +12,7 @@ describe('arcLayout', () => {
         const p = arcLayout(n, i);
         expect(p.leftPct).toBeGreaterThanOrEqual(6);
         expect(p.leftPct).toBeLessThanOrEqual(94);
-        expect(p.topPct).toBeGreaterThanOrEqual(2);
+        expect(p.topPct).toBeGreaterThanOrEqual(0.5);
         expect(p.topPct).toBeLessThanOrEqual(52);
       }
       // leftmost then rightmost

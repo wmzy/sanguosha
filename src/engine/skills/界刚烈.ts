@@ -22,7 +22,7 @@ import { applyAtom, frameCards } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerAfterHook } from '../skill';
-import { runPickTargetCardPanel } from './选牌面板';
+import { runPickTargetCardPanel } from '../pick-card-panel';
 
 const CONFIRM_REQUEST = '界刚烈/confirm';
 const PICK_REQUEST = '界刚烈/选牌';

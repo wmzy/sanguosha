@@ -16,7 +16,13 @@
 //
 // 注:即时锦囊仅【顺手牵羊】受距离限制;【借刀杀人】的约束是武器/杀目标,非距离。
 //     过河拆桥是唯一能"弃置"其他角色装备的途径(顺手牵羊是"获得",不受防具保护影响)。
+//
+//   2b. 防具/宝物保护(主动拦截):onInit 注册 before-hook 到「请求回应」atom,
+//       拦截过河拆桥选牌请求(requestType='过河拆桥_选牌',目标为 owner),在 toViewEvents
+//       之前就地过滤 prompt.equipment 中的防具/宝物 → 前端不展示、不可选。
+//       选牌面板/过河拆桥 不再 import 本模块(解耦),保护逻辑收敛到本 hook。
 import type { Skill, GameState } from '../types';
+import { registerBeforeHook } from '../skill';
 
 /** 奇才横切标签:持有者使用锦囊牌时忽略距离限制(由 顺手牵羊 validate 消费) */
 export const QICAI_TAG = '奇才/无距离限制';
@@ -26,12 +32,6 @@ export const QICAI_ARMOR_TAG = '奇才/防具保护';
 
 /** 奇才横切标签:其他角色不能弃置持有者装备区的宝物(由 过河拆桥 选牌消费) */
 export const QICAI_TREASURE_TAG = '奇才/宝物保护';
-
-/** 受奇才保护的装备槽位→对应标签(过河拆桥 / 选牌面板 消费) */
-export const QICAI_PROTECTED_SLOTS: Record<string, string> = {
-  防具: QICAI_ARMOR_TAG,
-  宝物: QICAI_TREASURE_TAG,
-};
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -52,7 +52,35 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!player.tags.includes(QICAI_TREASURE_TAG)) player.tags.push(QICAI_TREASURE_TAG);
   }
 
+  // 主动拦截:过河拆桥选牌请求(目标为 owner)时,在 toViewEvents 前就地过滤
+  // prompt.equipment 中的防具/宝物 → 前端不展示、不可选、超时 fallback 也不命中。
+  // 顺手牵羊(获得,requestType='顺手牵羊_选牌')不拦截 → 仍可获得装备。
+  const unloadHook = registerBeforeHook(state, skill.id, ownerId, '请求回应', async (ctx) => {
+    const atom = ctx.atom as {
+      requestType?: string;
+      prompt?: {
+        target?: number;
+        equipment?: Array<{ slot: string; cardId: string }>;
+      };
+    };
+    // 仅拦截过河拆桥的弃置选牌请求
+    if (atom.requestType !== '过河拆桥_选牌') return;
+    const targetIdx = atom.prompt?.target;
+    if (typeof targetIdx !== 'number') return;
+    // 仅保护 owner 自己的装备
+    if (targetIdx !== ownerId) return;
+    // 就地过滤掉受保护的槽位(防具/宝物)
+    if (atom.prompt?.equipment) {
+      atom.prompt.equipment = atom.prompt.equipment.filter((e) => {
+        if (e.slot === '防具') return false; // 奇才保护防具
+        if (e.slot === '宝物') return false; // 奇才保护宝物
+        return true;
+      });
+    }
+  });
+
   return () => {
+    unloadHook();
     const p = state.players[ownerId];
     if (p)
       p.tags = p.tags.filter(

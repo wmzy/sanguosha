@@ -44,7 +44,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
-import { runPickTargetCardPanel } from './选牌面板';
+import { runPickTargetCardPanel } from '../pick-card-panel';
 
 const _SKILL_ID = '界旋风';
 const DISPLAY_NAME = '旋风';

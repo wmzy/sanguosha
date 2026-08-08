@@ -235,9 +235,19 @@ const JUNZHENG_DECK: Entry[] = [
 // 此处复用同一份牌名→类型映射,避免维护两套。
 import { 基本牌列表, 锦囊牌列表 } from './cards/card-defs';
 
-const DEF_INDEX: Map<string, { type: CardType; subtype: CardSubType }> = new Map();
+const DEF_INDEX: Map<string, {
+  type: CardType;
+  subtype: CardSubType;
+  slashUnlimited?: boolean;
+  slashTargetBonusWhenLastCard?: number;
+}> = new Map();
 for (const def of [...基本牌列表, ...锦囊牌列表, ...装备牌列表]) {
-  DEF_INDEX.set(def.name, { type: def.type, subtype: def.subtype });
+  DEF_INDEX.set(def.name, {
+    type: def.type,
+    subtype: def.subtype,
+    slashUnlimited: def.slashUnlimited,
+    slashTargetBonusWhenLastCard: def.slashTargetBonusWhenLastCard,
+  });
 }
 
 function cardType(name: string): { type: CardType; subtype: CardSubType } {
@@ -267,6 +277,11 @@ export function createStandardDeck(): Card[] {
     };
     const range = equipmentRangeMap.get(name);
     if (range != null) card.range = range;
+    // 武器效果元数据(诸葛连弩:无限出杀 / 方天画戟:最后一张手牌多目标)
+    const meta = DEF_INDEX.get(name);
+    if (meta?.slashUnlimited) card.slashUnlimited = true;
+    if (meta?.slashTargetBonusWhenLastCard != null)
+      card.slashTargetBonusWhenLastCard = meta.slashTargetBonusWhenLastCard;
     if (opts?.trickSubtype) card.trickSubtype = opts.trickSubtype;
     if (opts?.damageType) card.damageType = opts.damageType;
     deck.push(card);

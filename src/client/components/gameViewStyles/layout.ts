@@ -27,6 +27,10 @@ export const pageRoot = css`
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* 武将卡统一高度:大卡(PlayerCardLarge)在底栏 align-self:stretch,
+     其渲染高度 = bottomLayout 内容高度(content-box)。座位卡(PlayerSeatView)
+     与之共用此值,保证两者像素级一致。宽高比 15:19 由各处 aspect-ratio 推导宽度。 */
+  --hero-card-h: 200px;
 `;
 
 // ─── Header(顶部栏,固定高度) ───
@@ -208,7 +212,8 @@ export const rightSidebar = css`
 // ─── 底部手牌区(固定高度):装备 | 手牌 | 我方武将 ───
 export const bottomLayout = css`
   flex: 0 0 auto;
-  height: 200px;
+  /* content-box:height 即内容高度,= 大卡 stretch 高度(= --hero-card-h);padding 额外 */
+  height: var(--hero-card-h);
   display: flex;
   align-items: stretch;
   gap: 10px;

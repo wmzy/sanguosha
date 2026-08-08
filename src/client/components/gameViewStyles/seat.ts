@@ -23,8 +23,8 @@ export const seatArcSlot = css`
   left: var(--seat-left, 0);
   top: var(--seat-top, 0);
   transform: translateX(-50%);
-  /* 竖向座位卡宽度;内部 CountdownBar 与卡对齐 */
-  width: 148px;
+  /* 宽度 = 武将卡高度 × 15/19,与大卡/座位卡同尺寸;内部 CountdownBar 与卡对齐 */
+  width: calc(var(--hero-card-h) * 15 / 19);
   display: flex;
   flex-direction: column;
   gap: 3px;

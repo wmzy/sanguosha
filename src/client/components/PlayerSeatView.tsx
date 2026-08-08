@@ -312,9 +312,9 @@ const seatCard = css`
   overflow: hidden;
   background: rgba(0, 0, 0, 0.5);
   transition: all 0.25s;
-  /* 宽高比 = 武将立绘 750×950(15:19),立绘完整不裁切 */
-  width: 200px;
-  aspect-ratio: 15 / 19;
+  /* 与底栏 PlayerCardLarge 同尺寸:高度统一为 --hero-card-h,宽度撑满 seatArcSlot(= 卡高 × 15/19) */
+  height: var(--hero-card-h);
+  width: 100%;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 `;
 // 势力色顶部条:武将名 + 身份

@@ -300,24 +300,25 @@ export function findSeatCenter(view: GameView, idx: number): { left: number; top
  * @returns { leftPct, topPct } 百分比坐标(相对 battleField)
  */
 export function arcLayout(totalOthers: number, i: number): { leftPct: number; topPct: number } {
-  if (totalOthers <= 0) return { leftPct: 50, topPct: 20 };
-  if (totalOthers === 1) return { leftPct: 50, topPct: 6 };
+  if (totalOthers <= 0) return { leftPct: 50, topPct: 1 };
+  if (totalOthers === 1) return { leftPct: 50, topPct: 1 };
 
   const t = i / (totalOthers - 1);
-  // 标准极角:0=右, π/2=上, π=左。人数多时两端更靠侧下,腾出顶部中央。
-  const startAngle = totalOthers <= 3 ? Math.PI * 0.88 : Math.PI * 1.12;
-  const endAngle = totalOthers <= 3 ? Math.PI * 0.12 : Math.PI * -0.12;
+  // 标准极角:0=右, π/2=上, π=左。人数多时用完整上半圆,左右两侧落座。
+  const startAngle = totalOthers <= 3 ? Math.PI * 0.88 : Math.PI;
+  const endAngle = totalOthers <= 3 ? Math.PI * 0.12 : 0;
   const angle = startAngle + (endAngle - startAngle) * t;
 
   const rx = totalOthers <= 3 ? 38 : 44;
-  const ry = totalOthers <= 3 ? 26 : 34;
+  // ry = cy - 1:最高点(弧顶)恰好贴近顶部(topPct≈1%),整体上移让武将卡尽量靠顶
   const cx = 50;
-  const cy = totalOthers <= 3 ? 20 : 26;
+  const cy = totalOthers <= 3 ? 14 : 19;
+  const ry = cy - 1;
 
   const leftPct = cx + rx * Math.cos(angle);
   const topPct = cy - ry * Math.sin(angle);
   return {
     leftPct: Math.min(94, Math.max(6, leftPct)),
-    topPct: Math.min(52, Math.max(2, topPct)),
+    topPct: Math.min(52, Math.max(0.5, topPct)),
   };
 }

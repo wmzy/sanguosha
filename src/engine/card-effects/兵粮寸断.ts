@@ -11,6 +11,7 @@ import { runJudgeFlow } from '../judge-flow';
 import { effectiveDistance } from '../distance';
 import { viewEffectiveDistance } from '../viewDistance';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { registerDelayedTrick } from '../card-effect/delayed-trick-registry';
 
 /** 跳过摸牌阶段的 tag 名 */
 const SKIP_TAG = '兵粮寸断/跳过摸牌';
@@ -76,3 +77,6 @@ const supplyShortageEffect: CardEffect = {
 };
 
 registerCardEffect('兵粮寸断', supplyShortageEffect);
+
+// 自注册延时锦囊:判定非♣生效后跳过摸牌阶段
+registerDelayedTrick({ name: '兵粮寸断', skipPhase: { tag: SKIP_TAG, phase: '摸牌' } });

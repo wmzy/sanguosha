@@ -12,9 +12,10 @@
 // 新批次到来时 setState 推送 VfxPlaybackItem[]，驱动 VfxLayer 重新渲染。
 
 import { useEffect, useRef, useState } from 'react';
-import type { ViewEvent } from '../../engine/types';
+import type { ViewEvent, Card } from '../../engine/types';
 import { getAtomDef } from '../../engine/atom';
 import { resourceManager } from '../resources';
+import { getCardVfx } from '../cardVfx';
 import type { QueuedEvent } from './useEventPlayback';
 
 /** ViewEvent 自带的 effect 片段（派生事件携带；静态 atom 走 getAtomDef） */
@@ -23,9 +24,19 @@ type EventEffect = { vfx?: string } | undefined;
 /**
  * 从 ViewEvent 提取 effect.vfx。
  * 优先用 ViewEvent 自带 effect（派生事件），fallback 到 atom 静态 effect。
- * 查表失败（未注册 type）返回 null，不抛。
+ *  查表失败（未注册 type）返回 null，不抛。
+ *
+ * 「使用时」事件的出牌动效由前端按 cardName + damageType 自行计算
+ *  (getCardVfx),引擎不再在 effect 中硬编码 vfx。
  */
-function extractVfx(event: ViewEvent): string | null {
+function extractVfx(event: ViewEvent, cardMap: Record<string, Card>): string | null {
+  if (event.type === '使用时') {
+    const ev = event as { cardName?: string; cardId?: string };
+    const cardName = ev.cardName;
+    if (!cardName) return null;
+    const damageType = ev.cardId ? cardMap[ev.cardId]?.damageType : undefined;
+    return getCardVfx(cardName, damageType as string | undefined);
+  }
   const atomType = (event as { atomType?: string }).atomType ?? event.type;
   let staticEffect: EventEffect;
   try {
@@ -55,6 +66,7 @@ export interface VfxPlaybackItem {
  */
 export function useVfxPlayback(
   ingested: readonly QueuedEvent[] | null | undefined,
+  cardMap: Record<string, Card>,
 ): VfxPlaybackItem[] {
   const lastSeqRef = useRef(0);
   const [items, setItems] = useState<VfxPlaybackItem[]>([]);
@@ -68,7 +80,7 @@ export function useVfxPlayback(
 
     const newItems: VfxPlaybackItem[] = [];
     for (const { event, seq } of fresh) {
-      const vfxId = extractVfx(event);
+      const vfxId = extractVfx(event, cardMap);
       if (!vfxId) continue;
       const url = resourceManager.get(`anim/${vfxId}`);
       if (!url) continue;
@@ -84,6 +96,9 @@ export function useVfxPlayback(
     if (newItems.length > 0) {
       setItems((prev) => [...prev, ...newItems]);
     }
+    // cardMap 引用每次渲染变化,但 fresh 事件由 ingested 数组引用驱动;
+    // 这里只在 ingested 变化时触发(cardMap 在闭包中取最新传入值)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ingested]);
 
   return items;

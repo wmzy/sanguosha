@@ -164,7 +164,8 @@ export function GameViewComponentImpl({
   // 氛围音效(回合/阶段)fire-and-forget;动作音效串行(间隔基于音频时长)避免叠音。
   useSoundPlayback(ingestedEvents);
   // Lottie 特效:同样监听 ingested 批次,按 effect.vfx 查 ResourceManager 播放 anim/{id}
-  const vfxItems = useVfxPlayback(ingestedEvents);
+  // (使用时事件的出牌动效由前端按 cardName + damageType 自行计算)
+  const vfxItems = useVfxPlayback(ingestedEvents, view.cardMap);
   // 资源包管理:发现 + 启停(localStorage 持久化),供顶部「📦」浮层调用
   const { packs, refresh, togglePack } = useResourcePacks();
   const [showPacks, setShowPacks] = useState(false);

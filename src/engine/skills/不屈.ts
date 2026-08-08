@@ -24,6 +24,9 @@ import { applyAtom } from '../index';
 import { registerAfterHook } from '../skill';
 
 const SURVIVE_KEY = '不屈/存活';
+// 置创牌 atom 的 vars key(创牌列表存储键 + 重复判定结果键),与 atom 参数对齐
+const WOUND_KEY = '不屈/创牌';
+const DUPLICATE_KEY = '不屈/重复';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -48,14 +51,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (ctx.state.zones.deck.length === 0) return;
 
     // 清理上次不屈的临时判定结果
-    delete ctx.state.localVars['不屈/重复'];
+    delete ctx.state.localVars[DUPLICATE_KEY];
 
-    // 置创牌:翻牌堆顶一张作创牌,atom 内部判定点数重复
-    await applyAtom(ctx.state, { type: '置创牌', player: ownerId });
+    // 置创牌:翻牌堆顶一张作创牌,atom 内部判定点数重复(传入 vars/result 键名)
+    await applyAtom(ctx.state, {
+      type: '置创牌',
+      player: ownerId,
+      varsKey: WOUND_KEY,
+      resultKey: DUPLICATE_KEY,
+    });
 
-    const duplicate = ctx.state.localVars['不屈/重复'] as boolean | undefined;
+    const duplicate = ctx.state.localVars[DUPLICATE_KEY] as boolean | undefined;
     // 清理临时判定结果(仅存活标记需保留给 runDyingFlow 读取)
-    delete ctx.state.localVars['不屈/重复'];
+    delete ctx.state.localVars[DUPLICATE_KEY];
 
     if (duplicate) {
       // 点数重复且已移去此牌:不屈失败,不设存活标记 → runDyingFlow 继续求桃,无人救则击杀

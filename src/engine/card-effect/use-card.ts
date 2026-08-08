@@ -26,6 +26,7 @@ import { validateCardUse, computeAutoTargets } from './validate';
 import { getCardEffect, getAllCardEffects, requireCardEffect } from './registry';
 import type { CardEffect, CancellableBy } from './registry';
 import { isCancelled } from './registry';
+import { getDelayedTricks } from './delayed-trick-registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -359,7 +360,8 @@ export function registerDelayedTrickHooks(state: GameState): void {
     const self = ctx.state.players[player];
     if (!self) return;
 
-    const DELAYED_TRICKS = ['乐不思蜀', '兵粮寸断', '闪电'];
+    // 延时锦囊名单从注册表读取(各延时锦囊 CardEffect 自注册,数据驱动)
+    const delayedTrickNames = getDelayedTricks().map((t) => t.name);
 
     // 循环：逐个结算最后置入的延时锦囊，直到判定区无延时锦囊。
     //   规则：判定阶段检测判定区有延时锦囊 → 结算最后置入的 → 重复直到判定区清空。
@@ -373,7 +375,7 @@ export function registerDelayedTrickHooks(state: GameState): void {
       // 取最后置入的延时锦囊（规则：结算最后置入的）
       const trick = [...self.pendingTricks]
         .reverse()
-        .find((t) => DELAYED_TRICKS.includes(t.name));
+        .find((t) => delayedTrickNames.includes(t.name));
       if (!trick) break;
 
       const cancelled = await resumeDelayedSettlement(
@@ -400,28 +402,22 @@ export function registerDelayedTrickHooks(state: GameState): void {
     }
   });
 
-  // 跳过阶段 before-hook：乐不思蜀跳过出牌、兵粮寸断跳过摸牌
-  const SKIP_MAP: Record<string, string> = {
-    乐不思蜀: '乐不思蜀/跳过出牌',
-    兵粮寸断: '兵粮寸断/跳过摸牌',
-  };
+  // 跳过阶段 before-hook：遍历注册表中声明 skipPhase 的延时锦囊,
+  //   对应 tag 存在且阶段匹配 → 跳过(乐不思蜀跳出牌、兵粮寸断跳摸牌)
   registerBeforeHook(state, '延时锦囊', -1, '阶段开始', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始') return;
     const player = atom.player;
     const self = ctx.state.players[player];
     if (!self) return;
-    for (const [trickName, tag] of Object.entries(SKIP_MAP)) {
-      if (self.tags.includes(tag)) {
-        const skipPhase = atom.phase === '出牌' || atom.phase === '摸牌';
-        if (!skipPhase) continue;
-        if (
-          (trickName === '乐不思蜀' && atom.phase === '出牌') ||
-          (trickName === '兵粮寸断' && atom.phase === '摸牌')
-        ) {
-          const { skipPhase: doSkip } = await import('../skip-phase');
-          return doSkip(ctx.state, atom, tag);
-        }
+    if (atom.phase !== '出牌' && atom.phase !== '摸牌') return;
+    for (const trick of getDelayedTricks()) {
+      const sp = trick.skipPhase;
+      if (!sp) continue;
+      if (sp.phase !== atom.phase) continue;
+      if (self.tags.includes(sp.tag)) {
+        const { skipPhase: doSkip } = await import('../skip-phase');
+        return doSkip(ctx.state, atom, sp.tag);
       }
     }
   });

@@ -283,8 +283,11 @@ export type Atom =
   | { type: '帧参数赋值'; key: string; value: Json }
   // 回合用量(view 同步):出杀计数/限一次标记同步到前端 turnUsage
   | { type: '回合用量'; player: number; key: string; value: Json }
-  // 周泰·不屈:牌堆顶一张牌作为"创"牌置于武将牌上;点数重复则移去(进弃牌堆)
-  | { type: '置创牌'; player: number }
+  // 翻牌判定(通用):牌堆顶一张牌置于 player.vars[varsKey] 列表;点数与已有牌重复则移去(进弃牌堆)。
+  // 重复判定结果写入 localVars[resultKey]。服务于「翻一张牌作标记,点数去重」型技能(周泰不屈/界不屈)。
+  // varsKey=创牌列表的 player.vars 键名(由调用方技能指定,如 '不屈/创牌');
+  // resultKey=重复判定结果写入的 localVars 键名(如 '不屈/重复')。
+  | { type: '置创牌'; player: number; varsKey: string; resultKey: string }
   // 于吉·蛊惑:扣置一张手牌(面朝下移入弃牌堆暂存),声明为某基本牌。牌的真实身份对其他人隐藏。
   // apply:手牌→弃牌堆(面朝下)+ localVars['蛊惑/扣牌'] 记录 cardId 供后续揭示/给牌/生效。
   | { type: '扣牌'; player: number; cardId: string; declaredName: string }

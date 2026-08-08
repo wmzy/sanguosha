@@ -7,6 +7,12 @@ import { setSkillModuleResolver, setSkillModuleChecker } from '../skill';
 // Eager load：注册所有 CardEffect（杀/闪/桃 等），副作用 import
 import '../card-effects';
 
+// Eager load 马匹技能:其 createMountSkill 工厂在模块加载时调用
+// registerSkillViewDelta 注册静态视图增量。添加技能/移除技能 的 toViewEvents
+// 早于动态 import 马匹技能的 after-hook 执行,故必须在此预加载以保证注册表已填充。
+// (此前该模块由 atom 静态 import 间接触发预加载,解耦后改由此处显式预加载。)
+import './马匹技能';
+
 // 注意:系统规则的全局 hooks 不再在模块加载时注册(state-bound 注册表要求绑定到具体 state)。
 // 改由 index 的 bootstrap / registerSkillsFromState 对每个真实 state 调用 系统规则.onInit 注册。
 

@@ -104,7 +104,7 @@ describe('useVfxPlayback · target 提取优先级', () => {
         },
       },
     ];
-    const { result } = renderHook(() => useVfxPlayback(ingested as never));
+    const { result } = renderHook(() => useVfxPlayback(ingested as never, {}));
     expect(result.current).toHaveLength(1);
     // source 回退:桃/酒 selfTarget,使用者即目标 → target=2
     expect(result.current[0].target).toBe(2);
@@ -125,7 +125,7 @@ describe('useVfxPlayback · target 提取优先级', () => {
         },
       },
     ];
-    const { result } = renderHook(() => useVfxPlayback(ingested as never));
+    const { result } = renderHook(() => useVfxPlayback(ingested as never, {}));
     expect(result.current[0].target).toBe(3);
   });
 
@@ -133,7 +133,7 @@ describe('useVfxPlayback · target 提取优先级', () => {
     const ingested = [
       { seq: 1, event: { type: '回合', effect: { vfx: 'misc/turn' } } },
     ];
-    const { result } = renderHook(() => useVfxPlayback(ingested as never));
+    const { result } = renderHook(() => useVfxPlayback(ingested as never, {}));
     expect(result.current[0].target).toBeUndefined();
   });
 });

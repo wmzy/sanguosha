@@ -36,6 +36,8 @@ import { registerHandLimitProvider } from '../hand-limit';
 
 const SURVIVE_KEY = '不屈/存活';
 const WOUND_KEY = '不屈/创牌';
+// 置创牌 atom 重复判定结果写入的 localVars 键名,与 atom 参数对齐
+const DUPLICATE_KEY = '不屈/重复';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -65,14 +67,19 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (ctx.state.zones.deck.length === 0) return;
 
       // 清理上次不屈的临时判定结果
-      delete ctx.state.localVars['不屈/重复'];
+      delete ctx.state.localVars[DUPLICATE_KEY];
 
       // 置创牌:翻牌堆顶一张;不重复则置于武将牌,重复则移去(进弃牌堆)
-      await applyAtom(ctx.state, { type: '置创牌', player: ownerId });
+      await applyAtom(ctx.state, {
+        type: '置创牌',
+        player: ownerId,
+        varsKey: WOUND_KEY,
+        resultKey: DUPLICATE_KEY,
+      });
 
-      const duplicate = ctx.state.localVars['不屈/重复'] as boolean | undefined;
+      const duplicate = ctx.state.localVars[DUPLICATE_KEY] as boolean | undefined;
       // 清理临时判定结果(仅存活标记需保留给 runDyingFlow 读取)
-      delete ctx.state.localVars['不屈/重复'];
+      delete ctx.state.localVars[DUPLICATE_KEY];
 
       if (duplicate) {
         // 点数重复且已移去此牌:界不屈失败,不设存活标记 → runDyingFlow 继续求桃

@@ -8,20 +8,22 @@
 import type { AtomDefinition, Card, ViewEventSplit, ViewEvent } from '../types';
 import type { Color } from '../../engine/types';
 import { registerAtom } from '../atom';
+import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../cards/card-defs';
+
+/** 牌名→类型映射(从卡牌定义派生,数据驱动,不硬编码牌名)。
+ *  模块加载时构建一次,覆盖所有标准卡牌(基本/锦囊/装备)。 */
+const CARD_TYPE_MAP: ReadonlyMap<string, Card['type']> = (() => {
+  const map = new Map<string, Card['type']>();
+  for (const def of [...基本牌列表, ...锦囊牌列表, ...装备牌列表]) {
+    map.set(def.name, def.type);
+  }
+  return map;
+})();
 
 /** 根据转化后的牌名推断卡牌类型。
- *  基本牌(杀/闪/桃/酒)→ '基本牌';其余按已知锦囊名 → '锦囊牌'。
- *  未知名字默认 '基本牌'(武圣转化杀)。 */
-const BASIC_CARD_NAMES = new Set(['杀', '闪', '桃', '酒']);
-const TRICK_CARD_NAMES = new Set([
-  '决斗', '过河拆桥', '顺手牵羊', '无中生有', '借刀杀人', '无懈可击',
-  '桃园结义', '南蛮入侵', '万箭齐发', '五谷丰登', '火攻', '铁索连环',
-  '乐不思蜀', '兵粮寸断', '闪电',
-]);
+ *  从卡牌定义派生的静态映射查询;未知牌名默认 '基本牌'(常见转化场景)。 */
 function inferCardType(name: string): Card['type'] {
-  if (BASIC_CARD_NAMES.has(name)) return '基本牌';
-  if (TRICK_CARD_NAMES.has(name)) return '锦囊牌';
-  return '基本牌';
+  return CARD_TYPE_MAP.get(name) ?? '基本牌';
 }
 
 /**
@@ -126,7 +128,7 @@ export const 当作: AtomDefinition<{
           suit: single ? (origCard?.suit ?? '') : '',
           color: transformColor(cardIds, view.cardMap),
           rank: origCard?.rank ?? 'A',
-          type: '基本牌',
+          type: inferCardType(outputName),
           shadowOf: single ? cardIds[0] : undefined,
         };
         if (outputDamageType) shadowCard.damageType = outputDamageType;

@@ -8,9 +8,15 @@
 //   第一次: 清除标记 + drain闪 + 追加第二次询问闪。
 //   第二次: 放行(标记保持设置)。
 //
-// 选择 询问闪 after-hook(而非 生效前 after-hook)的原因:
-//   生效前 after-hook 按注册顺序执行——P1 的无双 hook 先于 P2 的闪 hook(P1 先实例化)。
-//   询问闪 after-hook 在 询问闪 resolve 时触发,此时闪的 respond action 已设置标记。
+// 实现方式(决斗部分):在「询问杀」after-hook 中处理(决斗.ts 不感知无双)。
+//   决斗循环每轮 applyAtom(询问杀) → 玩家 respond(出杀,杀进处理区) →
+//   询问杀 resolve → 无双的 询问杀 after-hook:
+//     第一次: 消费处理区第一张杀 + 追加第二次询问杀;
+//     第二次: 放行(第二张杀留给决斗循环消费)。
+//
+// 选择 after-hook(而非 before-hook)的原因:
+//   after-hook 在 atom resolve 后触发,此时玩家已回应(出杀/超时),处理区状态确定。
+//   且等待型 atom 的 after-hook 在 skip/silent/超时 情况下均会触发(见 applyAtom 管线)。
 
 import type { GameState, Skill } from '../types';
 import { applyAtom } from '../index';
@@ -31,6 +37,11 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 function dodgeCountKey(killCardId: string, target: number): string {
   return `无双/dodgeCount/${killCardId}/${target}`;
+}
+
+/** 无双决斗:每轮决斗内、针对某个被询问出杀者的双杀计数键(防第二次询问杀的 after-hook 再追加) */
+function duelKillCountKey(duelCardId: string, target: number): string {
+  return `无双/duelCount/${duelCardId}/${target}`;
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
@@ -71,6 +82,42 @@ export function onInit(skill: Skill, state: GameState): () => void {
     delete ctx.state.localVars[countKey];
   });
 
+  // ── 询问杀 after-hook:无双决斗中,被要求出杀的一方需连续打出两张杀 ──
+  // 决斗循环每轮 applyAtom(询问杀) resolve 后触发本 hook(与无双杀的 询问闪 hook 同构)。
+  // 决斗.ts 不再感知无双:本 hook 内部完成「消费第一张杀 + 追加第二次询问杀」。
+  //   第一次杀:消费处理区已打出的杀 → 追加第二次询问杀;
+  //   第二次杀:放行(不再追加),第二张杀由决斗循环的 consumePlayedSlashes 消费。
+  //   count 计数器(同无双杀)防止第二次询问杀的 after-hook 再次追加导致无限循环。
+  registerAfterHook(state, skill.id, ownerId, '询问杀', async (ctx) => {
+    const atom = ctx.atom as { target: number; source: number };
+    // 仅当要求出杀的一方(source)拥有无双时生效(无双 owner 是决斗中"要求对方出杀"的一方)
+    if (atom.source !== ownerId) return;
+    if (!ctx.state.players[ownerId]?.skills.includes('无双')) return;
+
+    // 仅在决斗上下文(结算帧顶的牌是决斗);南蛮入侵等同样用询问杀的牌不触发
+    const frame = ctx.state.settlementStack[ctx.state.settlementStack.length - 1];
+    const frameCardId = frame?.params?.cardId as string | undefined;
+    if (!frameCardId || ctx.state.cardMap[frameCardId]?.name !== '决斗') return;
+
+    const target = atom.target;
+    const countKey = duelKillCountKey(frameCardId, target);
+    const count = (ctx.state.localVars[countKey] as number) ?? 0;
+    if (count >= 1) {
+      // 第二次杀:放行(第二张杀留给决斗循环消费)
+      delete ctx.state.localVars[countKey];
+      return;
+    }
+
+    // 第一次杀:消费处理区已打出的杀;若未出杀则不追加(对方直接输)
+    const firstKills = await consumePlayedSlashes(ctx.state);
+    if (firstKills.length === 0) return;
+
+    // 标记已询问第一次,追加第二次询问杀
+    ctx.state.localVars[countKey] = count + 1;
+    await applyAtom(ctx.state, { type: '询问杀', target, source: ownerId });
+    delete ctx.state.localVars[countKey];
+  });
+
   return () => {};
 }
 
@@ -78,21 +125,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
 function getKillCardId(state: GameState): string {
   const frame = state.settlementStack[state.settlementStack.length - 1];
   return (frame?.params?.cardId as string) ?? '';
-}
-
-/**
- * 无双·决斗:若 otherParty(决斗中拥有无双的一方)有无双,消耗处理区已有的全部杀牌,
- * 再追加一次 applyAtom(询问杀)。
- */
-export async function enforceDualKill(
-  state: GameState,
-  otherParty: number,
-  current: number,
-): Promise<void> {
-  if (!state.players[otherParty]?.skills.includes('无双')) return;
-  const firstKills = await consumePlayedSlashes(state);
-  if (firstKills.length === 0) return;
-  await applyAtom(state, { type: '询问杀', target: current, source: otherParty });
 }
 
 export default { createSkill, onInit } satisfies SkillModule;

@@ -242,7 +242,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await applyAtom(ctx.state, {
         type: '回合用量',
         player: ownerId,
-        key: GRANT_VAR,
+        key: '杀/unlimited/父魂',
         value: true,
       });
     },
@@ -345,7 +345,7 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
       // 仅在获得武圣时显示
       const p = ctx.view.players[ctx.perspectiveIdx];
       if (!p) return false;
-      if (!p.turnUsage?.[GRANT_VAR]) return false;
+      if (!p.turnUsage?.['杀/unlimited/父魂']) return false;
       const hasRed = p.hand?.some((c) => c.color === '红') ?? false;
       return hasRed && viewCanSlash(ctx.view, ctx.perspectiveIdx);
     },

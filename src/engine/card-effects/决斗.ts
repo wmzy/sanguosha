@@ -9,7 +9,6 @@
 import type { Card } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../damage-flow';
-import { enforceDualKill } from '../skills/无双';
 import { consumePlayedSlashes } from '../card-effect/play-card';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
@@ -49,9 +48,10 @@ async function runDuelLoop(
       target: current,
       source: turn === 0 ? from : target,
     });
-    // 无双(吕布锁定技)：与你决斗的角色每次需连续打出两张杀
-    await enforceDualKill(state, turn === 0 ? from : target, current);
-    // 统一清理：处理区内打出的杀移入弃牌堆；返回空 = 没出杀（输）
+    // 无双(吕布锁定技):与你决斗的角色每次需连续打出两张杀
+    // —— 由 无双 skill 的「询问杀」after-hook 自动处理(本文件不感知具体技能)。
+    //   hook 消费第一张杀并追加第二次询问杀;第二张杀由下方 consumePlayedSlashes 消费。
+    // 统一清理:处理区内打出的杀移入弃牌堆;返回空 = 没出杀(输)
     const kills = await consumePlayedSlashes(state);
     if (kills.length > 0) {
       turn = turn === 0 ? 1 : 0;

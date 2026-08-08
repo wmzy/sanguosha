@@ -36,7 +36,7 @@ import {
   type SkillModule,
 } from '../skill';
 import { defaultPlayActive } from '../action-active';
-import { runPickTargetCardPanel } from './选牌面板';
+import { runPickTargetCardPanel } from '../pick-card-panel';
 import { registerAttackRangeExemptor } from '../distance';
 import { registerSlashExemptor } from '../slash-quota';
 
@@ -161,7 +161,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         await applyAtom(st, {
           type: '回合用量',
           player: from,
-          key: SUIT_VAR,
+          key: '杀/exemptSuit',
           value: discardedCard.suit,
         });
       }
