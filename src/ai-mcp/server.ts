@@ -10,7 +10,7 @@
 //
 // 工具与启动语义：
 //   createRoom / joinRoom / spectateRoom 三选一启动（同一 MCP 连接只能启动一次）。
-//   play 仅在已启动后可用；lobby→playing 推进由 play 内部 advanceLobby 完成。
+//   play 仅在已启动后可用；lobby→playing 推进融入 runPlay 的 tick 循环（lobbyAdvancer），lobby 阶段阻塞等待而非立即返回。
 //   启动工具的 roomId 在 schema 层 required（joinRoom/spectateRoom），杜绝漏传静默建房的旧问题。
 import * as readline from 'node:readline';
 import { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
@@ -22,7 +22,7 @@ import {
   type JoinRoomOpts,
   type SpectateRoomOpts,
 } from './mcpServer';
-import { joinAndReady, advanceToStart } from './lobby';
+import { joinAndReady, createLobbyAdvancer } from './lobby';
 import type { RoomConfig } from '../server/protocol';
 import { DEFAULT_CHAT_CONFIG } from '../server/protocol';
 
@@ -114,16 +114,10 @@ async function main(): Promise<void> {
     logErr(`spectator joined: ${opts.roomId}`);
   };
 
-  // ── play 工具内部：lobby→playing 推进 ──
-  // 旁观者不准备/不开局，仅 no-op。
-  // 5s 短超时使 advanceToStart 快速返回，避免 MCP 客户端 30s 超时。调用方持续调 play({}) 即可重试。
-  const advanceLobby = async (): Promise<void> => {
-    if (startedRole === 'spectator') return;
-    if (hgc.phase !== 'lobby') return;
-    // 非房主也调 applyConfigUpdate（no-op）；房主建房时如有 timeoutScale/name 则发送 updateConfig。
-    // 这里不再传 timeoutScale/name（启动工具已处理），仅推进开局。
-    await advanceToStart(hgc, 5_000);
-  };
+  // lobby 推进器：runPlay 在 lobby 阶段周期调用，全员就绪且房主时发一次 startGame。
+  // 非阻塞、幂等，替代原先 play 前单独阻塞 advanceToStart(5s) 的做法——推进融入
+  // runPlay 的 tick 循环，lobby 阶段持续阻塞等待 playing，避免 agent 高频轮询浪费 token。
+  const lobbyAdvance = createLobbyAdvancer(hgc);
 
   const isStarted = (): boolean => startedRole !== null;
 
@@ -132,7 +126,7 @@ async function main(): Promise<void> {
     doCreateRoom,
     doJoinRoom,
     doSpectateRoom,
-    advanceLobby,
+    lobbyAdvance,
     isStarted,
     seat: SEAT,
     playState: { lastView: null },

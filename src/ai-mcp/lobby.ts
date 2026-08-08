@@ -131,6 +131,29 @@ export async function advanceToStart(
 }
 
 /**
+ * 创建 lobby 推进器：返回幂等、非阻塞的推进函数，供 playHandler 的 tick 循环
+ * 在 lobby/connecting 阶段周期调用。
+ *
+ * 全员就绪后房主发送一次 startGame（内部去重，避免 phase 切换前重复发送）；
+ * 非房主 / 未全员就绪 / 已进入 playing 时为 no-op。这样 runPlay 在 lobby 阶段可持续
+ * 阻塞等待进入 playing + needsAction，而非立即返回迫使 agent 高频轮询浪费 token。
+ */
+export function createLobbyAdvancer(hgc: HeadlessGameClient): () => void {
+  let startRequested = false;
+  return () => {
+    if (startRequested) return;
+    if (isPlaying(hgc)) return;
+    if (!isAllReady(hgc)) return;
+    // 全员就绪：房主发一次开局；非房主无需动作。置 startRequested 避免重复发送。
+    startRequested = true;
+    const rs = hgc.roomState;
+    if (rs?.hostId && rs.hostId === hgc.playerId) {
+      void hgc.sendStartGame();
+    }
+  };
+}
+
+/**
  * 加入房间并推进到开局。
  * create 模式：建房→准备→等待他人加入并就绪→房主开局。
  * join 模式：加入→准备→等待房主开局。

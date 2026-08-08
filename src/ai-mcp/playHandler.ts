@@ -21,6 +21,10 @@ export interface PlayInput {
   waitTimeoutMs?: number;
   /** play 状态引用；提供时计算 stateDiff 并更新 lastView。 */
   state?: PlayState;
+  /** lobby/connecting 阶段的非阻塞推进回调（房主全员就绪时发 startGame）。
+   *  由调用方提供（createLobbyAdvancer），runPlay 在 lobby 阶段周期调用以推进开局，
+   *  避免立即返回导致 agent 高频轮询浪费 token。 */
+  lobbyAdvance?: () => void;
 }
 
 export interface PlayResult {
@@ -131,10 +135,14 @@ export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promis
         lastActionResult = 'rejected';
       }
       if (hgc.phase === 'ended' || hgc.gameOverWinner !== null) return settle();
-      // lobby/connecting 阶段立即返回，让调用方重新调 play 重试 advanceToStart。
-      // 否则 runPlay 会阻塞到 deadline（120s），超出 MCP 客户端 30s 超时。
-      if (hgc.phase === 'connecting' || hgc.phase === 'lobby') return settle();
-      if (hgc.needsAction()) return settle();
+      // lobby/connecting 阶段：周期推进（房主开局）并阻塞等待进入 playing，
+      // 而非立即返回——避免 agent 在游戏未开始时空轮询浪费 token。
+      // deadline（默认 25s）低于 MCP 客户端 30s 超时；超时返回 lobby 状态让调用方重试。
+      if (hgc.phase === 'connecting' || hgc.phase === 'lobby') {
+        input.lobbyAdvance?.();
+      } else if (hgc.needsAction()) {
+        return settle();
+      }
       if (Date.now() >= deadline) {
         if (lastActionResult === 'accepted') lastActionResult = 'timeout';
         return settle();

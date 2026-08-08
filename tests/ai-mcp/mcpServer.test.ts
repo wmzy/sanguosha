@@ -19,6 +19,7 @@ import {
 } from '../../src/ai-mcp/mcpServer';
 import '../../src/engine/skills';
 import type { HeadlessGameClient } from '../../src/client/headless/HeadlessGameClient';
+import type { ClientPhase } from '../../src/client/headless/types';
 import {
   reportBugResult,
   resolveFeedbackDir,
@@ -43,13 +44,42 @@ function makeFakeHgc(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameC
   } as unknown as HeadlessGameClient;
 }
 
+/**
+ * fake HGC：phase 初始 lobby，delayMs 后异步推进到 playing + needsAction。
+ * 用于验证 play 工具在 lobby 阶段阻塞等待进入 playing，而非立即返回。
+ */
+function makeLobbyAdvancingHgc(delayMs: number): HeadlessGameClient {
+  const state = { phase: 'lobby' as ClientPhase, needsAction: false };
+  setTimeout(() => {
+    state.phase = 'playing';
+    state.needsAction = true;
+  }, delayMs);
+  return {
+    isSpectator: false,
+    get phase() {
+      return state.phase;
+    },
+    seatIndex: 0,
+    playerId: 'p1',
+    roomId: 'ROOM1',
+    roomState: { hostId: 'p1', readyPlayers: ['p1', 'p2'], playerIds: ['p1', 'p2'], maxPlayers: 2, config: { name: 'r', timeoutScale: 1, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 } }, spectatorIds: [], viewGrants: {}, pendingViewRequests: {} },
+    gameOverWinner: null,
+    view: null,
+    getAvailableActions: () => [],
+    needsAction: () => state.needsAction,
+    drainNewEvents: () => [],
+    sendAction: vi.fn(),
+    consumeActionRejected: () => false,
+  } as unknown as HeadlessGameClient;
+}
+
 function makeCtx(
   hgc: HeadlessGameClient,
   handlers: Partial<{
     doCreateRoom: (o: CreateRoomOpts) => Promise<void>;
     doJoinRoom: (o: JoinRoomOpts) => Promise<void>;
     doSpectateRoom: (o: SpectateRoomOpts) => Promise<void>;
-    advanceLobby: () => Promise<void>;
+    lobbyAdvance: () => void;
     isStarted: () => boolean;
   }> = {},
 ): McpHandlerContext {
@@ -58,7 +88,7 @@ function makeCtx(
     doCreateRoom: handlers.doCreateRoom ?? (vi.fn(async () => {})),
     doJoinRoom: handlers.doJoinRoom ?? (vi.fn(async () => {})),
     doSpectateRoom: handlers.doSpectateRoom ?? (vi.fn(async () => {})),
-    advanceLobby: handlers.advanceLobby ?? vi.fn(async () => {}),
+    lobbyAdvance: handlers.lobbyAdvance ?? (vi.fn(() => {})),
     isStarted: handlers.isStarted ?? (() => true),
     seat: 0,
     playState: { lastView: null },
@@ -143,6 +173,27 @@ describe('handleMcpRequest', () => {
     };
     expect(result.content[0].text).toBeTypeOf('string');
     expect(result.structuredContent.lastActionResult).toBe('accepted');
+  });
+
+  it('tools/call play 在 lobby 阶段阻塞等待进入 playing 而非立即返回', async () => {
+    const hgc = makeLobbyAdvancingHgc(50);
+    const lobbyAdvance = vi.fn(() => {});
+    const ctx = makeCtx(hgc, { lobbyAdvance });
+    const t0 = Date.now();
+    const res = await handleMcpRequest(
+      { jsonrpc: '2.0', id: 31, method: 'tools/call', params: { name: 'play', arguments: {} } },
+      ctx,
+    );
+    const elapsed = Date.now() - t0;
+    // 至少阻塞到 phase 推进（~50ms），证明不是 lobby 立即返回
+    expect(elapsed).toBeGreaterThanOrEqual(40);
+    const sc = (res!.result as {
+      structuredContent: { phase: string; needsAction: boolean };
+    }).structuredContent;
+    expect(sc.phase).toBe('playing');
+    expect(sc.needsAction).toBe(true);
+    // 期间周期调用了 lobby 推进回调
+    expect(lobbyAdvance).toHaveBeenCalled();
   });
 
   it('tools/call play 未启动时返回 -32602 引导用启动工具', async () => {

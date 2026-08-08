@@ -1,7 +1,7 @@
 // tests/ai-mcp/lobby.test.ts
 // 大厅编排单测：建房/加入/房主等待开局/非房主等待/超时。
 import { describe, it, expect, vi } from 'vitest';
-import { joinAndStartRoom, applyConfigUpdate } from '../../src/ai-mcp/lobby';
+import { joinAndStartRoom, applyConfigUpdate, createLobbyAdvancer } from '../../src/ai-mcp/lobby';
 import type { HeadlessGameClient } from '../../src/client/headless/HeadlessGameClient';
 import type { ClientPhase } from '../../src/client/headless/types';
 import type { RoomState } from '../../src/client/headless/types';
@@ -216,5 +216,101 @@ describe('applyConfigUpdate', () => {
     await applyConfigUpdate(hgc, { timeoutScale: Infinity });
     const sent = sendUpdateConfig.mock.calls[0][0] as RoomConfig;
     expect(sent.timeoutScale).toBe(Infinity);
+  });
+});
+
+/** 专测 createLobbyAdvancer 的 fake HGC：可控 phase/playerId/hostId/ready。 */
+function makeAdvancerHgc(opts: {
+  phase: ClientPhase;
+  playerId: string;
+  hostId: string;
+  ready: boolean;
+}): { hgc: HeadlessGameClient; sendStartGame: ReturnType<typeof vi.fn> } {
+  const players = ['p-a', 'p-b'];
+  if (!players.includes(opts.playerId)) players[0] = opts.playerId;
+  const sendStartGame = vi.fn(async () => {});
+  return {
+    hgc: {
+      get phase() {
+        return opts.phase;
+      },
+      get playerId() {
+        return opts.playerId;
+      },
+      get roomState() {
+        return {
+          readyPlayers: opts.ready ? players : [opts.hostId],
+          playerIds: players,
+          hostId: opts.hostId,
+          maxPlayers: 2,
+          config: BASE_CONFIG,
+          spectatorIds: [],
+          viewGrants: {},
+          pendingViewRequests: {},
+        } as RoomState;
+      },
+      sendStartGame,
+    } as unknown as HeadlessGameClient,
+    sendStartGame,
+  };
+}
+
+describe('createLobbyAdvancer', () => {
+  it('房主 + 全员就绪：调用一次发 startGame', () => {
+    const { hgc, sendStartGame } = makeAdvancerHgc({
+      phase: 'lobby',
+      playerId: 'p-host',
+      hostId: 'p-host',
+      ready: true,
+    });
+    createLobbyAdvancer(hgc)();
+    expect(sendStartGame).toHaveBeenCalledTimes(1);
+  });
+
+  it('幂等：多次调用只发一次 startGame（避免 phase 切换前重复发送）', () => {
+    const { hgc, sendStartGame } = makeAdvancerHgc({
+      phase: 'lobby',
+      playerId: 'p-host',
+      hostId: 'p-host',
+      ready: true,
+    });
+    const advance = createLobbyAdvancer(hgc);
+    advance();
+    advance();
+    advance();
+    expect(sendStartGame).toHaveBeenCalledTimes(1);
+  });
+
+  it('非房主 + 全员就绪：不发 startGame', () => {
+    const { hgc, sendStartGame } = makeAdvancerHgc({
+      phase: 'lobby',
+      playerId: 'p-guest',
+      hostId: 'p-host',
+      ready: true,
+    });
+    createLobbyAdvancer(hgc)();
+    expect(sendStartGame).not.toHaveBeenCalled();
+  });
+
+  it('未全员就绪：不发 startGame', () => {
+    const { hgc, sendStartGame } = makeAdvancerHgc({
+      phase: 'lobby',
+      playerId: 'p-host',
+      hostId: 'p-host',
+      ready: false,
+    });
+    createLobbyAdvancer(hgc)();
+    expect(sendStartGame).not.toHaveBeenCalled();
+  });
+
+  it('已进入 playing：不发 startGame', () => {
+    const { hgc, sendStartGame } = makeAdvancerHgc({
+      phase: 'playing',
+      playerId: 'p-host',
+      hostId: 'p-host',
+      ready: true,
+    });
+    createLobbyAdvancer(hgc)();
+    expect(sendStartGame).not.toHaveBeenCalled();
   });
 });

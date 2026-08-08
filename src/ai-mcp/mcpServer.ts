@@ -217,8 +217,8 @@ export interface McpHandlerContext {
   doJoinRoom: (opts: JoinRoomOpts) => Promise<void>;
   /** 以旁观者身份加入（幂等） */
   doSpectateRoom: (opts: SpectateRoomOpts) => Promise<void>;
-  /** 推进 lobby→playing（5s 短超时；play 工具内部调用）。旁观者 no-op。 */
-  advanceLobby: () => Promise<void>;
+  /** lobby 推进回调（房主全员就绪时发 startGame）；play 工具在 lobby 阶段周期调用。 */
+  lobbyAdvance: () => void;
   /** 是否已调用过任一启动工具 */
   isStarted: () => boolean;
   /** 默认座次（baseSeq/ownerId 占位回填用） */
@@ -439,7 +439,6 @@ export async function handleMcpRequest(
               '建房做房主用 createRoom；加入已有房间用 joinRoom（roomId 必填）；旁观用 spectateRoom。',
           );
         }
-        await ctx.advanceLobby();
         const args = asRecord(params.arguments);
         const action = args['action'] as
           | {
@@ -460,6 +459,7 @@ export async function handleMcpRequest(
             : undefined,
           waitTimeoutMs: optNumber(args, 'waitTimeoutMs'),
           state: ctx.playState,
+          lobbyAdvance: ctx.lobbyAdvance,
         });
         return okResponse(id, result);
       }
