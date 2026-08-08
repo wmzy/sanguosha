@@ -7,6 +7,7 @@ import app, { startServerLifecycle } from './app';
 import { createLogger } from './logger';
 import { flushPendingWrites } from './persistence';
 import { shutdownAll } from './lifecycles';
+import { closeRoomStore } from './roomStore';
 
 const log = createLogger('vite-plugin');
 
@@ -26,22 +27,39 @@ export function honoApiPlugin(): Plugin {
         try {
           await flushPendingWrites();
           await shutdownAll();
+          // 显式关闭 PGlite 连接,刷 WAL + 清 postmaster.pid。
+          // 此前遗漏此调用,导致每次退出 PGlite 都被强杀,留下脏锁文件。
+          await closeRoomStore();
         } catch (err) {
           log.error('关闭清理失败', { error: err });
         }
         return originalClose();
       };
       // Ctrl+C(SIGINT)vite 不处理:接管它,走完整关闭(含上面的清理)再退出。
-      let sigintHandled = false;
-      process.once('SIGINT', async () => {
-        if (sigintHandled) return;
-        sigintHandled = true;
-        try {
-          await server.close();
-        } catch (err) {
-          log.error('SIGINT 关闭失败', { error: err });
+      // 分级响应:第一次优雅关闭(flushPendingWrites/shutdownAll/closeRoomStore/originalClose),
+      // 第二次 SIGINT 立即强制退出;优雅关闭设 6s 超时兜底,防止清理卡住导致进程挂起
+      // (挂起后只能 kill -9 → PGlite 脏关闭 → postmaster.pid 残留 → 恶性循环)。
+      // 注意:主线程被同步死循环阻塞(如依赖优化卡死)时信号 callback 无法执行,只能 kill -9。
+      let sigintCount = 0;
+      process.on('SIGINT', () => {
+        sigintCount++;
+        if (sigintCount >= 2) {
+          log.warn('第二次 SIGINT，强制退出');
+          process.exit(130);
         }
-        process.exit(0);
+        log.info('SIGINT 收到，开始优雅关闭（再按 Ctrl+C 强制退出）');
+        const forceExit = setTimeout(() => {
+          log.warn('优雅关闭超时(6s)，强制退出');
+          process.exit(1);
+        }, 6000);
+        forceExit.unref();
+        server
+          .close()
+          .catch((err) => log.error('SIGINT 关闭失败', { error: err }))
+          .finally(() => {
+            clearTimeout(forceExit);
+            process.exit(0);
+          });
       });
 
       // 挂载 Hono REST API 到 /api

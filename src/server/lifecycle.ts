@@ -2,6 +2,7 @@
 
 import { flushPendingWrites } from './persistence';
 import { shutdownAll } from './lifecycles';
+import { closeRoomStore } from './roomStore';
 import { createLogger } from './logger';
 
 const log = createLogger('lifecycle');
@@ -33,6 +34,12 @@ function shutdown(server: { close: (callback?: () => void) => void }, signal: st
       await shutdownAll();
     } catch (err) {
       log.error('关闭注册资源失败', { error: String(err) });
+    }
+    try {
+      // 显式关闭 PGlite 连接,刷 WAL + 清 postmaster.pid,避免脏关闭。
+      await closeRoomStore();
+    } catch (err) {
+      log.error('关闭 DB 连接失败', { error: String(err) });
     }
     log.info('优雅关闭完成');
     process.exit(0);
