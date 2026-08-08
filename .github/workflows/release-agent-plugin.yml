@@ -1,6 +1,7 @@
 name: Release Agent Plugin
 
 on:
+  workflow_dispatch: # 支持手动触发——构建修复后补发被阻塞的版本时使用
   push:
     branches: [main]
     paths:
