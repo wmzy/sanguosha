@@ -21,6 +21,10 @@ export default defineConfig({
     passWithNoTests: true,
     clearMocks: true,
     restoreMocks: true,
+    // isolate:false 下所有文件共享 worker 上下文,vi.stubGlobal 的污染会跨文件泄漏。
+    // unstubGlobals 让 vitest 在每个测试后自动还原被 stub 的全局(如 URL),避免
+    // 后续文件在模块顶层 new URL() 时撞上被替换成普通对象的 URL。
+    unstubGlobals: true,
     // 全局关闭文件级隔离:引擎模块级状态已全部改为 state-bound(WeakMap),
     // DOM 清理由 setup.ts 全局注册的 afterEach(cleanup) 负责,
     // 所有文件共享 worker context + 模块缓存,显著减少重复 import 开销。
