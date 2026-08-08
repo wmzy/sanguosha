@@ -12,7 +12,7 @@
 // 或反之(区中引用了 cardMap 查无的 id),本次只识别、不抛错——先护栏重复。
 //
 // 默认关闭:仅当 state.assertInvariants === true 时,applyAtom 才在正常完成路径调用。
-import type { EquipSlot, GameState } from './types';
+import type { EquipSlot, GameState } from '../types';
 
 /** 装备五槽——遍历 equipment 时按固定顺序读取各槽 */
 const EQUIP_SLOTS: readonly EquipSlot[] = ['武器', '防具', '进攻马', '防御马', '宝物'];

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { GameLog } from '../../src/engine/log';
+import type { GameLog } from '../../src/engine/util/log';
 import { saveLog, loadLog } from '../../src/client/utils/logFile';
 
 // Mock URL and document for saveLog

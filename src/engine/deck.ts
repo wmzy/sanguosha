@@ -25,7 +25,7 @@
 
 import type { Card, Suit, Rank, CardType, CardSubType, TrickSubType, DamageType } from './types';
 import { suitColor } from './types';
-import type { Rng } from './rng';
+import type { Rng } from './util/rng';
 import { 装备牌列表 } from './cards/card-defs/equipment';
 import { getCardDescription } from './cards/card-defs/description';
 

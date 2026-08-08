@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createRng } from '@engine/rng';
+import { createRng } from '@engine/util/rng';
 
 describe('种子化随机数', () => {
   it('相同种子产生相同序列', () => {

@@ -1,5 +1,5 @@
 import type { GameState } from '../../engine/types';
-import type { GameLog } from '../../engine/log';
+import type { GameLog } from '../../engine/util/log';
 
 export function saveState(state: GameState): void {
   const json = JSON.stringify(state);

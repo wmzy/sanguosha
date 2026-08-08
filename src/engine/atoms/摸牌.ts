@@ -4,7 +4,7 @@
 // 才算不合法(validate 报错)。
 import type { AtomDefinition, Card, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../atom';
-import { createRng } from '../../engine/rng';
+import { createRng } from '../util/rng';
 
 interface DrawPlan {
   /** 实际将要摸入的 cardIds(已倒序:末尾对应最先摸) */

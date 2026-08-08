@@ -48,7 +48,7 @@ import type {
 } from './types';
 import { createGameState, TARGET_SYSTEM } from './types';
 import { buildView as buildViewImpl } from './view/buildView';
-import { assertCardInvariants } from './invariants';
+import { assertCardInvariants } from './util/invariants';
 import {
   findActionEntry,
   findPendingSlot,

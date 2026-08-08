@@ -30,7 +30,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
-import { createRng } from '../../engine/rng';
+import { createRng } from '../util/rng';
 
 const TIAN_YI_PD_RT = '天义/拼点'; // 天义询问目标出拼点牌的 requestType
 const TIAN_YI_TARGET_CARD_KEY = '天义/targetCard'; // 天义 execute 读取的目标拼点牌 localVars
