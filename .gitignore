@@ -1,7 +1,9 @@
 node_modules
 dist
 coverage
-data
+# 仅忽略仓库根目录的运行时数据目录(db/rooms/replay 等);
+# 锚定 / 前缀避免误伤 src/engine/data/ 源码目录。
+/data
 # plugin MCP 构建产物（只进 npm tarball，不入 git）
 plugin/mcp/
 .env
