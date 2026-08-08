@@ -146,15 +146,8 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   for (const player of state.players) {
     系统规则mod.registerSystemRespondActions(state, player.index);
   }
-  // 注册酒的全局「造成伤害」before-hook(消费增伤标记)
-  const { registerWineHook } = await import('../skills/cards/酒');
-  registerWineHook(state);
-  // 注册延时锦囊（乐不思蜀/兵粮寸断/闪电）的判定阶段 + 跳过阶段 before-hook
-  const { registerDelayedTrickHooks } = await import('../skills/cards/use-card');
-  registerDelayedTrickHooks(state);
-  // 注册连环传导全局 after-hook（属性伤害联动横置状态）
-  const { registerChainConductionHook } = await import('../flows/face-down');
-  registerChainConductionHook(state);
+  // 酒增伤/延时锦囊判定/连环传导 全局 hooks 由 使用牌 skill 的 onInit 注册
+  // (首次实例化时注册,后续座次跳过)
   await dispatch(state, {
     skillId: '开局',
     actionType: 'start',
@@ -304,15 +297,8 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
   for (const player of state.players) {
     系统规则mod.registerSystemRespondActions(state, player.index);
   }
-  // 注册酒的全局「造成伤害」before-hook(消费增伤标记)
-  const { registerWineHook } = await import('../skills/cards/酒');
-  registerWineHook(state);
-  // 注册延时锦囊（乐不思蜀/兵粮寸断/闪电）的判定阶段 + 跳过阶段 before-hook
-  const { registerDelayedTrickHooks } = await import('../skills/cards/use-card');
-  registerDelayedTrickHooks(state);
-  // 注册连环传导全局 after-hook（属性伤害联动横置状态）
-  const { registerChainConductionHook } = await import('../flows/face-down');
-  registerChainConductionHook(state);
+  // 酒增伤/延时锦囊判定/连环传导 全局 hooks 由 使用牌 skill 的 onInit 注册
+  // (registerSkills 内部按座次逐个实例化,首次实例化的座次负责注册)
 }
 
 /**

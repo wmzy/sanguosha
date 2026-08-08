@@ -28,6 +28,8 @@ import { getCardEffect, getAllCardEffects, requireCardEffect } from '../../core/
 import type { CardEffect, CancellableBy } from '../../core/card-effect/registry';
 import { isCancelled } from '../../core/card-effect/registry';
 import { getDelayedTricks } from '../../core/card-effect/delayed-trick-registry';
+import { registerWineHook } from './酒';
+import { registerChainConductionHook } from '../../flows/face-down';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -440,14 +442,28 @@ export function registerDelayedTrickHooks(state: GameState): void {
   });
 }
 
+/** 全局 hooks 已注册的 state 集合。使用牌对每个座次实例化,但全局 hooks(ownerId=-1)
+ *  每个 state 只需注册一次。WeakSet 随 state GC 自动清理。 */
+const globalHooksRegistered = new WeakSet<GameState>();
+
 /** 注册 use action：逐卡名注册（skillId=卡名），validate 查 CardEffect 注册表，execute 调 runUseFlow。
  *  按卡名注册而非统一 '使用牌' skillId，是为了：
  *  1. 保持 triggerAction('杀','use',...) 等调用向后兼容
  *  2. 让 界火计/界乱击 等 registerAction('万箭齐发',...) 覆盖机制仍然生效
- *  3. 前端 transform.name='万箭齐发' → skillId='万箭齐发' 路由不变 */
+ *  3. 前端 transform.name='万箭齐发' → skillId='万箭齐发' 路由不变
+ *
+ *  全局 hooks（酒增伤/延时锦囊判定/连环传导）在首次实例化时注册,后续座次跳过。 */
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   const unloads: Array<() => void> = [];
+
+  // 全局 hooks:每个 state 只注册一次(首次实例化的座次负责)
+  if (!globalHooksRegistered.has(state)) {
+    globalHooksRegistered.add(state);
+    registerWineHook(state);
+    registerDelayedTrickHooks(state);
+    registerChainConductionHook(state);
+  }
 
   for (const [cardName, effect] of getAllCardEffects()) {
     const u = registerAction(
