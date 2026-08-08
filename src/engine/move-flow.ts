@@ -1,5 +1,5 @@
 // src/engine/move-flow.ts
-// 移动牌编排函数(对齐 flow-redesign.md 模块 F / move.md)。
+// 移动牌编排函数(对齐 出牌流程重设计.md 模块 F / move.md)。
 //
 // 将单 atom(移动牌)模式升级为「编排函数 + 时机标记 atom」模式(与 runUseFlow /
 // runDamageFlow / runDeathFlow 一致):

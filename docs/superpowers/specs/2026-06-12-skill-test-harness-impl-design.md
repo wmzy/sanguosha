@@ -1,6 +1,6 @@
 # 技能测试方案实现设计(Spec)
 
-> 实现对象:[`docs/design/skill-test-harness.md`](../../design/skill-test-harness.md)
+> 实现对象:[`docs/testing/技能测试框架.md`](../../testing/技能测试框架.md)
 > 本 spec 范围:**Phase 0 + Phase 1 + Phase 2 + Phase 3 + 1 个示范(`tests/skill-tests/杀.test.ts`)**。Phase 4(全量技能迁移)、给现有 backend-only skill 补 `onMount`、删除 legacy scenarios,均不在本次 PR 范围。
 
 ## 0. 决策摘要

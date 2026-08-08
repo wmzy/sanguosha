@@ -1,5 +1,5 @@
 // src/engine/rank-flow.ts
-// 拼点两步化编排函数(对齐 flow-redesign.md 模块 G / rankcompare.md)。
+// 拼点两步化编排函数(对齐 出牌流程重设计.md 模块 G / rankcompare.md)。
 //
 // 将单 atom(拼点)模式升级为「编排函数 + 时机标记 atom」模式(与 runUseFlow /
 // runDamageFlow / runDeathFlow / runMoveCardFlow 一致):

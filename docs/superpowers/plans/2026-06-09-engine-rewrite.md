@@ -120,7 +120,7 @@ git commit -m "refactor(engine): 老代码迁移到 _legacy/ 目录,为新引擎
 
 ```ts
 // src/engine/types.ts
-// 新引擎类型定义。详见 docs/ENGINE-DESIGN.md §3-7
+// 新引擎类型定义。详见 docs/architecture/引擎架构.md §3-7
 
 export type Json =
   | string
@@ -1025,7 +1025,7 @@ registerAtom(回复体力);
 
 - [ ] **Step 3-26: 按同样模式写剩下 24 个 atom**
 
-(本 Task 仅列 2 个示例,实际 PR 中工程师按"engine/atoms/<name>.ts" 模式写完余下 24 个,每文件 ~30-50 行。完整列表参考 `docs/ENGINE-DESIGN.md` §5):
+(本 Task 仅列 2 个示例,实际 PR 中工程师按"engine/atoms/<name>.ts" 模式写完余下 24 个,每文件 ~30-50 行。完整列表参考 `docs/architecture/引擎架构.md` §5):
 
 - 失去体力 / 失去牌 / 获得 / 给予 / 抽牌 / 装备 / 卸下 / 设上限
 - 加标记 / 去标记 / 清过期标记 / 加标签 / 去标签 / 设横置

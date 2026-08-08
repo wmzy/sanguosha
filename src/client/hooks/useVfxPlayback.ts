@@ -35,7 +35,7 @@ function extractVfx(event: ViewEvent, cardMap: Record<string, Card>): string | n
     const cardName = ev.cardName;
     if (!cardName) return null;
     const damageType = ev.cardId ? cardMap[ev.cardId]?.damageType : undefined;
-    return getCardVfx(cardName, damageType as string | undefined);
+    return getCardVfx(cardName, damageType);
   }
   const atomType = (event as { atomType?: string }).atomType ?? event.type;
   let staticEffect: EventEffect;

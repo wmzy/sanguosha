@@ -1,5 +1,5 @@
 // tests/skill-tests/statechange-timing.test.ts
-// 模块 E:状态变更时机 atom 验证(对齐 docs/flow-redesign.md 模块 E)。
+// 模块 E:状态变更时机 atom 验证(对齐 docs/architecture/出牌流程重设计.md 模块 E)。
 //
 // 验证点:
 //   1. 翻面后:flipFaceDown 发 faceDown=true,flipFaceUp 发 faceDown=false

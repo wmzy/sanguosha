@@ -1,5 +1,5 @@
 // src/engine/atoms/move-timing.ts
-// 移动牌编排时机 atom 定义(对齐 flow-redesign.md 模块 F / move.md):
+// 移动牌编排时机 atom 定义(对齐 出牌流程重设计.md 模块 F / move.md):
 //   - 移动到目标区域前 / 移动到目标区域后
 //   全部为事件标记型:validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
 //   由 src/engine/move-flow.ts 的编排函数 runMoveCardFlow 在实质移动牌(移动牌 atom)前后依次发出。

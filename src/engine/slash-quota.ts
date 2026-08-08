@@ -1,6 +1,6 @@
 // 出杀次数上限计算——查询型提供者模式(与 registerAction/registerBeforeHook 同构)。
 //
-// 三层模型(对齐 docs/flow-redesign.md 模块 K / condition.md):
+// 三层模型(对齐 docs/architecture/出牌流程重设计.md 模块 K / condition.md):
 //   上限 = 额定(quota,覆盖型 max) + 额外(extra,叠加型 Σ);任一无限提供者命中 → ∞
 //   已用 = 杀/quotaUsed(额定已用) + 杀/extraUsed(额外已用),消耗时优先扣额定
 //

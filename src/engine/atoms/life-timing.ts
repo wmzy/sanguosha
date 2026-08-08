@@ -1,5 +1,5 @@
 // src/engine/atoms/life-timing.ts
-// 体力编排时机 atom 定义(对齐 flow-redesign.md 模块 M):
+// 体力编排时机 atom 定义(对齐 出牌流程重设计.md 模块 M):
 //   - 扣减体力:runDecreaseLifeFlow/runDamageFlow 的底层体力扣减 atom(实质副作用:扣 health)。
 //   - 时机标记型 atom(确定回复数值时/回复体力后/失去体力时/失去体力后/
 //     扣减体力前/扣减体力时/扣减体力后/减上限后/加上限后):
@@ -60,7 +60,7 @@ registerAtom(扣减体力);
 // ── before-hook modify amount 的回传通道 ────────────────────
 // 确定回复数值时 的 before-hook(如救援)可 modify amount;apply 把最终(被折叠后的)
 // amount 写入 state.localVars[MODIFY_AMOUNT_KEY],runRecoverLifeFlow 据此读取修正后的回复值。
-// 后续模块可优化为更通用的机制(见 flow-redesign.md),当前先用 localVars 简单传递。
+// 后续模块可优化为更通用的机制(见 出牌流程重设计.md),当前先用 localVars 简单传递。
 export const MODIFY_AMOUNT_KEY = '__modifyAmount';
 
 // ── 回复体力时机 ────────────────────────────────────────────

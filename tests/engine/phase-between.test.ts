@@ -1,5 +1,5 @@
 // tests/skill-tests/phase-between.test.ts
-// 模块 J:阶段间时机 atom 验证(对齐 docs/flow-redesign.md 模块 J)。
+// 模块 J:阶段间时机 atom 验证(对齐 docs/architecture/出牌流程重设计.md 模块 J)。
 //
 // 验证点:
 //   1. 阶段间 atom 在 阶段结束 与 阶段开始(next) 之间发出

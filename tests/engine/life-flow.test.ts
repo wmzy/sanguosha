@@ -3,7 +3,7 @@
 // 时机顺序验证。不依赖具体技能——直接调用编排函数,断言 state.atomHistory 的 atom 时序
 // 与 state.players[].health 的实质变化。
 //
-// 验证点(对齐 docs/flow-redesign.md 模块 M):
+// 验证点(对齐 docs/architecture/出牌流程重设计.md 模块 M):
 //   1. runDecreaseLifeFlow:扣减体力前 → 扣减体力时 → 扣减体力(实质) → 扣减体力后,health 下降。
 //   2. runRecoverLifeFlow:确定回复数值时 → 回复体力(实质) → 回复体力后,health 上升。
 //   3. runLoseLifeFlow:失去体力时 → (扣减体力前/时/扣减体力/后) → 失去体力后。

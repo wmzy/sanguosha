@@ -1,9 +1,9 @@
 // tests/skill-tests/judge-flow.test.ts
-// 模块 H:判定编排函数 runJudgeFlow 时机顺序验证(对齐 docs/flow-redesign.md 模块 H / judge.md)。
+// 模块 H:判定编排函数 runJudgeFlow 时机顺序验证(对齐 docs/architecture/出牌流程重设计.md 模块 H / judge.md)。
 // 不依赖具体技能——直接调用编排函数,断言 state.atomHistory 的 atom 时序、判定牌翻出/入弃牌堆、
 // 返回值(最终判定牌 cardId)与 牌堆空 早退行为。
 //
-// 验证点(对齐 docs/flow-redesign.md 模块 H 验收):
+// 验证点(对齐 docs/architecture/出牌流程重设计.md 模块 H 验收):
 //   1. 判定时 atom 在判定之前发出
 //   2. 翻出的判定牌最终入弃牌堆,返回该 cardId
 //   3. 牌堆空时判定 atom apply 早退(不翻牌),runJudgeFlow 返回 undefined

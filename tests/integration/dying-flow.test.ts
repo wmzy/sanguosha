@@ -1,5 +1,5 @@
 // tests/integration/dying-flow.test.ts
-// 模块 C:濒死流程修正验证(对齐 docs/flow-redesign.md 模块 C / neardeath.md)。
+// 模块 C:濒死流程修正验证(对齐 docs/architecture/出牌流程重设计.md 模块 C / neardeath.md)。
 //
 // 验证点(对齐 assignment 模块 C 验收):
 //   1. P1 回合内 P2 濒死 → 从 P1(当前回合角色)起逆时针询问:P1 → P0 → P3 → P2

@@ -1,5 +1,5 @@
 // 引擎状态类型:基础类型/枚举/常量 + PlayerState/GameState + 工厂。
-// 详见 docs/ENGINE-DESIGN.md §3-7。原 src/engine/types.ts 按域拆分,本文件经 barrel(types/index.ts)统一导出。
+// 详见 docs/architecture/引擎架构.md §3-7。原 src/engine/types.ts 按域拆分,本文件经 barrel(types/index.ts)统一导出。
 
 import type { Atom } from './atom';
 import type { ActionLogEntry, AppliedAtomEntry, PendingSlot, SettlementFrame } from './skill';

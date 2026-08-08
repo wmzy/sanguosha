@@ -5,7 +5,7 @@
 
 **日期**: 2026-06-09
 **状态**: 设计完成,待用户 review
-**前置依赖**: `docs/ENGINE-DESIGN.md`(终态设计,已就绪)
+**前置依赖**: `docs/architecture/引擎架构.md`(终态设计,已就绪)
 
 ---
 
@@ -13,7 +13,7 @@
 
 ### 1.1 目标
 
-把现有 v2/v3 混存引擎**重写**为 `docs/ENGINE-DESIGN.md` 描述的终态架构:
+把现有 v2/v3 混存引擎**重写**为 `docs/architecture/引擎架构.md` 描述的终态架构:
 - 客户端协议统一为 `ClientMessage { skillId, actionType, params, baseSeq }`
 - 技能 API 改为 `createSkill / onInit / onMount`,通过 `registerAction` + `onAtomBefore/After` 注册
 - 等待回应用 atom `awaits` 声明,不再有独立 pending 状态机

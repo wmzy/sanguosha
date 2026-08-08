@@ -1,5 +1,5 @@
 // src/engine/atoms/death-timing.ts
-// 死亡编排时机 atom 定义(对齐 flow-redesign.md 模块 B / death.md 5 时机):
+// 死亡编排时机 atom 定义(对齐 出牌流程重设计.md 模块 B / death.md 5 时机):
 //   - 亮身份牌前 / 亮身份牌 / 死亡时 / 系统处理牌 / 死亡后
 //   由 src/engine/death-flow.ts 的编排函数 runDeathFlow 在角色死亡时依次发出。
 //
@@ -188,7 +188,7 @@ export const 死亡后: AtomDefinition<DeathTimingAtom> = {
 
 registerAtom(死亡后);
 
-// ── 濒死编排时机(对齐 flow-redesign.md 模块 C / neardeath.md) ────
+// ── 濒死编排时机(对齐 出牌流程重设计.md 模块 C / neardeath.md) ────
 // 进入濒死状态时 / 新的濒死状态时:事件标记型,validate 恒通过、apply 无副作用,
 // 只提供 before/after hook 注册点。由 系统规则.runDyingFlow 在濒死流程中发出。
 //

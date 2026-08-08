@@ -206,5 +206,5 @@ return {
 
 ## 七、参考文档
 
-- [ENGINE-DESIGN.md](../ENGINE-DESIGN.md) §5 Atom / §5.2 ViewEvent / §6.1 apply 流程
+- [引擎架构.md](../architecture/引擎架构.md) §5 Atom / §5.2 ViewEvent / §6.1 apply 流程
 - [添加技能.md](./添加技能.md) 技能实现规范(技能是 atom 的消费者)

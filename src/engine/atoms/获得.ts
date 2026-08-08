@@ -1,7 +1,7 @@
 // src/engine/atoms/获得.ts
 // 获得:玩家获得一张牌(可选从指定玩家处)
 //
-// 模块 F 迁移(flow-redesign.md):afterApply 为「从他人手牌获得」发出「移动到目标区域后」
+// 模块 F 迁移(出牌流程重设计.md):afterApply 为「从他人手牌获得」发出「移动到目标区域后」
 // 时机标记(reason='获得'),为失去牌类技能提供统一 hook 点。ZoneLoc 不含「装备」区域,
 // 从装备区获得不发标记。本 atom 的 apply + view 事件保持不变(含信息分级)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';

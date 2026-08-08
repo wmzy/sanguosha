@@ -1,5 +1,5 @@
 // src/engine/atoms/statechange-timing.ts
-// 状态变更编排时机 atom 定义(对齐 flow-redesign.md 模块 E):
+// 状态变更编排时机 atom 定义(对齐 出牌流程重设计.md 模块 E):
 //   - 翻面后 / 横置后 / 武将牌明置后 / 武将牌移除后 / 游戏牌亮出后
 //   全部为事件标记型:validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
 //   由各状态变更编排路径在实质操作后依次发出。

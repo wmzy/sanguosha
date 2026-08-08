@@ -1,9 +1,9 @@
 // tests/skill-tests/death-flow.test.ts
-// 模块 B:死亡编排函数 runDeathFlow 时机顺序验证(对齐 docs/flow-redesign.md 模块 B / death.md)。
+// 模块 B:死亡编排函数 runDeathFlow 时机顺序验证(对齐 docs/architecture/出牌流程重设计.md 模块 B / death.md)。
 // 不依赖具体技能——直接调用编排函数,断言 state.atomHistory 的 atom 时序、身份揭示、
 // 弃牌+alive=false 的实质变化,以及奖惩(反贼摸3/忠臣弃牌)。
 //
-// 验证点(对齐 docs/flow-redesign.md 模块 B 验收):
+// 验证点(对齐 docs/architecture/出牌流程重设计.md 模块 B 验收):
 //   1. 正常死亡:5 时机(亮身份牌前/亮身份牌/死亡时/系统处理牌/死亡后)依次发出,
 //      alive=false、手牌+装备入弃牌堆。
 //   2. killer 透传:死亡时/死亡后 的 atom 携带 killer。

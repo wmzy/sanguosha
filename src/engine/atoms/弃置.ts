@@ -1,7 +1,7 @@
 // src/engine/atoms/弃置.ts
 // 弃置:从玩家手牌/装备区将 cardIds 移至弃牌堆
 //
-// 模块 F 迁移(flow-redesign.md):afterApply 为来自手牌的弃牌发出「移动到目标区域后」
+// 模块 F 迁移(出牌流程重设计.md):afterApply 为来自手牌的弃牌发出「移动到目标区域后」
 // 时机标记(reason='弃置',to='弃牌堆'),为连营/落英/屯田等「失去牌」技能提供统一 hook 点。
 // ZoneLoc 不含「装备」区域,装备/判定区弃置不发标记——失去牌类技能主要关心手牌。
 // 本 atom 的 apply + view 事件保持不变(含信息分级),时机标记仅为额外 hook 注册点。

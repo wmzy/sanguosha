@@ -1,9 +1,9 @@
 // tests/skill-tests/damage-flow.test.ts
-// 模块 A1:伤害编排函数 runDamageFlow 时机顺序验证(对齐 docs/flow-redesign.md 模块 A / damage.md)。
+// 模块 A1:伤害编排函数 runDamageFlow 时机顺序验证(对齐 docs/architecture/出牌流程重设计.md 模块 A / damage.md)。
 // 不依赖具体技能——直接调用编排函数,断言 state.atomHistory 的 atom 时序、amount 传递
 // 与 state.players[].health 的实质变化。
 //
-// 验证点(对齐 docs/flow-redesign.md 模块 A 验收):
+// 验证点(对齐 docs/architecture/出牌流程重设计.md 模块 A 验收):
 //   1. 正常伤害:7 时机 + 扣减体力子流程(模块 M 四时机)依次发出,health 下降。
 //   2. before-hook modify amount:造成伤害时 modify → 后续时机与扣减量携带新值。
 //   3. 受到伤害时 cancel → 跳到伤害结算结束时,不执行 造成/受到伤害后、不扣血。

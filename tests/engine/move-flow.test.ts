@@ -1,12 +1,12 @@
 // tests/skill-tests/move-flow.test.ts
 // 模块 F:移动牌编排函数 runMoveCardFlow 时机顺序 + 牌堆耗尽重洗 + reason 透传验证
-// (对齐 docs/flow-redesign.md 模块 F / move.md)。
+// (对齐 docs/architecture/出牌流程重设计.md 模块 F / move.md)。
 //
 // 不依赖具体技能——直接调用编排函数,断言 state.atomHistory 的 atom 时序、实质移动、
 // 以及牌堆耗尽(非摸牌路径)自动重洗。另验证 弃置/获得/给予 经 afterApply 发出
 // 「移动到目标区域后」时机标记并透传 reason(失去原因字段)。
 //
-// 验证点(对齐 docs/flow-redesign.md 模块 F 验收):
+// 验证点(对齐 docs/architecture/出牌流程重设计.md 模块 F 验收):
 //   1. 时序:移动到目标区域前 → 移动牌 → 移动到目标区域后。
 //   2. reason 透传到时机 atom。
 //   3. 移动到目标区域前 before-hook modify to 改变实质移动目标。

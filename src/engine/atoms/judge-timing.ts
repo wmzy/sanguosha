@@ -1,5 +1,5 @@
 // src/engine/atoms/judge-timing.ts
-// 判定编排时机 atom 定义(对齐 flow-redesign.md 模块 H / judge.md):
+// 判定编排时机 atom 定义(对齐 出牌流程重设计.md 模块 H / judge.md):
 //   - 判定时 / 判定牌生效前 / 判定牌生效后
 //   全部为事件标记型:validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
 //   由 src/engine/judge-flow.ts 的编排函数 runJudgeFlow 在判定流程中依次发出。

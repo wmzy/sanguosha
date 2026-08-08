@@ -1,9 +1,9 @@
 // tests/skill-tests/rank-flow.test.ts
-// 模块 G:拼点两步化编排函数 runRankCompareFlow 验证(对齐 docs/flow-redesign.md 模块 G / rankcompare.md)。
+// 模块 G:拼点两步化编排函数 runRankCompareFlow 验证(对齐 docs/architecture/出牌流程重设计.md 模块 G / rankcompare.md)。
 // 不依赖具体技能——直接调用编排函数,断言 state.atomHistory 的 atom 时序、面朝下信息分级、
 // 点数比较结果与 state.zones 的实质变化。
 //
-// 验证点(对齐 docs/flow-redesign.md 模块 G 验收):
+// 验证点(对齐 docs/architecture/出牌流程重设计.md 模块 G 验收):
 //   1. 三时机依次发出:拼点扣置 → 拼点亮出 → 拼点后(尾随两张 移动牌 入弃牌堆)
 //   2. 面朝下:拼点扣置 toViewEvents 对非扣置者隐藏牌面(发起方只看到自己的牌,目标方只看到自己的)
 //   3. 拼点亮出:向全员公开两张牌面

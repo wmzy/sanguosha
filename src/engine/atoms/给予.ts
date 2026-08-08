@@ -1,7 +1,7 @@
 // src/engine/atoms/给予.ts
 // 给予:从 from 玩家手牌将 cardId 给予 to 玩家
 //
-// 模块 F 迁移(flow-redesign.md):afterApply 发出「移动到目标区域后」时机标记(reason='给予')。
+// 模块 F 迁移(出牌流程重设计.md):afterApply 发出「移动到目标区域后」时机标记(reason='给予')。
 // 给予.validate 保证 cardId 在 from 手牌,from/to 均为手牌区域(ZoneLoc 可表达),标记 from/to 准确。
 // 本 atom 的 apply + view 事件保持不变(含信息分级)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';

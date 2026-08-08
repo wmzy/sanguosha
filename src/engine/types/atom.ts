@@ -76,7 +76,7 @@ export type ZoneLoc =
   | { zone: '手牌'; player: number }
   | { zone: '处理区' };
 
-/** 牌移动的原因(失去原因字段,对齐 flow-redesign.md 模块 F)。
+/** 牌移动的原因(失去原因字段,对齐 出牌流程重设计.md 模块 F)。
  *  由 runMoveCardFlow 透传到 移动到目标区域前/后 时机 atom,供连营/落英/屯田等
  *  「失去牌」类技能区分触发场景(如 reason='弃置' && to='弃牌堆')。
  *  仅在有「失去原因」语义的关键路径(弃置/获得/给予,经 runMoveCardFlow 迁移)
@@ -96,7 +96,7 @@ export type Atom =
   | { type: '摸牌'; player: number; count: number }
   | { type: '弃置'; player: number; cardIds: string[]; voluntary?: boolean }
   | { type: '移动牌'; cardId: string; from: ZoneLoc; to: ZoneLoc }
-  // 移动牌编排时机标记(对齐 flow-redesign.md 模块 F / move.md):事件标记型,
+  // 移动牌编排时机标记(对齐 出牌流程重设计.md 模块 F / move.md):事件标记型,
   // validate 恒通过,apply 无副作用,只提供 before/after hook 注册点。由 move-flow.ts 的
   // runMoveCardFlow 在实质移动牌前后依次发出。
   //   移动到目标区域前:纵玄/章武② 可改变目标区域(before-hook modify to)。
@@ -112,7 +112,7 @@ export type Atom =
   | { type: '重洗' }
   | { type: '整理牌堆'; cards: string[]; topCount?: number; bottomCount?: number }
   // 角色状态
-  // 伤害编排时机标记(对齐 flow-redesign.md 模块 A / damage.md 8 时机):事件标记型,
+  // 伤害编排时机标记(对齐 出牌流程重设计.md 模块 A / damage.md 8 时机):事件标记型,
   // validate 恒通过,apply 无副作用,只提供 before/after hook 注册点。由 damage-flow.ts 的
   // runDamageFlow 编排函数依次发出(在扣减体力前补发这 7 个时机)。
   // 伤害结算开始时/造成伤害时/受到伤害时 三者的 before-hook 可 modify amount(加伤/减伤),
@@ -139,14 +139,14 @@ export type Atom =
   | { type: '扣减体力时'; target: number; amount: number }
   | { type: '扣减体力后'; target: number; amount: number }
   | { type: '陷入濒死'; target: number }
-  // 濒死编排时机标记(对齐 flow-redesign.md 模块 C / neardeath.md):事件标记型,
+  // 濒死编排时机标记(对齐 出牌流程重设计.md 模块 C / neardeath.md):事件标记型,
   // validate 恒通过,apply 无副作用,只提供 before/after hook 注册点。由系统规则.runDyingFlow
   // 在濒死流程中发出。陷入濒死 atom 保留为濒死开始的系统通知(不屈/涅槃/伏枥/仁心等 after-hook);
   // 进入濒死状态时 为补益/随势①独立时机(先于求桃,补益可能直接回血化解);
   // 新的濒死状态时 在被救仍濒死时触发(重置响应起点为当前响应者,重新逆时针)。
   | { type: '进入濒死状态时'; target: number }
   | { type: '新的濒死状态时'; target: number }
-  // 死亡编排时机标记(对齐 flow-redesign.md 模块 B / death.md 5 时机):由 death-flow.ts 的
+  // 死亡编排时机标记(对齐 出牌流程重设计.md 模块 B / death.md 5 时机):由 death-flow.ts 的
   // 编排函数 runDeathFlow 在角色死亡时依次发出。亮身份牌前/死亡时/死亡后 为事件标记型
   // (apply 无副作用,只提供 before/after hook 注册点);亮身份牌 apply 揭示身份(view 层);
   // 系统处理牌 为实质 atom——弃手牌/装备入弃牌堆 + alive=false。
@@ -168,7 +168,7 @@ export type Atom =
   // 体力上限编排时机标记(由 runSetMaxHealthFlow 在 设上限 后发出):事件标记型,apply 无副作用。
   | { type: '减上限后'; player: number }
   | { type: '加上限后'; player: number }
-  // 状态变更编排时机标记(对齐 flow-redesign.md 模块 E):事件标记型,validate 恒通过,
+  // 状态变更编排时机标记(对齐 出牌流程重设计.md 模块 E):事件标记型,validate 恒通过,
   // apply 无副作用,只提供 before/after hook 注册点。由各状态变更编排路径在实质操作后发出。
   //   翻面后:flipFaceDown/flipFaceUp 在 加标签/去标签 后发出(faceDown=true=翻成背面,false=翻回正面)。
   //   横置后:setChain 在 设横置 后发出(chained 携带新状态)。
@@ -193,7 +193,7 @@ export type Atom =
   | { type: '回合结束后'; player: number }
   | { type: '阶段开始'; player: number; phase: string }
   | { type: '阶段结束'; player: number; phase: string }
-  // 阶段间时机标记(对齐 flow-redesign.md 模块 J / game.md「X阶段与Y阶段间」时机):事件标记型,
+  // 阶段间时机标记(对齐 出牌流程重设计.md 模块 J / game.md「X阶段与Y阶段间」时机):事件标记型,
   // validate 恒通过,apply 无副作用,只提供 before/after hook 注册点。由 回合管理.ts 的阶段结束
   // after-hook 在 阶段结束 与 阶段开始(next) 之间发出。from/to 为相邻阶段名。
   // before-hook cancel → 不 apply 阶段开始(next),跳过下一阶段(等价于 skipPhase)。
@@ -213,7 +213,7 @@ export type Atom =
   // 判定
   | { type: '添加延时锦囊'; player: number; trick: PendingTrick }
   | { type: '移除延时锦囊'; player: number; trickName: string }
-  // 拼点两步化(对齐 flow-redesign.md 模块 G / rankcompare.md):由 rank-flow.ts 的
+  // 拼点两步化(对齐 出牌流程重设计.md 模块 G / rankcompare.md):由 rank-flow.ts 的
   // runRankCompareFlow 编排函数依次发出。
   //   拼点扣置:apply 把两张拼点牌从手牌移入处理区(面朝下);toViewEvents 对非扣置者隐藏牌面
   //     (发起方只看到自己的牌,目标方只看到自己的牌,其他人两张都看不到)。
@@ -240,7 +240,7 @@ export type Atom =
   | { type: '初始化洗牌'; seed: number }
   | { type: '发牌'; handSize: number }
   | { type: '判定'; player: number; judgeType: string }
-  // 判定编排时机标记(对齐 flow-redesign.md 模块 H / judge.md):事件标记型,
+  // 判定编排时机标记(对齐 出牌流程重设计.md 模块 H / judge.md):事件标记型,
   // validate 恒通过,apply 无副作用,只提供 before/after hook 注册点。由 judge-flow.ts 的
   // runJudgeFlow 在判定流程中依次发出。与 判定(底层翻牌 atom)区分——后者保留为底层操作,
   // 其 apply(翻牌)+ afterApply(runJudgeModifiers 改判)+ afterHooks(消费+移弃牌堆)不变。

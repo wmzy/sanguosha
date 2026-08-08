@@ -1,5 +1,5 @@
 // src/engine/judge-flow.ts
-// 判定结算编排函数(对齐 flow-redesign.md 模块 H / judge.md)。
+// 判定结算编排函数(对齐 出牌流程重设计.md 模块 H / judge.md)。
 //
 // 将判定流程拆为「判定时 → 翻牌(判定 atom)→ 生效前 → 生效后」时机标记 atom,
 // 与 runUseFlow / runDamageFlow / runDeathFlow / runMoveCardFlow 一致的
@@ -19,7 +19,7 @@ import { applyAtom } from './index';
 /** runJudgeFlow 收尾回写最终判定牌 cardId 的 localVars 键(与 cleanupJudgeCard 一致)。 */
 const JUDGE_FINAL_CARD_KEY = '判定/finalJudgeCardId';
 
-/** 判定结算编排函数——对齐 judge.md / flow-redesign.md 模块 H 四时机。
+/** 判定结算编排函数——对齐 judge.md / 出牌流程重设计.md 模块 H 四时机。
  *
  *  时机1 判定时:咒缚 before-hook 可替换判定牌来源。
  *  时机2 判定(翻牌):底层操作,牌堆顶→结算帧牌区。

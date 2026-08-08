@@ -1,5 +1,5 @@
 // src/engine/atoms/rank-timing.ts
-// 拼点两步化编排时机 atom 定义(对齐 flow-redesign.md 模块 G / rankcompare.md):
+// 拼点两步化编排时机 atom 定义(对齐 出牌流程重设计.md 模块 G / rankcompare.md):
 //   - 拼点扣置 / 拼点亮出 / 拼点后
 //   由 src/engine/rank-flow.ts 的编排函数 runRankCompareFlow 在拼点流程中依次发出。
 //

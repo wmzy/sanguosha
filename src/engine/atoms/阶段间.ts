@@ -1,5 +1,5 @@
 // src/engine/atoms/阶段间.ts
-// 阶段间编排时机 atom 定义(对齐 flow-redesign.md 模块 J / game.md「X阶段与Y阶段间」时机):
+// 阶段间编排时机 atom 定义(对齐 出牌流程重设计.md 模块 J / game.md「X阶段与Y阶段间」时机):
 //   - 阶段间
 //   事件标记型:validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
 //   由 src/engine/skills/回合管理.ts 的阶段结束 after-hook 在 阶段结束 与 阶段开始(next) 之间发出。

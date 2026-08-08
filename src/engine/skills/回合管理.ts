@@ -72,7 +72,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const next = nextPhase(phase);
     if (!next) return;
 
-    // 阶段间时机(对齐 flow-redesign.md 模块 J / game.md「X阶段与Y阶段间」时机):
+    // 阶段间时机(对齐 出牌流程重设计.md 模块 J / game.md「X阶段与Y阶段间」时机):
     // 在 阶段结束 与 阶段开始(next) 之间发出,提供 before/after hook 注册点。
     // (神速①/裸衣/放权/克己 等未来 hook 迁移点;本模块只新增注册点,不改现有技能挂法)
     // cancel 语义:阶段间 before-hook cancel → 不 apply 阶段开始(next),跳过下一阶段

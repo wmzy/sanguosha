@@ -1,5 +1,5 @@
 // src/engine/atoms/damage-timing.ts
-// 伤害编排时机 atom 定义(对齐 flow-redesign.md 模块 A / damage.md 8 时机):
+// 伤害编排时机 atom 定义(对齐 出牌流程重设计.md 模块 A / damage.md 8 时机):
 //   - 伤害结算开始时 / 造成伤害时 / 受到伤害时 / 造成伤害后 / 受到伤害后 /
 //     伤害结算结束时 / 伤害结算结束后
 //   全部为事件标记型:validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
