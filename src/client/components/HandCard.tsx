@@ -102,7 +102,7 @@ export function HandCardImpl(props: HandCardProps) {
       }
     >
       {/* 卡牌牌面:cards-local 图片(object fallback)或 HTML 绘制牌面 */}
-      <CardFace name={card.name} suit={card.suit} rank={card.rank} size="normal" />
+      <CardFace name={card.name} suit={card.suit} rank={card.rank} size="normal" damageType={card.damageType} />
       {/* 转化模式标注层:仅在武圣等转化牌时叠加显示转化后牌名 + 原牌名 */}
       {isTransformMatch && transformWrapperName && (
         <div className={styles.handCardMeta}>

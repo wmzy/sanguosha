@@ -11,6 +11,7 @@
 import { css } from '@linaria/core';
 import { SUIT_COLOR } from './gameViewConstants';
 import { getCardImage } from '../assets/imageAssets';
+import { displayCardName } from '../utils/gameViewHelpers';
 
 export type CardFaceSize = 'normal' | 'large' | 'small';
 
@@ -26,15 +27,20 @@ export function CardFace({
   suit,
   rank,
   size = 'normal',
+  damageType,
 }: {
   name: string;
   suit?: string;
   rank?: string;
   size?: CardFaceSize;
+  /** 伤害属性(火焰/雷电):用于 HTML fallback 显示「火杀」「雷杀」;
+   *  图片 URL 仍用原始 name('杀')因资源按内部牌名索引。 */
+  damageType?: string;
 }) {
   const url = getCardImage({ name, suit, rank });
   const color = SUIT_COLOR[suit ?? ''] ?? '#ccc';
   const sz = size;
+  const display = displayCardName(name, damageType);
 
   const fallback = (
     <div
@@ -45,7 +51,7 @@ export function CardFace({
         <span className={rankCls}>{rank}</span>
         <span className={suitCls}>{suit}</span>
       </div>
-      <div className={cardName}>{name}</div>
+      <div className={cardName}>{display}</div>
     </div>
   );
 
@@ -56,7 +62,7 @@ export function CardFace({
     <object
       className={cardObject}
       data={url}
-      aria-label={`${name} ${suit}${rank}`}
+      aria-label={`${display} ${suit}${rank}`}
     >
       {/* object 加载失败时浏览器渲染此 fallback */}
       {fallback}

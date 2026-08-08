@@ -563,6 +563,28 @@ export class HeadlessGameClient {
       }
       return;
     }
+    // pickProcessingCard 类型 prompt（五谷丰登：从处理区亮的明牌选一张）：
+    // 为每张可选牌生成独立 respond action，与前端 AwaitingPrompt 一致。
+    if (pending.prompt?.type === 'pickProcessingCard') {
+      const pickPrompt = pending.prompt;
+      const sep = reqType.search(/[/_]/);
+      const pickSkillId = sep >= 0 ? reqType.slice(0, sep) : reqType;
+      for (const c of (pickPrompt.cards ?? [])) {
+        out.push({
+          description: `选【${c.cardName} ${c.suit}${c.rank}】`,
+          message: {
+            skillId: pickSkillId,
+            actionType: 'respond',
+            ownerId,
+            params: { cardId: c.cardId },
+            baseSeq: 0,
+          },
+          validTargets: [],
+          category: 'respond',
+        });
+      }
+      return;
+    }
     // 弃牌阶段：引擎注册 系统规则:respond，validate 要求 params.cardIds。
     // 此处给出一个"选择弃牌"占位 action，agent 须自行从手牌选足 discardMin 张填入 cardIds。
     if (reqType === '__弃牌') {

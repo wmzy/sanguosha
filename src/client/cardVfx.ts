@@ -19,8 +19,8 @@ const CARD_VFX: Record<string, string> = {
  *  杀区分火/雷属性;其余牌按牌名查表。 */
 export function getCardVfx(cardName: string, damageType?: string): string | null {
   if (cardName === '杀') {
-    if (damageType === 'fire') return 'card/fire_slash';
-    if (damageType === 'thunder') return 'card/thunder_slash';
+    if (damageType === '火焰') return 'card/fire_slash';
+    if (damageType === '雷电') return 'card/thunder_slash';
   }
   return CARD_VFX[cardName] ?? null;
 }

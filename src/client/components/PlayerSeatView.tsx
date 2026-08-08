@@ -172,7 +172,7 @@ function PlayerSeatViewImpl({
         </div>
         <div className={seatCharName}>{displayChar || '未知'}</div>
       </div>
-      {/* 体力红心 */}
+      {/* 体力红心 — \uFE0E 强制文本渲染,防止 iOS Safari 将 ♥ 渲染为彩色 emoji 导致空血心也显示红色 */}
       <div className={seatHpRow}>
         {Array.from({ length: player.maxHealth }, (_, i) => (
           <span
@@ -183,7 +183,7 @@ function PlayerSeatViewImpl({
               isHealed && hpHealFlash,
             )}
           >
-            ♥
+            ♥{'\uFE0E'}
           </span>
         ))}
       </div>

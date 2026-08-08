@@ -7,7 +7,7 @@ import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
 
-/** 无中生有的结算：目标角色摸牌(2) */
+/** 无中生有的结算：使用者摸牌(2) */
 async function resolveExNihilo(ctx: ResolveCtx): Promise<void> {
   const { state, target } = ctx;
   // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
@@ -16,13 +16,12 @@ async function resolveExNihilo(ctx: ResolveCtx): Promise<void> {
 
 const exNihiloEffect: CardEffect = {
   timing: '出牌阶段',
-  target: { kind: 'any', min: 1, max: 1 },
+  target: { kind: 'self' },
   resolve: resolveExNihilo,
   prompt: {
-    type: 'useCardAndTarget',
+    type: 'useCard',
     title: '无中生有',
     cardFilter: { filter: (c: Card) => c.name === '无中生有', min: 1, max: 1 },
-    targetFilter: { min: 1, max: 1, allowSelf: true },
   },
   label: '无中生有',
   style: 'primary',

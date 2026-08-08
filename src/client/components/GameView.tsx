@@ -40,6 +40,7 @@ import { PlayHistoryStrip } from './PlayHistoryStrip';
 import {
   canShowCancelSelectionButton,
   canShowEndTurnButton,
+  displayCardName,
   findUseActionForCard,
   hasUseEntry,
   isActiveAction,
@@ -851,9 +852,9 @@ export function GameViewComponentImpl({
                         { '--suit-color': SUIT_COLOR[card.suit] ?? '#ccc' } as React.CSSProperties
                       }
                       onClick={() => handleCardClick(card)}
-                      title={`${card.name} ${card.suit}${card.rank}`}
+                      title={`${displayCardName(card.name, card.damageType)} ${card.suit}${card.rank}`}
                     >
-                      <div className={styles.cardName}>{card.name}</div>
+                      <div className={styles.cardName}>{displayCardName(card.name, card.damageType)}</div>
                       <div className={styles.cardSuit}>
                         {card.suit}
                         {card.rank}

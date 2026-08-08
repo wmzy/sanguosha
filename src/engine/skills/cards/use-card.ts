@@ -493,13 +493,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
         let targets = effect.preUse
           ? effect.preUse(state, ownerId, params)
           : ((params.targets as number[]) ?? []);
-        // 自动计算目标：self → [ownerId]；AOE(allOthers/allPlayers) → 全场
-        if (targets.length === 0) {
-          if (effect.target.kind === 'self') {
-            targets = [ownerId];
-          } else {
-            targets = computeAutoTargets(state, ownerId, cardName);
-          }
+        // 自动计算目标：self → [ownerId](强制,忽略客户端误传目标);AOE(allOthers/allPlayers) → 全场
+        if (effect.target.kind === 'self') {
+          targets = [ownerId];
+        } else if (targets.length === 0) {
+          targets = computeAutoTargets(state, ownerId, cardName);
         }
         // 合法性已由本 action 的 validate 完成;此处直接走使用结算流程 + 计费(onSettle)
         await runUseFlow(state, ownerId, cardId, targets, cardName, {

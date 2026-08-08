@@ -299,6 +299,16 @@ export function findSeatCenter(view: GameView, idx: number): { left: number; top
  * @param i 当前玩家在"其他玩家"序列中的下标(0-based)
  * @returns { leftPct, topPct } 百分比坐标(相对 battleField)
  */
+/** 将卡牌名 + 伤害属性转为面向玩家的显示名。
+ *  杀 + 火焰 → 火杀;杀 + 雷电 → 雷杀;其余原样返回。 */
+export function displayCardName(name: string, damageType?: string): string {
+  if (name === '杀') {
+    if (damageType === '火焰') return '火杀';
+    if (damageType === '雷电') return '雷杀';
+  }
+  return name;
+}
+
 export function arcLayout(totalOthers: number, i: number): { leftPct: number; topPct: number } {
   if (totalOthers <= 0) return { leftPct: 50, topPct: 1 };
   if (totalOthers === 1) return { leftPct: 50, topPct: 1 };

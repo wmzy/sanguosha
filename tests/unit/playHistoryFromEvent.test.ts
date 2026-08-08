@@ -90,4 +90,62 @@ describe('playHistoryMutationFromEvent', () => {
     );
     expect(m).toEqual({ kind: 'caption', cardId: 'c3', caption: '刘备→张角' });
   });
+
+  // ── 雷杀/火杀牌名展示(displayCardName) ──
+  it('打出雷杀 → 短标注「名出雷杀」+ card.name=雷杀', () => {
+    const view = makeView();
+    view.cardMap = { 'thunder-slash': { name: '杀', suit: '♣', rank: '7', damageType: '雷电' } as never };
+    const m = playHistoryMutationFromEvent(
+      {
+        type: '打出',
+        player: 1,
+        cardId: 'thunder-slash',
+        card: { name: '杀', suit: '♣', rank: '7' },
+      },
+      view,
+      1000,
+    );
+    expect(m?.kind).toBe('push');
+    if (m?.kind !== 'push') return;
+    expect(m.items[0].caption).toBe('张角出雷杀');
+    expect(m.items[0].card.name).toBe('雷杀');
+  });
+
+  it('打出火杀 → 短标注「名出火杀」+ card.name=火杀', () => {
+    const view = makeView();
+    view.cardMap = { 'fire-slash': { name: '杀', suit: '♥', rank: '4', damageType: '火焰' } as never };
+    const m = playHistoryMutationFromEvent(
+      {
+        type: '打出',
+        player: 0,
+        cardId: 'fire-slash',
+        card: { name: '杀', suit: '♥', rank: '4' },
+      },
+      view,
+      1000,
+    );
+    expect(m?.kind).toBe('push');
+    if (m?.kind !== 'push') return;
+    expect(m.items[0].caption).toBe('刘备出火杀');
+    expect(m.items[0].card.name).toBe('火杀');
+  });
+
+  it('打出普通杀(无damageType) → 仍显示「名出杀」', () => {
+    const view = makeView();
+    view.cardMap = { 'normal-slash': { name: '杀', suit: '♠', rank: '7' } as never };
+    const m = playHistoryMutationFromEvent(
+      {
+        type: '打出',
+        player: 1,
+        cardId: 'normal-slash',
+        card: { name: '杀', suit: '♠', rank: '7' },
+      },
+      view,
+      1000,
+    );
+    expect(m?.kind).toBe('push');
+    if (m?.kind !== 'push') return;
+    expect(m.items[0].caption).toBe('张角出杀');
+    expect(m.items[0].card.name).toBe('杀');
+  });
 });

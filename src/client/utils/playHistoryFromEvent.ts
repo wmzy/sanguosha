@@ -3,6 +3,7 @@
 
 import type { GameView, ViewEvent } from '../../engine/types';
 import type { PlayHistoryItem } from './playHistoryQueue';
+import { displayCardName } from './gameViewHelpers';
 
 function playerName(view: GameView, index: number): string {
   return view.players.find((p) => p.index === index)?.name ?? `P${index}`;
@@ -38,14 +39,18 @@ export function playHistoryMutationFromEvent(
     const card = event.card as { name?: string; suit?: string; rank?: string } | undefined;
     if (player === undefined || !card?.name) return null;
     const name = playerName(view, player);
+    // 查 cardMap 获取 damageType,展示火杀/雷杀
+    const cardId = event.cardId as string | undefined;
+    const fullCard = cardId ? view.cardMap[cardId] : undefined;
+    const display = displayCardName(card.name, fullCard?.damageType);
     // 响应/无目标:「张角出闪」;有目标时指定目标事件会改成「源→目标」
-    const caption = `${name}出${card.name}`;
+    const caption = `${name}出${display}`;
     return {
       kind: 'push',
       items: [
         {
           id: nextId(),
-          card: { name: card.name, suit: card.suit, rank: card.rank },
+          card: { name: display, suit: card.suit, rank: card.rank },
           caption,
           enqueuedAt: now,
           cardId: event.cardId as string | undefined,
@@ -81,13 +86,14 @@ export function playHistoryMutationFromEvent(
     const cardNames = (event.cardNames as string[] | undefined) ?? [];
     const items: PlayHistoryItem[] = [];
     for (let i = 0; i < Math.max(cardIds.length, cardNames.length); i++) {
-      const cardName = cardNames[i] ?? view.cardMap[cardIds[i] ?? '']?.name;
-      if (!cardName) continue;
+      const rawName = cardNames[i] ?? view.cardMap[cardIds[i] ?? '']?.name;
+      if (!rawName) continue;
       const full = cardIds[i] ? view.cardMap[cardIds[i]] : undefined;
+      const display = displayCardName(rawName, full?.damageType);
       items.push({
         id: nextId(),
         card: {
-          name: cardName,
+          name: display,
           suit: full?.suit,
           rank: full?.rank,
         },

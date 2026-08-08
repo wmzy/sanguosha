@@ -1,5 +1,6 @@
 // tests/skill-tests/无中生有.test.ts
-// 无中生有(普通锦囊):出牌阶段对包括自己在内的一名角色使用,该角色摸两张牌。
+// 无中生有(普通锦囊):出牌阶段对自己使用,自己摸两张牌。
+// 标准规则:target.kind='self',强制目标=使用者,忽略客户端传入的其他目标。
 //
 // 完整行为测试覆盖:
 //   正面:
@@ -164,9 +165,9 @@ describe('无中生有', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 1c. 正面:对他人使用 → 目标摸 2 张(界限突破/1V1/国-标 语义)
+  // 1c. 正面:标准规则下无中生有仅对自己使用 — 即使客户端误传目标也强制自己摸牌
   // ─────────────────────────────────────────────────────────────
-  it('P1 对 P2 使用无中生有 → pass 后 P2 摸 2 张,P1 不摸牌', async () => {
+  it('P1 使用无中生有(误传 P2 目标) → 强制自己摸 2 张,P2 不摸牌', async () => {
     const c1 = makeCard('d1', '杀', '♠', '5', '基本牌');
     const c2 = makeCard('d2', '闪', '♥', '6', '基本牌');
     const state = buildState({ extraCards: { d1: c1, d2: c2 } });
@@ -180,16 +181,16 @@ describe('无中生有', () => {
     const p1HandBefore = harness.state.players[0].hand.length; // 1 (wz1)
     const p2HandBefore = harness.state.players[1].hand.length; // 0
 
-    // 目标指定为 P2(座次 1)
+    // 即使客户端传入 P2 目标,kind='self' 强制目标=自己
     await P1.useCardAndTarget('无中生有', 'wz1', [1]);
     P1.expectPending('请求回应');
     await P1.pass();
 
-    // 目标 P2 摸 2 张
-    expect(harness.state.players[1].hand.length).toBe(p2HandBefore + 2);
-    expect(harness.state.players[1].hand).toEqual(expect.arrayContaining(['d1', 'd2']));
-    // 使用者 P1 仅打出 wz1,不摸牌
-    expect(harness.state.players[0].hand.length).toBe(p1HandBefore - 1);
+    // 使用者 P1 自己摸 2 张(net +1: 打出 wz1, 摸 d1+d2)
+    expect(harness.state.players[0].hand.length).toBe(p1HandBefore + 1);
+    expect(harness.state.players[0].hand).toEqual(expect.arrayContaining(['d1', 'd2']));
+    // P2 不摸牌
+    expect(harness.state.players[1].hand.length).toBe(p2HandBefore);
     // 无中生有进弃牌堆
     expect(harness.state.zones.discardPile).toContain('wz1');
     // 牌堆 -2

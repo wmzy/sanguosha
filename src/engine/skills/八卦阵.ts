@@ -53,6 +53,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (ctx): Promise<HookResult | void> => {
       if ((ctx.atom).target !== ownerId) return;
       if (ctx.state.zones.deck.length === 0) return;
+      // 动态校验防具仍在装备区(陷阱8:获得/顺手牵羊等路径只移除装备槽、
+      // 不触发移除技能,陈旧 hook 可能残留)。触发前校验防具仍是八卦阵。
+      const armorId = ctx.state.players[ownerId]?.equipment?.['防具'];
+      if (!armorId || ctx.state.cardMap[armorId]?.name !== '八卦阵') return;
 
       // 询问是否发动八卦阵
       delete ctx.state.localVars['八卦阵/confirmed'];
