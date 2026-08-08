@@ -25,7 +25,7 @@
 //   无次数限制(描述明确)。
 import type { Card, EquipSlot, FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, hasBlockingPending } from '../skill';
 
 const TRICK_NAME = '乐不思蜀';

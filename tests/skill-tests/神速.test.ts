@@ -22,7 +22,7 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/index';
 import { validateCardUse } from '../../src/engine/card-effect/validate';
-import { slashUsed } from '../../src/engine/slash-quota';
+import { slashUsed } from '../../src/engine/rules/slash-quota';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A'): Card {

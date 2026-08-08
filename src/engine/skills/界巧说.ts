@@ -34,9 +34,9 @@ import type {
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runRankCompareFlow } from '../rank-flow';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
-import { registerTrickBlocker } from '../trick-quota';
+import { registerTrickBlocker } from '../rules/trick-quota';
 
 const SKILL_ID = '界巧说';
 const DISPLAY_NAME = '巧说';

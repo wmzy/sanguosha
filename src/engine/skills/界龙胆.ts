@@ -21,7 +21,7 @@
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
 import { registerAction, declareAlternativeResponse } from '../skill';
 import { applyAtom } from '../index';
-import { viewCanSlash, defaultPlayActive } from '../action-active';
+import { viewCanSlash, defaultPlayActive } from '../rules/action-active';
 
 /** 源卡名 → 转化目标牌名(四向双向映射;每张源卡唯一确定目标) */
 const TRANSFORM_MAP: Record<string, string> = {

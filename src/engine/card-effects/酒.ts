@@ -11,9 +11,9 @@
 import type { Card } from '../types';
 import { applyAtom } from '../index';
 import { registerBeforeHook } from '../skill';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import type { HookResult } from '../types';
 
 /** 注册酒的全局「造成伤害」before-hook（消费增伤标记）。

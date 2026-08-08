@@ -37,7 +37,7 @@ import {
   usedThisTurn,
   markOncePerTurn,
   activeUnlessUsedThisTurn,
-} from '../once-per-turn';
+} from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { skillLoaders } from './index';
 

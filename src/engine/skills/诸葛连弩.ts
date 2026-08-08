@@ -10,7 +10,7 @@
 //   → "装前出过杀,卸载后不能再用"自然成立。
 //   无需 before hook 兜底,无需 onInstantiate/onDestroy 写状态——提供者存在即贡献。
 import type { Skill, GameState } from '../types';
-import { registerSlashUnlimitedProvider } from '../slash-quota';
+import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '诸葛连弩', description: '武器:出牌阶段使用【杀】无次数限制', isLocked: true };

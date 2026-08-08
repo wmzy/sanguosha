@@ -18,7 +18,7 @@ import {
   extractCardFilter,
   type PlayRules,
 } from '../utils/gameViewHelpers';
-import { viewSlashTargetMax } from '../../engine/action-active';
+import { viewSlashTargetMax } from '../../engine/rules/action-active';
 
 /** 从 use action 的 prompt 取 targetFilter（useCardAndTarget/selectTarget 才有）。 */
 function getTargetFilter(prompt: SkillActionDef['prompt']): TargetFilter | null {

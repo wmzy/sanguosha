@@ -11,7 +11,7 @@
 //   - 独立界版技能文件,不修改标制衡。限一次标记键为 '界制衡'(与标制衡键隔离,互不影响)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

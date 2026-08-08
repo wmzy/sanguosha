@@ -18,7 +18,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import {
   registerAction,
   registerBeforeHook,

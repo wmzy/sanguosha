@@ -60,9 +60,9 @@ import type { ActionContext, FrontendAPI, GameState, Json, Skill } from '../type
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../skill';
-import { inAttackRange } from '../distance';
-import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
-import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
+import { inAttackRange } from '../rules/distance';
+import { canSlash, incSlashUsed, slashUsed } from '../rules/slash-quota';
+import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 
 const SKILL_ID = '界蛊惑';
 const DISPLAY_NAME = '蛊惑'; // OL 官方技能名(不带"界"前缀)

@@ -24,8 +24,8 @@
 import type { GameState, FrontendAPI, GameView, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
-import { inAttackRange } from '../distance';
-import { canSlash } from '../slash-quota';
+import { inAttackRange } from '../rules/distance';
+import { canSlash } from '../rules/slash-quota';
 import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';
 
 // localVars keys(界刘备视为使用基本牌流程)

@@ -32,7 +32,7 @@
 import type { GameState, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerAfterHook } from '../skill';
-import { registerHandLimitProvider } from '../hand-limit';
+import { registerHandLimitProvider } from '../rules/hand-limit';
 
 const SURVIVE_KEY = '不屈/存活';
 const WOUND_KEY = '不屈/创牌';

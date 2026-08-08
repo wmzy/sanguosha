@@ -15,7 +15,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../index';
-import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
 const BONUS_TAG = '裸衣/bonus';

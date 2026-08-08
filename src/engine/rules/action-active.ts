@@ -5,7 +5,7 @@
 // 而 onMount 在前端运行(skillActionRegistry import skills 触发)。若谓词放 client 层,
 // 会形成 engine→client 反向依赖。故放 engine 层,与 ActionContext(engine/types)同层。
 // client/utils/gameViewHelpers 的 DEFAULT_PLAY_ACTIVE 复用此处,消除重复。
-import type { ActionContext } from './types';
+import type { ActionContext } from '../types';
 
 /** 默认出牌激活条件:当前视角回合 + 出牌阶段 + 无阻塞型 pending。
  *  非阻塞型 pending(出牌窗口)不阻止出牌/用技。这是绝大多数主动出牌/用技场景的

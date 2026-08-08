@@ -45,9 +45,9 @@ import type { ActionContext, FrontendAPI, GameState, Json, Skill } from '../type
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../skill';
-import { inAttackRange } from '../distance';
-import { canSlash, incSlashUsed, slashUsed } from '../slash-quota';
-import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
+import { inAttackRange } from '../rules/distance';
+import { canSlash, incSlashUsed, slashUsed } from '../rules/slash-quota';
+import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 
 const REQUEST_TYPE = '蛊惑/质疑';
 const QUESTIONER_VAR = '蛊惑/质疑者';

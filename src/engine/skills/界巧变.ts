@@ -39,7 +39,7 @@ import type {
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, registerBeforeHook, registerAfterHook, hasBlockingPending } from '../skill';
-import { skipPhase } from '../skip-phase';
+import { skipPhase } from '../rules/skip-phase';
 
 // ── requestType 常量(用于 请求回应 atom 的 requestType 字段) ──
 const CONFIRM_RT = '界巧变/confirm';

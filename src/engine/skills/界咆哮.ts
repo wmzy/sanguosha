@@ -12,7 +12,7 @@
 import type { Skill, GameState } from '../types';
 import { applyAtom } from '../index';
 import { registerAfterHook } from '../skill';
-import { registerSlashUnlimitedProvider } from '../slash-quota';
+import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

@@ -17,7 +17,7 @@
 //     (无双双杀、轮流出杀、输者受 1 点伤害),且走完整时机 atom 序列保证事件一致。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { getGender } from '../data/character-meta';
 import { runUseFlow } from '../card-effect/use-card';

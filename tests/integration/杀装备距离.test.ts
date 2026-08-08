@@ -13,8 +13,8 @@
 import { describe, it, expect } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/index';
 import { fireTimeoutAndWait, dispatchAndWait } from '../engine-harness';
-import { inAttackRange } from '../../src/engine/distance';
-import { slashMax } from '../../src/engine/slash-quota';
+import { inAttackRange } from '../../src/engine/rules/distance';
+import { slashMax } from '../../src/engine/rules/slash-quota';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';

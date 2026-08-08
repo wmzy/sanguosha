@@ -12,7 +12,7 @@
 // 提供者签名携带 cardId,支持 per-card 决策(疠火判火杀属性、方天画戟判最后一张手牌)。
 // 注册表为 state-bound(WeakMap 外挂在 GameState 上),随 state 自动隔离与 GC。
 
-import type { GameState } from './types';
+import type { GameState } from '../types';
 
 /**
  * 杀目标数提供者:返回该来源允许的【杀】最大目标数。

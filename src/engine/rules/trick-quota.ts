@@ -8,7 +8,7 @@
 // 随 state 自动隔离与 GC,无模块级全局状态泄漏。阻断器是查询型谓词(读取 state),
 // 不预写状态——技能只需在 onInit 注册一次,谓词内动态读 turn.vars 判定当前是否生效。
 
-import type { GameState } from './types';
+import type { GameState } from '../types';
 
 /**
  * 普通锦囊牌阻断器:返回 true 表示该玩家本回合被禁止使用普通锦囊牌。

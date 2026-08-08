@@ -20,9 +20,9 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
-import { inAttackRange } from '../distance';
+import { inAttackRange } from '../rules/distance';
 
 const SKILL_ID = '界挑衅';
 const DISPLAY_NAME = '挑衅';

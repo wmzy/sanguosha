@@ -30,7 +30,7 @@ import type {
 import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { registerBeforeHook, type SkillModule } from '../skill';
-import { registerHandLimitProvider } from '../hand-limit';
+import { registerHandLimitProvider } from '../rules/hand-limit';
 
 const DISPLAY_NAME = '宗室';
 

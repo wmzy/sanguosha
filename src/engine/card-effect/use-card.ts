@@ -432,7 +432,7 @@ export function registerDelayedTrickHooks(state: GameState): void {
       if (!sp) continue;
       if (sp.phase !== atom.phase) continue;
       if (self.tags.includes(sp.tag)) {
-        const { skipPhase: doSkip } = await import('../skip-phase');
+        const { skipPhase: doSkip } = await import('../rules/skip-phase');
         return doSkip(ctx.state, atom, sp.tag);
       }
     }

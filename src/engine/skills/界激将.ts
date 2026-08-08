@@ -35,7 +35,7 @@ import type {
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
 import { registerAction, registerAfterHook, hasBlockingPending, declareAlternativeResponse, type SkillModule } from '../skill';
-import { inAttackRange } from '../distance';
+import { inAttackRange } from '../rules/distance';
 
 // localVars keys(界激将新增被动触发)
 const REQUEST_TYPE = '界激将/drawChoice';

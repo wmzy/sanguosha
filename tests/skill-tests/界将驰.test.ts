@@ -19,8 +19,8 @@ import '../../src/engine/skills';
 import { applyAtom } from '../../src/engine/index';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
-import { slashMax, slashUsed, canSlash } from '../../src/engine/slash-quota';
-import { handLimit } from '../../src/engine/hand-limit';
+import { slashMax, slashUsed, canSlash } from '../../src/engine/rules/slash-quota';
+import { handLimit } from '../../src/engine/rules/hand-limit';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(

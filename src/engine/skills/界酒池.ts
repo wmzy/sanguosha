@@ -23,7 +23,7 @@
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, registerAfterHook, hasBlockingPending, declareAlternativeResponse } from '../skill';
 import { applyAtom } from '../index';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 
 const DISABLE_BENGHUAI_VAR = '崩坏/disabled';
 /** 豁免酒使用方法Ⅰ每回合限一次的 tag(本技能"无次数限制")。酒.ts 的 canUseWine/activeWhen 检查此 tag。 */

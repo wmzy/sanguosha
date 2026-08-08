@@ -32,7 +32,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, topFrame } from '../index';
-import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { isDelayedTrick } from '../data/card-meta';
 import {
   registerAction,

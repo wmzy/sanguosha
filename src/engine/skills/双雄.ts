@@ -38,8 +38,8 @@ import {
   registerBeforeHook,
   hasBlockingPending,
 } from '../skill';
-import { skipPhase } from '../skip-phase';
-import { defaultPlayActive } from '../action-active';
+import { skipPhase } from '../rules/skip-phase';
+import { defaultPlayActive } from '../rules/action-active';
 
 const CONFIRM_RT = '双雄/confirm';
 const TRIGGERED_KEY = '双雄/triggered';

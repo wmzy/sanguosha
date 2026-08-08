@@ -38,8 +38,8 @@ import {
   registerAfterHook,
   hasBlockingPending,
 } from '../skill';
-import { defaultPlayActive, viewCanSlash } from '../action-active';
-import { registerSlashTargetProvider } from '../slash-target';
+import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
+import { registerSlashTargetProvider } from '../rules/slash-target';
 
 const _SKILL_ID = '界疠火';
 const DISPLAY_NAME = '疠火';

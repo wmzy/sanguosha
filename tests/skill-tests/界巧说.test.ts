@@ -18,7 +18,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
-import { isTrickBlocked } from '../../src/engine/trick-quota';
+import { isTrickBlocked } from '../../src/engine/rules/trick-quota';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(

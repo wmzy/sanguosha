@@ -18,8 +18,8 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
-import { slashMax, canSlash, isSlashBlocked } from '../../src/engine/slash-quota';
-import { inAttackRange } from '../../src/engine/distance';
+import { slashMax, canSlash, isSlashBlocked } from '../../src/engine/rules/slash-quota';
+import { inAttackRange } from '../../src/engine/rules/distance';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(

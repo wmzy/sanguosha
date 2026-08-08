@@ -14,9 +14,9 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { runRankCompareFlow } from '../rank-flow';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../skill';
-import { inAttackRange } from '../distance';
+import { inAttackRange } from '../rules/distance';
 
 /** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
 function rankValue(rank: string): number {

@@ -38,7 +38,7 @@ import type {
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runDamageFlow } from '../damage-flow';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 
 const SKILL_ID = '界焚城';

@@ -14,7 +14,7 @@
 import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../face-down';
-import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../skill';
 import { skillLoaders } from './index';
 

@@ -18,7 +18,7 @@ import { getAllCardEffects } from '../../engine/card-effect/registry';
 // getAllCardEffects 依赖各 card-effect 模块的 registerCardEffect 副作用,这里触发加载。
 import '../../engine/card-effects';
 import type { SkillActionDef } from '../skillActionRegistry';
-import { defaultPlayActive } from '../../engine/action-active';
+import { defaultPlayActive } from '../../engine/rules/action-active';
 
 // ─── use action 查找(filter-based) ───
 // 设计原则:action 声明即真相——技能 onMount 调 defineAction('use') 时通过

@@ -11,7 +11,7 @@
 // 注:src/client/utils/distance.ts 的同名函数语义一致,前端组件可直接用本模块,
 // 也可继续用 client util(两者基于同一套 distanceVars 投影)。
 
-import type { GameView } from './types';
+import type { GameView } from '../types';
 
 /** GameView 上 from 到 to 的环形座位距离(只算存活玩家) */
 export function viewSeatDistance(

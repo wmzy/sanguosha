@@ -7,7 +7,7 @@
 import type { Card, FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
 import { applyAtom } from '../index';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

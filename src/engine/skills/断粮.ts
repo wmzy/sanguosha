@@ -13,10 +13,10 @@
 //   - 放松:目标手牌数 >= 徐晃手牌数 → 无距离限制
 import type { Card, GameView, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, hasBlockingPending } from '../skill';
-import { effectiveDistance } from '../distance';
-import { viewEffectiveDistance } from '../viewDistance';
+import { effectiveDistance } from '../rules/distance';
+import { viewEffectiveDistance } from '../rules/viewDistance';
 
 const TRICK_NAME = '兵粮寸断';
 

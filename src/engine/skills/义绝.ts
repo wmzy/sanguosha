@@ -33,7 +33,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, type SkillModule } from '../skill';
 import { registerSuppressionProvider } from '../skill-suppression';
 

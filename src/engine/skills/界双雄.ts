@@ -49,7 +49,7 @@ import {
   hasBlockingPending,
   type SkillModule,
 } from '../skill';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 
 const _SKILL_ID = '界双雄';
 const DISPLAY_NAME = '双雄';

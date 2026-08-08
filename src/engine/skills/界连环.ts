@@ -29,7 +29,7 @@ import { recastCard } from '../recast';
 import { setChain } from '../face-down';
 import { registerAction, hasBlockingPending, validateUseCard } from '../skill';
 import { promptCancel } from '../无懈可击';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 
 const CHAIN_MARK = 'chained';
 

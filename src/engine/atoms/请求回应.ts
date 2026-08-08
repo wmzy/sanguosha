@@ -6,7 +6,7 @@ import type { ActionPrompt, AtomDefinition, Card, Json, ViewEventSplit, ViewEven
 
 import { applyAtom, resolveTimeoutMs } from '../index';
 import { registerAtom } from '../atom';
-import { handLimit } from '../hand-limit';
+import { handLimit } from '../rules/hand-limit';
 import { resolveChoosePlayerCandidates } from '../view/choosePlayerCandidates';
 import { resolveCardFilterCandidates } from '../view/cardFilterCandidates';
 import {

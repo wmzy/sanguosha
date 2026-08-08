@@ -9,7 +9,7 @@
 //   借刀杀人出的杀也走 canUseSlash 路径(forced 模式 + 借刀 respond.validate),故被借刀者
 //   满足条件时同样允许多目标。
 import type { Skill, GameState } from '../types';
-import { registerSlashTargetProvider } from '../slash-target';
+import { registerSlashTargetProvider } from '../rules/slash-target';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '方天画戟', description: '武器:最后一张手牌为杀时可指定最多3个目标', isLocked: true };

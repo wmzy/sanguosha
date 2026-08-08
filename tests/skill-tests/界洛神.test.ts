@@ -19,7 +19,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/index';
-import { handLimit } from '../../src/engine/hand-limit';
+import { handLimit } from '../../src/engine/rules/hand-limit';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A'): Card {

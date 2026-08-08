@@ -27,7 +27,7 @@ import type { FrontendAPI, GameState, Json, Skill, Card } from '../types';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { getGender } from '../data/character-meta';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 import type { GameView } from '../types';
 
 const SKILL_ID = '界荐言';

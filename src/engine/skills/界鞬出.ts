@@ -46,7 +46,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
-import { registerSlashExtraProvider } from '../slash-quota';
+import { registerSlashExtraProvider } from '../rules/slash-quota';
 
 const TAG = '界鞬出/禁闪';
 const CONFIRM = '界鞬出/confirmed';

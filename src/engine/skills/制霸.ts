@@ -33,7 +33,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../skill';
 
 const AWAKENED_KEY = '魂姿/awakened';

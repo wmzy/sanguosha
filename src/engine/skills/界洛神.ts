@@ -24,7 +24,7 @@ import { getHealthValue } from '../types';
 import { applyAtom, frameCards } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook } from '../skill';
-import { registerHandLimitProvider } from '../hand-limit';
+import { registerHandLimitProvider } from '../rules/hand-limit';
 
 /** turn.vars key:本回合经洛神获得的判定牌 id 列表(随「回合结束」自动清空) */
 const EXEMPT_VAR = '界洛神/豁免牌';

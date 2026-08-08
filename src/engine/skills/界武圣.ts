@@ -9,9 +9,9 @@
 import type { Card, EquipSlot, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
 import { registerAction, hasBlockingPending } from '../skill';
 import { applyAtom } from '../index';
-import { viewCanAttack } from '../viewDistance';
-import { defaultPlayActive, viewCanSlash } from '../action-active';
-import { registerAttackRangeExemptor } from '../distance';
+import { viewCanAttack } from '../rules/viewDistance';
+import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
+import { registerAttackRangeExemptor } from '../rules/distance';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

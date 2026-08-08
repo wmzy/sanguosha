@@ -5,7 +5,7 @@
 
 import type { Card } from '../types';
 import { applyAtom } from '../index';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
 /** 桃的牌特有校验：目标必须已受伤 */

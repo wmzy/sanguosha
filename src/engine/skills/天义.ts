@@ -20,11 +20,11 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runRankCompareFlow } from '../rank-flow';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../skill';
-import { registerSlashExtraProvider, registerSlashBlocker } from '../slash-quota';
-import { registerSlashTargetProvider } from '../slash-target';
-import { registerAttackRangeExemptor } from '../distance';
+import { registerSlashExtraProvider, registerSlashBlocker } from '../rules/slash-quota';
+import { registerSlashTargetProvider } from '../rules/slash-target';
+import { registerAttackRangeExemptor } from '../rules/distance';
 
 /** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
 function rankValue(rank: string): number {

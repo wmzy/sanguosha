@@ -39,8 +39,8 @@ import {
   hasBlockingPending,
   type SkillModule,
 } from '../skill';
-import { inAttackRange } from '../distance';
-import { defaultPlayActive } from '../action-active';
+import { inAttackRange } from '../rules/distance';
+import { defaultPlayActive } from '../rules/action-active';
 
 const SKILL_ID = '界解烦';
 const DISPLAY_NAME = '解烦';

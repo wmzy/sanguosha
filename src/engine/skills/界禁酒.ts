@@ -39,7 +39,7 @@ import {
 } from '../skill';
 import type { ActionEntry } from '../types';
 import { applyAtom } from '../index';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 
 const _SKILL_ID = '界禁酒';
 const DISPLAY_NAME = '禁酒';

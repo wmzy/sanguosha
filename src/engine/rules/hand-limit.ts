@@ -9,8 +9,8 @@
 // 注册表为 state-bound(WeakMap 外挂在 GameState 上),随 state 自动隔离与 GC,
 // 无模块级全局状态泄漏(与 skill.ts / slash-quota.ts 的 registries 同构)。
 
-import type { GameState } from './types';
-import { getHealthValue } from './types';
+import type { GameState } from '../types';
+import { getHealthValue } from '../types';
 
 /**
  * 手牌上限覆盖提供者:返回该玩家手牌上限的绝对值(undefined = 不覆盖)。

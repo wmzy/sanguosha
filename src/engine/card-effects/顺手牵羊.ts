@@ -5,8 +5,8 @@
 
 import type { Card } from '../types';
 import type { GameView } from '../types';
-import { effectiveDistance } from '../distance';
-import { viewEffectiveDistance } from '../viewDistance';
+import { effectiveDistance } from '../rules/distance';
+import { viewEffectiveDistance } from '../rules/viewDistance';
 import { runPickTargetCardPanel } from '../pick-card-panel';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 

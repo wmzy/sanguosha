@@ -26,7 +26,7 @@
 //   内部 Skill.name = '势斩'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 import { runUseFlow } from '../card-effect/use-card';
 

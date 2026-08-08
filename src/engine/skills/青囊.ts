@@ -10,7 +10,7 @@
 //   - 限一次:players[ownerId].vars['青囊/usedThisTurn'](后端) + turnUsage(前端)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

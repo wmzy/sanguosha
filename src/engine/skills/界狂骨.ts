@@ -13,7 +13,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
-import { effectiveDistance } from '../distance';
+import { effectiveDistance } from '../rules/distance';
 
 /** 界魏延二选一问询的 requestType(隔离 respond 路由)。
  *  前缀必须等于 skillId('界狂骨'):前端 resolvePendingRespond 按 requestType

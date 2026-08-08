@@ -17,7 +17,7 @@ import type {
   Skill,
 } from '../types';
 import { registerBeforeHook } from '../skill';
-import { registerHandLimitProvider } from '../hand-limit';
+import { registerHandLimitProvider } from '../rules/hand-limit';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

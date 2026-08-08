@@ -22,8 +22,8 @@
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerBeforeHook, registerAfterHook, type SkillModule } from '../skill';
-import { registerSlashExtraProvider } from '../slash-quota';
-import { registerAttackRangeExemptor } from '../distance';
+import { registerSlashExtraProvider } from '../rules/slash-quota';
+import { registerAttackRangeExemptor } from '../rules/distance';
 
 /** 本回合诈降杀增益是否激活的 turn.vars key(值为激活者座次 number)。
  *  仅在 owner 出牌阶段失去体力后设置;杀技能/action-active/distance 据此分支红色杀增益。 */

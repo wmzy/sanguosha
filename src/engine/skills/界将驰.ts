@@ -41,9 +41,9 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { recastCard } from '../recast';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
-import { registerSlashQuotaProvider, registerSlashBlocker } from '../slash-quota';
-import { registerHandLimitProvider } from '../hand-limit';
-import { registerAttackRangeExemptor } from '../distance';
+import { registerSlashQuotaProvider, registerSlashBlocker } from '../rules/slash-quota';
+import { registerHandLimitProvider } from '../rules/hand-limit';
+import { registerAttackRangeExemptor } from '../rules/distance';
 
 const _SKILL_ID = '界将驰';
 const DISPLAY_NAME = '将驰';

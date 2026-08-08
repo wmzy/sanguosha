@@ -37,7 +37,7 @@ import {
   hasBlockingPending,
   type SkillModule,
 } from '../skill';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 
 const SKILL_ID = '界渐营';
 const DISPLAY_NAME = '渐营';

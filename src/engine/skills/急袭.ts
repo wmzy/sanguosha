@@ -20,7 +20,7 @@
 //     若距离变远导致 use validate 失败,rollback 恢复一切(安全)
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 import { registerAction } from '../skill';
 
 const TIAN_PREFIX = '屯田/田:';

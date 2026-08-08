@@ -40,7 +40,7 @@ import { registerAction, hasBlockingPending } from '../skill';
 import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { promptCancel } from '../无懈可击';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

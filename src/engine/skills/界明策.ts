@@ -38,8 +38,8 @@ import type {
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
 import { registerAction, hasBlockingPending } from '../skill';
-import { defaultPlayActive } from '../action-active';
-import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../once-per-turn';
+import { defaultPlayActive } from '../rules/action-active';
+import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../rules/once-per-turn';
 
 const SKILL_ID = '界明策';
 const DISPLAY_NAME = '明策';

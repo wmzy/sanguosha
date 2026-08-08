@@ -17,7 +17,7 @@
 //   - 展示:复用「展示」atom 公开牌面(apply no-op,广播 cardId+牌面)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 
 const PICK_REQUEST = '攻心/选牌';

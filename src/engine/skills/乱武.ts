@@ -24,9 +24,9 @@
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, hasBlockingPending } from '../skill';
-import { effectiveDistance } from '../distance';
+import { effectiveDistance } from '../rules/distance';
 
 const USED_KEY = '乱武/used';
 const CHOICE_VAR = '乱武/出杀';

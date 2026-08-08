@@ -44,9 +44,9 @@ import type {
 } from '../types';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../skill';
 import { applyAtom, topFrame } from '../index';
-import { registerSlashUnlimitedProvider } from '../slash-quota';
-import { viewCanAttack } from '../viewDistance';
-import { defaultPlayActive, viewCanSlash } from '../action-active';
+import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
+import { viewCanAttack } from '../rules/viewDistance';
+import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
 
 const GRANT_VAR = '父魂/granted';
 const COLOR_LIMIT_VAR = '闪/色限制';

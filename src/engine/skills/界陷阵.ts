@@ -54,11 +54,11 @@ import {
   instantiateSkill,
   type SkillModule,
 } from '../skill';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
-import { registerSlashUnlimitedProvider } from '../slash-quota';
-import { registerHandLimitProvider } from '../hand-limit';
-import { registerDistanceExemptor } from '../distance';
-import { defaultPlayActive } from '../action-active';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
+import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
+import { registerHandLimitProvider } from '../rules/hand-limit';
+import { registerDistanceExemptor } from '../rules/distance';
+import { defaultPlayActive } from '../rules/action-active';
 
 const SKILL_ID = '界陷阵';
 const DISPLAY_NAME = '陷阵';

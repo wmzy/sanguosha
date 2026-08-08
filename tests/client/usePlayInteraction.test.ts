@@ -7,7 +7,7 @@ import { act, renderHook } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { usePlayInteraction } from '@/hooks/usePlayInteraction';
 import type { PlayInteractionParams } from '@/hooks/usePlayInteraction';
-import { defaultPlayActive } from '@engine/action-active';
+import { defaultPlayActive } from '@engine/rules/action-active';
 import type { SkillActionDef } from '@/skillActionRegistry';
 import type { Card, DistributePrompt, GameView, Json, PendingView } from '@engine/types';
 

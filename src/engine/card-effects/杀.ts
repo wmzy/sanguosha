@@ -12,11 +12,11 @@
 import type { Card, GameView, GameState, Json } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../damage-flow';
-import { inAttackRange } from '../distance';
-import { viewCanAttack } from '../viewDistance';
-import { incSlashUsed, isSlashExempted, slashUsed } from '../slash-quota';
-import { slashTargetMax } from '../slash-target';
-import { defaultPlayActive, viewCanSlash } from '../action-active';
+import { inAttackRange } from '../rules/distance';
+import { viewCanAttack } from '../rules/viewDistance';
+import { incSlashUsed, isSlashExempted, slashUsed } from '../rules/slash-quota';
+import { slashTargetMax } from '../rules/slash-target';
+import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
 import {
   registerCardEffect,
   type CardEffect,

@@ -22,7 +22,7 @@
 // 注册表为 state-bound(WeakMap 外挂在 GameState 上),随 state 自动隔离与 GC,
 // 无模块级全局状态泄漏(与 skill.ts 的 registries 同构)。
 
-import type { GameState } from './types';
+import type { GameState } from '../types';
 
 /** 额定已用次数的 vars key */
 const QUOTA_USED_VAR = '杀/quotaUsed';

@@ -15,7 +15,7 @@
 //   - 限一次标记必须在第一个 await 前设置,防 dispatch 重入(同制衡/结姻)
 import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
 
 const TARGET_RT = '缔盟/target'; // 鲁肃:选两名目标

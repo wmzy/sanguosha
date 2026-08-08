@@ -15,8 +15,8 @@ import { applyAtom } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
 import { isCardBanned } from '../card-effect/validate';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
-import { inAttackRange } from '../distance';
-import { slashTargetMax } from '../slash-target';
+import { inAttackRange } from '../rules/distance';
+import { slashTargetMax } from '../rules/slash-target';
 
 /** 请求 A 出杀问询的 requestType */
 const REQUEST_TYPE = '借刀杀人/出杀';

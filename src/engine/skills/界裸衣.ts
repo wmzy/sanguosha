@@ -25,9 +25,9 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { usedThisTurn, markOncePerTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
-import { skipPhase } from '../skip-phase';
+import { skipPhase } from '../rules/skip-phase';
 
 const BONUS_TAG = '裸衣/bonus';
 /** 询问①:是否发动界裸衣(亮牌+增伤) */

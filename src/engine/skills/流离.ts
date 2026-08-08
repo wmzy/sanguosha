@@ -7,7 +7,7 @@
 import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
-import { inAttackRange } from '../distance';
+import { inAttackRange } from '../rules/distance';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

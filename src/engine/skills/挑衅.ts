@@ -19,9 +19,9 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runUseFlow } from '../card-effect/use-card';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../skill';
-import { inAttackRange } from '../distance';
+import { inAttackRange } from '../rules/distance';
 
 // localVars 键 / requestType 常量(对齐 乱武/借刀杀人 风格)
 const REQUEST_TYPE = '挑衅/出杀';      // 出杀询问的 requestType

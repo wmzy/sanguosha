@@ -12,7 +12,7 @@ import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { recastCard } from '../recast';
 import { registerAction, hasBlockingPending } from '../skill';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 
 /** 影子卡 id:${原id}#连环 */
 function shadowIdOf(cardId: string): string {

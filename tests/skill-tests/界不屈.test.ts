@@ -18,7 +18,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
-import { handLimit } from '../../src/engine/hand-limit';
+import { handLimit } from '../../src/engine/rules/hand-limit';
 import type { Card, GameState } from '../../src/engine/types';
 
 function mkCard(

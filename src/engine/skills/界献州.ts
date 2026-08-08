@@ -30,9 +30,9 @@ import {
   type SkillModule,
 } from '../skill';
 import { skillLoaders } from './index';
-import { inAttackRange } from '../distance';
-import { viewCanAttack } from '../viewDistance';
-import { defaultPlayActive } from '../action-active';
+import { inAttackRange } from '../rules/distance';
+import { viewCanAttack } from '../rules/viewDistance';
+import { defaultPlayActive } from '../rules/action-active';
 
 const SKILL_ID = '界献州';
 const DISPLAY_NAME = '献州';

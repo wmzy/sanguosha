@@ -27,7 +27,7 @@ import {
   canSlash,
   incSlashUsed,
   SLASH_USED_VAR,
-} from '../../src/engine/slash-quota';
+} from '../../src/engine/rules/slash-quota';
 
 function makeState(): GameState {
   return createGameState({

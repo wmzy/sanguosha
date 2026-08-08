@@ -20,11 +20,11 @@
 // 命名:文件名/loader key/character skill name 均为 '界乱武';内部 Skill.name='乱武'。
 import type { Card, FrontendAPI, GameState, GameView, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { defaultPlayActive } from '../action-active';
+import { defaultPlayActive } from '../rules/action-active';
 import { runUseFlow, chargeOnSettle } from '../card-effect/use-card';
 import { registerAction, hasBlockingPending, type SkillModule } from '../skill';
-import { effectiveDistance } from '../distance';
-import { canSlash } from '../slash-quota';
+import { effectiveDistance } from '../rules/distance';
+import { canSlash } from '../rules/slash-quota';
 
 const _SKILL_ID = '界乱武';
 const DISPLAY_NAME = '乱武';

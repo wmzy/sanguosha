@@ -20,7 +20,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
-import { inAttackRange } from '../distance';
+import { inAttackRange } from '../rules/distance';
 import { runPickTargetCardPanel } from '../pick-card-panel';
 
 /** localVars keys */

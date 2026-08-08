@@ -14,7 +14,7 @@
 // 限一次:player.vars['黄天/usedThisTurn'](后缀约定,回合结束 atom 自动清空)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../skill';
 
 /** 判断一张牌是否为黄天可交的牌(闪或闪电) */

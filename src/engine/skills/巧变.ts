@@ -26,7 +26,7 @@ import type {
 } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../skill';
-import { skipPhase } from '../skip-phase';
+import { skipPhase } from '../rules/skip-phase';
 
 const CONFIRM_RT = '巧变/confirm';
 const DISCARD_RT = '巧变/discard';

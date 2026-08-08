@@ -40,7 +40,7 @@ import type {
 } from '../types';
 import type { Color } from '../../engine/types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { effectiveDistance } from '../distance';
+import { effectiveDistance } from '../rules/distance';
 import {
   registerAction,
   registerAfterHook,

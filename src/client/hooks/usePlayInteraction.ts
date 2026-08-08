@@ -36,7 +36,7 @@ import {
   extractCardFilter,
 } from '../utils/gameViewHelpers';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
-import { viewSlashTargetMax } from '../../engine/action-active';
+import { viewSlashTargetMax } from '../../engine/rules/action-active';
 
 /**
  * 有序选择 + FIFO 淘汰:点击一张牌 toggle 其选中状态。

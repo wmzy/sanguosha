@@ -9,7 +9,7 @@
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
 import { registerAction, declareAlternativeResponse } from '../skill';
 import { applyAtom } from '../index';
-import { viewCanSlash, defaultPlayActive } from '../action-active';
+import { viewCanSlash, defaultPlayActive } from '../rules/action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

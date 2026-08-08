@@ -6,7 +6,7 @@
 // 各技能自行注册 predicate 判定是否豁免。
 // 注册表为 state-bound(WeakMap 外挂),随 state 自动隔离/GC,与 slash-quota/hand-limit 同构。
 
-import type { GameState } from './types';
+import type { GameState } from '../types';
 
 /**
  * 环形座位距离(只算存活玩家)。

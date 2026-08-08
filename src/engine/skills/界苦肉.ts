@@ -17,7 +17,7 @@
 //   内部 Skill.name = '苦肉'(OL 官方技能名,玩家可见)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
-import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../once-per-turn';
+import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../rules/once-per-turn';
 import { registerAction, type SkillModule } from '../skill';
 
 /** skillId / loader key / once-per-turn key(与标苦肉隔离)。 */
