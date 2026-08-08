@@ -44,6 +44,8 @@ export interface SeatArcLayoutProps {
   damageFlashIndices: Map<number, number>;
   healFlashIndices: Map<number, number>;
   turnVersion: number;
+  /** 游戏中已断线的座次集合(view player index),座位卡据此显示离线角标 */
+  disconnectedSeats?: Set<number>;
   /** 贴在座位区底部的操作坞(提示/倒计时/主按钮) */
   bottomSlot?: ReactNode;
 }
@@ -62,6 +64,7 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
     damageFlashIndices,
     healFlashIndices,
     turnVersion,
+    disconnectedSeats,
     bottomSlot,
   } = props;
 
@@ -99,6 +102,7 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
                 healVersion={healFlashIndices.get(realIdx) ?? 0}
                 isTurnGlow={player.name === currentPlayerName && turnVersion > 0}
                 turnGlowVersion={turnVersion}
+                isDisconnected={disconnectedSeats?.has(realIdx) ?? false}
               />
               {seatDeadline !== null && (
                 <CountdownBar deadline={seatDeadline} totalMs={seatTotalMs} />

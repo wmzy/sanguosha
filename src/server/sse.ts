@@ -8,7 +8,7 @@ import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import type { ServerMessage, EventSeq } from './protocol';
 import { serialize } from './protocol';
 import type { ConnectionSink } from './connection';
-import { getRoom, removeSpectator } from './room';
+import { getRoom, removeSpectator, leaveRoom } from './room';
 import { broadcastMessage } from './room';
 import { getChatHistory, buildRoomState } from './room';
 import { gameSessions, playerRoomMap } from './registry';
@@ -189,17 +189,30 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
         stopHeartbeat();
         sink.close();
         // 只在自己仍是当前 sink 时删除（刷新重连后旧连接的 onAbort 可能晚于新连接触发）
-        if (room.players.get(playerId) === sink) {
-          room.players.delete(playerId);
-          // session 在游戏开始后才创建(POST /start)，必须在断线时重新查询，
-          // 而非使用 SSE 连接建立时捕获的引用(大厅阶段为 undefined)。
-          const currentSession = gameSessions.get(roomId);
-          if (currentSession) {
-            currentSession.handleDisconnect(playerId);
-          }
+        if (room.players.get(playerId) !== sink) return;
+        room.players.delete(playerId);
+
+        // session 在游戏开始后才创建(POST /start)，必须在断线时重新查询，
+        // 而非使用 SSE 连接建立时捕获的引用(大厅阶段为 undefined)。
+        const currentSession = gameSessions.get(roomId);
+        if (currentSession && room.status === '进行中') {
+          // 游戏进行中:保留座位进入重连宽限期(广播 player_disconnected)。
+          // 座位必须保留,否则断线玩家在宽限期内重连将无法归位。
+          currentSession.handleDisconnect(playerId);
           if (room.isDebug) {
             playerRoomMap.delete(playerId);
           }
+          return;
+        }
+
+        // 等待/已结束阶段:释放座位并广播 room_state。
+        // 否则断线玩家的座位永远保留在 seats 中,房间内持续显示其"在线"
+        // (幽灵座位),且新玩家无法补位。普通房间保留房间本身(房主可重新进入);
+        // 快速房间全员离开时由 leaveRoom 自动销毁(返回 null,无需广播)。
+        const left = leaveRoom(roomId, playerId);
+        playerRoomMap.delete(playerId);
+        if (left) {
+          broadcastMessage(left, buildRoomState(left));
         }
       });
 

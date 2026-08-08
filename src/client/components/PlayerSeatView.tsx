@@ -49,6 +49,8 @@ export interface PlayerSeatProps {
   hideIdentity?: boolean;
   /** 视角玩家可主动发动的技能动作列表(预留,目前仅接受不渲染) */
   skillActions?: SkillActionDef[];
+  /** 该座次对应玩家已断线(重连宽限期内),座位卡显示离线角标并置灰 */
+  isDisconnected?: boolean;
 }
 
 function PlayerSeatViewImpl({
@@ -70,6 +72,7 @@ function PlayerSeatViewImpl({
   turnGlowVersion = 0,
   hideIdentity = true,
   skillActions: _skillActions, // 预留:未来用于在座位卡上显示可点使用的技能按钮
+  isDisconnected = false,
 }: PlayerSeatProps) {
   useSkillDescReady(); // 技能模块加载后重渲染,确保 title 中 getSkillDescription 命中
   void turnGlowVersion; // 预留:未来用于触发不同强度的回合光环动画
@@ -111,6 +114,7 @@ function PlayerSeatViewImpl({
         isHealed && seatHealOverlay,
         isTurnGlow && turnGlowing,
         isChained && seatCardChained,
+        isDisconnected && seatCardDisconnected,
       )}
       data-player-name={player.name}
       data-seat-index={index}
@@ -147,6 +151,7 @@ function PlayerSeatViewImpl({
                 ⛓
               </span>
             )}
+            {isDisconnected && <span className={offlineBadge} title="该玩家已断线,等待重连">离线</span>}
             {isDead && <span className={deadBadgeText}>亡</span>}
             {showIdentity && identity && (
               <span
@@ -291,6 +296,7 @@ function playerSeatPropsEqual(prev: PlayerSeatProps, next: PlayerSeatProps): boo
     prev.isTurnGlow === next.isTurnGlow &&
     prev.turnGlowVersion === next.turnGlowVersion &&
     prev.hideIdentity === next.hideIdentity &&
+    prev.isDisconnected === next.isDisconnected &&
     // 函数 props（引用相等，依赖父组件 useCallback）
     prev.onTargetClick === next.onTargetClick &&
     prev.onSeatDoubleClick === next.onSeatDoubleClick &&
@@ -467,6 +473,22 @@ const chainBadge = css`
   margin-left: 4px;
   font-weight: bold;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+`;
+// 离线角标:灰底,标示该玩家 SSE 已断开(重连宽限期内)
+const offlineBadge = css`
+  display: inline-block;
+  background: #888;
+  border: 1px solid #aaa;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 10px;
+  color: #fff;
+  margin-left: 4px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+`;
+// 断线座位置灰(与死亡置灰区分:断线保持立绘可见,仅降透明度)
+const seatCardDisconnected = css`
+  opacity: 0.6;
 `;
 const lordBadge = css`
   background: #ffd700;

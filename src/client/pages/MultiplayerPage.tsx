@@ -544,6 +544,7 @@ export function MultiplayerPage() {
             onReorderHand={() => {}}
             currentEvent={mp.currentEvent}
             ingestedEvents={mp.ingestedEvents}
+            disconnectedSeats={mp.disconnectedSeats}
           />
         </div>
       </>
@@ -670,6 +671,7 @@ export function MultiplayerPage() {
             chatMessages={mp.chatMessages}
             chatConfig={mp.roomState?.config?.chat}
             onSendChat={mp.sendChat}
+            disconnectedSeats={mp.disconnectedSeats}
           />
         </div>
       </>

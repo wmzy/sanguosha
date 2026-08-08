@@ -171,8 +171,8 @@ export type ServerMessage =
   | { type: 'room_joined'; roomId: string; playerId: string; seatIndex?: number }
   | { type: 'player_joined'; playerId: string }
   | { type: 'player_left'; playerId: string }
-  | { type: 'player_disconnected'; playerId: string; graceMs: number }
-  | { type: 'player_reconnected'; playerId: string }
+  | { type: 'player_disconnected'; playerId: string; seatIndex: number; graceMs: number }
+  | { type: 'player_reconnected'; playerId: string; seatIndex: number }
   | { type: 'game_started' }
   | { type: 'room_config'; config: RoomConfig }
   | {

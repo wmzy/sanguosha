@@ -90,6 +90,8 @@ export interface MultiplayerRoom {
   updateConfig: (config: RoomConfig, maxPlayers?: number) => void;
   /** 当前连接状态(供 UI 显示连接/重连提示) */
   connectionState: ConnectionState;
+  /** 游戏中已断线的座次集合(view player index),前端据此显示离线角标 */
+  disconnectedSeats: Set<number>;
   /** 当前播放的事件(供 GameViewComponent 中央动效展示:他人出牌/判定翻牌等) */
   currentEvent: import('./useEventPlayback').QueuedEvent | null;
   /** 刚入队的事件批次:出牌历史条立即消费(不等播放队列) */
@@ -126,6 +128,8 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const [incomingSeatSwap, setIncomingSeatSwap] = useState<
     { requesterId: string; requesterSeat: number; targetSeat: number; expiresAt: number } | null
   >(null);
+  /** 游戏中已断线的座次(game view player index 集合),供座位卡显示离线标识 */
+  const [disconnectedSeats, setDisconnectedSeats] = useState<Set<number>>(new Set());
 
   // 初始命令:有 initialRoomId 则自动 join(分享链接直达)
   const [command, setCommand] = useState<Command>(() =>
@@ -214,6 +218,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         if (msg.type === 'game_started') {
           // 每局游戏是独立的聊天会话:开局时清空上一局的消息
           setChatMessages([]);
+          setDisconnectedSeats(new Set());
         }
         if (msg.type === 'game_reset') {
           setGameOver(null);
@@ -225,6 +230,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
           historySeqRef.current = 0;
           recorderRef.current.reset();
           playbackRef.current.reset(0);
+          setDisconnectedSeats(new Set());
         }
         if (msg.type === 'event' && msg.view) {
           // 事件播放:他人出牌/判定翻牌等中央动效(供 GameViewComponent 中央展示)
@@ -246,6 +252,23 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         // 座位交换结果：清除通知
         if (msg.type === 'seat_swap_result') {
           setIncomingSeatSwap(null);
+        }
+        // 玩家断线/重连:维护离线座次集合,供座位卡显示离线角标
+        if (msg.type === 'player_disconnected' && msg.seatIndex >= 0) {
+          setDisconnectedSeats((prev) => {
+            if (prev.has(msg.seatIndex)) return prev;
+            const next = new Set(prev);
+            next.add(msg.seatIndex);
+            return next;
+          });
+        }
+        if (msg.type === 'player_reconnected' && msg.seatIndex >= 0) {
+          setDisconnectedSeats((prev) => {
+            if (!prev.has(msg.seatIndex)) return prev;
+            const next = new Set(prev);
+            next.delete(msg.seatIndex);
+            return next;
+          });
         }
       },
     });
@@ -379,6 +402,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setChatMessages([]);
     setIncomingSeatSwap(null);
     playbackRef.current.reset(0);
+    setDisconnectedSeats(new Set());
   }, []);
 
   const sendAction = useCallback((action: ActionMsg) => {
@@ -540,6 +564,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     sendChat,
     updateConfig,
     connectionState,
+    disconnectedSeats,
     reconnectAttempt,
     cancelReconnect,
     currentEvent: playback.current,

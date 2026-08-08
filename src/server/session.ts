@@ -467,9 +467,12 @@ export class GameSession {
     if (this.graceTimer === null && this.allPlayersDisconnected()) {
       this.graceTimer = setTimeout(() => this.endDueToDisconnect(), RECONNECT_GRACE_MS);
     }
+    // seatIndex = 游戏 view 的 player 下标(playerNames 语义),供前端定位离线座位
+    const seatIndex = this.playerNames.get(playerId) ?? -1;
     this.broadcast({
       type: 'player_disconnected',
       playerId,
+      seatIndex,
       graceMs: RECONNECT_GRACE_MS,
     });
   }
@@ -553,7 +556,8 @@ export class GameSession {
     // initialView 已是全量状态，不需要补推差量。
     // 同步水位标记，避免后续 broadcastNewState 重发已含在 initialView 中的事件。
     this.lastBroadcastSeq = Math.max(this.lastBroadcastSeq, this.state.seq);
-    this.broadcast({ type: 'player_reconnected', playerId });
+    const reconSeatIndex = this.playerNames.get(playerId) ?? -1;
+    this.broadcast({ type: 'player_reconnected', playerId, seatIndex: reconSeatIndex });
     return true;
   }
 

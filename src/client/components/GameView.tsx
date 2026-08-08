@@ -100,6 +100,9 @@ interface Props {
   chatConfig?: import('../../server/protocol').ChatConfig;
   /** 发送聊天(可选)。 */
   onSendChat?: (text: string) => void;
+  /** 游戏中已断线的座次集合(view player index),座位卡据此显示离线角标。
+   *  正式多人模式由 useMultiplayerRoom 维护;debug/回放模式不传(默认无离线标识)。 */
+  disconnectedSeats?: Set<number>;
 }
 
 // ─── 主组件 ───
@@ -120,6 +123,7 @@ export function GameViewComponentImpl({
   chatMessages,
   chatConfig,
   onSendChat,
+  disconnectedSeats,
 }: Props) {
   // perspectiveIdx 必须是有效座次索引。旁观者(无授权 viewer=-1)或越界时回退到座次 0,
   // 避免 view.players[perspectiveIdx] 为 undefined 导致渲染崩溃。
@@ -449,6 +453,7 @@ export function GameViewComponentImpl({
                 damageFlashIndices={anim.damageFlashIndices}
                 healFlashIndices={anim.healFlashIndices}
                 turnVersion={anim.turnVersion}
+                disconnectedSeats={disconnectedSeats}
                 bottomSlot={
                   <>
                     {isPerspectiveAwaiting &&
