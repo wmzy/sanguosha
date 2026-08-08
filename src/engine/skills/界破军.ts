@@ -42,6 +42,7 @@ import type {
   Json,
   Skill,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom, pushFrame, popFrame } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../skill';
 
@@ -171,7 +172,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (target === ownerId) return;
 
     // X = target 当前体力值(<=0 时跳过)
-    const X = targetPlayer.health;
+    const X = getHealthValue(targetPlayer);
     if (X <= 0) return;
     // 目标须有牌可移
     if (totalCardCount(targetPlayer) === 0) return;
@@ -199,7 +200,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 重新读取(防御 pending 期间状态变化)
       const targetNow = ctx.state.players[target];
       if (!targetNow?.alive) return;
-      const Xnow = Math.min(X, targetNow.health);
+      const Xnow = Math.min(X, getHealthValue(targetNow));
       if (Xnow <= 0) return;
       const available = targetCardIds(targetNow);
       if (available.length === 0) return;

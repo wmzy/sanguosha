@@ -197,6 +197,8 @@ export const skillLoaders: Record<string, Loader> = {
   方天画戟: load(() => import('./方天画戟')),
   寒冰剑: load(() => import('./寒冰剑')),
   麒麟弓: load(() => import('./麒麟弓')),
+  古锭刀: load(() => import('./古锭刀')),
+  朱雀羽扇: load(() => import('./朱雀羽扇')),
   // 防具/延时锦囊
   仁王盾: load(() => import('./仁王盾')),
   藤甲: load(() => import('./藤甲')),
@@ -208,6 +210,7 @@ export const skillLoaders: Record<string, Loader> = {
   的卢: () => import('./马匹技能').then((m) => m.的卢),
   绝影: () => import('./马匹技能').then((m) => m.绝影),
   爪黄飞电: () => import('./马匹技能').then((m) => m.爪黄飞电),
+  骅骝: () => import('./马匹技能').then((m) => m.骅骝),
   // 铁索连环:保留技能文件(recast action + 连环传导 hook);use 已迁移到 card-effects
   铁索连环: load(() => import('./铁索连环')),
   再起: load(() => import('./再起')),

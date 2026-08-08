@@ -106,6 +106,30 @@ describe('模块 B:死亡编排函数 runDeathFlow', () => {
     expect(state.zones.discardPile.length).toBe(3);
   });
 
+  // ── 判定区延时锦囊清理 ─────────────────────────────────────
+  it('系统处理牌:死亡角色判定区延时锦囊(pendingTricks)入弃牌堆并清空', async () => {
+    // 死者判定区放 乐不思蜀 + 闪电(对齐 death.md Ⅰ.a「弃置死亡角色区域里所有的牌」)
+    const leCard = { id: 'le1', name: '乐不思蜀', suit: '♣' as const, color: '黑' as const, rank: '6', type: '锦囊牌' as const };
+    const lightCard = { id: 'lt1', name: '闪电', suit: '♠' as const, color: '黑' as const, rank: 'A', type: '锦囊牌' as const };
+    state.cardMap.le1 = leCard;
+    state.cardMap.lt1 = lightCard;
+    state.players[0].pendingTricks = [
+      { name: '乐不思蜀', source: 1, card: leCard },
+      { name: '闪电', source: 0, card: lightCard },
+    ];
+    // 同时有手牌,确认手牌+延时锦囊一并弃置
+    state.players[0].hand = ['c1'];
+    state.cardMap.c1 = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
+
+    await runDeathFlow(state, 0, 1);
+
+    // 判定区清空——无孤儿数据
+    expect(state.players[0].pendingTricks).toEqual([]);
+    // 延时锦囊牌进入弃牌堆(手牌1 + 延时锦囊2 = 3)
+    expect(state.zones.discardPile).toEqual(expect.arrayContaining(['c1', 'le1', 'lt1']));
+    expect(state.zones.discardPile.length).toBe(3);
+  });
+
   // ── killer 透传 ────────────────────────────────────────────
   it('killer 透传到 死亡时/死亡后 atom', async () => {
     await runDeathFlow(state, 0, 1);

@@ -133,7 +133,7 @@ describe('界矫诏', () => {
       '界矫诏',
       { cardId: 'c1', outputName: '无中生有' },
       '无中生有',
-      { cardId: 'c1#界矫诏' },
+      { cardId: 'c1#界矫诏', targets: [0] },
     );
     // 询问无懈可击:P1 pass(无无懈可击 → 不抵消 → 摸两张)
     await P1.pass();

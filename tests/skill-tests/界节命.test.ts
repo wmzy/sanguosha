@@ -4,9 +4,10 @@
 //    (X为其体力上限且至多为5)。"
 //
 // 触发机制(对齐实现 src/engine/skills/界节命.ts):
-//   - 受到伤害后(after-hook,时机6,濒死检查前):任何伤害(含致死)均触发,
+//   - 受到伤害后(after-hook,时机6,濒死检查之后):非致死 或 致死被救活时触发,
 //     并置「伤害已触发」标记;若随后荀彧死亡,死亡时 hook 见标记去重跳过。
-//   - 死亡时(after-hook,系统处理牌前):仅 非伤害致死(失去体力/减上限等)在此触发。
+//   - 死亡时(after-hook,系统处理牌前):伤害致死(濒死检查先执行,荀彧已亡,
+//     受到伤害后因 !alive 跳过)或 非伤害致死(失去体力/减上限等)在此触发。
 //
 // 与标版节命关键差异(必须验证):
 //   1. 受伤后触发:先摸 X 张,然后弃至 X 张(非「摸至 X 张」)
@@ -325,7 +326,7 @@ describe('界节命', () => {
   });
 
   // ─── 伤害致死:被杀致死 → 受到伤害后触发节命(死亡时去重跳过)────
-  it('P1(界荀彧,1血)被杀致死 → 受到伤害后触发节命(死亡时去重)→ 选 P0 摸弃 → P1仍死亡', async () => {
+  it('P1(界荀彧,1血)被杀致死 → 死亡时触发节命(濒死先于受到伤害后)→ 选 P0 摸弃 → P1仍死亡', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
     const cardMap: Record<string, Card> = { k1: slash };
     // deck 供 P0 摸 X 张
@@ -359,16 +360,15 @@ describe('界节命', () => {
     const P1 = harness.player('P1');
 
     await P0.useCardAndTarget('杀', 'k1', [1]);
-    // P1 0 手牌 → 询问闪 skip → 受 1 点伤害(1→0);受到伤害后(时机6,濒死检查前)触发节命
-
-    // 节命 confirm(P1 此刻仍 alive,濒死检查在其后)
+    // P1 0 手牌 → 询问闪 skip → 受 1 点伤害(1→0)→ 扣减体力后濒死检查(先于 受到伤害后)
+    // 濒死求桃无人救 → 死亡 → 死亡时 hook 触发节命(受到伤害后因 !alive 跳过)
     P1.expectPending('请求回应');
     await P1.respond('界节命', { choice: true });
     P1.expectPending('请求回应');
     await P1.respond('界节命', { target: 0 });
 
     // 节命结算后继续:濒死检查 → 求桃(无人有桃)→ 死亡;
-    // 死亡时 hook 见「伤害已触发」标记去重跳过,不再二次触发节命
+    // 节命由 死亡时 hook 触发;死亡后 受到伤害后 hook 因 !alive 跳过(不重复触发)
     await fireTimeoutAndWait(harness.state);
     await harness.waitForStable();
     harness.processAllEvents();

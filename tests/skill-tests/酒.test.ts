@@ -2,15 +2,18 @@
 // 酒(基本牌,军争篇)技能测试:
 //   use:出牌阶段对自己使用,加 '酒/nextKillDamageBonus' mark,
 //        造成伤害时 before hook 消费 mark,增伤 +1。
-//   respond:濒死求桃时酒当桃用(等同桃的救援)。
+//        使用方法Ⅰ(增伤)每回合限一次(酒/usedThisTurn)。
+//   respond:濒死求桃时酒当桃用(等同桃的救援)。方法Ⅱ不受每回合限一次约束。
 //
 // 验证:
 //   1. 正面:use 加 mark,牌进弃牌堆
 //   2. 正面:造成伤害时消费 mark,伤害 +1(酒+杀)
-//   3. 正面:respond 在濒死时酒当桃
-//   4. 负面:非自己回合 use 拒绝
-//   5. 负面:牌名不是酒(用杀当酒)被拒绝
-//   6. 负面:不是自己 use(给自己以外的 use)— 实际酒只能给自己用,validate 用 targetSelf 校验
+//   3. 限一次:使用方法Ⅰ后,本回合第二次 use 被拒
+//   4. 回归:回合结束后限一次标记清除,下回合可再用
+//   5. 方法Ⅱ不受限:已设限一次标记 → 濒死自救(respond)仍可用
+//   6. 负面:非自己回合 use 拒绝
+//   7. 负面:牌名不是酒(用杀当酒)被拒绝
+//   8. 负面:不是自己 use(给自己以外的 use)— 实际酒只能给自己用,validate 用 targetSelf 校验
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -134,6 +137,112 @@ describe('酒', () => {
     // view 级断言
     P2.processEvents();
     P2.expectView((v) => expect(v.players[1].health).toBe(2));
+  });
+
+  // ─── 限一次(使用方法Ⅰ每回合限一次) ──────────────
+
+  it('限一次:使用方法Ⅰ后,本回合第二次 use 被拒', async () => {
+    const wine1 = makeCard('w1', '酒', '♠', 'A');
+    const wine2 = makeCard('w2', '酒', '♦', '9');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['w1', 'w2'], skills: ['酒'] }),
+        makePlayer({ index: 1, name: 'P2', skills: [] }),
+      ],
+      cardMap: { w1: wine1, w2: wine2 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 第一次使用方法Ⅰ:成功
+    await P1.useCard('酒', 'w1');
+    expect(harness.state.players[0].vars['酒/usedThisTurn']).toBe(true);
+
+    // 第二次使用方法Ⅰ:被拒(每回合限一次)
+    await P1.expectRejected({ skillId: '酒', actionType: 'use', params: { cardId: 'w2' } });
+    // 第二张酒仍在手牌(未被消耗)
+    expect(harness.state.players[0].hand).toContain('w2');
+  });
+
+  it('回归:回合结束后限一次标记清除,下回合可再用', async () => {
+    const wine1 = makeCard('w1', '酒', '♠', 'A');
+    const wine2 = makeCard('w2', '酒', '♦', '9');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['w1', 'w2'], skills: ['酒'] }),
+        makePlayer({ index: 1, name: 'P2', skills: [] }),
+      ],
+      cardMap: { w1: wine1, w2: wine2 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 第一次使用方法Ⅰ:成功
+    await P1.useCard('酒', 'w1');
+    expect(harness.state.players[0].vars['酒/usedThisTurn']).toBe(true);
+
+    // 推进到回合结束:限一次标记随 /usedThisTurn 后缀被「回合结束」atom 清空
+    const { applyAtom } = await import('../../src/engine/index');
+    await applyAtom(harness.state, { type: '回合结束', player: 0 });
+    await harness.waitForStable();
+    expect(harness.state.players[0].vars['酒/usedThisTurn']).toBeUndefined();
+
+    // 下回合可再次使用方法Ⅰ:成功
+    await P1.useCard('酒', 'w2');
+    expect(harness.state.players[0].marks.some((m) => m.id === '酒/nextKillDamageBonus')).toBe(
+      true,
+    );
+  });
+
+  it('方法Ⅱ不受限:已设限一次标记 → 濒死自救(respond)仍可用', async () => {
+    // P0 出杀击杀 P1(1 血)→ P1 濒死。P1 已"用过方法Ⅰ"(预设标记),仍可用酒自救(方法Ⅱ)。
+    const slash = makeCard('c1', '杀', '♠', 'A');
+    const wine = makeCard('w1', '酒', '♠', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['c1'],
+          skills: ['杀', '闪'],
+          health: 4,
+          maxHealth: 4,
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: ['w1'],
+          skills: ['酒', '闪'],
+          health: 1,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { c1: slash, w1: wine },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    // 模拟 P2 本回合已用过方法Ⅰ(限一次标记已设)
+    state.players[1].vars['酒/usedThisTurn'] = true;
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P0 出杀 → P1(1 血)不闪 → HP=0 濒死 → 求桃 pending
+    await P1.useCardAndTarget('杀', 'c1', [1]);
+    await P2.pass();
+    expect(harness.state.players[1].health).toBe(0);
+
+    // P2(濒死者)→ 酒当桃自救(方法Ⅱ):即使限一次标记已设,respond 路径不受限
+    await P2.respond('酒', { cardId: 'w1' });
+    expect(harness.state.players[1].health).toBe(1);
+    expect(harness.state.zones.discardPile).toContain('w1');
   });
 
   // ─── 负面:use ─────────────────────────────

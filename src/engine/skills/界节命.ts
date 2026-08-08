@@ -8,8 +8,10 @@
 //     标版仅「摸至 X 张」(只摸不弃,且语义为补满而非固定张数)。
 //   - 无额外效果(旧实现的「若目标手牌数原为 0,你摸一张牌」不在官方描述中,已移除)。
 //
-// 模式 A(被动触发·受伤):after hook 挂在「造成伤害」。
-//   造成伤害(target=自己 + amount>0 + 自己存活) → runJieMing()
+// 模式 A(被动触发·受伤):after hook 挂在「受到伤害后」。
+//   受到伤害后(target=自己 + amount>0 + 自己存活) → runJieMing()
+//   (濒死检查在扣减体力时执行,先于 受到伤害后:致死未救活时 !alive 跳过,
+//    改由模式 B 死亡时 触发;非致死或致死被救活时此处触发。)
 //
 // 模式 B(被动触发·死亡):after hook 挂在「死亡时」(模块 B:系统处理牌之前)。
 //   死亡时(player=自己) → runJieMing()(不 cancel,系统处理牌随后正常执行,
@@ -197,12 +199,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     unloaders.push(off);
   }
 
-  // ── 造成伤害 after:荀彧受伤后触发(含致死伤害)──
-  // 受到伤害后(时机6)在濒死检查(时机7)之前执行:此时 health 可能 ≤0 但 alive 仍 true,
-  // 尚不知荀彧是否会被桃救活。故此处对所有伤害(含致死被救活)统一触发节命并置标记;
-  // 若随后荀彧仍死亡,死亡时 hook 见标记即跳过,避免双重触发。
-  // (旧实现按 health≤0 跳过、改由死亡时接管:会漏掉「致死伤害被桃救活」——荀彧未死,
-  //  死亡时不触发,节命整局不发动。)
+  // ── 受到伤害后 after:荀彧受伤后触发(非致死 或 致死被救活)──
+  // 濒死检查在扣减体力时(先于 受到伤害后)执行:若荀彧被救活(health>0)则此处触发;
+  // 若荀彧未被救活(死亡),此处因 !alive 跳过,改由 死亡时 hook 触发。
+  // 对所有存活伤害统一触发节命并置标记;若随后荀彧死亡,死亡时 hook 见标记去重跳过。
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
@@ -214,8 +214,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 死亡时 after:荀彧死亡时触发(系统处理牌之前)──
-  // 伤害致死的节命已在 受到伤害后(时机6)触发过——见标记则跳过,避免双重触发;
-  // 仅 非伤害致死(失去体力/减上限等)在此触发。
+  // 伤害致死时,濒死检查先于 受到伤害后 执行:荀彧已死亡(alive=false),
+  // 受到伤害后 hook 因 !alive 跳过(DAMAGE_HANDLED_KEY 未置)→ 死亡时 hook 触发节命。
+  // 非伤害致死(失去体力/减上限等):死亡时 hook 直接触发。
   registerAfterHook(state, skill.id, ownerId, '死亡时', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '死亡时') return;

@@ -3,7 +3,7 @@
 //    包含四种花色,你可以执行一个额外的回合。"
 //
 // 触发方式:applyAtom(回合开始)记录弃牌堆基线 → applyAtom(弃置)塞入四花色牌 →
-//           applyAtom(回合结束)触发博图 before-hook。
+//           applyAtom(回合结束)→applyAtom(回合结束后)触发博图 before-hook。
 //
 // 覆盖:
 //   1. 本回合弃牌堆含四花色 + 未达上限 → 询问 → 确认 → 执行额外回合(count+1,吕蒙仍在自己的新回合)
@@ -101,6 +101,8 @@ describe('博图', () => {
     // 3) 回合结束 → 博图 before-hook 询问
     void applyAtom(harness.state, { type: '回合结束', player: 0 });
     await harness.waitForStable();
+    void applyAtom(harness.state, { type: '回合结束后', player: 0 });
+    await harness.waitForStable();
     expect(hasPending(harness.state, '博图/confirm')).toBe(true);
 
     // 确认执行额外回合
@@ -138,6 +140,8 @@ describe('博图', () => {
     await applyAtom(harness.state, { type: '回合开始', player: 0 });
     await applyAtom(harness.state, { type: '弃置', player: 0, cardIds: ['a1', 'a2'] });
     void applyAtom(harness.state, { type: '回合结束', player: 0 });
+    await harness.waitForStable();
+    void applyAtom(harness.state, { type: '回合结束后', player: 0 });
     await harness.waitForStable();
 
     // 不触发博图:无 博图/confirm 询问,且 count 未增
@@ -177,6 +181,8 @@ describe('博图', () => {
     await applyAtom(harness.state, { type: '回合开始', player: 0 });
     await applyAtom(harness.state, { type: '弃置', player: 0, cardIds: ['a1', 'a2', 'a3', 'a4'] });
     void applyAtom(harness.state, { type: '回合结束', player: 0 });
+    await harness.waitForStable();
+    void applyAtom(harness.state, { type: '回合结束后', player: 0 });
     await harness.waitForStable();
 
     expect(hasPending(harness.state, '博图/confirm')).toBe(false);
@@ -218,6 +224,8 @@ describe('博图', () => {
     await applyAtom(harness.state, { type: '回合开始', player: 0 });
     await applyAtom(harness.state, { type: '弃置', player: 0, cardIds: ['a1', 'a2', 'a3', 'a4'] });
     void applyAtom(harness.state, { type: '回合结束', player: 0 });
+    await harness.waitForStable();
+    void applyAtom(harness.state, { type: '回合结束后', player: 0 });
     await harness.waitForStable();
     // 满足四花色 + 未达上限 → 出现博图询问
     expect(hasPending(harness.state, '博图/confirm')).toBe(true);

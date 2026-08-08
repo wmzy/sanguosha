@@ -403,10 +403,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 清除 skipAll 标志(后续不再 skip)
       delete ctx.state.localVars[SKIP_FLAG];
 
-      // 亲自执行 end-turn 序列:清过期标记 → 下一玩家 → 回合结束
+      // 亲自执行 end-turn 序列:清过期标记 → 下一玩家 → 回合结束 → 回合结束后
+      // (回合推进 beginTurn 挂在 回合结束后 的 after-hook,故须发出否则下一家不启动)
       await applyAtom(ctx.state, { type: '清过期标记', player: ownerId });
       await applyAtom(ctx.state, { type: '下一玩家' });
-      await applyAtom(ctx.state, { type: '回合结束', player: ownerId });
+      const turnEnded = await applyAtom(ctx.state, { type: '回合结束', player: ownerId });
+      if (turnEnded) {
+        await applyAtom(ctx.state, { type: '回合结束后', player: ownerId });
+      }
 
       return { kind: 'cancel' };
     },

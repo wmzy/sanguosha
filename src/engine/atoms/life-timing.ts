@@ -15,7 +15,7 @@ import { registerAtom } from '../atom';
 import { getBeforeHooks } from '../skill';
 
 // ── 扣减体力:底层实质 atom ──────────────────────────────────
-// 仅扣减体力值(下限 0),不在此处触发濒死/死亡——由编排函数或系统规则现有 after-hook 决定。
+// 扣减体力(可负——濒死时 health ≤ 0),不在此处触发濒死/死亡——由编排函数或系统规则现有 after-hook 决定。
 // 注意:这是"扣减"语义,不做 alive 清理(由 death-flow 的 系统处理牌 负责)。
 export const 扣减体力: AtomDefinition<{ target: number; amount: number }> = {
   type: '扣减体力',
@@ -28,7 +28,7 @@ export const 扣减体力: AtomDefinition<{ target: number; amount: number }> = 
   },
   apply(state, atom) {
     const target = state.players[atom.target];
-    target.health = Math.max(0, target.health - atom.amount);
+    target.health = target.health - atom.amount;
     // 不在此处置 alive——由 death-flow 的 系统处理牌 atom 负责清理。
   },
   effect: { sound: 'injure_1', animation: 'shake', particles: 'blood', duration: 800 },
@@ -47,7 +47,7 @@ export const 扣减体力: AtomDefinition<{ target: number; amount: number }> = 
     const pi = view.players.findIndex((p) => p.index === (event.target as number));
     if (pi < 0) return;
     const p = view.players[pi];
-    p.health = Math.max(0, p.health - (event.amount as number));
+    p.health = p.health - (event.amount as number);
     // alive 由 death-flow 的 系统处理牌 atom applyView 更新,这里不提前设。
   },
   toViewLog(event) {

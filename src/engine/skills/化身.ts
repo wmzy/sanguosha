@@ -259,8 +259,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await offerTurnAction(st, ownerId);
   });
 
-  // ── 回合结束 after-hook:自己回合结束 → 询问行动 ──
-  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx) => {
+  // ── 回合结束后 after-hook:自己回合结束后 → 询问行动(化身②)──
+  // 文档 game.md「回合结束后」:化身② 时机(已离开回合内,区别于 回合结束 的回合内时机)。
+  registerAfterHook(state, skill.id, ownerId, '回合结束后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     if (!ctx.state.players[ownerId]?.alive) return;

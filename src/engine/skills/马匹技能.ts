@@ -60,3 +60,4 @@ export const 大宛 = createMountSkill('大宛', '进攻', '进攻马:你与其�
 export const 的卢 = createMountSkill('的卢', '防御', '防御马:其他角色与你的距离+1');
 export const 绝影 = createMountSkill('绝影', '防御', '防御马:其他角色与你的距离+1');
 export const 爪黄飞电 = createMountSkill('爪黄飞电', '防御', '防御马:其他角色与你的距离+1');
+export const 骅骝 = createMountSkill('骅骝', '防御', '防御马:其他角色与你的距离+1');

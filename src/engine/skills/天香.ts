@@ -29,6 +29,7 @@ import type {
   Json,
   Skill,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { runDamageFlow } from '../damage-flow';
 import { registerAction, registerBeforeHook } from '../skill';
@@ -209,12 +210,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 5) 执行所选选项
       if (isDamage) {
-        // 选项①:该角色受到伤害来源的1点伤害(保留原来源)
+        // 选项①:该角色受到伤害来源的伤害(保留原来源/原属性/原伤害值——转移伤害六要素同原伤害)
         const source = atom.source ?? ownerId;
-        await runDamageFlow(ctx.state, source, newTarget, 1, undefined, '普通');
+        await runDamageFlow(ctx.state, source, newTarget, amount, undefined, atom.damageType);
         // 摸 X 张牌(X = 已损失体力值,至多 5;伤害结算后)
         if (targetPlayer.alive) {
-          const lostHealth = targetPlayer.maxHealth - targetPlayer.health;
+          const lostHealth = targetPlayer.maxHealth - getHealthValue(targetPlayer);
           const x = Math.min(lostHealth, 5);
           if (x > 0) {
             await applyAtom(ctx.state, { type: '摸牌', player: newTarget, count: x });

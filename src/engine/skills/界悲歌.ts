@@ -283,9 +283,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (ctx.state.localVars[SKIP_FLAG] !== player) return;
 
       delete ctx.state.localVars[SKIP_FLAG];
+      // 亲自执行 end-turn 序列(含 回合结束后):回合推进 beginTurn 挂在 回合结束后 的 after-hook
       await applyAtom(ctx.state, { type: '清过期标记', player });
       await applyAtom(ctx.state, { type: '下一玩家' });
-      await applyAtom(ctx.state, { type: '回合结束', player });
+      const turnEnded = await applyAtom(ctx.state, { type: '回合结束', player });
+      if (turnEnded) {
+        await applyAtom(ctx.state, { type: '回合结束后', player });
+      }
       return { kind: 'cancel' };
     },
   );

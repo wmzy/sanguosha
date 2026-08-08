@@ -9,8 +9,9 @@
 //   - 体力 > 全场最小 → 触发,须扣减
 //
 // 选择:减1点体力上限(设上限) 或 减1点体力(失去体力)。
-//   体力上限最低降至 1(设上限 atom.validate 要求 amount>0)。
+//   体力上限可降至0:上限为0时角色直接死亡(设上限 after-hook → runDeathFlow)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -62,11 +63,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 全场存活玩家最小体力
     const alivePlayers = ctx.state.players.filter((p) => p.alive);
     const minHealth = alivePlayers.reduce(
-      (min, p) => Math.min(min, p.health),
+      (min, p) => Math.min(min, getHealthValue(p)),
       Number.POSITIVE_INFINITY,
     );
-    // 体力 == 最小(含并列)→ 不触发;体力 > 最小 → 触发
-    if (self.health <= minHealth) return;
+    // 体力值 == 最小(含并列)→ 不触发;体力值 > 最小 → 触发
+    if (getHealthValue(self) <= minHealth) return;
 
     // 询问选择
     delete ctx.state.localVars[CHOICE_KEY];
@@ -90,7 +91,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await applyAtom(ctx.state, {
         type: '设上限',
         player: ownerId,
-        amount: Math.max(1, self.maxHealth - 1),
+        amount: self.maxHealth - 1,
       });
     } else {
       await applyAtom(ctx.state, { type: '失去体力', target: ownerId, amount: 1 });

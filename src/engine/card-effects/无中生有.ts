@@ -1,27 +1,28 @@
 // 无中生有 CardEffect — 普通锦囊·无中生有的使用结算。
 //
-// resolve: 摸两张牌（无懈可击由 runSettlementPhase 的「生效前」时机统一处理）。
-// target.kind='self': 目标是使用者自己。
+// resolve: 目标角色摸两张牌（无懈可击由 runSettlementPhase 的「生效前」时机统一处理）。
+// target.kind='any': 包括使用者在内的一名角色（界限突破/1V1/国-标 语义）。
 
 import type { Card } from '../types';
 import { applyAtom } from '../index';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
 
-/** 无中生有的结算：摸牌(2) */
+/** 无中生有的结算：目标角色摸牌(2) */
 async function resolveExNihilo(ctx: ResolveCtx): Promise<void> {
-  const { state, source } = ctx;
+  const { state, target } = ctx;
   // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
-  await applyAtom(state, { type: '摸牌', player: source, count: 2 });
+  await applyAtom(state, { type: '摸牌', player: target, count: 2 });
 }
 
 const exNihiloEffect: CardEffect = {
   timing: '出牌阶段',
-  target: { kind: 'self' },
+  target: { kind: 'any', min: 1, max: 1 },
   resolve: resolveExNihilo,
   prompt: {
-    type: 'useCard',
+    type: 'useCardAndTarget',
     title: '无中生有',
     cardFilter: { filter: (c: Card) => c.name === '无中生有', min: 1, max: 1 },
+    targetFilter: { min: 1, max: 1, allowSelf: true },
   },
   label: '无中生有',
   style: 'primary',

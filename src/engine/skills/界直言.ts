@@ -33,6 +33,7 @@ import type {
   Json,
   Skill,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 import { skillLoaders } from './index';
@@ -197,8 +198,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
     } else {
       // 非装备牌:若其体力值不等于你,其失去1点体力
-      const targetHealth = st.players[target].health;
-      const myHealth = st.players[ownerId].health;
+      const targetHealth = getHealthValue(st.players[target]);
+      const myHealth = getHealthValue(st.players[ownerId]);
       if (targetHealth !== myHealth && st.players[target]?.alive) {
         await applyAtom(st, { type: '失去体力', target, amount: 1 });
       }

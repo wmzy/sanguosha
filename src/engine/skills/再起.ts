@@ -19,6 +19,7 @@ import type {
   Json,
   Skill,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom, frameCards } from '../index';
 import { registerAction, registerBeforeHook } from '../skill';
 
@@ -71,7 +72,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!self?.alive) return;
 
       // 发动条件:已受伤(当前体力 < 体力上限)
-      const lostHealth = self.maxHealth - self.health;
+      const lostHealth = self.maxHealth - getHealthValue(self);
       if (lostHealth <= 0) return; // 未受伤 → 默认摸牌
 
       // 牌堆不足 → 无法展示 → 默认摸牌

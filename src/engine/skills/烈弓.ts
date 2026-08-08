@@ -20,6 +20,7 @@ import type {
   HookResult,
   Skill,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 
@@ -75,7 +76,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 发动条件(官方):目标手牌数 ≥ 自己体力值,或 目标手牌数 ≤ 自己攻击范围
     const attackRange = (self.vars['距离/出杀范围'] as number) ?? 1;
     const condMet =
-      targetPlayer.hand.length >= self.health || targetPlayer.hand.length <= attackRange;
+      targetPlayer.hand.length >= getHealthValue(self) || targetPlayer.hand.length <= attackRange;
     if (!condMet) return;
 
     // 询问是否发动烈弓("你可以令其不能出闪"——可选)

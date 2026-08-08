@@ -28,6 +28,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界毅重'(避开标版毅重冲突);
 //   内部 Skill.name = '毅重'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
+import { getHealthValue } from '../types';
 import { registerBeforeHook, type SkillModule } from '../skill';
 
 const _SKILL_ID = '界毅重';
@@ -76,8 +77,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const source = atom.source;
       if (source === undefined) return;
       // 来源体力 ≥ 自己 → 黑杀无效
-      const sourceHp = ctx.state.players[source]?.health ?? 0;
-      const myHp = ctx.state.players[ownerId]?.health ?? 0;
+      const sourceHp = getHealthValue(ctx.state.players[source]);
+      const myHp = getHealthValue(ctx.state.players[ownerId]);
       if (sourceHp < myHp) return;
       if (!isBlackSlash(ctx.state, atom.cardId)) return;
       return { kind: 'cancel' };

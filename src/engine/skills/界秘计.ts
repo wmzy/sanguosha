@@ -30,6 +30,7 @@ import type {
   Skill,
   SkillModule,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -56,7 +57,7 @@ const GIVE_CARDS_KEY = '界秘计/giveCards';
 function lostHealth(state: GameState, ownerId: number): number {
   const p = state.players[ownerId];
   if (!p) return 0;
-  return Math.max(0, p.maxHealth - p.health);
+  return Math.max(0, p.maxHealth - getHealthValue(p));
 }
 
 export function createSkill(id: string, ownerId: number): Skill {

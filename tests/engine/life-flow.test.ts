@@ -21,6 +21,7 @@ import {
   runSetMaxHealthFlow,
 } from '../../src/engine/life-flow';
 import { registerBeforeHook } from '../../src/engine/skill';
+import { applyAtom, registerSkillsFromState } from '../../src/engine/index';
 
 function makePlayer(opts: {
   index: number;
@@ -84,9 +85,10 @@ describe('模块 M:体力编排函数', () => {
     expect(state.players[0].health).toBe(2);
   });
 
-  it('runDecreaseLifeFlow:扣减不低于 0', async () => {
+  it('runDecreaseLifeFlow:扣减可低于 0(体力可为负)', async () => {
     await runDecreaseLifeFlow(state, 1, 10);
-    expect(state.players[1].health).toBe(0);
+    // 文档 glossary/value.md:体力可小于 0(过量伤害)。4 - 10 = -6。
+    expect(state.players[1].health).toBe(-6);
   });
 
   it('runDecreaseLifeFlow:透传 source 不影响扣减值', async () => {
@@ -202,5 +204,46 @@ describe('模块 M:体力编排函数', () => {
     // 编排函数内部仍调用现有 atom,故现有行为不受影响
     await runRecoverLifeFlow(state, 1, 1);
     expect(state.players[1].health).toBe(4); // 满血不超上限
+  });
+});
+
+// ── 上限为0→死亡契约(decreaselifemax.md:"若该角色的体力上限为0,其死亡") ──
+// 需 系统规则 的 设上限 after-hook(触发 runDeathFlow),故用 registerSkillsFromState 载入。
+describe('设上限:上限为0 → 直接死亡(不经濒死求桃)', () => {
+  let state: GameState;
+
+  beforeEach(async () => {
+    state = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', health: 4, maxHealth: 4 }),
+        makePlayer({ index: 1, name: 'P1', health: 4, maxHealth: 4 }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    // 注册 系统规则 全局 hooks(含 设上限→死亡),与 harness.setup 一致
+    await registerSkillsFromState(state);
+  });
+
+  it('runSetMaxHealthFlow(target, 0) → 角色死亡,且无濒死求桃窗口', async () => {
+    await runSetMaxHealthFlow(state, 0, 0);
+    expect(state.players[0].maxHealth).toBe(0);
+    expect(state.players[0].alive).toBe(false);
+    // 直接死亡:不应留下濒死求桃 pending 窗口(区别于体力扣减到0)
+    expect(state.pendingSlots.size).toBe(0);
+  });
+
+  it('直接 applyAtom(设上限, amount=0) → 角色死亡', async () => {
+    await applyAtom(state, { type: '设上限', player: 1, amount: 0 });
+    expect(state.players[1].maxHealth).toBe(0);
+    expect(state.players[1].alive).toBe(false);
+  });
+
+  it('减上限到 1(>0)→ 不死亡', async () => {
+    await runSetMaxHealthFlow(state, 0, 1);
+    expect(state.players[0].maxHealth).toBe(1);
+    expect(state.players[0].alive).toBe(true);
   });
 });

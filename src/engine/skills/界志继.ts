@@ -76,11 +76,9 @@ async function awaken(state: GameState, ownerId: number): Promise<void> {
     }
   }
 
-  // 3. 减1点体力上限(设上限 amount = maxHealth - 1,需 > 0)
+  // 3. 减1点体力上限(设上限 amount = maxHealth - 1;减至0则角色死亡)
   const newMax = state.players[ownerId].maxHealth - 1;
-  if (newMax > 0) {
-    await applyAtom(state, { type: '设上限', player: ownerId, amount: newMax });
-  }
+  await applyAtom(state, { type: '设上限', player: ownerId, amount: newMax });
 
   // 4. 永久获得"观星"
   await applyAtom(state, { type: '添加技能', player: ownerId, skillId: '观星' });

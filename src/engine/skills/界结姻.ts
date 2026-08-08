@@ -35,6 +35,7 @@
 //     filter/targetFilter 是函数不可跨进程序列化,但主动技 distribute 的候选由前端
 //     resolveDistributeCardIds 就地计算,无需投影层注入。
 import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
+import { getHealthValue } from '../types';
 import type { GameView } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
@@ -213,8 +214,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
 
         // ── 效果:体力值比较(代价不改变体力,故与发动前等价)──
-        const ownerHealth = st.players[from].health;
-        const targetHealth = st.players[target].health;
+        const ownerHealth = getHealthValue(st.players[from]);
+        const targetHealth = getHealthValue(st.players[target]);
         if (ownerHealth > targetHealth) {
           // 自己摸1,目标回1
           await applyAtom(st, { type: '摸牌', player: from, count: 1 });

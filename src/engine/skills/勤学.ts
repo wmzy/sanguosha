@@ -11,6 +11,7 @@
 // 模式参考:志继/若愚(觉醒技 after-hook + 二选一 + 设上限 + 添加技能)。
 //   志继挂在「回合开始」,本技挂在「阶段开始」(因触发点是"阶段"而非"回合开始")。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook } from '../skill';
 
@@ -62,16 +63,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
     // 触发条件:手牌数 - 体力值 >= 2(无人数分支,OL 现行版)
-    if (self.hand.length - self.health < 2) return;
+    if (self.hand.length - getHealthValue(self) < 2) return;
 
     // 标记已觉醒(在读条件后立即设,防重入)
     ctx.state.players[ownerId].vars[AWAKENED_KEY] = true;
 
-    // 1. 减1点体力上限(设上限 amount = maxHealth - 1,需 > 0)
+    // 1. 减1点体力上限(设上限 amount = maxHealth - 1;减至0则角色死亡)
     const newMax = self.maxHealth - 1;
-    if (newMax > 0) {
-      await applyAtom(ctx.state, { type: '设上限', player: ownerId, amount: newMax });
-    }
+    await applyAtom(ctx.state, { type: '设上限', player: ownerId, amount: newMax });
 
     // 2. 二选一(摸两张牌 / 回复1点体力)
     delete ctx.state.localVars[CHOICE_KEY];

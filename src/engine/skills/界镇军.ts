@@ -36,6 +36,7 @@ import type {
   Json,
   Skill,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 
@@ -87,7 +88,7 @@ function totalCardCount(p: { hand: string[]; equipment: Record<string, string | 
 
 /** 计算镇军 X 值:target.hand.length - target.health,最小 1 */
 function computeX(target: { hand: string[]; health: number }): number {
-  return Math.max(1, target.hand.length - target.health);
+  return Math.max(1, target.hand.length - getHealthValue(target));
 }
 
 /** 目标牌中非装备牌数(即手牌数,因为目标牌来源只能是手牌或装备区) */

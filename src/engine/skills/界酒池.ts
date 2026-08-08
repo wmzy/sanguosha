@@ -4,7 +4,8 @@
 //   当你使用【酒】【杀】造成伤害后,本回合"崩坏"失效。
 //
 // 与标版区别(标版仅"黑桃手牌当酒"):
-//   1. 显式声明"无次数限制"(引擎标版酒.use 已无次数限制,等同语义,此处保留以贴合官方文本)
+//   1. 显式声明"无次数限制":标版酒.use 使用方法Ⅰ(增伤)每回合限一次(酒/usedThisTurn),
+//      本技能通过给 owner 加 '酒/无次数限制' tag 豁免该限制(canUseWine/activeWhen 检查此 tag)。
 //   2. 新增第三段效果:使用酒杀造成伤害后,本回合崩坏失效。
 //      机制:after-hook on '去标记' 检测 酒/nextKillDamageBonus mark 被消耗(即酒增伤生效)
 //      → 设 turn.vars['崩坏/disabled']=true,供 界崩坏 读取跳过本回合触发。
@@ -25,6 +26,8 @@ import { applyAtom } from '../index';
 import { defaultPlayActive } from '../action-active';
 
 const DISABLE_BENGHUAI_VAR = '崩坏/disabled';
+/** 豁免酒使用方法Ⅰ每回合限一次的 tag(本技能"无次数限制")。酒.ts 的 canUseWine/activeWhen 检查此 tag。 */
+const WINE_UNLIMITED_TAG = '酒/无次数限制';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -43,6 +46,11 @@ function shadowIdOf(cardId: string): string {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
+
+  // "你使用【酒】无次数限制":给 owner 加豁免 tag(同奇才/无距离限制 的持久 tag 模式),
+  // 供 酒.ts 的 canUseWine/activeWhen 跳过每回合限一次校验。
+  const self0 = state.players[ownerId];
+  if (self0 && !self0.tags.includes(WINE_UNLIMITED_TAG)) self0.tags.push(WINE_UNLIMITED_TAG);
 
   // transform action:把黑桃手牌转化为影子"酒"(新建 Card 实体,shadowOf 指向原卡)。
   // 作为 preceding 在 酒.use 之前执行。酒.validate 读 cardMap[影子id] 看到"酒"。
@@ -102,7 +110,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   const unloadDecl = declareAlternativeResponse(state, ownerId, '请求回应', '桃/求桃');
-  return () => { unloadDecl(); };
+  return () => {
+    const p = state.players[ownerId];
+    if (p) p.tags = p.tags.filter((t) => t !== WINE_UNLIMITED_TAG);
+    unloadDecl();
+  };
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): void {

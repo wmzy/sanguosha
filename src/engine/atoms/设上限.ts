@@ -6,7 +6,7 @@ import { registerAtom } from '../atom';
 export const 设上限: AtomDefinition<{ player: number; amount: number }> = {
   type: '设上限',
   validate(state, atom) {
-    if (atom.amount <= 0) return 'amount must be > 0';
+    // 允许 amount=0:体力上限降为0时角色直接死亡(由 设上限 after-hook 触发 runDeathFlow)。
     const p = state.players[atom.player];
     if (!p) return `player ${atom.player} not found`;
     return null;

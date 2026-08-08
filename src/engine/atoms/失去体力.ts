@@ -16,8 +16,7 @@ export const 失去体力: AtomDefinition<{ target: number; amount: number }> = 
   },
   apply(state, atom) {
     const target = state.players[atom.target];
-    const newHealth = Math.max(0, target.health - atom.amount);
-    target.health = newHealth;
+    target.health = target.health - atom.amount;
     // 不在此处置 alive——与 造成伤害时 一致,由 系统规则 after-hook 触发濒死流程,
     // 无人救援时由 death-flow 的 系统处理牌 负责。
   },
@@ -34,8 +33,7 @@ export const 失去体力: AtomDefinition<{ target: number; amount: number }> = 
     const pi = view.players.findIndex((p) => p.index === (event.target as number));
     if (pi < 0) return;
     const p = view.players[pi];
-    const newHealth = Math.max(0, p.health - (event.amount as number));
-    p.health = newHealth;
+    p.health = p.health - (event.amount as number);
     // alive 由 death-flow 的 系统处理牌 applyView 更新,这里不提前设(与 扣减体力 对齐)。
   },
   toViewLog(event) {

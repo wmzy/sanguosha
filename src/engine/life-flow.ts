@@ -97,14 +97,16 @@ export async function runLoseLifeFlow(
 
 /** 体力上限编排函数。
  *
- *  实质 设上限(现有 atom,apply 会 clamp health 到新上限——该 clamp 被 崩坏/志继/若愚等
+ *  实质 设上限(现有 atom,apply 会 clamp health 不超过新上限——该 clamp 被 崩坏/志继/若愚等
  *  8+ 现有调用方依赖,本模块不重构它)。
  *  减上限:若旧体力超出新上限,先走扣减子流程(触发扣减时机:伤逝等),再 设上限。
  *    —— 顺序关键:先扣减使 health 降至 newMax,随后 设上限 的 clamp 即为 no-op,避免重复扣减
  *    (若先 设上限,其 clamp 已静默降过一次,再走子流程会重复扣减)。
  *  加上限:加上限后 时机(设上限 的 clamp 对加上限是 no-op,不自动回血)。
  *
- *  上限为 0 则死亡——此处不调 runDeathFlow(B 模块负责),保留现有逻辑。 */
+ *  上限为 0 则直接死亡——由 设上限 的 after-hook(系统规则)触发 runDeathFlow,
+ *  不经濒死求桃(decreaselifemax.md:"其死亡"非"濒死")。newMax=0 时跳过扣减子流程,
+ *  否则 扣减体力→濒死 after-hook 会错误地触发求桃(上限为0应直接死亡)。 */
 export async function runSetMaxHealthFlow(
   state: GameState,
   target: number,
@@ -115,7 +117,9 @@ export async function runSetMaxHealthFlow(
 
   // 减上限导致体力超出新上限:先走扣减子流程(触发扣减时机),再 设上限。
   // 顺序:先扣减 → health 降到 newMax → 设上限 的 clamp 成为 no-op(净效果 = newMax,无重复扣减)。
-  if (newMax < oldMax && oldHealth > newMax) {
+  // newMax=0 时跳过:上限为0应直接死亡(设上限 after-hook → runDeathFlow),
+  // 不走扣减(否则 扣减体力 after-hook 会触发濒死求桃)。
+  if (newMax > 0 && newMax < oldMax && oldHealth > newMax) {
     await runDecreaseLifeFlow(state, target, oldHealth - newMax);
   }
 
@@ -126,5 +130,5 @@ export async function runSetMaxHealthFlow(
   } else if (newMax > oldMax) {
     await applyAtom(state, { type: '加上限后', player: target });
   }
-  // 上限为 0 则死亡——保留现有逻辑(B 模块负责 runDeathFlow)
+  // 上限为 0 则死亡——由 设上限 after-hook(系统规则)触发 runDeathFlow。
 }

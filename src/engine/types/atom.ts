@@ -187,6 +187,10 @@ export type Atom =
   // 流程
   | { type: '回合开始'; player: number }
   | { type: '回合结束'; player: number }
+  // 回合结束后(game.md「回合结束后」,已离开该角色回合内):事件标记型,apply 无副作用。
+  // 由 回合管理 / performSkipTurn 在 回合结束 之后发出(仅当 回合结束 未被 cancel)。
+  // 博图/化身② 等技能挂其 after/before-hook;下一家 beginTurn 也挂其 after-hook。
+  | { type: '回合结束后'; player: number }
   | { type: '阶段开始'; player: number; phase: string }
   | { type: '阶段结束'; player: number; phase: string }
   // 阶段间时机标记(对齐 flow-redesign.md 模块 J / game.md「X阶段与Y阶段间」时机):事件标记型,
@@ -253,6 +257,11 @@ export type Atom =
   | { type: '生效时'; source: number; target: number; cardId: string }
   | { type: '生效后'; source: number; target: number; cardId: string }
   | { type: '使用结算结束时'; source: number; target: number; cardId: string }
+  // 使用结算后时机(use.md 使用结算后):事件标记型,validate 恒通过,apply 无副作用。
+  // 在所有目标结算完毕后(逐目标 使用结算结束时 之后)、popFrame 之前由 runUseFlow 发出。
+  // apply 不做牌移动(沿用 runUseFlow 中既有的 移动牌 调用),只提供 before/after hook 注册点,
+  // 供奔袭①等"使用结算结束后"技能挂载。延时锦囊的结算延迟到判定阶段,不在使用时触发此 atom。
+  | { type: '使用结算结束后'; source: number; cardId: string }
   | { type: '被抵消'; source: number; target: number; cardId: string }
   // 等待回应
   | { type: '询问闪'; target: number; source: number }

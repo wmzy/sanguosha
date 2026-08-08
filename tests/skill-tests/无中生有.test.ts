@@ -1,5 +1,5 @@
 // tests/skill-tests/无中生有.test.ts
-// 无中生有(普通锦囊):出牌阶段对自己使用,摸两张牌。
+// 无中生有(普通锦囊):出牌阶段对包括自己在内的一名角色使用,该角色摸两张牌。
 //
 // 完整行为测试覆盖:
 //   正面:
@@ -92,7 +92,7 @@ describe('无中生有', () => {
   // ─────────────────────────────────────────────────────────────
   // 1. 正面:摸2张 + pending/respondInfo 全链路
   // ─────────────────────────────────────────────────────────────
-  it('P1 对自己使用无中生有 → expectPending(请求回应) + pass 后摸 2 张', async () => {
+  it('P1 对自己使用无中生有 → expectPending(请求回应) + pass 后自己摸 2 张', async () => {
     const c1 = makeCard('d1', '杀', '♠', '5', '基本牌');
     const c2 = makeCard('d2', '闪', '♥', '6', '基本牌');
     const state = buildState({ extraCards: { d1: c1, d2: c2 } });
@@ -106,7 +106,7 @@ describe('无中生有', () => {
 
     const handBefore = harness.state.players[0].hand.length; // 1
 
-    await P1.useCard('无中生有', 'wz1');
+    await P1.useCardAndTarget('无中生有', 'wz1', [0]);
 
     // useCard 后立即:进入"无懈可击"请求回应窗口(broadcast target=-2)
     P1.expectPending('请求回应');
@@ -152,7 +152,7 @@ describe('无中生有', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P1.useCard('无中生有', 'wz1');
+    await P1.useCardAndTarget('无中生有', 'wz1', [0]);
 
     // P2 视角:pending 是 broadcast(target=-2),respondInfo 也能推导
     P2.expectPending('请求回应');
@@ -161,6 +161,40 @@ describe('无中生有', () => {
     // P2 手牌 [wx1, s1] → respondableCards 仅 wx1
     const cards = P2.respondableCards();
     expect(cards.map((c) => c.id)).toEqual(['wx1']);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 1c. 正面:对他人使用 → 目标摸 2 张(界限突破/1V1/国-标 语义)
+  // ─────────────────────────────────────────────────────────────
+  it('P1 对 P2 使用无中生有 → pass 后 P2 摸 2 张,P1 不摸牌', async () => {
+    const c1 = makeCard('d1', '杀', '♠', '5', '基本牌');
+    const c2 = makeCard('d2', '闪', '♥', '6', '基本牌');
+    const state = buildState({ extraCards: { d1: c1, d2: c2 } });
+    // 牌堆顶:d1, d2
+    state.zones = { deck: ['d1', 'd2'], discardPile: [], processing: [] };
+    // P2 加载 无懈可击 skill,以便出现无懈窗口(pass 消耗)
+    state.players[1].skills = ['无懈可击'];
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    const p1HandBefore = harness.state.players[0].hand.length; // 1 (wz1)
+    const p2HandBefore = harness.state.players[1].hand.length; // 0
+
+    // 目标指定为 P2(座次 1)
+    await P1.useCardAndTarget('无中生有', 'wz1', [1]);
+    P1.expectPending('请求回应');
+    await P1.pass();
+
+    // 目标 P2 摸 2 张
+    expect(harness.state.players[1].hand.length).toBe(p2HandBefore + 2);
+    expect(harness.state.players[1].hand).toEqual(expect.arrayContaining(['d1', 'd2']));
+    // 使用者 P1 仅打出 wz1,不摸牌
+    expect(harness.state.players[0].hand.length).toBe(p1HandBefore - 1);
+    // 无中生有进弃牌堆
+    expect(harness.state.zones.discardPile).toContain('wz1');
+    // 牌堆 -2
+    expect(harness.state.zones.deck).not.toContain('d1');
+    expect(harness.state.zones.deck).not.toContain('d2');
   });
 
   // ─────────────────────────────────────────────────────────────

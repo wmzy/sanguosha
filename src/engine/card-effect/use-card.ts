@@ -20,7 +20,7 @@
 
 import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom, frameCards, popFrame, pushFrame, topFrame } from '../index';
-import { registerAction, registerBeforeHook } from '../skill';
+import { registerAction, registerBeforeHook, registerAfterHook } from '../skill';
 import { promptCancel } from '../无懈可击';
 import { validateCardUse, computeAutoTargets } from './validate';
 import { getCardEffect, getAllCardEffects, requireCardEffect } from './registry';
@@ -170,6 +170,8 @@ export async function runUseFlow(
       await applyAtom(state, { type: '使用时', source, cardId });
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- 布尔 OR 语义:false || true 必须为 true,?? 会误返回 false
       await runSettlementPhase(state, effect, source, source, cardId, 0, opts?.virtual || opts?.skipCancelQuery);
+      // ── 使用结算后：使用结算结束后时机（use.md 使用结算后）──
+      // Ⅰ. 若使用的不是装备牌，将处理区里此牌置入弃牌堆
       if (!opts?.virtual && frameCards(state).includes(cardId)) {
         await applyAtom(state, {
           type: '移动牌',
@@ -178,6 +180,8 @@ export async function runUseFlow(
           to: { zone: '弃牌堆' },
         });
       }
+      // Ⅱ. 使用结算结束后时机（奔袭① after-hook）
+      await applyAtom(state, { type: '使用结算结束后', source, cardId });
       return;
     }
 
@@ -287,8 +291,8 @@ export async function runUseFlow(
       await runSettlementPhase(state, effect, source, target, cardId, i, opts?.virtual);
     }
 
-    // ── 使用结算后：移出处理区 ──
-    // 虚拟使用无实体牌，跳过
+    // ── 使用结算后：使用结算结束后时机（use.md 使用结算后）──
+    // Ⅰ. 若使用的不是装备牌，将处理区里此牌置入弃牌堆（装备牌已装备不在处理区；虚拟使用无实体牌）
     if (!opts?.virtual && frameCards(state).includes(cardId)) {
       await applyAtom(state, {
         type: '移动牌',
@@ -296,6 +300,12 @@ export async function runUseFlow(
         from: { zone: '处理区' },
         to: { zone: '弃牌堆' },
       });
+    }
+    // Ⅱ. 使用结算结束后时机（奔袭① after-hook）
+    //   延时锦囊的结算中延迟到判定阶段（resumeDelayedSettlement），其使用结算尚未结束，
+    //   故使用时不触发本时机。
+    if (!effect.delayed) {
+      await applyAtom(state, { type: '使用结算结束后', source, cardId });
     }
     // onSettle 回调：在 popFrame 前执行，保持帧作用域（五谷丰登.onSettle 的清理依赖
     // frameCards）。是否执行由调用方 useCard 通过 opts.onSettle 决定（runUseFlow 自身不再
@@ -348,12 +358,18 @@ export async function resumeDelayedSettlement(
   }
 }
 
-/** 注册延时锦囊（乐不思蜀/兵粮寸断/闪电）的全局判定阶段 before-hook + 跳过阶段 hook。
+/** 注册延时锦囊（乐不思蜀/兵粮寸断/闪电）的全局判定阶段 after-hook + 跳过阶段 before-hook。
  *  在 index bootstrap / registerSkillsFromState 中调用。
  *  全局注册(ownerId=-1)：判定阶段 hook 检查 atom.player 的判定区有无延时锦囊。 */
 export function registerDelayedTrickHooks(state: GameState): void {
-  // 判定阶段 before-hook：判定区有延时锦囊 → 逐个结算最后置入的，循环直到清空（对齐 game.md）
-  registerBeforeHook(state, '延时锦囊', -1, '阶段开始', async (ctx) => {
+  // 判定阶段 after-hook：判定区有延时锦囊 → 逐个结算最后置入的，循环直到清空（对齐 game.md）
+  //
+  // 用 after-hook 而非 before-hook：game.md 时序为「判定阶段开始时」(能发动技能:勇略)
+  // →「判定阶段」(检测判定区延时锦囊并结算) →「判定阶段结束时」。before-hook 在 apply
+  // 和 after-hook 之前执行，会把延时锦囊结算提前到「判定阶段开始时」技能之前。
+  // after-hook 在 apply 之后执行，且系统级 hook(ownerId<0)在 runAfterHooks 中排在玩家
+  // after-hook 之后——故勇略等「判定阶段开始时」玩家 after-hook 先触发，延时锦囊结算随后。
+  registerAfterHook(state, '延时锦囊', -1, '阶段开始', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段开始' || atom.phase !== '判定') return;
     const player = atom.player;

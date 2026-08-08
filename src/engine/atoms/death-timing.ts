@@ -115,7 +115,7 @@ export const 系统处理牌: AtomDefinition<{ player: number }> = {
   apply(state, atom) {
     const p = state.players[atom.player];
     p.alive = false;
-    // 死亡:手牌和装备进入弃牌堆
+    // 死亡:手牌、装备和判定区延时锦囊进入弃牌堆(对齐 death.md Ⅰ.a「弃置死亡角色区域里所有的牌」)
     for (const cardId of p.hand) state.zones.discardPile.push(cardId);
     p.hand = [];
     for (const slot of Object.keys(p.equipment) as Array<keyof typeof p.equipment>) {
@@ -125,6 +125,13 @@ export const 系统处理牌: AtomDefinition<{ player: number }> = {
         delete p.equipment[slot];
       }
     }
+    // 判定区延时锦囊(乐不思蜀/兵粮寸断/闪电等)一并弃置。
+    // 注:闪电判定生效时有独立的「传递给下家」规则(由 闪电.ts 的判定效果处理),
+    // 此处是死亡清理——死亡角色已无下家可传,统一弃置。
+    for (const trick of p.pendingTricks) {
+      state.zones.discardPile.push(trick.card.id);
+    }
+    p.pendingTricks = [];
   },
   effect: { animation: 'fade', duration: 1500 },
   toViewEvents(state, atom): ViewEventSplit {
@@ -141,11 +148,12 @@ export const 系统处理牌: AtomDefinition<{ player: number }> = {
     const pi = view.players.findIndex((p) => p.index === (event.player as number));
     if (pi >= 0) {
       const p = view.players[pi];
-      // 弃牌堆计数:手牌数 + 装备数(与 apply 对称)
+      // 弃牌堆计数:手牌数 + 装备数 + 判定区延时锦囊数(与 apply 对称)
       const handCount = p.handCount;
       const equipCount = Object.values(p.equipment).filter(Boolean).length;
+      const trickCount = p.pendingTricks?.length ?? 0;
       if (view.zones) {
-        view.zones.discardPileCount += handCount + equipCount;
+        view.zones.discardPileCount += handCount + equipCount + trickCount;
       }
       p.alive = false;
       // 只有 owner(viewer === 阵亡玩家)才清 hand 为 [];
@@ -155,6 +163,8 @@ export const 系统处理牌: AtomDefinition<{ player: number }> = {
       }
       p.handCount = 0;
       p.equipment = {};
+      // 清空判定区延时锦囊,避免死亡角色留下孤儿数据
+      p.pendingTricks = [];
     }
   },
   toViewLog(event) {

@@ -3,12 +3,17 @@
 // resolve: 加标记（本回合下一张杀伤害+1）。
 // target.kind='self': 对自己使用。
 // respond: 濒死时酒当桃用（见 respond 字段）。
+//
+// 使用方法Ⅰ（出牌阶段增伤）每回合限一次：once-per-turn 工具三件套（usedThisTurn/
+// markOncePerTurn/activeUnlessUsedThisTurn），key='酒/usedThisTurn'，由「回合结束」atom
+// 自动清空。仅限方法Ⅰ（resolve 路径），方法Ⅱ（respond 濒死自救）不受限（独立路径，不读写该标记）。
 
 import type { Card } from '../types';
 import { applyAtom } from '../index';
 import { registerBeforeHook } from '../skill';
 import { defaultPlayActive } from '../action-active';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../card-effect/registry';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../once-per-turn';
 import type { HookResult } from '../types';
 
 /** 注册酒的全局「造成伤害」before-hook（消费增伤标记）。
@@ -24,6 +29,9 @@ export function registerWineHook(state: import('../types').GameState): void {
     if (!self) return;
     const hasMark = self.marks.some((m) => m.id === '酒/nextKillDamageBonus');
     if (!hasMark) return;
+    // 增伤仅对「杀」造成的伤害生效（火攻/决斗/南蛮入侵等非杀来源不消耗标记）
+    const damageCard = atom.cardId !== undefined ? ctx.state.cardMap[atom.cardId] : undefined;
+    if (damageCard?.name !== '杀') return;
     await applyAtom(ctx.state, {
       type: '去标记',
       player: atom.source,
@@ -36,9 +44,11 @@ export function registerWineHook(state: import('../types').GameState): void {
   });
 }
 
-/** 酒的结算：加增伤标记 */
+/** 酒的结算：加增伤标记 + 标记本回合已用过酒增伤（使用方法Ⅰ每回合限一次） */
 async function resolveWine(ctx: ResolveCtx): Promise<void> {
   const { state, source } = ctx;
+  // 使用方法Ⅰ每回合限一次：同步设 vars（防 dispatch 重入）+ 回合用量 atom 投影 view（前端禁用）
+  await markOncePerTurn(state, source, '酒');
   await applyAtom(state, {
     type: '加标记',
     player: source,
@@ -46,12 +56,20 @@ async function resolveWine(ctx: ResolveCtx): Promise<void> {
   });
 }
 
-/** 酒牌特有校验：只能对自己使用 */
+/** 酒牌特有校验：只能对自己使用 + 使用方法Ⅰ每回合限一次 */
 function canUseWine(
-  _state: import('../types').GameState,
+  state: import('../types').GameState,
   ownerId: number,
   params: Record<string, import('../types').Json>,
 ): string | null {
+  // 使用方法Ⅰ（增伤）每回合限一次；方法Ⅱ（濒死自救）走 respond 路径，不受此限制。
+  // 拥有 '酒/无次数限制' tag 的玩家（如界董卓·界酒池）豁免此限制。
+  if (
+    usedThisTurn(state, ownerId, '酒') &&
+    !state.players[ownerId]?.tags.includes('酒/无次数限制')
+  ) {
+    return '本回合已使用过酒';
+  }
   const target =
     (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0];
   if (target !== undefined && target !== ownerId) return '只能对自己使用酒';
@@ -102,7 +120,13 @@ const wineEffect: CardEffect = {
   },
   label: '酒',
   style: 'default',
-  activeWhen: (ctx) => defaultPlayActive(ctx),
+  activeWhen: (ctx) => {
+    // 拥有 '酒/无次数限制' tag 的玩家（如界董卓·界酒池）豁免每回合限一次
+    if (ctx.view.players[ctx.perspectiveIdx]?.tags?.includes('酒/无次数限制')) {
+      return defaultPlayActive(ctx);
+    }
+    return activeUnlessUsedThisTurn('酒')(ctx);
+  },
 };
 
 registerCardEffect('酒', wineEffect);

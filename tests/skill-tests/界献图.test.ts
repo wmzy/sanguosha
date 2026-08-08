@@ -359,7 +359,7 @@ describe('界献图(OL 界限突破版)', () => {
     const d1 = makeCard('d1', '桃');
     const d2 = makeCard('d2', '杀');
     const state = buildState({
-      p0Health: 3,
+      p0Health: 4,
       p0Hand: ['h1', 'h2'],
       extraCards: { h1, h2, d1, d2 },
       deck: ['d1', 'd2'],

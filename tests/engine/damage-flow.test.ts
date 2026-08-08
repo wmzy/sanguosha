@@ -97,18 +97,19 @@ describe('模块 A1:伤害编排函数 runDamageFlow', () => {
     expect(state.players[1].health).toBe(4);
   });
 
-  it('伤害值=0 时不走扣减体力子流程,仍发全部时机', async () => {
+  it('伤害值=0 时防止全部伤害,跳过扣减/造成/受到伤害后,直接进入伤害结算结束时', async () => {
+    // 文档 damage.md:伤害减为0即防止全部点数的伤害,视为来源未造成过伤害、
+    // 目标角色也未受到过伤害,在此技能结算完毕后直接进入"伤害结算结束时"。
     await runDamageFlow(state, 1, 0, 0);
     expect(atomTypes(state)).toEqual([
       '伤害结算开始时',
       '造成伤害时',
       '受到伤害时',
-      // amount=0 → 跳过扣减子流程
-      '造成伤害后',
-      '受到伤害后',
+      // amount=0 → 防止全部伤害:跳过扣减子流程、造成伤害后、受到伤害后
       '伤害结算结束时',
       '伤害结算结束后',
     ]);
+    // 未受到伤害,体力不变
     expect(state.players[0].health).toBe(4);
   });
 
@@ -186,6 +187,31 @@ describe('模块 A1:伤害编排函数 runDamageFlow', () => {
       '伤害结算结束后',
     ]);
     // 不扣血
+    expect(state.players[0].health).toBe(4);
+    // 结束时/结束后 amount=0
+    const end = findAtom<Extract<Atom, { type: '伤害结算结束时' }>>(state, '伤害结算结束时');
+    expect(end.amount).toBe(0);
+  });
+
+  it('受到伤害时 modify 折叠为 0 → 防止全部伤害,跳过 造成/受到伤害后', async () => {
+    // 回归 damage.md:伤害减为0即防止全部点数的伤害,视为来源未造成过伤害、
+    // 目标角色也未受到过伤害,直接进入"伤害结算结束时"。
+    // 模拟名士/藤甲减伤:受到伤害时把 amount modify 为 0(非 cancel)。
+    registerBeforeHook(state, 'mockReduceToZero', 0, '受到伤害时', async (ctx) => {
+      const a = ctx.atom;
+      return { kind: 'modify', atom: { ...a, amount: 0 } };
+    });
+    await runDamageFlow(state, 1, 0, 1);
+    // 受到伤害时 atom 正常执行(进 history),但 amount=0 → 防止全部伤害,
+    // 跳过 扣减/造成伤害后/受到伤害后,直接进入 伤害结算结束时/后。
+    expect(atomTypes(state)).toEqual([
+      '伤害结算开始时',
+      '造成伤害时',
+      '受到伤害时',
+      '伤害结算结束时',
+      '伤害结算结束后',
+    ]);
+    // 未受到伤害,体力不变
     expect(state.players[0].health).toBe(4);
     // 结束时/结束后 amount=0
     const end = findAtom<Extract<Atom, { type: '伤害结算结束时' }>>(state, '伤害结算结束时');

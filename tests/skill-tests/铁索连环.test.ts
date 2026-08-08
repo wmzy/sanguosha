@@ -7,6 +7,7 @@ import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { DEFAULT_SKILLS } from '../../src/engine/atoms/选将';
+import { runDamageFlow } from '../../src/engine/damage-flow';
 
 function mkCard(
   id: string,
@@ -76,9 +77,11 @@ describe('铁索连环', () => {
     const P0 = harness.player('P0');
 
     await P0.triggerAction('铁索连环', 'use', { cardId: 'chain1', targets: [1, 2] });
-    // 无懈可击:逐目标 pass(超时 = 无人打无懈)
-    await P0.pass();
-    await P0.pass();
+    // 无懈可击:逐目标 pass(超时 = 无人打无懈) → 目标各自选择横置
+    await P0.pass(); // 无懈 target 1
+    await harness.player('P1').respond('铁索连环', { option: '横置' });
+    await P0.pass(); // 无懈 target 2
+    await harness.player('P2').respond('铁索连环', { option: '横置' });
 
     // P1 和 P2 都被横置
     expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
@@ -87,7 +90,7 @@ describe('铁索连环', () => {
     expect(harness.state.zones.discardPile).toContain('chain1');
   });
 
-  it('use:重置已横置角色(toggle)', async () => {
+  it('use:目标选择重置解除横置', async () => {
     const chain = mkCard('chain2', '铁索连环', '♠', '5', '锦囊牌');
     await harness.setup(
       createGameState({
@@ -108,15 +111,71 @@ describe('铁索连环', () => {
 
     await P0.triggerAction('铁索连环', 'use', { cardId: 'chain2', targets: [1] });
     await P0.pass(); // 无懈可击 pass
+    // 目标选择重置（而非强制 toggle）
+    await harness.player('P1').respond('铁索连环', { option: '重置' });
 
     // P1 被重置(不再横置)
     expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(false);
   });
 
+  // ─── use:目标可选维持现状（规则：已横置可选横置、未横置可选重置）───
+  // bug 核心回归:旧实现强制 toggle,目标无法维持现状。修复后目标可显式选择与当前状态
+  // 相同的选项(已横置选横置仍横置、未横置选重置仍不横置)。
+  it('use:已横置目标选横置 → 维持横置(不强制翻转)', async () => {
+    const chain = mkCard('chainKeep', '铁索连环', '♣', '3', '锦囊牌');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: 'P0', character: '主公', hand: ['chainKeep'], skills: ['铁索连环'] }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', marks: [{ id: 'chained', scope: 1 }], skills: [] }),
+        ],
+        cardMap: { chainKeep: chain },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const P0 = harness.player('P0');
+
+    expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
+
+    await P0.triggerAction('铁索连环', 'use', { cardId: 'chainKeep', targets: [1] });
+    await P0.pass(); // 无懈可击 pass
+    // 已横置目标选「横置」→ 维持横置(旧 toggle 实现会错误地重置)
+    await harness.player('P1').respond('铁索连环', { option: '横置' });
+
+    expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
+  });
+
+  it('use:超时未选择 → 维持现状', async () => {
+    const chain = mkCard('chainTimeout', '铁索连环', '♠', '5', '锦囊牌');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: 'P0', character: '主公', hand: ['chainTimeout'], skills: ['铁索连环'] }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', marks: [{ id: 'chained', scope: 1 }], skills: [] }),
+        ],
+        cardMap: { chainTimeout: chain },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const P0 = harness.player('P0');
+
+    expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
+
+    await P0.triggerAction('铁索连环', 'use', { cardId: 'chainTimeout', targets: [1] });
+    await P0.pass(); // 无懈可击 pass
+    // 目标超时不选择 → 维持现状(仍横置)
+    await harness.player('P1').pass();
+
+    expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
+  });
+
   // ─── use:混合目标(一个横置 + 一个重置)───
-  // bug 回归:对 [未横置A, 已横置B] 同时使用,期望 A 横置、B 重置(toggle 各自独立)。
-  // 此前仅测了纯横置 / 单目标重置,未覆盖「同一张牌内混合 toggle」。
-  it('use:混合目标[未横置A, 已横置B] → A横置, B重置', async () => {
+  // 每个目标各自独立选择横置/重置。
+  it('use:混合目标[未横置A, 已横置B] → A选横置, B选重置', async () => {
     const chain = mkCard('chainMix', '铁索连环', '♣', '3', '锦囊牌');
     await harness.setup(
       createGameState({
@@ -139,9 +198,11 @@ describe('铁索连环', () => {
 
     await P0.triggerAction('铁索连环', 'use', { cardId: 'chainMix', targets: [1, 2] });
     await P0.pass(); // 无懈 target 1
+    await harness.player('P1').respond('铁索连环', { option: '横置' });
     await P0.pass(); // 无懈 target 2
+    await harness.player('P2').respond('铁索连环', { option: '重置' });
 
-    // P1 被横置, P2 被重置(各自独立 toggle)
+    // P1 被横置, P2 被重置(各自独立选择)
     expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
     expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(false);
   });
@@ -192,6 +253,8 @@ describe('铁索连环', () => {
     // 以自己为目标
     await P0.triggerAction('铁索连环', 'use', { cardId: 'chainSelf', targets: [0] });
     await P0.pass(); // 无懈可击 pass
+    // 自己作为目标选择横置
+    await P0.respond('铁索连环', { option: '横置' });
 
     // 自己被横置
     expect(harness.state.players[0].marks.some((m) => m.id === 'chained')).toBe(true);
@@ -215,7 +278,9 @@ describe('铁索连环', () => {
 
     await P0.triggerAction('铁索连环', 'use', { cardId: 'chainSelf2', targets: [0, 1] });
     await P0.pass(); // 无懈对 P0
+    await P0.respond('铁索连环', { option: '横置' }); // 自己作为目标选横置
     await P0.pass(); // 无懈对 P1
+    await harness.player('P1').respond('铁索连环', { option: '横置' });
 
     expect(harness.state.players[0].marks.some((m) => m.id === 'chained')).toBe(true);
     expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
@@ -303,7 +368,9 @@ describe('铁索连环', () => {
     // Step 1: 铁索连环横置 P1 P2
     await P0.triggerAction('铁索连环', 'use', { cardId: 'chainC', targets: [1, 2] });
     await P0.pass(); // 无懈可击 pass (目标1)
+    await harness.player('P1').respond('铁索连环', { option: '横置' });
     await P0.pass(); // 无懈可击 pass (目标2)
+    await harness.player('P2').respond('铁索连环', { option: '横置' });
 
     expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
     expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(true);
@@ -422,5 +489,38 @@ describe('铁索连环', () => {
     // 传导后重置
     expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(false);
     expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(false);
+  });
+
+  // ─── 回归:0 点属性伤害不传导、不重置连环 ───
+  // bug:连环传导 hook 未校验 amount>0,0 点属性伤害(amount 经减伤折叠为0)
+  //     仍传导并重置连环状态。修复:face-down.ts 增加 amount<=0 守卫。
+  it('0 点属性伤害不传导、不重置连环状态', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: 'P0', character: '主公', skills: ['使用牌', '打出牌'] }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', health: 3, maxHealth: 3, marks: [{ id: 'chained', scope: 1 }], skills: ['使用牌', '打出牌'] }),
+          mkPlayer({ index: 2, name: 'P2', character: '反', health: 3, maxHealth: 3, marks: [{ id: 'chained', scope: 2 }], skills: ['使用牌', '打出牌'] }),
+        ],
+        cardMap: {},
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+
+    const p1Before = harness.state.players[1].health;
+    const p2Before = harness.state.players[2].health;
+
+    // 直接造成 0 点火焰伤害(P1 已横置)
+    await runDamageFlow(harness.state, 0, 1, 0, undefined, '火焰');
+    await harness.waitForStable();
+
+    // 0 点伤害:无人掉血
+    expect(harness.state.players[1].health).toBe(p1Before);
+    expect(harness.state.players[2].health).toBe(p2Before);
+    // 0 点属性伤害不传导 → 连环状态不被重置(P1/P2 仍横置)
+    expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
+    expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(true);
   });
 });

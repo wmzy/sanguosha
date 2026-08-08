@@ -19,9 +19,6 @@ import { applyAtom } from './index';
 import { runDecreaseLifeFlow } from './life-flow';
 import { DAMAGE_AMOUNT_KEY, DAMAGE_SOURCE_KEY } from './atoms/damage-timing';
 
-/** localVars flag:runDamageFlow 执行扣减体力期间为 true,系统规则据此跳过扣减体力的濒死检查(改由伤害结算结束时处理)。 */
-const DAMAGE_FLOW_FLAG = '__inDamageFlow';
-
 /** 伤害结算编排函数——对齐 damage.md 8 时机。
  *
  *  时机1 伤害结算开始时:绝情(cancel 整个结算)/ 狂风大雾(修正伤害值或类型)
@@ -65,8 +62,11 @@ export async function runDamageFlow(
   const sufferResult = await applyAtom(state, {
     type: '受到伤害时', source, target, amount, cardId, damageType,
   });
-  if (!sufferResult) {
-    // 被 cancel(完全防止)→ 跳到伤害结算结束时,不执行 造成/受到伤害后、不扣血
+  amount = state.localVars[DAMAGE_AMOUNT_KEY];
+  if (!sufferResult || amount <= 0) {
+    // cancel(完全防止)或 amount 经 modify 折叠为 0(伤害减为0即防止全部伤害):
+    // 视为来源未造成过伤害、目标角色也未受到过伤害,
+    // 跳过 造成/受到伤害后 与扣减,直接进入 伤害结算结束时/后(amount=0)。
     await applyAtom(state, {
       type: '伤害结算结束时', source, target, amount: 0, cardId, damageType,
     });
@@ -75,19 +75,12 @@ export async function runDamageFlow(
     });
     return;
   }
-  amount = state.localVars[DAMAGE_AMOUNT_KEY];
 
   // 时机4:扣减体力(模块 M 的子流程,含扣减前/时/扣减/后四时机)
-  // 必须在 造成伤害后/受到伤害后 之前:扣减体力 先扣血再触发 after-hook,
-  // 新流程同样保证 after-hook 看到扣血后的体力值。
-  // 濒死检查延迟到 时机7(伤害结算结束时):避免濒死 pending 在 受到伤害后 的技能之前阻塞。
+  // 扣减体力的 after-hook 中,系统规则会检查濒死(若体力≤0 → runDyingFlow)。
+  // 对齐 decreaselife.md:扣减 → 若0则濒死结算,濒死在 造成伤害后/受到伤害后 之前触发。
   if (amount > 0) {
-    state.localVars[DAMAGE_FLOW_FLAG] = true;
-    try {
-      await runDecreaseLifeFlow(state, target, amount, source);
-    } finally {
-      delete state.localVars[DAMAGE_FLOW_FLAG];
-    }
+    await runDecreaseLifeFlow(state, target, amount, source);
   }
 
   // 时机5:造成伤害后(来源方:狂骨/破军)

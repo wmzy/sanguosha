@@ -33,6 +33,7 @@ import type {
   Json,
   Skill,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
 import { registerAttackRangeExemptor, effectiveDistance } from '../distance';
@@ -127,7 +128,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
     // 两条件独立判定
     const condBlock = targetPlayer.hand.length <= self.hand.length; // 效果1:手牌不大于自己
-    const condBonus = targetPlayer.health >= self.health; // 效果2:体力不小于自己
+    const condBonus = getHealthValue(targetPlayer) >= getHealthValue(self); // 效果2:体力值不小于自己
     if (!condBlock && !condBonus) return;
 
     // 询问是否发动(单次发动,统一管理两效果)

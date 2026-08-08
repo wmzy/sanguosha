@@ -78,11 +78,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 标记已觉醒(在读条件后立即设,防重入)
     ctx.state.players[ownerId].vars[AWAKENED_KEY] = true;
 
-    // 1. 减1点体力上限(设上限 amount = maxHealth - 1,需 > 0)
+    // 1. 减1点体力上限(设上限 amount = maxHealth - 1;减至0则角色死亡)
     const newMax = self.maxHealth - 1;
-    if (newMax > 0) {
-      await applyAtom(ctx.state, { type: '设上限', player: ownerId, amount: newMax });
-    }
+    await applyAtom(ctx.state, { type: '设上限', player: ownerId, amount: newMax });
 
     // 2. 获得技能"急袭"
     await applyAtom(ctx.state, { type: '添加技能', player: ownerId, skillId: '急袭' });

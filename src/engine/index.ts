@@ -675,33 +675,34 @@ export function pushNotify(state: GameState, event: NotifyEvent): void {
 // 非锁定技失效扩展点(skill-suppression.ts)提供,引擎核心不感知具体技能/标签。
 // 提供者由各技能自行注册(义绝/界铁骑/界完杀 等),predicate 内部读自己的 tag/vars。
 
-/** 运行 after hooks。
- *  默认:系统级 hooks(ownerId===TARGET_SYSTEM)最后执行,确保遗计/反馈等
- *  “受伤害后”技能先于濒死检查触发。
- *  模块 P:伤害结算结束后(连环传导时机)改为按 ownerId 逆时针排列
- *  (当前回合角色起,系统级 hook ownerId<0 排最前)。 */
-async function runAfterHooks(state: GameState, atom: Atom): Promise<void> {
-  const sortedHooks = [...getAfterHooks(state, atom.type)];
+/** 多角色结算顺序排序(原则 §2.2b):从当前回合角色起按 ownerId 逆时针排列玩家 hook。
+ *  系统级 hook(ownerId<0)非“角色”,不受多角色原则约束,统一排在最后——保持既有
+ *  “系统级 hook 最后执行”语义(延时锦囊判定在勇略等玩家技能之后、濒死/死亡检查在
+ *  受伤害技能之后)。同一玩家的多个 hook 维持注册序(Array.sort 在 V8/Node 下稳定)。
+ *
+ *  历史:仅 ‘摸牌’ before-hook 与 ‘伤害结算结束后’ after-hook 做了逆时针排序,其余
+ *  atom 一律按注册插入序(从 0 号座起)遍历,在 currentPlayerIndex≠0 时违反多角色
+ *  结算原则——此处泛化到所有 atom。‘伤害结算结束后’ 原把系统级 hook(连环传导)排最前,
+ *  经核实其传导/重置与玩家“伤害结算结束后”技能(遗计/节命/忘隙)无共享状态、且每次
+ *  atom 仅命中单一目标玩家,系统级排前/排后功能等价,故统一为排最后。返回新数组,
+ *  不修改注册表中的原数组。 */
+function sortHooksCounterclockwise<T extends { ownerId: number }>(hooks: T[], state: GameState): T[] {
+  if (hooks.length <= 1) return [...hooks];
+  const cur = state.currentPlayerIndex;
+  const n = state.players.length;
+  return [...hooks].sort((a, b) => {
+    const aSys = a.ownerId < 0;
+    const bSys = b.ownerId < 0;
+    if (aSys && bSys) return 0; // 系统级之间维持注册序
+    if (aSys) return 1; // 系统级排最后
+    if (bSys) return -1;
+    return ((a.ownerId - cur + n) % n) - ((b.ownerId - cur + n) % n);
+  });
+}
 
-  // 模块 P:伤害结算结束后(连环传导时机)的 after-hook 按 ownerId 逆时针排列——
-  // 当前回合角色起逆时针,系统级 hook(ownerId<0,如连环传导)排最前。
-  // 其他 atom 维持原有"系统级 hook 排最后"顺序,确保遗计/反馈等"受伤害后"
-  // 技能先于濒死检查触发(与 runBeforeHooks 模块 L 摸牌修正写法一致)。
-  if (atom.type === '伤害结算结束后' && sortedHooks.length > 1) {
-    const cur = state.currentPlayerIndex;
-    const n = state.players.length;
-    sortedHooks.sort((a, b) => {
-      const distA = a.ownerId < 0 ? -1 : (a.ownerId - cur + n) % n;
-      const distB = b.ownerId < 0 ? -1 : (b.ownerId - cur + n) % n;
-      return distA - distB;
-    });
-  } else {
-    sortedHooks.sort((a, b) => {
-      if (a.ownerId === TARGET_SYSTEM && b.ownerId !== TARGET_SYSTEM) return 1;
-      if (a.ownerId !== TARGET_SYSTEM && b.ownerId === TARGET_SYSTEM) return -1;
-      return 0;
-    });
-  }
+/** 运行 after hooks:按多角色结算顺序(逆时针,系统级排最后)遍历。 */
+async function runAfterHooks(state: GameState, atom: Atom): Promise<void> {
+  const sortedHooks = sortHooksCounterclockwise(getAfterHooks(state, atom.type), state);
   for (const h of sortedHooks) {
     // 界铁骑:目标本回合非锁定技失效 → 跳过非锁定技 hook
     if (isHookSuppressed(state, h.ownerId, h.skillId)) continue;
@@ -759,24 +760,12 @@ export async function runJudgeModifiers(state: GameState): Promise<void> {
 export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> {
   state.atomStack.push(atom);
 
-  // before 阶段:折叠(folding)语义。hooks 按注册顺序(座次序)依次跑,
+  // before 阶段:折叠(folding)语义。hooks 按多角色结算顺序(逆时针,系统级排最后)依次跑,
   // 每个 hook 可 pass/modify/cancel。modify 叠加(藤甲-1 后白银狮子看到减过的值);
   // cancel 终止(仁王盾/检测有效性 cancel 后后续 hook 不跑,atom 不进入 validate/apply/after)。
   let current = atom;
   let cancelled = false;
-  // 摸牌修正类 before-hook 按 ownerId 逆时针排列(当前回合角色起),
-  // 近似规则的"修正后任意顺序叠加"(模块 L)。其他 atom 维持注册序+座次序不变。
-  // 系统级 hook(ownerId<0,如酒的全局增伤)排最前。
-  const hooks = [...getBeforeHooks(state, atom.type)];
-  if (atom.type === '摸牌' && hooks.length > 1) {
-    const cur = state.currentPlayerIndex;
-    const n = state.players.length;
-    hooks.sort((a, b) => {
-      const distA = a.ownerId < 0 ? -1 : (a.ownerId - cur + n) % n;
-      const distB = b.ownerId < 0 ? -1 : (b.ownerId - cur + n) % n;
-      return distA - distB;
-    });
-  }
+  const hooks = sortHooksCounterclockwise(getBeforeHooks(state, atom.type), state);
   for (const h of hooks) {
     // 界铁骑:目标本回合非锁定技失效 → 跳过非锁定技 hook
     if (isHookSuppressed(state, h.ownerId, h.skillId)) continue;

@@ -37,6 +37,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界将驰'(避开标版未实现的 将驰);
 //   内部 Skill.name = '将驰'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Skill } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { recastCard } from '../recast';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
@@ -118,7 +119,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const slashCount = p.hand.filter((cid) => st.cardMap[cid]?.name === '杀').length;
     if (slashCount === 0) return undefined; // 无杀牌时不覆盖,走默认公式
     const bonus = (st.turn.vars[`手牌上限/bonus:${player}`] as number | undefined) ?? 0;
-    const health = p.health ?? 0;
+    const health = getHealthValue(p);
     return health + bonus + slashCount;
   });
 

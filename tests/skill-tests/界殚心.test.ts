@@ -156,7 +156,7 @@ describe('界殚心', () => {
     ];
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P0', hand: [] }),
+        makePlayer({ index: 0, name: 'P0', hand: [], health: 5, maxHealth: 5 }),
         makePlayer({
           index: 1,
           name: 'P1',

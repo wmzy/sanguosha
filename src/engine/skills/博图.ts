@@ -36,7 +36,8 @@ const COUNT_KEY = '博图/count'; // player.vars:本轮已发动次数
 const CONFIRM_RT = '博图/confirm';
 const CONFIRMED_KEY = '博图/confirmed';
 
-/** 复刻「回合结束」atom 的 per-turn 清理(cancel 回合结束后 atom.apply 不执行,需手动清理)。
+/** 复刻「回合结束」atom 的 per-turn 清理(幂等防御:博图 cancel 回合结束后 时,
+ *  回合结束 已先行 apply 清理过,此处重复执行无副作用,仅作防御)。
  *  与 回合结束.ts apply 保持一致:清空 turn.vars、清所有玩家 duration='turn' 标记、
  *  清 /usedThisTurn|/healed|/givenCount|/givenTargets|/basicUsed vars。 */
 function clearPerTurnState(state: GameState): void {
@@ -67,7 +68,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '博图',
     description:
-      '每轮限X次(X为存活角色数至多3),回合结束时若本回合弃牌堆含四种花色,可执行一个额外回合',
+      '每轮限X次(X为存活角色数至多3),回合结束后若本回合弃牌堆含四种花色,可执行一个额外回合',
   };
 }
 
@@ -98,22 +99,26 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const atom = ctx.atom;
     if (atom.type !== '回合开始') return;
     if (atom.player !== ownerId) return;
-    ctx.state.turn.vars[BASE_VAR] = ctx.state.zones.discardPile.length;
+    // 基线存 player.vars 而非 turn.vars:回合结束 atom 会清空 turn.vars,而博图在
+    // 回合结束后 时机才读取(此时 turn.vars 已清),故用 player.vars 跨过 回合结束。
+    ctx.state.players[ownerId].vars[BASE_VAR] = ctx.state.zones.discardPile.length;
   });
 
-  // ── 回合结束 before-hook:博图主逻辑(额外回合)──
+  // ── 回合结束后 before-hook:博图主逻辑(额外回合)──
+  // 文档 game.md「回合结束后」:博图 时机(已离开回合内)。cancel 回合结束后 阻止正常
+  // 回合推进(下一家 beginTurn 挂在 回合结束后 的 after-hook),亲自启动额外回合。
   registerBeforeHook(
     state,
     skill.id,
     ownerId,
-    '回合结束',
+    '回合结束后',
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
-      if (atom.type !== '回合结束') return;
+      if (atom.type !== '回合结束后') return;
       if (atom.player !== ownerId) return;
       const st = ctx.state;
       const self = st.players[ownerId];
-      if (!self?.alive) return; // 死亡 → 放行正常回合结束
+      if (!self?.alive) return; // 死亡 → 放行正常回合结束后
 
       // 每轮计数:轮次变化则重置
       const round = st.turn.round;
@@ -126,7 +131,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (used >= x) return; // 达本轮上限 → 放行
 
       // 花色检查:本回合新进弃牌堆的牌是否含四花色
-      const base = st.turn.vars[BASE_VAR] as number | undefined;
+      const base = self.vars[BASE_VAR] as number | undefined;
       if (typeof base !== 'number') return;
       // 重洗可能令弃牌堆变短;此时基线失效,保守视为不满足(本回合不再发动)
       if (st.zones.discardPile.length < base) return;
@@ -161,7 +166,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 计数 +1(永久 vars,不被 clearPerTurnState 清理)
       st.players[ownerId].vars[COUNT_KEY] = used + 1;
 
-      // cancel 回合结束 → 手动清理 per-turn 状态 → 亲自启动额外回合
+      // cancel 回合结束后 → 亲自启动额外回合(clearPerTurnState 此处为幂等防御:
+      // 回合结束 atom 已在 回合结束后 之前 apply 清理过 per-turn 状态)
       clearPerTurnState(st);
       st.currentPlayerIndex = ownerId;
       await startTurn(st, ownerId);

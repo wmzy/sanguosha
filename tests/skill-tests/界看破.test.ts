@@ -113,7 +113,7 @@ describe('界看破', () => {
     const p2HandBefore = harness.state.players[1].hand.length;
 
     // P2 出无中生有 → 移到处理区 → 开无懈窗口
-    await P2.useCard('无中生有', 'wz');
+    await P2.useCardAndTarget('无中生有', 'wz', [1]);
     // 无懈可击广播窗口
     P2.expectPending('请求回应');
 
@@ -161,7 +161,7 @@ describe('界看破', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P2.useCard('无中生有', 'wz');
+    await P2.useCardAndTarget('无中生有', 'wz', [1]);
     P2.expectPending('请求回应');
     await P1.transformThenRespond('界看破', { cardId: 'c2' }, '无懈可击', { cardId: 'c2#界看破' });
 
@@ -188,7 +188,7 @@ describe('界看破', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P2.useCard('无中生有', 'wz');
+    await P2.useCardAndTarget('无中生有', 'wz', [1]);
     P2.expectPending('请求回应');
     await P1.transformThenRespond('界看破', { cardId: 'e1' }, '无懈可击', {
       cardId: 'e1#界看破',
@@ -220,7 +220,7 @@ describe('界看破', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P2.useCard('无中生有', 'wz');
+    await P2.useCardAndTarget('无中生有', 'wz', [1]);
     P2.expectPending('请求回应');
 
     // P1 用实际无懈牌(非界看破转化):应走标版,设 已回应=true → 开反无懈窗口
@@ -253,7 +253,7 @@ describe('界看破', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P2.useCard('无中生有', 'wz');
+    await P2.useCardAndTarget('无中生有', 'wz', [1]);
     P2.expectPending('请求回应');
 
     // transform c1 成功(开窗)→ 影子 c1#界看破 入手牌;
@@ -288,7 +288,7 @@ describe('界看破', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P2.useCard('无中生有', 'wz');
+    await P2.useCardAndTarget('无中生有', 'wz', [1]);
     P2.expectPending('请求回应');
     // 界看破 transform 红牌 → 拒绝
     await P1.expectRejected({
@@ -333,7 +333,7 @@ describe('界看破', () => {
     const P2 = harness.player('P2');
 
     // P2 出无中生有开无懈窗口,使界看破 transform 激活
-    await P2.useCard('无中生有', 'wz');
+    await P2.useCardAndTarget('无中生有', 'wz', [1]);
     P2.expectPending('请求回应');
 
     const P1 = harness.player('P1');

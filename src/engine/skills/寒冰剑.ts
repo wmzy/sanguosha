@@ -70,6 +70,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!weaponId) return;
       const weapon = ctx.state.cardMap[weaponId];
       if (weapon?.name !== '寒冰剑') return;
+      // 仅限【杀】造成的伤害才触发(普通/火/雷杀 name 均为 '杀')。
+      // 决斗/南蛮入侵/万箭齐发/火攻 等其他来源的伤害不触发(规则:仅你使用【杀】造成伤害时)。
+      const damageCardId = atom.cardId;
+      if (!damageCardId) return;
+      const damageCard = ctx.state.cardMap[damageCardId];
+      if (damageCard?.name !== '杀') return;
       const target = ctx.state.players[atom.target];
       if (!target) return;
       // 触发条件:目标有牌(手牌或装备区)

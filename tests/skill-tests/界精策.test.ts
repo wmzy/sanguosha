@@ -163,7 +163,7 @@ describe('界精策', () => {
     expect(harness.state.turn.vars[handLimitBonusKey(0)]).toBe(1);
 
     // 出无中生有(♥)→ bonus=2
-    await P0.useCard('无中生有', 'wz');
+    await P0.useCardAndTarget('无中生有', 'wz', [0]);
     expect(harness.state.turn.vars[handLimitBonusKey(0)]).toBe(2);
     expect(handLimit(harness.state, 0)).toBe(6);
   });
@@ -280,7 +280,7 @@ describe('界精策', () => {
     await P0.useCardAndTarget('杀', 's1', [1]);
     await P1.pass();
     // 出无中生有(锦囊牌)→ 无懈窗口 → P1 不打无懈 → 摸 d1,d2
-    await P0.useCard('无中生有', 'wz');
+    await P0.useCardAndTarget('无中生有', 'wz', [0]);
     await P1.pass(); // 无懈可击窗口
     expect(harness.state.players[0].hand.length).toBe(2); // d1, d2
 
@@ -329,7 +329,7 @@ describe('界精策', () => {
     await P0.useCardAndTarget('杀', 's1', [1]);
     await P1.pass();
     // 出无中生有(锦囊牌)→ 无懈窗口 → P1 不打 → 摸 d1,d2
-    await P0.useCard('无中生有', 'wz');
+    await P0.useCardAndTarget('无中生有', 'wz', [0]);
     await P1.pass(); // 无懈可击窗口
     // 装备武器(装备牌)
     await P0.useCard('装备通用', 'w1');

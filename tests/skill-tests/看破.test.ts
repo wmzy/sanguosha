@@ -102,7 +102,7 @@ describe('看破', () => {
     const p1HandBefore = harness.state.players[0].hand.length;
 
     // P1 出无中生有 → 移到处理区 → 开无懈窗口
-    await P1.useCard('无中生有', 'wz');
+    await P1.useCardAndTarget('无中生有', 'wz', [0]);
     // 无懈可击广播窗口
     P1.expectPending('请求回应');
 
@@ -145,7 +145,7 @@ describe('看破', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await P1.useCard('无中生有', 'wz');
+    await P1.useCardAndTarget('无中生有', 'wz', [0]);
     P1.expectPending('请求回应');
     // 看破 transform 红牌 → 拒绝
     await P2.expectRejected({

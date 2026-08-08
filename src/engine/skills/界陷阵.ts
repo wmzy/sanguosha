@@ -43,6 +43,7 @@ import type {
   Json,
   Skill,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import { runRankCompareFlow } from '../rank-flow';
 import {
@@ -143,7 +144,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const slashCount = p.hand.filter((cid) => st.cardMap[cid]?.name === '杀').length;
     if (slashCount === 0) return undefined;
     const bonus = (st.turn.vars[`手牌上限/bonus:${player}`] as number | undefined) ?? 0;
-    const health = p.health ?? 0;
+    const health = getHealthValue(p);
     return health + bonus + slashCount;
   });
 

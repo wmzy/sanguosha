@@ -101,7 +101,7 @@ describe('界集智', () => {
     const P1 = harness.player('P1');
 
     // 使用无中生有 → 集智 afterHook → 集智 confirm 窗口
-    await P1.useCard('无中生有', 'wz1');
+    await P1.useCardAndTarget('无中生有', 'wz1', [0]);
     expect(currentRequestType(harness.state)).toBe('界集智/confirm');
 
     // 确认摸牌
@@ -133,7 +133,7 @@ describe('界集智', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.useCard('无中生有', 'wz1');
+    await P1.useCardAndTarget('无中生有', 'wz1', [0]);
     await P1.respond('界集智', { choice: true }); // 摸牌
 
     // 弃置 d3 换上限
@@ -166,7 +166,7 @@ describe('界集智', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.useCard('无中生有', 'wz1');
+    await P1.useCardAndTarget('无中生有', 'wz1', [0]);
     await P1.respond('界集智', { choice: true }); // 摸牌
     // 不弃置
     await P1.respond('界集智', { choice: false });
@@ -199,7 +199,7 @@ describe('界集智', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.useCard('无中生有', 'wz1');
+    await P1.useCardAndTarget('无中生有', 'wz1', [0]);
     await P1.respond('界集智', { choice: true }); // 摸牌
 
     // 摸到 d3(非基本牌)→ 无界集智/discard 窗口
@@ -230,7 +230,7 @@ describe('界集智', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.useCard('无中生有', 'wz1');
+    await P1.useCardAndTarget('无中生有', 'wz1', [0]);
     await P1.respond('界集智', { choice: false }); // 不摸
     await P1.pass(); // 无懈窗口
 
@@ -340,7 +340,7 @@ describe('界集智', () => {
     const P1 = harness.player('P1');
 
     // 用无中生有 → 集智摸 → 弃 d3 换上限+1 → 无中生有再摸 d2, d1
-    await P1.useCard('无中生有', 'wz1');
+    await P1.useCardAndTarget('无中生有', 'wz1', [0]);
     await P1.respond('界集智', { choice: true }); // 摸牌(d3 基本牌)
     await P1.respond('界集智', { choice: true }); // 弃 d3 换上限+1
     await P1.pass(); // 无中生有的无懈可击窗口(无人打出)

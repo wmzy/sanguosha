@@ -25,6 +25,7 @@ import type {
   Skill,
   GameView,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../skill';
@@ -86,7 +87,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!self?.alive) return;
 
     // X = 已损失体力值
-    const lostHealth = self.maxHealth - self.health;
+    const lostHealth = self.maxHealth - getHealthValue(self);
     if (lostHealth <= 0) return; // 满血时 X=0,放逐无意义
 
     // 必须有其他存活角色可选

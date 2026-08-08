@@ -76,6 +76,8 @@ export function registerChainConductionHook(state: GameState): void {
     const atom = ctx.atom;
     const dt = atom.damageType;
     if (dt !== '火焰' && dt !== '雷电') return;
+    const amount = atom.amount ?? 1;
+    if (amount <= 0) return; // 0 点属性伤害不传导、不重置连环
     const target = atom.target;
     if (typeof target !== 'number') return;
     if (!isChained(ctx.state, target)) return;
@@ -83,7 +85,6 @@ export function registerChainConductionHook(state: GameState): void {
 
     ctx.state.localVars[CONDUCTING_VAR] = true;
     try {
-      const amount = atom.amount ?? 1;
       const source = atom.source ?? TARGET_SYSTEM;
       // 传导给其他所有横置的存活角色(按座次)
       const others = ctx.state.players.filter(
@@ -111,14 +112,33 @@ export function isFaceDown(state: GameState, player: number): boolean {
   return state.players[player].tags.some((t) => t.endsWith('/翻面'));
 }
 
-/** 跳过整回合（翻面的系统效果）：清过期标记 → 下一玩家 → 回合结束。
+/** 翻回正面（清除该玩家所有 `/翻面` 后缀标签）+ 发「翻面后」时机(faceDown=false)。
+ *  与 flipFaceUp(source) 的区别：一次性清除全部翻面标签——一个角色可能被多个技能
+ *  叠加翻面（如同时持有 `放逐/翻面` 与 `悲歌/翻面`）。供 回合管理 跳过翻面角色时使用。 */
+export async function flipFaceUpAll(state: GameState, player: number): Promise<void> {
+  const tags = state.players[player]?.tags ?? [];
+  const flipTags = tags.filter((t) => t.endsWith('/翻面'));
+  for (const tag of flipTags) {
+    await applyAtom(state, { type: '去标签', player, tag });
+  }
+  if (flipTags.length > 0) {
+    await applyAtom(state, { type: '翻面后', player, faceDown: false });
+  }
+}
+
+/** 跳过整回合（翻面的系统效果）：清过期标记 → 下一玩家 → 回合结束 → 回合结束后。
  *  与 回合管理.end action 的尾段一致。调用方负责 cancel 触发它的 阶段结束 原子，
- *  以免 phase-end after-hook 推进产生幻影阶段链（沿用原内联实现的手法）。 */
+ *  以免 phase-end after-hook 推进产生幻影阶段链（沿用原内联实现的手法）。
+ *  回合结束后 仅在 回合结束 未被 cancel 时发出——下一家 beginTurn 挂在其 after-hook，
+ *  不发出则下一家不启动。 */
 export async function performSkipTurn(
   state: GameState,
   player: number,
 ): Promise<void> {
   await applyAtom(state, { type: '清过期标记', player });
   await applyAtom(state, { type: '下一玩家' });
-  await applyAtom(state, { type: '回合结束', player });
+  const ended = await applyAtom(state, { type: '回合结束', player });
+  if (ended) {
+    await applyAtom(state, { type: '回合结束后', player });
+  }
 }

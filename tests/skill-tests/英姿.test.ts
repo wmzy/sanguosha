@@ -143,7 +143,7 @@ describe('英姿', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
 
-    await P0.useCard('无中生有', 'wz');
+    await P0.useCardAndTarget('无中生有', 'wz', [0]);
     // 无中生有先经无懈可击窗口
     P0.expectPending('请求回应');
     await P0.pass();

@@ -28,6 +28,7 @@ import type {
   Json,
   Skill,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, type SkillModule } from '../skill';
 import { registerHandLimitProvider } from '../hand-limit';
@@ -98,7 +99,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const p = st.players[player];
     if (!p) return undefined;
     const bonus = (st.turn.vars[`手牌上限/bonus:${player}`] as number | undefined) ?? 0;
-    return (p.health ?? 0) + bonus + yiCount(st, player);
+    return getHealthValue(p) + bonus + yiCount(st, player);
   });
 
   // ── 游戏开始初始化(化身/界巧变先例):'回合开始' after-hook,首次触发加 X 枚裔 ──

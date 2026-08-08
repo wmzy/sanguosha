@@ -1,7 +1,8 @@
 // 界酒池(界董卓·转化技)测试(界限突破版):
 // 核心差异(相对标酒池 src/engine/skills/酒池.ts):
 //   1. 黑桃手牌当酒(同标版)
-//   2. 显式"无次数限制"(引擎标版酒.use 已无限制,等价)
+//   2. 显式"无次数限制":标版酒.use 使用方法Ⅰ每回合限一次,本技能通过 '酒/无次数限制'
+//      tag 豁免(canUseWine/activeWhen 检查)→ 界董卓可一回合多次用酒增伤
 //   3. NEW: 使用酒杀造成伤害后,本回合崩坏失效
 //      机制:after-hook on '去标记' 检测 酒/nextKillDamageBonus mark 被消耗
 //      → 设 turn.vars['崩坏/disabled']=true
@@ -14,6 +15,7 @@
 //   5. 端到端:酒杀造成伤害 → turn.vars['崩坏/disabled']=true
 //   6. 端到端:无酒增伤的普通伤害 → var 不设置
 //   7. 端到端:酒增伤但伤害由他人造成 → var 不设置(mark 不在 owner 身上)
+//   8. 无次数限制:同回合连续用两次酒(增伤)均成功
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -236,7 +238,7 @@ describe('界酒池', () => {
     expect(harness.state.turn.vars['崩坏/disabled']).toBeUndefined();
 
     // 步骤2:P0 造成 1 点伤害(模拟杀命中)。酒 before-hook 会消费 mark + 增伤 +1
-    await runDamageFlow(harness.state, 0, 1, 1);
+    await runDamageFlow(harness.state, 0, 1, 1, 's1');
     await harness.waitForStable();
     harness.processAllEvents();
 
@@ -323,5 +325,44 @@ describe('界酒池', () => {
       (m) => m.id === '酒/nextKillDamageBonus',
     );
     expect(hasMark).toBe(true);
+  });
+
+  // ─── 8. 无次数限制:同回合连续用两次酒(增伤)均成功 ──────────
+  it('无次数限制:同回合连续用两次酒(增伤)均成功(标版限一次,界版豁免)', async () => {
+    const spade1 = makeCard('s1', '杀', '♠', '7');
+    const spade2 = makeCard('s2', '杀', '♠', '8');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['s1', 's2'],
+          skills: ['界酒池', '酒'],
+        }),
+        makePlayer({ index: 1, name: 'P1', skills: [] }),
+      ],
+      cardMap: { s1: spade1, s2: spade2 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    // 确认界酒池已设豁免 tag
+    expect(harness.state.players[0].tags).toContain('酒/无次数限制');
+
+    // 第一次:界酒池转化 + 酒.use → 成功
+    await P0.transformThenUse('界酒池', { cardId: 's1' }, '酒', { cardId: 's1#界酒池' });
+    expect(harness.state.players[0].vars['酒/usedThisTurn']).toBe(true);
+    expect(harness.state.zones.discardPile).toContain('s1');
+
+    // 第二次:界酒池转化 + 酒.use → 仍成功(无次数限制豁免标版每回合限一次)
+    await P0.transformThenUse('界酒池', { cardId: 's2' }, '酒', { cardId: 's2#界酒池' });
+    expect(harness.state.zones.discardPile).toContain('s2');
+    // 仍有增伤 mark(第二次重新加 mark)
+    expect(
+      harness.state.players[0].marks.some((m) => m.id === '酒/nextKillDamageBonus'),
+    ).toBe(true);
   });
 });

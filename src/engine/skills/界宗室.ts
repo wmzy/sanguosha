@@ -27,6 +27,7 @@ import type {
   HookResult,
   Skill,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { registerBeforeHook, type SkillModule } from '../skill';
 import { registerHandLimitProvider } from '../hand-limit';
@@ -79,7 +80,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const p = st.players[player];
     if (!p) return undefined;
     const bonus = (st.turn.vars[`手牌上限/bonus:${player}`] as number | undefined) ?? 0;
-    return (p.health ?? 0) + bonus + countFactions(st);
+    return getHealthValue(p) + bonus + countFactions(st);
   });
 
   // ── 造成伤害 before-hook:其他角色对 owner 造成伤害 → 防止 + 来源摸 1 ──

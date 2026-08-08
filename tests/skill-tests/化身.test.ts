@@ -222,6 +222,8 @@ describe('化身', () => {
     // 触发回合结束 → 询问更换
     void applyAtom(harness.state, { type: '回合结束', player: 0 });
     await harness.waitForStable();
+    void applyAtom(harness.state, { type: '回合结束后', player: 0 });
+    await harness.waitForStable();
     harness.processAllEvents();
 
     ZUO.expectPending('请求回应');
@@ -448,6 +450,8 @@ describe('化身(界左慈)', () => {
     const ZUO = harness.player(0);
     // 触发回合结束 → 询问选择行动
     void applyAtom(harness.state, { type: '回合结束', player: 0 });
+    await harness.waitForStable();
+    void applyAtom(harness.state, { type: '回合结束后', player: 0 });
     await harness.waitForStable();
     harness.processAllEvents();
 

@@ -8,6 +8,7 @@ import type { GameState, Json, Skill } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../skill';
 import { handLimit } from '../hand-limit';
+import { isFaceDown, flipFaceUpAll } from '../face-down';
 
 const PHASE_ORDER = ['准备', '判定', '摸牌', '出牌', '弃牌', '回合结束'] as const;
 
@@ -25,6 +26,32 @@ function findNextAlive(state: { players: { alive: boolean }[] }, fromIndex: numb
     if (state.players[idx].alive) return idx;
   }
   return fromIndex;
+}
+
+/** 启动 player 的回合：回合开始 → 阶段开始/结束(准备)，触发阶段推进链。
+ *  翻面检查集中在此（对齐 rules/flow/game.md「回合开始前」：武将牌背面朝上则翻面后
+ *  跳过此回合，直接进入下回合的「回合开始前」）：
+ *    若 player 背面朝上，先翻回正面（发「翻面后」时机），不 fire 回合开始/回合结束
+ *    atom，直接推进到下家并重复检查——故翻面角色整回合被跳过，不触发
+ *    「回合开始时 / 回合结束时 / 回合结束后」技能。
+ *    连续跳过所有背面朝上的玩家，直到遇到正面朝上的玩家；存活玩家数兜底保证终止。 */
+async function beginTurn(state: GameState, player: number): Promise<void> {
+  const aliveCount = state.players.filter((p) => p.alive).length;
+  let cur = player;
+  let guard = 0;
+  while (isFaceDown(state, cur) && guard < aliveCount) {
+    // 翻回正面（清除所有 /翻面 标签 + 发「翻面后」时机）
+    await flipFaceUpAll(state, cur);
+    // 推进到下家（不 fire 回合结束 atom，故不触发该被跳过玩家的回合结束技能）
+    await applyAtom(state, { type: '下一玩家' });
+    cur = state.currentPlayerIndex;
+    guard++;
+  }
+
+  await applyAtom(state, { type: '回合开始', player: cur });
+  await applyAtom(state, { type: '阶段开始', player: cur, phase: '准备' });
+  // 触发阶段结束,让该玩家的阶段推进钩子接着跑(准备→判定→摸牌→出牌)
+  await applyAtom(state, { type: '阶段结束', player: cur, phase: '准备' });
 }
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -118,7 +145,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (next === '回合结束') {
       await applyAtom(ctx.state, { type: '清过期标记', player });
       await applyAtom(ctx.state, { type: '下一玩家' });
-      await applyAtom(ctx.state, { type: '回合结束', player });
+      // 回合结束后时机(game.md「回合结束后」,已离开回合内):仅当 回合结束 未被 cancel 时发出。
+      // 放权等额外回合技能在 回合结束 的 before-hook cancel,阻止到达此处;
+      // 博图等额外回合技能在 回合结束后 的 before-hook cancel。下一家 beginTurn 挂在
+      // 回合结束后 的 after-hook(见下),故此处必须发出 回合结束后 否则下一家不启动。
+      const turnEnded = await applyAtom(ctx.state, { type: '回合结束', player });
+      if (turnEnded) {
+        await applyAtom(ctx.state, { type: '回合结束后', player });
+      }
       return;
     }
 
@@ -131,9 +165,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
   });
 
-  // ─── 上家回合结束 → 如果我是下一家,启动自己的回合 ───
-  registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx) => {
-    if (ctx.atom.type !== '回合结束') return;
+  // ─── 上家回合结束后 → 如果我是下一家,启动自己的回合 ───
+  // 回合推进挂在 回合结束后 的 after-hook(而非 回合结束):回合结束后 是"已离开回合内"
+  // 的最后时机,博图/连破等额外回合技能在其 before-hook cancel 本 atom 阻止正常推进;
+  // 回合结束 的 after-hook 仅留回合结束时的清理型/触发型技能(义绝等)。
+  registerAfterHook(state, skill.id, ownerId, '回合结束后', async (ctx) => {
+    if (ctx.atom.type !== '回合结束后') return;
     const finishedIndex = ctx.atom.player;
     const state = ctx.state;
 
@@ -141,10 +178,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 不是我就跳过——只有轮到的玩家启动自己的回合
     if (nextIndex !== me) return;
 
-    await applyAtom(ctx.state, { type: '回合开始', player: me });
-    await applyAtom(ctx.state, { type: '阶段开始', player: me, phase: '准备' });
-    // 触发阶段结束,让本实例的阶段推进钩子接着跑(准备→判定→摸牌→出牌)
-    await applyAtom(ctx.state, { type: '阶段结束', player: me, phase: '准备' });
+    // 启动本玩家回合（含翻面跳过检查）：翻面角色整回合被跳过，
+    // 不 fire 回合开始/回合结束 atom（对齐 rules/flow/game.md「回合开始前」）。
+    await beginTurn(ctx.state, me);
   });
 
   // ─── 主动结束回合 ───

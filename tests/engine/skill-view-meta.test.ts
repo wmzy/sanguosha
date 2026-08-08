@@ -78,6 +78,7 @@ describe('skill-view-meta 注册表(马匹 atom 解耦)', () => {
     expect(getSkillViewDelta('的卢')).toEqual({ mountDistanceVars: { defenseMod: 1 } });
     expect(getSkillViewDelta('绝影')).toEqual({ mountDistanceVars: { defenseMod: 1 } });
     expect(getSkillViewDelta('爪黄飞电')).toEqual({ mountDistanceVars: { defenseMod: 1 } });
+    expect(getSkillViewDelta('骅骝')).toEqual({ mountDistanceVars: { defenseMod: 1 } });
   });
 
   it('非马匹技能无视图增量', () => {

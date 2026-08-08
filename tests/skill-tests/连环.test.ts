@@ -175,6 +175,8 @@ describe('连环', () => {
     );
     // 无懈可击 pass
     await PT.pass();
+    // 目标选择横置
+    await harness.player('P1').respond('铁索连环', { option: '横置' });
 
     // P1 被横置
     expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(true);
@@ -182,10 +184,9 @@ describe('连环', () => {
     expect(harness.state.players[0].hand).not.toContain('c1');
   });
 
-  // ─── transform:重置已横置角色(庞统梅花牌→铁索连环 toggle 重置)───
-  // bug 回归:庞统用连环将梅花牌当铁索连环,对「已横置」角色使用应重置(解除连环)。
-  // 此前仅测了 transform→横置,未覆盖 transform→重置路径。
-  it('transform:梅花牌当铁索连环,重置已横置角色', async () => {
+  // ─── transform:目标选择重置已横置角色(庞统梅花牌→铁索连环)───
+  // 庞统用连环将梅花牌当铁索连环,对「已横置」角色使用,目标选择重置(解除连环)。
+  it('transform:梅花牌当铁索连环,目标选择重置解除横置', async () => {
     const club = mkCard('c2', '杀', '♣', '7'); // 梅花杀
     await harness.setup(
       createGameState({
@@ -217,6 +218,8 @@ describe('连环', () => {
       { cardId: 'c2#连环', targets: [1] },
     );
     await PT.pass(); // 无懈可击 pass
+    // 目标选择重置
+    await harness.player('P1').respond('铁索连环', { option: '重置' });
 
     // P1 被重置(不再横置)
     expect(harness.state.players[1].marks.some((m) => m.id === 'chained')).toBe(false);

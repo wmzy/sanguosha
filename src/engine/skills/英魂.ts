@@ -23,6 +23,7 @@ import type {
   Json,
   Skill,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { registerAction, registerBeforeHook } from '../skill';
 
@@ -74,7 +75,7 @@ export async function performYinghunPrepare(
   // 发动条件:已受伤(当前体力 < 体力上限)
   if (self.health >= self.maxHealth) return;
   // X = 已损失体力值
-  const x = self.maxHealth - self.health;
+  const x = self.maxHealth - getHealthValue(self);
 
   // 1) 询问是否发动
   delete state.localVars[CONFIRMED_KEY];

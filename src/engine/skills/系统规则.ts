@@ -182,23 +182,10 @@ export function onInit(_skill: Skill, state: GameState): () => void {
   // 濒死检查由 扣减体力 after-hook 负责,killer 由 runDecreaseLifeFlow 写入。
 
   // ── 扣减体力 after hook:濒死检查 ──
-  // 仅处理非伤害路径(失去体力 → runDecreaseLifeFlow → 扣减体力)。
-  // 伤害路径(runDamageFlow)设置 __inDamageFlow 标志,濒死检查延迟到 伤害结算结束时
-  // (确保 放逐/断肠 等受伤后技能先于濒死检查执行)。
+  // 扣减体力后立即检查濒死(若体力≤0 → runDyingFlow),对齐 decreaselife.md:
+  // 扣减 → 若0则濒死结算。伤害路径(runDamageFlow)与失去体力路径共用此检查,
+  // 濒死结算在 造成伤害后/受到伤害后 之前触发。
   registerAfterHook(state, '系统规则', -1, '扣减体力', async (ctx) => {
-    if (ctx.state.localVars['__inDamageFlow']) return; // 伤害路径:延迟到 伤害结算结束时
-    const atom = ctx.atom;
-    if (typeof atom.target !== 'number') return;
-    const target = ctx.state.players[atom.target];
-    if (target && target.alive && target.health <= 0) {
-      await runDyingFlow(ctx.state, atom.target);
-    }
-  });
-
-  // ── 伤害结算结束时:濒死检查(伤害路径专用)──
-  // 扣减体力 在 造成伤害后/受到伤害后 之前执行,但濒死检查延迟到此时机
-  // (在所有受伤后技能执行完毕后),与旧 造成伤害 after-hook 的系统规则最后执行语义一致。
-  registerAfterHook(state, '系统规则', -1, '伤害结算结束时', async (ctx) => {
     const atom = ctx.atom;
     if (typeof atom.target !== 'number') return;
     const target = ctx.state.players[atom.target];
@@ -216,6 +203,20 @@ export function onInit(_skill: Skill, state: GameState): () => void {
       // 体力致死无来源——清除可能残留的来源记录
       delete ctx.state.localVars['死亡/killer'];
       await runDyingFlow(ctx.state, atom.target);
+    }
+  });
+
+  // ── 设上限 after hook:体力上限降为0→直接死亡 ──
+  // 对齐 decreaselifemax.md:"若该角色的体力上限为0,其死亡。"
+  // 与 扣减体力/失去体力 的濒死检查不同:上限为0是直接死亡(runDeathFlow),
+  // 不经濒死求桃(区别于体力扣减到0)。减上限致死无来源——清除残留来源记录。
+  registerAfterHook(state, '系统规则', -1, '设上限', async (ctx) => {
+    const atom = ctx.atom;
+    if (typeof atom.player !== 'number') return;
+    const target = ctx.state.players[atom.player];
+    if (target && target.alive && target.maxHealth <= 0) {
+      delete ctx.state.localVars['死亡/killer'];
+      await runDeathFlow(ctx.state, atom.player);
     }
   });
 

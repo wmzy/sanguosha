@@ -13,6 +13,7 @@
 //
 //   关键:增上限必须在回复前(先增加上限,再回复),否则回复被旧上限 clamp。
 import type { FrontendAPI, GameState, Skill } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom } from '../index';
 import { registerAfterHook } from '../skill';
 
@@ -43,8 +44,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 体力全场最少(或之一):与所有存活玩家比较
     const alivePlayers = ctx.state.players.filter((p) => p.alive);
     if (alivePlayers.length === 0) return;
-    const minHealth = Math.min(...alivePlayers.map((p) => p.health));
-    if (self.health > minHealth) return;
+    const minHealth = Math.min(...alivePlayers.map((p) => getHealthValue(p)));
+    if (getHealthValue(self) > minHealth) return;
 
     // 标记已觉醒(在读条件后立即设,防重入)
     ctx.state.players[ownerId].vars[AWAKENED_KEY] = true;

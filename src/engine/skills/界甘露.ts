@@ -31,6 +31,7 @@ import type {
   Json,
   Skill,
 } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom, popFrame, pushFrame } from '../index';
 import {
   usedThisTurn,
@@ -59,7 +60,7 @@ function equipmentCount(state: GameState, idx: number): number {
 function lostHealth(state: GameState, idx: number): number {
   const p = state.players[idx];
   if (!p) return 0;
-  return Math.max(0, p.maxHealth - p.health);
+  return Math.max(0, p.maxHealth - getHealthValue(p));
 }
 
 /** 列出玩家在某 slot 的装备 cardId(若有)。 */

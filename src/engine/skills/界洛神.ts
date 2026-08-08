@@ -20,6 +20,7 @@
 // 因此洛神的 判定牌生效后 hook 读 frameCards(此时判定牌还在处理区);随后 runJudgeFlow 收尾把
 // 判定牌移入弃牌堆。洛神主循环在 runJudgeFlow 返回后,从弃牌堆顶读判定牌。
 import type { FrontendAPI, Skill, GameState, Card } from '../types';
+import { getHealthValue } from '../types';
 import { applyAtom, frameCards } from '../index';
 import { runJudgeFlow } from '../judge-flow';
 import { registerAction, registerAfterHook } from '../skill';
@@ -104,7 +105,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const inHand = exempt.filter((id) => hand.includes(id)).length;
     if (inHand === 0) return undefined;
     const bonus = (st.turn.vars[`手牌上限/bonus:${player}`] as number | undefined) ?? 0;
-    const health = st.players[player]?.health ?? 0;
+    const health = getHealthValue(st.players[player]);
     return health + bonus + inHand;
   });
 

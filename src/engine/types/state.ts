@@ -100,6 +100,9 @@ export interface PlayerState {
   index: number;
   name: string;
   character: string;
+  /** 体力（可负）。角色受到过量伤害后体力可小于 0；濒死期间 health ≤ 0。
+   *  区别于「体力值」= Math.max(0, health)（封底为 0，用于显示/手牌上限/已损失体力值等）。
+   *  取体力值请用 getHealthValue(player)。 */
   health: number;
   maxHealth: number;
   alive: boolean;
@@ -118,6 +121,15 @@ export interface PlayerState {
   identity?: Identity;
   /** 武将势力(魏蜀吴群),影响部分技能(如激将、无懈可击·国) */
   faction?: Faction;
+}
+
+/**
+ * 体力值 = Math.max(0, 体力)。体力（health）可小于 0（过量伤害/濒死），
+ * 体力值封底为 0。手牌上限、已损失体力值、距离、显示等一律取体力值。
+ * 详见 glossary/value.md「体力」「体力值」。
+ */
+export function getHealthValue(player: { health: number } | undefined | null): number {
+  return Math.max(0, player?.health ?? 0);
 }
 
 export interface GameState {

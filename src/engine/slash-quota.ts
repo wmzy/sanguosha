@@ -299,8 +299,11 @@ export function isSlashExempted(
   return false;
 }
 
-/** 当前玩家是否还能出杀(未被阻断 且 已用次数 < 上限)。
- *  cardId 可选:若提供且该卡被任一豁免器命中,则绕过次数上限检查。 */
+/** 当前玩家是否还能出杀(未被阻断 且 额定/额外次数至少一层未达上限)。
+ *  cardId 可选:若提供且该卡被任一豁免器命中,则绕过次数上限检查。
+ *  无限出杀(诸葛连弩/咆哮)始终放行。
+ *  否则按文档两层 OR 判断:quotaUsed < quotaMax || extraUsed < extraMax
+ *  (即"不能出杀" = 额定达上限 AND 额外达上限)。 */
 export function canSlash(
   state: GameState,
   player: number,
@@ -308,13 +311,20 @@ export function canSlash(
 ): boolean {
   if (isSlashBlocked(state, player)) return false;
   if (cardId !== undefined && isSlashExempted(state, player, cardId)) return true;
-  return slashUsed(state) < slashMax(state, player);
+  if (isSlashUnlimited(state, player)) return true;
+  return slashQuotaUsed(state) < slashQuotaMax(state, player)
+    || slashExtraUsed(state) < slashExtraMax(state, player);
 }
 
-/** 记录一次出杀(已用次数 +1,优先扣额定,额定满后扣额外)。在杀 use 的 execute 末尾调用 */
+/** 记录一次出杀(已用次数 +1)。
+ *  无限出杀(诸葛连弩/咆哮)时始终计入 quotaUsed(不计入 extraUsed),
+ *  即使超过 quotaMax 也不动 extraUsed——文档规定无限出杀的杀只计入额定次数。
+ *  否则优先扣额定,额定满后扣额外。在杀 use 的 execute 末尾调用。 */
 export function incSlashUsed(state: GameState): void {
   const player = state.currentPlayerIndex;
-  if (slashQuotaUsed(state) < slashQuotaMax(state, player)) {
+  if (isSlashUnlimited(state, player)) {
+    state.turn.vars[QUOTA_USED_VAR] = slashQuotaUsed(state) + 1;
+  } else if (slashQuotaUsed(state) < slashQuotaMax(state, player)) {
     state.turn.vars[QUOTA_USED_VAR] = slashQuotaUsed(state) + 1;
   } else {
     state.turn.vars[EXTRA_USED_VAR] = slashExtraUsed(state) + 1;

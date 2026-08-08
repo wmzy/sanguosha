@@ -99,11 +99,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
     }
 
-    // 3. 减1点体力上限(设上限 amount = maxHealth - 1,需 > 0)
+    // 3. 减1点体力上限(设上限 amount = maxHealth - 1;减至0则角色死亡)
     const newMax = ctx.state.players[ownerId].maxHealth - 1;
-    if (newMax > 0) {
-      await applyAtom(ctx.state, { type: '设上限', player: ownerId, amount: newMax });
-    }
+    await applyAtom(ctx.state, { type: '设上限', player: ownerId, amount: newMax });
 
     // 4. 永久获得"观星"
     await applyAtom(ctx.state, { type: '添加技能', player: ownerId, skillId: '观星' });

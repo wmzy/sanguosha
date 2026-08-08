@@ -108,11 +108,9 @@ export const 仁王盾: CardDef = {
 };
 
 // ─── 军争篇装备牌 ──────────────────────────────────────────
-// 藤甲 / 白银狮子 的防具技已在 engine/skills/ 中实现(按 card.name 动态挂载),
-// 这里仅补 CardDef 声明,使牌堆能生成这两张牌。
-// 古锭刀 / 朱雀羽扇 / 骅骝 的特殊技尚未实现,暂作为仅提供射程/槽位的占位装备
-// (与 丈八蛇矛 / 方天画戟 现状一致:有 range,无 weaponEffect)。
-// 将来实现其技能时,在 engine/skills/ 新增同名模块即可自动挂载(见 card-meta.ts)。
+// 藤甲 / 白银狮子 / 古锭刀 / 朱雀羽扇 / 骅骝 的特殊技已在 engine/skills/ 中实现
+// (按 card.name 动态挂载),这里仅补 CardDef 声明,使牌堆能生成这些牌。
+// 骅骝 为防御马,距离修正技走 skills/马匹技能.ts 工厂(见 card-meta.ts)。
 
 export const 藤甲: CardDef = {
   name: '藤甲',

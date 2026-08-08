@@ -79,7 +79,7 @@ describe('集智', () => {
     const P1 = harness.player('P1');
 
     // 使用无中生有 → 锦囊进处理区 → 集智 afterHook → 集智 confirm 窗口
-    await P1.useCard('无中生有', 'wz1');
+    await P1.useCardAndTarget('无中生有', 'wz1', [0]);
     P1.expectPending('请求回应');
     // 确认发动集智
     await P1.respond('集智', { choice: true });
@@ -118,7 +118,7 @@ describe('集智', () => {
     const P2 = harness.player('P2');
 
     // P2 出无中生有 → 无懈可击广播窗口(P2 非 owner,不触发 P1 的集智)
-    await P2.useCard('无中生有', 'wz1');
+    await P2.useCardAndTarget('无中生有', 'wz1', [1]);
     // P1 打出无懈可击 → 移出 P1 手牌 → 集智 afterHook 命中(无懈可击 ∈ 非延时锦囊)
     await P1.respond('无懈可击', { cardId: 'wx1' });
     P1.expectPending('请求回应'); // 集智 confirm 窗口
@@ -155,7 +155,7 @@ describe('集智', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.useCard('无中生有', 'wz1');
+    await P1.useCardAndTarget('无中生有', 'wz1', [0]);
     P1.expectPending('请求回应');
     // 不发动集智
     await P1.respond('集智', { choice: false });
