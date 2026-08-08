@@ -13,7 +13,7 @@
 // 中的受保护装备(见 skills/界奇才.ts)。runPickTargetCardPanel 在 applyAtom 后回读
 // (可能被过滤后的)prompt.equipment 重算默认选择,避免超时 fallback 命中受保护装备。
 import type { ActionLogEntry, GameState, Json } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 
 /** 在 actionLog 中当前(最后一条)条目之前插入一条"设置手牌顺序"条目。
  *  重放时该条目先执行 → 目标 hand 顺序恢复 → 后续盲选取 hand[K] 确定性正确。

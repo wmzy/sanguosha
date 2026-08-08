@@ -25,7 +25,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 

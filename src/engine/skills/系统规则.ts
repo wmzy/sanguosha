@@ -2,7 +2,7 @@
 // 这些是三国杀全局规则,不是单个技能职责,通过 after hooks 统一处理。
 // applyAtom 只管通用管线(before → validate → apply → emit → after hooks → pending)。
 import type { Card, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, instantiateSkill, unloadSkillInstance } from '../core/skill';
 import { DEFAULT_SKILLS } from '../atoms/选将';
 import { skillLoaders } from './index';

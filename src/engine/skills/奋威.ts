@@ -26,7 +26,8 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, topFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { topFrame } from '../core/frame';
 import { registerAction, registerBeforeHook, type SkillModule } from '../core/skill';
 
 const USED_KEY = '奋威/used';

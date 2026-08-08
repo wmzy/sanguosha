@@ -8,7 +8,8 @@
 // 之后每次调用处理一个目标。清理（剩余牌入弃牌堆）在 onSettle 中完成。
 
 import type { Card, SettlementFrame } from '../types';
-import { applyAtom, frameCards } from '../index';
+import { applyAtom } from '../core/apply'
+import { frameCards } from '../core/frame';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 
 /** 从使用者开始,按座次旋转的所有存活玩家 */

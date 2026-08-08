@@ -12,7 +12,7 @@
 //   体力上限可降至0:上限为0时角色直接死亡(设上限 after-hook → runDeathFlow)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 
 const CHOOSE_RT = '崩坏/choose';

@@ -11,7 +11,8 @@
 //   - 判定结果通过「判定牌生效后」after hook 在判定牌生效后捕获花色,存 localVars.
 //   - 来源手牌不足两张时只能选择受到伤害(规则 FAQ)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, frameCards } from '../index';
+import { applyAtom } from '../core/apply'
+import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';

@@ -20,7 +20,7 @@
 //   - bottom 放最底;middle 是观察范围之外的牌(原 deck 去掉顶 X 张);
 //   - top 倒序后追加到末尾,使 top[0] 落到 deck[len-1]=最先摸。
 import type { FrontendAPI, GameState, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 
 /** localVars 键:准备阶段全置底 → 结束阶段再次发动(一次性) */

@@ -27,7 +27,7 @@ import type {
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
 
 const TRIGGER_RT = '界突袭/trigger';

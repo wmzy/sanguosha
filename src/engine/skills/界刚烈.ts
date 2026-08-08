@@ -18,7 +18,8 @@
 //   - 来源无任何可弃置的牌时跳过(规则:无法弃置则无事发生)。
 //   - judgeType='界刚烈' 与标版 '刚烈' 区分(日志/调试用,不影响机制)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, frameCards } from '../index';
+import { applyAtom } from '../core/apply'
+import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';

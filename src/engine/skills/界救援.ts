@@ -28,7 +28,7 @@
 //     故天然不与濒死求桃场景冲突,无需检查 求桃/已救 标志。
 import type { GameState, HookResult, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
 
 /** 界救援问询的 requestType(隔离 respond 路由) */

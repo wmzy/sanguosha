@@ -11,7 +11,7 @@
 // 本 helper 仅做实质的「弃牌+摸一张」，不含 frame——是否包 frame 由调用方决定
 // （铁索连环/连环/界连环/界燕语 用 pushFrame 包装做日志归属，界将驰在 hook 内直接调用不包 frame）。
 import type { GameState } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 
 /** 重铸一张牌：弃置此牌并摸一张。 */
 export async function recastCard(

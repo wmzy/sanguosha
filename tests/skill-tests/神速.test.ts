@@ -20,7 +20,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import { validateCardUse } from '../../src/engine/core/card-effect/validate';
 import { slashUsed } from '../../src/engine/rules/slash-quota';
 import type { Card, GameState } from '../../src/engine/types';

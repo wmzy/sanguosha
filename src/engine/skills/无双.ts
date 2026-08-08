@@ -19,7 +19,7 @@
 //   且等待型 atom 的 after-hook 在 skip/silent/超时 情况下均会触发(见 applyAtom 管线)。
 
 import type { GameState, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { isCancelled, clearCancelled } from '../core/card-effect/registry';
 import { consumePlayedSlashes } from '../core/card-effect/play-card';

@@ -15,7 +15,7 @@ import '../../src/engine/skills';
 
 describe('atomHistory seq 唯一性:同一 dispatch 内多 atom 不丢事件', () => {
   it('连续 applyAtom 的 atomHistory entry 各有唯一 seq', async () => {
-    const { applyAtom } = await import('../../src/engine/index');
+    const { applyAtom } = await import('../../src/engine/core/apply');
     const state = createGameState({
       players: [
         {
@@ -54,7 +54,7 @@ describe('atomHistory seq 唯一性:同一 dispatch 内多 atom 不丢事件', (
   });
 
   it('水位过滤不丢同批次事件:sinceSeq=第一个 atom seq,第二个 atom 仍可见', async () => {
-    const { applyAtom } = await import('../../src/engine/index');
+    const { applyAtom } = await import('../../src/engine/core/apply');
     const state = createGameState({
       players: [
         {

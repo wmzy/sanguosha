@@ -37,7 +37,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 
 // 内部 requestType/localVars 键名保持原前缀「节命/」,不改为「界节命/」

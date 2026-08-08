@@ -31,7 +31,7 @@ import type {
   Mark,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
 
 const USED_KEY = '武烈/used';

@@ -17,7 +17,7 @@
 //  11. 端到端:正面朝上时即使外得≥上限 → 不触发翻回询问
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import { runJudgeFlow } from '../../src/engine/flows/judge';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

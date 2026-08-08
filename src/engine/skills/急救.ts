@@ -13,7 +13,7 @@
 //     装备区红色牌需额外卸载装备流程,超出当前范围,此处不实现。
 //   - 与 酒.respond 同构:移动牌 手牌→弃牌堆 + 设 localVars['求桃/已救']。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, declareAlternativeResponse } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

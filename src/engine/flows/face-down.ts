@@ -15,7 +15,7 @@
 //   解耦：任何途径置入连环状态（铁索连环牌、武将技能调 setChain）都受传导管辖。
 import type { GameState } from '../types';
 import { TARGET_SYSTEM } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { runDamageFlow } from './damage';
 import { registerAfterHook } from '../core/skill';
 

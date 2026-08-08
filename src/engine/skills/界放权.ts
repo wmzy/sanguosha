@@ -30,7 +30,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAction, registerBeforeHook } from '../core/skill';
 

@@ -10,7 +10,7 @@
 //   - 减上限后若体力>新上限,设上限 atom 自动 clamp(参考 types.ts 设上限定义)
 //   - 急袭技能模块需在 skills/index.ts 注册
 import type { FrontendAPI, GameState, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 
 const AWAKENED_KEY = '凿险/awakened';

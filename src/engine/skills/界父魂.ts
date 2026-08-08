@@ -43,7 +43,8 @@ import type {
   HookResult,
 } from '../types';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../core/skill';
-import { applyAtom, topFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { topFrame } from '../core/frame';
 import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';

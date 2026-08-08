@@ -11,7 +11,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 
 // 已知引擎局限:化身动态添加武将技能时,其 onInit 设置的距离 vars(如马术)

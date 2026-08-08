@@ -20,7 +20,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
 

@@ -2,7 +2,8 @@
 //   把装备牌装到对应栏位(根据 card.subtype),旧装备卸下进弃牌堆。
 //   若装备牌自带技能(以 card.name 作 skillId),动态挂载技能实例。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { skillLoaders } from './index';
 

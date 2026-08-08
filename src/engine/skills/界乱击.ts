@@ -36,7 +36,7 @@
 //   内部 Skill.name = '乱击'(OL 官方技能名,玩家可见)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, hasBlockingPending } from '../core/skill';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { runUseFlow, chargeOnSettle } from '../core/card-effect/use-card';
 import { defaultPlayActive } from '../rules/action-active';
 

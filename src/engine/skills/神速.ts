@@ -21,7 +21,7 @@ import type {
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { runUseFlow, chargeOnSettle } from '../core/card-effect/use-card';
 import { skipPhase } from '../rules/skip-phase';

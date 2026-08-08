@@ -26,7 +26,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const _SKILL_NAME = '界补益';

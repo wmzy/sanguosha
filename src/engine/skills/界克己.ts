@@ -23,7 +23,7 @@ import type {
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 
 /** turn.vars key:本回合【出牌阶段】是否使用/打出过杀。

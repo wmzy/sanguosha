@@ -8,7 +8,7 @@
 //   4. 体力致死(无来源 killer=undefined)→ 断肠不触发
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';

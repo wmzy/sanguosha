@@ -18,7 +18,7 @@ import type {
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
 

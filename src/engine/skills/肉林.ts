@@ -4,7 +4,7 @@
 //   询问闪 resolve 后,肉林检测到标记被设置 → 第一次: 清除标记+drain+追加第二次询问。
 
 import type { GameState, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { isCancelled, clearCancelled } from '../core/card-effect/registry';
 import { getGender } from '../data/character-meta';

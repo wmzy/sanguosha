@@ -29,7 +29,8 @@ import type {
   GameState,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 

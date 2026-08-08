@@ -7,7 +7,7 @@
 // 闪技能零感知倾国——它看到的永远是 cardMap 里的一张"闪"。
 import type { Card, GameState, Json, Skill, FrontendAPI } from '../types';
 import { registerAction, declareAlternativeResponse } from '../core/skill';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

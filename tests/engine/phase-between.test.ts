@@ -10,7 +10,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import type { Atom, GameState, PlayerState } from '../../src/engine/types';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import { registerBeforeHook } from '../../src/engine/core/skill';
 import { SkillTestHarness } from '../engine-harness';
 

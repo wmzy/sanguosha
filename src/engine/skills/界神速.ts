@@ -22,7 +22,8 @@ import type {
   HookResult,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 import { runUseFlow, chargeOnSettle } from '../core/card-effect/use-card';

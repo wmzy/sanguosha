@@ -7,7 +7,7 @@
 // 调用的是不含 成为目标 的 runDuelLoop。
 
 import type { Card } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { runDamageFlow } from '../flows/damage';
 import { consumePlayedSlashes } from '../core/card-effect/play-card';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';

@@ -27,7 +27,7 @@
 // 与贯石斧的差异:贯石斧弃 2 张牌让原杀强命(原杀还在处理区);
 // 青龙腰月刀是额外使用一张新杀(新杀进处理区,旧闪移走)。
 import type { FrontendAPI, Skill, GameState } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { isCancelled } from '../core/card-effect/registry';
 import { runUseFlow, chargeOnSettle } from '../core/card-effect/use-card';

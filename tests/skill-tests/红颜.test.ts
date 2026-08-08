@@ -8,7 +8,8 @@
 //   4. 非黑桃判定牌不受影响
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
-import { applyAtom, pushFrame, popFrame } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply'
+import { pushFrame, popFrame } from '../../src/engine/core/frame';
 import { runJudgeFlow } from '../../src/engine/flows/judge';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

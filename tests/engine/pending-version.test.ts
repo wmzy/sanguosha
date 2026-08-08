@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-  dispatch,
-  applyAtom,
-  registerSkillsFromState,
-} from '../../src/engine/index';
+import { dispatch, registerSkillsFromState } from '../../src/engine/index'
+import { applyAtom } from '../../src/engine/core/apply';
 import { registerAction } from '../../src/engine/core/skill';
 import { createGameState } from '../../src/engine/types';
 

@@ -4,7 +4,7 @@
 // target.kind='wounded': 可对包括自己在内的已受伤角色使用。
 
 import type { Card } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 

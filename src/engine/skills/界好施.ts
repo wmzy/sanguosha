@@ -31,7 +31,8 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, topFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { topFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { isDelayedTrick } from '../data/card-meta';
 import {

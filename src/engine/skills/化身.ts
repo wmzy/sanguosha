@@ -50,7 +50,7 @@
 //   - 界版"移去至多两张":简化为移去池末尾的卡片(不弹面板让玩家选具体哪张),
 //     但始终保留展示牌(避免歧义——展示牌被移去后技能归属未明确)。
 import type { Faction, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { createRng } from '../util/rng';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';

@@ -29,7 +29,7 @@
 //   翻转 cancelKey(抵消状态)的逻辑两者一致;差异仅在是否触发 close-reopen。
 import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, findPendingSlot } from '../core/skill';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { runUseFlow } from '../core/card-effect/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {

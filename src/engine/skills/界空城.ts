@@ -12,7 +12,8 @@
 //   2. after-hook 挂「被抵消」:检测自己使用的杀被闪抵消 → 摸一张牌。
 //      实现模式与界张飞咆哮(界咆哮.ts)完全一致。
 import type { HookResult, Skill, GameState } from '../types';
-import { applyAtom, topFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { topFrame } from '../core/frame';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

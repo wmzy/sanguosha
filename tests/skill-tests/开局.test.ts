@@ -9,7 +9,8 @@
 //   5. 正面:分配武将后体力值=武将卡牌 maxHealth(2人局人数≤4,主公不+1)
 //   6. 正面:5人局(人数>4)主公体力上限=maxHealth+1,非主公不加
 import { describe, it, expect, beforeEach } from 'vitest';
-import { bootstrap, applyAtom, type GameConfig } from '../../src/engine/index';
+import { bootstrap, type GameConfig } from '../../src/engine/index'
+import { applyAtom } from '../../src/engine/core/apply';
 import { dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

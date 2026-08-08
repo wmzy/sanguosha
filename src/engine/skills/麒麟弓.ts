@@ -5,7 +5,7 @@
 //   每当你使用【杀】对目标角色造成伤害时,你可以弃置其1张坐骑牌(+1马或-1马)。
 //   不防止伤害——只是额外弃马(与寒冰剑的关键区别)。
 import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

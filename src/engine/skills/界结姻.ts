@@ -37,7 +37,8 @@
 import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
 import type { GameView } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 import { getGender } from '../data/character-meta';

@@ -9,7 +9,7 @@
 // 自动清空。仅限方法Ⅰ（resolve 路径），方法Ⅱ（respond 濒死自救）不受限（独立路径，不读写该标记）。
 
 import type { Card } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerBeforeHook } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';

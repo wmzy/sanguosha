@@ -2,7 +2,7 @@
 // 询问闪:等待型 atom — 等待 target 出闪
 import type { ActionPrompt, AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../core/atom';
-import { resolveTimeoutMs } from '../index';
+import { resolveTimeoutMs } from '../core/timeout';
 import {
   SHORT_DELAY_MS,
   SILENT_RESPONSE_PROMPT,

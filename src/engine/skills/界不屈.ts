@@ -30,7 +30,7 @@
 //     | localVars['不屈/重复']   | 读 | 置创牌 atom(写)              | ✅ 已实现 |
 //     | player.vars['不屈/创牌'] | 读 | 置创牌 atom(写)              | ✅ 已实现 |
 import type { GameState, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 

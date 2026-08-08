@@ -30,7 +30,8 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 import { runUseFlow } from '../core/card-effect/use-card';

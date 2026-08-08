@@ -28,7 +28,7 @@
 //        涅槃把 health 拉回 3,循环立即退出,庞统不死亡。
 //   三选一参考 化身.ts 的 respond{skill} 模式(prompt=confirm + 候选暂存 localVars)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { setChain } from '../flows/face-down';
 import { registerAction, registerAfterHook } from '../core/skill';
 

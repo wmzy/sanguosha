@@ -44,7 +44,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerSlashExtraProvider } from '../rules/slash-quota';
 

@@ -14,7 +14,7 @@ import '../../src/engine/atoms'; // 注册所有 atom(含 judge-timing)
 import { createGameState } from '../../src/engine/types';
 import type { Atom, Card, GameState, PlayerState } from '../../src/engine/types';
 import { runJudgeFlow } from '../../src/engine/flows/judge';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import { suitColor } from '../../src/engine/types';
 
 function makePlayer(opts: {

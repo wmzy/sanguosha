@@ -10,7 +10,8 @@
 //   - "任意张牌"= 手牌+装备均可弃(标版引擎本就支持,界版沿用)。
 //   - 独立界版技能文件,不修改标制衡。限一次标记键为 '界制衡'(与标制衡键隔离,互不影响)。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 

@@ -16,7 +16,8 @@
 //   - 决斗结算复用 runUseFlow({virtual:true}),与正常决斗行为一致
 //     (无双双杀、轮流出杀、输者受 1 点伤害),且走完整时机 atom 序列保证事件一致。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 import { getGender } from '../data/character-meta';

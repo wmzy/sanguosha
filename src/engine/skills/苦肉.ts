@@ -2,7 +2,8 @@
 //   出牌阶段，你可以失去1点体力，然后摸两张牌。
 //   无次数限制，可多次发动。
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, type SkillModule } from '../core/skill';
 

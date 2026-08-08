@@ -29,7 +29,8 @@ import type {
   Skill,
   SkillModule,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 
 const SKILL_ID = '界强识';

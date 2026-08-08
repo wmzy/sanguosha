@@ -240,9 +240,10 @@ describe('界义从', () => {
     // 但角色技能限制只允许同武将。改用直接 applyAtom 模拟失去体力。
     //
     // 更简单:dispatch 一个 失去体力 atom 直接走 hook 链。
-    const { registerSkillsFromState, applyAtom } = await import(
+    const { registerSkillsFromState } = await import(
       '../../src/engine/index'
     );
+    const { applyAtom } = await import('../../src/engine/core/apply');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', skills: ['界义从'], health: 3 }),

@@ -25,7 +25,7 @@
 //   8. 非伤害致死:失去体力致死 → 死亡时触发 → 选目标摸弃
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, fireTimeoutAndWait } from '../engine-harness';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';

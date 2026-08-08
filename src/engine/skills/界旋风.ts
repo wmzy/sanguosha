@@ -42,7 +42,7 @@ import type {
   Skill,
   GameView,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 

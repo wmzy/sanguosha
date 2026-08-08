@@ -188,7 +188,7 @@ describe('酒', () => {
     expect(harness.state.players[0].vars['酒/usedThisTurn']).toBe(true);
 
     // 推进到回合结束:限一次标记随 /usedThisTurn 后缀被「回合结束」atom 清空
-    const { applyAtom } = await import('../../src/engine/index');
+    const { applyAtom } = await import('../../src/engine/core/apply');
     await applyAtom(harness.state, { type: '回合结束', player: 0 });
     await harness.waitForStable();
     expect(harness.state.players[0].vars['酒/usedThisTurn']).toBeUndefined();

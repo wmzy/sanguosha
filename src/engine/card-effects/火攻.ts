@@ -6,7 +6,7 @@
 // resolve 内部通过 localVars 与 respond action 通信。
 
 import type { Card } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { runDamageFlow } from '../flows/damage';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 

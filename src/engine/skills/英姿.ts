@@ -12,7 +12,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerBeforeHook } from '../core/skill';
 

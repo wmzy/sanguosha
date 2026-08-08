@@ -33,7 +33,7 @@ import {
   SEAT_SWAP_TIMEOUT_MS,
 } from '../../src/server/room';
 import { normalizeRoomConfig, DEFAULT_ROOM_CONFIG } from '../../src/server/protocol';
-import { resolveTimeoutMs } from '../../src/engine/index';
+import { resolveTimeoutMs } from '../../src/engine/core/timeout';
 import type { GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import type { ConnectionSink } from '../../src/server/connection';

@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import '../../src/engine/atoms'; // 注册 atom 定义(阶段结束 等)
 import { createGameState } from '../../src/engine/types';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import { assertCardInvariants } from '../../src/engine/util/invariants';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 

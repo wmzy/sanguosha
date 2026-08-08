@@ -14,7 +14,7 @@
 // 非延时锦囊(12):过河拆桥/顺手牵羊/无中生有/无懈可击/借刀杀人/桃园结义/
 //                 五谷丰登/南蛮入侵/万箭齐发/决斗/火攻/铁索连环
 import type { FrontendAPI, GameState, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 
 /** 非延时锦囊牌名集合(即时锦囊,共 12 张:标准版 10 + 军争篇 火攻/铁索连环) */

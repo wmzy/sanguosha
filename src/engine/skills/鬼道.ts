@@ -15,7 +15,8 @@
 //   询问。雷击(张角自身技能)在 `await applyAtom(判定)` 之后从弃牌堆顶读最终判定牌,
 //   改判已在 afterApply 完成,故"打闪→雷击→鬼道改判为黑桃"链成立。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, frameCards } from '../index';
+import { applyAtom } from '../core/apply'
+import { frameCards } from '../core/frame';
 import { registerAction, registerJudgeModifier } from '../core/skill';
 
 const REPLACE_RT = '鬼道/replace';

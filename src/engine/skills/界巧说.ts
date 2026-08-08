@@ -32,7 +32,8 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { runRankCompareFlow } from '../flows/rank';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';

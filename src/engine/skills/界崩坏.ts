@@ -22,7 +22,7 @@
 //   - turn.vars 随「回合结束」atom 自动清空(语义贴合"本回合")
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 
 const CHOOSE_RT = '界崩坏/choose';

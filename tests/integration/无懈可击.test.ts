@@ -10,12 +10,9 @@
 //
 // 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  registerSkillsFromState,
-  frameCards,
-  dispatch as engineDispatch,
-  applyAtom,
-} from '../../src/engine/index';
+import { registerSkillsFromState, dispatch as engineDispatch } from '../../src/engine/index'
+import { frameCards } from '../../src/engine/core/frame'
+import { applyAtom } from '../../src/engine/core/apply';
 import { fireTimeoutAndWait, dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

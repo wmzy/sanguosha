@@ -15,7 +15,7 @@
 //   跳到伤害结算结束时(仍发 结束时/结束后 时机,amount=0)。
 import type { GameState } from '../types';
 import type { DamageType } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { runDecreaseLifeFlow } from './life';
 import { DAMAGE_AMOUNT_KEY, DAMAGE_SOURCE_KEY } from '../atoms/damage-timing';
 

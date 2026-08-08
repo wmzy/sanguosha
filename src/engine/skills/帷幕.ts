@@ -11,7 +11,7 @@
 //   锦囊卡 id 来源:成为目标/造成伤害 由 atom.cardId 直接给出;获得/弃置/设横置 由
 //   顶帧 frame.params.cardId 给出(各锦囊 use execute pushFrame 时把 cardId 带入 params)。
 import type { HookResult, Skill, GameState, Card } from '../types';
-import { topFrame } from '../index';
+import { topFrame } from '../core/frame';
 import { registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

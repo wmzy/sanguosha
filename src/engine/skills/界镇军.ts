@@ -37,7 +37,8 @@ import type {
   Skill,
 } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const SKILL_ID = '界镇军';

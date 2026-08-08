@@ -286,7 +286,7 @@ describe('界克己', () => {
 
     // 手动模拟"在非出牌阶段把杀从手牌移入处理区"(例如响应延时锦囊判定的决斗)。
     // 标版会写 vars['克己/playedSlash']=true;界版因 phase!=='出牌' 跳过,不写入。
-    const { applyAtom } = await import('../../src/engine/index');
+    const { applyAtom } = await import('../../src/engine/core/apply');
     // 先用一个不会真正结算伤害的方式触发移动牌:直接构造 移动牌 atom
     // 注意:杀从 P1 手牌(c1)移到处理区
     await applyAtom(harness.state, {

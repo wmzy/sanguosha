@@ -4,7 +4,7 @@
 // target.kind='allOthers': 所有其他角色（从下家开始按座次）。
 
 import type { Card } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { runDamageFlow } from '../flows/damage';
 import { registerCardEffect, type CardEffect, type ResolveCtx, isCancelled } from '../core/card-effect/registry';
 

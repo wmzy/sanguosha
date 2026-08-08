@@ -24,7 +24,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, declareAlternativeResponse } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

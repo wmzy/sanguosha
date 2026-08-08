@@ -5,7 +5,7 @@
 //   3) 主动 end action:玩家在出牌阶段点"结束回合"
 //   4) 主动 start action:仅主公位首次开局触发
 import type { GameState, Json, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { handLimit } from '../rules/hand-limit';
 import { isFaceDown, flipFaceUpAll } from '../flows/face-down';

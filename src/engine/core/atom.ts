@@ -1,6 +1,8 @@
-// src/engine/atom.ts
+// src/engine/core/atom.ts
 // atom 注册表 + 基础 apply 引擎(同步,无 awaits)
-// 完整 apply pipeline(含 before/after 钩子 + awaits 等待)由 index.ts 接管
+// 完整 apply pipeline(含 before/after 钩子 + awaits 等待)由 core/apply.ts 接管
+// atom 注册副作用由 core/index.ts 的 `import '../atoms'` 触发(后端)和
+// client/engine-imports.ts 的 `import '../engine/atoms'` 触发(前端)。
 
 import type { Atom, AtomDefinition, GameState, ViewEvent, ViewEventSplit } from '../types';
 

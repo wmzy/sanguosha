@@ -18,7 +18,7 @@
 // 与转化来源无关。
 import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, hasBlockingPending } from '../core/skill';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { defaultPlayActive } from '../rules/action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {

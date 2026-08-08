@@ -24,7 +24,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, GameState, Mark, PlayerState } from '../../src/engine/types';
 
 const BIAN_PREFIX = '界巧变/变:';

@@ -30,7 +30,8 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, frameCards } from '../index';
+import { applyAtom } from '../core/apply'
+import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
 import {
   registerAction,

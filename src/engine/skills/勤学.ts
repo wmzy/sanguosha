@@ -12,7 +12,7 @@
 //   志继挂在「回合开始」,本技挂在「阶段开始」(因触发点是"阶段"而非"回合开始")。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 
 const CHOOSE_RT = '勤学/choose';

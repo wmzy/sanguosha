@@ -18,7 +18,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const CONFIRM_REQUEST = '闭月/confirm';

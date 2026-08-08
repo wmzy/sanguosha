@@ -18,7 +18,7 @@
 // 类别判断:cardMap 的 type 字段(基本牌/锦囊牌/装备牌)。
 // "交给一名角色"含自己(FAQ 明确)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';

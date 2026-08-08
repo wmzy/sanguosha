@@ -12,7 +12,7 @@
 //   5. 无装备时 → 手牌上限=体力(默认公式)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
-import { pushFrame, popFrame } from '../../src/engine/index';
+import { pushFrame, popFrame } from '../../src/engine/core/frame';
 import { runJudgeFlow } from '../../src/engine/flows/judge';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

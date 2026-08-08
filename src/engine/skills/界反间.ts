@@ -14,7 +14,8 @@
 //
 // 内部键名保持标版前缀('反间/xxx'):界版与标版互斥不共存(界裸衣规范)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 

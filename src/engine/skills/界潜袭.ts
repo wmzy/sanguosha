@@ -39,7 +39,8 @@ import type {
   Skill,
 } from '../types';
 import type { Color } from '../../engine/types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { effectiveDistance } from '../rules/distance';
 import {
   registerAction,

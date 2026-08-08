@@ -19,7 +19,8 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界乱武';内部 Skill.name='乱武'。
 import type { Card, FrontendAPI, GameState, GameView, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
 import { runUseFlow, chargeOnSettle } from '../core/card-effect/use-card';
 import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';

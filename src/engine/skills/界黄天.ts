@@ -11,7 +11,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界黄天';
 //   内部 Skill.name = '黄天'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 

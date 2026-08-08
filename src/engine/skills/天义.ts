@@ -18,7 +18,8 @@
 // 限一次:player.vars['天义/usedThisTurn'](后缀约定,回合结束 atom 自动清空)。
 // 目标需 respond 选拼点牌——respond action 为所有玩家注册(validate 严格校验 pending requestType)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { runRankCompareFlow } from '../flows/rank';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';

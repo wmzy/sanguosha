@@ -24,7 +24,7 @@ import type {
   Skill,
 } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
 
 const CONFIRM_RT = '英魂/confirm'; // 孙坚:是否发动

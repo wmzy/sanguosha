@@ -10,7 +10,7 @@
 //   其余延时锦囊配上可区分花色的判定牌 —— 结算顺序错位时观测状态会不同。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';

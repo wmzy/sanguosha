@@ -4,7 +4,7 @@
 // target.kind='any': 包括使用者在内的一名角色（界限突破/1V1/国-标 语义）。
 
 import type { Card } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 
 /** 无中生有的结算：目标角色摸牌(2) */

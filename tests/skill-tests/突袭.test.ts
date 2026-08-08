@@ -5,7 +5,7 @@
 //   阶段开始(摸牌) → 突袭 before hook。发动则偷牌+跳过摸牌;不发动/无目标则默认摸2张。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';

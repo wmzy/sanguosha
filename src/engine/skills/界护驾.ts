@@ -27,7 +27,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, declareAlternativeResponse, type SkillModule } from '../core/skill';
 
 // localVars keys(标护驾主技路径)

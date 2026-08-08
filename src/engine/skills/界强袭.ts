@@ -20,7 +20,8 @@
 // 命名:文件名/loader key/character skill name 均为 '界强袭'(避开标强袭冲突);
 //   内部 Skill.name = '强袭'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';

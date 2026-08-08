@@ -15,7 +15,7 @@
 // 命名: 文件名/loader key/character skill name 均为 '界殚心'(避开标殚心冲突);
 //   内部 Skill.name = '殚心'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const SKILL_ID = '界殚心';

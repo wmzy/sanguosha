@@ -438,7 +438,7 @@ describe('回合管理', () => {
     // 触发阶段结束(摸牌)→ hook 推进到出牌 → __出牌 循环启动
     const { dispatch } = await import('../../src/engine/index');
     // 用 applyAtom 触发阶段链
-    const { applyAtom } = await import('../../src/engine/index');
+    const { applyAtom } = await import('../../src/engine/core/apply');
     await applyAtom(harness.state, { type: '阶段结束', player: 0, phase: '摸牌' });
     await harness.waitForStable();
 

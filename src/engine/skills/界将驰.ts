@@ -38,7 +38,7 @@
 //   内部 Skill.name = '将驰'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { recastCard } from '../flows/recast';
 import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 import { registerSlashQuotaProvider, registerSlashBlocker } from '../rules/slash-quota';

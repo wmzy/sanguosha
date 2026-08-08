@@ -11,7 +11,8 @@
 //   - 黑桃 = ♠
 //   - 判定牌在 frame.cards 末尾(判定牌生效后时仍在结算帧牌区顶,runJudgeFlow 收尾后才入弃牌堆)
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, frameCards } from '../index';
+import { applyAtom } from '../core/apply'
+import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
 

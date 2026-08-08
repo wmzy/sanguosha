@@ -42,7 +42,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import {
   registerAction,
   registerAfterHook,

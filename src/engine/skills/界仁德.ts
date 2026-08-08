@@ -22,7 +22,8 @@
 //   · 酒:仅对自己,标记下一张杀伤害+1。
 //   - 转化卡:用 `仁德:杀:${source}:${target}:${seq}` 等虚拟卡 id,无实体;不入弃牌堆。
 import type { GameState, FrontendAPI, GameView, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { canSlash } from '../rules/slash-quota';

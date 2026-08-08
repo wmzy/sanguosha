@@ -4,7 +4,7 @@
 // target.kind='allPlayers': 所有存活角色（含使用者）。
 
 import type { Card } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 
 /** 桃园结义的逐目标结算：满血跳过 → 回复体力 */

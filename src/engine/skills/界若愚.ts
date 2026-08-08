@@ -19,7 +19,7 @@
 //   独立界版文件,注册键 '界若愚'(与标版若愚键隔离,不修改标版)。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 
 const AWAKENED_KEY = '界若愚/awakened';

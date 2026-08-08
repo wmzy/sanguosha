@@ -6,7 +6,7 @@
 // 看到"火攻"通过。火攻技能零感知火计——它看到的永远是 cardMap 里的"火攻"。
 import type { Card, FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { registerAction, hasBlockingPending } from '../core/skill';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { defaultPlayActive } from '../rules/action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {

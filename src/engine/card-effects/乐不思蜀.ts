@@ -8,7 +8,7 @@
 //   判定♥   → 无效，弃置
 
 import type { Card } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
 import { registerDelayedTrick } from '../core/card-effect/delayed-trick-registry';

@@ -19,7 +19,8 @@
 // 迁移后，卡牌只需 registerCardEffect，不再注册 action。
 
 import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../../types';
-import { applyAtom, frameCards, popFrame, pushFrame, topFrame } from '../../index';
+import { applyAtom } from '../../core/apply'
+import { frameCards, popFrame, pushFrame, topFrame } from '../../core/frame';
 import { registerAction, registerBeforeHook, registerAfterHook } from '../skill';
 import { promptCancel } from '../../flows/cancel';
 import { validateCardUse, computeAutoTargets } from './validate';

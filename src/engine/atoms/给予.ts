@@ -6,7 +6,7 @@
 // 本 atom 的 apply + view 事件保持不变(含信息分级)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../core/atom';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 
 export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }> = {
   type: '给予',

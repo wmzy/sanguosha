@@ -3,7 +3,7 @@
 //   判定:非梅花 → 跳过摸牌阶段;梅花 → 无效弃置。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';

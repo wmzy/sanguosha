@@ -20,7 +20,7 @@
 // transform validate 不限定回合/阶段:由主 action(杀.use/桃.use/酒.use/respond 等)校验。
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
 import { registerAction, declareAlternativeResponse } from '../core/skill';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { viewCanSlash, defaultPlayActive } from '../rules/action-active';
 
 /** 源卡名 → 转化目标牌名(四向双向映射;每张源卡唯一确定目标) */

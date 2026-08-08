@@ -14,7 +14,7 @@
 //   说明:不修改 南蛮入侵.ts——用 hook 解耦,且不破坏现有测试。A 与 B 在同一 造成伤害 hook 中
 //        分支处理(target=孟获→cancel;否则→modify source)。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
-import { topFrame } from '../index';
+import { topFrame } from '../core/frame';
 import { registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

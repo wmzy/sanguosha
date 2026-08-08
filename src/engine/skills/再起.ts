@@ -20,7 +20,8 @@ import type {
   Skill,
 } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom, frameCards } from '../index';
+import { applyAtom } from '../core/apply'
+import { frameCards } from '../core/frame';
 import { registerAction, registerBeforeHook } from '../core/skill';
 
 const TRIGGER_RT = '再起/trigger';

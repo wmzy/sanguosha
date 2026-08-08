@@ -17,7 +17,7 @@
 //     装备 -1 马(进攻修正)通过 player.vars['距离/进攻修正'] 进一步缩短距离——自动支持。
 //   - 官方无体力条件:即使满血也可选择摸牌(回复体力则被上限截断,无溢出)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';
 

@@ -11,7 +11,7 @@
 // localVars[CHOICE_VAR] = { cardId, targets }。
 
 import type { Card, GameState, GameView } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { runUseFlow } from '../core/card-effect/use-card';
 import { isCardBanned } from '../core/card-effect/validate';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';

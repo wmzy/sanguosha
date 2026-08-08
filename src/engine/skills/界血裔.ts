@@ -29,7 +29,7 @@ import type {
   Skill,
 } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 

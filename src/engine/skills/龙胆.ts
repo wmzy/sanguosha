@@ -8,7 +8,7 @@
 // transform validate 不限定回合/阶段:杀当闪是防御向(非自己回合),闪当杀的回合/次数由 杀.use/respond 校验。
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
 import { registerAction, declareAlternativeResponse } from '../core/skill';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { viewCanSlash, defaultPlayActive } from '../rules/action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {

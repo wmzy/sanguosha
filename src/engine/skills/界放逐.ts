@@ -24,7 +24,7 @@ import type {
   GameView,
 } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 
 const CONFIRM_RT = '界放逐/confirm';

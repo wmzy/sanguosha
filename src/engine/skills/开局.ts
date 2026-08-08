@@ -1,7 +1,7 @@
 // 开局(系统级):开局流程。由 index.bootstrap() 在游戏开始时调用。
 //   start action:抽身份 → 选将 → 初始化洗牌 → 发牌 → 回合开始(主公) → 阶段开始(主公,准备)
 import type { ActionEntry, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { createRng } from '../util/rng';
 import { registerActionEntry, unregisterActionEntry, instantiateSkill } from '../core/skill';
 

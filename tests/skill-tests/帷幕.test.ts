@@ -13,7 +13,8 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
-import { applyAtom, pushFrame, popFrame } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply'
+import { pushFrame, popFrame } from '../../src/engine/core/frame';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function mkCard(

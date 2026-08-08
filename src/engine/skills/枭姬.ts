@@ -16,7 +16,7 @@
 //   3. 获得(顺手牵羊顺装备):获得 atom,from===自己,cardId 来自装备区 → 装备→他人手牌。
 //      同理用 before hook 快照(after 时已无法判断来自手牌还是装备)。
 import type { FrontendAPI, Skill, GameState } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook, registerAfterHook, type SkillModule } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

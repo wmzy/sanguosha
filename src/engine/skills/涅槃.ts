@@ -16,7 +16,7 @@
 //        runDyingFlow 在 陷入濒死 after-hook 后进入求桃循环,首项 health>0 即 return,
 //        涅槃把 health 拉回 3,循环立即退出,庞统不死亡。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { setChain } from '../flows/face-down';
 import { registerAction, registerAfterHook } from '../core/skill';
 

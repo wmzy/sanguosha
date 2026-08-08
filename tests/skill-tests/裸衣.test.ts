@@ -214,7 +214,7 @@ describe('裸衣', () => {
     expect(harness.state.players[0].tags).toContain('裸衣/bonus');
 
     // 推进到许褚自己回合结束
-    const { applyAtom } = await import('../../src/engine/index');
+    const { applyAtom } = await import('../../src/engine/core/apply');
     await applyAtom(harness.state, { type: '回合结束', player: 0 });
     harness.processAllEvents();
 
@@ -239,7 +239,7 @@ describe('裸衣', () => {
     expect(harness.state.players[0].tags).toContain('裸衣/bonus');
 
     // P1 回合结束 → 不应清除许褚(P0)的标签
-    const { applyAtom } = await import('../../src/engine/index');
+    const { applyAtom } = await import('../../src/engine/core/apply');
     await applyAtom(harness.state, { type: '回合结束', player: 1 });
     harness.processAllEvents();
 

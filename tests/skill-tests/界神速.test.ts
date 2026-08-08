@@ -16,7 +16,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import { applyAtom } from '../../src/engine';
+import { applyAtom } from '../../src/engine/core/apply';
 // 临时注册界神速(主 agent 会统一注册到 index.ts)
 import { skillLoaders } from '../../src/engine/skills';
 import * as 界神速Module from '../../src/engine/skills/界神速';

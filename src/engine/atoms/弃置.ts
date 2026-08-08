@@ -7,7 +7,7 @@
 // 本 atom 的 apply + view 事件保持不变(含信息分级),时机标记仅为额外 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { registerAtom } from '../core/atom';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 
 /** localVars key:本次弃置中来自手牌的 cardId(afterApply 发时机标记用)。
  *  apply→afterApply 之间无其他 atom 运行,单键安全。 */

@@ -14,7 +14,7 @@
 //   - 选牌面板逻辑与过河拆桥/顺手牵羊共用(见 ../pick-card-panel.ts);反馈为 obtain 模式,
 //     includeJudge=false(经典规则仅手牌+装备)。
 import type { FrontendAPI, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 

@@ -21,7 +21,8 @@ import {
   runSetMaxHealthFlow,
 } from '../../src/engine/flows/life';
 import { registerBeforeHook } from '../../src/engine/core/skill';
-import { applyAtom, registerSkillsFromState } from '../../src/engine/index';
+import { registerSkillsFromState } from '../../src/engine/index'
+import { applyAtom } from '../../src/engine/core/apply';
 
 function makePlayer(opts: {
   index: number;

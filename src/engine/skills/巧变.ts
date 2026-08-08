@@ -24,7 +24,8 @@ import type {
   Skill,
   GameView,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 

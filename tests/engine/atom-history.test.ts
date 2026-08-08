@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGameState } from '../../src/engine/types';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import { eventsForViewer } from '../../src/engine/view/events-for-viewer';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

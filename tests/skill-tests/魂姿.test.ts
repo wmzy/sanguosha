@@ -9,7 +9,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import type { GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 
 function mkPlayer(opts: {
   index: number;

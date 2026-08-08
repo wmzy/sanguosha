@@ -7,7 +7,7 @@
 
 import type { Card, GameState } from '../types';
 import { TARGET_SYSTEM } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';

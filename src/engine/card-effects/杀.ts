@@ -10,7 +10,7 @@
 //   出杀次数累加（slash-quota）+ 回合用量 view 同步。
 
 import type { Card, GameView, GameState, Json } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { runDamageFlow } from '../flows/damage';
 import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';

@@ -36,7 +36,7 @@ import type {
   GameState,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
 
 const SKILL_ID = '界精策';

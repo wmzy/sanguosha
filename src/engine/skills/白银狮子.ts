@@ -2,7 +2,7 @@
 //   当你失去装备区里的白银狮子后,回复1点体力。
 //   (官方文案见 src/cards/description.ts)
 import type { HookResult, Skill, GameState } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

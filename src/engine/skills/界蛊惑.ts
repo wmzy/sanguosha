@@ -57,7 +57,8 @@
 //   - 弃牌选择:质疑者无手牌时强制失去1点体力(沿用刚烈 FAQ 模式)。
 //   - 多质疑者结算顺序:按座次顺序逐个处理(保证视图可预测)。
 import type { ActionContext, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { inAttackRange } from '../rules/distance';

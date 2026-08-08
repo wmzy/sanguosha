@@ -3,7 +3,7 @@
 // 覆盖 ENGINE-DESIGN §4.13 —— 添加技能 atom 后引擎应 import 模块 → onInit 注册 action/hook
 import { describe, it, expect, beforeEach } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/index';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import { findActionEntry } from '../../src/engine/core/skill';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';

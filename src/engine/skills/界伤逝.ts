@@ -25,7 +25,7 @@
 //   - 春华在自己的回合内反复触发是合法的(例如连出两张牌,每张都触发一次)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const CONFIRM_RT = '界伤逝/confirm';

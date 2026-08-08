@@ -15,7 +15,8 @@ import type {
 import { TARGET_SYSTEM } from '../types';
 import { createRng } from '../util/rng';
 import { createStandardDeck, shuffle } from '../core/deck';
-import { applyAtom, resolveTimeoutMs } from '../index';
+import { applyAtom } from '../core/apply'
+import { resolveTimeoutMs } from '../core/timeout';
 import { registerAtom } from '../core/atom';
 
 /** 默认通用技能列表 */

@@ -16,7 +16,8 @@
 //     atom 同步 view.turnUsage 供前端 targetFilter 过滤已指定目标。
 //   - 官方未提距离限制,故不再校验目标是否在攻击范围内。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';

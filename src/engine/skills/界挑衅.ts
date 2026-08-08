@@ -18,7 +18,8 @@
 // 命名:文件名/loader key/character skill name 均为 '界挑衅'(避开标挑衅冲突);
 //   内部 Skill.name = '挑衅'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { runUseFlow } from '../core/card-effect/use-card';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';

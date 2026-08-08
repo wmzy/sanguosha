@@ -17,7 +17,7 @@ import {
   fireTimeoutAndWait,
   disableAutoCompare,
 } from '../engine-harness';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';

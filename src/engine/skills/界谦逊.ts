@@ -27,7 +27,8 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, topFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { topFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 
 const CONFIRM_RT = '界谦逊/trigger';

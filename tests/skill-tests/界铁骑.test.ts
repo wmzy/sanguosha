@@ -328,7 +328,7 @@ describe('界铁骑', () => {
 
     // 推进到回合结束:不断 pass/end,直到回合结束清理
     // 通过直接 dispatch 回合结束 atom 模拟阶段推进
-    const { applyAtom } = await import('../../src/engine/index');
+    const { applyAtom } = await import('../../src/engine/core/apply');
     await applyAtom(harness.state, { type: '回合结束', player: 0 });
     harness.processAllEvents();
 

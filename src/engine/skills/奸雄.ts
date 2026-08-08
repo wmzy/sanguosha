@@ -8,7 +8,7 @@
 // 故采用"延迟拿取":造成伤害后记录 wantCard=cardId,挂 移动牌 after hook,
 // 在该伤害牌被移入弃牌堆的瞬间再 移动牌(弃牌堆→手牌)。此时父收尾已完成、无重复。
 import type { FrontendAPI, GameState, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 
 const CHOOSE_RT = '奸雄/choose';

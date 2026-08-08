@@ -30,7 +30,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
 
 const CONFIRM_RT_PREFIX = '奋激/confirm';

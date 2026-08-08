@@ -24,7 +24,8 @@
 // 命名:文件名/loader key/character skill name 均为 '界荐言';
 //   内部 Skill.name = '荐言'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill, Card } from '../types';
-import { applyAtom, popFrame, pushFrame, frameCards } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 import { getGender } from '../data/character-meta';
 import { defaultPlayActive } from '../rules/action-active';

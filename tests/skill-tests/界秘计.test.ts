@@ -60,7 +60,7 @@ function makePlayer(opts: {
 /** 触发结束阶段:阶段开始(回合结束) atom */
 async function triggerEndPhase(harness: SkillTestHarness, player: number): Promise<void> {
    
-  const { applyAtom } = await import('../../src/engine/index');
+  const { applyAtom } = await import('../../src/engine/core/apply');
   void applyAtom(harness.state, { type: '阶段开始', player, phase: '回合结束' });
   await harness.waitForStable();
 }

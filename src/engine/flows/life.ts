@@ -11,7 +11,7 @@
 //   - 编排函数不直接触发濒死/死亡——保持 系统规则.ts 的 after-hook 触发逻辑
 //     (失去体力 after-hook 检查 health<=0 → runDyingFlow)。
 import type { GameState } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { MODIFY_AMOUNT_KEY } from '../atoms/life-timing';
 
 /** 读取 before-hook modify 后的 amount(从 确定回复数值时 的 apply 回写值)。

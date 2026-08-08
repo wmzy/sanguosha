@@ -21,7 +21,7 @@
 // 乱击出的万箭齐发可被无懈可击抵消——由 万箭齐发.use 自身的 询问无懈可击 流程保证。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, hasBlockingPending } from '../core/skill';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { defaultPlayActive } from '../rules/action-active';
 
 export function createSkill(id: string, ownerId: number): Skill {

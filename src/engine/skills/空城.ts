@@ -9,7 +9,7 @@
 // 备注(规则):已被杀指定为目标后再失去手牌,不影响该杀的结算——本实现因挂在"成为目标"
 //   (结算阶段入口)天然满足:此时手牌状态即结算时状态。
 import type { HookResult, Skill, GameState } from '../types';
-import { topFrame } from '../index';
+import { topFrame } from '../core/frame';
 import { registerBeforeHook } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

@@ -291,7 +291,7 @@ describe('界旋风', () => {
     const P0 = harness.player('界凌统');
 
     // 直接 applyAtom 弃置 2 张手牌(走 hook pipeline)
-    const { applyAtom } = await import('../../src/engine/index');
+    const { applyAtom } = await import('../../src/engine/core/apply');
     void (async () => {
       await applyAtom(harness.state, { type: '弃置', player: 0, cardIds: ['p1', 'p2'] });
     })();
@@ -401,7 +401,7 @@ describe('界旋风', () => {
     const P0 = harness.player('界凌统');
 
     // 直接弃置装备触发(用 applyAtom)
-    const { applyAtom } = await import('../../src/engine/index');
+    const { applyAtom } = await import('../../src/engine/core/apply');
     void (async () => {
       await applyAtom(harness.state, { type: '弃置', player: 0, cardIds: ['w1'] });
     })();
@@ -513,7 +513,7 @@ describe('界旋风', () => {
     const P0 = harness.player('界凌统');
 
     // 一次性弃置 2 件装备(同时满足失装备+丢2张两条件)
-    const { applyAtom } = await import('../../src/engine/index');
+    const { applyAtom } = await import('../../src/engine/core/apply');
     void (async () => {
       await applyAtom(harness.state, { type: '弃置', player: 0, cardIds: ['w1', 'a1'] });
     })();

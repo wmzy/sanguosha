@@ -3,7 +3,8 @@
 // 场景:P0 装备诸葛连弩(step A) → P0 卸下(step B) → 回放验证各 step
 import { describe, it, expect } from 'vitest';
 import { dispatchAndWait, SkillTestHarness } from '../../engine-harness';
-import { registerSkillsFromState, applyAtom, buildView } from '../../../src/engine/index';
+import { registerSkillsFromState, buildView } from '../../../src/engine/index'
+import { applyAtom } from '../../../src/engine/core/apply';
 import { ReplayRecorder } from '../../../src/client/replay/recorder';
 import { getViewAt } from '../../../src/client/replay/replayEngine';
 import type { Card, GameState } from '../../../src/engine/types';

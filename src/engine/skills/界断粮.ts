@@ -30,7 +30,8 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';

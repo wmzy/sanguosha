@@ -35,7 +35,8 @@ import type {
   Skill,
   SkillModule,
 } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { runUseFlow } from '../core/card-effect/use-card';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';

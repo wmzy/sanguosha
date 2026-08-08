@@ -9,7 +9,8 @@
 //     铁索连环.use 零感知连环——它看到的是 cardMap 里的一张"铁索连环"。
 //     模式参考 龙胆.ts / 武圣.ts。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, popFrame, pushFrame } from '../index';
+import { applyAtom } from '../core/apply'
+import { popFrame, pushFrame } from '../core/frame';
 import { recastCard } from '../flows/recast';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';

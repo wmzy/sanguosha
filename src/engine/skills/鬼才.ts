@@ -16,7 +16,8 @@
 // 交换判定牌通过直接 mutate frameCards(与武圣影子卡同样的直接-mutate 先例:
 //   无现成 atom 承载"替换判定牌"操作)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom, frameCards } from '../index';
+import { applyAtom } from '../core/apply'
+import { frameCards } from '../core/frame';
 import { registerAction, registerJudgeModifier } from '../core/skill';
 
 export function createSkill(id: string, ownerId: number): Skill {

@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
-import { applyAtom } from '../../src/engine/index';
+import { applyAtom } from '../../src/engine/core/apply';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, Json, TurnPhase } from '../../src/engine/types';

@@ -5,7 +5,7 @@
 // 将此杀转移给攻击范围内的一名其他角色。
 // 时机:成为目标 after hook(结算阶段),修改杀帧的 resolvedTargets。
 import type { FrontendAPI, Skill, GameState } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 

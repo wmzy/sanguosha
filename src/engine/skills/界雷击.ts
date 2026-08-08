@@ -24,7 +24,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界雷击';
 //   内部 Skill.name = '雷击'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';

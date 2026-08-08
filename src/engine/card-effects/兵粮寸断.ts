@@ -6,7 +6,7 @@
 
 import type { Card } from '../types';
 import type { GameView } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { effectiveDistance } from '../rules/distance';
 import { viewEffectiveDistance } from '../rules/viewDistance';

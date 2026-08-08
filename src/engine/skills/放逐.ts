@@ -26,7 +26,7 @@ import type {
   GameView,
 } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom } from '../index';
+import { applyAtom } from '../core/apply';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 

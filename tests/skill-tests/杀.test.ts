@@ -1,5 +1,5 @@
 // tests/skill-tests/杀.test.ts
-import { frameCards } from '../../src/engine/index';
+import { frameCards } from '../../src/engine/core/frame';
 // 杀(基本牌)技能测试示范
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
