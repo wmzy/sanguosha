@@ -23,7 +23,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
-import { runUseFlow, chargeOnSettle } from '../core/card-effect/use-card';
+import { runUseFlow, chargeOnSettle } from './cards/use-card';
 import { skipPhase } from '../rules/skip-phase';
 
 const OPT1_TRIGGER_RT = '神速/opt1-trigger';

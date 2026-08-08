@@ -5,7 +5,7 @@ import type { SkillModule } from '../core/skill';
 import { setSkillModuleResolver, setSkillModuleChecker } from '../core/skill';
 
 // Eager load：注册所有 CardEffect（杀/闪/桃 等），副作用 import
-import '../card-effects';
+import './cards';
 
 // Eager load 马匹技能:其 createMountSkill 工厂在模块加载时调用
 // registerSkillViewDelta 注册静态视图增量。添加技能/移除技能 的 toViewEvents
@@ -30,9 +30,9 @@ export const skillLoaders: Record<string, Loader> = {
   // 基础
   开局: load(() => import('./开局')),
   // 使用牌:统一的卡牌使用入口技能(配合 CardEffect 注册表路由)
-  使用牌: load(() => import('../core/card-effect/use-card')),
+  使用牌: load(() => import('./cards/use-card')),
   // 打出牌:统一的卡牌打出入口技能(无目标选择/无效果结算,仅声明+置入处理区)
-  打出牌: load(() => import('../core/card-effect/play-card')),
+  打出牌: load(() => import('./cards/play-card')),
   仁德: load(() => import('./仁德')),
   激将: load(() => import('./激将')),
   护甲: load(() => import('./护甲')),

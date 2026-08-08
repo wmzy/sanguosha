@@ -38,7 +38,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
-import { runUseFlow } from '../core/card-effect/use-card';
+import { runUseFlow } from './cards/use-card';
 import {
   registerAction,
   registerAfterHook,

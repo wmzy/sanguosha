@@ -24,7 +24,7 @@
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { runUseFlow } from '../core/card-effect/use-card';
+import { runUseFlow } from './cards/use-card';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';

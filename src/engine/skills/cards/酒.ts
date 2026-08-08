@@ -8,19 +8,19 @@
 // markOncePerTurn/activeUnlessUsedThisTurn），key='酒/usedThisTurn'，由「回合结束」atom
 // 自动清空。仅限方法Ⅰ（resolve 路径），方法Ⅱ（respond 濒死自救）不受限（独立路径，不读写该标记）。
 
-import type { Card } from '../types';
-import { applyAtom } from '../core/apply';
-import { registerBeforeHook } from '../core/skill';
-import { defaultPlayActive } from '../rules/action-active';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import type { HookResult } from '../types';
+import type { Card } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { registerBeforeHook } from '../../core/skill';
+import { defaultPlayActive } from '../../rules/action-active';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../../rules/once-per-turn';
+import type { HookResult } from '../../types';
 
 /** 注册酒的全局「造成伤害」before-hook（消费增伤标记）。
  *  酒的使用者拥有 '酒/nextKillDamageBonus' 标记时，其造成的伤害 +1，然后消耗标记。
  *  全局注册(ownerId=-1)——酒是基本牌面能力，不限技能持有者。
  *  在 index bootstrap 中调用。 */
-export function registerWineHook(state: import('../types').GameState): void {
+export function registerWineHook(state: import('../../types').GameState): void {
   registerBeforeHook(state, '酒', -1, '造成伤害时', async (ctx): Promise<HookResult | void> => {
     const atom = ctx.atom;
     if (atom.source === undefined) return;
@@ -58,9 +58,9 @@ async function resolveWine(ctx: ResolveCtx): Promise<void> {
 
 /** 酒牌特有校验：只能对自己使用 + 使用方法Ⅰ每回合限一次 */
 function canUseWine(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   ownerId: number,
-  params: Record<string, import('../types').Json>,
+  params: Record<string, import('../../types').Json>,
 ): string | null {
   // 使用方法Ⅰ（增伤）每回合限一次；方法Ⅱ（濒死自救）走 respond 路径，不受此限制。
   // 拥有 '酒/无次数限制' tag 的玩家（如界董卓·界酒池）豁免此限制。

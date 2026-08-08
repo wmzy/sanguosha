@@ -4,22 +4,22 @@
 //   判定非♣ → 跳过摸牌阶段
 //   判定♣   → 无效，弃置
 
-import type { Card } from '../types';
-import type { GameView } from '../types';
-import { applyAtom } from '../core/apply';
-import { runJudgeFlow } from '../flows/judge';
-import { effectiveDistance } from '../rules/distance';
-import { viewEffectiveDistance } from '../rules/viewDistance';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
-import { registerDelayedTrick } from '../core/card-effect/delayed-trick-registry';
+import type { Card } from '../../types';
+import type { GameView } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { runJudgeFlow } from '../../flows/judge';
+import { effectiveDistance } from '../../rules/distance';
+import { viewEffectiveDistance } from '../../rules/viewDistance';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import { registerDelayedTrick } from '../../core/card-effect/delayed-trick-registry';
 
 /** 跳过摸牌阶段的 tag 名 */
 const SKIP_TAG = '兵粮寸断/跳过摸牌';
 
 function canUseSupplyShortage(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   ownerId: number,
-  params: Record<string, import('../types').Json>,
+  params: Record<string, import('../../types').Json>,
 ): string | null {
   const target =
     (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0];

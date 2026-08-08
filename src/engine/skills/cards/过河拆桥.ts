@@ -3,15 +3,15 @@
 // resolve: 询问无懈可击 →（若未被抵消）弹选牌面板弃置目标一张牌。
 // target.kind='other': 任意其他角色（无距离限制）。
 
-import type { Card } from '../types';
-import { runPickTargetCardPanel } from '../flows/pick-card-panel';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
+import type { Card } from '../../types';
+import { runPickTargetCardPanel } from '../../flows/pick-card-panel';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
 
 /** 过河拆桥牌特有校验：目标有牌、非自己 */
 function canUseDismantle(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   ownerId: number,
-  params: Record<string, import('../types').Json>,
+  params: Record<string, import('../../types').Json>,
 ): string | null {
   const targets = params.targets as number[] | undefined;
   if (!Array.isArray(targets) || targets.length === 0) return '目标不合法';

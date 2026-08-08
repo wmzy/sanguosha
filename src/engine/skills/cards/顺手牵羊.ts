@@ -3,17 +3,17 @@
 // resolve: 询问无懈可击 →（若未被抵消）弹选牌面板获得目标一张牌。
 // target.kind='distance' dist=1: 距离 1 内的其他角色（奇才无距离限制）。
 
-import type { Card } from '../types';
-import type { GameView } from '../types';
-import { effectiveDistance } from '../rules/distance';
-import { viewEffectiveDistance } from '../rules/viewDistance';
-import { runPickTargetCardPanel } from '../flows/pick-card-panel';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
+import type { Card } from '../../types';
+import type { GameView } from '../../types';
+import { effectiveDistance } from '../../rules/distance';
+import { viewEffectiveDistance } from '../../rules/viewDistance';
+import { runPickTargetCardPanel } from '../../flows/pick-card-panel';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
 
 function canUseSnatch(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   ownerId: number,
-  params: Record<string, import('../types').Json>,
+  params: Record<string, import('../../types').Json>,
 ): string | null {
   const target =
     (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0];

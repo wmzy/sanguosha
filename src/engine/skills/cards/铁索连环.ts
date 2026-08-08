@@ -7,10 +7,10 @@
 // 连环传导(属性伤害联动)在 face-down.ts 的 registerChainConductionHook，
 //   由 index 作为伤害结算基础设施注册。
 
-import type { Card } from '../types';
-import { setChain } from '../flows/face-down';
-import { applyAtom } from '../core/apply';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
+import type { Card } from '../../types';
+import { setChain } from '../../flows/face-down';
+import { applyAtom } from '../../core/apply';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
 
 /** 目标选择横置/重置的 requestType（resolve 发出 → respond 写回 localVars）。 */
 const CHOOSE_RT = '铁索连环/choose';
@@ -53,9 +53,9 @@ async function resolveChain(ctx: ResolveCtx): Promise<void> {
 
 /** 铁索连环牌特有校验：1-2 名存活角色（含自己） */
 function canUseChain(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   _ownerId: number,
-  params: Record<string, import('../types').Json>,
+  params: Record<string, import('../../types').Json>,
 ): string | null {
   const targets = params.targets as number[] | undefined;
   if (!Array.isArray(targets) || targets.length < 1 || targets.length > 2)

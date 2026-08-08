@@ -5,13 +5,13 @@
 //   其他结果 → 闪电传递给下家（下家的判定区）
 // 无来源伤害用 source: TARGET_SYSTEM（系统惯例，见 扣减体力 atom）。
 
-import type { Card, GameState } from '../types';
-import { TARGET_SYSTEM } from '../types';
-import { applyAtom } from '../core/apply';
-import { runJudgeFlow } from '../flows/judge';
-import { runDamageFlow } from '../flows/damage';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
-import { registerDelayedTrick } from '../core/card-effect/delayed-trick-registry';
+import type { Card, GameState } from '../../types';
+import { TARGET_SYSTEM } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { runJudgeFlow } from '../../flows/judge';
+import { runDamageFlow } from '../../flows/damage';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import { registerDelayedTrick } from '../../core/card-effect/delayed-trick-registry';
 
 const TRICK_NAME = '闪电';
 

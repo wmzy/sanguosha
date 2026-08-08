@@ -5,10 +5,10 @@
 // 跨玩家 respond（展示/弃牌）仍保留在 skill 中（按 requestType 分流）。
 // resolve 内部通过 localVars 与 respond action 通信。
 
-import type { Card } from '../types';
-import { applyAtom } from '../core/apply';
-import { runDamageFlow } from '../flows/damage';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
+import type { Card } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { runDamageFlow } from '../../flows/damage';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
 
 /** 火攻的结算：展示手牌 → 弃同花色 → 火焰伤害 */
 async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
@@ -79,9 +79,9 @@ async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
 
 /** 火攻牌特有校验：目标有手牌（可对自己使用火攻） */
 function canUseFireAttack(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   ownerId: number,
-  params: Record<string, import('../types').Json>,
+  params: Record<string, import('../../types').Json>,
 ): string | null {
   const targets = params.targets as number[] | undefined;
   if (!Array.isArray(targets) || targets.length !== 1) return '火攻只能指定一名目标';

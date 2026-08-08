@@ -7,13 +7,13 @@
 // 实现方式：在 resolve 第一次调用时翻牌（通过 localVars 标记），
 // 之后每次调用处理一个目标。清理（剩余牌入弃牌堆）在 onSettle 中完成。
 
-import type { Card, SettlementFrame } from '../types';
-import { applyAtom } from '../core/apply'
-import { frameCards } from '../core/frame';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
+import type { Card, SettlementFrame } from '../../types';
+import { applyAtom } from '../../core/apply'
+import { frameCards } from '../../core/frame';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
 
 /** 从使用者开始,按座次旋转的所有存活玩家 */
-function alivePlayersFrom(state: import('../types').GameState, from: number): number[] {
+function alivePlayersFrom(state: import('../../types').GameState, from: number): number[] {
   const alive = state.players.filter((p) => p.alive);
   const n = alive.length;
   if (n === 0) return [];
@@ -28,7 +28,7 @@ function alivePlayersFrom(state: import('../types').GameState, from: number): nu
 
 /** 选牌面板：弹 pickProcessingCard pending，超时兜底选候选列表第一张 */
 async function runPickProcessingCard(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   target: number,
   revealedIds: string[],
   frame: SettlementFrame,
@@ -117,7 +117,7 @@ async function resolveBountifulHarvest(ctx: ResolveCtx): Promise<void> {
 
 /** 五谷丰登的结算后回调：剩余亮出的牌入弃牌堆 + 清理 localVars */
 async function onSettleBountifulHarvest(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   _source: number,
   _cardId: string,
 ): Promise<void> {

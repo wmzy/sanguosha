@@ -6,17 +6,17 @@
 // 注意：虚拟决斗（离间 等走 runUseFlow({virtual:true})）包含 成为目标，决斗 CardEffect.resolve
 // 调用的是不含 成为目标 的 runDuelLoop。
 
-import type { Card } from '../types';
-import { applyAtom } from '../core/apply';
-import { runDamageFlow } from '../flows/damage';
-import { consumePlayedSlashes } from '../core/card-effect/play-card';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
+import type { Card } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { runDamageFlow } from '../../flows/damage';
+import { consumePlayedSlashes } from './play-card';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
 
 /** 决斗牌特有校验：不能对自己使用 */
 function canUseDuel(
-  _state: import('../types').GameState,
+  _state: import('../../types').GameState,
   ownerId: number,
-  params: Record<string, import('../types').Json>,
+  params: Record<string, import('../../types').Json>,
 ): string | null {
   const targets = params.targets as number[];
   if (targets.length !== 1) return '决斗只能指定一名目标';
@@ -26,7 +26,7 @@ function canUseDuel(
 
 /** 决斗循环（不含无懈）：目标先出杀，之后发起者出杀，轮流。 */
 async function runDuelLoop(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   from: number,
   target: number,
   cardId: string,

@@ -9,28 +9,28 @@
 // onSettle 职责（runUseFlow 在结算完成后、popFrame 前调用）：
 //   出杀次数累加（slash-quota）+ 回合用量 view 同步。
 
-import type { Card, GameView, GameState, Json } from '../types';
-import { applyAtom } from '../core/apply';
-import { runDamageFlow } from '../flows/damage';
-import { inAttackRange } from '../rules/distance';
-import { viewCanAttack } from '../rules/viewDistance';
-import { incSlashUsed, isSlashExempted, slashUsed } from '../rules/slash-quota';
-import { slashTargetMax } from '../rules/slash-target';
-import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
+import type { Card, GameView, GameState, Json } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { runDamageFlow } from '../../flows/damage';
+import { inAttackRange } from '../../rules/distance';
+import { viewCanAttack } from '../../rules/viewDistance';
+import { incSlashUsed, isSlashExempted, slashUsed } from '../../rules/slash-quota';
+import { slashTargetMax } from '../../rules/slash-target';
+import { defaultPlayActive, viewCanSlash } from '../../rules/action-active';
 import {
   registerCardEffect,
   type CardEffect,
   type ResolveCtx,
-} from '../core/card-effect/registry';
+} from '../../core/card-effect/registry';
 
 /** 杀的合法性追加检测：仅校验目标在攻击范围内。
  *  出杀次数限制（slash-quota）不由此处检查——由 validateCardUse.checkUsageLimit
  *  统一负责（mode='play' 强制，mode='forced' 跳过）。此处若重复检查 canSlash，
  *  会导致 forced 模式（借刀杀人/激将/挑衅/乱武 逼杀）被回合内出杀次数误挡。 */
 function canUseSlash(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   ownerId: number,
-  params: Record<string, import('../types').Json>,
+  params: Record<string, import('../../types').Json>,
 ): string | null {
   const cardId = params.cardId as string | undefined;
   // 攻击范围校验
@@ -58,7 +58,7 @@ async function resolveSlash(ctx: ResolveCtx): Promise<void> {
 
 /** 杀的结算后回调：出杀次数累加 + view 同步 */
 async function onSettleSlash(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   source: number,
   cardId: string,
 ): Promise<void> {

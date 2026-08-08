@@ -40,7 +40,7 @@ import {
   hasBlockingPending,
   type SkillModule,
 } from '../core/skill';
-import { runUseFlow } from '../core/card-effect/use-card';
+import { runUseFlow } from './cards/use-card';
 
 const SKILL_ID = '界酒诗';
 const DISPLAY_NAME = '酒诗';

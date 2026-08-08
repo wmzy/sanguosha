@@ -21,13 +21,13 @@
 import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../../types';
 import { applyAtom } from '../../core/apply'
 import { frameCards, popFrame, pushFrame, topFrame } from '../../core/frame';
-import { registerAction, registerBeforeHook, registerAfterHook } from '../skill';
+import { registerAction, registerBeforeHook, registerAfterHook } from '../../core/skill';
 import { promptCancel } from '../../flows/cancel';
-import { validateCardUse, computeAutoTargets } from './validate';
-import { getCardEffect, getAllCardEffects, requireCardEffect } from './registry';
-import type { CardEffect, CancellableBy } from './registry';
-import { isCancelled } from './registry';
-import { getDelayedTricks } from './delayed-trick-registry';
+import { validateCardUse, computeAutoTargets } from '../../core/card-effect/validate';
+import { getCardEffect, getAllCardEffects, requireCardEffect } from '../../core/card-effect/registry';
+import type { CardEffect, CancellableBy } from '../../core/card-effect/registry';
+import { isCancelled } from '../../core/card-effect/registry';
+import { getDelayedTricks } from '../../core/card-effect/delayed-trick-registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

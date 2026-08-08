@@ -14,12 +14,12 @@
 //
 // 闪的色限制（诸葛连弩等）由 effect.respond.validate 校验。
 
-import type { Card, GameState, Json } from '../types';
+import type { Card, GameState, Json } from '../../types';
 import {
   registerCardEffect,
   type CardEffect,
-} from '../core/card-effect/registry';
-import type { Color } from '../../engine/types';
+} from '../../core/card-effect/registry';
+import type { Color } from '../../../engine/types';
 
 const COLOR_LIMIT_VAR = '闪/色限制';
 

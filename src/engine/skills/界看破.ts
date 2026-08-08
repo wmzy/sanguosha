@@ -30,7 +30,7 @@
 import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, findPendingSlot } from '../core/skill';
 import { applyAtom } from '../core/apply';
-import { runUseFlow } from '../core/card-effect/use-card';
+import { runUseFlow } from './cards/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

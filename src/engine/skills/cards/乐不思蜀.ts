@@ -7,20 +7,20 @@
 //   判定非♥ → 跳过出牌阶段（加标签，出牌阶段 before-hook 消费）
 //   判定♥   → 无效，弃置
 
-import type { Card } from '../types';
-import { applyAtom } from '../core/apply';
-import { runJudgeFlow } from '../flows/judge';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
-import { registerDelayedTrick } from '../core/card-effect/delayed-trick-registry';
+import type { Card } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { runJudgeFlow } from '../../flows/judge';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import { registerDelayedTrick } from '../../core/card-effect/delayed-trick-registry';
 
 /** 跳过出牌阶段的 tag 名 */
 const SKIP_TAG = '乐不思蜀/跳过出牌';
 
 /** 乐不思蜀牌特有校验：任意其他角色、判定区无同名（无距离限制） */
 function canUseIndulgence(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   ownerId: number,
-  params: Record<string, import('../types').Json>,
+  params: Record<string, import('../../types').Json>,
 ): string | null {
   const target =
     (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0];

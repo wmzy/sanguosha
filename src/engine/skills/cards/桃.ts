@@ -3,16 +3,16 @@
 // resolve: 回复目标 1 点体力。
 // target.kind='wounded': 可对包括自己在内的已受伤角色使用。
 
-import type { Card } from '../types';
-import { applyAtom } from '../core/apply';
-import { defaultPlayActive } from '../rules/action-active';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
+import type { Card } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { defaultPlayActive } from '../../rules/action-active';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
 
 /** 桃的牌特有校验：目标必须已受伤 */
 function canUsePeach(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   ownerId: number,
-  params: Record<string, import('../types').Json>,
+  params: Record<string, import('../../types').Json>,
 ): string | null {
   const target =
     ((params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined) ??
@@ -30,7 +30,7 @@ async function resolvePeach(ctx: ResolveCtx): Promise<void> {
 }
 
 /** 桃使用阶段激活条件：默认出牌条件 + 自己已受伤（满血不可出桃）。 */
-function peachActiveWhen(ctx: import('../types').ActionContext): boolean {
+function peachActiveWhen(ctx: import('../../types').ActionContext): boolean {
   if (!defaultPlayActive(ctx)) return false;
   const p = ctx.view.players[ctx.perspectiveIdx];
   return p ? p.health < p.maxHealth : false;

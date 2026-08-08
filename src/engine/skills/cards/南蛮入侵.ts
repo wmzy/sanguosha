@@ -3,11 +3,11 @@
 // resolve（逐目标）：询问无懈可击 → 询问杀 → 检查处理区 → 伤害。
 // target.kind='allOthers': 所有其他角色（从下家开始按座次）。
 
-import type { Card } from '../types';
-import { applyAtom } from '../core/apply';
-import { runDamageFlow } from '../flows/damage';
-import { consumePlayedSlashes } from '../core/card-effect/play-card';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
+import type { Card } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { runDamageFlow } from '../../flows/damage';
+import { consumePlayedSlashes } from './play-card';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
 
 /** 南蛮入侵的逐目标结算：询问杀 → 统一清理打出杀 → 伤害 */
 async function resolveBarbarianInvasion(ctx: ResolveCtx): Promise<void> {

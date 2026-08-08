@@ -3,9 +3,9 @@
 // resolve（逐目标）：满血跳过 → 询问无懈可击 → 回复 1 点体力。
 // target.kind='allPlayers': 所有存活角色（含使用者）。
 
-import type { Card } from '../types';
-import { applyAtom } from '../core/apply';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
+import type { Card } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
 
 /** 桃园结义的逐目标结算：满血跳过 → 回复体力 */
 async function resolvePeachGarden(ctx: ResolveCtx): Promise<void> {

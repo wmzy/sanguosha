@@ -10,13 +10,13 @@
 // A 的「出杀」选择由本文件的 respond 字段(被 play-card 按卡名注册到每个座次)写入
 // localVars[CHOICE_VAR] = { cardId, targets }。
 
-import type { Card, GameState, GameView } from '../types';
-import { applyAtom } from '../core/apply';
-import { runUseFlow } from '../core/card-effect/use-card';
-import { isCardBanned } from '../core/card-effect/validate';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
-import { inAttackRange } from '../rules/distance';
-import { slashTargetMax } from '../rules/slash-target';
+import type { Card, GameState, GameView } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { runUseFlow } from './use-card';
+import { isCardBanned } from '../../core/card-effect/validate';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import { inAttackRange } from '../../rules/distance';
+import { slashTargetMax } from '../../rules/slash-target';
 
 /** 请求 A 出杀问询的 requestType */
 const REQUEST_TYPE = '借刀杀人/出杀';
@@ -73,9 +73,9 @@ async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
 /** 借刀杀人牌特有校验：目标有武器、killTarget 合法、A 不能是自己
  *  killTarget 允许是发起者自己(借别人的刀杀自己)。 */
 function canUseBorrowedSword(
-  state: import('../types').GameState,
+  state: import('../../types').GameState,
   ownerId: number,
-  params: Record<string, import('../types').Json>,
+  params: Record<string, import('../../types').Json>,
 ): string | null {
   // 兼容 targets=[A,B] 和 target=A+killTarget=B 两种格式
   let targetIdx: number | undefined;

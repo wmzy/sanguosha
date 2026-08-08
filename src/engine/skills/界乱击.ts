@@ -37,7 +37,7 @@
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { applyAtom } from '../core/apply';
-import { runUseFlow, chargeOnSettle } from '../core/card-effect/use-card';
+import { runUseFlow, chargeOnSettle } from './cards/use-card';
 import { defaultPlayActive } from '../rules/action-active';
 
 const SKILL_ID = '界乱击';

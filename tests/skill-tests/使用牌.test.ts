@@ -31,8 +31,8 @@ import {
   findLegalTargets,
   validateCardUse,
 } from '../../src/engine/core/card-effect/validate';
-import { runUseFlow } from '../../src/engine/core/card-effect/use-card';
-import { runPlayFlow } from '../../src/engine/core/card-effect/play-card';
+import { runUseFlow } from '../../src/engine/skills/cards/use-card';
+import { runPlayFlow } from '../../src/engine/skills/cards/play-card';
 
 // ─── 测试用牌效果（模块级，只注册一次） ──────────────────────
 

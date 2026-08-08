@@ -3,9 +3,9 @@
 // resolve: 目标角色摸两张牌（无懈可击由 runSettlementPhase 的「生效前」时机统一处理）。
 // target.kind='any': 包括使用者在内的一名角色（界限突破/1V1/国-标 语义）。
 
-import type { Card } from '../types';
-import { applyAtom } from '../core/apply';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../core/card-effect/registry';
+import type { Card } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
 
 /** 无中生有的结算：目标角色摸牌(2) */
 async function resolveExNihilo(ctx: ResolveCtx): Promise<void> {

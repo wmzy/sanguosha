@@ -3,10 +3,10 @@
 // resolve（逐目标）：询问无懈可击 → 询问闪 → 检查处理区 → 伤害/抵消。
 // target.kind='allOthers': 所有其他角色（从下家开始按座次）。
 
-import type { Card } from '../types';
-import { applyAtom } from '../core/apply';
-import { runDamageFlow } from '../flows/damage';
-import { registerCardEffect, type CardEffect, type ResolveCtx, isCancelled } from '../core/card-effect/registry';
+import type { Card } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { runDamageFlow } from '../../flows/damage';
+import { registerCardEffect, type CardEffect, type ResolveCtx, isCancelled } from '../../core/card-effect/registry';
 
 /** 万箭齐发的逐目标结算：询问闪 → 检查帧 cancelled → 伤害/抵消。
  *  闪走 runUseFlow，resolve 设万箭齐发帧 cancelled=true；此处检查该字段。 */

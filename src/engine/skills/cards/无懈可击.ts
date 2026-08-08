@@ -9,12 +9,12 @@
 //
 // 无懈可击本身可被无懈可击抵消（递归嵌套），由 runSettlementPhase 自动推导 cancelledBy 处理。
 
-import type { Card, GameState, Json } from '../types';
-import { findPendingSlot } from '../core/skill';
+import type { Card, GameState, Json } from '../../types';
+import { findPendingSlot } from '../../core/skill';
 import {
   registerCardEffect,
   type CardEffect,
-} from '../core/card-effect/registry';
+} from '../../core/card-effect/registry';
 
 const CARD_NAME = '无懈可击';
 

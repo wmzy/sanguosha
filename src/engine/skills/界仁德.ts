@@ -27,7 +27,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { canSlash } from '../rules/slash-quota';
-import { runUseFlow, chargeOnSettle } from '../core/card-effect/use-card';
+import { runUseFlow, chargeOnSettle } from './cards/use-card';
 
 // localVars keys(界刘备视为使用基本牌流程)
 const BASIC_CHOICE_VAR = '仁德/basicChoice';
