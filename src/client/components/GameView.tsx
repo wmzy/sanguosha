@@ -249,6 +249,9 @@ export function GameViewComponentImpl({
     selectedActive,
     playButtonState,
     selectedRespondCardId,
+    respondTargetName,
+    respondNeedsTarget,
+    respondTargetReady,
     altActions,
     playRules,
     handleCardClick,
@@ -326,8 +329,13 @@ export function GameViewComponentImpl({
     phase: view.phase,
     pending,
   });
+  const isRespondPending =
+    isMyAwaiting &&
+    !isDiscardPhase &&
+    !broadcastSkipped &&
+    (pending?.prompt?.type === 'useCard' || pending?.prompt?.type === 'useCardAndTarget');
   const showCenterActionBar =
-    (isMyAwaiting && !isDiscardPhase && pending?.prompt?.type === 'useCard' && !broadcastSkipped) ||
+    isRespondPending ||
     (canOperate && !!selectedActive && !!transformMode) ||
     (canOperate && !!selectedActive && !transformMode && !!selectedCardId && !!playButtonState) ||
     (canOperate && !transformMode && !!selectedCardId && altActions.length > 0) ||
@@ -341,7 +349,8 @@ export function GameViewComponentImpl({
   // selectedNeedsTarget 同源：选目标阶段 + 自己可被选（allowSelf/selfTarget）。
   const selfInTargetMode =
     (!!playRules && playRules.needsTarget) ||
-    (isDistributeActive && !!activeDistribute?.externalTargetSelection);
+    (isDistributeActive && !!activeDistribute?.externalTargetSelection) ||
+    respondNeedsTarget;
   const selfTargetable = canOperate && selfInTargetMode && isTargetable(perspectiveIdx);
   const selfSelectedAsTarget =
     isDistributeActive && activeDistribute?.externalTargetSelection
@@ -414,7 +423,8 @@ export function GameViewComponentImpl({
                 currentPlayerName={currentPlayerName}
                 selectedNeedsTarget={
                   (!!playRules && playRules.needsTarget) ||
-                  (isDistributeActive && !!activeDistribute?.externalTargetSelection)
+                  (isDistributeActive && !!activeDistribute?.externalTargetSelection) ||
+                  respondNeedsTarget
                 }
                 selectedTargetNames={
                   isDistributeActive && activeDistribute?.externalTargetSelection
@@ -425,9 +435,13 @@ export function GameViewComponentImpl({
                       ? [selectedTarget, selectedKillTarget].filter((n): n is string => !!n)
                       : playRules?.multiTarget
                         ? selectedMultiTargets
-                        : selectedTarget
-                          ? [selectedTarget]
-                          : []
+                        : respondNeedsTarget
+                          ? respondTargetName
+                            ? [respondTargetName]
+                            : []
+                          : selectedTarget
+                            ? [selectedTarget]
+                            : []
                 }
                 isTargetable={isTargetable}
                 onTargetClick={handleTargetClick}
@@ -506,26 +520,31 @@ export function GameViewComponentImpl({
 
                     {showCenterActionBar && (
                       <div className={styles.actionBar}>
-                        {isMyAwaiting &&
-                          !isDiscardPhase &&
-                          pending?.prompt?.type === 'useCard' &&
-                          !broadcastSkipped && (
-                            <>
-                              <button
-                                className={cx(
-                                  styles.playBtn,
-                                  !selectedRespondCardId && styles.btnDisabled,
-                                )}
-                                onClick={handlePlayRespond}
-                                disabled={!selectedRespondCardId}
-                              >
-                                打出
-                              </button>
-                              <button className={styles.promptBtn} onClick={() => handleRespond()}>
-                                不回应
-                              </button>
-                            </>
-                          )}
+                        {isRespondPending && (
+                          <>
+                            <button
+                              className={cx(
+                                styles.playBtn,
+                                (!selectedRespondCardId || !respondTargetReady) &&
+                                  styles.btnDisabled,
+                              )}
+                              onClick={handlePlayRespond}
+                              disabled={!selectedRespondCardId || !respondTargetReady}
+                            >
+                              打出
+                              {respondNeedsTarget
+                                ? respondTargetName
+                                  ? ` → ${respondTargetName}`
+                                  : ' (请选目标)'
+                                : ''}
+                            </button>
+                            <button className={styles.promptBtn} onClick={() => handleRespond()}>
+                              {pending?.prompt?.type === 'useCardAndTarget'
+                                ? '交出武器'
+                                : '不回应'}
+                            </button>
+                          </>
+                        )}
                         {canOperate &&
                           transformMode &&
                           transformMode.minCards > 1 &&

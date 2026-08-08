@@ -170,6 +170,12 @@ export interface PlayInteractionResult {
   playButtonState: { canPlay: boolean; targetLabel: string } | null;
   /** useCard 类回应选中的牌 id(点牌选中,再点「打出」出牌);非回应窗口为 null */
   selectedRespondCardId: string | null;
+  /** useCardAndTarget 类回应(借刀杀人/出杀)选中的目标座次 name;非此模式为 null */
+  respondTargetName: string | null;
+  /** 当前回应是否需要选目标(useCardAndTarget 且非 selfTarget) */
+  respondNeedsTarget: boolean;
+  /** respond 目标是否已满足(选了牌 + 选了目标) */
+  respondTargetReady: boolean;
   /** 选中牌的可用替代动作(如铁索连环·重铸),均已 active */
   altActions: SkillActionDef[];
   // ─── handlers ───
@@ -252,6 +258,9 @@ export function usePlayInteraction(
   // useCard 类回应(被杀出闪/求桃/无懈可击等):先选牌(高亮)再点「打出」确认,避免误触直接出牌。
   // 与弃牌阶段 selectedForDiscard 同为「选+确认」两步式,但只选一张。
   const [selectedRespondCardId, setSelectedRespondCardId] = useState<string | null>(null);
+  // useCardAndTarget 类回应(借刀杀人/出杀):选中杀牌后再选目标座次 name,满足后「打出」可提交。
+  // respond 模式独立于出牌阶段的 selectedTarget,避免与出牌选牌状态互相干扰。
+  const [respondTargetName, setRespondTargetName] = useState<string | null>(null);
   const [transformMode, setTransformMode] = useState<TransformMode | null>(null);
   const [distributeMode, setDistributeMode] = useState<{
     skillId: string;
@@ -327,6 +336,7 @@ export function usePlayInteraction(
   // 询问窗口切换/打出后/不回应后:pending 变化驱动清空回应选牌,与 selectedForDiscard 同源。
   useEffect(() => {
     setSelectedRespondCardId(null);
+    setRespondTargetName(null);
   }, [pending]);
   const distKey = activeDistribute
     ? `${activeDistribute.skillId}:${activeDistribute.actionType}:${activeDistribute.prompt.mode ?? 'allocate'}`
@@ -486,6 +496,23 @@ export function usePlayInteraction(
     return { canPlay, targetLabel };
   })();
 
+  // ─── respond 模式派生(useCardAndTarget 类回应,如借刀杀人/出杀)───
+  // respond 与主动出牌是两套独立交互,不复用 selectedTarget/selectedUseAction。
+  // respondTargetFilter 来自 pending.prompt.targetFilter(经投影层下发);无 filter 时
+  // 前端以「其他存活玩家」作 UI 提示,后端 validate 权威校验距离/必含等约束。
+  const respondTargetFilter =
+    isMyAwaiting && pending?.prompt?.type === 'useCardAndTarget'
+      ? pending.prompt.targetFilter
+      : null;
+  const respondNeedsTarget =
+    isMyAwaiting &&
+    pending?.prompt?.type === 'useCardAndTarget' &&
+    !pending.prompt.selfTarget;
+  // respond 目标是否已满足:min<=1 时选了一个即可;max>1 时至少选 min 个。
+  // 当前仅支持单目标路径(借刀杀人 targetFilter.max<=3 但默认选 1 即可);多目标累加
+  // 复用 selectedMultiTargets 的场景极少(无现有 useCardAndTarget respond 需多选),暂不支持。
+  const respondTargetReady = respondNeedsTarget ? !!respondTargetName : true;
+
   // ─── handlers ───
   const nameToIndex = useCallback(
     (name: string): number => {
@@ -506,6 +533,17 @@ export function usePlayInteraction(
         return view.players[i]?.alive === true;
       }
       const tf = selectedTargetFilter;
+      // respond 模式 useCardAndTarget(借刀杀人/出杀):座位可选性由 respondTargetFilter 决定。
+      // 不依赖 selectedUseAction(respond 时 selectedCardId=null,selectedUseAction=undefined)。
+      if (isMyAwaiting && respondTargetFilter) {
+        const tf2 = respondTargetFilter;
+        // 不能选自己(借刀杀人/出杀的目标是其他角色;selfTarget 的 useCardAndTarget respond 不走此分支)
+        if (i === perspectiveIdx) return false;
+        if (!view.players[i]?.alive) return false;
+        const filter = tf2.filter;
+        if (!filter) return true;
+        return filter(view, i);
+      }
       // 多槽位目标(借刀杀人 A+B):按当前选择进度取对应槽位 filter 判断可选性。
       // 槽位自身决定可选性（含是否允许自己作为 killTarget），不应用 self 排除。
       if (tf?.slots && tf.slots.length > 1) {
@@ -555,6 +593,8 @@ export function usePlayInteraction(
       playRules,
       selectedMultiTargets,
       selectedCard,
+      isMyAwaiting,
+      respondTargetFilter,
     ],
   );
 
@@ -631,6 +671,14 @@ export function usePlayInteraction(
         }
         return;
       }
+      // respond 模式 useCardAndTarget(借刀杀人/出杀):点目标 toggle 选中,与出牌阶段 selectedTarget 独立。
+      // 不依赖 selectedCardId/selectedUseAction(respond 时两者均空),直接操作 respondTargetName。
+      if (isMyAwaiting && respondTargetFilter) {
+        if (!isTargetable(idx)) return;
+        setSelectedRespondCardId((prev) => prev); // 保持选中牌高亮
+        setRespondTargetName(respondTargetName === name ? null : name);
+        return;
+      }
       // 转化模式(丈八蛇矛/武圣):永远只提交单目标(handleTransformPlay 取 targets:[idx]),
       // 不走多目标累加——否则杀的 targetFilter.max=3 会让 multiTarget=true,
       // 点击目标写入 selectedMultiTargets 而按钮只认 selectedTarget → 按钮卡住 disabled。
@@ -678,6 +726,9 @@ export function usePlayInteraction(
       distSelected,
       playRules,
       transformMode,
+      isMyAwaiting,
+      respondTargetFilter,
+      respondTargetName,
     ],
   );
 
@@ -828,7 +879,16 @@ export function usePlayInteraction(
         if (info.cardFilter && !info.cardFilter(card)) return;
         // 求桃:按救援牌路由到对应技能(桃/酒/急救);其他回应用默认 skillId
         const rescueSkill = info.rescueSkillForCard?.(card);
-        send(rescueSkill ?? info.skillId, 'respond', { cardId });
+        // useCardAndTarget 类回应(借刀杀人/出杀):附带 targets,必含发起者指定的 killTarget。
+        // respondTargetName 为前端选中的单目标;无 targetFilter 的 useCardAndTarget(不应出现)回退仅 cardId。
+        if (respondNeedsTarget) {
+          if (!respondTargetName) return;
+          const tIdx = view.players.findIndex((pl) => pl.name === respondTargetName);
+          if (tIdx < 0) return;
+          send(rescueSkill ?? info.skillId, 'respond', { cardId, targets: [tIdx] });
+        } else {
+          send(rescueSkill ?? info.skillId, 'respond', { cardId });
+        }
       } else if (pendingTargetIdx < 0) {
         // 广播型 pending(无懈可击):发 skip 让服务端累计,全员 skip 时提前结束窗口
         send('__skip', 'skip', {});
@@ -848,6 +908,9 @@ export function usePlayInteraction(
       pendingTargetIdx,
       markBroadcastSkipped,
       broadcastKey,
+      respondNeedsTarget,
+      respondTargetName,
+      view.players,
     ],
   );
 
@@ -856,14 +919,16 @@ export function usePlayInteraction(
     send('回合管理', 'end', {});
   }, [isMyTurn, send]);
 
-  // useCard 类回应「打出」按钮:用当前选中的回应牌发起 respond(走 handleRespond 的 cardId 分支,
-  // 含求桃按救援牌路由/无懈可击默认 skillId),打出后立即清空选中(pending 变化也会清,这里即时反馈)。
+  // useCard/useCardAndTarget 类回应「打出」按钮:用当前选中的回应牌发起 respond。
+  // useCardAndTarget(借刀杀人/出杀)还需已选目标(respondTargetReady)。
   const handlePlayRespond = useCallback(() => {
     if (!selectedRespondCardId) return;
+    if (respondNeedsTarget && !respondTargetName) return;
     const cardId = selectedRespondCardId;
     setSelectedRespondCardId(null);
+    setRespondTargetName(null);
     handleRespond(cardId);
-  }, [selectedRespondCardId, handleRespond]);
+  }, [selectedRespondCardId, respondNeedsTarget, respondTargetName, handleRespond]);
 
   const handleCardClick = useCallback(
     (card: Card) => {
@@ -1116,6 +1181,9 @@ export function usePlayInteraction(
     selectedActive,
     playButtonState,
     selectedRespondCardId,
+    respondTargetName,
+    respondNeedsTarget,
+    respondTargetReady,
     altActions,
     handleCardClick,
     handlePlayCard,

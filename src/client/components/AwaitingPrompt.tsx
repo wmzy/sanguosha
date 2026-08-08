@@ -351,14 +351,18 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
               </div>
             );
           }
-          // useCard 类 pending:手牌区对可回应的牌(杀/闪/桃/酒)高亮。改为「先选牌再点打出」两步式
+          // useCard / useCardAndTarget 类 pending:手牌区对可回应的牌(杀/闪/桃/酒)高亮。改为「先选牌再点打出」两步式
           // (避免误触直接出牌),出牌/不回应按钮在下方统一操作区(actionBar),此处仅显示文案提示。
+          // useCardAndTarget(借刀杀人/出杀)还需选目标座次,提示文案区分。
           const respondableCount = filterFn ? perspectiveHand.filter(filterFn).length : 0;
+          const needsTarget = pending.prompt.type === 'useCardAndTarget';
           return (
             <div className={styles.promptActions}>
               <span className={styles.promptDescInline}>
                 {respondableCount > 0
-                  ? `选择高亮的牌（共 ${respondableCount} 张可选），再点「打出」确认，或点「不回应」跳过`
+                  ? needsTarget
+                    ? `选择高亮的牌（共 ${respondableCount} 张可选），再选目标，点「打出」确认；或点「交出武器」跳过`
+                    : `选择高亮的牌（共 ${respondableCount} 张可选），再点「打出」确认，或点「不回应」跳过`
                   : '当前没有可出的牌回应，点「不回应」跳过'}
               </span>
             </div>
