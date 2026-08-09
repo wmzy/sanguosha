@@ -21,6 +21,7 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { slashMax, slashUsed, canSlash } from '../../src/engine/rules/slash-quota';
 import { handLimit } from '../../src/engine/rules/hand-limit';
+import { viewCanSlash, viewSlashMax } from '../../src/engine/rules/action-active';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(
@@ -427,5 +428,76 @@ describe('界将驰', () => {
 
     expect(harness.state.turn.vars['将驰/choice1']).toBeUndefined();
     expect(harness.state.turn.vars['将驰/choice2']).toBeUndefined();
+  });
+
+  // ─── 回归(FwXS7N):view.turnUsage 必须用客户端谓词约定的前缀 ────────────
+  //   选项①前缀错(将驰/choice1)→ viewCanSlash 读不到禁杀,【杀】仍出现在 availableActions,
+  //   AI 出杀被后端 blocker 拒;选项②缺 '杀/extra/' → viewSlashMax 误显示上限 1(后端实际 2)。
+
+  it('选项①:view 同步 杀/blocked/界将驰(viewCanSlash=false)', async () => {
+    const d1 = makeCard('d1', '桃', '♥', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['界将驰'] }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操' }),
+      ],
+      cardMap: { d1 },
+      zones: { deck: ['d1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '摸牌',
+      turn: { round: 1, phase: '摸牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '摸牌' });
+    await harness.waitForStable();
+    void applyAtom(harness.state, { type: '阶段结束', player: 0, phase: '摸牌' });
+    await harness.waitForStable();
+    await P0.respond('界将驰', { choice: true }); // 发动
+    await harness.waitForStable();
+    // 手牌为空 → 跳过询问②,自动走选项①
+    expect(harness.state.turn.vars['将驰/choice1']).toBe(0);
+
+    P0.processEvents();
+    P0.expectView((v) => {
+      expect(v.players[0].turnUsage?.['杀/blocked/界将驰']).toBe(true);
+      expect(viewCanSlash(v, 0)).toBe(false);
+    });
+  });
+
+  it('选项②:view 同步 杀/extra/界将驰=1(viewSlashMax=2)', async () => {
+    const x1 = makeCard('x1', '闪', '♥', '3');
+    const d1 = makeCard('d1', '桃', '♦', '4');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['x1'], skills: ['界将驰'] }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操' }),
+      ],
+      cardMap: { x1, d1 },
+      zones: { deck: ['d1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '摸牌',
+      turn: { round: 1, phase: '摸牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '摸牌' });
+    await harness.waitForStable();
+    void applyAtom(harness.state, { type: '阶段结束', player: 0, phase: '摸牌' });
+    await harness.waitForStable();
+    await P0.respond('界将驰', { choice: true }); // 发动
+    await harness.waitForStable();
+    await P0.respond('界将驰', { choice: false }); // ②重铸一张
+    await harness.waitForStable();
+    await P0.respond('界将驰', { cardId: 'x1' }); // 选 x1 重铸
+    await harness.waitForStable();
+
+    P0.processEvents();
+    P0.expectView((v) => {
+      expect(v.players[0].turnUsage?.['杀/extra/界将驰']).toBe(1);
+      expect(viewSlashMax(v, 0)).toBe(2);
+    });
   });
 });

@@ -218,11 +218,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // ── 选项①:摸一张牌 + 杀次数-1(blocker)+ 杀不计入手牌上限(hand-limit provider) ──
       await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
       ctx.state.turn.vars[CHOICE1_VAR] = ownerId;
-      // 投影到 view.turnUsage,供前端 viewSlashMax / viewCanAttack / hand-limit 显示
+      // 投影到 view.turnUsage:用 viewCanSlash 约定的 '杀/blocked/' 前缀,供前端/MCP 客户端
+      // 推断禁杀(杀从 availableActions 隐藏)。后端 blocker 读 turn.vars[CHOICE1_VAR],不受影响。
       await applyAtom(ctx.state, {
         type: '回合用量',
         player: ownerId,
-        key: CHOICE1_VAR,
+        key: '杀/blocked/界将驰',
         value: true,
       });
       return;
@@ -254,12 +255,19 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // 重铸:弃置 + 摸一张
     await recastCard(ctx.state, ownerId, cardId);
     ctx.state.turn.vars[CHOICE2_VAR] = ownerId;
-    // 投影到 view.turnUsage
+    // 投影到 view.turnUsage:'将驰/choice2' 供 viewDistance 推断杀无距离;
+    // '杀/extra/界将驰'=1 供 viewSlashMax 推断上限 +1(额定 1 + 额外 1 = 2)。
     await applyAtom(ctx.state, {
       type: '回合用量',
       player: ownerId,
       key: CHOICE2_VAR,
       value: true,
+    });
+    await applyAtom(ctx.state, {
+      type: '回合用量',
+      player: ownerId,
+      key: '杀/extra/界将驰',
+      value: 1,
     });
   });
 

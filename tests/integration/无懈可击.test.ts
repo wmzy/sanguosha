@@ -10,7 +10,7 @@
 //
 // 模式:createGameState + registerSkillsFromState → dispatch 走真实 action 路径
 import { describe, it, expect, beforeEach } from 'vitest';
-import { registerSkillsFromState, dispatch as engineDispatch } from '../../src/engine/index'
+import { registerSkillsFromState, dispatch as engineDispatch, buildView } from '../../src/engine/index'
 import { frameCards } from '../../src/engine/core/frame'
 import { applyAtom } from '../../src/engine/core/apply';
 import { fireTimeoutAndWait, dispatchAndWait, waitForStable } from '../engine-harness';
@@ -930,3 +930,116 @@ describe('skip 机制:广播型 pending 放弃回应', () => {
     expect(state.players[1].hand).not.toContain(nullifId);
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// 死亡玩家不参与广播型无懈可击询问(1EyezD 回归)
+// 规则:已死亡玩家不参与任何结算询问。广播型无懈可击(target=-2)不应向死亡
+// 玩家展示可操作 pending。
+//   1. buildView:死亡 viewer 的 pending 不匹配广播 slot(无可操作 prompt)
+//   2. applyView(增量):死亡 viewer 收到广播 请求回应 event 时不设可操作 pending
+// ─────────────────────────────────────────────────────────────
+describe('死亡玩家不参与广播型无懈可击询问', () => {
+  let state: GameState;
+
+  beforeEach(async () => {
+    state = createGameState({
+      players: [
+        {
+          index: 0,
+          name: 'P0',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: [],
+          equipment: {},
+          skills: ['回合管理', '过河拆桥', '无懈可击'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+        {
+          index: 1,
+          name: 'P1',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: true,
+          hand: ['d1'],
+          equipment: {},
+          skills: ['回合管理', '过河拆桥', '无懈可击'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+        {
+          index: 2,
+          name: 'P2',
+          character: '',
+          health: 4,
+          maxHealth: 4,
+          alive: false, // P2 已死亡
+          hand: [],
+          equipment: {},
+          skills: ['回合管理', '过河拆桥', '无懈可击'],
+          vars: {},
+          marks: [],
+          pendingTricks: [],
+          tags: [],
+          judgeZone: [],
+        },
+      ],
+      cardMap: {
+        d1: { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' },
+      },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await registerSkillsFromState(state);
+  });
+
+  it('死亡玩家 buildView 的 pending 不匹配广播型无懈 slot(无可操作 prompt)', async () => {
+    const gqId = 'gq-0';
+    state.cardMap[gqId] = {
+      id: gqId,
+      name: '过河拆桥',
+      suit: '♠',
+      color: '黑',
+      rank: '3',
+      type: '锦囊牌',
+    };
+    state.players[0].hand.push(gqId);
+
+    await dispatchAndWait(state, {
+      skillId: '过河拆桥',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: gqId, targets: [1] },
+      baseSeq: state.seq,
+    });
+
+    // 广播型无懈 slot 存在
+    const wuxieSlot = [...state.pendingSlots.values()].find(
+      (s) => (s.atom as { target?: number }).target === -2,
+    );
+    expect(wuxieSlot).toBeDefined();
+
+    // 存活玩家 P0/P1 的视图:能看到广播型无懈可操作 prompt
+    const view0 = buildView(state, 0);
+    const view1 = buildView(state, 1);
+    const wuxiePrompt = (p: unknown): boolean =>
+      (p as { prompt?: { title?: string } })?.prompt?.title === '是否打出无懈可击?';
+    expect(wuxiePrompt(view0.pending)).toBe(true);
+    expect(wuxiePrompt(view1.pending)).toBe(true);
+
+    // 死亡玩家 P2 的视图:pending 不应是广播无懈的可操作 prompt
+    const view2 = buildView(state, 2);
+    expect(wuxiePrompt(view2.pending)).toBe(false);
+  });
+});
+

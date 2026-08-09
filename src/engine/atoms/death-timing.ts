@@ -79,9 +79,8 @@ export const 亮身份牌: AtomDefinition<{ player: number }> = {
       }
     }
   },
-  toViewLog(event) {
-    return { player: event.player as number, text: '阵亡' };
-  },
+  // 不输出"阵亡"日志——本时机只负责身份揭示,死亡日志由 系统处理牌(置 alive=false)统一输出,
+  // 避免一次死亡在日志里出现两条"阵亡"(原 击杀 atom 拆分为多时机时 toViewLog 被误复制)。
 };
 
 registerAtom(亮身份牌);

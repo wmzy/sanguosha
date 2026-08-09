@@ -7,7 +7,12 @@
 //   1. 造成伤害(target=春华):X = maxHealth - health 可能因受伤增加
 //   2. 失去体力(target=春华):同上(闪电等无来源体力流失;或被绝情转化的伤害)
 //   3. 弃置(player=春华):手牌数减少
-//   4. 移动牌(from=春华手牌):打出/使用让手牌数减少
+//   4. 移动牌(from=春华手牌):被拆(过河拆桥)等让手牌数减少;
+//      非延时牌的"使用声明"(手牌→处理区)延后到 使用结算结束后 检查(见下),
+//      延时锦囊(无 使用结算结束后)仍在此即时检查
+//   4b. 使用结算结束后(source=春华):春华使用非延时牌(杀/桃/锦囊)结算完毕后检查,
+//       以稳定状态判定——避免桃/桃园结义/青囊等回复牌在回复结算中途的瞬态误触发
+//       (手牌已减但 X 尚未因回复而下降)
 //   5. 获得(from=春华)/装备(player=春华):被偷/被拿(顺手牵羊等)、
 //      装备手牌中的装备牌,均让手牌数减少
 //      (获得/装备 atom 自带 apply、不发 移动牌,故独立 hook)
@@ -26,6 +31,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
+import { getCardEffect } from '../core/card-effect/registry';
 import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const CONFIRM_RT = '界伤逝/confirm';
@@ -153,6 +159,24 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (atom.from?.player !== ownerId) return;
     // 手牌→自己的手牌(罕见)不减,跳过
     if (atom.to?.zone === '手牌' && atom.to?.player === ownerId) return;
+    // 卡牌使用声明(手牌→处理区):非延时牌延后到「使用结算结束后」检查。
+    // 桃/桃园结义/青囊等回复牌在回复结算中途若即时检查,会看到"手牌已减但 X(已损失体力)
+    // 尚未因回复而下降"的瞬态,误触发伤逝(回复后 X 减小,伤逝本不应发动)。
+    // 延时锦囊(乐不思蜀/兵粮寸断/闪电)不发 使用结算结束后,仍在此即时检查。
+    if (atom.to?.zone === '处理区' && atom.cardId) {
+      const card = ctx.state.cardMap[atom.cardId];
+      const effect = card && getCardEffect(card.name);
+      if (effect && !effect.delayed) return;
+    }
+    await checkTrigger(ctx.state, ownerId);
+  });
+
+  // ── 使用结算结束后 after:春华使用非延时牌结算完毕 → 以稳定状态检查 ──
+  // 覆盖杀/桃/锦囊等(经 runUseFlow)的手牌减少。桃等回复牌在此检查时,
+  // X 已随回复更新(避免回复结算中途的瞬态误触发)。
+  registerAfterHook(state, skill.id, ownerId, '使用结算结束后', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.source !== ownerId) return;
     await checkTrigger(ctx.state, ownerId);
   });
 

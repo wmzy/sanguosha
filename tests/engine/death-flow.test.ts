@@ -18,6 +18,7 @@ import '../../src/engine/atoms'; // 注册所有 atom(含 death-timing)
 import { createGameState } from '../../src/engine/types';
 import type { Atom, GameState, PlayerState } from '../../src/engine/types';
 import { runDeathFlow } from '../../src/engine/flows/death';
+import { getAtomDef } from '../../src/engine/core/atom';
 
 function makePlayer(opts: {
   index: number;
@@ -268,5 +269,17 @@ describe('模块 B:死亡编排函数 runDeathFlow', () => {
     expect(handAtDeathTiming).toEqual(['c1']);
     // 最终手牌被系统处理牌清空
     expect(state.players[0].hand).toEqual([]);
+  });
+
+  // ── 死亡日志去重:一次死亡只输出一条"阵亡" ─────────────────
+  it('死亡日志只输出一次:亮身份牌仅揭示身份,由系统处理牌统一输出"阵亡"', () => {
+    // 回归:原 击杀 atom 拆分为 亮身份牌 + 系统处理牌 时,toViewLog("阵亡")被复制到两者,
+    // 导致一次死亡在视图日志里出现两条"阵亡"。亮身份牌 只负责身份揭示(toViewEvents),
+    // 不应再输出"阵亡"日志。
+    const revealDef = getAtomDef('亮身份牌');
+    const processDef = getAtomDef('系统处理牌');
+    expect(revealDef.toViewLog).toBeUndefined();
+    const log = processDef.toViewLog!({ type: '系统处理牌', player: 0 }, 0, () => 'P0');
+    expect(log).toEqual({ player: 0, text: '阵亡' });
   });
 });

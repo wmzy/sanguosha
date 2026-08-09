@@ -211,3 +211,66 @@ describe('弃置装备:卸载自带技能实例', () => {
     expect(state.zones.discardPile).toContain('h1');
   });
 });
+
+// 获得路径(顺手牵羊/反馈)同样需卸载被取走装备的自带技能实例。
+// Bug(game-4 反馈):获得 atom 从 from 装备区取牌时,apply 移除装备但未移除技能,
+// 导致装备技能实例(hook/provider)残留在原玩家。系统规则 获得 after-hook 统一兜底。
+// 与 弃置 after-hook 同构。
+describe('获得装备:卸载自带技能实例(顺手牵羊/反馈路径)', () => {
+  it('顺手牵羊偷走方天画戟 → 原玩家 skills 不再含 方天画戟,slashTargetMax 提供者消失', async () => {
+    const fangtian: Card = {
+      id: 'wp-ft', name: '方天画戟', suit: '♦', color: '红', rank: 'Q',
+      type: '装备牌', subtype: '武器', range: 4,
+    };
+    const snatch: Card = {
+      id: 'm-sn', name: '顺手牵羊', suit: '♠', color: '黑', rank: 'J', type: '锦囊牌',
+    };
+    const slash: Card = { id: 'k1', name: '杀', suit: '♣', color: '黑', rank: '5', type: '基本牌' };
+    const jink: Card = { id: 'd1', name: '闪', suit: '♦', color: '红', rank: '6', type: '基本牌' };
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [snatch.id], skills: ['顺手牵羊', '杀'] }),
+        makePlayer({
+          index: 1, name: 'P1', hand: [jink.id],
+          equipment: { 武器: fangtian.id },
+          skills: ['闪', '方天画戟'],
+        }),
+      ],
+      cardMap: { [fangtian.id]: fangtian, [snatch.id]: snatch, [slash.id]: slash, [jink.id]: jink },
+      zones: { deck: [], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.players[1].vars['距离/出杀范围'] = 4;
+    await registerSkillsFromState(state);
+
+    expect(state.players[1].skills).toContain('方天画戟');
+
+    // P0 顺手牵羊 P1(距离 1)
+    await dispatchAndWait(state, {
+      skillId: '顺手牵羊', actionType: 'use', ownerId: 0,
+      params: { cardId: snatch.id, targets: [1] }, baseSeq: state.seq,
+    });
+    // 无懈可击广播(锦囊牌自动推导):两玩家都跳过
+    await dispatchAndWait(state, {
+      skillId: '__skip', actionType: 'skip', ownerId: 0, params: {}, baseSeq: state.seq,
+    });
+    await dispatchAndWait(state, {
+      skillId: '__skip', actionType: 'skip', ownerId: 1, params: {}, baseSeq: state.seq,
+    });
+    // 选牌面板:P0 选装备方天画戟
+    await dispatchAndWait(state, {
+      skillId: '顺手牵羊', actionType: 'respond', ownerId: 0,
+      params: { zone: 'equipment', cardId: fangtian.id }, baseSeq: state.seq,
+    });
+
+    // 装备被取走
+    expect(state.players[1].equipment['武器']).toBeUndefined();
+    // 获得者拿到牌
+    expect(state.players[0].hand).toContain(fangtian.id);
+    // 修复后:装备技能实例被卸载,skills 不再含 方天画戟
+    expect(state.players[1].skills).not.toContain('方天画戟');
+  });
+});

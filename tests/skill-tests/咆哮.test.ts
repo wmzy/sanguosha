@@ -12,6 +12,8 @@ import '../../src/engine/skills';
 import { slashMax } from '../../src/engine/rules/slash-quota';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
+import { applyAtom } from '../../src/engine/core/apply';
+import { viewCanSlash } from '../../src/engine/rules/action-active';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(
@@ -145,6 +147,46 @@ describe('咆哮', () => {
       skillId: '杀',
       actionType: 'use',
       params: { cardId: 's2', targets: [1] },
+    });
+  });
+
+  // 回归(G84oMT):咆哮缺 view.turnUsage 同步时,客户端 viewSlashMax 读不到 '杀/unlimited/',
+  // 首次出杀后(usedCount=1 ≥ max 1)viewCanSlash 误判 false,【杀】从 availableActions 消失,
+  // 让 AI/玩家以为"杀被拒"。后端 slashMax 仍为 ∞(provider 正确),仅客户端投影缺失。
+  it('view 同步:出牌阶段开始投影 杀/unlimited/咆哮 → 首次出杀后 viewCanSlash 仍 true', async () => {
+    const s1 = makeCard('s1', '杀', '♠', 'A');
+    const s2 = makeCard('s2', '杀', '♠', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['s1', 's2'], skills: ['咆哮', '杀'] }),
+        makePlayer({ index: 1, name: 'P2', skills: ['杀'] }),
+      ],
+      cardMap: { s1, s2 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // 出牌阶段开始 → 咆哮 after-hook 投影 '杀/unlimited/咆哮' 到 view.turnUsage
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '出牌' });
+    await harness.waitForStable();
+    P1.processEvents();
+    P1.expectView((v) => {
+      expect(v.players[0].turnUsage?.['杀/unlimited/咆哮']).toBe(true);
+      expect(viewCanSlash(v, 0)).toBe(true);
+    });
+
+    // 出一张杀(usedCount→1),unlimited 仍在 → viewCanSlash 仍 true(可继续出第二张)
+    await P1.useCardAndTarget('杀', 's1', [1]);
+    await P2.pass();
+    P1.processEvents();
+    P1.expectView((v) => {
+      expect(v.players[0].turnUsage?.['杀/unlimited/咆哮']).toBe(true);
+      expect(v.players[0].turnUsage?.['杀/usedCount']).toBe(1);
+      expect(viewCanSlash(v, 0)).toBe(true);
     });
   });
 });

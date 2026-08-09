@@ -26,7 +26,10 @@ import {
 } from '../../src/ai-mcp/feedbackHandler';
 
 function makeFakeHgc(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameClient {
-  return {
+  // 模拟服务端异步处理 action:sendAction 后推进 seq,让 runPlay 的
+  // "提交后等待处理(seq 推进/被拒/游戏结束)"守门通过(对齐真实 SSE 推送语义)。
+  let seq = 0;
+  const base = {
     isSpectator: false,
     phase: 'playing',
     seatIndex: 0,
@@ -41,7 +44,17 @@ function makeFakeHgc(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameC
     sendAction: vi.fn(),
     consumeActionRejected: () => false,
     ...overrides,
-  } as unknown as HeadlessGameClient;
+  };
+  const origSendAction = base.sendAction as ((...args: unknown[]) => void) | undefined;
+  base.sendAction = vi.fn((...args: unknown[]) => {
+    origSendAction?.(...args);
+    setTimeout(() => {
+      seq = 1;
+    }, 5);
+  });
+  const hgc = base as unknown as HeadlessGameClient;
+  Object.defineProperty(hgc, 'lastSeq', { get: () => seq, configurable: true });
+  return hgc;
 }
 
 /**
@@ -173,6 +186,46 @@ describe('handleMcpRequest', () => {
     };
     expect(result.content[0].text).toBeTypeOf('string');
     expect(result.structuredContent.lastActionResult).toBe('accepted');
+  });
+
+  it('tools/call play 接受整条 availableActions 项(含嵌套 message)并展开转发', async () => {
+    // LLM 按工具说明"action 从 availableActions 取一条"传整条对象,
+    // skillId 嵌在 message 里；必须展开否则 action 被静默丢弃(not-applicable)。
+    const hgc = makeFakeHgc();
+    const ctx = makeCtx(hgc);
+    const message = {
+      skillId: '系统规则',
+      actionType: '选将',
+      ownerId: 1,
+      params: { character: '界孙策' },
+      baseSeq: 0,
+    };
+    const res = await handleMcpRequest(
+      {
+        jsonrpc: '2.0',
+        id: 33,
+        method: 'tools/call',
+        params: {
+          name: 'play',
+          arguments: {
+            action: {
+              description: '选择武将【界孙策】',
+              message,
+              validTargets: [],
+              category: 'selectChar',
+            },
+          },
+        },
+      },
+      ctx,
+    );
+    // sendAction 收到的是展开后的 message（ownerId 保留为传入的 1）
+    expect(hgc.sendAction).toHaveBeenCalledWith(
+      expect.objectContaining({ skillId: '系统规则', actionType: '选将', ownerId: 1 }),
+    );
+    const sc = (res!.result as { structuredContent: { lastActionResult: string } })
+      .structuredContent;
+    expect(sc.lastActionResult).toBe('accepted');
   });
 
   it('tools/call play 在 lobby 阶段阻塞等待进入 playing 而非立即返回', async () => {

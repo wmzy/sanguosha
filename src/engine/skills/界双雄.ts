@@ -5,16 +5,20 @@
 // 与标版双雄( src/engine/skills/双雄.ts )区别(本界版独立实现):
 //   1. 触发时机+动作:标版"摸牌阶段开始 → 改为进行一次判定 → 获得判定牌 + 记判定牌颜色";
 //      界版"摸牌阶段结束 → 弃置一张手牌 + 记弃置牌颜色"(不跳过默认摸牌,不判定,
-//      不获得额外牌)。故触发点完全不同:after-hook on 阶段结束(摸牌),而非 before-hook
-//      on 阶段开始(摸牌)。
+//      不获得额外牌)。故触发点完全不同:before-hook on 阶段结束(摸牌),而非 before-hook
+//      on 阶段开始(摸牌)。(界版用 before-hook 而非 after-hook 的原因见 A 注释)
 //   2. 转化条件:标版/界版措辞都是"与之颜色不同"——标版"判定牌颜色",界版"弃置牌颜色"。
 //   3. 界版新增:结束阶段,获得本回合对界颜良文丑造成伤害的牌(标版无此效果)。
 //
 // 四部分组合:
-//   A) 摸牌阶段结束(after-hook on 阶段结束, phase='摸牌'):
+//   A) 摸牌阶段结束(before-hook on 阶段结束, phase='摸牌'):
 //        询问发动 → 选一张手牌弃置 → 记 turn.vars['界双雄/color']=弃置牌颜色
-//        (镜像 界将驰/截辎:用 NORMAL_KEY 区分被跳过的摸牌阶段——兵粮寸断/神速/巧变/再起
-//        在 before-hook cancel 阶段开始,after-hook 不执行 → NORMAL_KEY 不设置 → 本 hook 不触发)
+//        (用 before-hook 而非 after-hook:回合管理的 阶段结束(摸牌) after-hook 会推进到
+//        出牌阶段并以 fire-and-forget 启动出牌窗口循环,其 slot 与本技能阻塞型 pending
+//        同 target 冲突(互相覆盖→孤立→卡死)。before-hook 先于回合管理结算,避免冲突。
+//        镜像 截辎 的同款手法)
+//        (NORMAL_KEY 区分被跳过的摸牌阶段——兵粮寸断/神速/巧变/再起 在 before-hook
+//        cancel 阶段开始,阶段开始 after-hook 不执行 → NORMAL_KEY 不设置 → 本 hook 不触发)
 //   B) 转化 action(transform,preceding 决斗.use,镜像标版双雄/武圣单卡转化):
 //        把一张与弃置牌颜色不同的手牌当【决斗】(影子卡 outputName='决斗')
 //   C) 造成伤害 after-hook:target=ownerId 且 amount>0 时,记 cardId 到
@@ -46,6 +50,7 @@ import { applyAtom } from '../core/apply';
 import {
   registerAction,
   registerAfterHook,
+  registerBeforeHook,
   hasBlockingPending,
   type SkillModule,
 } from '../core/skill';
@@ -131,8 +136,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ctx.state.localVars[NORMAL_KEY] = ownerId;
   });
 
-  // ── 阶段结束(摸牌) after-hook:核心触发 A —— 询问发动 → 弃牌 → 记色 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
+  // ── 阶段结束(摸牌) before-hook:核心触发 A —— 询问发动 → 弃牌 → 记色 ──
+  //   必须用 before-hook(非 after-hook):回合管理 的 阶段结束(摸牌) after-hook 会把
+  //   state.phase 推进到"出牌"并以 fire-and-forget 启动出牌窗口循环(创建非阻塞 slot)。
+  //   回合管理 注册早于角色技能(DEFAULT_SKILLS 排在前),after-hook 中本技能晚于它执行,
+  //   其阻塞型 pending(ACTIVATE_RT/PICK_RT)会与出牌窗口 slot 冲突——pendingSlots 按
+  //   target 索引,两者同 target 互相覆盖,被覆盖方 slot 孤立、超时 fireTimeoutNow 因
+  //   pendingSlots.get(target)!==slot 而 bail → 永不 resolve → 游戏卡死。
+  //   改用 before-hook:本技能先于 atom apply 与回合管理 after-hook 结算,pending 在出牌
+  //   窗口创建前已全部 resolve,无 slot 冲突。(镜像 截辎 的同款 before-hook 手法)
+  registerBeforeHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.phase !== '摸牌') return;

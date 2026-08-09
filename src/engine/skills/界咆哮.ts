@@ -30,6 +30,22 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // 注册无限出杀提供者:返回 true → slashMax = ∞ → 可无限出杀。
   const unregMax = registerSlashUnlimitedProvider(state, ownerId, () => true);
 
+  // view 同步:在拥有者每个出牌阶段开始时把 '杀/unlimited/界咆哮' 投影到 view.turnUsage
+  // (回合结束自动清空)。前端/MCP 客户端 viewSlashMax 据此推断无限出杀;缺失则首次出杀后
+  // (usedCount=1 ≥ max 1)viewCanSlash 误判为 false,【杀】从 availableActions 消失。
+  const unregSync = registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.type !== '阶段开始') return;
+    if (atom.phase !== '出牌') return;
+    if (atom.player !== ownerId) return;
+    await applyAtom(ctx.state, {
+      type: '回合用量',
+      player: ownerId,
+      key: '杀/unlimited/界咆哮',
+      value: true,
+    });
+  });
+
   // 杀被闪抵消后摸一张牌(无次数限制,每次被闪都摸)。
   const unregHook = registerAfterHook(
     state,
@@ -48,6 +64,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   return () => {
     unregMax();
+    unregSync();
     unregHook();
   };
 }

@@ -178,6 +178,27 @@ export function onInit(_skill: Skill, state: GameState): () => void {
     }
   });
 
+  // ── 获得 after hook:卸载从他人装备区获得的装备自带技能实例 ──
+  // 顺手牵羊/反馈用 获得 atom 从目标装备区取牌:apply 把牌从 from.equipment 移到 player.hand,
+  // 但没走 装备通用 → 装备技能实例(hook/provider)残留在 from 玩家。与 弃置 hook 同构兜底。
+  // 判据:atom.from 存在(来自他人) 且 该牌为装备牌且其 name 是已挂载的装备技能。
+  // apply 后 from.equipment 已不含该牌,用 card.type + skillLoaders(name)+ from.skills(是否挂载)双判。
+  registerAfterHook(state, '系统规则', -1, '获得', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.from === undefined) return;
+    const fromPlayer = ctx.state.players[atom.from];
+    if (!fromPlayer) return;
+    const card = ctx.state.cardMap[atom.cardId];
+    if (
+      card?.type === '装备牌' &&
+      card?.name &&
+      skillLoaders[card.name] &&
+      fromPlayer.skills.includes(card.name)
+    ) {
+      await applyAtom(ctx.state, { type: '移除技能', player: atom.from, skillId: card.name });
+    }
+  });
+
   // ── 造成伤害 after hook 已删除:伤害走 runDamageFlow → 扣减体力,
   // 濒死检查由 扣减体力 after-hook 负责,killer 由 runDecreaseLifeFlow 写入。
 

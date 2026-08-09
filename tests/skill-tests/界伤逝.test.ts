@@ -7,7 +7,9 @@
 //   3. 春华受伤但 hand ≥ X → 不触发
 //   4. 春华未受伤(X=0) → 不触发
 //   5. 春华失去体力(无来源)后 hand < X → 触发(失去体力 hook)
-//   6. 春华出牌后 hand < X → 触发(移动牌 hook)
+//   6. 春华出牌后 hand < X → 触发(使用结算结束后 hook)
+//   7. 春华用桃回满血(X→0) → 不触发(回复结算中途的瞬态不再误触发)
+//   8. 春华用桃回复但仍受伤(X>0) → 回复后才触发,以回复后的 X 判定摸牌数
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -284,8 +286,8 @@ describe('界伤逝', () => {
     expect(harness.state.players[0].hand.length).toBe(2);
   });
 
-  // ─── 6. 春华出牌后 hand<X → 触发(移动牌 hook) ─────────
-  it('春华出牌后 hand<X → 触发(移动牌 hook)', async () => {
+  // ─── 6. 春华出牌后 hand<X → 触发(使用结算结束后 hook) ─────────
+  it('春华出牌后 hand<X → 触发(使用结算结束后 hook)', async () => {
     // 春华 maxHealth=3,health=1(X=2),hand=1。春华自己出杀 → hand=0 < 2 → 触发
     const slash = makeCard('k1', '杀', '♠', '7');
     const state: GameState = createGameState({
@@ -314,7 +316,7 @@ describe('界伤逝', () => {
     await harness.setup(state);
     const P0 = harness.player('春华');
 
-    // 春华出杀 → 移动牌(手牌→处理区)→ 春华 hand=0 < X=2 → 触发伤逝
+    // 春华出杀 → 使用结算结束后(杀结算完毕)→ 春华 hand=0 < X=2 → 触发伤逝
     await P0.useCardAndTarget('杀', 'k1', [1]);
     await waitForStable(harness.state);
 
@@ -336,5 +338,98 @@ describe('界伤逝', () => {
 
     // 春华出杀 hand 1→0,触发伤逝后摸至 X=2 张 → hand=2
     expect(harness.state.players[0].hand.length).toBe(2);
+  });
+
+  // ─── 7. 春华用桃回满血(X→0) → 不触发(回复结算中途瞬态不再误触发) ───
+  // 来源:game-3 feedback(0cDIwj)。旧实现在 移动牌(手牌→处理区,即桃使用声明)时
+  // 即时检查伤逝,此时 hand 已减 1 但 X(已损失体力)尚未因回复而下降,hand<X 成立 →
+  // 在"回复体力前"误弹出伤逝询问;回复后 X 归 0,伤逝本不应发动。
+  // 修复:非延时牌的使用声明延后到 使用结算结束后 检查,X 已随回复更新。
+  it('春华用桃回满血(X→0) → 不触发(回复前瞬态不再误触发)', async () => {
+    const peach = makeCard('t1', '桃', '♥', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '春华',
+          hand: ['t1'],
+          skills: ['界伤逝', '桃'],
+          health: 2,
+          maxHealth: 3,
+        }),
+        makePlayer({
+          index: 1,
+          name: '友',
+          character: '刘备',
+          hand: [],
+          skills: [],
+        }),
+      ],
+      cardMap: { t1: peach },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('春华');
+
+    // 春华 health=2(X=1),hand={桃}。使用桃自疗 → 回满血(X=0)。
+    await P0.useCardAndTarget('桃', 't1', [0]);
+    await waitForStable(harness.state);
+
+    expect(harness.state.players[0].health).toBe(3);
+    expect(harness.state.players[0].hand.length).toBe(0);
+    // X=0,伤逝不应触发(无 pending)
+    expect(harness.state.pendingSlots.size).toBe(0);
+  });
+
+  // ─── 8. 春华用桃回复但仍受伤(X>0) → 回复后才触发,以回复后的 X 判定 ───
+  it('春华用桃回复但仍受伤(X>0) → 回复后才触发,以回复后X判定摸牌数', async () => {
+    const peach = makeCard('t1', '桃', '♥', '5');
+    const d1 = makeCard('d1', '杀', '♠', '8');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '春华',
+          hand: ['t1'],
+          skills: ['界伤逝', '桃'],
+          health: 1,
+          maxHealth: 3,
+        }),
+        makePlayer({
+          index: 1,
+          name: '友',
+          character: '刘备',
+          hand: [],
+          skills: [],
+        }),
+      ],
+      cardMap: { t1: peach, d1 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('春华');
+
+    // 春华 health=1(X=2),hand={桃}。使用桃自疗 → health=2(X=1)。
+    // 旧实现:移动牌时 hand=0 < X=2 → 摸至 2 张(瞬态过度摸牌)。
+    // 新实现:使用结算结束后 hand=0 < X=1 → 摸至 1 张(回复后正确 X)。
+    await P0.useCardAndTarget('桃', 't1', [0]);
+    await waitForStable(harness.state);
+
+    // 伤逝 confirm 应出现(回复后 X=1, hand=0 < 1)
+    const slot = [...harness.state.pendingSlots.values()][0];
+    const atom = slot.atom as { type: string; requestType?: string };
+    expect(atom.type).toBe('请求回应');
+    expect(atom.requestType).toBe('界伤逝/confirm');
+
+    // 确认 → 摸至 X=1 张(非旧实现的 2 张)
+    await P0.respond('界伤逝', { choice: true });
+    await waitForStable(harness.state);
+
+    expect(harness.state.players[0].health).toBe(2);
+    expect(harness.state.players[0].hand.length).toBe(1);
   });
 });

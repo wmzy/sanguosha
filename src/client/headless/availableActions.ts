@@ -139,22 +139,53 @@ function enumerateTransformActions(
     const minCards = cardFilter.min ?? 1;
 
     if (minCards > 1) {
-      // 多卡转化(丈八蛇矛):组合数大,只生成描述性 action,validTargets 为空
-      const sampleCard = me.hand.find(filter);
-      const wrapperName =
-        sampleCard && action.transform ? action.transform(sampleCard).name : '杀';
-      result.push({
-        description: `${action.skillId}转化【${wrapperName}】(选 ${minCards} 张手牌)`,
-        message: {
-          skillId: wrapperName,
-          actionType: 'use',
-          ownerId: seatIndex,
-          params: {},
-          baseSeq: 0,
-        },
-        validTargets: [],
-        category: 'transform',
-      });
+      // 多卡转化(丈八蛇矛):为每对匹配手牌生成一个具体 action,
+      // 主 action params.cardId = 影子 id(`${id1}#${id2}#skillId`),
+      // preceding transform 携带 cardIds=[id1,id2];agent 仅需补 targets。
+      // (回归 yrjQ7X:旧实现只生成 params={} 的描述性 action + 空 validTargets,
+      //  agent 无法构造合法 preceding/影子 cardId → 丈八蛇矛完全不可用。)
+      const targetFilter = getTargetFilter(action.prompt);
+      const rules = derivePlayRules(targetFilter, getSelfTarget(action.prompt));
+      const validTargets = computeValidTargets(view, seatIndex, targetFilter, rules);
+      // 需要目标但无合法目标(如距离不够)→ 跳过
+      if (rules.needsTarget && !rules.selfTarget && validTargets.length === 0) continue;
+      const wrapperName = '杀';
+      const slashMax =
+        wrapperName === '杀' && rules.needsTarget && !rules.selfTarget
+          ? viewSlashTargetMax(view, seatIndex, { name: '杀' })
+          : undefined;
+      const matchingCards = me.hand.filter(filter);
+      for (let i = 0; i < matchingCards.length; i++) {
+        for (let j = i + 1; j < matchingCards.length; j++) {
+          const c1 = matchingCards[i];
+          const c2 = matchingCards[j];
+          const shadowCardId = `${c1.id}#${c2.id}#${action.skillId}`;
+          const desc = `${c1.suit}${c1.rank}+${c2.suit}${c2.rank}`;
+          result.push({
+            description:
+              wrapperName === '杀' && slashMax && slashMax > 1
+                ? `${action.skillId}转化【${wrapperName}】(${desc}) (最多${slashMax}目标)`
+                : `${action.skillId}转化【${wrapperName}】(${desc})`,
+            message: {
+              skillId: wrapperName,
+              actionType: 'use',
+              ownerId: seatIndex,
+              params: { cardId: shadowCardId },
+              preceding: [
+                {
+                  skillId: action.skillId,
+                  actionType: 'transform',
+                  params: { cardIds: [c1.id, c2.id] },
+                },
+              ],
+              baseSeq: 0,
+            },
+            validTargets,
+            category: 'transform',
+            ...(slashMax !== undefined ? { maxTarget: slashMax } : {}),
+          });
+        }
+      }
       continue;
     }
 

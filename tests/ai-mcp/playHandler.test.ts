@@ -9,6 +9,7 @@ function makeFake(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameClie
   return {
     phase: 'playing',
     needsAction: () => true,
+    lastSeq: 0,
     gameOverWinner: null,
     view: null,
     getAvailableActions: () => [],
@@ -49,8 +50,17 @@ describe('runPlay', () => {
     expect(res.gameOver).toEqual({ winner: '主公' });
   });
 
-  it('执行传入的 action', async () => {
-    const fake = makeFake();
+  it('执行传入的 action 并等待服务端处理(seq 推进)后再返回', async () => {
+    // 模拟服务端异步处理 action:sendAction 后 5ms 推进 seq（视图更新）
+    let seq = 0;
+    const fake = makeFake({
+      sendAction: vi.fn(() => {
+        setTimeout(() => {
+          seq = 1;
+        }, 5);
+      }),
+    });
+    Object.defineProperty(fake, 'lastSeq', { get: () => seq, configurable: true });
     const action: EngineClientMessage = {
       skillId: '杀',
       actionType: 'use',
@@ -58,8 +68,36 @@ describe('runPlay', () => {
       params: { cardId: 'c1', targets: [1] },
       baseSeq: 0,
     };
-    await runPlay(fake, { action: { message: action }, waitTimeoutMs: 100 });
+    const start = Date.now();
+    const res = await runPlay(fake, { action: { message: action }, waitTimeoutMs: 500 });
     expect(fake.sendAction).toHaveBeenCalledWith(action);
+    // 守门:必须等到 seq 推进后才返回,不能在 0ms 用 pre-action 旧视图立即返回
+    expect(Date.now() - start).toBeGreaterThanOrEqual(4);
+    expect(res.lastActionResult).toBe('accepted');
+  });
+
+  it('action 提交后服务端未处理(seq 未推进)时不立即返回 pre-action 旧视图', async () => {
+    // 回归:sendAction 是 fire-and-forget 的 HTTP POST。旧实现首个同步 tick 看到的仍是
+    // pre-action 视图(needsAction 仍为提交前的 true)→ 立即返回 accepted + 旧手牌,
+    // LLM 误判"未生效"并重复提交同一张牌。修复后须等待 seq 推进 / 被拒 / 游戏结束。
+    const fake = makeFake({
+      needsAction: () => true, // 提交前即为 true（出牌窗口）
+      lastSeq: 0, // 服务端始终未推进
+      sendAction: vi.fn(),
+    });
+    const action: EngineClientMessage = {
+      skillId: '杀',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: 'c1', targets: [1] },
+      baseSeq: 0,
+    };
+    const start = Date.now();
+    const res = await runPlay(fake, { action: { message: action }, waitTimeoutMs: 60 });
+    const elapsed = Date.now() - start;
+    // 未等到 seq 推进 → 持续等到 deadline,而非 0ms 立即返回 pre-action 旧视图
+    expect(elapsed).toBeGreaterThanOrEqual(50);
+    expect(res.lastActionResult).toBe('timeout');
   });
 
   it('未轮到自己且超时后返回 needsAction=false', async () => {

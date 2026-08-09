@@ -3,7 +3,7 @@
 //    当【决斗】使用。结束阶段,你获得本回合对你造成伤害的牌。"
 //
 // 模型四部分:
-//   A) 摸牌阶段结束(after-hook on 阶段结束, phase='摸牌'):
+//   A) 摸牌阶段结束(before-hook on 阶段结束, phase='摸牌'):
 //        询问发动 → 选手牌弃置 → 记 turn.vars['界双雄/color']=弃置牌颜色
 //   B) 转化(transform,preceding 决斗.use):异色手牌当决斗
 //   C) 造成伤害 after-hook:target=ownerId → 记 cardId 到 turn.vars['界双雄/damageCards']
@@ -622,5 +622,60 @@ describe('界双雄', () => {
     // 原卡 ws 从弃牌堆移到界颜良文丑手牌
     expect(harness.state.players[0].hand).toContain('ws');
     expect(harness.state.zones.discardPile).not.toContain('ws');
+  });
+
+  // ─── 回归:界双雄 pending 不与回合管理出牌窗口 slot 冲突(game-13 feedback) ──
+  //   bug:界双雄曾用 after-hook on 阶段结束(摸牌),与回合管理的同 atom after-hook
+  //   (推进到出牌 + fire-and-forget 启动出牌窗口循环)冲突——两者 slot 同 target
+  //   互相覆盖,出牌窗口 slot 被孤立,其超时 fireTimeoutNow bail → 出牌窗口永不
+  //   resolve → 回合无法结束 → 游戏卡死。改用 before-hook 修复。
+  //   本用例在带回合管理的完整 phase 推进中验证:双雄 pending resolve 后,出牌窗口
+  //   slot 仍存活(非孤立),游戏处于可操作的出牌阶段。
+  it('带回合管理:双雄发动后出牌窗口不被孤立(slot 冲突回归)', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const c1 = makeCard('c1', '闪', '♠', '2'); // 黑色弃置代价
+    await harness.setup(
+      createGameState({
+        players: [
+          makePlayer({
+            index: 0,
+            name: '界颜良文丑',
+            hand: ['c1'],
+            skills: ['回合管理', '界双雄'],
+          }),
+          makePlayer({ index: 1, name: 'P2', skills: ['回合管理'] }),
+        ],
+        cardMap: { c1 },
+        currentPlayerIndex: 0,
+        phase: '摸牌',
+        turn: { round: 1, phase: '摸牌', vars: {} },
+      }),
+    );
+    const Y = harness.player('界颜良文丑');
+
+    // 阶段开始(摸牌)→ 标记正常开始
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '摸牌' });
+    await harness.waitForStable();
+
+    // 阶段结束(摸牌)→ before-hook 先触发双雄,再由回合管理 after-hook 推进到出牌
+    void applyAtom(harness.state, { type: '阶段结束', player: 0, phase: '摸牌' });
+    await harness.waitForStable();
+
+    // 询问①:是否发动?
+    Y.expectPending('请求回应');
+    await Y.respond('界双雄', { choice: true });
+    await harness.waitForStable();
+
+    // 询问②:选哪张手牌弃置
+    Y.expectPending('请求回应');
+    await Y.respond('界双雄', { cardId: 'c1' });
+    await harness.waitForStable();
+
+    // 双雄 pending 已 resolve → 回合管理推进到出牌阶段 → 出牌窗口 slot 应存活(非孤立)
+    expect(harness.state.phase).toBe('出牌');
+    const slot = harness.state.pendingSlots.get(0);
+    expect(slot).toBeDefined();
+    expect((slot?.atom as { type?: string }).type).toBe('出牌窗口');
+    restoreAutoCompare();
   });
 });

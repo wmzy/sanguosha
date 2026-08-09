@@ -352,14 +352,41 @@ describe('enumerateAvailableActions', () => {
     expect(actions.find((x) => x.category === 'transform')).toBeUndefined();
   });
 
-  it('丈八蛇矛转化（多卡）：生成描述性 action，validTargets 为空', () => {
+  // 回归(yrjQ7X):多卡转化(丈八蛇矛)必须为每对匹配手牌生成具体 action——
+  // 主 action params.cardId = 影子 id(`${id1}#${id2}#丈八蛇矛`),
+  // preceding transform 携带 cardIds=[id1,id2],validTargets 给出合法目标。
+  // 旧实现只生成 params={} + 空 validTargets 的描述性 action,agent 无法构造合法消息。
+  it('丈八蛇矛转化（多卡）：为每对匹配手牌生成具体 transform action', () => {
     const view = makeView(0, '出牌', [redCard, redCard2]);
     const actions = enumerateAvailableActions(view, 0, [zhangbaTransformAction]);
-    const tf = actions.find((x) => x.category === 'transform');
-    expect(tf).toBeDefined();
-    expect(tf!.message.skillId).toBe('杀');
-    expect(tf!.validTargets).toHaveLength(0);
-    expect(tf!.description).toContain('丈八蛇矛');
+    const tf = actions.filter((x) => x.category === 'transform');
+    expect(tf).toHaveLength(1); // 2 张手牌 → 1 对
+    const a = tf[0];
+    expect(a.message.skillId).toBe('杀');
+    // 影子 cardId = 两张原卡 id 拼接
+    expect(a.message.params.cardId).toBe('c2#c3#丈八蛇矛');
+    // preceding transform 携带 cardIds(顺序与影子 id 一致)
+    expect(a.message.preceding).toEqual([
+      { skillId: '丈八蛇矛', actionType: 'transform', params: { cardIds: ['c2', 'c3'] } },
+    ]);
+    // 攻击范围内的其他角色作为合法目标(非空)
+    expect(a.validTargets).toEqual([1]);
+    expect(a.description).toContain('丈八蛇矛');
+  });
+
+  it('丈八蛇矛转化（多卡）：3 张手牌生成 C(3,2)=3 个 transform action', () => {
+    const c4: Card = { id: 'c5', name: '桃', suit: '♥', color: '红', rank: '9', type: '基本牌' };
+    const view = makeView(0, '出牌', [redCard, redCard2, c4]);
+    const actions = enumerateAvailableActions(view, 0, [zhangbaTransformAction]);
+    const tf = actions.filter((x) => x.category === 'transform');
+    expect(tf).toHaveLength(3);
+    // 每个动作的 cardId 与 preceding.cardIds 自洽(顺序一致)
+    for (const a of tf) {
+      const cardId = a.message.params.cardId as string;
+      const cardIds = (a.message.preceding![0].params as { cardIds: string[] }).cardIds;
+      expect(cardId).toBe(`${cardIds[0]}#${cardIds[1]}#丈八蛇矛`);
+      expect(new Set(cardIds).size).toBe(2);
+    }
   });
 
   // 回归:连环/界连环转化铁索连环。transform action 缺 transform 字段时,
@@ -931,5 +958,77 @@ describe('HeadlessGameClient.getAvailableActions() — pickTargetCard pending', 
     const actions = hgc.getAvailableActions();
     const respondActions = actions.filter((a) => a.category === 'respond');
     expect(respondActions).toHaveLength(0);
+  });
+});
+
+// 回归测试：useCardAndTarget 类回应（界天香选牌+选目标 / 乱武·挑衅·借刀杀人 逼杀）
+//   修复前：落入通用 cardFilter 分支，每张牌只带 {cardId}、validTargets:[]，
+//   界天香/choose 永远被 validate 拒（需 target），AI 卡死、无法转移伤害。
+//   修复后：按 targetFilter 计算 validTargets，agent 可提交 {cardId, target}。
+describe('HeadlessGameClient.getAvailableActions() — useCardAndTarget pending', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('界天香/choose：每张候选牌生成带 validTargets 的 respond action', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 1;
+    (hgc as unknown as { _debugMode: boolean })._debugMode = true;
+    // 界小乔(P1)持 ♥火攻 + ♠杀(界红颜视为红桃)；刘备(P0)为目标候选
+    const hand1: Card[] = [
+      { id: '火攻-♥2-109', name: '火攻', suit: '♥', color: '红', rank: '2', type: '锦囊牌' },
+      { id: '杀-♠10-47', name: '杀', suit: '♠', color: '黑', rank: '10', type: '基本牌' },
+    ];
+    const view: GameView = {
+      viewer: 1,
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 8, phase: '出牌', vars: {} },
+      players: [
+        { index: 0, name: '刘备', character: '刘备', health: 4, maxHealth: 4, alive: true, equipment: {}, skills: [], handCount: 1, marks: [] },
+        { index: 1, name: '界小乔', character: '界小乔', health: 3, maxHealth: 3, alive: true, equipment: {}, skills: [], handCount: 2, hand: hand1, marks: [] },
+      ],
+      cardMap: Object.fromEntries(hand1.map((c) => [c.id, c])),
+      pending: {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType: '界天香/choose', target: 1 } as never,
+        prompt: {
+          type: 'useCardAndTarget',
+          title: '界天香:弃一张红桃牌(手牌或装备区),选择一名其他角色',
+          cardFilter: {
+            filter: () => true, // 跨进程丢失，真实由 candidates 权威
+            candidates: ['火攻-♥2-109', '杀-♠10-47'],
+            min: 1,
+            max: 1,
+          },
+          targetFilter: {
+            min: 1,
+            max: 1,
+            filter: (_v: GameView, t: number) => t !== 1,
+          },
+        },
+        target: 1,
+        isBlocking: true,
+      },
+      deadline: null,
+      deadlineTotalMs: 0,
+      log: [],
+      settlementStack: [],
+    };
+    (hgc as unknown as { _view: GameView | null })._view = view;
+
+    const actions = hgc.getAvailableActions();
+    const respondActions = actions.filter((a) => a.category === 'respond');
+    // 2 张候选牌 → 2 个 respond action
+    expect(respondActions).toHaveLength(2);
+    for (const a of respondActions) {
+      // 每个 action 带 cardId 且合法目标含刘备(0)、排除自己(1)
+      expect(typeof a.message.params.cardId).toBe('string');
+      expect(a.validTargets).toEqual([0]);
+    }
+    const cardIds = respondActions.map((a) => a.message.params.cardId as string).sort();
+    expect(cardIds).toEqual(['杀-♠10-47', '火攻-♥2-109']);
+    // 提供 skip
+    expect(actions.some((a) => a.category === 'skip')).toBe(true);
   });
 });

@@ -68,8 +68,15 @@ const TICK_MS = 20;
 
 export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promise<PlayResult> {
   let lastActionResult: PlayResult['lastActionResult'] = 'not-applicable';
-  if (input.action?.message) {
-    hgc.sendAction(input.action.message);
+  // 提交 action 后,必须等服务端真正处理(seq 推进 / 被拒 / 游戏结束)再判定 needsAction。
+  // sendAction 是 fire-and-forget 的 HTTP POST,首个同步 tick 看到的仍是 pre-action 旧视图
+  // (此时 needsAction 仍为提交前的 true)→ 立即返回 accepted + 旧手牌,LLM 误判"未生效"并
+  // 重复提交同一张牌。用 seq 基线守门,确保返回的视图至少反映了本次 action 的处理结果。
+  const submittedAction = !!input.action?.message;
+  const seqBeforeAction = submittedAction ? hgc.lastSeq : -1;
+  let actionProcessed = !submittedAction;
+  if (submittedAction) {
+    hgc.sendAction(input.action!.message);
     lastActionResult = 'accepted';
   }
   // 自动注册技能：选将后 view 有 character + skills 但 registry 可能未注册。
@@ -136,8 +143,23 @@ export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promis
       // 服务端拒了本次 action：报告 rejected，继续等下一个 needsAction 点
       if (hgc.consumeActionRejected()) {
         lastActionResult = 'rejected';
+        actionProcessed = true; // 被拒 = 服务端已处理本次 action
       }
       if (hgc.phase === 'ended' || hgc.gameOverWinner !== null) return settle();
+      // 提交了 action 但尚未确认处理:等待 seq 推进(状态变化)后再判定 needsAction,
+      // 避免用 pre-action 旧视图的 needsAction=true 立即返回(见函数头注释)。
+      if (!actionProcessed) {
+        if (hgc.lastSeq > seqBeforeAction) {
+          actionProcessed = true;
+        } else {
+          if (Date.now() >= deadline) {
+            if (lastActionResult === 'accepted') lastActionResult = 'timeout';
+            return settle();
+          }
+          setTimeout(tick, TICK_MS);
+          return;
+        }
+      }
       // lobby/connecting 阶段：周期推进（房主开局）并阻塞等待进入 playing，
       // 而非立即返回——避免 agent 在游戏未开始时空轮询浪费 token。
       if (hgc.phase === 'connecting' || hgc.phase === 'lobby') {

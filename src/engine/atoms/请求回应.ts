@@ -152,9 +152,13 @@ export const 请求回应: AtomDefinition<{
     const timeoutMs = (event.timeoutMs as number | undefined) ?? 30 * 1000;
     const mandatory = event.mandatory === true;
     const mode = (event.responseMode as 'normal' | 'silent' | 'skip' | undefined) ?? 'normal';
-    // 广播型(target=TARGET_BROADCAST,如无懈可击):所有 viewer 都设置 pending
+    // 广播型(target=TARGET_BROADCAST,如无懈可击):存活玩家设置可操作 pending;
+    // 死亡玩家不参与任何询问(1EyezD:死亡玩家收到无懈询问但只能 skip)。
     if (target < 0) {
       if (!prompt) return;
+      // view.viewer 对应玩家已死亡 → 不设可操作 pending(死亡玩家不参与结算询问)。
+      // 增量视图累积的 players[].alive 在此时已是最终值(死亡由更早的 系统处理牌 atom 设置)。
+      if (view.viewer >= 0 && view.players[view.viewer]?.alive === false) return;
       view.pending = {
         type: 'awaits',
         atom: {

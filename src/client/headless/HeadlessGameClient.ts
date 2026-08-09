@@ -6,6 +6,7 @@ import type {
   GameView,
   ViewEvent,
   Json,
+  Card,
   ClientMessage as EngineClientMessage,
 } from '../../engine/types';
 import type { ServerMessage, RoomConfig } from '../../server/protocol';
@@ -715,6 +716,63 @@ export class HeadlessGameClient {
       //   只有 请求回应 + confirm 才是纯确认操作（choice: true/false）。
       const atomType = atom.type ?? '';
       const isAskType = atomType.startsWith('询问');
+      // useCardAndTarget 类回应（界天香选牌+选目标 / 乱武·挑衅·借刀杀人 逼杀）：
+      // 既有 cardFilter 又有 targetFilter，agent 须同时提交 cardId + target。
+      // 此前落入下方通用 cardFilter 分支只带 cardId、无目标信息 → 永远被拒（界天香卡死）。
+      if (!isAskType && pending.prompt?.type === 'useCardAndTarget') {
+        const prompt = pending.prompt;
+        const me = view.players[ownerId];
+        // 可选牌:优先用投影层下发的 candidates(权威,跨进程),否则用 info.cardFilter 过滤手牌
+        const candidateIds = prompt.cardFilter.candidates;
+        let candidates: Card[];
+        if (candidateIds) {
+          const cset = new Set(candidateIds);
+          candidates = me?.hand?.filter((c) => cset.has(c.id)) ?? [];
+        } else if (info.cardFilter) {
+          candidates = me?.hand?.filter((c) => info.cardFilter!(c)) ?? [];
+        } else {
+          candidates = me?.hand ?? [];
+        }
+        // 合法目标:默认排除自己;allowSelf/selfTarget(铁索连环)时纳入自己
+        const allowSelf = !!prompt.targetFilter?.allowSelf || !!prompt.selfTarget;
+        const tFilter = prompt.targetFilter?.filter;
+        const validTargets: number[] = [];
+        for (const p of view.players) {
+          if (!p.alive) continue;
+          if (p.index === ownerId && !allowSelf) continue;
+          if (tFilter && !tFilter(view, p.index)) continue;
+          validTargets.push(p.index);
+        }
+        for (const card of candidates) {
+          out.push({
+            description: `回应【${info.skillId}】(${card.suit}${card.rank})`,
+            message: {
+              skillId: info.skillId,
+              actionType: 'respond',
+              ownerId,
+              params: { cardId: card.id },
+              baseSeq: 0,
+            },
+            validTargets,
+            category: 'respond',
+          });
+        }
+        if (pending.target >= 0) {
+          out.push({
+            description: candidates.length === 0 ? `无牌可出，跳过` : `不出【${info.skillId}】`,
+            message: {
+              skillId: '__skip',
+              actionType: 'skip',
+              ownerId,
+              params: {},
+              baseSeq: 0,
+            },
+            validTargets: [],
+            category: 'skip',
+          });
+        }
+        return;
+      }
       if (!isAskType && pending.prompt?.type === 'confirm') {
         const confirmLabel = pending.prompt.confirmLabel ?? '确认';
         const cancelLabel = pending.prompt.cancelLabel ?? '取消';

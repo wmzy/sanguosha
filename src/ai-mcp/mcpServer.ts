@@ -286,6 +286,33 @@ function parseSpectateRoomOpts(args: unknown): SpectateRoomOpts {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// play action 归一化
+// ──────────────────────────────────────────────────────────────────────────
+
+/** play 工具 action 入参的归一化形态（= ClientMessage 字段）。 */
+interface PlayActionFields {
+  skillId?: string;
+  actionType?: string;
+  ownerId?: number;
+  params?: Record<string, unknown>;
+}
+
+/** 归一化 play 工具的 action 参数。
+ *  工具说明"action 从上次返回的 availableActions 取一条"会让 LLM 传整条 AvailableAction
+ *  对象（含 description/message/validTargets/category），而 skillId 嵌在 .message 里。
+ *  若不展开，顶层 skillId 缺失 → action 被静默丢弃（runPlay 返回 not-applicable），
+ *  选将等阻塞窗口表现为"提交无效、卡死"（见 feedback DEA0As）。
+ *  这里统一接受两种形态：整条 AvailableAction（取 .message）或 message 字段本身。 */
+function normalizePlayAction(raw: unknown): PlayActionFields | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const obj = raw as { message?: unknown } & PlayActionFields;
+  if (obj.message && typeof obj.message === 'object') {
+    return obj.message as PlayActionFields;
+  }
+  return obj;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // getSkillInfo 辅助
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -444,14 +471,7 @@ export async function handleMcpRequest(
           );
         }
         const args = asRecord(params.arguments);
-        const action = args['action'] as
-          | {
-              skillId?: string;
-              actionType?: string;
-              ownerId?: number;
-              params?: Record<string, unknown>;
-            }
-          | undefined;
+        const action = normalizePlayAction(args['action']);
         const result = await runPlay(ctx.hgc, {
           action: action?.skillId
             ? {
