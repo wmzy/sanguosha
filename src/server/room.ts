@@ -187,6 +187,24 @@ export function addRoom(room: Room): void {
   roomList.set(room.id, room);
 }
 
+/** 从房间成员结构中移除一名玩家（players/seats/ready/交换请求）。
+ *  不处理房主转移、房间销毁或 DB 同步——由调用方决定。
+ *  leaveRoom 与 kickPlayer 共用此逻辑。 */
+function removePlayerMembership(room: Room, playerId: string): void {
+  room.players.delete(playerId);
+  room.readyPlayers.delete(playerId);
+  const seatIdx = room.seats.indexOf(playerId);
+  if (seatIdx >= 0) room.seats[seatIdx] = null;
+  cancelSeatSwapInternal(room, playerId);
+  // 取消指向该玩家（现已空）座位的交换请求
+  for (const [reqId, swap] of room.pendingSeatSwaps) {
+    if (room.seats[swap.targetSeat] === null) {
+      clearTimeout(swap.timer);
+      room.pendingSeatSwaps.delete(reqId);
+    }
+  }
+}
+
 /** 调试玩家加入调试房间。 */
 export interface JoinDebugResult {
   room: Room;
@@ -245,23 +263,7 @@ export function leaveRoom(roomId: string, playerId: string): Room | null {
   const room = roomList.get(roomId);
   if (!room) return null;
 
-  room.players.delete(playerId);
-  room.readyPlayers.delete(playerId);
-  // 清除座位 + 取消该玩家的交换请求
-  const seatIdx = room.seats.indexOf(playerId);
-  if (seatIdx >= 0) room.seats[seatIdx] = null;
-  const pendingSwap = room.pendingSeatSwaps.get(playerId);
-  if (pendingSwap) {
-    clearTimeout(pendingSwap.timer);
-    room.pendingSeatSwaps.delete(playerId);
-  }
-  // 如果有人请求与离开的玩家交换,也取消
-  for (const [reqId, swap] of room.pendingSeatSwaps) {
-    if (room.seats[swap.targetSeat] === null) {
-      clearTimeout(swap.timer);
-      room.pendingSeatSwaps.delete(reqId);
-    }
-  }
+  removePlayerMembership(room, playerId);
 
   // 普通房间: 不自动销毁, 不自动换主。仅同步 DB。
   if (room.roomType === 'normal') {
@@ -282,6 +284,43 @@ export function leaveRoom(roomId: string, playerId: string): Room | null {
   }
 
   return room;
+}
+
+/** 房主踢出指定成员（占座玩家或旁观者）。仅等待中允许。
+ *  返回被踢成员的连接 sink（供调用方发送 player_kicked 后关闭）。
+ *  校验失败返回 null：房间不存在 / 非等待中 / 调用者非房主 / 目标不在房间 / 踢自己。
+ *  踢出后不转移房主、不销毁房间（房主仍在）。 */
+export function kickPlayer(
+  roomId: string,
+  hostId: string,
+  targetPlayerId: string,
+): { room: Room; kickedSink: ConnectionSink | null } | null {
+  const room = roomList.get(roomId);
+  if (!room) return null;
+  if (room.status !== '等待中') return null;
+  // 仅房主可踢人（调试房间无房主，不允许踢人）
+  if (room.hostId === null || room.hostId !== hostId) return null;
+  // 不能踢自己
+  if (targetPlayerId === hostId) return null;
+
+  const isPlayer = room.players.has(targetPlayerId);
+  const isSpectator = room.spectators.has(targetPlayerId);
+  if (!isPlayer && !isSpectator) return null;
+
+  const kickedSink = isPlayer
+    ? (room.players.get(targetPlayerId) ?? null)
+    : (room.spectators.get(targetPlayerId) ?? null);
+
+  if (isPlayer) {
+    removePlayerMembership(room, targetPlayerId);
+  } else {
+    room.spectators.delete(targetPlayerId);
+    room.viewGrants.delete(targetPlayerId);
+    room.pendingViewRequests.delete(targetPlayerId);
+  }
+
+  roomChangeHandler?.(room, 'update');
+  return { room, kickedSink };
 }
 
 /** 更新房间配置。仅房主可调用(调试房间无房主时任意座次可调用)。

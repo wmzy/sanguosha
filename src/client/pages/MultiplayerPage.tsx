@@ -861,8 +861,48 @@ export function MultiplayerPage() {
           </div>
           {/* 旁观者列表 */}
           {spectatorCount > 0 && (
-            <div className={readyInfo} style={{ fontSize: '13px', color: colors.text.muted }}>
-              👁 旁观者：{spectatorCount} 人
+            <div className={readyInfo} style={{ fontSize: '13px', color: colors.text.muted, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
+              <span>👁 旁观者：{spectatorCount} 人</span>
+              {mp.isHost &&
+                (mp.roomState?.spectatorIds ?? []).map((sid) => (
+                  <span
+                    key={sid}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      background: colors.bg.input,
+                      borderRadius: '12px',
+                      padding: '2px 4px 2px 10px',
+                    }}
+                  >
+                    {sid.slice(0, 6)}
+                    <button
+                      className={btnStyle}
+                      title="踢出该旁观者"
+                      style={{
+                        '--btn-bg': colors.accent.red,
+                        '--btn-padding': '0',
+                        '--btn-font-size': '11px',
+                        width: '16px',
+                        height: '16px',
+                        minWidth: 0,
+                        lineHeight: '16px',
+                        borderRadius: '50%',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: 0,
+                      } as React.CSSProperties}
+                      onClick={() => {
+                        if (window.confirm(`确定将旁观者 ${sid.slice(0, 8)} 踢出房间吗？`)) {
+                          mp.kickPlayer(sid);
+                        }
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
             </div>
           )}
           {/* 房主聊天配置 */}
@@ -914,43 +954,76 @@ export function MultiplayerPage() {
                       ([, v]) => v.targetSeat === i,
                     );
                     return (
-                      <button
-                        key={i}
-                        className={btnStyle}
-                        disabled={isMe || i === mySeat}
-                        style={{
-                          '--btn-bg': isMe ? colors.accent.gold : isEmpty ? colors.bg.input : colors.accent.darkRed,
-                          '--btn-padding': '8px 14px',
-                          '--btn-font-size': '13px',
-                          cursor: isMe ? 'default' : 'pointer',
-                          opacity: isMe ? 0.8 : 1,
-                          border: isEmpty ? `1px dashed ${colors.text.muted}` : '1px solid #555',
-                          borderRadius: '8px',
-                          minWidth: '90px',
-                          textAlign: 'center',
-                        } as React.CSSProperties}
-                        onClick={() => {
-                          if (isEmpty) {
-                            mp.moveSeat(i);
-                          } else if (!isMe) {
-                            // 请求交换座位
-                            if (window.confirm(`要与 ${seatPlayerId.slice(0, 8)} 交换座位吗？`)) {
-                              mp.requestSeatSwap(i);
+                      <div key={i} style={{ position: 'relative' }}>
+                        <button
+                          className={btnStyle}
+                          disabled={isMe || i === mySeat}
+                          style={{
+                            '--btn-bg': isMe ? colors.accent.gold : isEmpty ? colors.bg.input : colors.accent.darkRed,
+                            '--btn-padding': '8px 14px',
+                            '--btn-font-size': '13px',
+                            cursor: isMe ? 'default' : 'pointer',
+                            opacity: isMe ? 0.8 : 1,
+                            border: isEmpty ? `1px dashed ${colors.text.muted}` : '1px solid #555',
+                            borderRadius: '8px',
+                            minWidth: '90px',
+                            textAlign: 'center',
+                          } as React.CSSProperties}
+                          onClick={() => {
+                            if (isEmpty) {
+                              mp.moveSeat(i);
+                            } else if (!isMe) {
+                              // 请求交换座位
+                              if (window.confirm(`要与 ${seatPlayerId.slice(0, 8)} 交换座位吗？`)) {
+                                mp.requestSeatSwap(i);
+                              }
                             }
-                          }
-                        }}
-                        title={isEmpty ? '移动到此座位' : isMe ? '你的座位' : `请求交换座位`}
-                      >
-                        <div style={{ fontWeight: 'bold' }}>P{i + 1}</div>
-                        <div style={{ fontSize: '11px', opacity: 0.8 }}>
-                          {isMe ? '我' : isEmpty ? '空位' : seatPlayerId.slice(0, 6)}
-                        </div>
-                        {isPending && !isMe && (
-                          <div style={{ fontSize: '10px', marginTop: '2px', color: colors.accent.gold }}>
-                            交换中...
+                          }}
+                          title={isEmpty ? '移动到此座位' : isMe ? '你的座位' : `请求交换座位`}
+                        >
+                          <div style={{ fontWeight: 'bold' }}>P{i + 1}</div>
+                          <div style={{ fontSize: '11px', opacity: 0.8 }}>
+                            {isMe ? '我' : isEmpty ? '空位' : seatPlayerId.slice(0, 6)}
                           </div>
+                          {isPending && !isMe && (
+                            <div style={{ fontSize: '10px', marginTop: '2px', color: colors.accent.gold }}>
+                              交换中...
+                            </div>
+                          )}
+                        </button>
+                        {/* 房主踢出该座次玩家 */}
+                        {mp.isHost && !isEmpty && !isMe && seatPlayerId !== null && (
+                          <button
+                            className={btnStyle}
+                            title="踢出该玩家"
+                            style={{
+                              position: 'absolute',
+                              top: '-8px',
+                              right: '-8px',
+                              '--btn-bg': colors.accent.red,
+                              '--btn-padding': '0',
+                              '--btn-font-size': '12px',
+                              width: '20px',
+                              height: '20px',
+                              minWidth: 0,
+                              lineHeight: '20px',
+                              borderRadius: '50%',
+                              border: `1px solid ${colors.bg.panel}`,
+                              cursor: 'pointer',
+                              padding: 0,
+                              zIndex: 2,
+                            } as React.CSSProperties}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`确定将 ${seatPlayerId.slice(0, 8)} 踢出房间吗？`)) {
+                                mp.kickPlayer(seatPlayerId);
+                              }
+                            }}
+                          >
+                            ✕
+                          </button>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>

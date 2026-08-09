@@ -30,6 +30,7 @@ import {
   moveSeat,
   requestSeatSwap,
   respondSeatSwap,
+  kickPlayer,
   SEAT_SWAP_TIMEOUT_MS,
 } from '../../src/server/room';
 import { normalizeRoomConfig, DEFAULT_ROOM_CONFIG } from '../../src/server/protocol';
@@ -1101,5 +1102,131 @@ describe('座位残留与重连', () => {
     expect(p2result).not.toBeNull();
     const p2count = room.seats.filter((s) => s === 'p2').length;
     expect(p2count).toBeLessThanOrEqual(1);
+  });
+});
+
+// ─── 踢出玩家 ───
+describe('踢出玩家', () => {
+  it('房主踢出占座玩家：移除 players/seats 并返回其 sink', () => {
+    const hostSink = createMockSink();
+    const p2Sink = createMockSink();
+    const room = createRoom('房间', 4, 'host', hostSink);
+    joinRoom(room.id, 'p2', p2Sink);
+    expect(room.seats).toEqual(['host', 'p2', null, null]);
+
+    const result = kickPlayer(room.id, 'host', 'p2');
+
+    expect(result).not.toBeNull();
+    expect(result!.kickedSink).toBe(p2Sink);
+    expect(result!.room.players.has('p2')).toBe(false);
+    expect(result!.room.seats).toEqual(['host', null, null, null]);
+    // 房主仍在
+    expect(result!.room.hostId).toBe('host');
+  });
+
+  it('踢出玩家时清除其准备状态', () => {
+    const room = createRoom('房间', 4, 'host', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+    setReady(room.id, 'p2');
+    expect(room.readyPlayers.has('p2')).toBe(true);
+
+    kickPlayer(room.id, 'host', 'p2');
+
+    expect(room.readyPlayers.has('p2')).toBe(false);
+  });
+
+  it('房主踢出旁观者：移除 spectators/viewGrants/pendingViewRequests', () => {
+    const room = createRoom('房间', 4, 'host', createMockSink());
+    const specSink = createMockSink();
+    joinAsSpectator(room.id, 'spec1', specSink);
+    approveView(room.id, 'spec1', 0);
+    expect(room.spectators.has('spec1')).toBe(true);
+    expect(room.viewGrants.has('spec1')).toBe(true);
+
+    const result = kickPlayer(room.id, 'host', 'spec1');
+
+    expect(result).not.toBeNull();
+    expect(result!.kickedSink).toBe(specSink);
+    expect(room.spectators.has('spec1')).toBe(false);
+    expect(room.viewGrants.has('spec1')).toBe(false);
+    expect(room.pendingViewRequests.has('spec1')).toBe(false);
+  });
+
+  it('踢出玩家时取消其待处理的座位交换请求', () => {
+    const room = createRoom('房间', 4, 'host', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+    joinRoom(room.id, 'p3', createMockSink());
+    // p3 请求与 host 交换（p3 发起）
+    requestSeatSwap(room.id, 'p3', 0);
+    expect(room.pendingSeatSwaps.has('p3')).toBe(true);
+
+    kickPlayer(room.id, 'host', 'p3');
+
+    expect(room.pendingSeatSwaps.has('p3')).toBe(false);
+    expect(room.seats.filter((s) => s === 'p3').length).toBe(0);
+  });
+
+  it('踢出玩家不转移房主、不销毁房间', () => {
+    const room = createRoom('快速房', 4, 'host', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+
+    const result = kickPlayer(room.id, 'host', 'p2');
+
+    expect(result).not.toBeNull();
+    expect(result!.room.hostId).toBe('host');
+    // 房间仍在列表中（未被销毁）
+    expect(getRoom(room.id)).not.toBeNull();
+  });
+
+  it('非房主不能踢人', () => {
+    const room = createRoom('房间', 4, 'host', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+
+    const result = kickPlayer(room.id, 'p2', 'host');
+
+    expect(result).toBeNull();
+    expect(room.players.has('host')).toBe(true);
+  });
+
+  it('房主不能踢自己', () => {
+    const room = createRoom('房间', 4, 'host', createMockSink());
+
+    const result = kickPlayer(room.id, 'host', 'host');
+
+    expect(result).toBeNull();
+    expect(room.players.has('host')).toBe(true);
+  });
+
+  it('游戏进行中不能踢人', () => {
+    const room = createRoom('房间', 4, 'host', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+    room.status = '进行中';
+
+    const result = kickPlayer(room.id, 'host', 'p2');
+
+    expect(result).toBeNull();
+    expect(room.players.has('p2')).toBe(true);
+  });
+
+  it('踢出不在房间中的目标返回 null', () => {
+    const room = createRoom('房间', 4, 'host', createMockSink());
+
+    const result = kickPlayer(room.id, 'host', 'ghost');
+
+    expect(result).toBeNull();
+  });
+
+  it('调试房间（无房主）不允许踢人', () => {
+    const room = createDebugRoom('调试', 4);
+    joinRoom(room.id, 'p1', createMockSink());
+
+    const result = kickPlayer(room.id, 'p1', 'p2');
+
+    expect(result).toBeNull();
+  });
+
+  it('房间不存在时返回 null', () => {
+    const result = kickPlayer('NOPE', 'host', 'p2');
+    expect(result).toBeNull();
   });
 });

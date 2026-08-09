@@ -32,6 +32,7 @@ import {
   moveSeat,
   requestSeatSwap,
   respondSeatSwap,
+  kickPlayer,
   type Room,
 } from './room';
 import { destroyRoomCompletely } from './teardown';
@@ -433,6 +434,36 @@ export function applyRestRoutes(app: Hono): void {
     if (!isNormal && !leftRoom) {
       void destroyRoomCompletely(roomId);
     }
+    return c.json({ success: true });
+  });
+
+  // POST /api/rooms/:id/kick — 房主踢出玩家（仅等待中）
+  app.post('/api/rooms/:id/kick', async (c) => {
+    const roomId = c.req.param('id');
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    const targetPlayerId = typeof raw.targetPlayerId === 'string' ? raw.targetPlayerId : '';
+    if (!playerId || !targetPlayerId) return c.json({ error: '缺少参数' }, 400);
+
+    const result = kickPlayer(roomId, playerId, targetPlayerId);
+    if (!result) {
+      return c.json({ error: '无法踢出该玩家（仅房主可操作，或目标不在房间中）' }, 400);
+    }
+
+    // 先通知被踢玩家（让其显示「被移出」而非触发自动重连），再关闭其连接
+    if (result.kickedSink) {
+      result.kickedSink.send({ type: 'player_kicked', playerId: targetPlayerId, hostId: playerId });
+      try {
+        result.kickedSink.close();
+      } catch {
+        /* */
+      }
+    }
+    playerRoomMap.delete(targetPlayerId);
+
+    // 广播给其余成员：等同离开 + 更新房间状态
+    broadcastMessage(result.room, { type: 'player_left', playerId: targetPlayerId });
+    broadcastRoomState(result.room);
     return c.json({ success: true });
   });
 

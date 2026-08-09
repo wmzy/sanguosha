@@ -80,6 +80,8 @@ export interface MultiplayerRoom {
   requestSeatSwap: (targetSeat: number) => void;
   /** 响应座位交换请求 */
   respondSeatSwap: (requesterId: string, accept: boolean) => void;
+  /** 房主踢出指定成员（玩家或旁观者），仅等待中 */
+  kickPlayer: (targetPlayerId: string) => void;
   /** 当前收到的座位交换请求 (收到的请求者 id 和目标座次) */
   incomingSeatSwap: { requesterId: string; requesterSeat: number; targetSeat: number; expiresAt: number } | null;
   /** 聊天消息列表 */
@@ -252,6 +254,21 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         // 座位交换结果：清除通知
         if (msg.type === 'seat_swap_result') {
           setIncomingSeatSwap(null);
+        }
+        // 自己被房主移出：断开连接（避免自动重连），返回大厅并提示
+        if (msg.type === 'player_kicked' && msg.playerId === hgc.playerId) {
+          hgc.disconnect();
+          setCommand({ type: 'idle' });
+          setStage('lobby');
+          setRoomId(null);
+          setRoomState(null);
+          setView(null);
+          setGameOver(null);
+          setChatMessages([]);
+          setIncomingSeatSwap(null);
+          playbackRef.current.reset(0);
+          setDisconnectedSeats(new Set());
+          setError('你已被房主移出房间');
         }
         // 玩家断线/重连:维护离线座次集合,供座位卡显示离线角标
         if (msg.type === 'player_disconnected' && msg.seatIndex >= 0) {
@@ -529,6 +546,16 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setIncomingSeatSwap(null);
   }, []);
 
+  const kickPlayer = useCallback((targetPlayerId: string) => {
+    const hgc = hgcRef.current;
+    if (!hgc?.roomId || !hgc.playerId) return;
+    apiFetch<void>(`/api/rooms/${hgc.roomId}/kick`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: hgc.playerId, targetPlayerId }),
+    }).catch((err) => log.error('kickPlayer failed', { error: String(err) }));
+  }, []);
+
   return {
     stage,
     roomId,
@@ -559,6 +586,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     moveSeat,
     requestSeatSwap,
     respondSeatSwap,
+    kickPlayer,
     incomingSeatSwap,
     chatMessages,
     sendChat,

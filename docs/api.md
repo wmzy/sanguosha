@@ -129,10 +129,29 @@ POST /api/rooms/:id/restart   { "playerId": "pid-xxx" }
 POST /api/rooms/:id/action    { "playerId": "pid-xxx", "action": GameAction }
 POST /api/rooms/:id/reorder   { "playerId": "pid-xxx", "order": ["card1", "card2"] }
 POST /api/rooms/:id/leave     { "playerId": "pid-xxx" }
+POST /api/rooms/:id/kick      { "playerId": "pid-xxx(房主)", "targetPlayerId": "pid-yyy" }
 PUT  /api/rooms/:id/config    { "playerId": "pid-xxx", "config": RoomConfig }
 ```
 
 所有端点返回 `{ "success": true }` 或错误 JSON。
+
+### 踢出玩家
+
+```
+POST /api/rooms/:id/kick
+Content-Type: application/json
+
+{ "playerId": "房主 playerId", "targetPlayerId": "被踢 playerId" }
+```
+
+仅房主可调用，且仅在房间「等待中」状态可用。`targetPlayerId` 可以是占座玩家或旁观者；不能踢自己。
+
+- 被踢成员先收到 `player_kicked` SSE 事件（客户端据此提示「你已被房主移出房间」并返回大厅，而非触发自动重连），随后其连接被关闭。
+- 其余成员收到 `player_left` 事件及更新后的 `room_state`。
+- 踢出后不转移房主、不销毁房间（房主仍在）。
+
+**响应 200** — `{ "success": true }`
+**响应 400** — `{ "error": "无法踢出该玩家（仅房主可操作，或目标不在房间中）" }`（非房主 / 目标不存在 / 踢自己 / 游戏进行中 / 调试房间）
 
 ## WebSocket 协议（兼容 fallback）
 
@@ -177,6 +196,7 @@ type ServerMessage =
   | { type: 'room_joined'; roomId: string; playerId: string; seatIndex?: number }
   | { type: 'player_joined'; playerId: string }
   | { type: 'player_left'; playerId: string }
+  | { type: 'player_kicked'; playerId: string; hostId: string }
   | { type: 'player_disconnected'; playerId: string; seatIndex: number; graceMs: number }
   | { type: 'player_reconnected'; playerId: string; seatIndex: number }
   | { type: 'game_started' }
