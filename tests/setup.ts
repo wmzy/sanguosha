@@ -10,4 +10,13 @@ import { cleanup } from '@testing-library/react';
 // node 环境下 mountedContainers 为空,cleanup 是 no-op,安全。
 afterEach(() => {
   cleanup();
+  // 清理由 cardFlyAnimation/cardMoveAnimation 直接 document.body.appendChild 的瞬时
+  // 飞牌动画元素。这些元素不走 React,@testing-library 的 cleanup 不会管理它们;
+  // jsdom 不触发 CSS animation 的 animationend,即便有 setTimeout 兜底也存在
+  // ~1.2s 窗口。isolate:false 下它们会跨文件残留到 document.body,污染后续测试的
+  // screen.queryByText 查询(如 replay-equip-ui-repro 的装备文本断言)。
+  // 用 data-fly-card 标记精确定位并移除,避免误删 React 容器。
+  if (typeof document !== 'undefined' && document.body) {
+    document.body.querySelectorAll('[data-fly-card]').forEach((el) => el.remove());
+  }
 });

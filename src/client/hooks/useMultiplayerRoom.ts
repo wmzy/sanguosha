@@ -65,7 +65,7 @@ export interface MultiplayerRoom {
   sendAction: (action: ActionMsg) => void;
   reorderHand: (order: string[]) => void;
   /** 切换身份（等待中） */
-  switchRole: (role: 'player' | 'spectator') => void;
+  switchRole: (role: 'player' | 'spectator', seat?: number) => void;
   /** 旁观者申请查看指定座次 */
   requestView: (targetSeat: number) => void;
   /** 玩家审批通过 */
@@ -157,7 +157,10 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const serverUrl = window.location.origin;
 
   const isHost = roomState?.hostId === playerId && playerId !== null;
-  const isSpectator = stage === 'spectating';
+  // isSpectator 从服务端 roomState 派生，而非 stage。
+  // 这样等待大厅内的旁观者（stage 仍为 waiting）也能正确识别身份，
+  // 不依赖 stage 切换来追踪旁观状态。
+  const isSpectator = !!playerId && (roomState?.spectatorIds.includes(playerId) ?? false);
   // ready 从服务端 room_state 派生，而非本地状态。这样服务端 reset 后自动同步。
   const ready = !!playerId && !!(roomState?.readyPlayers.includes(playerId));
 
@@ -186,7 +189,8 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
       onRoomState: (rs) => setRoomState(rs),
       onPhaseChange: (phase: ClientPhase) => {
         if (phase === 'lobby') setConnectionState('connected');
-        if (phase === 'playing' && !hgc.isSpectator) setStage('playing');
+        // 旁观者游戏开始时进入 spectating（看旁观视图），玩家进入 playing
+        if (phase === 'playing') setStage(hgc.isSpectator ? 'spectating' : 'playing');
         if (phase === 'ended' && !hgc.isSpectator) setStage('ended');
       },
       onGameOver: (winner) => setGameOver({ winner }),
@@ -287,10 +291,11 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
             return next;
           });
         }
-        // 身份切换（player↔spectator）：同步本地 stage。
-        // HGC 内部已更新 _isSpectator，这里驱动 UI 渲染对应界面。
+        // 身份切换同步 stage：
+        // - spectator→player：切回等待大厅（无论原 stage 是 waiting 还是 spectating）
+        // - player→spectator：保持当前 stage（等待大厅内旁观不切换视图）
         if (msg.type === 'role_changed' && msg.playerId === hgc.playerId) {
-          setStage(msg.newRole === 'spectator' ? 'spectating' : 'waiting');
+          if (msg.newRole === 'player') setStage('waiting');
         }
       },
     });
@@ -468,13 +473,15 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     log.info('joinAsSpectator', { roomId: targetRoomId });
   }, []);
 
-  const switchRole = useCallback((role: 'player' | 'spectator') => {
+  const switchRole = useCallback((role: 'player' | 'spectator', seat?: number) => {
     const hgc = hgcRef.current;
     if (!hgc?.roomId || !hgc.playerId) return;
+    const payload: Record<string, unknown> = { playerId: hgc.playerId, role };
+    if (seat !== undefined) payload.seat = seat;
     apiFetch<void>(`/api/rooms/${hgc.roomId}/switch-role`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: hgc.playerId, role }),
+      body: JSON.stringify(payload),
     }).catch((err) => {
       log.error('switchRole failed', { error: String(err) });
       const body = (err as { body?: { error?: string } }).body;

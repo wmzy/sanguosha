@@ -189,8 +189,16 @@ export function flyCards(
     container.appendChild(cardEl);
   }
 
+  // data-fly-card:标记瞬时飞行动画元素(与 cardFlyAnimation 一致),供测试 afterEach 清理。
+  container.setAttribute('data-fly-card', '');
   document.body.appendChild(container);
-  container.addEventListener('animationend', () => container.remove());
+  let removed = false;
+  const remove = () => {
+    if (removed) return;
+    removed = true;
+    container.remove();
+  };
+  container.addEventListener('animationend', remove);
   // 安全兜底:若 animationend 未触发(如标签页隐藏),超时后强制移除
-  setTimeout(() => container.remove(), FLY_DURATION_MS + 300);
+  setTimeout(remove, FLY_DURATION_MS + 300);
 }

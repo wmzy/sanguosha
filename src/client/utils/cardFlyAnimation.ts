@@ -11,7 +11,8 @@ const FLY_BORDER = '#3498db';
 const FLY_BG = 'rgba(22,33,62,0.95)';
 const FLY_TEXT = '#e0e0e0';
 const FLY_SHADOW = '0 0 16px rgba(52,152,219,0.6)';
-const FLY_ANIMATION = 'flyToCenter 0.9s cubic-bezier(0.4, 0, 0.2, 1) forwards';
+const FLY_DURATION_MS = 900;
+const FLY_ANIMATION = `flyToCenter ${FLY_DURATION_MS}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`;
 // 中央落点偏移(略高于屏幕正中)
 const CENTER_Y_OFFSET = 40;
 
@@ -50,6 +51,18 @@ export function createCardFlyAnimation(cardEl: HTMLElement, card: Card): void {
 
   floating.appendChild(nameDiv);
   floating.appendChild(suitDiv);
+  // data-fly-card:标记为瞬时飞行动画元素,供测试 afterEach 清理(document.body.appendChild
+  // 创建的元素不受 @testing-library cleanup 管理,jsdom 又不触发 animationend → 永久泄漏)。
+  floating.setAttribute('data-fly-card', '');
   document.body.appendChild(floating);
-  floating.addEventListener('animationend', () => floating.remove());
+  let removed = false;
+  const remove = () => {
+    if (removed) return;
+    removed = true;
+    floating.remove();
+  };
+  floating.addEventListener('animationend', remove);
+  // 安全兜底:animationend 在无 CSS 动画支持的环境(jsdom/标签页隐藏)永不触发,
+  // 超时后强制移除,避免浮动卡片残留泄漏到 document.body。
+  setTimeout(remove, FLY_DURATION_MS + 300);
 }

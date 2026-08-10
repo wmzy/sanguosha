@@ -1,18 +1,22 @@
 // tests/integration/闪电判定.test.ts
 // 集成测试:闪电(延时锦囊)判定
 //
-// 注:闪电 skill 模块尚未实现,所以真实的"判定黑桃2-9则造成3点伤害"逻辑
-// 只能等到 skill 实现后才能测。当前覆盖:
+// 闪电 skill 已实现(src/engine/skills/cards/闪电.ts):判定♠2-9→3点雷电伤害并移除,
+// 否则传递给下家。其 resolve 由 判定阶段 after-hook(registerDelayedTrickHooks)→
+// resumeDelayedSettlement → runSettlementPhase 触发,而非直接调 runJudgeFlow。
+//
+// 覆盖:
 //   1. 闪电卡通过 添加延时锦囊 atom 进入/离开判定区
 //   2. 闪电与其他延时锦囊(乐不思蜀)并存 → 各自按 name 独立移除
-//   3. 判定 atom (judgeType='闪电') 通用行为:翻判定牌→after hooks→进弃牌堆
-//      (无 闪电 skill 时 after hook 不消耗闪电,验证 plumbing 通路)
+//   3. 判定 atom (judgeType='闪电') 通用 plumbing:翻判定牌→after hooks→进弃牌堆
+//      (runJudgeFlow 直接调用不走 CardEffect resolve,故不消耗闪电,验证 atom 层通路)
 //   4. 重复添加去重、重新装备、validate 校验
+//   5. 端到端:判定阶段触发 → 命中(♠2-9)伤害 / 非命中传递下家
 import { describe, it, expect, beforeEach } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/index'
 import { applyAtom } from '../../src/engine/core/apply';
 import { runJudgeFlow } from '../../src/engine/flows/judge';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
 import { getAtomDef } from '../../src/engine/core/atom';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
@@ -175,10 +179,11 @@ describe('闪电:延时锦囊判定(plumbing & 端到端)', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 用例 4:判定 atom (judgeType='闪电') → 翻判定牌进处理区,after hooks 不消耗延时锦囊
-  // (因为当前无 闪电 skill 监听该 after hook,所以原子层 plumbing 验证)
+  // 用例 4:判定 atom (judgeType='闪电') → 翻判定牌进处理区,after hooks 收尾入弃
+  // (plumbing 验证:直接调 runJudgeFlow 只走 atom 层翻牌/收尾,不触发闪电 CardEffect
+  //  resolve —— resolve 由 判定阶段 after-hook 驱动,故此处闪电不被消耗)
   // ─────────────────────────────────────────────────────────────
-  it('用例4:判定 atom 翻判定牌到处理区 → after hooks 收尾入弃;闪电仍在判定区(无 skill)', async () => {
+  it('用例4:判定 atom 翻判定牌到处理区 → after hooks 收尾入弃;闪电仍在判定区(plumbing)', async () => {
     const sd: Card = makeCard('sd1', '闪电', '♠', 'A');
     const judgeCard: Card = makeCard('jd1', '杀', '♥', '7', '基本牌');
 
@@ -206,7 +211,7 @@ describe('闪电:延时锦囊判定(plumbing & 端到端)', () => {
     expect(harness.state.zones.processing).not.toContain(judgeCard.id);
     expect(harness.state.zones.discardPile).toContain(judgeCard.id);
 
-    // 闪电仍在判定区(无 skill 处理 → 不移除)
+    // 闪电仍在判定区(runJudgeFlow 直接调用不触发 CardEffect resolve → 不移除)
     expect(harness.state.players[0].pendingTricks).toHaveLength(1);
     expect(harness.state.players[0].pendingTricks[0].name).toBe('闪电');
   });
@@ -409,12 +414,12 @@ describe('闪电:延时锦囊判定(判定→黑桃→伤害端到端)', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 用例 2:判定 atom 翻判定牌(♠5)→ 处理区 → after hooks 收尾入弃
-  //   无 闪电 skill 时,闪电仍保留在判定区(没有 skill 处理)
+  // 用例 2:判定阶段触发 闪电 → 翻判定牌 ♥K(非♠2-9)→ 闪电不命中 → 传递给下家 P1
+  //   走真实路径:阶段开始(判定)after-hook → resumeDelayedSettlement → resolveLightning
   // ─────────────────────────────────────────────────────────────
-  it('用例2:判定 atom 翻判定牌(♠5)到处理区 → after hooks 收尾入弃;闪电仍在判定区(无 skill)', async () => {
+  it('用例2:判定 ♥K(非命中)→ 闪电传递给下家 P1,P0 不受伤', async () => {
     const sd: Card = makeCard('sd1', '闪电', '♠', 'A');
-    const judgeCard: Card = makeCard('jd1', '杀', '♠', '5', '基本牌');
+    const judgeCard: Card = makeCard('jd1', '杀', '♥', 'K', '基本牌');
 
     const state: GameState = createGameState({
       players: [
@@ -423,6 +428,7 @@ describe('闪电:延时锦囊判定(判定→黑桃→伤害端到端)', () => {
           name: 'P0',
           pendingTricks: [{ name: '闪电', source: 0, card: sd }],
         }),
+        makePlayer({ index: 1, name: 'P1', hand: [], skills: [] }),
       ],
       cardMap: { [sd.id]: sd, [judgeCard.id]: judgeCard },
       currentPlayerIndex: 0,
@@ -432,34 +438,30 @@ describe('闪电:延时锦囊判定(判定→黑桃→伤害端到端)', () => {
     });
     await harness.setup(state);
 
-    // 触发判定 atom
-    await runJudgeFlow(state, 0, '闪电');
+    // 触发判定阶段 → 闪电 hook:先问无懈(broadcast 超时无人出)→ 判定 ♥K → 非命中 → 传递下家
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '判定' });
+    await waitForStable(harness.state); // 等到无懈 broadcast pending
+    await fireTimeoutAndWait(harness.state); // 消耗无懈窗口(无人出无懈)
 
-    // 判定牌已从牌堆翻到处理区,after hooks 收尾后入弃
+    // 判定牌从牌堆翻出后入弃牌堆
     expect(harness.state.zones.deck).not.toContain(judgeCard.id);
     expect(harness.state.zones.discardPile).toContain(judgeCard.id);
     expect(harness.state.zones.processing).not.toContain(judgeCard.id);
 
-    // 关键:无 闪电 skill 时,判定牌 ♠5 应触发 3 点伤害,
-    //   但当前 skill 未实现 → 闪电仍保留在判定区(无 skill 处理)
-    expect(harness.state.players[0].pendingTricks).toHaveLength(1);
-    expect(harness.state.players[0].pendingTricks[0].name).toBe('闪电');
-    // 玩家血量未被伤害(因为无 闪电 skill)
+    // P0 判定区清空(闪电已传递走)
+    expect(harness.state.players[0].pendingTricks).toHaveLength(0);
+    // P1 收到闪电(下家)
+    expect(harness.state.players[1].pendingTricks).toHaveLength(1);
+    expect(harness.state.players[1].pendingTricks[0].name).toBe('闪电');
+    // P0 未受伤(非命中)
     expect(harness.state.players[0].health).toBe(4);
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 用例 3:[BUG 标注]期望:判定 ♠2-9 触发 3 点雷电伤害
-  //   当前引擎未实现 闪电 skill,跳过断言
+  // 用例 3:判定阶段触发 闪电 → 翻判定牌 ♠5(命中♠2-9)→ P0 受 3 点雷电伤害 + 闪电移除
+  //   走真实路径:阶段开始(判定)after-hook → resumeDelayedSettlement → resolveLightning
   // ─────────────────────────────────────────────────────────────
-  it.skip('BUG:判定 ♠5 → 期望对 P0 造成 3 点雷电伤害(闪电 skill 未实现,跳过)', async () => {
-    // BUG: 闪电 skill 模块未在 src/engine/skills/index.ts 注册(无 闪电.ts 文件)。
-    // 预期: 判定阶段翻判定牌 → 若为 ♠2-9 → 对 P0 造成 3 点雷电伤害(无防具/技能挡)
-    // 当前: 判定 atom 走完,但无 after hook 监听 判定/闪电 来 apply 伤害
-    // 修复: 新增 src/engine/skills/闪电.ts,实现判定后花色检测 + 伤害应用,
-    //      在 index.ts skillLoaders 注册;延后再写 判定/闪电 after hook。
-    //
-    // 本测试为占位:待 闪电 skill 实现后,移除 .skip 并补充完整断言。
+  it('用例3:判定 ♠5(命中)→ P0 受 3 点雷电伤害,闪电从判定区移除', async () => {
     const sd: Card = makeCard('sd1', '闪电', '♠', 'A');
     const judgeCard: Card = makeCard('jd1', '杀', '♠', '5', '基本牌');
 
@@ -481,11 +483,16 @@ describe('闪电:延时锦囊判定(判定→黑桃→伤害端到端)', () => {
     });
     await harness.setup(state);
 
-    await runJudgeFlow(state, 0, '闪电');
+    // 触发判定阶段 → 闪电 hook:先问无懈(broadcast 超时无人出)→ 判定 ♠5 → 命中 → 3 点雷电伤害
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '判定' });
+    await waitForStable(harness.state); // 等到无懈 broadcast pending
+    await fireTimeoutAndWait(harness.state); // 消耗无懈窗口(无人出无懈)
 
-    // 期望: 判定 ♠5 → 闪电触发 → P0 扣 3 血(4 → 1)
+    // 判定牌入弃牌堆
+    expect(harness.state.zones.discardPile).toContain(judgeCard.id);
+    // P0 受 3 点雷电伤害:4 → 1
     expect(harness.state.players[0].health).toBe(1);
-    // 闪电应从判定区移除
+    // 闪电从判定区移除
     expect(harness.state.players[0].pendingTricks).toHaveLength(0);
   });
 });

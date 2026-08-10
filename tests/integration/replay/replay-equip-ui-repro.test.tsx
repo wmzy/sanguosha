@@ -52,19 +52,16 @@ describe('回放 UI 渲染:装备随 step 变化', () => {
     const { container, rerender } = render(<GameViewComponent view={v0} onAction={() => {}} readOnly />);
     // step 0:无装备
     let titles = Array.from(container.querySelectorAll('[title]')).map(e => (e as HTMLElement).getAttribute('title'));
-    console.log('step0 titles:', titles);
     expect(titles).not.toContain('诸葛连弩(武器)');
 
     // step 1:有武器
     rerender(<GameViewComponent view={v1} onAction={() => {}} readOnly />);
     titles = Array.from(container.querySelectorAll('[title]')).map(e => (e as HTMLElement).getAttribute('title'));
-    console.log('step1 titles:', titles);
     expect(titles).toContain('诸葛连弩(武器)');
 
     // 切回无装备
     rerender(<GameViewComponent view={v0} onAction={() => {}} readOnly />);
     titles = Array.from(container.querySelectorAll('[title]')).map(e => (e as HTMLElement).getAttribute('title'));
-    console.log('step0again titles:', titles);
     expect(titles).not.toContain('诸葛连弩(武器)');
   });
 });

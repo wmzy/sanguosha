@@ -562,8 +562,10 @@ export function applyRestRoutes(app: Hono): void {
     const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
     const newRole = raw.role === 'spectator' ? 'spectator' : raw.role === 'player' ? 'player' : '';
     if (!playerId || !newRole) return c.json({ error: '缺少 playerId 或 role' }, 400);
+    // 可选座位号：spectator→player 时占据指定空座位
+    const seat = typeof raw.seat === 'number' ? raw.seat : undefined;
 
-    const result = switchRole(roomId, playerId, newRole);
+    const result = switchRole(roomId, playerId, newRole, seat);
     if (!result.room) return c.json({ error: '房间不存在' }, 404);
     if (!result.success) return c.json({ error: '切换失败（仅等待中允许，或房间已满）' }, 400);
 

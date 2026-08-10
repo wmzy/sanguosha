@@ -765,7 +765,7 @@ export function MultiplayerPage() {
         {reconnectBanner}
         <div className={page}>
           <h1 className={title}>等待大厅</h1>
-          <p className={subtitle}>等待玩家加入并准备</p>
+          <p className={subtitle}>{mp.isSpectator ? '👁 旁观中 · 点击空位加入游戏' : '等待玩家加入并准备'}</p>
           <div className={card}>
           <div className={roomCodeBox}>
             <div className={roomCodeLabel}>房间码（分享给其他玩家）</div>
@@ -971,7 +971,7 @@ export function MultiplayerPage() {
             );
             return (
               <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '14px', color: colors.text.muted, marginBottom: '8px' }}>座位安排（点击空位移动，点击他人座位请求交换）</div>
+                <div style={{ fontSize: '14px', color: colors.text.muted, marginBottom: '8px' }}>座位安排（{mp.isSpectator ? '点击空位加入游戏' : '点击空位移动，点击他人座位请求交换'}）</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                   {seats.map((seatPlayerId, i) => {
                     const isEmpty = seatPlayerId === null;
@@ -996,6 +996,11 @@ export function MultiplayerPage() {
                             textAlign: 'center',
                           } as React.CSSProperties}
                           onClick={() => {
+                            // 旁观者点空位 → 占据该座位加入游戏；点他人座位无效
+                            if (mp.isSpectator) {
+                              if (isEmpty) mp.switchRole('player', i);
+                              return;
+                            }
                             if (isEmpty) {
                               mp.moveSeat(i);
                             } else if (!isMe) {
@@ -1005,7 +1010,7 @@ export function MultiplayerPage() {
                               }
                             }
                           }}
-                          title={isEmpty ? '移动到此座位' : isMe ? '你的座位' : `请求交换座位`}
+                          title={mp.isSpectator ? (isEmpty ? '加入游戏' : '旁观中') : isEmpty ? '移动到此座位' : isMe ? '你的座位' : `请求交换座位`}
                         >
                           <div style={{ fontWeight: 'bold' }}>P{i + 1}</div>
                           <div style={{ fontSize: '11px', opacity: 0.8 }}>
@@ -1088,7 +1093,7 @@ export function MultiplayerPage() {
             );
           })()}
           <div className={buttonRow}>
-            {!mp.ready && (
+            {!mp.isSpectator && !mp.ready && (
               <button
                 className={btnStyle}
                 style={{ '--btn-bg': colors.accent.green } as React.CSSProperties}
@@ -1097,7 +1102,7 @@ export function MultiplayerPage() {
                 准备
               </button>
             )}
-            {mp.ready && (
+            {!mp.isSpectator && mp.ready && (
               <button
                 className={btnStyle}
                 style={{ '--btn-bg': colors.disabled } as React.CSSProperties}
@@ -1121,14 +1126,22 @@ export function MultiplayerPage() {
                 开始游戏
               </button>
             )}
-            <button
-              className={btnStyle}
-              style={{ '--btn-bg': colors.bg.input } as React.CSSProperties}
-              onClick={() => mp.switchRole('spectator')}
-              title="切换为旁观者，不参与本局游戏"
-            >
-              👁 旁观
-            </button>
+            {mp.isSpectator ? (
+              <span
+                style={{ color: colors.accent.gold, fontSize: '13px', alignSelf: 'center', padding: '0 8px' }}
+              >
+                👁 旁观中
+              </span>
+            ) : (
+              <button
+                className={btnStyle}
+                style={{ '--btn-bg': colors.bg.input } as React.CSSProperties}
+                onClick={() => mp.switchRole('spectator')}
+                title="切换为旁观者，不参与本局游戏"
+              >
+                👁 旁观
+              </button>
+            )}
             <button
               className={btnStyle}
               style={{ '--btn-bg': colors.disabled } as React.CSSProperties}

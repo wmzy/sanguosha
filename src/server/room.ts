@@ -615,6 +615,7 @@ export function switchRole(
   roomId: string,
   playerId: string,
   newRole: 'player' | 'spectator',
+  seat?: number,
 ): { room: Room; success: boolean } {
   const room = roomList.get(roomId);
   if (!room) return { room: null as never, success: false };
@@ -639,12 +640,18 @@ export function switchRole(
     const sink = room.spectators.get(playerId);
     if (!sink) return { room, success: false };
     if (room.players.size >= room.maxPlayers) return { room, success: false };
+    // 指定座位时校验：必须有效且为空
+    if (seat !== undefined) {
+      if (seat < 0 || seat >= room.seats.length || room.seats[seat] !== null) {
+        return { room, success: false };
+      }
+    }
     room.spectators.delete(playerId);
     room.viewGrants.delete(playerId);
     room.pendingViewRequests.delete(playerId);
     room.players.set(playerId, sink);
-    // 分配首个空座位
-    const emptySeat = room.seats.indexOf(null);
+    // 占据指定座位（或首个空座位）
+    const emptySeat = seat !== undefined ? seat : room.seats.indexOf(null);
     if (emptySeat >= 0) room.seats[emptySeat] = playerId;
     return { room, success: true };
   }
