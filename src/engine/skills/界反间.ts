@@ -17,7 +17,8 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
+import type { SkillModule } from '../types';
 
 /** 目标二选一请求类型。 */
 const CHOICE_REQUEST = '界反间/choice';

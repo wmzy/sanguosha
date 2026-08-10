@@ -35,7 +35,8 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { pushFrame, popFrame } from '../core/frame';
-import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界恩怨';
 const DISPLAY_NAME = '恩怨';

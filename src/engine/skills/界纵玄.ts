@@ -20,7 +20,8 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界纵玄';
 const DISPLAY_NAME = '纵玄';

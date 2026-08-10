@@ -2,7 +2,6 @@
 // 类型定义在 types/card-effect.ts;帧状态操作(isCancelled 等)在 core/frame.ts。
 // 新增卡牌效果时在 skills/cards/ 下创建文件并在此 cardEffectMap 添加条目。
 import type { CardEffect } from '../../types';
-import { setCardNameChecker } from '../../core/skill';
 import { arrowVolleyEffect } from './万箭齐发';
 import { indulgenceEffect } from './乐不思蜀';
 import { bountifulHarvestEffect } from './五谷丰登';
@@ -62,5 +61,3 @@ export function hasCardEffect(cardName: string): boolean {
 export function getAllCardEffects(): [string, CardEffect][] {
   return Object.entries(cardEffectMap);
 }
-
-setCardNameChecker((id: string) => id in cardEffectMap);

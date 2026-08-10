@@ -22,7 +22,8 @@
 import type { Card, HookResult, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
-import { registerBeforeHook, type SkillModule } from '../core/skill';
+import { registerBeforeHook } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界帷幕';
 const DISPLAY_NAME = '帷幕';

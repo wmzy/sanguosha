@@ -12,7 +12,7 @@ import { isActiveAction } from '../utils/gameViewHelpers';
 import { EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON } from './gameViewConstants';
 import { getEquipCardImage } from '../assets/imageAssets';
 import { shallowSetEqual } from '../utils/memo';
-import { getSkillDescription } from '../../engine/core/skill';
+import { getSkillDescription } from '../../engine/skills/lifecycle';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { useHoverTooltip } from '../hooks/useHoverTooltip';
 

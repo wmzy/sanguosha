@@ -9,7 +9,7 @@ import {
   getSkillDescription,
   getSkillDescriptionAsync,
   getSkillModule,
-} from '../../src/engine/core/skill';
+} from '../../src/engine/skills/lifecycle';
 
 describe('getSkillDescription', () => {
   it('模块加载后同步返回技能描述', async () => {

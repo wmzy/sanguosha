@@ -23,7 +23,7 @@ import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { isCancelled, clearCancelled } from '../core/frame';
 import { consumePlayedSlashes } from './cards/play-card';
-import type { SkillModule } from '../core/skill';
+import type { SkillModule } from '../types';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

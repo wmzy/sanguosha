@@ -28,7 +28,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界纵适';
 const DISPLAY_NAME = '纵适';

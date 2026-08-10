@@ -16,8 +16,9 @@
 import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { skillLoaders } from './index';
+import type { SkillModule } from '../types';
 
 const SKILL_NAME = '界直谏';
 

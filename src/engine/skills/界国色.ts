@@ -28,7 +28,8 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const TRICK_NAME = '乐不思蜀';
 

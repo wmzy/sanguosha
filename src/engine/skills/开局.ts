@@ -3,9 +3,11 @@
 import type { ActionEntry, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { createRng } from '../util/rng';
-import { registerActionEntry, unregisterActionEntry, instantiateSkill } from '../core/skill';
+import { registerActionEntry, unregisterActionEntry } from '../core/skill';
+import { instantiateSkill } from './lifecycle';
 
 import { getCharacterBaseId, isLord } from '../data/character-meta';
+import type { SkillModule } from '../types';
 
 /**
  * system 命名空间占位 ownerId(座次下标 -1,不对应任何玩家槽位)。

@@ -29,8 +29,9 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { createRng } from '../util/rng';
+import type { SkillModule } from '../types';
 
 const TIAN_YI_PD_RT = '天义/拼点'; // 天义询问目标出拼点牌的 requestType
 const TIAN_YI_TARGET_CARD_KEY = '天义/targetCard'; // 天义 execute 读取的目标拼点牌 localVars

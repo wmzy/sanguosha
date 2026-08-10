@@ -43,8 +43,8 @@ import {
   registerAction,
   registerAfterHook,
   registerBeforeHook,
-  type SkillModule,
 } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界求援';
 const DISPLAY_NAME = '求援';

@@ -39,8 +39,8 @@ import {
   registerAction,
   registerBeforeHook,
   registerAfterHook,
-  type SkillModule,
 } from '../core/skill';
+import type { SkillModule } from '../types';
 
 // ── 摸牌逻辑常量(镜像标好施)──
 const CONFIRM_RT = '界好施/confirm';

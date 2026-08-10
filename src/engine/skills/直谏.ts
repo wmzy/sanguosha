@@ -15,8 +15,9 @@
 import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { skillLoaders } from './index';
+import type { SkillModule } from '../types';
 
 /** 装备牌 subtype → 装备栏位(与 装备 atom 的 inferSlot 一致) */
 function slotOf(card: { subtype?: string } | undefined): EquipSlot | null {

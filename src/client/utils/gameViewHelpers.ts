@@ -14,8 +14,6 @@ import type {
   TargetFilter,
 } from '../../engine/types';
 import { getCardEffect } from '../../engine/skills/cards';
-// 副作用 import:确保 cardEffectMap(skills/cards/index.ts 聚合)在模块加载时已构造。
-import '../../engine/skills/cards';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { defaultPlayActive } from '../../engine/rules/action-active';
 

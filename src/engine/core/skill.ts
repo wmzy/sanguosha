@@ -1,14 +1,13 @@
-// src/engine/skill.ts
-// action/hook 实例注册 + 实例管理(state-bound 注册表)。
+// core/skill.ts — action/hook 注册表 CRUD + state-bound 注册表(WeakMap 外挂)。
+//
+// 纯注册表操作:registerAction / registerBeforeHook / registerAfterHook /
+// registerJudgeModifier / declareAlternativeResponse + 对应的查询/清理。
+// 模块加载与实例生命周期(instantiateSkill / unloadSkillInstance / moduleCache)
+// 已迁至 skills/lifecycle.ts,该处可直接 import skillLoaders 与 cardEffectMap,
+// 无需 service locator setter。
 //
 // 注册表通过 WeakMap 外挂在 GameState 上,实现 state 隔离 = 注册表隔离。
 // 这消除了模块级全局状态导致的跨对局泄漏(如 流离 hook 残留错误触发)。
-//
-// skill 直接 import 以下函数使用(state 作为注册表句柄,首参):
-//   - registerAction(state, skillId, ownerId, actionType, validate, execute)
-//   - registerBeforeHook(state, skillId, ownerId, atomType, handler)
-//   - registerAfterHook(state, skillId, ownerId, atomType, handler)
-//   - 对应的 unregisterXxx 配套
 
 import type {
   ActionEntry,
@@ -17,130 +16,13 @@ import type {
   AtomHookEntry,
   AtomName,
   AtomOfName,
-  FrontendAPI,
   GameState,
   HookResult,
   Json,
   PendingSlot,
-  Skill,
 } from '../types';
 import { TARGET_SYSTEM } from '../types';
 import { isTrickBlocked } from '../rules/trick-quota';
-
-/** 卡名检查器（由 card-effect/registry.ts 设置）：判断某 id 是否是已注册的卡牌名。
- *  用于 unloadSkillInstance 跳过卡名同名技能的前缀清理。 */
-let cardNameChecker: ((id: string) => boolean) | null = null;
-
-export function setCardNameChecker(fn: (id: string) => boolean): void {
-  cardNameChecker = fn;
-}
-
-function isCardName(id: string): boolean {
-  return cardNameChecker ? cardNameChecker(id) : false;
-}
-
-export interface SkillModule {
-  createSkill: (id: string, ownerId: number) => Skill;
-  /** 注册时拿到 skill + state;ownerId 从 skill.ownerId 取。
-   *  返回卸载函数,由 unloadSkillInstance 调用清理(装备类技能如马匹在此设/清 vars)。 */
-  onInit?: (skill: Skill, state: GameState) => (() => void) | void;
-  onMount?: (skill: Skill, api: FrontendAPI) => (() => void) | void;
-}
-
-// ─── module 查询 ───────────────────────────────────────────
-
-/**
- * 技能模块解析器。由 skills/index.ts 设置,打破循环依赖
- * (技能文件 import skill.ts → skill.ts 不能反向 import skills/index.ts)。
- */
-let skillModuleResolver: ((id: string) => Promise<SkillModule>) | null = null;
-
-export function setSkillModuleResolver(fn: (id: string) => Promise<SkillModule>): void {
-  skillModuleResolver = fn;
-}
-
-/** 同步检查技能模块是否注册。由 skills/index.ts 设置,用于避免 try-catch 控制流。 */
-let skillModuleChecker: ((id: string) => boolean) | null = null;
-
-export function setSkillModuleChecker(fn: (id: string) => boolean): void {
-  skillModuleChecker = fn;
-}
-
-/** 通过解析器查找技能模块(动态 import,按需加载)。加载后缓存,供 getCachedSkillModule 同步获取。 */
-const moduleCache = new Map<string, SkillModule>();
-
-// ─── moduleCache 变更订阅(供前端 useSyncExternalStore 在技能模块加载后触发重渲染) ───
-let moduleCacheVersion = 0;
-const moduleCacheListeners = new Set<() => void>();
-
-export function subscribeModuleCache(cb: () => void): () => void {
-  moduleCacheListeners.add(cb);
-  return () => {
-    moduleCacheListeners.delete(cb);
-  };
-}
-
-export function getModuleCacheVersion(): number {
-  return moduleCacheVersion;
-}
-
-export async function getSkillModule(id: string): Promise<SkillModule> {
-  const cached = moduleCache.get(id);
-  if (cached) return cached;
-  if (!skillModuleResolver)
-    throw new Error('skillModuleResolver not set (forgot to import skills/index?)');
-  const mod = await skillModuleResolver(id);
-  moduleCache.set(id, mod);
-  moduleCacheVersion++;
-  moduleCacheListeners.forEach((cb) => cb());
-  return mod;
-}
-
-/** 同步获取已加载过的技能模块(未加载返回 undefined)。用于卸载时同步查模块的场景。 */
-/** 同步检查技能模块是否已注册（在 skillLoaders 中）。
- *  用于跳过未注册的技能 id（如已删除的 per-card 技能），避免 getSkillModule 拑错。
- *  在 skillModuleChecker 设置前返回 false。 */
-export function isSkillModuleRegistered(id: string): boolean {
-  return skillModuleChecker ? skillModuleChecker(id) : false;
-}
-
-export function getCachedSkillModule(id: string): SkillModule | undefined {
-  return moduleCache.get(id);
-}
-
-// ─── 技能描述查询(静态数据,前端 tooltip / MCP 工具共享) ─────────
-// createSkill 返回的 description 不依赖 ownerId(每个技能固定文案),
-// 故用 ownerId=0 取一次并缓存,供前端 hover tip 与 MCP getSkillInfo 复用,
-// 避免在多处重复硬编码或重复调用 createSkill。
-const descriptionCache = new Map<string, string>();
-
-/** 同步获取技能描述。依赖技能模块已加载(moduleCache 命中);未加载返回 undefined。
- *  前端 useSkillActions 在 view 变化时为所有玩家 registerSkillActions → 全量加载技能模块,
- *  故渲染时基本能命中;首次渲染(effect 未跑完)的极少数情况优雅降级(只显示技能名)。
- *  需要确保命中的场景(MCP 工具/服务端)用 getSkillDescriptionAsync。 */
-export function getSkillDescription(id: string): string | undefined {
-  if (descriptionCache.has(id)) return descriptionCache.get(id);
-  const mod = moduleCache.get(id);
-  if (!mod) return undefined;
-  try {
-    const desc = mod.createSkill(id, 0).description;
-    descriptionCache.set(id, desc);
-    return desc;
-  } catch {
-    return undefined;
-  }
-}
-
-/** 异步获取技能描述:先查缓存,未命中则加载模块再取。模块缺失(无对应技能)返回 undefined。 */
-export async function getSkillDescriptionAsync(id: string): Promise<string | undefined> {
-  if (descriptionCache.has(id)) return descriptionCache.get(id);
-  try {
-    await getSkillModule(id);
-  } catch {
-    return undefined;
-  }
-  return getSkillDescription(id);
-}
 
 // ─── state-bound 注册表(WeakMap 外挂) ────────────────────────
 
@@ -163,6 +45,9 @@ interface SkillRegistry {
    *  由 判定 atom 的 afterApply 阶段遍历触发,与普通 after hook 解耦。 */
   judgeModifiers: Map<number, AtomHookEntry>;
   instanceUnloads: Map<string, () => void>;
+  /** 技能 isLocked 元数据(实例化时写入):skillId → isLocked。
+   *  供 skill-suppression 查询,替代旧 getCachedSkillModule 反射查询。 */
+  lockedSkills: Map<string, boolean>;
   /** 替代回应能力声明表(技能就近注册)。 */
   altResponseDecls: AltResponseDecl[];
 }
@@ -180,6 +65,7 @@ function getRegistry(state: GameState): SkillRegistry {
       afterHooks: new Map(),
       judgeModifiers: new Map(),
       instanceUnloads: new Map(),
+      lockedSkills: new Map(),
       altResponseDecls: [],
     };
     registries.set(state, r);
@@ -301,7 +187,7 @@ export function unregisterActionEntry(
   getRegistry(state).actions.delete(actionKey(skillId, ownerId, actionType));
 }
 
-function unregisterActionsForInstance(state: GameState, skillId: string, ownerId: number): void {
+export function unregisterActionsForInstance(state: GameState, skillId: string, ownerId: number): void {
   const reg = getRegistry(state);
   const prefix = `${skillId}:${ownerId}:`;
   for (const key of [...reg.actions.keys()]) {
@@ -486,6 +372,8 @@ export function registerJudgeModifier(
 }
 
 // ─── 实例管理(state-bound) ──────────────────────────────────
+// 实例化/卸载生命周期由 skills/lifecycle.ts 管理(那里可直接 import skillLoaders
+// 和 cardEffectMap,无需 service locator setter)。本文件只提供注册表读写原语。
 
 export function setSkillInstanceUnload(
   state: GameState,
@@ -496,62 +384,28 @@ export function setSkillInstanceUnload(
   getRegistry(state).instanceUnloads.set(instanceKey(skillId, ownerId), unload);
 }
 
-export function unloadSkillInstance(state: GameState, skillId: string, ownerId: number): void {
-  const reg = getRegistry(state);
-  const key = instanceKey(skillId, ownerId);
-  const unload = reg.instanceUnloads.get(key);
-  if (unload) {
-    unload();
-    reg.instanceUnloads.delete(key);
-  }
-  // 按前缀清理残留 action/hook。但跳过卡名同名技能（如铁索连环）：
-  // 使用牌/打出牌 按卡名注册 use/respond action（skillId=卡名），
-  // 若此处按前缀清理会误删这些由 使用牌 注册的 action。
-  // 卡名同名技能的 action 清理由其自身 unload 函数精确处理。
-  if (!isCardName(skillId)) {
-    unregisterActionsForInstance(state, skillId, ownerId);
-  }
-}
-
-export async function registerSkillsFromState(state: GameState): Promise<void> {
-  // 顺序实例化(按座次 + skills 数组序),保证 after/before hook 的注册顺序确定。
-  // 此前用 Promise.all 并发,模块缓存命中时各 instantiateSkill 的 onInit 执行顺序
-  // 由微任务调度决定——会导致依赖注册顺序的技能(如鬼才须先于闪电注册才能改判)
-  // 在并发调度下顺序反转。与 开局.ts 中既有的 for-await 实例化模式保持一致。
-  for (const player of state.players) {
-    for (const skillId of player.skills) {
-      await instantiateSkill(state, skillId, player.index);
-    }
-  }
-}
-
-/**
- * 实例化单个 skill(从 index bootstrap / registerSkillsFromState / 添加技能 atom 调用)。
- *
- * 幂等:若 (skillId, ownerId) 已有实例,先卸载旧实例(调其 unload 函数 + 清 action/hook 注册),
- * 再重新注册。保证 registerSkillsFromState 重入、并发 dispatch、动态 添加技能 等场景不会因
- * `registerActionEntry` 的 "already registered" 抛错。
- */
-export async function instantiateSkill(
+export function getSkillInstanceUnload(
   state: GameState,
   skillId: string,
   ownerId: number,
-): Promise<Skill | null> {
-  // 先卸载已有实例(若存在),释放其 action/hook 注册,避免重复注册拑错
-  // 但仅当技能模块存在时才卸载——否则会误删 使用牌/打出牌 按卡名注册的 action
-  // （如 player.skills 含 '无中生有' 但该模块已删除，其 action 由 使用牌 注册）。
-  if (skillModuleChecker && !skillModuleChecker(skillId)) return null;
-  unloadSkillInstance(state, skillId, ownerId);
-  const module = await getSkillModule(skillId);
-  const skill = module.createSkill(skillId, ownerId);
-  if (module.onInit) {
-    const unload = module.onInit(skill, state);
-    setSkillInstanceUnload(
-      state,
-      skillId,
-      ownerId,
-      typeof unload === 'function' ? unload : () => {},
-    );
-  }
-  return skill;
+): (() => void) | undefined {
+  return getRegistry(state).instanceUnloads.get(instanceKey(skillId, ownerId));
+}
+
+export function deleteSkillInstanceUnload(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+): void {
+  getRegistry(state).instanceUnloads.delete(instanceKey(skillId, ownerId));
+}
+
+/** 写入技能 isLocked 元数据(实例化时由 lifecycle.ts 调用)。 */
+export function setSkillLocked(state: GameState, skillId: string, isLocked: boolean): void {
+  getRegistry(state).lockedSkills.set(skillId, isLocked);
+}
+
+/** 查询技能是否为锁定技(suppression provider 用,锁定技永不压制)。 */
+export function isSkillLocked(state: GameState, skillId: string): boolean {
+  return getRegistry(state).lockedSkills.get(skillId) ?? false;
 }

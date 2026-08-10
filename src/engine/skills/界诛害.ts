@@ -20,7 +20,8 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { runUseFlow } from './cards/use-card';
-import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界诛害';
 const DISPLAY_NAME = '诛害';

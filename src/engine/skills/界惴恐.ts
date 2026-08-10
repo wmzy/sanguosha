@@ -45,8 +45,8 @@ import {
   registerAction,
   registerAfterHook,
   registerBeforeHook,
-  type SkillModule,
 } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界惴恐';
 const DISPLAY_NAME = '惴恐';

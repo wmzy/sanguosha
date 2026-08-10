@@ -22,8 +22,9 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界挑衅';
 const DISPLAY_NAME = '挑衅';

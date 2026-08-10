@@ -33,9 +33,9 @@ import {
   registerAction,
   registerAfterHook,
   hasBlockingPending,
-  type SkillModule,
 } from '../core/skill';
 import { getGender } from '../data/character-meta';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界燕语';
 const DISPLAY_NAME = '燕语';

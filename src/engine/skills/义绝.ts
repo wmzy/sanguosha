@@ -35,8 +35,9 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { registerSuppressionProvider } from '../core/skill-suppression';
+import type { SkillModule } from '../types';
 
 /** 请求类型:目标展示一张手牌。 */
 const REVEAL_REQUEST = '义绝/reveal';

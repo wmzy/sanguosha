@@ -29,8 +29,9 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerBeforeHook, type SkillModule } from '../core/skill';
+import { registerBeforeHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
+import type { SkillModule } from '../types';
 
 const DISPLAY_NAME = '宗室';
 

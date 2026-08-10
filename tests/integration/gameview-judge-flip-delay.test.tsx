@@ -18,7 +18,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
-import '../../src/client/engine-imports'; // 注册 atoms + skills 副作用
 import { clearRegistry } from '../../src/client/skillActionRegistry';
 import type { GameView, PendingView } from '../../src/engine/types';
 

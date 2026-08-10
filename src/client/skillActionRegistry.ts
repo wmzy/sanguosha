@@ -1,7 +1,5 @@
 // src/client/skillActionRegistry.ts
 // 前端技能 action 注册表：收集技能 onMount 调用 defineAction 注册的 UI 配置
-// import skills/index 触发 setSkillModuleResolver(动态 import 按需加载)
-import '../engine/skills';
 import type {
   ActionActiveWhen,
   ActionPrompt,
@@ -10,7 +8,7 @@ import type {
   FrontendAPI,
   Skill,
 } from '../engine/types';
-import { getSkillModule } from '../engine/core/skill';
+import { getSkillModule } from '../engine/skills/lifecycle';
 
 export interface SkillActionDef {
   skillId: string;

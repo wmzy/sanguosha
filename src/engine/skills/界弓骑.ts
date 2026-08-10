@@ -34,12 +34,12 @@ import { popFrame, pushFrame } from '../core/frame';
 import {
   registerAction,
   hasBlockingPending,
-  type SkillModule,
 } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import { registerSlashExemptor } from '../rules/slash-quota';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界弓骑';
 const DISPLAY_NAME = '弓骑';

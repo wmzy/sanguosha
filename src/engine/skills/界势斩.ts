@@ -28,8 +28,9 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界势斩';
 const DISPLAY_NAME = '势斩';

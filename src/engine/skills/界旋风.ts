@@ -43,8 +43,9 @@ import type {
   GameView,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
+import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界旋风';
 const DISPLAY_NAME = '旋风';

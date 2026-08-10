@@ -10,8 +10,8 @@
 //
 // 与后端 apply 对称:apply 改 GameState,applyView 改 GameView。
 
-// 引入 atoms 触发注册(前端构建 tree-shake 后端 validate/apply,保留 applyView)
-import '../engine-imports';
+// 引入 atoms: getAtomDef 静态 import 已触发 atoms/index.ts 聚合 atomMap。
+// skills/cards/马匹技能 通过组件链(useSkillActions→skillActionRegistry→lifecycle)预加载。
 import { getAtomDef } from '../../engine/core/atom';
 import type { GameView, ViewEvent } from '../../engine/types';
 import type { PlayerNameResolver } from '../../engine/types';

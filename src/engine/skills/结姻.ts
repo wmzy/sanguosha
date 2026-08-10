@@ -16,8 +16,9 @@ import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { getGender } from '../data/character-meta';
+import type { SkillModule } from '../types';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

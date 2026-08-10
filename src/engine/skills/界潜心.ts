@@ -19,7 +19,8 @@
 //   此处实现不依赖"是否在 ownerId 回合",只要满足 source === ownerId 即可。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAfterHook, type SkillModule } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界潜心';
 const DISPLAY_NAME = '潜心';

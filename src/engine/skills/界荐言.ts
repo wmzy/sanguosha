@@ -26,10 +26,11 @@
 import type { FrontendAPI, GameState, Json, Skill, Card } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame, frameCards } from '../core/frame';
-import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { getGender } from '../data/character-meta';
 import { defaultPlayActive } from '../rules/action-active';
 import type { GameView } from '../types';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界荐言';
 const DISPLAY_NAME = '荐言';

@@ -32,7 +32,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const USED_KEY = '武烈/used';
 const CONFIRM_RT = '武烈/confirm';

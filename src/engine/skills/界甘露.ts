@@ -39,8 +39,9 @@ import {
   markOncePerTurn,
   activeUnlessUsedThisTurn,
 } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { skillLoaders } from './index';
+import type { SkillModule } from '../types';
 
 const SKILL_NAME = '界甘露';
 const DISPLAY_NAME = '甘露';

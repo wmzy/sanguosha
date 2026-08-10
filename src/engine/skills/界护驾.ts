@@ -28,7 +28,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, declareAlternativeResponse, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook, declareAlternativeResponse } from '../core/skill';
+import type { SkillModule } from '../types';
 
 // localVars keys(标护驾主技路径)
 const DODGE_PLAYED_VAR = '界护驾/闪出';

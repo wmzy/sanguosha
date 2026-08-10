@@ -35,8 +35,9 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { skillLoaders } from './index';
+import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界直言';
 const DISPLAY_NAME = '直言';

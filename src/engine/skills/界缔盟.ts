@@ -26,7 +26,8 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, registerBeforeHook, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const TARGET_RT = '界缔盟/target';
 const DISCARD_RT = '界缔盟/discard';

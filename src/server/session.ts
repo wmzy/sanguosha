@@ -25,8 +25,6 @@ import {
   qunCharacters,
 } from '../engine/data/characters';
 
-import '../engine/atoms';
-import '../engine/skills';
 import type { ServerMessage, DeadlineInfo } from './protocol';
 import type { Room } from './room';
 import { createLogger } from './logger';

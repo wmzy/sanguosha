@@ -30,8 +30,9 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界血裔';
 const DISPLAY_NAME = '血裔';

@@ -37,7 +37,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界精策';
 const DISPLAY_NAME = '精策';

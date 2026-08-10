@@ -23,7 +23,7 @@
 //   判定是否命中。数量极少(全局几个技能),遍历成本可忽略。
 
 import type { GameState } from '../types';
-import { getCachedSkillModule } from './skill';
+import { isSkillLocked } from './skill';
 
 /**
  * 非锁定技失效判定器:返回 true 表示该 owner 的此技能 hook 应被跳过。
@@ -81,18 +81,9 @@ export function isHookSuppressed(
   skillId: string,
 ): boolean {
   if (ownerId < 0) return false; // TARGET_SYSTEM / TARGET_BROADCAST
-  // 从已加载模块查 isLocked:技能自行声明,引擎不解析描述字符串。
-  // createSkill 同步且确定性(isLocked 对每个技能固定),缓存 lookup 即可。
-  // 不走 instantiateSkill 的副作用路径——仅取元数据。
-  const mod = getCachedSkillModule(skillId);
-  if (mod) {
-    try {
-      const sample = mod.createSkill(skillId, ownerId);
-      if (sample.isLocked) return false;
-    } catch {
-      // 模块 createSkill 抛错属实现 bug,保守不压制(上层 onError 会捕获真实错误)。
-    }
-  }
+  // 锁定技/防具/武器(isLocked=true)永不压制——从实例化时写入的元数据查。
+  // 替代旧 getCachedSkillModule 反射查询(消除 core→lifecycle 数据依赖)。
+  if (isSkillLocked(state, skillId)) return false;
   const set = getSuppressionRegistry(state).providers;
   for (const fn of set) {
     if (fn(state, ownerId, skillId)) return true;

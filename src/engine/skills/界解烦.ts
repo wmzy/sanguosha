@@ -38,10 +38,10 @@ import {
   registerAction,
   registerBeforeHook,
   hasBlockingPending,
-  type SkillModule,
 } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界解烦';
 const DISPLAY_NAME = '解烦';

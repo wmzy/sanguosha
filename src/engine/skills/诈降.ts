@@ -21,9 +21,10 @@
 // provider 随技能实例生命周期注册/卸载(返回的 unload 由 setSkillInstanceUnload 清理)。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerBeforeHook, registerAfterHook, type SkillModule } from '../core/skill';
+import { registerBeforeHook, registerAfterHook } from '../core/skill';
 import { registerSlashExtraProvider } from '../rules/slash-quota';
 import { registerAttackRangeExemptor } from '../rules/distance';
+import type { SkillModule } from '../types';
 
 /** 本回合诈降杀增益是否激活的 turn.vars key(值为激活者座次 number)。
  *  仅在 owner 出牌阶段失去体力后设置;杀技能/action-active/distance 据此分支红色杀增益。 */

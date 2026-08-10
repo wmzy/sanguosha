@@ -24,7 +24,8 @@
 //   内部 Skill.name = '耀武'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAfterHook, type SkillModule } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界耀武';
 const DISPLAY_NAME = '耀武';

@@ -40,9 +40,10 @@ import type { GameView } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { getGender } from '../data/character-meta';
 import { skillLoaders } from './index';
+import type { SkillModule } from '../types';
 
 const SKILL_NAME = '界结姻';
 const USED_KEY = `${SKILL_NAME}/usedThisTurn`;

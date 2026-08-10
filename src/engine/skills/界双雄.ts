@@ -52,9 +52,9 @@ import {
   registerAfterHook,
   registerBeforeHook,
   hasBlockingPending,
-  type SkillModule,
 } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
+import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界双雄';
 const DISPLAY_NAME = '双雄';

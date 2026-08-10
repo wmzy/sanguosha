@@ -45,7 +45,8 @@ import type {
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply'
 import { pushFrame, popFrame } from '../core/frame';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界破军';
 const DISPLAY_NAME = '破军';

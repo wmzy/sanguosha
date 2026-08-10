@@ -28,12 +28,12 @@ import { runDamageFlow } from '../flows/damage';
 import {
   registerAction,
   hasBlockingPending,
-  type SkillModule,
 } from '../core/skill';
 import { skillLoaders } from './index';
 import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive } from '../rules/action-active';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界献州';
 const DISPLAY_NAME = '献州';

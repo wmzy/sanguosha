@@ -51,15 +51,14 @@ import {
   registerAction,
   registerAfterHook,
   registerBeforeHook,
-  unloadSkillInstance,
-  instantiateSkill,
-  type SkillModule,
 } from '../core/skill';
+import { unloadSkillInstance, instantiateSkill } from './lifecycle';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import { registerDistanceExemptor } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界陷阵';
 const DISPLAY_NAME = '陷阵';

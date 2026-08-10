@@ -22,7 +22,8 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { registerAction, registerAfterHook, registerBeforeHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const CONFIRM_REQUEST = '固政/确认';
 const PICK_REQUEST = '固政/选牌';

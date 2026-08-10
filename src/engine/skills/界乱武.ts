@@ -23,9 +23,10 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
 import { runUseFlow, chargeOnSettle } from './cards/use-card';
-import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';
 import { canSlash } from '../rules/slash-quota';
+import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界乱武';
 const DISPLAY_NAME = '乱武';

@@ -15,7 +15,7 @@
 import { runPlay, type PlayState } from './playHandler';
 import { projectView } from './viewProjector';
 import { reportBugResult, type ReportBugInput } from './feedbackHandler';
-import { getSkillDescriptionAsync } from '../engine/core/skill';
+import { getSkillDescriptionAsync } from '../engine/skills/lifecycle';
 import type { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
 import type { ClientMessage as EngineClientMessage } from '../engine/types';
 

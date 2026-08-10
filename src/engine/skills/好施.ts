@@ -23,8 +23,8 @@ import {
   registerAction,
   registerBeforeHook,
   registerAfterHook,
-  type SkillModule,
 } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const CONFIRM_RT = '好施/confirm'; // 鲁肃:是否发动好施
 const CHOOSE_TARGET_RT = '好施/target'; // 鲁肃:并列时选目标

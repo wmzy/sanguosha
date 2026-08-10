@@ -40,10 +40,11 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { recastCard } from '../flows/recast';
-import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { registerSlashQuotaProvider, registerSlashBlocker } from '../rules/slash-quota';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import { registerAttackRangeExemptor } from '../rules/distance';
+import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界将驰';
 const DISPLAY_NAME = '将驰';

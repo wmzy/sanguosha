@@ -11,7 +11,7 @@ import { useState, useEffect, type ReactNode } from 'react';
 import { css, cx } from '@linaria/core';
 import { FACTION_BG, IDENTITY_COLORS } from './gameViewConstants';
 import { CountdownBar } from './CountdownBar';
-import { getSkillDescription } from '../../engine/core/skill';
+import { getSkillDescription } from '../../engine/skills/lifecycle';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { SkillTag } from './SkillTooltip';
 import { getCharacterImage } from '../assets/imageAssets';

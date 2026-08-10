@@ -23,7 +23,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, instantiateSkill } from '../core/skill';
+import { registerAction, registerAfterHook } from '../core/skill';
+import { instantiateSkill } from './lifecycle';
 import { skillLoaders } from './index';
 
 // ── 效果①:装备→无懈可击 转化 ──

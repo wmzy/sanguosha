@@ -32,8 +32,8 @@ import {
   registerAction,
   registerAfterHook,
   registerBeforeHook,
-  type SkillModule,
 } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const DISPLAY_NAME = '自守';
 

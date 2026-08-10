@@ -39,7 +39,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
+import { registerAction, registerAfterHook } from '../core/skill';
+import type { SkillModule } from '../types';
 
 const BASE_VAR = '界再起/base'; // turn.vars:本回合弃牌堆基线长度
 const X_VAR = '界再起/x'; // localVars:本次最大目标数(供 chooseTargets validate 校验)

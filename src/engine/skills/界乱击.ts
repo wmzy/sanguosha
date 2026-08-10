@@ -279,7 +279,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   return;
 }
 
-const _skillModule: import('../core/skill').SkillModule = {
+const _skillModule: import('../types').SkillModule = {
   createSkill,
   onInit,
   onMount,

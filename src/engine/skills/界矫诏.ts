@@ -30,9 +30,9 @@ import {
   registerAction,
   registerAfterHook,
   hasBlockingPending,
-  type SkillModule,
 } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
+import type { SkillModule } from '../types';
 
 const SKILL_ID = '界矫诏';
 const DISPLAY_NAME = '矫诏';

@@ -182,4 +182,4 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   });
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../core/skill').SkillModule;
+export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

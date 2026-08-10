@@ -19,9 +19,10 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending, type SkillModule } from '../core/skill';
+import { registerAction, hasBlockingPending } from '../core/skill';
 import { getGender } from '../data/character-meta';
 import { runUseFlow } from './cards/use-card';
+import type { SkillModule } from '../types';
 
 /** 校验某座次是否为男性存活角色 */
 function isMaleAlive(state: GameState, target: number): boolean {

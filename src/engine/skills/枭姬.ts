@@ -17,7 +17,8 @@
 //      同理用 before hook 快照(after 时已无法判断来自手牌还是装备)。
 import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerBeforeHook, registerAfterHook, type SkillModule } from '../core/skill';
+import { registerAction, registerBeforeHook, registerAfterHook } from '../core/skill';
+import type { SkillModule } from '../types';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
