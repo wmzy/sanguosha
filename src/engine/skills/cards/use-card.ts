@@ -1,33 +1,19 @@
 // 使用牌：统一的卡牌使用入口技能。
 //
-// 对齐文档 use.md 使用事件的结算流程：
-//   使用结算前（声明阶段，逐时机跨所有目标）：
-//     选择目标时 → 置入处理区 → 使用时
-//     → 逐目标：指定目标
-//     → 逐目标：成为目标
-//     → 逐目标：指定目标后
-//     → 逐目标：成为目标后
-//   使用结算中（逐目标完整结算）：
-//     逐目标：检测有效性 → 生效前[handleSlashDodge for 杀] → 生效时 → 生效后[resolve] → 使用结算结束时
-//   使用结算后：
-//     移出处理区（onSettle 由调用方 useCard 按 quotaPolicy 决定）
-//
-// 本技能注册 use action，validate 查 CardEffect 注册表做合法性检测，
-// execute 调 runUseFlow 编排完整流程。
-//
-// 与现有卡牌技能并存：现有杀/决斗等仍各自注册 action。
-// 迁移后，卡牌只需 registerCardEffect，不再注册 action。
+// 对齐文档 use.md 使用事件的结算流程。
+// CardEffect 定义在 types/card-effect.ts,数据聚合在 skills/cards/index.ts(cardEffectMap)。
+// validate 在 skills/cards/validate.ts,帧状态操作(isCancelled 等)在 core/frame.ts。
 
 import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../../types';
 import { applyAtom } from '../../core/apply'
 import { frameCards, popFrame, pushFrame, topFrame } from '../../core/frame';
 import { registerAction, registerBeforeHook, registerAfterHook } from '../../core/skill';
 import { promptCancel } from '../../flows/cancel';
-import { validateCardUse, computeAutoTargets } from '../../core/card-effect/validate';
-import { getCardEffect, getAllCardEffects, requireCardEffect } from '../../core/card-effect/registry';
-import type { CardEffect, CancellableBy } from '../../core/card-effect/registry';
-import { isCancelled } from '../../core/card-effect/registry';
-import { getDelayedTricks } from '../../core/card-effect/delayed-trick-registry';
+import { validateCardUse, computeAutoTargets } from '../../skills/cards/validate';
+import type { CardEffect, CancellableBy } from '../../types';
+import { isCancelled } from '../../core/frame';
+import { getCardEffect, getAllCardEffects, requireCardEffect } from '../../skills/cards';
+
 import { registerWineHook } from './酒';
 import { registerChainConductionHook } from '../../flows/face-down';
 
@@ -379,8 +365,10 @@ export function registerDelayedTrickHooks(state: GameState): void {
     const self = ctx.state.players[player];
     if (!self) return;
 
-    // 延时锦囊名单从注册表读取(各延时锦囊 CardEffect 自注册,数据驱动)
-    const delayedTrickNames = getDelayedTricks().map((t) => t.name);
+    // 延时锦囊名单从 cardEffectMap 按 delayed 标志派生(数据驱动)
+    const delayedTrickNames = getAllCardEffects()
+      .filter(([, e]) => e.delayed)
+      .map(([name]) => name);
 
     // 循环：逐个结算最后置入的延时锦囊，直到判定区无延时锦囊。
     //   规则：判定阶段检测判定区有延时锦囊 → 结算最后置入的 → 重复直到判定区清空。
@@ -430,8 +418,8 @@ export function registerDelayedTrickHooks(state: GameState): void {
     const self = ctx.state.players[player];
     if (!self) return;
     if (atom.phase !== '出牌' && atom.phase !== '摸牌') return;
-    for (const trick of getDelayedTricks()) {
-      const sp = trick.skipPhase;
+    for (const [, effect] of getAllCardEffects()) {
+      const sp = effect.skipPhase;
       if (!sp) continue;
       if (sp.phase !== atom.phase) continue;
       if (self.tags.includes(sp.tag)) {

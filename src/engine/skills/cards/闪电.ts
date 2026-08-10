@@ -10,8 +10,7 @@ import { TARGET_SYSTEM } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { runJudgeFlow } from '../../flows/judge';
 import { runDamageFlow } from '../../flows/damage';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
-import { registerDelayedTrick } from '../../core/card-effect/delayed-trick-registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 const TRICK_NAME = '闪电';
 
@@ -101,7 +100,7 @@ async function resolveLightning(ctx: ResolveCtx): Promise<void> {
   }
 }
 
-const lightningEffect: CardEffect = {
+export const lightningEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'self' },
   delayed: true,
@@ -116,8 +115,3 @@ const lightningEffect: CardEffect = {
   label: '闪电',
   style: 'danger',
 };
-
-registerCardEffect(TRICK_NAME, lightningEffect);
-
-// 自注册延时锦囊:闪电判定不跳过阶段(无 skipPhase)
-registerDelayedTrick({ name: TRICK_NAME });

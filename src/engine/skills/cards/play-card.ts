@@ -19,7 +19,7 @@ import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../../typ
 import { applyAtom } from '../../core/apply'
 import { frameCards } from '../../core/frame';
 import { registerAction } from '../../core/skill';
-import { getAllCardEffects } from '../../core/card-effect/registry';
+import { getAllCardEffects } from '../../skills/cards';
 import { runUseFlow } from './use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {

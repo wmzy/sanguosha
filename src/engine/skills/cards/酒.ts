@@ -12,7 +12,7 @@ import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { registerBeforeHook } from '../../core/skill';
 import { defaultPlayActive } from '../../rules/action-active';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../../rules/once-per-turn';
 import type { HookResult } from '../../types';
 
@@ -76,7 +76,7 @@ function canUseWine(
   return null;
 }
 
-const wineEffect: CardEffect = {
+export const wineEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'self' },
   canUse: canUseWine,
@@ -129,4 +129,3 @@ const wineEffect: CardEffect = {
   },
 };
 
-registerCardEffect('酒', wineEffect);

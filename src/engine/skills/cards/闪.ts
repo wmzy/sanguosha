@@ -15,17 +15,14 @@
 // 闪的色限制（诸葛连弩等）由 effect.respond.validate 校验。
 
 import type { Card, GameState, Json } from '../../types';
-import {
-  registerCardEffect,
-  type CardEffect,
-} from '../../core/card-effect/registry';
+import type { CardEffect } from '../../types';
 import type { Color } from '../../../engine/types';
 
 const COLOR_LIMIT_VAR = '闪/色限制';
 
 /** 闪 CardEffect — respond-only：成为杀的目标时打出闪抵消。
  *  resolve = 闪的使用效果 = 设下层帧（杀帧）的 cancelled 字段为 true。 */
-const dodgeEffect: CardEffect = {
+export const dodgeEffect: CardEffect = {
   timing: '生效前',
   target: { kind: 'effect' },
   resolve: async (ctx) => {
@@ -75,4 +72,3 @@ const dodgeEffect: CardEffect = {
   style: 'default',
 };
 
-registerCardEffect('闪', dodgeEffect);

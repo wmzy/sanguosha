@@ -1,33 +1,18 @@
 // 合法性检测 helper（对齐文档 condition.md 三条件）。
-//
-// 一张牌能被使用的条件：
-//   1. 不受技能效果影响不能使用此牌（禁用 tag）
-//   2. 使用次数未达上限（仅杀，走 slash-quota）
-//   3. 额定目标数 > 0（全场有至少一个合法额定目标）
-//
-// 检测合法性 = 距离合法性 + 选择目标合法性。
-
-import type { GameState, Json } from '../../types';
+// 从原 core/card-effect/validate.ts 移植,路径调整后的新位置。
+import type { GameState, Json, CardTargetSpec } from '../../types';
 import { effectiveDistance, inAttackRange } from '../../rules/distance';
 import { canSlash } from '../../rules/slash-quota';
-import { validateUseCard } from '../skill';
-import type { CardTargetSpec } from './registry';
-import { getCardEffect } from './registry';
+import { validateUseCard } from '../../core/skill';
+import { getCardEffect } from '.';
 
-/** 检查 ownerId 是否被禁止使用此牌（condition.md 条件1）。
- *  当前通过 player.tags 检查通用禁用标记。
- *  义绝的 '义绝/禁出牌' 标记已覆盖此路径。
- *  导出供 逼杀 respond.validate 复用（useCard 删除后，禁出牌检查归位调用方）。 */
 export function isCardBanned(state: GameState, ownerId: number, _cardName: string): boolean {
   const player = state.players[ownerId];
   if (!player) return false;
-  // 义绝：禁出牌标记阻止使用/打出任何需要出牌的 prompt
   if (player.tags.includes('义绝/禁出牌')) return true;
   return false;
 }
 
-/** 检查使用次数（condition.md 条件2，仅杀）。
- *  从 params 取 cardId 传给 canSlash，以支持 per-card 出杀次数豁免（SlashExemptor）。 */
 function checkUsageLimit(
   state: GameState,
   ownerId: number,
@@ -41,8 +26,6 @@ function checkUsageLimit(
   return null;
 }
 
-/** 判断 target 是否为 ownerId 使用 cardName 的合法目标（condition.md 合法性检测）。
- *  检测距离合法性 + 选择目标合法性。 */
 export function isLegalTarget(
   state: GameState,
   ownerId: number,
@@ -54,8 +37,6 @@ export function isLegalTarget(
   const spec: CardTargetSpec = effect.target;
 
   if (target === ownerId) {
-    // 自己作为目标：只有 target.kind='self'/'allPlayers'/'any' 时合法；
-    // kind='wounded' 时需自己已受伤。
     if (spec.kind === 'self' || spec.kind === 'allPlayers' || spec.kind === 'any') return true;
     if (spec.kind === 'wounded') {
       const p = state.players[ownerId];
@@ -74,7 +55,6 @@ export function isLegalTarget(
     case 'inAttackRange':
       return inAttackRange(state, ownerId, target);
     case 'distance': {
-      // 奇才/界奇才:使用锦囊牌无距离限制(集中在此检查,各卡牌不再各自感知奇才)
       if (state.players[ownerId]?.tags.includes('奇才/无距离限制')) return true;
       return effectiveDistance(state, ownerId, target) <= spec.dist;
     }
@@ -90,9 +70,6 @@ export function isLegalTarget(
   }
 }
 
-/** 为 AOE 类锦囊（target.kind=allOthers/allPlayers）自动计算目标。
- *  从使用者下家开始按座次顺时针排列所有存活角色（allOthers 排除使用者）。
- *  调用方（使用牌 execute）在 params.targets 为空且 target.kind 是 AOE 型时调用。 */
 export function computeAutoTargets(
   state: GameState,
   ownerId: number,
@@ -115,8 +92,6 @@ export function computeAutoTargets(
   return result;
 }
 
-/** 遍历全场，找到所有合法的额定目标（condition.md 条件3）。
- *  用于检查"额定目标数 > 0"。 */
 export function findLegalTargets(
   state: GameState,
   ownerId: number,
@@ -129,17 +104,6 @@ export function findLegalTargets(
   return result;
 }
 
-/** 统一合法性检测（condition.md 三条件）。
- *  返回 null=通过，字符串=拒绝理由。
- *
- *  mode：
- *    'play'（默认）= 主动使用：走 validateUseCard 基线（自己回合+出牌阶段+无阻塞 pending+存活+
- *      手牌中有牌+牌名匹配）+ checkUsageLimit（仅杀次数上限）。
- *    'forced' = 逼杀/虚拟使用：使用者未必在自己出牌阶段，跳过基线与次数检查；
- *      仍手动校验牌存在 + 牌名匹配、禁用检测、合法目标数、effect.canUse。
- *
- *  检查顺序：
- *    基础（play）/ 牌存在+牌名（forced） → 禁用 → 次数（play）→ 合法目标数 → 牌特有校验 */
 export function validateCardUse(
   state: GameState,
   ownerId: number,
@@ -148,11 +112,9 @@ export function validateCardUse(
   mode: 'play' | 'forced' = 'play',
 ): string | null {
   if (mode === 'play') {
-    // 基础检查：自己回合、出牌阶段、无阻塞 pending、存活、手牌中有牌、牌名匹配
     const base = validateUseCard(state, ownerId, params, { cardName });
     if (base) return base;
   } else {
-    // forced 模式：手动校验牌存在 + 牌名匹配（逼杀/虚拟使用跳过出牌阶段基线）
     const cardId = params.cardId as string | undefined;
     if (!cardId) return 'cardId required';
     const card = state.cardMap[cardId];
@@ -160,16 +122,13 @@ export function validateCardUse(
     if (card.name !== cardName) return `不是${cardName}`;
   }
 
-  // 条件1：禁用检测
   if (isCardBanned(state, ownerId, cardName)) return '你不能使用此牌';
 
   if (mode === 'play') {
-    // 条件2：次数限制（仅杀）
     const limit = checkUsageLimit(state, ownerId, cardName, params);
     if (limit) return limit;
   }
 
-  // 条件3：合法目标数 > 0（有目标要求的牌）
   const effect = getCardEffect(cardName);
   if (!effect) return `${cardName} 尚未注册 CardEffect`;
   if (effect.target.kind !== 'self' && effect.target.kind !== 'effect') {
@@ -177,7 +136,6 @@ export function validateCardUse(
     if (legalTargets.length === 0) return '没有合法目标';
   }
 
-  // 牌特有校验
   if (effect.canUse) {
     const customErr = effect.canUse(state, ownerId, params);
     if (customErr) return customErr;

@@ -17,11 +17,7 @@ import { viewCanAttack } from '../../rules/viewDistance';
 import { incSlashUsed, isSlashExempted, slashUsed } from '../../rules/slash-quota';
 import { slashTargetMax } from '../../rules/slash-target';
 import { defaultPlayActive, viewCanSlash } from '../../rules/action-active';
-import {
-  registerCardEffect,
-  type CardEffect,
-  type ResolveCtx,
-} from '../../core/card-effect/registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 杀的合法性追加检测：仅校验目标在攻击范围内。
  *  出杀次数限制（slash-quota）不由此处检查——由 validateCardUse.checkUsageLimit
@@ -73,7 +69,7 @@ async function onSettleSlash(
   }
 }
 
-const slashEffect: CardEffect = {
+export const slashEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'inAttackRange', min: 1, max: 3 },
   canUse: canUseSlash,
@@ -135,4 +131,3 @@ const slashEffect: CardEffect = {
   activeWhen: (ctx) => defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx),
 };
 
-registerCardEffect('杀', slashEffect);

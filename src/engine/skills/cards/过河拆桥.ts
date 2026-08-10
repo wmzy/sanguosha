@@ -5,7 +5,7 @@
 
 import type { Card } from '../../types';
 import { runPickTargetCardPanel } from '../../flows/pick-card-panel';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 过河拆桥牌特有校验：目标有牌、非自己 */
 function canUseDismantle(
@@ -42,7 +42,7 @@ async function resolveDismantle(ctx: ResolveCtx): Promise<void> {
   }
 }
 
-const dismantleEffect: CardEffect = {
+export const dismantleEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'other', min: 1, max: 1 },
   canUse: canUseDismantle,
@@ -99,4 +99,3 @@ const dismantleEffect: CardEffect = {
   style: 'primary',
 };
 
-registerCardEffect('过河拆桥', dismantleEffect);

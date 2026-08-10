@@ -10,7 +10,7 @@
 import type { Card, SettlementFrame } from '../../types';
 import { applyAtom } from '../../core/apply'
 import { frameCards } from '../../core/frame';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 从使用者开始,按座次旋转的所有存活玩家 */
 function alivePlayersFrom(state: import('../../types').GameState, from: number): number[] {
@@ -149,7 +149,7 @@ async function onSettleBountifulHarvest(
   delete state.localVars['五谷丰登/选择'];
 }
 
-const bountifulHarvestEffect: CardEffect = {
+export const bountifulHarvestEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'allPlayers' },
   resolve: resolveBountifulHarvest,
@@ -186,4 +186,3 @@ const bountifulHarvestEffect: CardEffect = {
   style: 'primary',
 };
 
-registerCardEffect('五谷丰登', bountifulHarvestEffect);

@@ -22,7 +22,7 @@ import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { DEFAULT_SKILLS } from '../../src/engine/atoms/选将';
 import { findActionEntry } from '../../src/engine/core/skill';
-import { getCardEffect } from '../../src/engine/core/card-effect/registry';
+import { getCardEffect } from '../../src/engine/skills/cards';
 
 function makePlayer(opts: {
   index: number;

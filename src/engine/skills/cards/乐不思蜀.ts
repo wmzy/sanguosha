@@ -10,8 +10,7 @@
 import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { runJudgeFlow } from '../../flows/judge';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
-import { registerDelayedTrick } from '../../core/card-effect/delayed-trick-registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 跳过出牌阶段的 tag 名 */
 const SKIP_TAG = '乐不思蜀/跳过出牌';
@@ -48,10 +47,11 @@ async function resolveIndulgence(ctx: ResolveCtx): Promise<void> {
   await applyAtom(state, { type: '移除延时锦囊', player: target, trickName: '乐不思蜀' });
 }
 
-const indulgenceEffect: CardEffect = {
+export const indulgenceEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'other', min: 1, max: 1 },
   delayed: true,
+  skipPhase: { tag: SKIP_TAG, phase: '出牌' },
   cancelledBy: { cardName: '无懈可击', broadcast: true },
   canUse: canUseIndulgence,
   resolve: resolveIndulgence,
@@ -64,8 +64,3 @@ const indulgenceEffect: CardEffect = {
   label: '乐不思蜀',
   style: 'danger',
 };
-
-registerCardEffect('乐不思蜀', indulgenceEffect);
-
-// 自注册延时锦囊:判定非♥生效后跳过出牌阶段
-registerDelayedTrick({ name: '乐不思蜀', skipPhase: { tag: SKIP_TAG, phase: '出牌' } });

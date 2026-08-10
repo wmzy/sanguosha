@@ -29,7 +29,7 @@
 import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { isCancelled } from '../core/card-effect/registry';
+import { isCancelled } from '../core/frame';
 import { runUseFlow, chargeOnSettle } from './cards/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {

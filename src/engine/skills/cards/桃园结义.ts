@@ -5,7 +5,7 @@
 
 import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 桃园结义的逐目标结算：满血跳过 → 回复体力 */
 async function resolvePeachGarden(ctx: ResolveCtx): Promise<void> {
@@ -19,7 +19,7 @@ async function resolvePeachGarden(ctx: ResolveCtx): Promise<void> {
   await applyAtom(state, { type: '回复体力', target, amount: 1 });
 }
 
-const peachGardenEffect: CardEffect = {
+export const peachGardenEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'allPlayers' },
   /** 满血目标无回血效果 → 不询问无懈、不结算 */
@@ -37,4 +37,3 @@ const peachGardenEffect: CardEffect = {
   style: 'primary',
 };
 
-registerCardEffect('桃园结义', peachGardenEffect);

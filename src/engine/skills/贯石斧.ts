@@ -8,7 +8,7 @@
 import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { isCancelled, clearCancelled } from '../core/card-effect/registry';
+import { isCancelled, clearCancelled } from '../core/frame';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

@@ -31,7 +31,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { getCardEffect } from '../core/card-effect/registry';
+import { getCardEffect } from '../skills/cards';
 import { registerAction, registerAfterHook, type SkillModule } from '../core/skill';
 
 const CONFIRM_RT = '界伤逝/confirm';

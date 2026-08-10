@@ -28,7 +28,7 @@ import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { isCancelled } from '../core/card-effect/registry';
+import { isCancelled } from '../core/frame';
 
 const _SKILL_ID = '界雷击';
 const DISPLAY_NAME = '雷击';

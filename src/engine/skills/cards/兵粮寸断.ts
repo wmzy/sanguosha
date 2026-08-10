@@ -10,8 +10,7 @@ import { applyAtom } from '../../core/apply';
 import { runJudgeFlow } from '../../flows/judge';
 import { effectiveDistance } from '../../rules/distance';
 import { viewEffectiveDistance } from '../../rules/viewDistance';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
-import { registerDelayedTrick } from '../../core/card-effect/delayed-trick-registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 跳过摸牌阶段的 tag 名 */
 const SKIP_TAG = '兵粮寸断/跳过摸牌';
@@ -49,10 +48,11 @@ async function resolveSupplyShortage(ctx: ResolveCtx): Promise<void> {
   await applyAtom(state, { type: '移除延时锦囊', player: target, trickName: '兵粮寸断' });
 }
 
-const supplyShortageEffect: CardEffect = {
+export const supplyShortageEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'distance', dist: 1, min: 1, max: 1 },
   delayed: true,
+  skipPhase: { tag: SKIP_TAG, phase: '摸牌' },
   cancelledBy: { cardName: '无懈可击', broadcast: true },
   canUse: canUseSupplyShortage,
   resolve: resolveSupplyShortage,
@@ -75,8 +75,3 @@ const supplyShortageEffect: CardEffect = {
   label: '兵粮寸断',
   style: 'danger',
 };
-
-registerCardEffect('兵粮寸断', supplyShortageEffect);
-
-// 自注册延时锦囊:判定非♣生效后跳过摸牌阶段
-registerDelayedTrick({ name: '兵粮寸断', skipPhase: { tag: SKIP_TAG, phase: '摸牌' } });

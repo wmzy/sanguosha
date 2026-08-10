@@ -6,7 +6,7 @@
 import type { GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
-import { isCancelled, clearCancelled } from '../core/card-effect/registry';
+import { isCancelled, clearCancelled } from '../core/frame';
 import { getGender } from '../data/character-meta';
 
 export function createSkill(id: string, ownerId: number): Skill {

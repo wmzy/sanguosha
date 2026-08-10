@@ -13,8 +13,8 @@
 import type { Card, GameState, GameView } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { runUseFlow } from './use-card';
-import { isCardBanned } from '../../core/card-effect/validate';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import { isCardBanned } from '../../skills/cards/validate';
+import type { CardEffect, ResolveCtx } from '../../types';
 import { inAttackRange } from '../../rules/distance';
 import { slashTargetMax } from '../../rules/slash-target';
 
@@ -106,7 +106,7 @@ function canUseBorrowedSword(
   return null;
 }
 
-const borrowedSwordEffect: CardEffect = {
+export const borrowedSwordEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'other', min: 1, max: 1 },
   canUse: canUseBorrowedSword,
@@ -217,4 +217,3 @@ const borrowedSwordEffect: CardEffect = {
   style: 'danger',
 };
 
-registerCardEffect('借刀杀人', borrowedSwordEffect);

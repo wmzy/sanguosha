@@ -7,7 +7,7 @@ import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { runDamageFlow } from '../../flows/damage';
 import { consumePlayedSlashes } from './play-card';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 南蛮入侵的逐目标结算：询问杀 → 统一清理打出杀 → 伤害 */
 async function resolveBarbarianInvasion(ctx: ResolveCtx): Promise<void> {
@@ -24,7 +24,7 @@ async function resolveBarbarianInvasion(ctx: ResolveCtx): Promise<void> {
   }
 }
 
-const barbarianInvasionEffect: CardEffect = {
+export const barbarianInvasionEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'allOthers' },
   resolve: resolveBarbarianInvasion,
@@ -37,4 +37,3 @@ const barbarianInvasionEffect: CardEffect = {
   style: 'danger',
 };
 
-registerCardEffect('南蛮入侵', barbarianInvasionEffect);

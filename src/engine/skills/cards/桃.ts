@@ -6,7 +6,7 @@
 import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { defaultPlayActive } from '../../rules/action-active';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 桃的牌特有校验：目标必须已受伤 */
 function canUsePeach(
@@ -36,7 +36,7 @@ function peachActiveWhen(ctx: import('../../types').ActionContext): boolean {
   return p ? p.health < p.maxHealth : false;
 }
 
-const peachEffect: CardEffect = {
+export const peachEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'wounded', min: 0, max: 1 },
   canUse: canUsePeach,
@@ -100,4 +100,3 @@ const peachEffect: CardEffect = {
   activeWhen: peachActiveWhen,
 };
 
-registerCardEffect('桃', peachEffect);

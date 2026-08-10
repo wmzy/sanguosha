@@ -8,7 +8,7 @@ import type { GameView } from '../../types';
 import { effectiveDistance } from '../../rules/distance';
 import { viewEffectiveDistance } from '../../rules/viewDistance';
 import { runPickTargetCardPanel } from '../../flows/pick-card-panel';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 function canUseSnatch(
   state: import('../../types').GameState,
@@ -45,7 +45,7 @@ async function resolveSnatch(ctx: ResolveCtx): Promise<void> {
   }
 }
 
-const snatchEffect: CardEffect = {
+export const snatchEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'distance', dist: 1, min: 1, max: 1 },
   canUse: canUseSnatch,
@@ -97,4 +97,3 @@ const snatchEffect: CardEffect = {
   style: 'primary',
 };
 
-registerCardEffect('顺手牵羊', snatchEffect);

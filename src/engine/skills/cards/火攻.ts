@@ -8,7 +8,7 @@
 import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { runDamageFlow } from '../../flows/damage';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 火攻的结算：展示手牌 → 弃同花色 → 火焰伤害 */
 async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
@@ -92,7 +92,7 @@ function canUseFireAttack(
   return null;
 }
 
-const fireAttackEffect: CardEffect = {
+export const fireAttackEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'any', min: 1, max: 1 },
   canUse: canUseFireAttack,
@@ -149,4 +149,3 @@ const fireAttackEffect: CardEffect = {
   style: 'danger',
 };
 
-registerCardEffect('火攻', fireAttackEffect);

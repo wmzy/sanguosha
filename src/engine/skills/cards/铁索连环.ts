@@ -10,7 +10,7 @@
 import type { Card } from '../../types';
 import { setChain } from '../../flows/face-down';
 import { applyAtom } from '../../core/apply';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 目标选择横置/重置的 requestType（resolve 发出 → respond 写回 localVars）。 */
 const CHOOSE_RT = '铁索连环/choose';
@@ -66,7 +66,7 @@ function canUseChain(
   return null;
 }
 
-const chainEffect: CardEffect = {
+export const chainEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'any', min: 1, max: 2 },
   canUse: canUseChain,
@@ -107,4 +107,3 @@ const chainEffect: CardEffect = {
   style: 'primary',
 };
 
-registerCardEffect('铁索连环', chainEffect);

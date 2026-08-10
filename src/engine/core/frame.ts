@@ -46,3 +46,36 @@ export function frameCards(state: GameState): string[] {
 export function emptyFrame(): SettlementFrame {
   return { skillId: '', from: TARGET_SYSTEM, params: Object.freeze({}), cards: [], cancelled: false };
 }
+
+// ── 抵消状态（结算帧 cancelled 字段操作）──
+// 闪/无懈走 runUseFlow → resolve 设下层帧(stack[length-2]).cancelled = true。
+// runSettlementPhase 在「生效前」后检查此字段：cancelled → 发出被抵消 atom → 跳过 resolve。
+// 无双/肉林/贯石斧等武器技在 hook 中读写此字段。
+
+/** 取栈顶帧的 cancelled 状态。 */
+export function isCancelled(state: GameState, _cardId: string, _target: number): boolean {
+  const frame = state.settlementStack[state.settlementStack.length - 1];
+  return frame?.cancelled === true;
+}
+
+/** 设置栈顶帧被抵消。 */
+export function setCancelled(state: GameState, _cardId: string, _target: number): void {
+  const frame = state.settlementStack[state.settlementStack.length - 1];
+  if (frame) frame.cancelled = true;
+}
+
+/** 清除栈顶帧的抵消状态。 */
+export function clearCancelled(state: GameState, _cardId: string, _target: number): void {
+  const frame = state.settlementStack[state.settlementStack.length - 1];
+  if (frame) frame.cancelled = false;
+}
+
+/** 直接操作帧的 cancelled 字段（无歧义版，供 resolve 等）。 */
+export function setFrameCancelled(frame: SettlementFrame | undefined, value: boolean): void {
+  if (frame) frame.cancelled = value;
+}
+
+/** 读取帧的 cancelled 字段。 */
+export function getFrameCancelled(frame: SettlementFrame | undefined): boolean {
+  return frame?.cancelled === true;
+}

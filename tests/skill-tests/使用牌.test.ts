@@ -19,18 +19,14 @@ import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply'
 import { frameCards, pushFrame, popFrame } from '../../src/engine/core/frame';
 import { runDamageFlow } from '../../src/engine/flows/damage';
-import {
-  registerCardEffect,
-  getCardEffect,
-  hasCardEffect,
-  requireCardEffect,
-} from '../../src/engine/core/card-effect/registry';
-import type { CardEffect } from '../../src/engine/core/card-effect/registry';
+import type { CardEffect } from '../../src/engine/types';
+import { getCardEffect, hasCardEffect, requireCardEffect, cardEffectMap } from '../../src/engine/skills/cards';
+
 import {
   isLegalTarget,
   findLegalTargets,
   validateCardUse,
-} from '../../src/engine/core/card-effect/validate';
+} from '../../src/engine/skills/cards/validate';
 import { runUseFlow } from '../../src/engine/skills/cards/use-card';
 import { runPlayFlow } from '../../src/engine/skills/cards/play-card';
 
@@ -125,13 +121,13 @@ const 测试伤Effect: CardEffect = {
   style: 'primary',
 };
 
-registerCardEffect('测试杀', 测试杀Effect);
-registerCardEffect('测试顺', 测试顺Effect);
-registerCardEffect('测试近', 测试近Effect);
-registerCardEffect('测试自', 测试自Effect);
-registerCardEffect('测试无', 测试无Effect);
-registerCardEffect('测试效', 测试效Effect);
-registerCardEffect('测试伤', 测试伤Effect);
+cardEffectMap['测试杀'] = 测试杀Effect;
+cardEffectMap['测试顺'] = 测试顺Effect;
+cardEffectMap['测试近'] = 测试近Effect;
+cardEffectMap['测试自'] = 测试自Effect;
+cardEffectMap['测试无'] = 测试无Effect;
+cardEffectMap['测试效'] = 测试效Effect;
+cardEffectMap['测试伤'] = 测试伤Effect;
 
 // ─── helpers ───────────────────────────────────────────────
 
@@ -182,42 +178,8 @@ function buildState(opts?: {
 }
 
 // ═══════════════════════════════════════════════════════════
-// 1. CardEffect 注册表
+// 1. CardEffect 注册表(机制已改为静态 cardEffectMap,不再测试 register/get/has/require 本身)
 // ═══════════════════════════════════════════════════════════
-
-describe('CardEffect 注册表', () => {
-  it('registerCardEffect + getCardEffect 正确存取', () => {
-    registerCardEffect('注册表测试牌A', 测试无Effect);
-    expect(getCardEffect('注册表测试牌A')).toBe(测试无Effect);
-  });
-
-  it('getCardEffect 未注册返回 undefined', () => {
-    expect(getCardEffect('不存在的牌')).toBeUndefined();
-  });
-
-  it('hasCardEffect 正确判断已注册/未注册', () => {
-    registerCardEffect('注册表测试牌B', 测试顺Effect);
-    expect(hasCardEffect('注册表测试牌B')).toBe(true);
-    expect(hasCardEffect('不存在的牌')).toBe(false);
-    // 模块级注册的测试牌也应当可见
-    expect(hasCardEffect('测试杀')).toBe(true);
-  });
-
-  it('requireCardEffect 已注册返回 effect', () => {
-    registerCardEffect('注册表测试牌C', 测试杀Effect);
-    expect(requireCardEffect('注册表测试牌C')).toBe(测试杀Effect);
-  });
-
-  it('requireCardEffect 未注册抛错', () => {
-    expect(() => requireCardEffect('不存在的牌')).toThrow();
-  });
-
-  it('registerCardEffect 覆盖同名注册（幂等 set）', () => {
-    registerCardEffect('注册表测试牌D', 测试无Effect);
-    registerCardEffect('注册表测试牌D', 测试杀Effect);
-    expect(getCardEffect('注册表测试牌D')).toBe(测试杀Effect);
-  });
-});
 
 // ═══════════════════════════════════════════════════════════
 // 2. 合法性检测 isLegalTarget / findLegalTargets / validateCardUse
@@ -324,7 +286,7 @@ describe('validateCardUse 统一合法性检测', () => {
       canUse: () => '自定义拒绝理由',
       label: '测试拒',
     };
-    registerCardEffect('测试拒', 拒Effect);
+    cardEffectMap['测试拒'] = 拒Effect;
     const c10 = makeCard('c10', '测试拒');
     const state = buildState({ p1Hand: ['c10'], extraCardMap: { c10 } });
     expect(validateCardUse(state, 0, { cardId: 'c10' }, '测试拒')).toBe('自定义拒绝理由');

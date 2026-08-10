@@ -5,7 +5,7 @@
 
 import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 无中生有的结算：使用者摸牌(2) */
 async function resolveExNihilo(ctx: ResolveCtx): Promise<void> {
@@ -14,7 +14,7 @@ async function resolveExNihilo(ctx: ResolveCtx): Promise<void> {
   await applyAtom(state, { type: '摸牌', player: target, count: 2 });
 }
 
-const exNihiloEffect: CardEffect = {
+export const exNihiloEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'self' },
   resolve: resolveExNihilo,
@@ -27,4 +27,3 @@ const exNihiloEffect: CardEffect = {
   style: 'primary',
 };
 
-registerCardEffect('无中生有', exNihiloEffect);

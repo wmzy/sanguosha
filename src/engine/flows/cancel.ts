@@ -21,7 +21,7 @@
 import type { GameState, Json } from '../types';
 import { TARGET_BROADCAST } from '../types';
 import { applyAtom } from '../core/apply';
-import type { CancellableBy } from '../core/card-effect/registry';
+import type { CancellableBy } from '../types';
 
 const RESPONDED_KEY = '抵消/已回应';
 

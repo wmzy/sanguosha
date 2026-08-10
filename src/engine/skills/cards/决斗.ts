@@ -10,7 +10,7 @@ import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { runDamageFlow } from '../../flows/damage';
 import { consumePlayedSlashes } from './play-card';
-import { registerCardEffect, type CardEffect, type ResolveCtx } from '../../core/card-effect/registry';
+import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 决斗牌特有校验：不能对自己使用 */
 function canUseDuel(
@@ -69,7 +69,7 @@ async function resolveDuel(ctx: ResolveCtx): Promise<void> {
   await runDuelLoop(state, source, target, cardId);
 }
 
-const duelEffect: CardEffect = {
+export const duelEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'other', min: 1, max: 1 },
   canUse: canUseDuel,
@@ -84,4 +84,3 @@ const duelEffect: CardEffect = {
   style: 'danger',
 };
 
-registerCardEffect('决斗', duelEffect);

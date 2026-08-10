@@ -13,9 +13,8 @@ import type {
   DistributePrompt,
   TargetFilter,
 } from '../../engine/types';
-import { getAllCardEffects } from '../../engine/core/card-effect/registry';
-// 副作用 import:确保 CardEffect 注册表(闪/无懈可击等 timing)在模块加载时已填充。
-// getAllCardEffects 依赖各 card-effect 模块的 registerCardEffect 副作用,这里触发加载。
+import { getCardEffect } from '../../engine/skills/cards';
+// 副作用 import:确保 cardEffectMap(skills/cards/index.ts 聚合)在模块加载时已构造。
 import '../../engine/skills/cards';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { defaultPlayActive } from '../../engine/rules/action-active';
@@ -65,7 +64,7 @@ export function findUseActionForCard(
  *  (装备牌由「装备通用」注册 use)均有 use 入口。
  *  与 use-card onMount 跳过 timing='生效前' 的逻辑同源。 */
 export function hasUseEntry(card: Card): boolean {
-  const effect = getAllCardEffects().get(card.name);
+  const effect = getCardEffect(card.name);
   // 已注册 card-effect:看 timing;未注册(装备等):默认有 use 入口(乐观)。
   return effect ? effect.timing !== '生效前' : true;
 }

@@ -11,14 +11,11 @@
 
 import type { Card, GameState, Json } from '../../types';
 import { findPendingSlot } from '../../core/skill';
-import {
-  registerCardEffect,
-  type CardEffect,
-} from '../../core/card-effect/registry';
+import type { CardEffect } from '../../types';
 
 const CARD_NAME = '无懈可击';
 
-const nullificationEffect: CardEffect = {
+export const nullificationEffect: CardEffect = {
   timing: '生效前',
   target: { kind: 'effect' },
   // resolve = 无懈可击的使用效果 = 设下层帧（被抵消锦囊帧）的 cancelled 字段为 true。
@@ -62,4 +59,3 @@ const nullificationEffect: CardEffect = {
   style: 'danger',
 };
 
-registerCardEffect(CARD_NAME, nullificationEffect);
