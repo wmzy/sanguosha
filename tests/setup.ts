@@ -19,4 +19,11 @@ afterEach(() => {
   if (typeof document !== 'undefined' && document.body) {
     document.body.querySelectorAll('[data-fly-card]').forEach((el) => el.remove());
   }
+  // isolate:false 下所有文件共享 worker context。unstubGlobals:true 只在每个 test
+  // 之前(onBeforeTryTask)调用 vi.unstubAllGlobals(),不在 test 之后。文件 A 最后一个
+  // test 结束后 stub 仍残留(如 logFile/replay-file 的 URL stub),文件 B 的模块导入
+  // 在 B 的第一个 beforeEach 之前执行,撞上被替换为普通对象的 URL →
+  // "TypeError: URL is not a constructor"。在全局 afterEach(注册最早 → 最后执行,
+  // 不影响测试文件自己的 afterEach)中显式恢复,消除跨文件泄漏窗口。
+  vi.unstubAllGlobals();
 });

@@ -115,6 +115,8 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   // 门禁已确保身份设置;大厅阶段也需 playerId 供「我的」tab 过滤。
   const [playerId, setPlayerId] = useState<string | null>(getPlayerId());
   const [roomState, setRoomState] = useState<RoomState | null>(null);
+  /** 从 HGC 同步的旁观者标志(joinAsSpectator 的 REST 响应立即生效,无需等 SSE room_state)。 */
+  const [hgcIsSpectator, setHgcIsSpectator] = useState(false);
   const [view, setView] = useState<GameView | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -157,10 +159,11 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const serverUrl = window.location.origin;
 
   const isHost = roomState?.hostId === playerId && playerId !== null;
-  // isSpectator 从服务端 roomState 派生，而非 stage。
-  // 这样等待大厅内的旁观者（stage 仍为 waiting）也能正确识别身份，
-  // 不依赖 stage 切换来追踪旁观状态。
-  const isSpectator = !!playerId && (roomState?.spectatorIds.includes(playerId) ?? false);
+  // isSpectator 合并两个来源:
+  // 1. hgcIsSpectator — joinAsSpectator 的 REST 响应立即置位,无需等 SSE room_state
+  // 2. roomState.spectatorIds — 服务端 room_state 确认(等待大厅内的旁观者,stage 仍为 waiting)
+  const isSpectator =
+    hgcIsSpectator || (!!playerId && (roomState?.spectatorIds.includes(playerId) ?? false));
   // ready 从服务端 room_state 派生，而非本地状态。这样服务端 reset 后自动同步。
   const ready = !!playerId && !!(roomState?.readyPlayers.includes(playerId));
 
@@ -266,6 +269,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
           setStage('lobby');
           setRoomId(null);
           setRoomState(null);
+          setHgcIsSpectator(false);
           setView(null);
           setGameOver(null);
           setChatMessages([]);
@@ -361,9 +365,10 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     const id = setInterval(() => {
       if (hgc.roomId && hgc.roomId !== roomId) setRoomId(hgc.roomId);
       if (hgc.playerId && hgc.playerId !== playerId) setPlayerId(hgc.playerId);
+      if (hgc.isSpectator !== hgcIsSpectator) setHgcIsSpectator(hgc.isSpectator);
     }, 200);
     return () => clearInterval(id);
-  }, [stage, roomId, playerId]);
+  }, [stage, roomId, playerId, hgcIsSpectator]);
 
   const createRoom = useCallback((name: string, maxPlayers: number, config?: RoomConfig, roomType?: 'normal' | 'quick') => {
     setError(null);
@@ -371,6 +376,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setView(null);
     
     setRoomState(null);
+    setHgcIsSpectator(false);
     setCommand({
       type: 'create',
       name: name || `房间${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
@@ -387,6 +393,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setView(null);
     
     setRoomState(null);
+    setHgcIsSpectator(false);
     setCommand({ type: 'join', roomId: targetRoomId });
     log.info('joinRoom', { roomId: targetRoomId });
   }, []);
@@ -422,6 +429,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setJoinFailed(null);
     setRoomId(null);
     setRoomState(null);
+    setHgcIsSpectator(false);
     setView(null);
     setGameOver(null);
     
