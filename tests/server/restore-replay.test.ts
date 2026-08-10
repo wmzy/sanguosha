@@ -1,4 +1,4 @@
-// tests/integration/restore-replay.test.ts
+// tests/server/restore-replay.test.ts
 // 验证 engine.restore 能正确重放含交互式选将的 actionLog。
 // 根因:restore 重放循环无等待,fire-and-forget 的开局 execute 还没创建选将 slot 时,
 // 选将 respond 的 validate 因 pendingSlots 为空被拒 → 选将 slot 永久挂起 → 重启后回到选将。

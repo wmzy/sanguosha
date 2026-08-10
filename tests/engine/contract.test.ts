@@ -1,4 +1,4 @@
-// tests/skill-tests/contract.test.ts
+// tests/engine/contract.test.ts
 // 前后端契约验证(正向):每个 defineAction 声明的 actionType 都有对应 registerAction。
 // 反向检查暂不做(等 PR-A:给所有 backend-only skill 补 onMount 之后)。
 import { describe, it, expect, beforeEach } from 'vitest';

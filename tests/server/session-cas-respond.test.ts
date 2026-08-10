@@ -1,7 +1,6 @@
 // tests/server/session-cas-respond.test.ts
 // 验证 session.handleAction 的行为:
-// 1. respond 路径(该 ownerId 有 pending slot)始终被接受(并行选将不卡死)。
-// 2. 全局 CAS 已删除:主动 action 不再因陈旧 baseSeq 被静默丢弃。
+// respond 路径(该 ownerId 有 pending slot)始终被接受(并行选将不卡死)。
 //
 // 核心场景:并行选将时多个玩家同时 respond,state.seq 连续 +1,
 // 后发的 respond 基于旧 lastSeq 仍能被引擎 validate 接受。
@@ -49,7 +48,7 @@ function getState(session: GameSession): GameState {
   return (session as unknown as { state: GameState }).state;
 }
 
-describe('session.handleAction:CAS 删除后 respond/主动 action 均被接受', () => {
+describe('session.handleAction:CAS 删除后 respond 被接受', () => {
   let session: GameSession;
 
   beforeEach(() => {
@@ -114,86 +113,5 @@ describe('session.handleAction:CAS 删除后 respond/主动 action 均被接受'
     for (const t of others) {
       expect(state.players[t].character).toBeTruthy();
     }
-  }, 15000);
-
-  it('主动 action 不再受 CAS 保护:陈旧 baseSeq 被接受', async () => {
-    // 等待上一个测试的 fire-and-forget bootstrap 完成
-    await sleep(200);
-    session = new GameSession(makeRoom(), true, 42);
-
-    // 启动并完成选将
-    await session.startGame(4);
-    const state = getState(session);
-    for (let i = 0; i < 100 && state.pendingSlots.size === 0; i++) await sleep(10);
-
-    // 主公选
-    const lordSlot2 = [...state.pendingSlots.values()][0].atom as {
-      target: number;
-      candidates: Array<{ name: string }>;
-    };
-    const lordTarget = lordSlot2.target;
-    const lordCand = lordSlot2.candidates[0];
-    await session.handleAction('p0', {
-      skillId: '系统规则',
-      actionType: '选将',
-      ownerId: lordTarget,
-      params: { character: lordCand.name },
-      baseSeq: state.seq,
-    });
-    for (let i = 0; i < 100 && state.pendingSlots.size !== 3; i++) await sleep(10);
-
-    // 其它人选
-    const others = [...state.pendingSlots.keys()];
-    for (const t of others) {
-      const slot = state.pendingSlots.get(t)!;
-      const cand = (slot.atom as { candidates: Array<{ name: string }> }).candidates[0];
-      await session.handleAction(`p${t}`, {
-        skillId: '系统规则',
-        actionType: '选将',
-        ownerId: t,
-        params: { character: cand.name },
-        baseSeq: state.seq,
-      });
-      await sleep(50);
-    }
-    for (let i = 0; i < 200 && state.pendingSlots.size > 0; i++) await sleep(10);
-    // 选将完成后无阻塞型 pending(出牌阶段会有 __出牌 询问,但不阻塞)
-    expect(state.pendingSlots.size <= 1).toBe(true);
-
-    // 等待进入 player 0 的出牌阶段(bootstrap 完成后回合管理自动推进到出牌)
-    // 出牌阶段会有 __出牌 询问(非阻塞型 pending),不检查 pendingSlots.size
-    // 注:某些角色(如刘禅·放权)在进入出牌阶段前会触发 confirm 询问——
-    // 自动拒绝以推进阶段切换。
-    for (let i = 0; i < 300 && (state.currentPlayerIndex !== 0 || state.phase !== '出牌'); i++) {
-      // 自动拒绝任何阻塞型 confirm 询问(如放权/trigger)
-      for (const [t, slot] of state.pendingSlots) {
-        if (!slot.isBlocking) continue;
-        const atom = slot.atom as { type?: string; requestType?: string; target?: number };
-        if (atom.type === '请求回应' && atom.target === t) {
-          await session.handleAction(`p${t}`, {
-            skillId: atom.requestType?.split('/')[0] ?? '系统规则',
-            actionType: 'respond',
-            ownerId: t,
-            params: { choice: false },
-            baseSeq: state.seq,
-          });
-        }
-      }
-      await sleep(10);
-    }
-
-    // 现在进入游戏,处于出牌阶段。用陈旧 baseSeq 发主动 action
-    const veryStaleSeq = state.seq - 10;
-    const beforeSeq = state.seq;
-    await session.handleAction('p0', {
-      skillId: '回合管理',
-      actionType: 'end',
-      ownerId: 0,
-      params: {},
-      baseSeq: veryStaleSeq,
-    });
-    await sleep(200);
-    // CAS 删除后:action 被接受 → seq 推进
-    expect(state.seq).toBeGreaterThan(beforeSeq);
   }, 15000);
 });

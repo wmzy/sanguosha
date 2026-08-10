@@ -1,4 +1,4 @@
-// tests/skill-tests/move-flow.test.ts
+// tests/engine/move-flow.test.ts
 // 模块 F:移动牌编排函数 runMoveCardFlow 时机顺序 + 牌堆耗尽重洗 + reason 透传验证
 // (对齐 docs/architecture/出牌流程重设计.md 模块 F / move.md)。
 //

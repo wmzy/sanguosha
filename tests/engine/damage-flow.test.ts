@@ -1,4 +1,4 @@
-// tests/skill-tests/damage-flow.test.ts
+// tests/engine/damage-flow.test.ts
 // 模块 A1:伤害编排函数 runDamageFlow 时机顺序验证(对齐 docs/architecture/出牌流程重设计.md 模块 A / damage.md)。
 // 不依赖具体技能——直接调用编排函数,断言 state.atomHistory 的 atom 时序、amount 传递
 // 与 state.players[].health 的实质变化。

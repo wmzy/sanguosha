@@ -1,4 +1,4 @@
-// tests/skill-tests/applyView-bugs.test.ts
+// tests/engine/applyView-consistency.test.ts
 // 验证 apply 与 applyView 的一致性：apply 修改 GameState，applyView 修改 GameView。
 // 如果两者不一致，前端（走事件流 applyView）看到的与引擎 state（测试断言的）不同。
 // 这些 bug 之前测不出来，因为绝大多数测试断言 harness.state（绝对真实）而非 processedView。
@@ -180,24 +180,24 @@ describe('applyView 一致性 bug', () => {
     });
   });
 
-  describe('加标记 atom: 缺少 applyView', () => {
-    it('apply 加 mark, 但 applyView 不存在 → 前端 marks 永不更新', () => {
+  describe('加标记 atom: applyView 已定义', () => {
+    it('apply 加 mark, applyView 同步更新前端 marks', () => {
       const def = getAtomDef('加标记');
-      expect(def.applyView).toBeDefined(); // ❌ BUG: 实际为 undefined
+      expect(def.applyView).toBeDefined();
     });
   });
 
-  describe('去标记 atom: 缺少 applyView', () => {
-    it('apply 移除 mark, 但 applyView 不存在', () => {
+  describe('去标记 atom: applyView 已定义', () => {
+    it('apply 移除 mark, applyView 同步更新前端 marks', () => {
       const def = getAtomDef('去标记');
-      expect(def.applyView).toBeDefined(); // ❌ BUG
+      expect(def.applyView).toBeDefined();
     });
   });
 
-  describe('清过期标记 atom: 缺少 applyView', () => {
-    it('apply 清 duration===turn marks, 但 applyView 不存在', () => {
+  describe('清过期标记 atom: applyView 已定义', () => {
+    it('apply 清 duration===turn marks, applyView 同步更新前端 marks', () => {
       const def = getAtomDef('清过期标记');
-      expect(def.applyView).toBeDefined(); // ❌ BUG
+      expect(def.applyView).toBeDefined();
     });
   });
 

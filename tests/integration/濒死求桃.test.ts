@@ -6,7 +6,7 @@
 //   2. 濒死状态观察:HP=0 但 alive 仍为 true(在求桃窗口期内)
 //   3. 救回场景(dispatch 模式):P1 濒死 → P2 出桃救回
 //   4. 救回场景(harness 模式):P1 不救 → P2 出桃救回
-//   5. 4 人局求桃顺序:target → +1 → +2(P3 未被问到,因为 P2 救回)
+//   5. 4 人局求桃顺序:逆时针从当前回合起(P0 回合 → P0 → P3 → P2,P1 因 P2 救回未被问到)
 //   6. 濒死玩家自救(优先级最高)→ 不会问下家
 //   7. 4 人局链上全部无桃 → 死亡(手牌装备进弃牌堆)
 //   8. 同回合两次濒死 → 两条独立求桃链(跨链标志清除)
@@ -24,7 +24,7 @@ import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { canRescueWith } from '../../src/engine/skills/系统规则';
 import { cardResponsePreResolveForTarget } from '../../src/engine/core/card-response-availability';
-import { declareAlternativeResponse } from '../../src/engine/core/skill';
+import { declareAlternativeResponse, registerBeforeHook } from '../../src/engine/core/skill';
 
 /** 返回第一个 pending slot 的 atom,无 pending 时返回 undefined */
 function firstPendingAtom(state: GameState): unknown | undefined {
@@ -338,6 +338,13 @@ function readAskTarget(state: GameState): number {
     throw new Error(`当前 pending 不是求桃,实际是 ${atom.type}/${atom.requestType}`);
   }
   return atom.target!;
+}
+
+/** 从 atomHistory 提取所有 atom 的 type 列表(按发出顺序)。 */
+function atomTypes(state: GameState): string[] {
+  return (state.atomHistory as Array<{ kind: string; atom?: { type: string } }>)
+    .filter((e) => e.kind === 'atom' && e.atom)
+    .map((e) => e.atom!.type);
 }
 
 // ── 以下为 SkillTestHarness 路径测试(含从濒死求桃链.test.ts 搬入的测试) ──
@@ -856,5 +863,124 @@ describe('求桃响应可用性预检(真实 DEFAULT_SKILLS)', () => {
     const filter = canRescueWith(state, 0, 1);
     const pre = cardResponsePreResolveForTarget(state, '请求回应', 0, filter, '桃/求桃');
     expect(pre).toEqual({ delayMs: 1500 }); // silent,非 normal
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// 以下为从 dying-flow.test.ts 合并的濒死流程模块 C 用例(独有覆盖):
+//   - 被救但仍濒死 → 从救者重新逆时针(新的濒死状态时 → 重置起点)
+//   - 进入濒死状态时 atom 在请求回应(桃/求桃)前发出
+// (dying-flow 中其余用例——逆时针询问顺序、无人救→死亡——已由上方用例覆盖,故不重复。)
+// ─────────────────────────────────────────────────────────────
+describe('濒死流程修正(合并自 dying-flow)', () => {
+  // ─────────────────────────────────────────────────────────────
+  // 被救但仍濒死 → 从救者重新逆时针
+  // before-hook on 回复体力:cancel → health 不增 → "仍濒死"路径
+  // ─────────────────────────────────────────────────────────────
+  it('被救但仍濒死 → 从救者重新逆时针(新的濒死状态时 → 重置)', async () => {
+    const slash: Card = makeCard('s1', '杀', '♠', '7');
+    const peach: Card = makeCard('p1', '桃', '♥', '5');
+    // 适配 skip/silent/normal:P0/P2/P3 0 手牌会致 求桃 slot skip,askOrder 收集不到。
+    // 给 P0/P2/P3 各一张非桃牌(杀)使 求桃 走 silent;P1 仍持桃负责首轮救援。
+    const dc0: Card = makeCard('dc0', '杀', '♣', '3');
+    const dc2: Card = makeCard('dc2', '杀', '♣', '5');
+    const dc3: Card = makeCard('dc3', '杀', '♣', '6');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [dc0.id], skills: ['桃', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', hand: [slash.id, peach.id], skills: ['杀', '桃', '闪'] }),
+        makePlayer({ index: 2, name: 'P2', hand: [dc2.id], skills: ['桃', '闪'], health: 1, maxHealth: 4 }),
+        makePlayer({ index: 3, name: 'P3', hand: [dc3.id], skills: ['桃', '闪'] }),
+      ],
+      cardMap: { s1: slash, p1: peach, [dc0.id]: dc0, [dc2.id]: dc2, [dc3.id]: dc3 },
+      currentPlayerIndex: 1, // P1 回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+
+    // before-hook on 回复体力:cancel → health 不增 → "仍濒死"路径
+    registerBeforeHook(state, '__mockNegate', -1, '回复体力', async () => {
+      return { kind: 'cancel' };
+    });
+    await registerSkillsFromState(state);
+
+    // P1 杀 P2
+    await dispatchAndWait(state, {
+      skillId: '杀',
+      actionType: 'use',
+      ownerId: 1,
+      params: { cardId: slash.id, targets: [2] },
+      baseSeq: state.seq,
+    });
+
+    const askOrder: number[] = [];
+    let loops = 0;
+    while (state.pendingSlots.size > 0 && loops < 30) {
+      for (const slot of state.pendingSlots.values()) {
+        const atom = slot.atom as { type?: string; requestType?: string; target?: number };
+        if (atom.type === '请求回应' && atom.requestType === '桃/求桃') {
+          askOrder.push(atom.target!);
+          break;
+        }
+      }
+      // 第一问 P1 → P1 有桃,出桃救援
+      if (askOrder.length === 1 && askOrder[0] === 1) {
+        await dispatchAndWait(state, {
+          skillId: '桃',
+          actionType: 'respond',
+          ownerId: 1,
+          params: { cardId: peach.id },
+          baseSeq: state.seq,
+        });
+      } else {
+        await fireTimeoutAndWait(state);
+      }
+      loops += 1;
+    }
+
+    // P1 被问(target=1),出桃 → 回复体力 cancel → 仍濒死 → 新的濒死状态时
+    // 重置起点为 P1(救者),逆时针重新:P1(已问)→ P0 → P3 → P2
+    // P0/P3/P2 无桃 → 全 pass → P2 死亡
+    expect(askOrder).toEqual([1, 0, 3, 2]);
+    expect(state.players[2].alive).toBe(false);
+
+    // 验证 新的濒死状态时 atom 被发出
+    const types = atomTypes(state);
+    expect(types).toContain('新的濒死状态时');
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 进入濒死状态时 atom 在请求回应(桃/求桃)前发出
+  // ─────────────────────────────────────────────────────────────
+  it('进入濒死状态时 atom 在请求回应(桃/求桃)前发出', async () => {
+    const slash: Card = makeCard('s1', '杀', '♠', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id], skills: ['杀', '闪'] }),
+        makePlayer({ index: 1, name: 'P1', skills: ['闪'], health: 1, maxHealth: 4 }),
+      ],
+      cardMap: { s1: slash },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+
+    const harness = new SkillTestHarness();
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.useCardAndTarget('杀', slash.id, [1]);
+    await P1.pass();
+    await harness.waitForStable();
+
+    const types = atomTypes(harness.state);
+    const enterIdx = types.indexOf('进入濒死状态时');
+    const firstRespondIdx = types.findIndex(
+      (t, i) => i > enterIdx && t === '请求回应',
+    );
+
+    expect(enterIdx).toBeGreaterThanOrEqual(0);
+    expect(firstRespondIdx).toBeGreaterThan(enterIdx);
   });
 });

@@ -1,12 +1,12 @@
 // tests/engine/draw-modifier-order.test.ts
-// before-hook 逆时针排序(多角色结算原则 §2.2b)。
+// 摸牌修饰器(draw modifier)叠加语义。
 //
-// 验证:
-//   1. applyAtom 对所有 atom 类型按座次逆时针(当前回合角色起)排序 before-hook。
-//   2. 系统级 hook(ownerId<0,如 TARGET_SYSTEM=-1)排最后。
-//   3. modify 叠加对纯加减法保持交换律(英姿+1 / 裸衣-1 类比:结果与顺序无关)。
-//   4. 单 before-hook 走快速路径不报错。
-//   5. 任意 atom(含 下一玩家)同样按逆时针排序(泛化,不再仅限 摸牌)。
+// 逆时针排序用例(基础序、modular 绕回、系统级排尾、单 hook 快速路径、泛化到其他
+// atom)已归并至 after-hook-order.test.ts——排序由共享私有函数
+// sortHooksCounterclockwise 完成,before-hook 与 after-hook 走同一实现,排序主题
+// 以 after-hook-order 为归属。本文件只保留摸牌 before-hook 的 modify 叠加行为:
+//   1. modify 叠加对纯加减法保持交换律(英姿+1 / 裸衣-1 类比:结果与顺序无关)。
+//   2. 多个正修正叠加(英姿+1 + 好施+2 = +3)。
 import { describe, it, expect } from 'vitest';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
@@ -52,15 +52,6 @@ function makeState(playerCount: number, currentPlayerIndex: number): GameState {
   });
 }
 
-/** 记录型 before-hook:把 ownerId 追加到 localVars['__order']。 */
-function recordDrawHook(state: GameState, ownerId: number): () => void {
-  return registerBeforeHook(state, `观察${ownerId}`, ownerId, '摸牌', async (ctx) => {
-    const arr = (ctx.state.localVars['__order'] as number[] | undefined) ?? [];
-    arr.push(ownerId);
-    ctx.state.localVars['__order'] = arr;
-  });
-}
-
 /** modify 型 before-hook:把摸牌 count 叠加 delta。 */
 function modifyDrawHook(state: GameState, ownerId: number, delta: number): () => void {
   return registerBeforeHook(state, `修正${ownerId}`, ownerId, '摸牌', async (ctx) => {
@@ -72,48 +63,8 @@ function modifyDrawHook(state: GameState, ownerId: number, delta: number): () =>
   });
 }
 
-describe('before-hook 逆时针排序(摸牌)', () => {
-  // ─── 1. 按逆时针(当前回合角色起)执行 ────────────────────
-  it('currentPlayer=0:hooks(ownerId 2,0,3) 按 [0,2,3] 逆时针执行', async () => {
-    const s = makeState(4, 0);
-    // 故意以乱序注册
-    recordDrawHook(s, 2);
-    recordDrawHook(s, 0);
-    recordDrawHook(s, 3);
-    await applyAtom(s, { type: '摸牌', player: 0, count: 1 });
-    expect(s.localVars['__order']).toEqual([0, 2, 3]);
-  });
-
-  // ─── 2. 非 0 起点:modular arithmetic 正确(逆时针绕回)─────
-  it('currentPlayer=2:hooks(ownerId 0,3,2) 按 [2,3,0] 逆时针执行', async () => {
-    const s = makeState(4, 2);
-    recordDrawHook(s, 0);
-    recordDrawHook(s, 3);
-    recordDrawHook(s, 2);
-    await applyAtom(s, { type: '摸牌', player: 2, count: 1 });
-    expect(s.localVars['__order']).toEqual([2, 3, 0]);
-  });
-
-  // ─── 3. 系统级 hook(ownerId<0)排最后 ───────────────────
-  it('系统级 hook(ownerId=-1)排在最后', async () => {
-    const s = makeState(4, 1);
-    recordDrawHook(s, 3);
-    recordDrawHook(s, -1);
-    recordDrawHook(s, 1);
-    await applyAtom(s, { type: '摸牌', player: 1, count: 1 });
-    // currentPlayer=1 逆时针:1(dist 0)→3(dist 2);-1 系统级排最后
-    expect(s.localVars['__order']).toEqual([1, 3, -1]);
-  });
-
-  // ─── 4. 单 hook 走快速路径(hooks.length<=1 不排序)────────
-  it('仅一个 before-hook 时仍正常执行', async () => {
-    const s = makeState(2, 0);
-    recordDrawHook(s, 1);
-    await applyAtom(s, { type: '摸牌', player: 0, count: 1 });
-    expect(s.localVars['__order']).toEqual([1]);
-  });
-
-  // ─── 5. modify 叠加交换律:+1 与 -1 结果与顺序无关 ─────────
+describe('摸牌修饰器叠加(modify)', () => {
+  // ─── 1. modify 叠加交换律:+1 与 -1 结果与顺序无关 ─────────
   //   类比 英姿(+1) 与 裸衣(-1):无论注册顺序如何,基础 2 +1 -1 = 2 张
   it('modify 叠加交换律:+1 与 -1 叠加后摸 2 张(与 ownerId 顺序无关)', async () => {
     const sA = makeState(3, 0);
@@ -131,31 +82,12 @@ describe('before-hook 逆时针排序(摸牌)', () => {
     expect(sB.players[0].hand.length).toBe(2);
   });
 
-  // ─── 6. 多个正修正叠加:类比 英姿+1 + 好施+2 = +3 ──────────
+  // ─── 2. 多个正修正叠加:类比 英姿+1 + 好施+2 = +3 ──────────
   it('modify 多正修正叠加:+1 与 +2 后摸 5 张(基础2+3)', async () => {
     const s = makeState(3, 0);
     modifyDrawHook(s, 2, +2); // 类比好施
     modifyDrawHook(s, 1, +1); // 类比英姿
     await applyAtom(s, { type: '摸牌', player: 0, count: 2 });
     expect(s.players[0].hand.length).toBe(5);
-  });
-});
-
-describe('其他 atom 的 before-hook 同样按逆时针排序(泛化验证)', () => {
-  // ─── 7. 任意 atom 同样逆时针排序(非仅限 摸牌)──────────────
-  //   注册顺序 [2,0,3] 与逆时针序(cur=0:0→2→3)不同,以此区分"泛化"与"注册序"
-  it('非摸牌 atom(下一玩家)before-hook 按逆时针排序(非注册序)', async () => {
-    const s = makeState(4, 0);
-    // 在 下一玩家 上注册观察 hook(注册序:2,0,3)
-    for (const oid of [2, 0, 3]) {
-      registerBeforeHook(s, `下一玩家观察${oid}`, oid, '下一玩家', async (ctx) => {
-        const arr = (ctx.state.localVars['__nextOrder'] as number[] | undefined) ?? [];
-        arr.push(oid);
-        ctx.state.localVars['__nextOrder'] = arr;
-      });
-    }
-    await applyAtom(s, { type: '下一玩家' });
-    // cur=0 逆时针:0(dist 0)→2(dist 2)→3(dist 3) → [0,2,3](非注册序 [2,0,3])
-    expect(s.localVars['__nextOrder']).toEqual([0, 2, 3]);
   });
 });

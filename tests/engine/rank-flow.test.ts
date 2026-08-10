@@ -1,4 +1,4 @@
-// tests/skill-tests/rank-flow.test.ts
+// tests/engine/rank-flow.test.ts
 // 模块 G:拼点两步化编排函数 runRankCompareFlow 验证(对齐 docs/architecture/出牌流程重设计.md 模块 G / rankcompare.md)。
 // 不依赖具体技能——直接调用编排函数,断言 state.atomHistory 的 atom 时序、面朝下信息分级、
 // 点数比较结果与 state.zones 的实质变化。

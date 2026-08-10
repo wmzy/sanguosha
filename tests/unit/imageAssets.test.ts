@@ -1,9 +1,10 @@
-// 图片资源映射 helper 的单元测试。
-// 覆盖:getCharacterImage / getCardImage / getEquipCardImage。
-// Task 5 后：三函数委托 ResourceManager，测试需注入 manifest。
+// 资源映射 helper 的单元测试。
+// 覆盖:getCharacterImage / getCardImage / getEquipCardImage / resolveSoundUrl。
+// Task 5 后：这些 helper 委托 ResourceManager，测试需注入 manifest。
 
 import { describe, expect, it, beforeEach } from 'vitest';
 import { getCardImage, getCharacterImage, getEquipCardImage } from '../../src/client/assets/imageAssets';
+import { resolveSoundUrl } from '../../src/client/sounds/soundMap';
 import { resourceManager } from '../../src/client/resources';
 import type { PacksIndex } from '../../src/client/resources/types';
 
@@ -28,6 +29,9 @@ const testIndex: PacksIndex = {
         { id: 'card/equipment/丈八蛇矛', type: 'image' },
         { id: 'card/equipment/诸葛连弩', type: 'image' },
         { id: 'card/equipment/赤兔', type: 'image' },
+        // 音效资源（resolveSoundUrl 测试）
+        { id: 'sound/flip', type: 'audio' },
+        { id: 'sound/card/杀', type: 'audio' },
       ],
     },
   }],
@@ -112,5 +116,22 @@ describe('getEquipCardImage', () => {
     expect(getEquipCardImage('桃园结义')).toBeNull();
     expect(getEquipCardImage('不存在')).toBeNull();
     expect(getEquipCardImage('')).toBeNull();
+  });
+});
+
+describe('resolveSoundUrl', () => {
+  beforeEach(() => {
+    resourceManager.reset();
+    resourceManager.loadIndex(testIndex);
+    resourceManager.setPackEnabled('base', true);
+  });
+
+  it('委托 ResourceManager 解析已注册音效并补 .mp3 后缀', () => {
+    expect(resolveSoundUrl('flip')).toBe('/packs/base/sound/flip.mp3');
+    expect(resolveSoundUrl('card/杀')).toBe('/packs/base/sound/card/杀.mp3');
+  });
+
+  it('未注册音效返回 null', () => {
+    expect(resolveSoundUrl('unknown_id')).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-// tests/skill-tests/toViewLog-perspective.test.ts
+// tests/engine/toViewLog-perspective.test.ts
 // 验证 toViewLog 的视角区分：
 //   1. 自己摸牌：日志展示具体牌面（花色点数+牌名）
 //   2. 他人摸牌：日志只展示数量

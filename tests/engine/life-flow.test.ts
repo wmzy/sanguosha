@@ -1,4 +1,4 @@
-// tests/skill-tests/life-flow.test.ts
+// tests/engine/life-flow.test.ts
 // 模块 M:体力编排函数(runDecreaseLifeFlow/runRecoverLifeFlow/runLoseLifeFlow/runSetMaxHealthFlow)
 // 时机顺序验证。不依赖具体技能——直接调用编排函数,断言 state.atomHistory 的 atom 时序
 // 与 state.players[].health 的实质变化。

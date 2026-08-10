@@ -398,4 +398,88 @@ describe('过河拆桥', () => {
     // 过河拆桥进弃牌堆
     expect(harness.state.zones.discardPile).toContain('gq1');
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // Bug2 续:目标判定区+手牌+装备三区都有 → 使用者选判定区后仅判定区清空,手牌/装备保留
+  // ─────────────────────────────────────────────────────────────
+  it('Bug2:目标三区(判定区+手牌+装备)都有 → 选判定区后判定区清空,手牌/装备保留', async () => {
+    const lb = makeCard('lb1', '乐不思蜀', '♠', '7');
+    const victim = makeCard('v1', '杀', '♥', '5', '基本牌');
+    const weapon = makeCard('wp1', '诸葛连弩', '♣', 'A', '装备牌');
+    const state = buildState({
+      p2Hand: ['v1'],
+      p2Equipment: { 武器: 'wp1' },
+      extraCards: { lb1: lb, v1: victim, wp1: weapon },
+    });
+    state.players[1].pendingTricks = [{ name: '乐不思蜀', source: 0, card: lb }];
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
+    await P1.pass();
+    // 选牌面板选判定区
+    await P1.respond('过河拆桥', { zone: 'judge', cardId: 'lb1' });
+
+    // 判定区清空,手牌与装备保留
+    expect(harness.state.players[1].pendingTricks).toEqual([]);
+    expect(harness.state.players[1].hand).toContain('v1');
+    expect(harness.state.players[1].equipment['武器']).toBe('wp1');
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // Bug2 续:同一目标先用过河拆桥拆判定区,再用一张拆手牌(可重拆同一目标)
+  // ─────────────────────────────────────────────────────────────
+  it('Bug2:同一目标先用过河拆桥拆判定区,再用一张拆手牌', async () => {
+    const gq2 = makeCard('gq2', '过河拆桥', '♠', '4');
+    const lb = makeCard('lb1', '乐不思蜀', '♠', '7');
+    const victim = makeCard('v1', '杀', '♥', '5', '基本牌');
+    const state = buildState({
+      p1Hand: ['gq1', 'gq2'],
+      p2Hand: ['v1'],
+      extraCards: { gq2, lb1: lb, v1: victim },
+    });
+    state.players[1].pendingTricks = [{ name: '乐不思蜀', source: 0, card: lb }];
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 第一次拆判定区
+    await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
+    await P1.pass();
+    await P1.respond('过河拆桥', { zone: 'judge', cardId: 'lb1' });
+    expect(harness.state.players[1].pendingTricks).toEqual([]);
+    expect(harness.state.players[1].hand).toContain('v1');
+
+    // 第二次拆手牌(盲选第 0 张)
+    await P1.useCardAndTarget('过河拆桥', 'gq2', [1]);
+    await P1.pass();
+    await P1.respond('过河拆桥', { zone: 'hand', handIndex: 0 });
+    expect(harness.state.players[1].hand).not.toContain('v1');
+    expect(harness.state.zones.discardPile).toContain('v1');
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // Bug2 续:判定区有多个延时锦囊 → 一次过河拆桥只拆使用者选的那一张
+  // ─────────────────────────────────────────────────────────────
+  it('Bug2:判定区有多个延时锦囊 → 一次过河拆桥只拆使用者选的那一张', async () => {
+    const lb = makeCard('lb1', '乐不思蜀', '♠', '7');
+    const sd = makeCard('sd1', '闪电', '♥', 'A');
+    const state = buildState({ p2Hand: [], extraCards: { lb1: lb, sd1: sd } });
+    state.players[1].pendingTricks = [
+      { name: '乐不思蜀', source: 0, card: lb },
+      { name: '闪电', source: 0, card: sd },
+    ];
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    expect(harness.state.players[1].pendingTricks).toHaveLength(2);
+
+    await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
+    await P1.pass();
+    // 使用者选第一张(乐不思蜀)
+    await P1.respond('过河拆桥', { zone: 'judge', cardId: 'lb1' });
+
+    // 只拆一张,剩下闪电
+    expect(harness.state.players[1].pendingTricks).toHaveLength(1);
+    expect(harness.state.players[1].pendingTricks[0].name).toBe('闪电');
+  });
 });
