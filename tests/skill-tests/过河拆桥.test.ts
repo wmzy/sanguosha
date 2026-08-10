@@ -267,6 +267,116 @@ describe('过河拆桥', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
+  // 10. Bug6 回归:选牌窗口必须"等待玩家",不能在玩家选之前自动弃牌
+  //    根因排查(timeout/defaultChoice/前端 三方向)结论见下方各断言。
+  //    ① timeout 不过短——选牌窗口 timeout=20s(与五谷丰登一致,正常询问,非 silent)
+  //    ② defaultChoice 仅为超时兜底——不设 responseMode='silent',不 preResolve 跳过
+  //    ③ 前端会渲染——使用者视角 view.pending 是 pickTargetCard 且含装备/手牌数据
+  // ─────────────────────────────────────────────────────────────
+  it('Bug6:出过河拆桥+过无懈后,引擎进入"选牌等待",不自动弃牌(使用者视角可见选牌面板)', async () => {
+    // P2 同时有手牌 + 装备(触发"明牌优先"的默认兜底分支,验证它不会提前生效)
+    const state = buildState({
+      p2Hand: ['v1', 'v2'],
+      p2Equipment: { 武器: 'wp1' },
+      extraCards: {
+        v1: makeCard('v1', '杀', '♥', '5', '基本牌'),
+        v2: makeCard('v2', '闪', '♦', '6', '基本牌'),
+        wp1: makeCard('wp1', '诸葛连弩', '♠', '1', '装备牌'),
+      },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
+    await P1.pass(); // 无懈窗口(无人打无懈)
+
+    // ① 引擎必须"等待玩家":有 请求回应 过河拆桥_选牌 pending(目标=使用者 P1),
+    //    且此时**没有任何牌被弃置**(未自动选牌)
+    const slots = [...harness.state.pendingSlots.values()];
+    expect(slots.length).toBe(1);
+    const pickAtom = slots[0].atom as { type: string; requestType?: string; target?: number };
+    expect(pickAtom.type).toBe('请求回应');
+    expect(pickAtom.requestType).toBe('过河拆桥_选牌');
+    expect(pickAtom.target).toBe(0); // 选牌窗口目标是使用者 P1(座次 0)
+    expect(harness.state.zones.discardPile).not.toContain('v1');
+    expect(harness.state.zones.discardPile).not.toContain('v2');
+    expect(harness.state.zones.discardPile).not.toContain('wp1');
+
+    // ②③ 使用者视角 view.pending 是 pickTargetCard:含装备明牌 + 手牌盲选,且非 silent
+    //    → 前端 AwaitingPrompt 会渲染选牌面板(不会"无面板 → 超时自动弃牌")
+    P1.processEvents();
+    P1.expectView((v) => {
+      expect(v.pending).not.toBeNull();
+      expect(v.pending!.target).toBe(0);
+      const prompt = v.pending!.prompt as {
+        type: string;
+        equipment?: Array<{ cardId: string }>;
+        handCount?: number;
+      };
+      expect(prompt.type).toBe('pickTargetCard');
+      expect(prompt.equipment).toHaveLength(1);
+      expect(prompt.equipment![0].cardId).toBe('wp1');
+      expect(prompt.handCount).toBe(2);
+      expect(v.pending!.responseMode).not.toBe('silent');
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 11. Bug6 回归:玩家选"非默认"牌(手牌盲选)时,弃置的是玩家所选牌,而非兜底的装备
+  // ─────────────────────────────────────────────────────────────
+  it('Bug6:目标有手牌+装备时,玩家盲选第 2 张手牌 → 弃置该手牌(而非兜底装备 wp1)', async () => {
+    const state = buildState({
+      p2Hand: ['v1', 'v2'],
+      p2Equipment: { 武器: 'wp1' },
+      extraCards: {
+        v1: makeCard('v1', '杀', '♥', '5', '基本牌'),
+        v2: makeCard('v2', '闪', '♦', '6', '基本牌'),
+        wp1: makeCard('wp1', '诸葛连弩', '♠', '1', '装备牌'),
+      },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
+    await P1.pass();
+    // 玩家主动盲选第 2 张手牌(v2)——默认兜底是装备 wp1,验证玩家选择优先
+    await P1.respond('过河拆桥', { zone: 'hand', handIndex: 1 });
+
+    // 弃置的是玩家所选的 v2,而非兜底的 wp1
+    expect(harness.state.zones.discardPile).toContain('v2');
+    expect(harness.state.zones.discardPile).not.toContain('wp1');
+    expect(harness.state.players[1].hand).not.toContain('v2');
+    expect(harness.state.players[1].equipment['武器']).toBe('wp1');
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 12. Bug6 回归:超时兜底(玩家真不选)保留——明牌优先(装备→判定→手牌[0])
+  //     这是"玩家真不选时自动选"的预期兜底,与"不等玩家就自动选"的 bug 区分
+  // ─────────────────────────────────────────────────────────────
+  it('Bug6:玩家真不选(超时)→ 兜底弃置装备 wp1(明牌优先),过河拆桥进弃牌堆', async () => {
+    const state = buildState({
+      p2Hand: ['v1', 'v2'],
+      p2Equipment: { 武器: 'wp1' },
+      extraCards: {
+        v1: makeCard('v1', '杀', '♥', '5', '基本牌'),
+        v2: makeCard('v2', '闪', '♦', '6', '基本牌'),
+        wp1: makeCard('wp1', '诸葛连弩', '♠', '1', '装备牌'),
+      },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.useCardAndTarget('过河拆桥', 'gq1', [1]);
+    await P1.pass(); // 无邪
+    await P1.pass(); // 选牌窗口:玩家不选 → 超时兜底
+
+    // 兜底弃置装备 wp1(明牌优先),手牌保留
+    expect(harness.state.zones.discardPile).toContain('wp1');
+    expect(harness.state.players[1].equipment['武器']).toBeUndefined();
+    expect(harness.state.zones.discardPile).toContain('gq1');
+  });
+
+  // ─────────────────────────────────────────────────────────────
   // 9. Bug2:拆判定区(延时锦囊)
   // ─────────────────────────────────────────────────────────────
   it('Bug2:P2 仅判定区有乐不思蜀 → validate 放行,选牌面板选判定区后 pendingTricks 清空', async () => {

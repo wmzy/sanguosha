@@ -6,7 +6,7 @@
 // 后端 dispatch 先执行 武圣.transform(创建影子杀),再 杀.use validate 看到"杀"通过。
 // 杀技能零感知武圣——它看到的永远是 cardMap 里的一张“杀”。
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { applyAtom } from '../core/apply';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
@@ -28,16 +28,16 @@ function shadowIdOf(cardId: string): string {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // transform action:把红色手牌转化为影子"杀"(新建 Card 实体,shadowOf 指向原卡)。
-  // 作为 preceding 在 杀.use 之前执行。杀.validate 读 cardMap[影子id] 看到"杀"。
-  registerAction(
+  // 作为 preceding 在 杀.use(出牌阶段)/ 杀.respond(被询问杀)之前执行。
+  const unloadTransform = registerAction(
     state,
     skill.id,
     ownerId,
     'transform',
     (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 无 pending + 存活 + 手牌 + 红牌
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const free = !hasBlockingPending(state);
+      // 通用合法条件:存活 + 手牌 + 红牌。时机由两条路径之一满足:
+      //   1. 出杀路径(自己回合 + 无阻塞 pending):preceding 在 杀.use 前
+      //   2. 回应路径(被询问杀:南蛮入侵/决斗):preceding 在 杀.respond 前
       const self = state.players[ownerId];
       const selfAlive = self.alive === true;
       const cardId = params.cardId as string;
@@ -45,7 +45,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const card = cardIdOk ? state.cardMap[cardId] : undefined;
       const cardInHand = cardIdOk && self.hand.includes(cardId);
       const isRed = !!card && card.color === '红';
-      const ok = myTurn && free && selfAlive && cardInHand && isRed;
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const free = !hasBlockingPending(state);
+      const slot = state.pendingSlots.get(ownerId);
+      const atomType = (slot?.atom as { type?: string })?.type;
+      const reqType = (slot?.atom as { requestType?: string })?.requestType;
+      const atomTarget = (slot?.atom as { target?: number })?.target;
+      // 与 杀.respond 的 pending 判定同构:询问杀 或 请求回应(杀/respondKill,激将/挑衅)
+      const askedKill =
+        !!slot &&
+        atomTarget === ownerId &&
+        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+      const contextOk = (myTurn && free) || askedKill;
+      const ok = selfAlive && cardInHand && isRed && contextOk;
       return ok ? null : '现在不能使用武圣';
     },
     async (state: GameState, params: Record<string, Json>) => {
@@ -70,12 +82,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (idx >= 0) self.hand[idx] = cardId;
     },
   );
-  return () => {};
+  // 声明替代回应:被询问杀(南蛮入侵/决斗 等)时,可用武圣把红色手牌当杀打出。
+  // 与龙胆/倾国同构:声明后 询问杀 的可用性检测不再 skip,建立回应窗口。
+  const unloadAlt = declareAlternativeResponse(state, ownerId, '询问杀');
+  return () => {
+    unloadAlt();
+    unloadTransform();
+  };
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): void {
   // 前端:武圣是转化技,defineAction 声明红牌+目标。
-  // 前端 UI 流程:选红牌 → 选目标 → 点武圣按钮 → 提交 preceding=[武圣.transform] + 主 action=杀.use。
+  // 前端 UI 流程(出杀):选红牌 → 选目标 → 点武圣按钮 → 提交 preceding=[武圣.transform] + 杀.use。
+  // 前端 UI 流程(打出):被询问杀时(南蛮/决斗),选红牌 → 点武圣按钮 → preceding + 杀.respond。
   api.defineAction('transform', {
     label: '武圣',
     style: 'passive',
@@ -86,18 +105,28 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
       targetFilter: {
         min: 1,
         max: 1,
-        // 攻击范围检查(转化出的杀同样需距离):filter 仅为前端 UI 提示
+        // 攻击范围检查(转化出的杀同样需距离):filter 仅为前端 UI 提示(出杀路径用)
         filter: (view: GameView, t: number) =>
           viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
       },
     },
     transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id }),
     activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
       const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p) return false;
+      if (!p?.alive) return false;
       const hasRed = p.hand?.some((c) => c.color === '红') ?? false;
-      return hasRed && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+      if (!hasRed) return false;
+      // 出杀路径(自己回合 + 出牌阶段 + 还能出杀)
+      const ownTurnCanSlash = defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+      // 回应路径(被询问杀:南蛮入侵/决斗):与龙胆同构
+      const slot = ctx.view.pending;
+      const atomType = (slot?.atom as { type?: string })?.type;
+      const reqType = (slot?.atom as { requestType?: string })?.requestType;
+      const askedKill =
+        !!slot &&
+        slot.target === ctx.perspectiveIdx &&
+        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+      return ownTurnCanSlash || askedKill;
     },
   });
   return;

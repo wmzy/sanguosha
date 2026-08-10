@@ -128,6 +128,16 @@ function enumerateTransformActions(
   if (!me?.hand) return [];
   const result: AvailableAction[] = [];
 
+  // 回应路径(被询问杀:南蛮入侵/决斗):转化技当杀打出 → 主 action=杀.respond(无目标)
+  const pendingSlot = view.pending;
+  const pendingAtomType = (pendingSlot?.atom as { type?: string })?.type;
+  const pendingReqType = (pendingSlot?.atom as { requestType?: string })?.requestType;
+  const isKillRespondCtx =
+    !!pendingSlot &&
+    pendingSlot.target === seatIndex &&
+    (pendingAtomType === '询问杀' ||
+      (pendingAtomType === '请求回应' && pendingReqType === '杀/respondKill'));
+
   for (const action of skillActions) {
     if (action.actionType !== 'transform') continue;
     if (!isActiveAction(action, ctx)) continue;
@@ -189,8 +199,39 @@ function enumerateTransformActions(
       continue;
     }
 
-    // 单卡转化(武圣):每张匹配牌生成一个 action
+    // 单卡转化(武圣/龙胆):每张匹配牌生成一个 action
     const matchingCards = me.hand.filter(filter);
+
+    // 回应路径(被询问杀):转化杀打出,无目标,主 action=杀.respond
+    if (isKillRespondCtx) {
+      for (const card of matchingCards) {
+        const wrapperName = action.transform ? action.transform(card).name : '杀';
+        if (wrapperName !== '杀') continue; // 仅杀回应
+        const shadowCardId = `${card.id}#${action.skillId}`;
+        const cardDesc = `${card.suit}${card.rank}`;
+        result.push({
+          description: `${action.skillId}转化【杀】(${cardDesc})打出`,
+          message: {
+            skillId: '杀',
+            actionType: 'respond',
+            ownerId: seatIndex,
+            params: { cardId: shadowCardId },
+            preceding: [
+              {
+                skillId: action.skillId,
+                actionType: 'transform',
+                params: { cardId: card.id },
+              },
+            ],
+            baseSeq: 0,
+          },
+          validTargets: [],
+          category: 'transform',
+        });
+      }
+      continue;
+    }
+
     const targetFilter = getTargetFilter(action.prompt);
     const rules = derivePlayRules(targetFilter, getSelfTarget(action.prompt));
     for (const card of matchingCards) {

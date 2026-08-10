@@ -558,7 +558,7 @@ export function MultiplayerPage() {
         {reconnectBanner}
         <div className={page}>
           <h1 className={title}>旁观等待中</h1>
-          <p className={subtitle}>等待房主开始游戏</p>
+          <p className={subtitle}>{mp.isHost ? '你是房主，可旁观或开始游戏' : '等待房主开始游戏'}</p>
           <div className={card}>
             <div className={roomCodeBox}>
               <div className={roomCodeLabel}>房间码</div>
@@ -639,6 +639,32 @@ export function MultiplayerPage() {
               </div>
             )}
             <div className={buttonRow}>
+              {/* 加入游戏：旁观者切回玩家（房间未满时） */}
+              {playerCount < maxPlayers && (
+                <button
+                  className={btnStyle}
+                  style={{ '--btn-bg': colors.accent.green } as React.CSSProperties}
+                  onClick={() => mp.switchRole('player')}
+                >
+                  加入游戏
+                </button>
+              )}
+              {/* 房主旁观时仍可开始游戏（hostId 不变） */}
+              {mp.isHost && (
+                <button
+                  className={btnStyle}
+                  style={
+                    {
+                      '--btn-bg': allReady ? colors.accent.orange : colors.disabled,
+                      '--btn-cursor': allReady ? 'pointer' : 'not-allowed',
+                    } as React.CSSProperties
+                  }
+                  disabled={!allReady}
+                  onClick={mp.startGame}
+                >
+                  开始游戏
+                </button>
+              )}
               <button
                 className={btnStyle}
                 style={{ '--btn-bg': colors.disabled } as React.CSSProperties}
@@ -1095,6 +1121,14 @@ export function MultiplayerPage() {
                 开始游戏
               </button>
             )}
+            <button
+              className={btnStyle}
+              style={{ '--btn-bg': colors.bg.input } as React.CSSProperties}
+              onClick={() => mp.switchRole('spectator')}
+              title="切换为旁观者，不参与本局游戏"
+            >
+              👁 旁观
+            </button>
             <button
               className={btnStyle}
               style={{ '--btn-bg': colors.disabled } as React.CSSProperties}

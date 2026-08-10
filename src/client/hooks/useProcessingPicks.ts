@@ -59,10 +59,12 @@ export function useProcessingPicks(view: GameView): ProcessingPickState | null {
         if (c) allCards.push(c);
       }
     } else {
-      // revealedIds 未到(亮牌事件还在队列):回退到帧 cards(当前处理区剩余)
+      // revealedIds 未到(亮牌事件还在队列):回退到帧 cards(当前处理区剩余)。
+      // frame.cards 含五谷丰登本身(使用中的锦囊)——它不是亮牌候选,必须排除,
+      // 否则会把锦囊本身渲染为可选牌(Bug5:选了却拿到对不上的牌)。
       for (const cardId of wuguFrame.cards) {
         const c = cardFromMap(view, cardId);
-        if (c) allCards.push(c);
+        if (c && c.cardName !== wuguFrame.skillId) allCards.push(c);
       }
     }
 

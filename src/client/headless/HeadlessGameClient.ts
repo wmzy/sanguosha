@@ -13,6 +13,7 @@ import type { ServerMessage, RoomConfig } from '../../server/protocol';
 import { applyServerMessage, mergeRoomConfig } from './viewMaintainer';
 import { enumerateAvailableActions } from './availableActions';
 import { resolvePendingRespond, getPendingRequestType } from '../utils/pendingRespond';
+import { resolveDistributeCardIds } from '../utils/gameViewHelpers';
 import { decideAutoSkip, DEFAULT_PREFS, type AutoSkipPrefs } from '../utils/autoSkip';
 import { getActionsForPlayer, registerSkillActions } from '../skillActionRegistry';
 import type { ClientPhase, HeadlessCallbacks, AvailableAction, RoomState, ReconnectState } from './types';
@@ -406,6 +407,12 @@ export class HeadlessGameClient {
     } else if (msg.type === 'chat_history') {
       this.callbacks.onChat?.(msg.messages);
     }
+    // 身份切换（player↔spectator）：更新本地 isSpectator 标志。
+    // 服务端 switchRole 仅在等待中广播 role_changed；切换后后续消息自动修正座次/视图。
+    if (msg.type === 'role_changed' && msg.playerId === this._playerId) {
+      this._isSpectator = msg.newRole === 'spectator';
+      if (this._isSpectator) this._seatIndex = -1;
+    }
     this.callbacks.onMessage?.(msg);
   }
 
@@ -707,6 +714,72 @@ export class HeadlessGameClient {
             },
             validTargets: [],
             category: 'respond',
+          });
+        }
+        return;
+      }
+      // 被动 distribute prompt（贯石斧杀被闪抵消后选 2 张弃置强命 / 遗计分配 等
+      // 请求回应型 distribute）。与主动 distribute（制衡/仁德 use，由 enumerateDistributeActions
+      // 处理）不同：这里 actionType='respond'，skillId 由 resolvePendingRespond 推导
+      // （贯石斧/select → '贯石斧'）。
+      // Bug4:此前无此分支，落入下方 info.cardFilter 兜底——deriveCardFilterFromAtom 对
+      // distribute 误推 c.name===skillId 匹配 0 张手牌 → 只生成 skip → AI 永远不发动贯石斧。
+      if (pending.prompt?.type === 'distribute') {
+        const distPrompt = pending.prompt;
+        const mode = distPrompt.mode ?? 'allocate';
+        const me = view.players[ownerId];
+        const equip = (me?.equipment ?? {}) as Partial<Record<string, string>>;
+        if (mode === 'select') {
+          // select 模式（贯石斧/神速②/制衡式弃牌 等）：选 minTotal..maxTotal 张。
+          // 候选可凑足下限时才生成 distribute（否则只 skip）；params.cardIds 留空由
+          // agent/LLM 补全——与主动 distribute（enumerateDistributeActions 制衡）一致，
+          // 避免对不同技能（神速②需装备、观星需排列）预填出非法 cardIds。
+          const candidateIds = resolveDistributeCardIds(distPrompt, me?.hand ?? [], equip);
+          const minTotal = distPrompt.minTotal ?? 1;
+          if (candidateIds.length >= minTotal) {
+            out.push({
+              description: `发动【${info.skillId}】（选 ${minTotal} 张${
+                distPrompt.source === 'handAndEquip' ? '手牌或装备' : '手牌'
+              }弃置，需填 cardIds）`,
+              message: {
+                skillId: info.skillId,
+                actionType: 'respond',
+                ownerId,
+                params: { cardIds: [] },
+                baseSeq: 0,
+              },
+              validTargets: [],
+              category: 'distribute',
+            });
+          }
+        } else {
+          // allocate 模式（遗计/界遗计 分配 等）：params.allocation 由 agent 补全。
+          out.push({
+            description: `发动【${info.skillId}】（分配牌给目标，需填 allocation）`,
+            message: {
+              skillId: info.skillId,
+              actionType: 'respond',
+              ownerId,
+              params: { allocation: [] },
+              baseSeq: 0,
+            },
+            validTargets: [],
+            category: 'distribute',
+          });
+        }
+        // 可选询问（非 mandatory）：提供 skip（贯石斧 defaultChoice=false → 不发动）
+        if (pending.target >= 0 && pending.mandatory !== true) {
+          out.push({
+            description: `不发动【${info.skillId}】`,
+            message: {
+              skillId: '__skip',
+              actionType: 'skip',
+              ownerId,
+              params: {},
+              baseSeq: 0,
+            },
+            validTargets: [],
+            category: 'skip',
           });
         }
         return;

@@ -11,12 +11,13 @@
 //   5. 负面:不在手牌的卡 transform 被拒
 //   6. 负面:transform 后 杀.use 失败(无目标)→ 触发 rollback,原卡还原
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
+import { applyAtom } from '../../src/engine/core/apply';
 
 function makeCard(
   id: string,
@@ -295,5 +296,57 @@ describe('武圣', () => {
     // P2 不闪 → 扣血(验证 ♦ 红牌走完整出杀流程)
     await P2.pass();
     expect(harness.state.players[1].health).toBe(3);
+  });
+
+  // ─── 回应(打出)路径:被询问杀时,武圣转化红牌当杀打出 ──────────
+  // Bug1 复现:武圣缺少 declareAlternativeResponse('询问杀'),导致关羽无字面杀时
+  // 被南蛮入侵/决斗询问出杀,询问杀窗口被 skip(无 pending),无法用武圣转化杀回应。
+  // 修复:武圣 onInit 声明 declareAlternativeResponse('询问杀'),并放宽 transform
+  // validate 允许询问杀上下文(与龙胆同构)。
+  it('回应路径:被询问杀时,武圣转化红牌当杀回应', async () => {
+    // 直接 applyAtom(询问杀) 不经南蛮/决斗父流程,杀牌留在处理区无父级清理,
+    // 会触发视图自动对比的 transient 处理区差异(真实对局父流程会消费处理区杀牌),
+    // 故临时关闭自动对比。核心断言在 state 层(pendingSlots/hand)。
+    const restoreAutoCompare = disableAutoCompare();
+    try {
+      const redDodge = makeCard('c1', '闪', '♥', 'A'); // 关羽红牌(无字面杀)
+      const state: GameState = createGameState({
+        players: [
+          makePlayer({ index: 0, name: 'P1', hand: ['c1'], skills: ['武圣'] }),
+          makePlayer({ index: 1, name: 'P2', hand: [], skills: [] }),
+        ],
+        cardMap: { c1: redDodge },
+        currentPlayerIndex: 1, // P2 的回合(模拟南蛮/决斗询问 P1 出杀)
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      });
+      await harness.setup(state);
+      const P1 = harness.player('P1');
+
+      // 模拟南蛮入侵/决斗:询问 P1 出杀(fire-and-forget,等待回应)
+      void applyAtom(harness.state, { type: '询问杀', target: 0, source: 1 });
+      await harness.waitForStable();
+
+      // 修复前:询问杀 skip(无字面杀 + 未声明替代回应)→ 无 pending,P1 永远无法回应。
+      // 修复后:建立 P1 的询问杀回应窗口。
+      expect(harness.state.pendingSlots.has(0)).toBe(true);
+
+      // P1 用武圣:红牌 c1 → 杀,preceding=[武圣.transform] + 主=杀.respond
+      await P1.tryDispatch({
+        skillId: '杀',
+        actionType: 'respond',
+        params: { cardId: 'c1#武圣' },
+        preceding: [{ skillId: '武圣', actionType: 'transform', params: { cardId: 'c1' } }],
+      });
+      await harness.waitForStable();
+
+      // 回应成功:询问杀窗口已 resolve(无 pending 残留),P1 手牌已用(转化为杀打出)
+      expect(harness.state.pendingSlots.has(0)).toBe(false);
+      expect(harness.state.players[0].hand).toEqual([]);
+      // 影子杀进处理区(供调用方南蛮/决斗检测);原卡 c1 仍在 cardMap
+      expect(harness.state.cardMap['c1']).toBeDefined();
+    } finally {
+      restoreAutoCompare();
+    }
   });
 });

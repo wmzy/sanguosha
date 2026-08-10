@@ -11,6 +11,7 @@ import {
 } from '../../src/client/utils/pendingRespond';
 import type { Card, PendingView } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
+import type { SkillActionDef } from '../../src/client/skillActionRegistry';
 
 function mkCard(id: string, name: string): Card {
   return { id, name, suit: '♠', color: suitColor('♠'), rank: 'A', type: '基本牌' };
@@ -124,5 +125,83 @@ describe('resolvePendingRespond: cardFilter.candidates 优先', () => {
 
   it('pending 为 null → 返回 null', () => {
     expect(resolvePendingRespond(null, [])).toBeNull();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// 求桃(桃/求桃)救援路由 —— Bug2/Bug8 根因复现
+//
+// Bug2:血量 1 被闪电命中(3 点伤害濒死),手中有酒,不能用酒自救。
+// Bug8:濒死求桃询问自己时,酒可高亮可选,但点酒后提交被拒。
+//
+// 根因:桃/酒是 CardEffect 型卡牌(src/engine/skills/cards/桃.ts、酒.ts),respond 定义在
+// CardEffect.respond 字段,无前端 onMount → 不注册到 skillActionRegistry。故求桃特判里
+// rescueActions(只含 registry 转化型救援技,如急救/界醇醪)不含字面桃/酒。
+// 旧兜底 skillId='桃'(由 '桃/求桃' 取首段),rescueSkillForCard 未覆盖酒 → handleRespond
+// 退回 skillId='桃' → 发到 桃:respond 带酒的 cardId → 桃 validate 拒绝(牌不是桃)。
+// ═══════════════════════════════════════════════════════════════════════
+describe('resolvePendingRespond: 求桃 rescue 路由(Bug2/Bug8)', () => {
+  it('字面酒(自救) → rescueSkillForCard 路由到 "酒"(而非误路由到桃/undefined)', () => {
+    // 引擎 candidates 已含自救酒(canRescueWith:酒仅自救)。registry 无救援 action
+    // (桃/酒是 CardEffect,不在 registry)。
+    const wine = mkCard('w1', '酒');
+    const pending = mkUseCardPending('桃/求桃', ['w1'], 0);
+    const info = resolvePendingRespond(pending, []);
+    expect(info).not.toBeNull();
+    expect(info!.skillId).toBe('桃'); // 求桃兜底 skillId 仍是桃
+    expect(info!.cardFilter?.(wine)).toBe(true); // 酒可高亮可选
+    // 关键:点酒时路由到 '酒'(酒:respond 校验通过),而非 '桃'(会被拒)
+    expect(info!.rescueSkillForCard?.(wine)).toBe('酒');
+  });
+
+  it('字面桃 → rescueSkillForCard 路由到 "桃"', () => {
+    const peach = mkCard('p1', '桃');
+    const pending = mkUseCardPending('桃/求桃', ['p1'], 0);
+    const info = resolvePendingRespond(pending, []);
+    expect(info!.rescueSkillForCard?.(peach)).toBe('桃');
+  });
+
+  it('无 candidates(registry 加载窗口) → derive 兜底仍高亮桃/酒,且 rescueSkillForCard 正确路由', () => {
+    const wine = mkCard('w1', '酒');
+    const peach = mkCard('p1', '桃');
+    const pending = mkUseCardPending('桃/求桃', undefined, 0);
+    const info = resolvePendingRespond(pending, []);
+    expect(info!.cardFilter?.(wine)).toBe(true);
+    expect(info!.cardFilter?.(peach)).toBe(true);
+    expect(info!.rescueSkillForCard?.(wine)).toBe('酒');
+    expect(info!.rescueSkillForCard?.(peach)).toBe('桃');
+  });
+
+  it('转化型救援技(急救红牌)与字面桃/酒共存:各自正确路由,不互相干扰', () => {
+    // 急救:华佗技能,onMount defineAction respond,respondFor='桃/求桃',filter=c.color==='红'。
+    // 桃(♥/♦ 红)同时满足急救 filter,但字面桃应优先路由到 '桃'(非急救)。
+    // 红色非桃非酒牌(如红杀)路由到急救。字面酒(♠/♣ 黑)路由到酒。
+    const firstAid: SkillActionDef = {
+      skillId: '急救',
+      ownerId: 0,
+      actionType: 'respond',
+      label: '急救',
+      style: 'primary',
+      respondFor: '桃/求桃',
+      prompt: {
+        type: 'useCard',
+        title: '急救',
+        cardFilter: { filter: (c: Card) => c.color === '红', min: 1, max: 1 },
+      },
+    };
+    const wine = mkCard('w1', '酒'); // ♠ 黑
+    const peach = { id: 'p1', name: '桃', suit: '♥', color: '红', rank: 'A', type: '基本牌' } as Card;
+    const redSlash = { id: 'r1', name: '杀', suit: '♥', color: '红', rank: '7', type: '基本牌' } as Card;
+    // candidates 仅字面桃/酒(canRescueBy 不含急救红牌);急救红牌由 transformRescue filter 补
+    const pending = mkUseCardPending('桃/求桃', ['w1', 'p1'], 0);
+    const info = resolvePendingRespond(pending, [firstAid]);
+    // 路由:字面优先(桃→桃、酒→酒),红杀→急救
+    expect(info!.rescueSkillForCard?.(wine)).toBe('酒');
+    expect(info!.rescueSkillForCard?.(peach)).toBe('桃');
+    expect(info!.rescueSkillForCard?.(redSlash)).toBe('急救');
+    // cardFilter 并集:字面桃/酒(经 candidates) + 急救红牌(经 filter)
+    expect(info!.cardFilter?.(wine)).toBe(true);
+    expect(info!.cardFilter?.(peach)).toBe(true);
+    expect(info!.cardFilter?.(redSlash)).toBe(true);
   });
 });

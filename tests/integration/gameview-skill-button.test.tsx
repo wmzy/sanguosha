@@ -8,7 +8,7 @@
 // 导致 useCard/useCardAndTarget(无 transform)的技能(仁德/制衡)无法显示按钮。
 // 修复:把 distribute prompt 加入 triggerableActions,并改仁德/制衡 prompt 为 distribute。
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
 import type { GameView, Card } from '../../src/engine/types';
@@ -399,5 +399,180 @@ describe('GameView:主公技仅在主公座次展示', () => {
     expect(screen.getAllByText('激将').length).toBeGreaterThan(0);
     // 非主公曹操的护驾(主公技)不应展示
     expect(screen.queryByText('护驾')).toBeNull();
+  });
+});
+
+// 武圣(关羽·转化技)回应路径:被询问杀(南蛮入侵/决斗)时,可用武圣把红色手牌当杀打出。
+// Bug1:武圣缺少回应路径(无 declareAlternativeResponse + activeWhen askedKill),
+// 导致被询问杀时按钮不出现/无法转化杀回应。修复后:回应上下文下武圣按钮可点 →
+// 选红牌 → 提交 preceding=[武圣.transform] + 杀.respond。
+describe('GameView:武圣回应(打出)路径', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('被询问杀时:武圣按钮出现 → 选红牌 → 提交 杀.respond + preceding', async () => {
+    const redDodge: Card = { id: 'c1', name: '闪', suit: '♥', color: '红', rank: 'A', type: '基本牌' };
+    const view: GameView = {
+      viewer: 0,
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+      players: [
+        {
+          index: 0, name: '关羽', character: '关羽', health: 4, maxHealth: 4, alive: true,
+          equipment: {}, skills: ['使用牌', '打出牌', '武圣'],
+          handCount: 1, hand: [redDodge], marks: [],
+        },
+        {
+          index: 1, name: '曹操', character: '曹操', health: 4, maxHealth: 4, alive: true,
+          equipment: {}, skills: ['使用牌', '打出牌'], handCount: 0, marks: [],
+        },
+      ],
+      cardMap: { c1: redDodge },
+      pending: {
+        type: 'awaits',
+        atom: { type: '询问杀', target: 0, source: 1 } as GameView['pending'] extends infer P
+          ? P extends { atom: infer A } ? A : never : never,
+        prompt: {
+          type: 'useCard',
+          title: '请打出杀',
+          cardFilter: { filter: (c: Card) => c.name === '杀', min: 1, max: 1 },
+        },
+        target: 0,
+        isBlocking: true,
+        totalMs: 50000,
+      },
+      deadline: null,
+      deadlineTotalMs: 0,
+      log: [],
+      settlementStack: [],
+    };
+    const onAction = vi.fn();
+    const { container } = render(<GameViewComponent view={view} onAction={onAction} />);
+
+    // 1. 武圣按钮出现(回应上下文下激活)
+    const wsBtn = await screen.findByRole('button', { name: '武圣' });
+    await act(async () => {
+      fireEvent.click(wsBtn);
+    });
+
+    // 2. 选红牌 c1(转化模式,优先于回应拦截)
+    await waitFor(() => expect(container.querySelector('[data-card-id="c1"]')).toBeTruthy());
+    const cardEl = container.querySelector('[data-card-id="c1"]')!;
+    await act(async () => {
+      fireEvent.click(cardEl);
+    });
+
+    // 3. 使用杀按钮(回应路径无需选目标)
+    const useBtn = await screen.findByRole('button', { name: /使用杀/ });
+    await act(async () => {
+      fireEvent.click(useBtn);
+    });
+
+    // 4. 提交 杀.respond + preceding
+    expect(onAction).toHaveBeenCalled();
+    const call = onAction.mock.calls[0][0];
+    expect(call.skillId).toBe('杀');
+    expect(call.actionType).toBe('respond');
+    expect(call.params.cardId).toBe('c1#武圣');
+    expect(call.preceding).toEqual([
+      { skillId: '武圣', actionType: 'transform', params: { cardId: 'c1' } },
+    ]);
+  });
+});
+
+// 贯石斧(武器):使用杀被目标闪抵消后,引擎发 被动 distribute pending
+//   requestType='贯石斧/select' prompt.type='distribute' mode='select'
+//   source='handAndEquip' minTotal=2 maxTotal=2
+// 人类(React)前端回归守卫:被动 distribute pending 应弹选牌面板——手牌/装备可点选
+// 高亮 + 提交按钮,提交发出 贯石斧:respond {cardIds}。(该路径本就正常,本测试固化契约。)
+// Bug4 真实根因在无头/AI 客户端 appendRespondActions(见 availableActions.test.ts):
+// 缺 distribute 分支 → 只生成 skip → AI 不发动贯石斧。
+describe('GameView:贯石斧被动 distribute(杀被闪抵消后选 2 张弃置强命)', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('被动 distribute pending 渲染手牌候选 + 提交按钮,提交发出 贯石斧:respond cardIds', async () => {
+    const base = makeView();
+    const view: GameView = {
+      ...base,
+      viewer: 0,
+      currentPlayerIndex: 0,
+      players: [
+        {
+          ...base.players[0],
+          index: 0,
+          name: '界夏侯惇',
+          character: '界夏侯惇',
+          skills: ['使用牌', '打出牌'],
+          hand: [makeCard('c1', '杀'), makeCard('c2', '桃'), makeCard('c5', '闪')],
+          handCount: 3,
+          equipment: { 武器: 'eq1' },
+        },
+        {
+          ...base.players[1],
+          name: '界孙策',
+          character: '界孙策',
+        },
+      ],
+      cardMap: {
+        c1: makeCard('c1', '杀'),
+        c2: makeCard('c2', '桃'),
+        c5: makeCard('c5', '闪'),
+        eq1: { id: 'eq1', name: '贯石斧', suit: '♦', color: '红', rank: '5', type: '装备牌' },
+      },
+      pending: {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType: '贯石斧/select', target: 0 } as GameView['pending'] extends infer P
+          ? P extends { atom: infer A } ? A : never : never,
+        prompt: {
+          type: 'distribute',
+          title: '贯石斧:选择 2 张牌弃置强命(不选则不发动)',
+          mode: 'select',
+          source: 'handAndEquip',
+          minTotal: 2,
+          maxTotal: 2,
+        },
+        target: 0,
+        isBlocking: true,
+      },
+    };
+
+    const onAction = vi.fn();
+    const { container } = render(<GameViewComponent view={view} onAction={onAction} />);
+
+    // handHeader 提示应出现
+    await waitFor(() => {
+      expect(screen.getAllByText(/贯石斧:选择 2 张牌弃置强命/).length).toBeGreaterThan(0);
+    });
+
+    // 手牌候选可点选(c2 桃)
+    const c2El = container.querySelector('[data-card-id="c2"]');
+    expect(c2El).not.toBeNull();
+    fireEvent.click(c2El!);
+    // 选第二张(c5 闪)
+    const c5El = container.querySelector('[data-card-id="c5"]');
+    expect(c5El).not.toBeNull();
+    fireEvent.click(c5El!);
+
+    // 提交按钮(确认(N)),应可点
+    const submitBtn = await screen.findByRole('button', { name: /确认/ });
+    expect((submitBtn as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(submitBtn);
+
+    // 提交发出 贯石斧:respond {cardIds:[c2,c5]}
+    await waitFor(() => {
+      expect(onAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skillId: '贯石斧',
+          actionType: 'respond',
+          params: expect.objectContaining({
+            cardIds: expect.arrayContaining(['c2', 'c5']),
+          }),
+        }),
+      );
+    });
   });
 });

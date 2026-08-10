@@ -16,6 +16,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
+import { buildView } from '../../src/engine/index';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(
@@ -269,5 +270,93 @@ describe('火攻', () => {
     // 火攻牌 + 弃牌进弃牌堆;展示牌仍在 P1 手牌
     expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['hg', 'o1']));
     expect(harness.state.players[0].hand).toContain('r1');
+  });
+
+  // ─── 7. 投影层 candidates 下发(Bug7)─────────────────────────────
+  // 火攻/弃牌 的请求回应 cardFilter.filter 是函数(c.suit===revealedSuit),
+  // 跨 WebSocket 序列化会丢失。前端依赖引擎投影层(buildView / 请求回应.toViewEvents)
+  // 下发的 cardFilter.candidates(合法手牌 id 列表)才能渲染可弃牌。
+  // 断言:在火攻/弃牌窗口,buildView(P1) 的 pending.prompt.cardFilter.candidates
+  //      必须包含 P1 的同花色(♥)手牌 id,且不包含不同花色(♦)手牌 id。
+  it('投影层下发火攻/弃牌 candidates:P1 弃牌窗口 candidates 含♥牌、不含♦牌', async () => {
+    const hg = makeCard('hg', '火攻', '♥', '2');
+    const heart = makeCard('h1', '桃', '♥', '5'); // P1 可弃的♥
+    const diamond = makeCard('d1', '杀', '♦', '7'); // P1 不同花色♦(不可弃)
+    const reveal = makeCard('r1', '杀', '♥', '3'); // P2 展示的♥
+    const state = buildState({
+      p1Hand: ['hg', 'h1', 'd1'],
+      p2Hand: ['r1'],
+      extraCards: { hg, h1: heart, d1: diamond, r1: reveal },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('火攻', 'hg', [1]);
+    await P1.pass(); // 无懈
+    P2.expectPending('请求回应');
+    await P2.respond('火攻', { cardId: 'r1' }); // P2 展示♥
+
+    // 现在轮到 P1 弃牌(火攻/弃牌窗口)。P1 的 hg 已用出,h1(♥)/d1(♦)在手。
+    P1.expectPending('请求回应');
+
+    // 全量投影(buildView / 重连路径)
+    const fullView = buildView(harness.state, 0);
+    expect(fullView.pending).not.toBeNull();
+    const fullCands = (
+      fullView.pending?.prompt as { cardFilter?: { candidates?: string[] } } | undefined
+    )?.cardFilter?.candidates;
+    expect(Array.isArray(fullCands)).toBe(true);
+    expect(fullCands).toContain('h1'); // ♥可弃
+    expect(fullCands).not.toContain('d1'); // ♦不可弃
+
+    // 增量投影(processedView / 事件流 applyView 路径)
+    P1.processEvents();
+    P1.expectView((v) => {
+      const incrCands = (
+        v.pending?.prompt as { cardFilter?: { candidates?: string[] } } | undefined
+      )?.cardFilter?.candidates;
+      expect(Array.isArray(incrCands)).toBe(true);
+      expect(incrCands).toContain('h1');
+      expect(incrCands).not.toContain('d1');
+    });
+
+    // 使用者实际弃该♥牌 → 造成火焰伤害
+    await P1.respond('火攻', { cardId: 'h1' });
+    expect(harness.state.players[1].health).toBe(3);
+  });
+
+  // ─── 8. 投影层 candidates 下发:展示窗口(任意手牌)────────────────
+  // 火攻/展示 的 filter=()=>true,candidates 应为目标全部手牌。
+  it('投影层下发火攻/展示 candidates:目标展示窗口 candidates 为全部手牌', async () => {
+    const hg = makeCard('hg', '火攻', '♥', '2');
+    const heart = makeCard('h1', '桃', '♥', '5');
+    const state = buildState({
+      p1Hand: ['hg', 'h1'],
+      p2Hand: ['r1', 'r2'],
+      extraCards: {
+        hg,
+        h1: heart,
+        r1: makeCard('r1', '杀', '♥', '3'),
+        r2: makeCard('r2', '闪', '♠', '4'),
+      },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('火攻', 'hg', [1]);
+    await P1.pass(); // 无懈
+
+    // P2 被询问展示一张手牌(火攻/展示, filter=()=>true)
+    P2.expectPending('请求回应');
+
+    // 全量投影:candidates 应为 P2 全部手牌
+    const fullView = buildView(harness.state, 1);
+    expect(fullView.pending).not.toBeNull();
+    const fullCands = (
+      fullView.pending?.prompt as { cardFilter?: { candidates?: string[] } } | undefined
+    )?.cardFilter?.candidates;
+    expect(fullCands).toEqual(['r1', 'r2']);
   });
 });

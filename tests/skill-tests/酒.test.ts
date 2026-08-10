@@ -387,6 +387,67 @@ describe('酒', () => {
     });
   });
 
+  // ─── Bug2/Bug8:濒死自救(求桃询问自己时用酒)─────────────
+
+  it('respond:闪电3点伤害濒死,求桃问到自己 → respond 酒自救成功(Bug2/Bug8 引擎层)', async () => {
+    // Bug2:血量被闪电命中(3 点无来源伤害)濒死,手中仅酒。
+    // Bug8:求桃循环轮到自己时,自己可选酒救援。
+    // 引擎层验证:酒.respond 在 requestType='桃/求桃' 时被接受 → 求桃/已救 → 回复体力 → 存活。
+    // (前端路由 bug 见 tests/client/pendingRespond.test.ts「求桃 rescue 路由」。)
+    const wine = makeCard('w1', '酒', '♠', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: ['w1'],
+          skills: ['酒', '桃'],
+          health: 3,
+          maxHealth: 4,
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P2',
+          hand: [],
+          skills: ['桃'],
+          health: 4,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { w1: wine },
+      currentPlayerIndex: 0, // P1 当前回合 → runDyingFlow 从 P1 起逆时针,先问 P1 自己
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 3 点无来源伤害(等同闪电命中,fire-and-forget 避免 blockUntilDone 死锁):
+    // P1 体力 3 → 0 濒死 → runDyingFlow 发 求桃 pending
+    const { applyAtom } = await import('../../src/engine/core/apply');
+    void applyAtom(harness.state, { type: '扣减体力', target: 0, amount: 3 });
+    await harness.waitForStable();
+    expect(harness.state.players[0].health).toBe(0);
+
+    // 求桃 pending 命中 P1 自己(当前回合角色,逆时针首位)
+    const slot = [...harness.state.pendingSlots.values()][0];
+    const slotAtom = slot.atom as { type?: string; requestType?: string; target?: number };
+    expect(slotAtom.requestType).toBe('桃/求桃');
+    expect(slotAtom.target).toBe(0);
+
+    // P1(濒死者)→ 酒当桃自救:respond 被接受
+    await P1.respond('酒', { cardId: 'w1' });
+    // 救活:体力 0 → 1、酒进弃牌堆、存活
+    expect(harness.state.players[0].health).toBe(1);
+    expect(harness.state.players[0].alive).toBe(true);
+    expect(harness.state.zones.discardPile).toContain('w1');
+    P1.processEvents();
+    P1.expectView((v) => {
+      expect(v.players[0].health).toBe(1);
+      expect(v.pending).toBeNull();
+    });
+  });
+
   // ─── 负面:respond ─────────────────────────
 
   it('respond:无求桃 pending → 拒绝', async () => {

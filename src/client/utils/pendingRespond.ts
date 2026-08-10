@@ -143,20 +143,38 @@ export function resolvePendingRespond(
   }
   if (!skillId) return null;
 
-  // 求桃特判:合并所有 respondFor='桃/求桃' 的救援 action(桃/酒/急救),
-  // cardFilter 取并集(手牌区高亮所有可救援牌),rescueSkillForCard 按 cardId 路由。
-  // registry 异步加载窗口期(rescueActions 为空)走下方通用兜底。
+  // 求桃特判:濒死求桃时,可救援的牌分两类——
+  //   ① 字面桃(任何人可用)/字面酒(仅自救):CardEffect 型卡牌(桃.ts/酒.ts),respond 定义在
+  //      CardEffect.respond 字段,无前端 onMount → 不注册到 skillActionRegistry,respond skillId
+  //      为卡名('桃'/'酒')。引擎投影层用 canRescueWith 把它们注入 cardFilter.candidates
+  //      (含「酒仅自救」语义)。
+  //   ② 转化型救援技(急救红牌当桃/界醇醪移醇当酒):SkillDef onMount defineAction respond,
+  //      respondFor='桃/求桃',在 registry 中,filter 在 prompt.cardFilter.filter。
+  // cardFilter = candidates(权威,含酒仅自救) ∪ 转化技 filter 的并集;
+  // rescueSkillForCard 按牌名优先路由字面桃/酒到同名 CardEffect,否则落到匹配的转化技。
+  //
+  // 修复 Bug2/Bug8:旧实现 rescueActions 只筛 registry 转化技,漏掉字面桃/酒(CardEffect 无
+  // 前端注册)——非空时 cardFilter/rescueSkillForCard 仅含转化技(桃误路由到急救、酒被漏);
+  // 为空时走兜底 skillId='桃' 但无 rescueSkillForCard → 点酒退回 '桃' → 桃 validate 拒绝酒。
   const PEACH_RESCUE = '桃/求桃';
   if (reqType === PEACH_RESCUE) {
-    const rescueActions = skillActions.filter((a) => a.respondFor === PEACH_RESCUE);
-    if (rescueActions.length > 0) {
-      return {
-        skillId,
-        cardFilter: (c: Card) => rescueActions.some((a) => extractCardFilterFromAction(a)?.(c)),
-        rescueSkillForCard: (c: Card) =>
-          rescueActions.find((a) => extractCardFilterFromAction(a)?.(c))?.skillId,
-      };
-    }
+    const transformRescue = skillActions.filter((a) => a.respondFor === PEACH_RESCUE);
+    const candidates = readCardFilterCandidates(pending);
+    const candSet = candidates ? new Set(candidates) : null;
+    const literalMatch: (c: Card) => boolean = candSet
+      ? (c) => candSet.has(c.id)
+      : (c) => c.name === '桃' || c.name === '酒';
+    const transformMatch = (c: Card): boolean =>
+      transformRescue.some((a) => extractCardFilterFromAction(a)?.(c));
+    return {
+      skillId,
+      cardFilter: (c: Card) => literalMatch(c) || transformMatch(c),
+      rescueSkillForCard: (c: Card) => {
+        // 字面桃/酒优先路由到同名 CardEffect(桃是红牌也满足急救 filter,但应走 桃.respond)
+        if (c.name === '桃' || c.name === '酒') return c.name;
+        return transformRescue.find((a) => extractCardFilterFromAction(a)?.(c))?.skillId;
+      },
+    };
   }
 
   // 引擎投影层下发的可序列化 candidates(权威):cardFilter.filter 是函数,跨进程丢失,

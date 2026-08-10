@@ -99,6 +99,16 @@ function PlayerSeatViewImpl({
   const showIdentity =
     identity && (!hideIdentity || isPerspective || identity === '主公' || !player.alive);
 
+  // 体力红心动态缩放:♥ 字形进宽约 1em,座位内容宽度约 136px
+  // (--hero-card-h 200px × 15/19 − 卡边框 − 行 padding 20px)。基础尺寸(满血 16px /
+  // 空血 14px / 间距 2px)下 maxHealth ≥ 7 即 18N−2 会超出该宽度而被截断/溢出。
+  // 故 maxHealth ≥ 7 时按 6/maxHealth 等比缩小满血与空血字号及间距(两者同步缩放保持对齐),
+  // 使任意 maxHealth 的所有心完整排列在座位内;≤ 6 沿用原值(标准 4 血场景无回归)。
+  const hpScale = player.maxHealth >= 7 ? 6 / player.maxHealth : 1;
+  const hpFullSize = `${16 * hpScale}px`;
+  const hpEmptySize = `${14 * hpScale}px`;
+  const hpGap = `${2 * hpScale}px`;
+
   return (
     <div
       className={cx(
@@ -178,19 +188,23 @@ function PlayerSeatViewImpl({
         <div className={seatCharName}>{displayChar || '未知'}</div>
       </div>
       {/* 体力红心 — \uFE0E 强制文本渲染,防止 iOS Safari 将 ♥ 渲染为彩色 emoji 导致空血心也显示红色 */}
-      <div className={seatHpRow}>
-        {Array.from({ length: player.maxHealth }, (_, i) => (
-          <span
-            key={i}
-            className={cx(
-              i < player.health ? hpHeartFull : hpHeartEmpty,
-              isDamaged && hpFlash,
-              isHealed && hpHealFlash,
-            )}
-          >
-            ♥{'\uFE0E'}
-          </span>
-        ))}
+      <div className={seatHpRow} style={{ gap: hpGap }}>
+        {Array.from({ length: player.maxHealth }, (_, i) => {
+          const isFull = i < player.health;
+          return (
+            <span
+              key={i}
+              className={cx(
+                isFull ? hpHeartFull : hpHeartEmpty,
+                isDamaged && hpFlash,
+                isHealed && hpHealFlash,
+              )}
+              style={{ fontSize: isFull ? hpFullSize : hpEmptySize }}
+            >
+              ♥{'\uFE0E'}
+            </span>
+          );
+        })}
       </div>
       {/* 技能标签 */}
       {(() => {

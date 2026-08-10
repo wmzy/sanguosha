@@ -290,4 +290,73 @@ describe('五谷丰登', () => {
     expect(harness.state.zones.processing.length).toBe(0);
     expect(harness.state.pendingSlots.size).toBe(0);
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // 6. Bug5:五谷丰登本身(使用中的锦囊)绝不可作为可选牌
+  //    引擎须把亮牌写入 frame.params.revealedIds(供前端 useProcessingPicks 投影候选),
+  //    且 respond.validate 必须拒绝选五谷丰登本身(否则 pickedId 落空 → fallback 拿第一张亮牌=错牌)。
+  // ─────────────────────────────────────────────────────────────
+  it('Bug5:五谷丰登本身不可选 + frame.params.revealedIds 投影亮牌(不含锦囊本身)', async () => {
+    const wugu: Card = makeCard('wg1', '五谷丰登', '♥', '3');
+    const cardA: Card = makeCard('pa', '杀', '♠', '7', '基本牌');
+    const cardB: Card = makeCard('pb', '桃', '♥', '2', '基本牌');
+
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['wg1'], skills: ['五谷丰登'] }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: { wg1: wugu, pa: cardA, pb: cardB },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: ['pa', 'pb'], discardPile: [], processing: [] };
+    await harness.setup(state);
+
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCard('五谷丰登', 'wg1');
+    // P1 选牌前问无懈 → pass
+    await P1.pass();
+
+    // 选牌窗口:五谷丰登结算帧应把亮牌写入 params.revealedIds(供前端投影全量候选)
+    const frame = harness.state.settlementStack[harness.state.settlementStack.length - 1];
+    expect(frame).toBeTruthy();
+    const revealedIds = frame.params.revealedIds as string[] | undefined;
+    expect(revealedIds).toEqual(['pa', 'pb']);
+    // 五谷丰登本身(使用中的锦囊)绝不在亮牌候选中
+    expect(revealedIds).not.toContain('wg1');
+
+    // 引擎发出的请求回应 prompt.cards 同样不含五谷丰登本身
+    const slot = [...harness.state.pendingSlots.values()].find(
+      (s) => (s.atom as { requestType?: string }).requestType === '五谷丰登/select',
+    );
+    expect(slot).toBeTruthy();
+    const pickCardIds = (
+      (slot!.atom as { prompt?: { cards?: Array<{ cardId: string }> } }).prompt?.cards ?? []
+    ).map((c) => c.cardId);
+    expect(pickCardIds).toEqual(['pa', 'pb']);
+    expect(pickCardIds).not.toContain('wg1');
+
+    // Bug5 核心症状:选五谷丰登本身必须被拒绝(否则 pickedId 落空 → fallback 拿第一张亮牌=错牌)
+    await P1.expectRejected({
+      skillId: '五谷丰登',
+      actionType: 'respond',
+      params: { cardId: 'wg1' },
+    });
+
+    // 选正常亮牌仍被接受且拿到所选之牌
+    await P1.respond('五谷丰登', { cardId: 'pa' });
+    // P2 选牌前问无懈 → pass → P2 选牌
+    await P1.pass();
+    await P2.respond('五谷丰登', { cardId: 'pb' });
+
+    expect(harness.state.players[0].hand).toContain('pa');
+    expect(harness.state.players[1].hand).toContain('pb');
+    expect(harness.state.zones.discardPile).toContain('wg1');
+    expect(harness.state.zones.processing.length).toBe(0);
+    expect(harness.state.pendingSlots.size).toBe(0);
+  });
 });

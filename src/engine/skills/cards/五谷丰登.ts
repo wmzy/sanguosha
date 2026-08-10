@@ -102,6 +102,14 @@ async function resolveBountifulHarvest(ctx: ResolveCtx): Promise<void> {
       revealedIds.push(topId);
     }
     state.localVars['五谷丰登/亮牌'] = revealedIds;
+    // 把亮牌写入结算帧 params(走 atom,供前端 useProcessingPicks 投影全量候选)。
+    // 亮牌只含翻出的牌,绝不含五谷丰登本身(使用中的锦囊)——这是前端候选的权威来源,
+    // 避免 useProcessingPicks 回退到 frame.cards(含锦囊本身)而把五谷丰登本身当成可选牌。
+    await applyAtom(state, {
+      type: '帧参数赋值',
+      key: 'revealedIds',
+      value: revealedIds,
+    });
   }
 
   const revealedIds = state.localVars['五谷丰登/亮牌'] as string[] | undefined;
@@ -157,7 +165,11 @@ const bountifulHarvestEffect: CardEffect = {
       if (atom.requestType !== '五谷丰登/select') return '当前不是五谷丰登选牌窗口';
       const cardId = params.cardId as string | undefined;
       if (!cardId) return 'cardId required';
-      if (!frameCards(state).includes(cardId)) return '该牌不在可选范围';
+      // 候选严格限定为亮出的牌:排除五谷丰登本身(使用中的锦囊)与已被选走的牌。
+      // 仅判 frameCards 会把锦囊本身也判合法 → pickedId 落空 → fallback 拿第一张亮牌=错牌。
+      const revealedIds = state.localVars['五谷丰登/亮牌'] as string[] | undefined;
+      if (!revealedIds || !revealedIds.includes(cardId)) return '该牌不在可选范围';
+      if (!frameCards(state).includes(cardId)) return '该牌已被选走';
       return null;
     },
     execute: async (state, _ownerId, params) => {

@@ -287,6 +287,11 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
             return next;
           });
         }
+        // 身份切换（player↔spectator）：同步本地 stage。
+        // HGC 内部已更新 _isSpectator，这里驱动 UI 渲染对应界面。
+        if (msg.type === 'role_changed' && msg.playerId === hgc.playerId) {
+          setStage(msg.newRole === 'spectator' ? 'spectating' : 'waiting');
+        }
       },
     });
     hgcRef.current = hgc;
@@ -470,7 +475,12 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId: hgc.playerId, role }),
-    }).catch((err) => log.error('switchRole failed', { error: String(err) }));
+    }).catch((err) => {
+      log.error('switchRole failed', { error: String(err) });
+      const body = (err as { body?: { error?: string } }).body;
+      setError(body?.error ?? (role === 'spectator' ? '切换为旁观者失败' : '加入游戏失败（房间可能已满）'));
+      setTimeout(() => setError(null), 3000);
+    });
   }, []);
 
   const requestView = useCallback((targetSeat: number) => {

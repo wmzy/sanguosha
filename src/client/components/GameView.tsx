@@ -263,6 +263,7 @@ export function GameViewComponentImpl({
     handleTargetClick,
     handleSkillAction,
     handleTransformPlay,
+    isKillRespondContext,
     handleRespond,
     handlePlayRespond,
     handleEndTurn,
@@ -614,10 +615,21 @@ export function GameViewComponentImpl({
                             );
                           })()}
                         {canOperate &&
-                          selectedActive &&
+                          (selectedActive || isKillRespondContext) &&
                           transformMode?.minCards === 1 &&
                           selectedCardId &&
                           (() => {
+                            // 回应路径(被询问杀):无需选目标,选中红牌即可提交 杀.respond
+                            if (isKillRespondContext) {
+                              return (
+                                <button
+                                  className={styles.playBtn}
+                                  onClick={() => handleTransformPlay('')}
+                                >
+                                  使用{transformMode.wrapperName}
+                                </button>
+                              );
+                            }
                             return (
                               <button
                                 className={cx(styles.playBtn, !selectedTarget && styles.btnDisabled)}
@@ -918,7 +930,8 @@ export function GameViewComponentImpl({
               const isAwaiting = !isDistributeActive && isMyAwaiting && !!respondFilter?.(card);
               const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
               const isTransformCandidate = !!transformMode?.cardFilter(card);
-              const isTransformActive = transformMode !== null && isMyTurn && canOperate;
+              const isTransformActive =
+                transformMode !== null && canOperate && (isMyTurn || isKillRespondContext);
               const isTransformMatch =
                 isTransformCandidate &&
                 (transformMode?.minCards === 1 ||

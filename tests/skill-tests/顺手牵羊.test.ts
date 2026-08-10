@@ -143,6 +143,43 @@ describe('顺手牵羊', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
+  // 1b. Bug6 回归:顺手牵羊与过河拆桥共用 runPickTargetCardPanel,
+  //     同样必须"等待玩家选牌",不能在玩家选之前自动获取(mode=obtain 同构)。
+  // ─────────────────────────────────────────────────────────────
+  it('Bug6:出顺手牵羊+过无懈后,引擎进入"选牌等待",不自动获取(使用者视角可见选牌面板)', async () => {
+    const state = buildState({
+      p2Hand: ['v1', 'v2'],
+      extraCards: {
+        v1: makeCard('v1', '杀', '♥', '5', '基本牌'),
+        v2: makeCard('v2', '闪', '♦', '6', '基本牌'),
+      },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('顺手牵羊', 'use', { cardId: 'sq1', target: 1 });
+    await P1.pass(); // 无懈窗口
+
+    // 引擎"等待玩家":有 请求回应 顺手牵羊_选牌 pending(目标=使用者),且未自动获取
+    const slots = [...harness.state.pendingSlots.values()];
+    expect(slots.length).toBe(1);
+    const pickAtom = slots[0].atom as { type: string; requestType?: string; target?: number };
+    expect(pickAtom.type).toBe('请求回应');
+    expect(pickAtom.requestType).toBe('顺手牵羊_选牌');
+    expect(pickAtom.target).toBe(0);
+    expect(harness.state.players[0].hand).not.toContain('v1');
+    expect(harness.state.players[0].hand).not.toContain('v2');
+
+    // 使用者视角 view.pending 是 pickTargetCard 且非 silent → 前端会渲染选牌面板
+    P1.processEvents();
+    P1.expectView((v) => {
+      expect(v.pending).not.toBeNull();
+      expect((v.pending!.prompt as { type: string }).type).toBe('pickTargetCard');
+      expect(v.pending!.responseMode).not.toBe('silent');
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
   // 2. validate 拒绝:距离 > 1
   // ─────────────────────────────────────────────────────────────
   it('P1 对 P3(距离 2)出顺手牵羊 → 被拒绝(距离 > 1)', async () => {

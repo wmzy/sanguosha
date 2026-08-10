@@ -1032,3 +1032,88 @@ describe('HeadlessGameClient.getAvailableActions() — useCardAndTarget pending'
     expect(actions.some((a) => a.category === 'skip')).toBe(true);
   });
 });
+
+// 回归测试：被动 distribute prompt（贯石斧杀被闪抵消后选 2 张弃置强命）
+//   Bug4:appendRespondActions 此前无 distribute 分支,落入 info.cardFilter 兜底
+//   (deriveCardFilterFromAtom 对 distribute 误推 c.name==='贯石斧',匹配 0 张手牌)
+//   → availableActions 只有 skip → AI 永远不发动贯石斧,杀直接被闪抵消。
+//   修复后:select 模式生成 贯石斧:respond {cardIds:[2张候选]} distribute action + skip。
+//   证据:data/sanguosha-replay-123.json 事件 86→87,贯石斧请求发出 594ms 后即被跳过
+//   (autoSkip act-delayed [500,2000]ms 区间,因 canRespond=false)。
+describe('HeadlessGameClient.getAvailableActions() — 被动 distribute pending(贯石斧)', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('贯石斧/select:生成 弃2张强命 respond action(手牌+装备候选)+ skip', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    const hand: Card[] = [
+      { id: 'x1', name: '桃', suit: '♥', color: '红', rank: '3', type: '基本牌' },
+      { id: 'x2', name: '桃', suit: '♥', color: '红', rank: '4', type: '基本牌' },
+    ];
+    const view = makeView3(0, '出牌', hand);
+    // P0 装备贯石斧(强命弃牌候选含装备区)
+    view.players[0].equipment = { 武器: 'gs' };
+    view.cardMap = {
+      ...view.cardMap,
+      gs: { id: 'gs', name: '贯石斧', suit: '♦', color: '红', rank: '5', type: '装备牌' },
+    };
+    view.pending = {
+      type: 'awaits',
+      atom: { type: '请求回应', requestType: '贯石斧/select', target: 0 } as GameView['pending'] extends infer P
+        ? P extends { atom: infer A } ? A : never : never,
+      prompt: {
+        type: 'distribute',
+        title: '贯石斧:选择 2 张牌弃置强命(不选则不发动)',
+        mode: 'select',
+        source: 'handAndEquip',
+        minTotal: 2,
+        maxTotal: 2,
+      },
+      target: 0,
+      isBlocking: true,
+    };
+    (hgc as unknown as { _view: GameView | null })._view = view;
+
+    const actions = hgc.getAvailableActions();
+    const distActions = actions.filter((a) => a.category === 'distribute');
+    // 修复前:0 个 distribute(只有 skip);修复后:1 个 贯石斧:respond
+    expect(distActions).toHaveLength(1);
+    const da = distActions[0];
+    expect(da.message.skillId).toBe('贯石斧');
+    expect(da.message.actionType).toBe('respond');
+    // params.cardIds 留空由 agent/LLM 补全(与主动 distribute 制衡一致)
+    expect(Array.isArray(da.message.params.cardIds)).toBe(true);
+    // 可选询问:提供 skip(不发动)
+    expect(actions.some((a) => a.category === 'skip')).toBe(true);
+  });
+
+  it('贯石斧/select:候选不足 minTotal 时不生成 distribute(只 skip)', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    const hand: Card[] = [{ id: 'x1', name: '桃', suit: '♥', color: '红', rank: '3', type: '基本牌' }];
+    const view = makeView3(0, '出牌', hand);
+    view.pending = {
+      type: 'awaits',
+      atom: { type: '请求回应', requestType: '贯石斧/select', target: 0 } as GameView['pending'] extends infer P
+        ? P extends { atom: infer A } ? A : never : never,
+      prompt: {
+        type: 'distribute',
+        title: '贯石斧:选择 2 张牌弃置强命(不选则不发动)',
+        mode: 'select',
+        source: 'handAndEquip',
+        minTotal: 2,
+        maxTotal: 2,
+      },
+      target: 0,
+      isBlocking: true,
+    };
+    (hgc as unknown as { _view: GameView | null })._view = view;
+
+    const actions = hgc.getAvailableActions();
+    // 手牌仅 1 张 < minTotal 2 → 无法弃 2 张强命,只提供 skip
+    expect(actions.filter((a) => a.category === 'distribute')).toHaveLength(0);
+    expect(actions.some((a) => a.category === 'skip')).toBe(true);
+  });
+});

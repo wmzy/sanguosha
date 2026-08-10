@@ -168,6 +168,8 @@ export interface PlayInteractionResult {
   playRules: import('../utils/gameViewHelpers').PlayRules | null;
   selectedActive: boolean;
   playButtonState: { canPlay: boolean; targetLabel: string } | null;
+  /** 被询问杀(南蛮/决斗)时的回应上下文:转化技当杀打出走此路径 */
+  isKillRespondContext: boolean;
   /** useCard 类回应选中的牌 id(点牌选中,再点「打出」出牌);非回应窗口为 null */
   selectedRespondCardId: string | null;
   /** useCardAndTarget 类回应(借刀杀人/出杀)选中的目标座次 name;非此模式为 null */
@@ -246,6 +248,17 @@ export function usePlayInteraction(
   } = p;
 
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
+
+  // 被询问杀(南蛮入侵/决斗/激将/挑衅)时的回应上下文:转化技(武圣)当杀打出走此路径。
+  // 与 isMyAwaiting 区别:仅针对"出杀"问询(询问杀 / 请求回应 杀/respondKill)。
+  const pendingAtom = pending?.atom as { type?: string; requestType?: string } | undefined;
+  const isKillRespondContext =
+    isMyAwaiting &&
+    !!pending &&
+    pending.target === perspectiveIdx &&
+    (!!pendingAtom &&
+      (pendingAtom.type === '询问杀' ||
+        (pendingAtom.type === '请求回应' && pendingAtom.requestType === '杀/respondKill')));
 
   // ─── 状态 ───
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -816,6 +829,30 @@ export function usePlayInteraction(
   const handleTransformPlay = useCallback(
     (targetName: string) => {
       if (!transformMode) return;
+      // 回应路径(被询问杀):转化杀打出,无目标,主 action=杀.respond
+      if (isKillRespondContext) {
+        if (transformMode.minCards > 1) return; // 多卡转化不参与杀回应
+        if (!selectedCardId) return;
+        const targetCard = perspectiveHand.find((c) => c.id === selectedCardId);
+        if (!targetCard) return;
+        const shadowCardId = `${selectedCardId}#${transformMode.skillId}`;
+        send(
+          transformMode.wrapperName,
+          'respond',
+          { cardId: shadowCardId },
+          [
+            {
+              skillId: transformMode.skillId,
+              actionType: transformMode.actionType,
+              params: { cardId: selectedCardId },
+            },
+          ],
+        );
+        setTransformMode(null);
+        setSelectedCardId(null);
+        setSelectedTarget(null);
+        return;
+      }
       // AOE 转化(乱击→万箭齐发)targetFilter.max=0,无需选目标,直接提交。
       const needsTarget = transformMode.targetFilter ? transformMode.targetFilter.max >= 1 : true;
       const idx = needsTarget ? nameToIndex(targetName) : -1;
@@ -853,7 +890,7 @@ export function usePlayInteraction(
       setSelectedCardId(null);
       setSelectedTarget(null);
     },
-    [transformMode, nameToIndex, selectedCardId, perspectiveHand, send],
+    [transformMode, isKillRespondContext, nameToIndex, selectedCardId, perspectiveHand, send],
   );
 
   const handleRespond = useCallback(
@@ -944,18 +981,8 @@ export function usePlayInteraction(
         setSelectedForDiscard((prev) => toggleOrderedFifo(prev, card.id, discardMax));
         return;
       }
-      // 回应模式:点牌只选中(高亮),不直接出牌;再点同一张取消选中。
-      // 真正出牌由「打出」按钮(handlePlayRespond)触发,避免误触。求桃/无懈可击同此路径。
-      if (isMyAwaiting) {
-        if (pendingRespondInfo?.cardFilter) {
-          if (pendingRespondInfo.cardFilter(card)) {
-            setSelectedRespondCardId((prev) => (prev === card.id ? null : card.id));
-          }
-        }
-        return;
-      }
-      // 转化模式
-      if (transformMode && isMyTurn && canOperate) {
+      // 转化模式(优先于回应拦截:玩家主动进入转化模式,包括被询问杀时武圣转化杀打出)
+      if (transformMode && canOperate && (isMyTurn || isKillRespondContext)) {
         if (!transformMode.cardFilter(card)) return;
         if (transformMode.minCards > 1) {
           setSelectedCardId(null);
@@ -982,6 +1009,16 @@ export function usePlayInteraction(
         }
         return;
       }
+      // 回应模式:点牌只选中(高亮),不直接出牌;再点同一张取消选中。
+      // 真正出牌由「打出」按钮(handlePlayRespond)触发,避免误触。求桃/无懈可击同此路径。
+      if (isMyAwaiting) {
+        if (pendingRespondInfo?.cardFilter) {
+          if (pendingRespondInfo.cardFilter(card)) {
+            setSelectedRespondCardId((prev) => (prev === card.id ? null : card.id));
+          }
+        }
+        return;
+      }
       // 出牌模式
       if (!isMyTurn || !canOperate) return;
       if (selectedCardId === card.id) {
@@ -999,6 +1036,7 @@ export function usePlayInteraction(
       isPerspectiveAwaiting,
       canOperate,
       discardMax,
+      isKillRespondContext,
       isMyAwaiting,
       pendingRespondInfo,
       transformMode,
@@ -1180,6 +1218,7 @@ export function usePlayInteraction(
     playRules,
     selectedActive,
     playButtonState,
+    isKillRespondContext,
     selectedRespondCardId,
     respondTargetName,
     respondNeedsTarget,
