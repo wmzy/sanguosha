@@ -651,7 +651,7 @@ export function switchRole(
     room.pendingViewRequests.delete(playerId);
     room.players.set(playerId, sink);
     // 占据指定座位（或首个空座位）
-    const emptySeat = seat !== undefined ? seat : room.seats.indexOf(null);
+    const emptySeat = seat ?? room.seats.indexOf(null);
     if (emptySeat >= 0) room.seats[emptySeat] = playerId;
     return { room, success: true };
   }

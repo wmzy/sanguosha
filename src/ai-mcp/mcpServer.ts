@@ -307,7 +307,7 @@ function normalizePlayAction(raw: unknown): PlayActionFields | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const obj = raw as { message?: unknown } & PlayActionFields;
   if (obj.message && typeof obj.message === 'object') {
-    return obj.message as PlayActionFields;
+    return obj.message;
   }
   return obj;
 }

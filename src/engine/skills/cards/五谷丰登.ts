@@ -168,7 +168,7 @@ const bountifulHarvestEffect: CardEffect = {
       // 候选严格限定为亮出的牌:排除五谷丰登本身(使用中的锦囊)与已被选走的牌。
       // 仅判 frameCards 会把锦囊本身也判合法 → pickedId 落空 → fallback 拿第一张亮牌=错牌。
       const revealedIds = state.localVars['五谷丰登/亮牌'] as string[] | undefined;
-      if (!revealedIds || !revealedIds.includes(cardId)) return '该牌不在可选范围';
+      if (!revealedIds?.includes(cardId)) return '该牌不在可选范围';
       if (!frameCards(state).includes(cardId)) return '该牌已被选走';
       return null;
     },
