@@ -7,7 +7,7 @@ import { SkillTestHarness, assertNoEngineErrors } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
-import { registerAtom } from '../../src/engine/core/atom';
+import { 展示型atoms } from '../../src/engine/atoms';
 import type { Atom, Card, GameState, ViewEvent } from '../../src/engine/types';
 
 function build(): GameState {
@@ -104,9 +104,11 @@ describe('harness 改进:引擎异常不再静默吞掉', () => {
     // 正常出杀建立基线
     await P1.useCardAndTarget('杀', 's0', [1]);
 
-    // 注册一个 throw applyView 的假 atom,然后手动推一个对应事件
+    // 注册一个 throw applyView 的假 atom,然后手动推一个对应事件。
+    // FAKE_TYPE 是纯 ViewEvent.type(非引擎 Atom.type),写入展示型atoms fallback map
+    // (getAtomDef 未命中 atomMap 时查此处),测试后删除避免污染其他用例。
     const FAKE_TYPE = '__test_applyview_throws';
-    registerAtom({
+    展示型atoms[FAKE_TYPE] = {
       type: FAKE_TYPE,
       validate: () => null,
       apply: () => {},
@@ -117,7 +119,7 @@ describe('harness 改进:引擎异常不再静默吞掉', () => {
       applyView: () => {
         throw new Error('applyView 故意抛错');
       },
-    });
+    };
 
     // 手动推一个 atomHistory 条目(模拟引擎 apply 了一个 atom 但 applyView 坏了)
     harness.state.seq += 1;
@@ -134,5 +136,6 @@ describe('harness 改进:引擎异常不再静默吞掉', () => {
 
     // processAllEvents 应该抛出 applyView 错误(同时匹配两个模式)
     expect(() => harness.processAllEvents()).toThrow(/applyView 抛错[\S\s]*applyView 故意抛错/);
+    delete 展示型atoms[FAKE_TYPE];
   });
 });

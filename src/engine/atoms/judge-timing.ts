@@ -15,7 +15,6 @@
 // 与 damage-timing / life-timing / statechange-timing 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 import { runJudgeModifiers } from '../core/apply';
 import { getBeforeHooks } from '../core/skill';
 
@@ -65,7 +64,6 @@ export const 判定时: AtomDefinition<JudgeTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(判定时);
 
 // ── 判定牌生效前(鬼才/鬼道 改判) ──────────────────────────
 // 已接入 runJudgeFlow(在 判定 atom 翻牌之后发出)。改判仍走 runJudgeModifiers
@@ -84,7 +82,6 @@ export const 判定牌生效前: AtomDefinition<JudgeTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(判定牌生效前);
 
 // ── 判定牌生效后(天妒/洛神 获得判定牌 / 屯田 置武将牌上 / 闪电·乐不思蜀 读牌执行) ─
 // 已接入 runJudgeFlow(在 判定牌生效前 改判之后发出)。判定牌此刻仍在结算帧牌区顶
@@ -99,4 +96,3 @@ export const 判定牌生效后: AtomDefinition<JudgeTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(判定牌生效后);

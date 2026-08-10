@@ -2,7 +2,6 @@
 // after hook 触发"打出牌时"时机技能(雷击/涯角等):打出特定牌后触发判定/摸牌。
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 打出牌时: AtomDefinition<{ player: number; cardId: string }> = {
   type: '打出牌时',
@@ -31,4 +30,3 @@ export const 打出牌时: AtomDefinition<{ player: number; cardId: string }> = 
   },
 };
 
-registerAtom(打出牌时);

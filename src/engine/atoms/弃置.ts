@@ -6,7 +6,6 @@
 // ZoneLoc 不含「装备」区域,装备/判定区弃置不发标记——失去牌类技能主要关心手牌。
 // 本 atom 的 apply + view 事件保持不变(含信息分级),时机标记仅为额外 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 import { applyAtom } from '../core/apply';
 
 /** localVars key:本次弃置中来自手牌的 cardId(afterApply 发时机标记用)。
@@ -110,4 +109,3 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[]; volunta
   },
 };
 
-registerAtom(弃置);

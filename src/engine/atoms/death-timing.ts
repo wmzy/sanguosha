@@ -15,7 +15,6 @@
 // 与 damage-timing / life-timing 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 import { getBeforeHooks } from '../core/skill';
 
 /** 死亡时机 atom 的公共形状(含可选 killer)。 */
@@ -52,7 +51,6 @@ export const 亮身份牌前: AtomDefinition<{ player: number }> = {
   applyView() {},
 };
 
-registerAtom(亮身份牌前);
 
 // ── 时机2:亮身份牌(揭示阵亡者身份) ──────────────────────────
 // apply 在 state 上无字段可改(PlayerState 无 identityHidden);身份揭示纯走 view 层。
@@ -83,7 +81,6 @@ export const 亮身份牌: AtomDefinition<{ player: number }> = {
   // 避免一次死亡在日志里出现两条"阵亡"(原 击杀 atom 拆分为多时机时 toViewLog 被误复制)。
 };
 
-registerAtom(亮身份牌);
 
 // ── 时机3:死亡时(行殇/断肠/界节命——在系统处理牌之前) ────────
 // 纯标记,after-hook 触发死亡时技能。断肠在此移除凶手技能(系统处理牌弃牌之前)。
@@ -98,7 +95,6 @@ export const 死亡时: AtomDefinition<DeathTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(死亡时);
 
 // ── 时机4:系统处理牌(弃手牌+装备入弃牌堆 + alive=false) ──────
 // 实质 atom:弃手牌+装备入弃牌堆 + alive=false。
@@ -171,7 +167,6 @@ export const 系统处理牌: AtomDefinition<{ player: number }> = {
   },
 };
 
-registerAtom(系统处理牌);
 
 // ── 时机5:死亡后(功獒/界完杀 cleanup) ───────────────────────
 // 纯标记,after-hook 触发死亡后技能(在系统处理牌与奖惩之后)。
@@ -185,7 +180,6 @@ export const 死亡后: AtomDefinition<DeathTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(死亡后);
 
 // ── 濒死编排时机(对齐 出牌流程重设计.md 模块 C / neardeath.md) ────
 // 进入濒死状态时 / 新的濒死状态时:事件标记型,validate 恒通过、apply 无副作用,
@@ -224,7 +218,6 @@ export const 进入濒死状态时: AtomDefinition<{ target: number }> = {
   applyView() {},
 };
 
-registerAtom(进入濒死状态时);
 
 // ── 新的濒死状态时(被救仍濒死,重置响应起点)──────────────
 export const 新的濒死状态时: AtomDefinition<{ target: number }> = {
@@ -241,4 +234,3 @@ export const 新的濒死状态时: AtomDefinition<{ target: number }> = {
   applyView() {},
 };
 
-registerAtom(新的濒死状态时);

@@ -6,7 +6,6 @@
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { applyAtom } from '../core/apply'
 import { resolveTimeoutMs } from '../core/timeout';
-import { registerAtom } from '../core/atom';
 
 const DEFAULT_TIMEOUT_SEC = 50;
 
@@ -77,4 +76,3 @@ export const 出牌窗口: AtomDefinition<{ player: number; timeout?: number }> 
   },
 };
 
-registerAtom(出牌窗口);

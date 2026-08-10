@@ -40,7 +40,7 @@ interface AtomDefinition<A = Atom> {
 
 ### 步骤 1:定义 Atom 类型
 
-在 `src/engine/types.ts` 的 `Atom` 联合类型中加一行:
+在 `src/engine/types/atom.ts` 的 `Atom` 联合类型中加一行:
 
 ```ts
 export type Atom =
@@ -51,12 +51,11 @@ export type Atom =
 
 ### 步骤 2:创建 atom 文件
 
-在 `src/engine/atoms/` 下创建 `${atom名}.ts`:
+在 `src/engine/atoms/` 下创建 `${atom名}.ts`,**只导出常量**(不需要调用注册函数):
 
 ```ts
 // src/engine/atoms/陷入濒死.ts
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../atom';
 
 export const 陷入濒死: AtomDefinition<{ target: number }> = {
   type: '陷入濒死',
@@ -88,17 +87,23 @@ export const 陷入濒死: AtomDefinition<{ target: number }> = {
     if (pi >= 0) view.players[pi].health = 0;
   },
 };
-
-registerAtom(陷入濒死);
 ```
 
 ### 步骤 3:注册
 
-在 `src/engine/atoms/index.ts` 加一行:
+在 `src/engine/atoms/index.ts` 的 atomMap 中添加条目:
 
 ```ts
-import './陷入濒死';
+import { 陷入濒死 } from './陷入濒死';
+
+export const atomMap: Record<AtomName, AtomDefinition<any>> = {
+  ...
+  陷入濒死,
+  ...
+};
 ```
+
+`Record<AtomName, ...>` 保证编译期完整性——Atom 联合每个 type 都必须有对应定义,漏注册会 tsc 报错。
 
 ## 三、等待型 atom(pending)
 
@@ -162,7 +167,7 @@ return {
 - [ ] `toViewEvents` 在 apply 前调用(读未变更的 state)
 - [ ] `applyView` 与 `apply` 对称(apply 改 GameState,applyView 改 GameView)
 - [ ] 等待型 atom:`pending.onTimeout`(async 函数)/`prompt`/`timeout` 三件套齐全
-- [ ] 在 `atoms/index.ts` 注册 import
+- [ ] 在 `atoms/index.ts` 的 atomMap 中添加条目
 
 ## 六、AI 提示词
 
@@ -187,8 +192,8 @@ return {
 ## 引擎规范(必须遵守)
 
 1. atom 文件路径:src/engine/atoms/${atom名}.ts
-2. 在 src/engine/types.ts 的 Atom 联合类型中添加对应成员
-3. 在 src/engine/atoms/index.ts 注册 import
+2. 在 src/engine/types/atom.ts 的 Atom 联合类型中添加对应成员
+3. 在 src/engine/atoms/index.ts 的 atomMap 中添加条目(import 常量 + object literal)
 4. apply 原地突变 state(state.players[atom.target].health -= 1),不返回新对象
 5. 玩家用座次下标(number):atom.target/atom.player/atom.source
 6. toViewEvents 在 apply 前调用,做信息分级(ownerViews/othersView)
@@ -197,7 +202,7 @@ return {
 
 ## 要求
 
-1. 导出 AtomDefinition 常量 + 调用 registerAtom
+1. 导出 AtomDefinition 常量(不需要调用注册函数)
 2. validate 严格检查
 3. 不实现测试(atom 的测试通过技能测试间接覆盖)
 

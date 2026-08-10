@@ -4,7 +4,6 @@
 // 添加技能/移除技能 hook 设置 vars(距离/进攻修正|距离/防御修正),与马术等武将技能一致。
 // 对应 卸下 atom 负责清除武器范围;马匹 vars 由技能卸载清理。
 import type { AtomDefinition, EquipSlot, GameState, ViewEventSplit, ViewEvent, Card } from '../types';
-import { registerAtom } from '../core/atom';
 
 function inferSlot(cardType: string | undefined): EquipSlot | null {
   switch (cardType) {
@@ -99,4 +98,3 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
   },
 };
 
-registerAtom(装备);

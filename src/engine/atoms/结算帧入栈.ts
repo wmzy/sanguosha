@@ -5,7 +5,6 @@
 // 与 pushFrame 函数的关系:pushFrame 内部 applyAtom({ type: '结算帧入栈', ... }),
 // 返回被压入的 frame 引用(与旧同步签名行为一致)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 结算帧入栈: AtomDefinition<{
   skillId: string;
@@ -54,4 +53,3 @@ export const 结算帧入栈: AtomDefinition<{
   },
 };
 
-registerAtom(结算帧入栈);

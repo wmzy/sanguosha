@@ -14,7 +14,6 @@
 // 与 damage-timing / life-timing 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 import { getBeforeHooks } from '../core/skill';
 
 /** 校验 player 存在(纯标记,不校验存活——编排函数前置保证)。 */
@@ -49,7 +48,6 @@ export const 翻面后: AtomDefinition<{ player: number; faceDown: boolean }> = 
   applyView() {},
 };
 
-registerAtom(翻面后);
 
 // ── 横置后(法恩 after-hook:chained=true 横置时触发) ──────────
 export const 横置后: AtomDefinition<{ player: number; chained: boolean }> = {
@@ -68,7 +66,6 @@ export const 横置后: AtomDefinition<{ player: number; chained: boolean }> = {
   applyView() {},
 };
 
-registerAtom(横置后);
 
 // ── 武将牌明置后(闺秀① after-hook) ──────────────────────────
 // 暗将机制未引入:武将牌开局即明置,此 atom 暂无触发方。
@@ -84,7 +81,6 @@ export const 武将牌明置后: AtomDefinition<{ player: number }> = {
   applyView() {},
 };
 
-registerAtom(武将牌明置后);
 
 // ── 武将牌移除后(闺秀② after-hook) ──────────────────────────
 // 暗将机制未引入,此 atom 暂无触发方。
@@ -100,7 +96,6 @@ export const 武将牌移除后: AtomDefinition<{ player: number }> = {
   applyView() {},
 };
 
-registerAtom(武将牌移除后);
 
 // ── 游戏牌亮出后(鹰扬 after-hook) ────────────────────────────
 // 牌面公开时机(展示/亮出 等)。暂无触发方——鹰扬未来消费。
@@ -122,4 +117,3 @@ export const 游戏牌亮出后: AtomDefinition<{ player: number; cardId: string
   applyView() {},
 };
 
-registerAtom(游戏牌亮出后);

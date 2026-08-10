@@ -14,7 +14,6 @@
 //   且后续假牌分支可直接用「移动牌」(弃牌堆→质疑者手牌)取回,无需新造"取回扣牌"atom。
 //   成功(真牌/无人质疑)分支牌留在弃牌堆(即"已使用"),假牌分支牌被质疑者取走(弃牌堆-1)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent, Card } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 扣牌: AtomDefinition<{
   player: number;
@@ -84,4 +83,3 @@ export const 扣牌: AtomDefinition<{
   },
 };
 
-registerAtom(扣牌);

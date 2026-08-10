@@ -6,7 +6,6 @@ import type { ActionPrompt, AtomDefinition, Card, Json, ViewEventSplit, ViewEven
 
 import { applyAtom } from '../core/apply'
 import { resolveTimeoutMs } from '../core/timeout';
-import { registerAtom } from '../core/atom';
 import { handLimit } from '../rules/hand-limit';
 import { resolveChoosePlayerCandidates } from '../view/choosePlayerCandidates';
 import { resolveCardFilterCandidates } from '../view/cardFilterCandidates';
@@ -229,4 +228,3 @@ export const 请求回应: AtomDefinition<{
   },
 };
 
-registerAtom(请求回应);

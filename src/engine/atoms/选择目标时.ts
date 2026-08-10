@@ -4,7 +4,6 @@
 // 进入结算前的统一时机,供转化/替换类技能一次性介入。
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 选择目标时: AtomDefinition<{ source: number; cardId: string; targets: number[] }> = {
   type: '选择目标时',
@@ -35,4 +34,3 @@ export const 选择目标时: AtomDefinition<{ source: number; cardId: string; t
   },
 };
 
-registerAtom(选择目标时);

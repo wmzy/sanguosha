@@ -13,7 +13,6 @@
 //   拼点后(纯标记 atom):validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
 //     无 before hook 时 toViewEvents 返回 null(与 damage-timing / move-timing 一致)。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent, Card } from '../types';
-import { registerAtom } from '../core/atom';
 import { getBeforeHooks } from '../core/skill';
 
 /** 拼点时机 atom 的公共形状(扣置/亮出)。 */
@@ -127,7 +126,6 @@ export const 拼点扣置: AtomDefinition<RankCompareAtom> = {
   },
 };
 
-registerAtom(拼点扣置);
 
 // ── 时机2:拼点亮出(同时亮出两张拼点牌,全员公开牌面) ──────────
 // 纯视图 atom:牌已在处理区(由 拼点扣置 移入),apply 无副作用。
@@ -166,7 +164,6 @@ export const 拼点亮出: AtomDefinition<RankCompareAtom> = {
   },
 };
 
-registerAtom(拼点亮出);
 
 // ── 时机3:拼点后(纯标记,after-hook 触发拼点后效果) ────────────
 // result 由编排函数确定后透传('赢'/'没赢'),供 拼点后 hook 读取。
@@ -203,4 +200,3 @@ export const 拼点后: AtomDefinition<{
   applyView() {},
 };
 
-registerAtom(拼点后);

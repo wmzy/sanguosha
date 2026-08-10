@@ -1,7 +1,6 @@
 // src/engine/atoms/指定目标.ts
 // 指定目标:事件标记(目标关系在事件流中记录)
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 指定目标: AtomDefinition<{ source: number; cardId?: string; target: number }> = {
   type: '指定目标',
@@ -47,4 +46,3 @@ export const 指定目标: AtomDefinition<{ source: number; cardId?: string; tar
   },
 };
 
-registerAtom(指定目标);

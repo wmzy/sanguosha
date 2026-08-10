@@ -1,7 +1,6 @@
 // src/engine/atoms/回复体力.ts
 // 回复体力:target 玩家回复 amount 体力(不超过 maxHealth)
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 回复体力: AtomDefinition<{ target: number; amount: number; source?: number }> = {
   type: '回复体力',
@@ -36,4 +35,3 @@ export const 回复体力: AtomDefinition<{ target: number; amount: number; sour
   },
 };
 
-registerAtom(回复体力);

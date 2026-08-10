@@ -1,7 +1,6 @@
 // src/engine/atoms/添加延时锦囊.ts
 // 添加延时锦囊:在玩家判定区放置延时锦囊
 import type { AtomDefinition, PendingTrick, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 添加延时锦囊: AtomDefinition<{ player: number; trick: PendingTrick }> = {
   type: '添加延时锦囊',
@@ -42,4 +41,3 @@ export const 添加延时锦囊: AtomDefinition<{ player: number; trick: Pending
   },
 };
 
-registerAtom(添加延时锦囊);

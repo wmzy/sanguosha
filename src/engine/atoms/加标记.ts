@@ -1,7 +1,6 @@
 // src/engine/atoms/加标记.ts
 // 加标记:为玩家添加一个 Mark
 import type { AtomDefinition, Mark, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 加标记: AtomDefinition<{
   player: number;
@@ -48,4 +47,3 @@ export const 加标记: AtomDefinition<{
   },
 };
 
-registerAtom(加标记);

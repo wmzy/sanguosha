@@ -4,7 +4,6 @@
 // 目标确定后触发,供判定/封印类技能介入影响后续响应。
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 指定目标后: AtomDefinition<{ source: number; cardId?: string; target: number }> = {
   type: '指定目标后',
@@ -33,4 +32,3 @@ export const 指定目标后: AtomDefinition<{ source: number; cardId?: string; 
   },
 };
 
-registerAtom(指定目标后);

@@ -11,7 +11,6 @@
 // 噪声抑制:此 atom 是纯时机型(apply/applyView 均无副作用)。当没有任何技能注册
 // before hook 时,整个执行是 no-op——不发 ViewEvent,不写日志,避免前端噪声。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 import { getBeforeHooks } from '../core/skill';
 
 export const 检测有效性: AtomDefinition<{ source: number; target: number; cardId: string }> = {
@@ -47,4 +46,3 @@ export const 检测有效性: AtomDefinition<{ source: number; target: number; c
   },
 };
 
-registerAtom(检测有效性);

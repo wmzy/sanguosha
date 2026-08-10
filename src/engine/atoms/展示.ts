@@ -11,7 +11,6 @@
 // 触发时机:有人质疑时翻开此牌(蛊惑 execute 在质疑分支调用)。
 // 无人质疑时不展示——其他人永远不知道这张牌的真身(标准蛊惑规则)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent, Card } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 展示: AtomDefinition<{ player: number; cardId: string }> = {
   type: '展示',
@@ -50,4 +49,3 @@ export const 展示: AtomDefinition<{ player: number; cardId: string }> = {
   },
 };
 
-registerAtom(展示);

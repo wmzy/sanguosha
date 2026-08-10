@@ -1,7 +1,6 @@
 // src/engine/atoms/添加技能.ts
 // 添加技能:为玩家添加 skillId(实际 registerAction/onInit 由 skill-loader 监听此 atom 触发)
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 import { getSkillViewDelta } from '../core/skill-view-meta';
 
 export const 添加技能: AtomDefinition<{ player: number; skillId: string }> = {
@@ -50,4 +49,3 @@ export const 添加技能: AtomDefinition<{ player: number; skillId: string }> =
   },
 };
 
-registerAtom(添加技能);

@@ -9,7 +9,6 @@
 // 调用方约定:applyAtom(被抵消) 后重新检查处理区,武器技可能已移走闪(贯石斧强命)
 // 或追杀改变状态(青龙),据此决定 drain 闪 / 造成伤害。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 被抵消: AtomDefinition<{ source: number; target: number; cardId: string }> = {
   type: '被抵消',
@@ -37,4 +36,3 @@ export const 被抵消: AtomDefinition<{ source: number; target: number; cardId:
   },
 };
 
-registerAtom(被抵消);

@@ -1,26 +1,26 @@
 // src/engine/core/atom.ts
-// atom 注册表 + 基础 apply 引擎(同步,无 awaits)
-// 完整 apply pipeline(含 before/after 钩子 + awaits 等待)由 core/apply.ts 接管
-// atom 注册副作用由 core/index.ts 的 `import '../atoms'` 触发(后端)和
-// client/engine-imports.ts 的 `import '../engine/atoms'` 触发(前端)。
+// atom 定义查表:getAtomDef / applyAtom / resolveViewEvents。
+// atom 定义静态聚合于 atoms/index.ts 的 atomMap(Record<AtomName, AtomDefinition>
+// 编译期完整性保证)——新增 atom 必须同时加 Atom 联合成员和 atomMap 条目,否则 tsc 报错,
+// 消灭"atom 未注册"运行时错误。展示型 ViewEvent.type(非 Atom.type)由展示型atoms fallback。
+// 完整 apply pipeline(before/after 钩子 + awaits 等待)由 core/apply.ts 接管。
 
 import type { Atom, AtomDefinition, GameState, ViewEvent, ViewEventSplit } from '../types';
+import { atomMap, 展示型atoms } from '../atoms';
 
-const registry = new Map<string, AtomDefinition>();
-
-export function registerAtom<A>(def: AtomDefinition<A>): void {
-  if (registry.has(def.type)) {
-    throw new Error(`Atom "${def.type}" already registered`);
-  }
-  registry.set(def.type, def as unknown as AtomDefinition);
-}
-
+/** 按 type 查 atom 定义。优先 atomMap(引擎 Atom),fallback 展示型atoms(ViewEvent-only type)。 */
 export function getAtomDef(type: string): AtomDefinition {
-  const def = registry.get(type);
-  if (!def) throw new Error(`Atom "${type}" not registered`);
-  return def;
+  // atomMap 声明为 Record<AtomName,…>(编译期保证 AtomName 全覆盖);
+  // 此处用 string 索引以允许运行时查 ViewEvent.type,未命中走 fallback。
+  const lookup = atomMap as Record<string, AtomDefinition>;
+  return lookup[type] ?? 展示型atoms[type] ?? throwMissing(type);
 }
 
+function throwMissing(type: string): never {
+  throw new Error(`Atom "${type}" not found`);
+}
+
+/** 同步应用一个 atom 的 apply(不走 hook pipeline)。完整管线见 core/apply.ts:applyAtom。 */
 export function applyAtom(state: GameState, atom: Atom): void {
   getAtomDef(atom.type).apply(state, atom);
 }

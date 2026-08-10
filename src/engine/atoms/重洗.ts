@@ -3,7 +3,6 @@
 // 当牌堆耗尽时由 摸牌 atom 内部触发;也可作为独立 atom 使用。
 // 用 state.rngSeed 派生 RNG(推进后写回),保证重放确定性。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 import { createRng } from '../util/rng';
 
 export const 重洗: AtomDefinition<Record<string, never>> = {
@@ -48,4 +47,3 @@ export const 重洗: AtomDefinition<Record<string, never>> = {
   },
 };
 
-registerAtom(重洗);

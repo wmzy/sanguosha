@@ -15,7 +15,6 @@
 // after-hook,故额外回合型技能(博图)在其 before-hook cancel 本 atom 即可阻止正常推进、
 // 亲自启动额外回合(放权则在更早的 回合结束 before-hook cancel)。
 import type { AtomDefinition, ViewEventSplit } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 回合结束后: AtomDefinition<{ player: number }> = {
   type: '回合结束后',
@@ -32,4 +31,3 @@ export const 回合结束后: AtomDefinition<{ player: number }> = {
   applyView() {},
 };
 
-registerAtom(回合结束后);

@@ -16,7 +16,6 @@
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { DamageType } from '../../engine/types';
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 import { getBeforeHooks } from '../core/skill';
 
 // ── before-hook modify amount 的回传通道 ────────────────────
@@ -73,7 +72,6 @@ export const 伤害结算开始时: AtomDefinition<DamageTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(伤害结算开始时);
 
 // ── 时机2:造成伤害时(来源方加伤:裸衣/古锭刀/暗箭/酒) ────────
 // before-hook modify amount 链式叠加(裸衣+1 后续减伤看到加过的值)。
@@ -90,7 +88,6 @@ export const 造成伤害时: AtomDefinition<DamageTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(造成伤害时);
 
 // ── 时机3:受到伤害时(目标方减伤/防止:藤甲/白银狮子/天香/名士) ─
 // before-hook 可 modify amount(减伤)或 cancel(完全防止→编排函数跳到伤害结算结束时)。
@@ -107,7 +104,6 @@ export const 受到伤害时: AtomDefinition<DamageTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(受到伤害时);
 
 // ── 时机4:造成伤害后(来源方:狂骨/破军) ─────────────────────
 // 纯标记,after-hook 触发来源方结算。无 afterApply(不修正 amount)。
@@ -121,7 +117,6 @@ export const 造成伤害后: AtomDefinition<DamageTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(造成伤害后);
 
 // ── 时机5:受到伤害后(目标方:奸雄/反馈/遗计/刚烈) ────────────
 // 纯标记,after-hook 触发目标方结算(扣血前)。
@@ -135,7 +130,6 @@ export const 受到伤害后: AtomDefinition<DamageTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(受到伤害后);
 
 // ── 时机7:伤害结算结束时(天香摸牌/连环重置) ─────────────────
 // 纯标记,扣减体力之后发出。
@@ -149,7 +143,6 @@ export const 伤害结算结束时: AtomDefinition<DamageTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(伤害结算结束时);
 
 // ── 时机8:伤害结算结束后(酒诗②/连环传导——可能触发新伤害) ────
 // 纯标记,整个结算的最末时机。连环传导在此 after-hook 内发起一次新的 runDamageFlow。
@@ -163,4 +156,3 @@ export const 伤害结算结束后: AtomDefinition<DamageTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(伤害结算结束后);

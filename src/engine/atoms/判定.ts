@@ -9,7 +9,6 @@
 // (在收到判定事件后临时把判定牌加入 view.zones.processing 展示,几秒后移除),
 // 不在 applyView 中处理——保持 applyView 与 buildView 一致。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
   type: '判定',
@@ -81,4 +80,3 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
   },
 };
 
-registerAtom(判定);

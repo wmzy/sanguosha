@@ -1,7 +1,6 @@
 // src/engine/atoms/设横置.ts
 // 设横置:设置玩家横置状态(简化为加/去 'chained' mark)
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 设横置: AtomDefinition<{ player: number; chained: boolean }> = {
   type: '设横置',
@@ -36,4 +35,3 @@ export const 设横置: AtomDefinition<{ player: number; chained: boolean }> = {
   },
 };
 
-registerAtom(设横置);

@@ -12,7 +12,6 @@
 // 与 使用结算结束时 的区别:使用结算结束时 是逐目标时机(携带 target),
 // 使用结算结束后 是所有目标结算完毕后的整体时机(无 target,携带 source+cardId)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 import { getBeforeHooks, getAfterHooks } from '../core/skill';
 
 export const 使用结算结束后: AtomDefinition<{ source: number; cardId: string }> = {
@@ -40,4 +39,3 @@ export const 使用结算结束后: AtomDefinition<{ source: number; cardId: str
   applyView() {},
 };
 
-registerAtom(使用结算结束后);

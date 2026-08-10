@@ -1,7 +1,6 @@
 // src/engine/atoms/询问杀.ts
 // 询问杀:等待型 atom — 等待 target 出杀
 import type { ActionPrompt, AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 import { resolveTimeoutMs } from '../core/timeout';
 import {
   SHORT_DELAY_MS,
@@ -98,4 +97,3 @@ export const 询问杀: AtomDefinition<{ target: number; source: number }> = {
   },
 };
 
-registerAtom(询问杀);

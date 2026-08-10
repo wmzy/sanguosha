@@ -28,8 +28,8 @@ import {
   logAction,
 } from './notify';
 
-// atom 注册副作用:必须 import 来注册所有 atom 定义(后端 dispatch 依赖)。
-// 前端通过 client/engine-imports.ts 的 `import '../engine/atoms'` 触发同一注册。
+// 引入 atoms 聚合 atomMap(后端 dispatch 的 getAtomDef 查表依赖)。
+// 前端通过 client/engine-imports.ts 的 `import '../engine/atoms'` 触发同一聚合。
 import '../atoms';
 // 系统规则 与本模块互依(系统规则 import applyAtom),用静态导入避免打包器循环依赖拆 chunk。
 // 系统规则模块顶层无副作用,静态/动态加载语义等价(ESM live binding 解析循环)。

@@ -7,7 +7,6 @@
 //
 // 操作栈顶帧:set params[key] = value。
 import type { AtomDefinition, ViewEventSplit, ViewEvent, Json } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 帧参数赋值: AtomDefinition<{ key: string; value: Json }> = {
   type: '帧参数赋值',
@@ -35,4 +34,3 @@ export const 帧参数赋值: AtomDefinition<{ key: string; value: Json }> = {
   },
 };
 
-registerAtom(帧参数赋值);

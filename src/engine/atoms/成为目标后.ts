@@ -4,7 +4,6 @@
 // 本时机在其后触发贞烈等"成为目标后"响应,此时目标已确定有效。
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 成为目标后: AtomDefinition<{ source: number; cardId?: string; target: number }> = {
   type: '成为目标后',
@@ -33,4 +32,3 @@ export const 成为目标后: AtomDefinition<{ source: number; cardId?: string; 
   },
 };
 
-registerAtom(成为目标后);

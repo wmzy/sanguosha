@@ -6,7 +6,6 @@
 //
 // 事件标记型——apply 无副作用,效果执行由 CardEffect.resolve 完成。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 生效后: AtomDefinition<{ source: number; target: number; cardId: string }> = {
   type: '生效后',
@@ -31,4 +30,3 @@ export const 生效后: AtomDefinition<{ source: number; target: number; cardId:
   applyView() {},
 };
 
-registerAtom(生效后);

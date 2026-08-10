@@ -1,7 +1,6 @@
 // src/engine/atoms/加标签.ts
 // 加标签:为玩家加 tag(写入 player.tags 数组)
 import type { AtomDefinition } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 加标签: AtomDefinition<{ player: number; tag: string }> = {
   type: '加标签',
@@ -15,4 +14,3 @@ export const 加标签: AtomDefinition<{ player: number; tag: string }> = {
   },
 };
 
-registerAtom(加标签);

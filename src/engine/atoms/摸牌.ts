@@ -3,7 +3,6 @@
 // 牌堆不足时,合并弃牌堆重洗补充(标准三国杀规则);牌堆+弃牌堆总数仍不足时,
 // 才算不合法(validate 报错)。
 import type { AtomDefinition, Card, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 import { createRng } from '../util/rng';
 
 interface DrawPlan {
@@ -118,4 +117,3 @@ export const 摸牌: AtomDefinition<{ player: number; count: number }> = {
   },
 };
 
-registerAtom(摸牌);

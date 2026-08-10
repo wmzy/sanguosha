@@ -5,7 +5,6 @@
 // 给予.validate 保证 cardId 在 from 手牌,from/to 均为手牌区域(ZoneLoc 可表达),标记 from/to 准确。
 // 本 atom 的 apply + view 事件保持不变(含信息分级)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 import { applyAtom } from '../core/apply';
 
 export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }> = {
@@ -94,4 +93,3 @@ export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }
   },
 };
 
-registerAtom(给予);

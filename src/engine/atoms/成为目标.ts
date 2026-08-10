@@ -4,7 +4,6 @@
 // before hook 可被"不能成为目标"类技能拦截(空城/帷幕等 cancel)。
 // after hook 触发"成为目标后"时机技能(流离转移等)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 成为目标: AtomDefinition<{ source: number; cardId?: string; target: number }> = {
   type: '成为目标',
@@ -33,4 +32,3 @@ export const 成为目标: AtomDefinition<{ source: number; cardId?: string; tar
   },
 };
 
-registerAtom(成为目标);

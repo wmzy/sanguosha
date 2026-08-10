@@ -18,7 +18,6 @@
 // 与 damage-timing / life-timing / statechange-timing 一致。atom 本身仍走完整 pipeline
 // (apply + after hooks),编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameState, MoveReason, ViewEventSplit, ViewEvent, ZoneLoc } from '../types';
-import { registerAtom } from '../core/atom';
 import { getBeforeHooks } from '../core/skill';
 
 // ── before-hook modify to 的回传通道 ─────────────────────────
@@ -70,7 +69,6 @@ export const 移动到目标区域前: AtomDefinition<MoveTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(移动到目标区域前);
 
 // ── 时机2:移动到目标区域后(连营/伤逝/落英/屯田 等「失去牌」技能) ─
 // 纯标记,after-hook 触发失去牌类技能(按 reason 区分触发场景)。无 afterApply。
@@ -84,4 +82,3 @@ export const 移动到目标区域后: AtomDefinition<MoveTimingAtom> = {
   applyView() {},
 };
 
-registerAtom(移动到目标区域后);

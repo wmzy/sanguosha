@@ -1,7 +1,6 @@
 // src/engine/atoms/设上限.ts
 // 设上限:设置玩家 maxHealth,clamp 当前 health 不超过新上限
 import type { AtomDefinition, GameView } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 设上限: AtomDefinition<{ player: number; amount: number }> = {
   type: '设上限',
@@ -25,4 +24,3 @@ export const 设上限: AtomDefinition<{ player: number; amount: number }> = {
   },
 };
 
-registerAtom(设上限);

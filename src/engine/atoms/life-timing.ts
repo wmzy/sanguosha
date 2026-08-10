@@ -11,7 +11,6 @@
 // 与 生效前/使用结算结束时 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 import { getBeforeHooks } from '../core/skill';
 
 // ── 扣减体力:底层实质 atom ──────────────────────────────────
@@ -55,7 +54,6 @@ export const 扣减体力: AtomDefinition<{ target: number; amount: number }> = 
   },
 };
 
-registerAtom(扣减体力);
 
 // ── before-hook modify amount 的回传通道 ────────────────────
 // 确定回复数值时 的 before-hook(如救援)可 modify amount;apply 把最终(被折叠后的)
@@ -94,7 +92,6 @@ export const 确定回复数值时: AtomDefinition<{
   applyView() {},
 };
 
-registerAtom(确定回复数值时);
 
 // 回复体力后:回复完成后的时机(伤逝/淑慎/恩怨①)。纯标记。
 export const 回复体力后: AtomDefinition<{ target: number; amount: number; source?: number }> = {
@@ -119,7 +116,6 @@ export const 回复体力后: AtomDefinition<{ target: number; amount: number; s
   applyView() {},
 };
 
-registerAtom(回复体力后);
 
 // ── 失去体力时机 ────────────────────────────────────────────
 // 失去体力时:失去体力前(黄巾天兵符②)。纯标记。
@@ -140,7 +136,6 @@ export const 失去体力时: AtomDefinition<{ target: number; amount: number }>
   applyView() {},
 };
 
-registerAtom(失去体力时);
 
 // 失去体力后:失去体力完成后(诈降)。纯标记。
 export const 失去体力后: AtomDefinition<{ target: number; amount: number }> = {
@@ -160,7 +155,6 @@ export const 失去体力后: AtomDefinition<{ target: number; amount: number }>
   applyView() {},
 };
 
-registerAtom(失去体力后);
 
 // ── 扣减体力时机(decreaselife.md,被 runDamageFlow 和 runLoseLifeFlow 共用)──
 // 扣减体力前:酒诗②/连环条件检测/重置。纯标记。
@@ -181,7 +175,6 @@ export const 扣减体力前: AtomDefinition<{ target: number; amount: number }>
   applyView() {},
 };
 
-registerAtom(扣减体力前);
 
 // 扣减体力时:不屈。纯标记。
 export const 扣减体力时: AtomDefinition<{ target: number; amount: number }> = {
@@ -201,7 +194,6 @@ export const 扣减体力时: AtomDefinition<{ target: number; amount: number }>
   applyView() {},
 };
 
-registerAtom(扣减体力时);
 
 // 扣减体力后:伤逝。纯标记。
 export const 扣减体力后: AtomDefinition<{ target: number; amount: number }> = {
@@ -221,7 +213,6 @@ export const 扣减体力后: AtomDefinition<{ target: number; amount: number }>
   applyView() {},
 };
 
-registerAtom(扣减体力后);
 
 // ── 体力上限时机 ────────────────────────────────────────────
 // 减上限后:runSetMaxHealthFlow 减上限(含同步降体力)后发出。纯标记。
@@ -242,7 +233,6 @@ export const 减上限后: AtomDefinition<{ player: number }> = {
   applyView() {},
 };
 
-registerAtom(减上限后);
 
 // 加上限后:runSetMaxHealthFlow 加上限后发出。纯标记。
 export const 加上限后: AtomDefinition<{ player: number }> = {
@@ -262,4 +252,3 @@ export const 加上限后: AtomDefinition<{ player: number }> = {
   applyView() {},
 };
 
-registerAtom(加上限后);

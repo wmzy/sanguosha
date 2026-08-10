@@ -16,10 +16,10 @@ metadata:
 ## 实现步骤
 
 ### 1. 定义 Atom 类型
-在 `src/engine/types.ts` 的 `Atom` 联合类型中添加成员。
+在 `src/engine/types/atom.ts` 的 `Atom` 联合类型中添加成员。
 
 ### 2. 创建 atom 文件
-在 `src/engine/atoms/` 下创建 `${atom名}.ts`,导出 `AtomDefinition` + 调用 `registerAtom`。
+在 `src/engine/atoms/` 下创建 `${atom名}.ts`,**只导出 `AtomDefinition` 常量**(不需要调用注册函数)。
 
 **引擎规范**:
 1. `validate`:数据级检查,返回 `string | null`
@@ -30,7 +30,8 @@ metadata:
 6. 等待型 atom:`pending` 三件套(onTimeout/prompt/timeout)必填
 
 ### 3. 注册
-在 `src/engine/atoms/index.ts` 添加 `import './${atom名}';`
+在 `src/engine/atoms/index.ts` 的 atomMap 中添加条目(import 常量 + 写入 object literal)。
+`Record<AtomName, AtomDefinition>` 保证编译期完整性:漏注册会 tsc 报错。
 
 ### 4. 编辑安全
 - 先读完整文件再编辑

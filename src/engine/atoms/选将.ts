@@ -17,7 +17,6 @@ import { createRng } from '../util/rng';
 import { createStandardDeck, shuffle } from '../core/deck';
 import { applyAtom } from '../core/apply'
 import { resolveTimeoutMs } from '../core/timeout';
-import { registerAtom } from '../core/atom';
 
 /** 默认通用技能列表 */
 export const DEFAULT_SKILLS = [
@@ -201,9 +200,6 @@ export const 发牌: AtomDefinition<{
   },
 };
 
-registerAtom(抽身份);
-registerAtom(初始化洗牌);
-registerAtom(发牌);
 
 // 选将询问(交互式选将)
 // 等待型 atom:给目标玩家展示候选人,等待选择。
@@ -301,7 +297,6 @@ export const 选将询问: AtomDefinition<{
   effect: { blockUntilDone: true, duration: 200 },
 };
 
-registerAtom(选将询问);
 
 // ── 并行选将(交互式,多人同时选)──────────────────────
 // 等待型 atom:给多个目标玩家同时展示各自的候选人,各自独立选择、独立 resolve。
@@ -414,4 +409,3 @@ export const 并行选将: AtomDefinition<{
   effect: { blockUntilDone: true, duration: 200 },
 };
 
-registerAtom(并行选将);

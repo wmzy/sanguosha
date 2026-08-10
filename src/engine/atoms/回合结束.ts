@@ -1,7 +1,6 @@
 // src/engine/atoms/回合结束.ts
 // 回合结束:清空本回合临时 vars,清 turn 持续 mark
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { registerAtom } from '../core/atom';
 
 export const 回合结束: AtomDefinition<{ player: number }> = {
   type: '回合结束',
@@ -49,4 +48,3 @@ export const 回合结束: AtomDefinition<{ player: number }> = {
   },
 };
 
-registerAtom(回合结束);
