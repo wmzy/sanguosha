@@ -10,7 +10,6 @@
 //   - onInit(添加技能时):立即设 vars(装备当帧生效)
 //   - 返回的卸载函数(移除技能/卸下时):清 vars
 import type { GameState, Skill } from '../types';
-import { registerSkillViewDelta } from '../core/skill-view-meta';
 import type { SkillModule } from '../types';
 
 /** 距离修正类型:进攻(缩短你到他人的距离)/防御(增加他人到你的距离) */
@@ -29,12 +28,6 @@ const VAR_KEY: Record<MountKind, string> = {
  */
 export function createMountSkill(name: string, kind: MountKind, desc: string): SkillModule {
   const key = VAR_KEY[kind];
-  // 注册视图元数据:马匹技能的 distanceVars 在 onInit(after-hook)里设置,
-  // 但 添加技能/移除技能 的 toViewEvents 早于 after-hook 执行,无法读取运行时 vars。
-  // 故在此预注册静态增量供通用 atom 查询(进攻马=attackMod,防御马=defenseMod)。
-  registerSkillViewDelta(name, {
-    mountDistanceVars: kind === '进攻' ? { attackMod: 1 } : { defenseMod: 1 },
-  });
   return {
     createSkill(id: string, ownerId: number): Skill {
       return { id, ownerId, name, description: desc };

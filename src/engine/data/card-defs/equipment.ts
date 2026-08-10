@@ -215,3 +215,10 @@ export const 武器列表 = [
 export const 防具列表 = [八卦阵, 仁王盾, 藤甲, 白银狮子];
 export const 马列表 = [赤兔, 紫骍, 大宛, 的卢, 绝影, 爪黄飞电, 骅骝];
 export const 装备牌列表 = [...武器列表, ...防具列表, ...马列表];
+
+/** 马匹距离修正表(skillId → 距离增量),供 添加技能/移除技能 atom 的 toViewEvents 同步。
+ *  从 CardDef.subtype 派生:进攻马→attackMod,防御马→defenseMod。
+ *  替代旧 registerSkillViewDelta 运行时注册(消除模块级可变 Map + 副作用 import)。 */
+export const 马匹距离修正表: ReadonlyMap<string, { attackMod?: number; defenseMod?: number }> = new Map(
+  马列表.map((c) => [c.name, c.subtype === '进攻马' ? { attackMod: 1 } : { defenseMod: 1 }]),
+);

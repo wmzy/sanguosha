@@ -1,7 +1,7 @@
 // src/engine/atoms/移除技能.ts
 // 移除技能:从玩家移除 skillId
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { getSkillViewDelta } from '../core/skill-view-meta';
+import { 马匹距离修正表 } from '../data/card-defs/equipment';
 
 export const 移除技能: AtomDefinition<{ player: number; skillId: string }> = {
   type: '移除技能',
@@ -23,7 +23,7 @@ export const 移除技能: AtomDefinition<{ player: number; skillId: string }> =
     };
     // 马匹技能:卸下时 onInit 返回的 cleanup 通过 after hook 删 vars。
     // include mount distanceVars keys to clear so applyView can sync.
-    const mountVars = getSkillViewDelta(atom.skillId)?.mountDistanceVars;
+    const mountVars = 马匹距离修正表.get(atom.skillId);
     if (mountVars) {
       view.clearMountDistanceVars = mountVars;
     }

@@ -2,14 +2,6 @@
 // 技能模块懒加载表：通过 import() 按需加载。
 // 动态加载是合理的：每局游戏只选 4 个武将 +部分装备，不需要全量加载 37 个模块。
 
-// Eager load：注册所有 CardEffect（杀/闪/桃 等），副作用 import
-import './cards';
-
-// Eager load 马匹技能:其 createMountSkill 工厂在模块加载时调用
-// registerSkillViewDelta 注册静态视图增量。添加技能/移除技能 的 toViewEvents
-// 早于动态 import 马匹技能的 after-hook 执行,故必须在此预加载以保证注册表已填充。
-// (此前该模块由 atom 静态 import 间接触发预加载,解耦后改由此处显式预加载。)
-import './马匹技能';
 import type { SkillModule } from '../types';
 
 // 注意:系统规则的全局 hooks 不再在模块加载时注册(state-bound 注册表要求绑定到具体 state)。

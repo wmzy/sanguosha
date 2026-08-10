@@ -1,17 +1,13 @@
 // tests/engine/skill-view-meta.test.ts
-// 验证马匹 atom 解耦:通用 atom(添加技能/移除技能)不再 import skills/,
-// 改经 skill-view-meta 注册表查询马匹 distanceVars。
+// 验证马匹 distanceVars 视图同步:添加技能/移除技能 atom 的 toViewEvents 从
+// 静态 马匹距离修正表 查询,applyView 同步/清除 distanceVars。
 //
-// 关键时序:马匹技能的 distanceVars 在 onInit(after-hook)设置,但 atom 的
-// toViewEvents 早于 after-hook 执行——故 createMountSkill 工厂在模块加载时
-// 预注册静态增量,由 skills/index eager-import 保证注册表在 atom 使用前已填充。
+// 替代旧 registerSkillViewDelta 运行时注册(已消除模块级可变 Map + 副作用 import)。
+// 静态表从 CardDef.subtype 派生:data/card-defs/equipment.ts。
 import { describe, it, expect } from 'vitest';
-// 导入引擎核心:atoms 注册所有 atom 定义;skills/index eager-load 马匹技能模块
-// (触发 registerSkillViewDelta),还原真实运行时的模块加载顺序。
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { getAtomDef } from '../../src/engine/core/atom';
-import { getSkillViewDelta } from '../../src/engine/core/skill-view-meta';
+import { 马匹距离修正表 } from '../../src/engine/data/card-defs/equipment';
 import { createGameState } from '../../src/engine/types';
 import type { GameState, GameView } from '../../src/engine/types';
 
@@ -68,23 +64,24 @@ function makeView(): GameView {
   };
 }
 
-describe('skill-view-meta 注册表(马匹 atom 解耦)', () => {
-  it('马匹技能在模块加载时已注册视图增量(eager-load 生效)', () => {
-    // 进攻马 → attackMod
-    expect(getSkillViewDelta('赤兔')).toEqual({ mountDistanceVars: { attackMod: 1 } });
-    expect(getSkillViewDelta('紫骍')).toEqual({ mountDistanceVars: { attackMod: 1 } });
-    expect(getSkillViewDelta('大宛')).toEqual({ mountDistanceVars: { attackMod: 1 } });
-    // 防御马 → defenseMod
-    expect(getSkillViewDelta('的卢')).toEqual({ mountDistanceVars: { defenseMod: 1 } });
-    expect(getSkillViewDelta('绝影')).toEqual({ mountDistanceVars: { defenseMod: 1 } });
-    expect(getSkillViewDelta('爪黄飞电')).toEqual({ mountDistanceVars: { defenseMod: 1 } });
-    expect(getSkillViewDelta('骅骝')).toEqual({ mountDistanceVars: { defenseMod: 1 } });
+describe('马匹距离修正表(静态数据)', () => {
+  it('进攻马 → attackMod:1', () => {
+    expect(马匹距离修正表.get('赤兔')).toEqual({ attackMod: 1 });
+    expect(马匹距离修正表.get('紫骍')).toEqual({ attackMod: 1 });
+    expect(马匹距离修正表.get('大宛')).toEqual({ attackMod: 1 });
   });
 
-  it('非马匹技能无视图增量', () => {
-    expect(getSkillViewDelta('马术')).toBeUndefined();
-    expect(getSkillViewDelta('仁德')).toBeUndefined();
-    expect(getSkillViewDelta('不存在')).toBeUndefined();
+  it('防御马 → defenseMod:1', () => {
+    expect(马匹距离修正表.get('的卢')).toEqual({ defenseMod: 1 });
+    expect(马匹距离修正表.get('绝影')).toEqual({ defenseMod: 1 });
+    expect(马匹距离修正表.get('爪黄飞电')).toEqual({ defenseMod: 1 });
+    expect(马匹距离修正表.get('骅骝')).toEqual({ defenseMod: 1 });
+  });
+
+  it('非马匹技能无修正', () => {
+    expect(马匹距离修正表.get('马术')).toBeUndefined();
+    expect(马匹距离修正表.get('仁德')).toBeUndefined();
+    expect(马匹距离修正表.get('不存在')).toBeUndefined();
   });
 });
 
