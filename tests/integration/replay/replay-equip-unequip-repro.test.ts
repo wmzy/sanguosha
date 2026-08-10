@@ -112,12 +112,12 @@ describe('回放装备卸下复现', () => {
 
     // 逐步打印 equipment 状态
     const total = file.seats[0].events.length;
-    console.log('=== P0 回放各 step 的 equipment ===');
+    console.warn('=== P0 回放各 step 的 equipment ===');
     for (let step = 0; step <= total; step++) {
       const v = getViewAt(file, 0, step)!;
       const eq = v.players[0].equipment;
       const evtType = file.seats[0].events[step - 1]?.event.type ?? '(initial)';
-      console.log(`step=${step} event=${evtType}: 武器=${eq['武器'] ?? '(空)'}`);
+      console.warn(`step=${step} event=${evtType}: 武器=${eq['武器'] ?? '(空)'}`);
     }
 
     // 关键断言:
@@ -128,15 +128,15 @@ describe('回放装备卸下复现', () => {
     expect(getViewAt(file, 0, equipIdx + 1)!.players[0].equipment['武器']).toBe('wp-zg');
     // 3. 卸下后:无武器
     const unequipIdx = file.seats[0].events.findIndex((e) => e.event.type === '卸下');
-    console.log('装备事件 step=', equipIdx + 1, '卸下事件 step=', unequipIdx + 1);
+    console.warn('装备事件 step=', equipIdx + 1, '卸下事件 step=', unequipIdx + 1);
     if (unequipIdx >= 0) {
       const afterUnequip = getViewAt(file, 0, unequipIdx + 1)!;
-      console.log('卸下后 equipment:', afterUnequip.players[0].equipment);
+      console.warn('卸下后 equipment:', afterUnequip.players[0].equipment);
       expect(afterUnequip.players[0].equipment['武器']).toBeUndefined();
     }
 
     // 导出录像
     fs.writeFileSync('/tmp/sgs-replay-unequip.json', JSON.stringify(file, null, 2));
-    console.log('录像已导出到 /tmp/sgs-replay-unequip.json');
+    console.warn('录像已导出到 /tmp/sgs-replay-unequip.json');
   });
 });

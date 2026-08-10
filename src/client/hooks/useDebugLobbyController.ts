@@ -95,7 +95,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     } catch (err) {
       showErrorFor(err, '创建失败', setError);
     }
-  }, [playerCount]);
+  }, [playerCount, navigate]);
 
   const handleDeleteRoom = useCallback(() => {
     if (!activeRoomId) return;

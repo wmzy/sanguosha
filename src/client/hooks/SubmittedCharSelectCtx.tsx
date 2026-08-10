@@ -4,19 +4,8 @@
 // useCharSelect 消费(通过 useContext)。
 // DebugLobby 只需包一层 Provider,不需要知道 GameView 具体信息。
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-
-export interface SubmittedCharSelectCtl {
-  submitted: Set<number>;
-  markSubmitted: (target: number) => void;
-  clearAll: () => void;
-}
-
-const Ctx = createContext<SubmittedCharSelectCtl>({
-  submitted: new Set(),
-  markSubmitted: () => {},
-  clearAll: () => {},
-});
+import { useState, useCallback, type ReactNode } from 'react';
+import { Ctx } from './useSubmittedCharSelect';
 
 export function SubmittedCharSelectProvider({ children }: { children: ReactNode }) {
   const [submitted, setSubmitted] = useState(() => new Set<number>());
@@ -32,17 +21,4 @@ export function SubmittedCharSelectProvider({ children }: { children: ReactNode 
   return <Ctx.Provider value={{ submitted, markSubmitted, clearAll }}>{children}</Ctx.Provider>;
 }
 
-/** useCharSelect 调用:检查座次是否已提交选将 */
-export function useSubmittedCharSelects(): Set<number> {
-  return useContext(Ctx).submitted;
-}
 
-/** useDebugMultiConnection 调用:获取标记函数 */
-export function useMarkCharSelectSubmitted(): (target: number) => void {
-  return useContext(Ctx).markSubmitted;
-}
-
-/** useDebugMultiConnection 调用:获取清除函数 */
-export function useClearSubmittedCharSelects(): () => void {
-  return useContext(Ctx).clearAll;
-}

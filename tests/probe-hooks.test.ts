@@ -80,21 +80,21 @@ describe('贯石斧 probe', () => {
     // Setup says: P2 needs to dodge first
     await P1.useCardAndTarget('杀', 'c1', [1]);
     // Now 询问闪 pending for P2 (target=1)
-    console.log('after useCard, pending:', harness.state.pendingSlots.size);
+    console.warn('after useCard, pending:', harness.state.pendingSlots.size);
     let slot = [...harness.state.pendingSlots.values()][0];
-    console.log('pending atom:', JSON.stringify(slot?.atom).slice(0, 200));
+    console.warn('pending atom:', JSON.stringify(slot?.atom).slice(0, 200));
 
     await P2.respond('闪', { cardId: 'c3' });
     // After P2 responds, 询问闪 resolves → 询问闪 after hooks fire → 贯石斧 hook creates 请求回应 pending
-    console.log('after P2 dodge, pending:', harness.state.pendingSlots.size);
+    console.warn('after P2 dodge, pending:', harness.state.pendingSlots.size);
     if (harness.state.pendingSlots.size > 0) {
       slot = [...harness.state.pendingSlots.values()][0];
-      console.log('pending atom:', JSON.stringify(slot?.atom).slice(0, 300));
+      console.warn('pending atom:', JSON.stringify(slot?.atom).slice(0, 300));
     }
-    console.log('P2 health:', harness.state.players[1].health);
-    console.log('P1 hand:', harness.state.players[0].hand);
-    console.log('discard:', harness.state.zones.discardPile);
-    console.log('processing:', harness.state.zones.processing);
+    console.warn('P2 health:', harness.state.players[1].health);
+    console.warn('P1 hand:', harness.state.players[0].hand);
+    console.warn('discard:', harness.state.zones.discardPile);
+    console.warn('processing:', harness.state.zones.processing);
 
     expect(true).toBe(true); // trace only
   });

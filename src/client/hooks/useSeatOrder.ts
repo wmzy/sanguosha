@@ -13,14 +13,15 @@ import type { GameView } from '../../engine/types';
  * @returns result[0] = perspectiveIdx;其后依次为上家、上上家、…、下家(逆时针)
  */
 export function useSeatOrder(view: GameView, perspectiveIdx: number): typeof view.players {
+  const players = view.players;
   return useMemo(() => {
-    const n = view.players.length;
-    if (n === 0) return [] as typeof view.players;
-    const result: typeof view.players = [view.players[perspectiveIdx]];
+    const n = players.length;
+    if (n === 0) return [] as typeof players;
+    const result: typeof players = [players[perspectiveIdx]];
     for (let i = 1; i < n; i++) {
       // (perspectiveIdx - i + n) % n 走的是 [上家, 上上家, ..., 下家] 的逆时针路径
-      result.push(view.players[(perspectiveIdx - i + n) % n]);
+      result.push(players[(perspectiveIdx - i + n) % n]);
     }
     return result;
-  }, [view.players, perspectiveIdx]);
+  }, [players, perspectiveIdx]);
 }

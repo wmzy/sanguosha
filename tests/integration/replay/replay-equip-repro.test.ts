@@ -132,9 +132,9 @@ describe('回放装备状态复现', () => {
     const fs = await import('node:fs');
     fs.writeFileSync('/tmp/sgs-replay-equip.json', JSON.stringify(file, null, 2));
     const total = file.seats[0].events.length;
-    console.log('P0 总步数:', total);
-    console.log('P0 baseline equipment:', file.baseline.players[0].equipment);
-    console.log(
+    console.warn('P0 总步数:', total);
+    console.warn('P0 baseline equipment:', file.baseline.players[0].equipment);
+    console.warn(
       'P0 final processedView equipment:',
       h.player(0).processedView.players[0].equipment,
     );
@@ -143,7 +143,7 @@ describe('回放装备状态复现', () => {
     for (let step = 0; step <= total; step++) {
       const v = getViewAt(file, 0, step)!;
       const eq = v.players[0].equipment;
-      console.log(
+      console.warn(
         `step=${step} event.type=${file.seats[0].events[step - 1]?.event.type ?? '(initial)'}:`,
         `武器=${eq['武器'] ?? '(空)'}`,
       );
@@ -157,7 +157,7 @@ describe('回放装备状态复现', () => {
       (e) => e.event.type === '装备',
     );
     expect(equipStep).toBeGreaterThanOrEqual(0);
-    console.log('装备事件位于 step =', equipStep + 1, '(1-indexed)');
+    console.warn('装备事件位于 step =', equipStep + 1, '(1-indexed)');
 
     // 装备事件应用后:武器 = wp-zg
     const afterEquip = getViewAt(file, 0, equipStep + 1)!;
@@ -228,15 +228,15 @@ describe('回放装备状态复现', () => {
 
     // baseline 的 cardMap 应含武器卡
     const initCardMap = file.baseline.cardMap;
-    console.log('baseline cardMap has weapon?', weapon.id in initCardMap);
+    console.warn('baseline cardMap has weapon?', weapon.id in initCardMap);
 
     // 回放视图的 cardMap 也应含武器卡
     const replayed = getViewAt(file, 0, file.seats[0].events.length)!;
-    console.log('replayed cardMap has weapon?', weapon.id in replayed.cardMap);
-    console.log('replayed equipment:', replayed.players[0].equipment);
+    console.warn('replayed cardMap has weapon?', weapon.id in replayed.cardMap);
+    console.warn('replayed equipment:', replayed.players[0].equipment);
     if (replayed.players[0].equipment['武器']) {
       const c = replayed.cardMap[replayed.players[0].equipment['武器']];
-      console.log('weapon card in replayed cardMap:', c);
+      console.warn('weapon card in replayed cardMap:', c);
     }
   });
 });

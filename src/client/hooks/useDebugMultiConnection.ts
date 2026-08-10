@@ -14,7 +14,7 @@ import { HeadlessGameClient } from '../headless/HeadlessGameClient';
 import { ReplayRecorder } from '../replay/recorder';
 import type { ClientPhase } from '../headless/types';
 import { useEventPlayback } from './useEventPlayback';
-import { useMarkCharSelectSubmitted, useClearSubmittedCharSelects } from './SubmittedCharSelectCtx';
+import { useMarkCharSelectSubmitted, useClearSubmittedCharSelects } from './useSubmittedCharSelect';
 import { createLogger } from '../utils/logger';
 import { logWsMessage, logUserAction } from '../utils/debugTelemetry';
 import { getPlayerId } from '../utils/playerIdentity';

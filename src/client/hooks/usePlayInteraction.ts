@@ -296,7 +296,10 @@ export function usePlayInteraction(
   const [altActionOverride, setAltActionOverride] = useState<SkillActionDef | null>(null);
 
   // ─── distribute 上下文(主动技 + 被动遗计共用)───
-  const perspectiveEquipment = view.players[perspectiveIdx]?.equipment ?? {};
+  const perspectiveEquipment = useMemo(
+    () => view.players[perspectiveIdx]?.equipment ?? {},
+    [view.players, perspectiveIdx],
+  );
   const activeDistribute = (() => {
     if (distributeMode) {
       const { skillId, actionType, prompt } = distributeMode;
@@ -934,6 +937,7 @@ export function usePlayInteraction(
         send(info.skillId, 'respond', {});
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleConfirmDiscard 定义在后面(const TDZ),其依赖已被本数组覆盖
     [
       pending,
       isDiscardPhase,
@@ -1029,6 +1033,7 @@ export function usePlayInteraction(
         setSelectedTarget(null);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleDistToggle 定义在后面(const TDZ),其依赖 activeDistribute 已在本数组中
     [
       isDistributeActive,
       activeDistribute,

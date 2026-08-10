@@ -14,7 +14,7 @@ import { getEquipCardImage } from '../assets/imageAssets';
 import { shallowSetEqual } from '../utils/memo';
 import { getSkillDescription } from '../../engine/core/skill';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
-import { useHoverTooltip } from './SkillTooltip';
+import { useHoverTooltip } from '../hooks/useHoverTooltip';
 
 /** 空槽短标签(马槽并排时用短名) */
 const EMPTY_SLOT_LABEL: Record<EquipSlot, string> = {

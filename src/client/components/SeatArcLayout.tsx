@@ -9,7 +9,8 @@ import type { GameView } from '../../engine/types';
 import * as styles from './gameViewStyles';
 import { arcLayout } from '../utils/gameViewHelpers';
 import { PlayerSeatView } from './PlayerSeatView';
-import { CountdownBar, DEFAULT_COUNTDOWN_TOTAL_MS } from './CountdownBar';
+import { CountdownBar } from './CountdownBar';
+import { DEFAULT_COUNTDOWN_TOTAL_MS } from '../hooks/useCountdown';
 
 /** 计算指定座次的倒计时 deadline。
  *  - pending 精准命中该座次(target === idx)→ pending.deadline

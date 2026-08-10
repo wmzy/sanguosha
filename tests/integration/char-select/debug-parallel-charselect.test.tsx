@@ -267,7 +267,7 @@ describe('useDebugPerspective:选将阶段自动跟随最后一个待选者', ()
     const views = makeLastPendingViews();
     let finalPerspective = -1;
     const { useMarkCharSelectSubmitted } =
-      await import('../../../src/client/hooks/SubmittedCharSelectCtx');
+      await import('../../../src/client/hooks/useSubmittedCharSelect');
     function Tracker() {
       const [perspective, setPerspective] = useState(2);
       finalPerspective = perspective;

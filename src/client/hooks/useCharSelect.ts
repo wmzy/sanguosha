@@ -5,7 +5,7 @@
 // 切到目标座次的连接即可看到其 pending,不需要从 view 跨连接读其他玩家的 slot。
 
 import type { GameView, PendingView } from '../../engine/types';
-import { useSubmittedCharSelects } from './SubmittedCharSelectCtx';
+import { useSubmittedCharSelects } from './useSubmittedCharSelect';
 
 export interface CharSelectSlot {
   /** 候选武将 */

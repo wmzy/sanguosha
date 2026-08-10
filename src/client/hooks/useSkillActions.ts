@@ -46,7 +46,7 @@ export function useSkillActions(view: GameView, perspectiveIdx: number): UseSkil
     return () => {
       cancelled = true;
     };
-  }, [skillActionsKey, perspectiveIdx]);
+  }, [skillActionsKey, perspectiveIdx, view.players]);
 
   return { skillActions };
 }

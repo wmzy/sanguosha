@@ -37,7 +37,7 @@ const onRender: ProfilerOnRenderCallback = (id, _phase, actualDuration) => {
   if (s.count % LOG_INTERVAL === 0) {
     const avg = (s.totalTime / s.count).toFixed(2);
     const last = s.lastTime.toFixed(2);
-    console.debug(
+    console.warn(
       `[Profiler] ${id}: ${s.count} renders, avg ${avg}ms (last ${last}ms)`,
     );
   }

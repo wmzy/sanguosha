@@ -80,6 +80,12 @@ export default [
     },
   },
   {
+    files: ['tests/**'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
     ignores: ['dist/**', 'node_modules/**', 'coverage/**', '*.min.js', '*.min.css', '.env*', 'eslint.config.mjs', 'prettier.config.mjs', 'vite.config.ts', 'vitest.config.ts', 'scripts/**', '.worktrees/**', 'playwright-report/**', '.playwright-mcp/**', '.sisyphus/**', 'plugin/mcp/**'],
   },
   // prettier 为格式权威;关闭 eslint 中所有与 prettier 冲突的格式规则

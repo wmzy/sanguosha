@@ -15,7 +15,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { GameView } from '../../engine/types';
-import { useSubmittedCharSelects } from './SubmittedCharSelectCtx';
+import { useSubmittedCharSelects } from './useSubmittedCharSelect';
 
 export interface AutoSwitchCtl {
   enabled: boolean;
