@@ -31,7 +31,7 @@ export interface RoomConfig {
   /** 房间名 */
   name: string;
   /** 出牌/操作倒计时倍率。1.0=默认, 0.6=偏快, 1.8=慢, Infinity=无限 */
-  timeoutScale: number;
+  timeoutSec: number;
   /** 将池预设 */
   charPool: CharPoolPreset;
   /** 每人初始手牌数(默认 4) */
@@ -70,7 +70,7 @@ export interface Room {
 
 ```typescript
 // src/engine/types.ts — GameState 增加
-config?: { timeoutScale: number };
+config?: { timeoutSec: number };
 
 // create-engine.ts — create() 从 GameConfig 接收
 export interface GameConfig {
@@ -79,18 +79,18 @@ export interface GameConfig {
   seed: number;
   gameId: string;
   handSize?: number;
-  timeoutScale?: number;  // ← 新增
+  timeoutSec?: number;  // ← 新增
 }
 ```
 
-`create()` 把 `timeoutScale` 写入 `state.config`。
+`create()` 把 `timeoutSec` 写入 `state.config`。
 
 ### 超时 helper
 
 ```typescript
 // src/engine/create-engine.ts 或单独模块
 export function scaledTimeout(state: GameState, baseSeconds: number): number {
-  const scale = state.config?.timeoutScale ?? 1;
+  const scale = state.config?.timeoutSec ?? 1;
   if (!Number.isFinite(scale)) return Number.MAX_SAFE_INTEGER; // 无限
   return baseSeconds * scale;
 }
@@ -104,7 +104,7 @@ export function scaledTimeout(state: GameState, baseSeconds: number): number {
 ```typescript
 // create-engine.ts — createAndAwaitSlot 内
 const baseTimeout = atomTimeout ?? def.pending!.timeout;
-const scale = state.config?.timeoutScale ?? 1;
+const scale = state.config?.timeoutSec ?? 1;
 const timeoutMs = (Number.isFinite(scale) ? baseTimeout * scale : Number.MAX_SAFE_INTEGER / 1000) * 1000;
 ```
 
@@ -192,7 +192,7 @@ export interface RoomInfo {
 配置 + 准备面板（在 `DebugLobby` 中，`activeRoomId` 存在但游戏未开始时渲染）：
 - 房间名输入（房主可改）
 - 将池预设下拉
-- 倒计时时长下拉（快/标准/慢/无限 → timeoutScale）
+- 倒计时时长下拉（快/标准/慢/无限 → timeoutSec）
 - 手牌数输入
 - 座次列表 + 每座次「准备」按钮
 - 全部准备后「开始」按钮
@@ -209,9 +209,9 @@ activeRoomId && started   → DebugGameView(游戏视图)
 
 ## 引擎改动清单
 
-1. `types.ts`：`GameState.config?: { timeoutScale: number }`
+1. `types.ts`：`GameState.config?: { timeoutSec: number }`
 2. `create-engine.ts`：
-   - `GameConfig.timeoutScale?`
+   - `GameConfig.timeoutSec?`
    - `create()` 写入 `state.config`
    - 新增 `resolveTimeoutMs(state, baseSeconds)`
    - `createAndAwaitSlot` 用 `resolveTimeoutMs` 替代 `timeoutSec * 1000`
@@ -231,6 +231,6 @@ activeRoomId && started   → DebugGameView(游戏视图)
 2. 可修改房间名/将池/倒计时/手牌数
 3. 切换到每个座次视角可点准备，准备状态实时同步
 4. 全部座次准备后可开始，点击后进入游戏
-5. 游戏内倒计时按配置的 timeoutScale 生效（验证出牌/询问闪/弃牌等）
+5. 游戏内倒计时按配置的 timeoutSec 生效（验证出牌/询问闪/弃牌等）
 6. 将池按预设裁剪（标准池少于全武将）
 7. 持久化后重启恢复房间配置

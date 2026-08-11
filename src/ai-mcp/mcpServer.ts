@@ -52,9 +52,9 @@ export const CREATE_ROOM_TOOL = {
       name: { type: 'string', description: '房间名（可选，默认随机生成）' },
       maxPlayers: { type: 'number', description: '最大人数，默认 2' },
       playerId: { type: 'string', description: '指定玩家 id，否则服务端自动生成' },
-      timeoutScale: {
+      timeoutSec: {
         type: 'number',
-        description: 'pending 超时倍率。1=默认；>1 更慢（应对慢 API）； Infinity=无限等待',
+        description: '操作倒计时秒数(绝对值)。30=默认；0=无限等待',
       },
     },
   },
@@ -71,9 +71,9 @@ export const JOIN_ROOM_TOOL = {
     properties: {
       roomId: { type: 'string', description: '要加入的房间码（必填）' },
       playerId: { type: 'string', description: '指定玩家 id，否则服务端自动生成' },
-      timeoutScale: {
+      timeoutSec: {
         type: 'number',
-        description: 'pending 超时倍率。1=默认；>1 更慢（应对慢 API）； Infinity=无限等待',
+        description: '操作倒计时秒数(绝对值)。30=默认；0=无限等待',
       },
     },
     required: ['roomId'],
@@ -195,13 +195,13 @@ export interface CreateRoomOpts {
   name?: string;
   maxPlayers?: number;
   playerId?: string;
-  timeoutScale?: number;
+  timeoutSec?: number;
 }
 
 export interface JoinRoomOpts {
   roomId: string;
   playerId?: string;
-  timeoutScale?: number;
+  timeoutSec?: number;
 }
 
 export interface SpectateRoomOpts {
@@ -253,7 +253,7 @@ function parseCreateRoomOpts(args: unknown): CreateRoomOpts {
     name: optString(o, 'name'),
     maxPlayers: optNumber(o, 'maxPlayers'),
     playerId: optString(o, 'playerId'),
-    timeoutScale: optNumber(o, 'timeoutScale'),
+    timeoutSec: optNumber(o, 'timeoutSec'),
   };
 }
 
@@ -269,7 +269,7 @@ function parseJoinRoomOpts(args: unknown): JoinRoomOpts {
   return {
     roomId,
     playerId: optString(o, 'playerId'),
-    timeoutScale: optNumber(o, 'timeoutScale'),
+    timeoutSec: optNumber(o, 'timeoutSec'),
   };
 }
 

@@ -574,7 +574,7 @@ describe('展示型 ViewEvent 注册', () => {
 
 // ── 请求回应 atom: applyView 的 deadline/totalMs 必须与后端真实超时口径一致 ──
 // 后端 createAndAwaitSlot 走 resolveTimeoutMs(state, base)。
-// toViewEvents 计算出 timeoutMs(已应用 timeoutScale)并透传给 applyView。
+// toViewEvents 计算出 timeoutMs(已应用 timeoutSec)并透传给 applyView。
 // applyView 必须从 event.timeoutMs 读取,而非硬编码 30s,
 // 否则前端倒计时(applyView 增量路径)与后端真实超时不一致。
 describe('请求回应 atom: deadline/totalMs 口径一致性', () => {

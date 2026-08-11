@@ -43,14 +43,17 @@ const TICK_MS = 50;
  */
 export async function applyConfigUpdate(
   hgc: HeadlessGameClient,
-  fields: { timeoutScale?: number; name?: string },
+  fields: { timeoutSec?: number; name?: string },
 ): Promise<boolean> {
   const current = hgc.roomState?.config;
   if (!current) return false;
   const next: RoomConfig = { ...current };
   let changed = false;
-  if (fields.timeoutScale !== undefined && fields.timeoutScale !== current.timeoutScale) {
-    next.timeoutScale = fields.timeoutScale;
+  if (fields.timeoutSec !== undefined && fields.timeoutSec !== current.timeoutSec) {
+    // Infinity/负数 → 0(无限)
+    next.timeoutSec = !Number.isFinite(fields.timeoutSec) || fields.timeoutSec < 0
+      ? 0
+      : fields.timeoutSec;
     changed = true;
   }
   if (fields.name !== undefined && fields.name !== current.name) {

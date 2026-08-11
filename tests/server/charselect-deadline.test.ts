@@ -33,7 +33,7 @@ function makeRoom(): Room {
     isDebug: true,
     createdAt: Date.now(),
     status: '进行中',
-    config: { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+    config: { name: '测试', charPool: 'all', handSize: 4 },
     spectators: new Map(),
     viewGrants: new Map(),
     pendingViewRequests: new Map(),

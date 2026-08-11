@@ -35,7 +35,7 @@ function makeFakeHgc(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameC
     seatIndex: 0,
     playerId: 'p1',
     roomId: 'ROOM1',
-    roomState: { hostId: 'p1', readyPlayers: ['p1'], playerIds: ['p1'], maxPlayers: 2, config: { name: 'r', timeoutScale: 1, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 } }, spectatorIds: [], viewGrants: {}, pendingViewRequests: {} },
+    roomState: { hostId: 'p1', readyPlayers: ['p1'], playerIds: ['p1'], maxPlayers: 2, config: { name: 'r', timeoutSec: 30, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 } }, spectatorIds: [], viewGrants: {}, pendingViewRequests: {} },
     needsAction: () => true,
     gameOverWinner: null,
     view: null,
@@ -75,7 +75,7 @@ function makeLobbyAdvancingHgc(delayMs: number): HeadlessGameClient {
     seatIndex: 0,
     playerId: 'p1',
     roomId: 'ROOM1',
-    roomState: { hostId: 'p1', readyPlayers: ['p1', 'p2'], playerIds: ['p1', 'p2'], maxPlayers: 2, config: { name: 'r', timeoutScale: 1, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 } }, spectatorIds: [], viewGrants: {}, pendingViewRequests: {} },
+    roomState: { hostId: 'p1', readyPlayers: ['p1', 'p2'], playerIds: ['p1', 'p2'], maxPlayers: 2, config: { name: 'r', timeoutSec: 30, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 } }, spectatorIds: [], viewGrants: {}, pendingViewRequests: {} },
     gameOverWinner: null,
     view: null,
     getAvailableActions: () => [],
@@ -290,7 +290,7 @@ describe('handleMcpRequest', () => {
         jsonrpc: '2.0',
         id: 11,
         method: 'tools/call',
-        params: { name: 'createRoom', arguments: { name: '测试房', maxPlayers: 4, timeoutScale: 5 } },
+        params: { name: 'createRoom', arguments: { name: '测试房', maxPlayers: 4, timeoutSec: 5 } },
       },
       ctx,
     );
@@ -298,7 +298,7 @@ describe('handleMcpRequest', () => {
       name: '测试房',
       maxPlayers: 4,
       playerId: undefined,
-      timeoutScale: 5,
+      timeoutSec: 5,
     });
     const sc = (res!.result as { structuredContent: { joinedAs: string; isHost: boolean; roomId: string } })
       .structuredContent;
@@ -324,7 +324,7 @@ describe('handleMcpRequest', () => {
       },
       ctx,
     );
-    expect(doJoinRoom).toHaveBeenCalledWith({ roomId: 'ABC123', playerId: 'ai-1', timeoutScale: undefined });
+    expect(doJoinRoom).toHaveBeenCalledWith({ roomId: 'ABC123', playerId: 'ai-1', timeoutSec: undefined });
     const sc = (res!.result as { structuredContent: { joinedAs: string; isHost: boolean } }).structuredContent;
     expect(sc.joinedAs).toBe('guest');
     expect(sc.isHost).toBe(false);

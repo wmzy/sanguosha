@@ -8,7 +8,7 @@
 // 三种模式:
 //   skip   —— target 一张手牌都没有(手牌数公开为 0,本就可判定无响应牌):不创建 slot、
 //             无延时,父流程(如杀的结算)立即看到处理区无响应牌 → 正常结算。
-//   silent —— target 有手牌但无匹配响应牌:创建短延时 slot(SHORT_DELAY_MS,不走 timeoutScale
+//   silent —— target 有手牌但无匹配响应牌:创建短延时 slot(SHORT_DELAY_MS,不走 timeoutSec
 //             缩放),但不向 target 展示可操作 prompt(给 target 观察型 pending,与"其他人看到的"
 //             一致)。其他人看到一个短暂停顿,无法分辨"没牌不响应"还是"有牌故意不响应"。
 //   normal —— target 有匹配响应牌:正常询问(维持现状)。
@@ -20,7 +20,7 @@
 import type { ActionPrompt, Atom, Card, GameState } from '../types';
 import { getBeforeHooks, hasDeclaredAlternativeResponse } from './skill';
 
-/** silent 模式的短延时毫秒数。固定值,不走房间 timeoutScale 缩放。 */
+/** silent 模式的短延时毫秒数。固定值,不走房间 timeoutSec 缩放。 */
 export const SHORT_DELAY_MS = 1500;
 
 export interface CardResponseAvailability {

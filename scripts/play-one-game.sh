@@ -4,7 +4,7 @@
 # 用法: ./scripts/play-one-game.sh <gameNumber>
 #
 # 流程:
-#   1. wmzy(房主) createRoom(maxPlayers=5, timeoutScale=Infinity)
+#   1. wmzy(房主) createRoom(maxPlayers=5, timeoutSec=0)
 #   2. 编排器轮询 REST 发现房间码
 #   3. 4 个 guest joinRoom 加入同一房间
 #   4. 5 个 omp 实例并行对局至 gameOver 后退出
@@ -89,7 +89,7 @@ HOST_PROMPT="/skill:sanguosha-play 你是三国杀游戏的房主 AI 玩家。�
 第一步(立即执行): 调用 createRoom 工具建房。参数:
 - maxPlayers: 5
 - playerId: \"$HOST_NAME\"
-- timeoutScale: Infinity
+- timeoutSec: 0
 - name: \"$ROOM_NAME\"
 
 第二步: 持续调用 play 工具(不带 action 参数=等待推进)。每次返回 needsAction=true 时, 从 availableActions 中选一个合理操作回传:
@@ -103,7 +103,7 @@ HOST_PROMPT="/skill:sanguosha-play 你是三国杀游戏的房主 AI 玩家。�
 
 第四步: gameOver 非空时任务完成。
 
-关键: timeoutScale=Infinity 表示操作无时间限制。直接用 MCP 工具(createRoom/play/reportBug), 通过 write 到 xd://mcp__sanguosha_* 路径调用。不要读源码, 不要用 bash/curl 探测服务器。"
+关键: timeoutSec=0 表示操作无时间限制。直接用 MCP 工具(createRoom/play/reportBug), 通过 write 到 xd://mcp__sanguosha_* 路径调用。不要读源码, 不要用 bash/curl 探测服务器。"
 
 echo "[game-$GAME_N] 启动房主 $HOST_NAME (minimax-code-cn/MiniMax-M3)..."
 timeout "$PER_INSTANCE_TIMEOUT" \
@@ -133,7 +133,7 @@ guest_prompt() {
 第一步(立即执行): 调用 joinRoom 工具加入房间。参数:
 - roomId: "$roomid"
 - playerId: "$name"
-- timeoutScale: Infinity
+- timeoutSec: 0
 
 第二步: 持续调用 play 工具(不带 action 参数=等待推进)。每次返回 needsAction=true 时, 从 availableActions 中选一个合理操作回传:
 - 选将(selectChar): 选技能强力的武将(优先张飞/甄姬/刘备/关羽)。
@@ -146,7 +146,7 @@ guest_prompt() {
 
 第四步: gameOver 非空时任务完成。
 
-关键: timeoutScale=Infinity 表示操作无时间限制。直接用 MCP 工具(joinRoom/play/reportBug), 通过 write 到 xd://mcp__sanguosha_* 路径调用。不要读源码, 不要用 bash/curl 探测服务器。
+关键: timeoutSec=0 表示操作无时间限制。直接用 MCP 工具(joinRoom/play/reportBug), 通过 write 到 xd://mcp__sanguosha_* 路径调用。不要读源码, 不要用 bash/curl 探测服务器。
 PROMPT
 }
 

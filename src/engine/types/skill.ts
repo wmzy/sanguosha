@@ -66,7 +66,7 @@ export interface PendingSlot {
   startTime: number;
   deadline: number;
   /** 实际生效的超时毫秒数(createAndAwaitSlot 据此设 deadline)。用于 buildView 的 totalMs,
-   *   与前端进度条口径一致。silent 模式下为 SHORT_DELAY_MS(不走 timeoutScale)。 */
+   *   与前端进度条口径一致。silent 模式下为 SHORT_DELAY_MS(不走 timeoutSec)。 */
   resolvedTimeoutMs?: number;
   /** 是否为阻塞型 pending。非阻塞型(出牌窗口)不阻止玩家出牌/用技,不计入 hasBlockingPending。 */
   isBlocking: boolean;

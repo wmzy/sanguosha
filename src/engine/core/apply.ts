@@ -189,7 +189,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
     // 卡牌回应型 atom 的响应可用性预检(skip/silent/normal)。
     //   skip   —— target 手牌为 0:不创建任何 slot、无延时,Promise.all([]) 立即继续。
     //             父流程(如杀的结算)看到处理区无响应牌 → 正常结算。
-    //   silent —— target 有手牌但无匹配牌:创建短延时 slot(silentDelayMs,不走 timeoutScale),
+    //   silent —— target 有手牌但无匹配牌:创建短延时 slot(silentDelayMs,不走 timeoutSec),
     //             target 不被询问(toViewEvents/applyView 给 target 观察型 pending)。
     //   null   —— 正常询问。
     // 预检在 apply→emit event→after hooks 之后、创建 slot 之前,与 toViewEvents 看到同一份 state。
@@ -256,7 +256,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
 }
 
 /** 为单个 target 创建 PendingSlot 并 await 到它 resolve。
- *  silentDelayMs:卡牌回应 silent 模式下的固定短延时(不走 timeoutScale 缩放)。
+ *  silentDelayMs:卡牌回应 silent 模式下的固定短延时(不走 timeoutSec 缩放)。
  *  undefined = 正常(走 resolveTimeoutMs)。 */
 function createAndAwaitSlot(
   state: GameState,
@@ -269,9 +269,9 @@ function createAndAwaitSlot(
     const pending = def.pending!;
     const atomTimeout = (atom as Record<string, unknown>).timeout;
     const timeoutSec = typeof atomTimeout === 'number' ? atomTimeout : pending.timeout;
-    // 应用房间配置的 timeoutScale(Infinity=无限)。
-    // 广播型 pending(target<0,如无懈可击)在 Infinity 时仍使用 base timeout,避免死锁。
-    // silent 模式直接用 silentDelayMs(固定短延时,不走缩放),与其他人看到的短暂停顿一致。
+    // 应用房间配置的 timeoutSec(0=无限)。
+    // 广播型 pending(target<0,如无懈可击)在无限时仍使用 base timeout,避免死锁。
+    // silent 模式直接用 silentDelayMs(固定短延时,不走房间配置),与其他人看到的短暂停顿一致。
     const isBroadcast = target < 0;
     const timeoutMs =
       silentDelayMs ?? resolveTimeoutMs(state, timeoutSec, isBroadcast);

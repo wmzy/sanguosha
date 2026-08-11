@@ -60,8 +60,8 @@ export const DEFAULT_CHAT_CONFIG: ChatConfig = {
 export interface RoomConfig {
   /** 房间名 */
   name: string;
-  /** 出牌/操作倒计时倍率。1=默认; <1 更快; >1 更慢; Infinity=无限 */
-  timeoutScale: number;
+  /** 操作倒计时秒数(绝对值)。正值=秒数; 0=无限。默认 30。 */
+  timeoutSec: number;
   /** 将池预设 */
   charPool: CharPoolPreset;
   /** 每人初始手牌数(默认 4) */
@@ -73,7 +73,7 @@ export interface RoomConfig {
 /** 默认房间配置 */
 export const DEFAULT_ROOM_CONFIG: RoomConfig = {
   name: '调试房间',
-  timeoutScale: 1,
+  timeoutSec: 30,
   charPool: 'all',
   handSize: 4,
   chat: { ...DEFAULT_CHAT_CONFIG },
@@ -117,11 +117,11 @@ export function normalizeRoomConfig(raw: unknown): RoomConfig {
     typeof r['name'] === 'string' && r['name'].trim()
       ? r['name'].trim().slice(0, 40)
       : DEFAULT_ROOM_CONFIG.name;
-  let timeoutScale =
-    typeof r['timeoutScale'] === 'number' && r['timeoutScale'] > 0
-      ? r['timeoutScale']
-      : DEFAULT_ROOM_CONFIG.timeoutScale;
-  if (!Number.isFinite(timeoutScale) || timeoutScale > 1000) timeoutScale = Infinity;
+  // timeoutSec: 绝对秒数(0=无限);负数/NaN/非数字回退默认值。
+  const timeoutSec =
+    typeof r['timeoutSec'] === 'number' && Number.isFinite(r['timeoutSec']) && r['timeoutSec'] >= 0
+      ? Math.floor(r['timeoutSec'])
+      : DEFAULT_ROOM_CONFIG.timeoutSec;
   const charPool: CharPoolPreset =
     r['charPool'] === 'standard' || r['charPool'] === 'extended' || r['charPool'] === 'all'
       ? r['charPool']
@@ -131,7 +131,7 @@ export function normalizeRoomConfig(raw: unknown): RoomConfig {
       ? Math.floor(r['handSize'])
       : DEFAULT_ROOM_CONFIG.handSize;
   const chat = r['chat'] !== undefined ? normalizeChatConfig(r['chat']) : { ...DEFAULT_CHAT_CONFIG };
-  return { name, timeoutScale, charPool, handSize, chat };
+  return { name, timeoutSec, charPool, handSize, chat };
 }
 
 /** 倒计时信息(pending 优先,否则出牌/弃牌阶段的 idleDeadline)。

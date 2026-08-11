@@ -16,12 +16,12 @@ describe('normalizeRoomConfig', () => {
   it('合法配置原样通过', () => {
     const cfg = normalizeRoomConfig({
       name: '测试房',
-      timeoutScale: 2,
+      timeoutSec: 60,
       charPool: 'standard',
       handSize: 6,
     });
     expect(cfg.name).toBe('测试房');
-    expect(cfg.timeoutScale).toBe(2);
+    expect(cfg.timeoutSec).toBe(60);
     expect(cfg.charPool).toBe('standard');
     expect(cfg.handSize).toBe(6);
     expect(cfg.chat).toBeDefined();
@@ -49,25 +49,29 @@ describe('normalizeRoomConfig', () => {
     expect(normalizeRoomConfig({ name: 123 }).name).toBe(DEFAULT_ROOM_CONFIG.name);
   });
 
-  it('timeoutScale 非正数回退默认值', () => {
-    expect(normalizeRoomConfig({ timeoutScale: 0 }).timeoutScale).toBe(
-      DEFAULT_ROOM_CONFIG.timeoutScale,
+  it('timeoutSec 负数/非数字回退默认值,0=无限(合法)', () => {
+    expect(normalizeRoomConfig({ timeoutSec: 0 }).timeoutSec).toBe(0);
+    expect(normalizeRoomConfig({ timeoutSec: -1 }).timeoutSec).toBe(
+      DEFAULT_ROOM_CONFIG.timeoutSec,
     );
-    expect(normalizeRoomConfig({ timeoutScale: -1 }).timeoutScale).toBe(
-      DEFAULT_ROOM_CONFIG.timeoutScale,
-    );
-    expect(normalizeRoomConfig({ timeoutScale: 'fast' }).timeoutScale).toBe(
-      DEFAULT_ROOM_CONFIG.timeoutScale,
+    expect(normalizeRoomConfig({ timeoutSec: 'fast' }).timeoutSec).toBe(
+      DEFAULT_ROOM_CONFIG.timeoutSec,
     );
   });
 
-  it('timeoutScale 超过 1000 视为 Infinity', () => {
-    expect(normalizeRoomConfig({ timeoutScale: 1001 }).timeoutScale).toBe(Infinity);
+  it('timeoutSec 小数被 floor 取整', () => {
+    expect(normalizeRoomConfig({ timeoutSec: 15.7 }).timeoutSec).toBe(15);
   });
 
-  it('timeoutScale = NaN 回退默认值', () => {
-    expect(normalizeRoomConfig({ timeoutScale: NaN }).timeoutScale).toBe(
-      DEFAULT_ROOM_CONFIG.timeoutScale,
+  it('timeoutSec = Infinity 回退默认值(非有限数)', () => {
+    expect(normalizeRoomConfig({ timeoutSec: Infinity }).timeoutSec).toBe(
+      DEFAULT_ROOM_CONFIG.timeoutSec,
+    );
+  });
+
+  it('timeoutSec = NaN 回退默认值', () => {
+    expect(normalizeRoomConfig({ timeoutSec: NaN }).timeoutSec).toBe(
+      DEFAULT_ROOM_CONFIG.timeoutSec,
     );
   });
 

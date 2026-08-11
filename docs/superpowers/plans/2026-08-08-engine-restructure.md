@@ -573,7 +573,7 @@ apply.ts ↔ frame.ts 循环说明：apply.ts 导入 `topFrame`/`emptyFrame`（�
 import type { GameState } from '../types';
 
 export function resolveTimeoutMs(state: GameState, baseSeconds: number, isBroadcast = false): number {
-  const scale = state.config?.timeoutScale ?? 1;
+  const scale = state.config?.timeoutSec ?? 1;
   const MAX_TIMEOUT_MS = 86_400_000;
   if (!Number.isFinite(scale)) {
     if (isBroadcast) return baseSeconds * 1000;

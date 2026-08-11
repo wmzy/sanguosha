@@ -12,7 +12,7 @@ const fullReady2p: RoomState = {
   playerIds: ['p-host', 'p2'],
   hostId: 'p-host',
   maxPlayers: 2,
-  config: { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 } },
+  config: { name: '测试', timeoutSec: 30, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 } },
   spectatorIds: [],
   viewGrants: {},
   pendingViewRequests: {},
@@ -170,20 +170,20 @@ function makeConfigTestHgc(config: RoomConfig | null): {
 
 const BASE_CONFIG: RoomConfig = {
   name: '测试房',
-  timeoutScale: 1,
+  timeoutSec: 30,
   charPool: 'all',
   handSize: 4,
   chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 },
 };
 
 describe('applyConfigUpdate', () => {
-  it('timeoutScale 变化时发送完整 RoomConfig（未变字段保留原值）', async () => {
+  it('timeoutSec 变化时发送完整 RoomConfig（未变字段保留原值）', async () => {
     const { hgc, sendUpdateConfig } = makeConfigTestHgc(BASE_CONFIG);
-    const changed = await applyConfigUpdate(hgc, { timeoutScale: 2 });
+    const changed = await applyConfigUpdate(hgc, { timeoutSec: 15 });
     expect(changed).toBe(true);
     expect(sendUpdateConfig).toHaveBeenCalledTimes(1);
     const sent = sendUpdateConfig.mock.calls[0][0] as RoomConfig;
-    expect(sent.timeoutScale).toBe(2);
+    expect(sent.timeoutSec).toBe(15);
     expect(sent.name).toBe('测试房');
     expect(sent.charPool).toBe('all');
     expect(sent.handSize).toBe(4);
@@ -194,28 +194,28 @@ describe('applyConfigUpdate', () => {
     await applyConfigUpdate(hgc, { name: '新房间名' });
     const sent = sendUpdateConfig.mock.calls[0][0] as RoomConfig;
     expect(sent.name).toBe('新房间名');
-    expect(sent.timeoutScale).toBe(1);
+    expect(sent.timeoutSec).toBe(30);
   });
 
   it('配置未变化时不发送 updateConfig', async () => {
     const { hgc, sendUpdateConfig } = makeConfigTestHgc(BASE_CONFIG);
-    const changed = await applyConfigUpdate(hgc, { timeoutScale: 1, name: '测试房' });
+    const changed = await applyConfigUpdate(hgc, { timeoutSec: 30, name: '测试房' });
     expect(changed).toBe(false);
     expect(sendUpdateConfig).not.toHaveBeenCalled();
   });
 
   it('无 roomState 时返回 false 不发送', async () => {
     const { hgc, sendUpdateConfig } = makeConfigTestHgc(null);
-    const changed = await applyConfigUpdate(hgc, { timeoutScale: 5 });
+    const changed = await applyConfigUpdate(hgc, { timeoutSec: 5 });
     expect(changed).toBe(false);
     expect(sendUpdateConfig).not.toHaveBeenCalled();
   });
 
-  it('Infinity timeoutScale 正确触发更新', async () => {
+  it('Infinity timeoutSec 转为 0(无限) 以兼容 JSON 序列化', async () => {
     const { hgc, sendUpdateConfig } = makeConfigTestHgc(BASE_CONFIG);
-    await applyConfigUpdate(hgc, { timeoutScale: Infinity });
+    await applyConfigUpdate(hgc, { timeoutSec: Infinity });
     const sent = sendUpdateConfig.mock.calls[0][0] as RoomConfig;
-    expect(sent.timeoutScale).toBe(Infinity);
+    expect(sent.timeoutSec).toBe(0);
   });
 });
 

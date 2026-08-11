@@ -231,10 +231,10 @@ const errorBox = css`
 `;
 
 const TIMEOUT_OPTIONS: Array<{ label: string; value: number }> = [
-  { label: '快 (0.6×)', value: 0.6 },
-  { label: '标准 (1×)', value: 1 },
-  { label: '慢 (1.8×)', value: 1.8 },
-  { label: '无限', value: Infinity },
+  { label: '快 (15s)', value: 15 },
+  { label: '标准 (30s)', value: 30 },
+  { label: '慢 (60s)', value: 60 },
+  { label: '无限', value: 0 },
 ];
 
 const POOL_OPTIONS: Array<{ label: string; value: CharPoolPreset }> = [
@@ -329,18 +329,23 @@ export function RoomConfigPanel({
             <label className={label}>操作倒计时</label>
             <select
               className={select}
-              value={editConfig.timeoutScale}
+              value={editConfig.timeoutSec}
               onChange={(e) => {
-                const v = e.target.value === 'Infinity' ? Infinity : Number(e.target.value);
-                handleField('timeoutScale', v);
-                setTimeout(() => onUpdateConfig({ ...editConfig, timeoutScale: v }), 0);
+                const v = Number(e.target.value);
+                handleField('timeoutSec', v);
+                setTimeout(() => onUpdateConfig({ ...editConfig, timeoutSec: v }), 0);
               }}
             >
               {TIMEOUT_OPTIONS.map((o) => (
-                <option key={o.label} value={o.value === Infinity ? 'Infinity' : o.value}>
+                <option key={o.label} value={o.value}>
                   {o.label}
                 </option>
               ))}
+              {!TIMEOUT_OPTIONS.some((o) => o.value === editConfig.timeoutSec) && (
+                <option value={editConfig.timeoutSec}>
+                  {editConfig.timeoutSec <= 0 ? '无限' : `${editConfig.timeoutSec}s`}
+                </option>
+              )}
             </select>
           </div>
 

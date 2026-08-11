@@ -37,8 +37,8 @@ export interface GameConfig {
   seed: number;
   gameId: string;
   handSize?: number;
-  /** pending 超时倍率(房间配置)。1=默认; <1 更快; >1 更慢; Infinity=无限。 */
-  timeoutScale?: number;
+  /** 操作倒计时秒数(房间配置,绝对值)。正值=秒数; 0=无限。未设置时各 atom 用自身默认秒数。 */
+  timeoutSec?: number;
 }
 
 /** 检查游戏是否结束。纯函数,基于 state 计算。
@@ -101,8 +101,8 @@ export function create(gameConfig: GameConfig): GameState {
 
   const state = createGameState({ players: stubPlayers, cardMap });
   state.startedAt = Date.now();
-  if (gameConfig.timeoutScale !== undefined) {
-    state.config = { timeoutScale: gameConfig.timeoutScale };
+  if (gameConfig.timeoutSec !== undefined) {
+    state.config = { timeoutSec: gameConfig.timeoutSec };
   }
   return state;
 }

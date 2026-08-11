@@ -39,7 +39,7 @@ function makeRoom(playerIds: string[], roomType: 'normal' | 'quick' = 'quick'): 
     readyPlayers: new Set(playerIds),
     roomType,
     isDebug: true,
-    config: { name: '清理测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+    config: { name: '清理测试', timeoutSec: 30, charPool: 'all', handSize: 4 },
     spectators: new Map(),
     viewGrants: new Map(),
     pendingViewRequests: new Map(),

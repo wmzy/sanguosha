@@ -134,17 +134,15 @@ const POOL_LABELS: Record<string, string> = {
 };
 
 const TIMEOUT_OPTIONS: Array<{ label: string; value: number }> = [
-  { label: '快 (0.6×)', value: 0.6 },
-  { label: '标准 (1×)', value: 1 },
-  { label: '慢 (1.8×)', value: 1.8 },
-  { label: '无限', value: Infinity },
+  { label: '快 (15s)', value: 15 },
+  { label: '标准 (30s)', value: 30 },
+  { label: '慢 (60s)', value: 60 },
+  { label: '无限', value: 0 },
 ];
 
 function timeoutLabel(v: number): string {
-  if (!Number.isFinite(v)) return '无限';
-  if (v <= 0.7) return `快 (${v}×)`;
-  if (v === 1) return `标准 (${v}×)`;
-  return `慢 (${v}×)`;
+  if (v <= 0) return '无限';
+  return `${v}s`;
 }
 
 const buttonRow = css`
@@ -638,18 +636,23 @@ export function MultiplayerPage() {
                   <label className={label}>操作倒计时</label>
                   <select
                     className={inputStyle}
-                    value={Number.isFinite(editConfig.timeoutScale) ? editConfig.timeoutScale : 'Infinity'}
+                    value={editConfig.timeoutSec}
                     onChange={(e) => {
-                      const v = e.target.value === 'Infinity' ? Infinity : Number(e.target.value);
-                      handleConfigField('timeoutScale', v);
-                      mp.updateConfig({ ...editConfig, timeoutScale: v });
+                      const v = Number(e.target.value);
+                      handleConfigField('timeoutSec', v);
+                      mp.updateConfig({ ...editConfig, timeoutSec: v });
                     }}
                   >
                     {TIMEOUT_OPTIONS.map((o) => (
-                      <option key={o.label} value={o.value === Infinity ? 'Infinity' : o.value}>
+                      <option key={o.label} value={o.value}>
                         {o.label}
                       </option>
                     ))}
+                    {!TIMEOUT_OPTIONS.some((o) => o.value === editConfig.timeoutSec) && (
+                      <option value={editConfig.timeoutSec}>
+                        {timeoutLabel(editConfig.timeoutSec)}
+                      </option>
+                    )}
                   </select>
                 </div>
               </div>
@@ -693,7 +696,7 @@ export function MultiplayerPage() {
               </div>
               <div className={configItem}>
                 <span className={configKey}>操作倒计时</span>
-                <span className={configVal}>{timeoutLabel(mp.roomState.config.timeoutScale)}</span>
+                <span className={configVal}>{timeoutLabel(mp.roomState.config.timeoutSec)}</span>
               </div>
               <div className={configItem}>
                 <span className={configKey}>初始手牌</span>

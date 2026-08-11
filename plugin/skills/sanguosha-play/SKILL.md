@@ -23,7 +23,7 @@ allowed-tools: mcp__sanguosha__play, mcp__sanguosha__createRoom, mcp__sanguosha_
   ```
 - **旁观**（不占座次）：`spectateRoom({ roomId: "ABC123" })`
 
-可选字段：`playerId`（指定玩家 id，否则服务端自动生成）、`name`（建房时房间名）、`timeoutScale`（pending 超时倍率，1=默认，Infinity=无限等待）。
+可选字段：`playerId`（指定玩家 id，否则服务端自动生成）、`name`（建房时房间名）、`timeoutSec`（操作倒计时秒数，30=默认，0=无限等待）。
 
 返回结构：`{ ok, roomId, playerId, isHost, joinedAs: "host"|"guest"|"spectator", phase }`。**如果 `joinedAs` 与你本意不符（比如本该加入却变 host），说明选错工具——下次启动前重启 MCP 连接重试。**
 

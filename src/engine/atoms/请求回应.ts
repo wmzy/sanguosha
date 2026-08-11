@@ -94,10 +94,10 @@ export const 请求回应: AtomDefinition<{
   },
   effect: { blockUntilDone: true, duration: 200 },
   toViewEvents(state, atom): ViewEventSplit {
-    // 应用房间 timeoutScale:优先 atom 自带 timeout,回退到 pending.timeout。
+    // 应用房间 timeoutSec:优先 atom 自带 timeout,回退到 pending.timeout。
     // 透传 timeoutMs 给 applyView,使其 deadline/totalMs 与后端真实定时器口径一致
     // (createAndAwaitSlot 同样走 resolveTimeoutMs)。
-    // 卡牌回应型(useCard+cardFilter.filter,silent 模式)用固定短延时(不走 timeoutScale)。
+    // 卡牌回应型(useCard+cardFilter.filter,silent 模式)用固定短延时(不走 timeoutSec)。
     const timeoutSec = atom.timeout ?? 请求回应.pending!.timeout;
     const isBroadcast = atom.target < 0;
     const cardFilter = responseCardFilter(atom);

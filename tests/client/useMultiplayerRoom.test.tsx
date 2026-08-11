@@ -231,10 +231,10 @@ describe('useMultiplayerRoom', () => {
 
   it('createRoom 携带 config 时透传到 create_room 消息', async () => {
     const { result } = renderHook(() => useMultiplayerRoom());
-    act(() => result.current.createRoom('房', 2, { ...DEFAULT_ROOM_CONFIG, timeoutScale: 2 }));
+    act(() => result.current.createRoom('房', 2, { ...DEFAULT_ROOM_CONFIG, timeoutSec: 2 }));
     await flushConnect();
     const create = fetchCalls.find((c) => c.body && typeof c.body.name === 'string')!;
-    expect(create.body.config?.timeoutScale).toBe(2);
+    expect(create.body.config?.timeoutSec).toBe(2);
   });
 
   it('createRoom 把本地身份 playerId 透传到请求体', async () => {

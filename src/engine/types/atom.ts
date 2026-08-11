@@ -25,7 +25,7 @@ export interface AtomPending<A = Atom> {
   isBlocking?: boolean;
   /** 卡牌回应型 atom 的响应可用性预检(在 apply→emit event→after hooks 之后、创建 slot 之前调用)。
    *  - 'skip'       = 立即跳过:不创建 slot、无延时,target 手牌为 0(手牌数本就公开)。
-   *  - { delayMs }  = silent:创建短延时 slot(delayMs 固定,不走 timeoutScale 缩放),
+   *  - { delayMs }  = silent:创建短延时 slot(delayMs 固定,不走 timeoutSec 缩放),
    *                   且 toViewEvents/applyView 不向 target 展示可操作 prompt(target 有手牌但无匹配牌)。
    *  - null         = 正常询问(维持现状)。
    *  默认 null。仅 询问闪/询问杀/请求回应(useCard+cardFilter) 实现此字段。 */

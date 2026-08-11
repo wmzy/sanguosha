@@ -177,7 +177,7 @@ describe('杀完整结算流程', () => {
     expect(harness.state.pendingSlots.size).toBe(1);
     const slot = [...harness.state.pendingSlots.values()][0];
     expect((slot.atom as { type: string }).type).toBe('询问闪');
-    expect(slot.resolvedTimeoutMs).toBe(SHORT_DELAY_MS); // 固定短延时,不走 timeoutScale
+    expect(slot.resolvedTimeoutMs).toBe(SHORT_DELAY_MS); // 固定短延时,不走 timeoutSec
     // target(P2)不被询问:prompt 是观察型 confirm,不是可操作 useCard
     expect(P2.processedView.pending?.responseMode).toBe('silent');
     expect(P2.processedView.pending?.prompt.type).toBe('confirm');
@@ -261,7 +261,7 @@ describe('请求回应(useCard+cardFilter) 卡牌回应 skip/silent/normal', () 
 
     expect(harness.state.pendingSlots.size).toBe(1);
     const slot = [...harness.state.pendingSlots.values()][0];
-    expect(slot.resolvedTimeoutMs).toBe(SHORT_DELAY_MS); // 固定短延时,不走 timeoutScale
+    expect(slot.resolvedTimeoutMs).toBe(SHORT_DELAY_MS); // 固定短延时,不走 timeoutSec
     // target 不被询问:观察型 confirm prompt + responseMode='silent'
     expect(P2.processedView.pending?.responseMode).toBe('silent');
     expect(P2.processedView.pending?.prompt.type).toBe('confirm');

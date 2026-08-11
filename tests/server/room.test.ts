@@ -260,7 +260,7 @@ describe('房间配置', () => {
     const sink = createMockSink();
     const room = createRoom('测试', 4, 'host1', sink);
     expect(room.config).toBeDefined();
-    expect(room.config.timeoutScale).toBe(1);
+    expect(room.config.timeoutSec).toBe(30);
     expect(room.config.charPool).toBe('all');
     expect(room.config.handSize).toBe(4);
     expect(room.config.name).toBe('测试');
@@ -269,7 +269,7 @@ describe('房间配置', () => {
   it('创建调试房间应携带默认 config', () => {
     const room = createDebugRoom('调试', 5);
     expect(room.config).toBeDefined();
-    expect(room.config.timeoutScale).toBe(1);
+    expect(room.config.timeoutSec).toBe(30);
     expect(room.config.name).toBe('调试');
   });
 
@@ -277,13 +277,13 @@ describe('房间配置', () => {
     const sink = createMockSink();
     const customConfig = {
       name: '自定义',
-      timeoutScale: 0.6,
+      timeoutSec: 15,
       charPool: 'standard' as const,
       handSize: 5,
       chat: { enabled: false, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 },
     };
     const room = createRoom('x', 4, 'h', sink, customConfig);
-    expect(room.config.timeoutScale).toBe(0.6);
+    expect(room.config.timeoutSec).toBe(15);
     expect(room.config.charPool).toBe('standard');
     expect(room.config.handSize).toBe(5);
   });
@@ -293,13 +293,13 @@ describe('房间配置', () => {
     const room = createRoom('测试', 4, 'host1', sink);
     const updated = updateConfig(
       room.id,
-      { name: '新名', timeoutScale: 2, charPool: 'standard', handSize: 3 },
+      { name: '新名', timeoutSec: 60, charPool: 'standard', handSize: 3 },
       'host1',
     );
     expect(updated).not.toBeNull();
     expect(updated!.name).toBe('新名');
-    expect(updated!.timeoutScale).toBe(2);
-    expect(room.config.timeoutScale).toBe(2);
+    expect(updated!.timeoutSec).toBe(60);
+    expect(room.config.timeoutSec).toBe(60);
     expect(room.name).toBe('新名');
   });
 
@@ -309,7 +309,7 @@ describe('房间配置', () => {
     // 非房主应失败
     const result = updateConfig(
       room.id,
-      { name: 'x', timeoutScale: 1, charPool: 'all', handSize: 4 },
+      { name: 'x', timeoutSec: 30, charPool: 'all', handSize: 4 },
       'other',
     );
     expect(result).toBeNull();
@@ -319,22 +319,22 @@ describe('房间配置', () => {
     const room = createDebugRoom('调试', 4);
     const result = updateConfig(
       room.id,
-      { name: '改名', timeoutScale: 1.5, charPool: 'extended', handSize: 4 },
+      { name: '改名', timeoutSec: 45, charPool: 'extended', handSize: 4 },
       'anyone',
     );
     expect(result).not.toBeNull();
-    expect(result!.timeoutScale).toBe(1.5);
+    expect(result!.timeoutSec).toBe(45);
   });
 
   it('normalizeRoomConfig 应修正非法字段', () => {
     const cfg = normalizeRoomConfig({
       name: '   ',
-      timeoutScale: -1,
+      timeoutSec: -1,
       charPool: 'invalid',
       handSize: 999,
     });
     expect(cfg.name).toBe(DEFAULT_ROOM_CONFIG.name); // 空名回退默认
-    expect(cfg.timeoutScale).toBe(1); // 非法回退默认
+    expect(cfg.timeoutSec).toBe(30); // 非法回退默认
     expect(cfg.charPool).toBe('all'); // 非法回退默认
     expect(cfg.handSize).toBe(4); // 超范围回退默认
   });
@@ -349,7 +349,7 @@ describe('房间配置', () => {
 
     updateConfig(
       room.id,
-      { name: '改名', timeoutScale: 2, charPool: 'all', handSize: 4 },
+      { name: '改名', timeoutSec: 2, charPool: 'all', handSize: 4 },
       'host1',
     );
     expect(room.readyPlayers.size).toBe(0);
@@ -360,7 +360,7 @@ describe('房间配置', () => {
     const room = createRoom('测试', 4, 'host1', sink);
     updateConfig(
       room.id,
-      { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+      { name: '测试', timeoutSec: 30, charPool: 'all', handSize: 4 },
       'host1',
       6,
     );
@@ -375,7 +375,7 @@ describe('房间配置', () => {
     // 当前 3 人在线，改为 2 应失败
     const result = updateConfig(
       room.id,
-      { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+      { name: '测试', timeoutSec: 30, charPool: 'all', handSize: 4 },
       'host1',
       2,
     );
@@ -388,7 +388,7 @@ describe('房间配置', () => {
     const room = createRoom('测试', 4, 'host1', sink);
     updateConfig(
       room.id,
-      { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+      { name: '测试', timeoutSec: 30, charPool: 'all', handSize: 4 },
       'host1',
       1,
     );
@@ -396,7 +396,7 @@ describe('房间配置', () => {
 
     updateConfig(
       room.id,
-      { name: '测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+      { name: '测试', timeoutSec: 30, charPool: 'all', handSize: 4 },
       'host1',
       99,
     );
@@ -405,42 +405,43 @@ describe('房间配置', () => {
 });
 
 describe('resolveTimeoutMs', () => {
-  it('默认 timeoutScale=1 返回原值', () => {
+  it('未配置 timeoutSec 时回退 atom baseSeconds', () => {
     const state: GameState = createGameState({ players: [], cardMap: {} });
     expect(resolveTimeoutMs(state, 30)).toBe(30000);
+    expect(resolveTimeoutMs(state, 15)).toBe(15000);
   });
 
-  it('应用 timeoutScale 倍率', () => {
+  it('配置绝对秒数直接生效', () => {
     const state: GameState = createGameState({ players: [], cardMap: {} });
-    state.config = { timeoutScale: 0.5 };
-    expect(resolveTimeoutMs(state, 30)).toBe(15000);
-    state.config = { timeoutScale: 2 };
-    expect(resolveTimeoutMs(state, 15)).toBe(30000);
+    state.config = { timeoutSec: 10 };
+    expect(resolveTimeoutMs(state, 30)).toBe(10000); // baseSeconds 被覆盖
+    state.config = { timeoutSec: 60 };
+    expect(resolveTimeoutMs(state, 15)).toBe(60000);
   });
 
-  it('Infinity 返回 24 小时(定时器实际不触发)', () => {
+  it('timeoutSec=0 返回 24 小时(无限,定时器实际不触发)', () => {
     const state: GameState = createGameState({ players: [], cardMap: {} });
-    state.config = { timeoutScale: Infinity };
+    state.config = { timeoutSec: 0 };
     expect(resolveTimeoutMs(state, 30)).toBe(86_400_000);
   });
 
-  // Bug #10: 广播型 pending(如无懈可击)在 Infinity 时不死锁,使用 base timeout
-  it('Infinity + isBroadcast 返回 base timeout(不死锁)', () => {
+  // Bug #10: 广播型 pending(如无懈可击)在无限时不死锁,使用 base timeout
+  it('timeoutSec=0 + isBroadcast 返回 base timeout(不死锁)', () => {
     const state: GameState = createGameState({ players: [], cardMap: {} });
-    state.config = { timeoutScale: Infinity };
+    state.config = { timeoutSec: 0 };
     expect(resolveTimeoutMs(state, 30, true)).toBe(30000);
   });
 
-  it('isBroadcast=false 时 Infinity 仍返回 24 小时', () => {
+  it('isBroadcast=false 时无限仍返回 24 小时', () => {
     const state: GameState = createGameState({ players: [], cardMap: {} });
-    state.config = { timeoutScale: Infinity };
+    state.config = { timeoutSec: 0 };
     expect(resolveTimeoutMs(state, 30, false)).toBe(86_400_000);
   });
 
-  it('有限 scale 下 isBroadcast 不影响结果', () => {
+  it('有限秒数下 isBroadcast 不影响结果', () => {
     const state: GameState = createGameState({ players: [], cardMap: {} });
-    state.config = { timeoutScale: 2 };
-    expect(resolveTimeoutMs(state, 15, true)).toBe(30000);
+    state.config = { timeoutSec: 20 };
+    expect(resolveTimeoutMs(state, 15, true)).toBe(20000);
   });
 });
 

@@ -66,7 +66,7 @@ async function restoreNormalRoomsFromDb(): Promise<void> {
       readyPlayers: new Set(),
       roomType: 'normal',
       isDebug: row.isDebug,
-      config: row.config,
+      config: normalizeRoomConfig(row.config),
       spectators: new Map(),
       viewGrants: new Map(),
       pendingViewRequests: new Map(),
@@ -141,10 +141,10 @@ async function restorePersistedRooms(): Promise<void> {
       }
       // 从持久化 state.config 恢复房间配置;旧数据无 config 时用默认值
       const restoredConfig =
-        state.config && typeof state.config.timeoutScale === 'number'
+        state.config && typeof state.config.timeoutSec === 'number'
           ? {
               ...normalizeRoomConfig(undefined),
-              timeoutScale: state.config.timeoutScale,
+              timeoutSec: state.config.timeoutSec,
               name: persisted.roomName || `恢复-${roomId}`,
             }
           : { ...normalizeRoomConfig(undefined), name: persisted.roomName || `恢复-${roomId}` };

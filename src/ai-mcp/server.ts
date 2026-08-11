@@ -45,11 +45,11 @@ function logErr(msg: string): void {
 
 type StartedRole = 'host' | 'guest' | 'spectator';
 
-function buildRoomConfig(opts: { timeoutScale?: number; name?: string }, defaultName: string): RoomConfig | undefined {
-  if (opts.timeoutScale === undefined && opts.name === undefined) return undefined;
+function buildRoomConfig(opts: { timeoutSec?: number; name?: string }, defaultName: string): RoomConfig | undefined {
+  if (opts.timeoutSec === undefined && opts.name === undefined) return undefined;
   return {
     name: opts.name ?? defaultName,
-    timeoutScale: opts.timeoutScale ?? 1,
+    timeoutSec: opts.timeoutSec ?? 30,
     charPool: 'all',
     handSize: 4,
     chat: DEFAULT_CHAT_CONFIG,
@@ -89,7 +89,7 @@ async function main(): Promise<void> {
     });
     startedRole = 'host';
     logErr(`multiplayer room created: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost}`);
-    // 房主建房后允许 timeoutScale 后续在 play 内通过 applyConfigUpdate 应用（已 ready 后服务端仍接受 updateConfig 在 lobby）。
+    // 房主建房后允许 timeoutSec 后续在 play 内通过 applyConfigUpdate 应用（已 ready 后服务端仍接受 updateConfig 在 lobby）。
   };
 
   // ── 启动工具：加入指定房间 ──

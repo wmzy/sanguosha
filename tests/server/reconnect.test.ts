@@ -33,7 +33,7 @@ function makeMultiplayerRoom(playerIds: string[]): { room: Room; sinks: Map<stri
     status: '等待中',
     hostId: playerIds[0],
     readyPlayers: new Set(playerIds),
-    config: { name: '多人重连测试', timeoutScale: 1, charPool: 'all', handSize: 4 },
+    config: { name: '多人重连测试', timeoutSec: 30, charPool: 'all', handSize: 4 },
     spectators: new Map(),
     viewGrants: new Map(),
     pendingViewRequests: new Map(),

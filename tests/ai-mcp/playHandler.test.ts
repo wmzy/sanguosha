@@ -21,7 +21,7 @@ function makeFake(overrides: Partial<HeadlessGameClient> = {}): HeadlessGameClie
     seatIndex: 0,
     playerId: 'p1',
     roomId: 'ROOM1',
-    roomState: { hostId: 'p1', readyPlayers: ['p1'], playerIds: ['p1'], maxPlayers: 2, config: { name: 'r', timeoutScale: 1, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 } }, spectatorIds: [], viewGrants: {}, pendingViewRequests: {} },
+    roomState: { hostId: 'p1', readyPlayers: ['p1'], playerIds: ['p1'], maxPlayers: 2, config: { name: 'r', timeoutSec: 30, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 } }, spectatorIds: [], viewGrants: {}, pendingViewRequests: {} },
     ...overrides,
   } as unknown as HeadlessGameClient;
 }

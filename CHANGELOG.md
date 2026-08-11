@@ -693,13 +693,13 @@ debug 模式下，孙权点制衡进入选牌面板后不操作，出牌窗口�
 
 ### Added — 房间配置功能(配置+准备阶段)
 
-调试房间创建后不再立即开局,进入「配置+准备」阶段。房主(调试房间任意玩家)可配置房间名、操作倒计时倍率、将池预设、初始手牌数。所有玩家(调试房间逐座次)准备后可开始。配置模型对普通/调试房间通用,前端先只接调试房间。
+调试房间创建后不再立即开局,进入「配置+准备」阶段。房主(调试房间任意玩家)可配置房间名、操作倒计时秒数、将池预设、初始手牌数。所有玩家(调试房间逐座次)准备后可开始。配置模型对普通/调试房间通用,前端先只接调试房间。
 
-- **`RoomConfig`** (`src/server/protocol.ts`): 新增 `{ name, timeoutScale, charPool, handSize }` + `normalizeRoomConfig` 规范化 + `DEFAULT_ROOM_CONFIG`。
+- **`RoomConfig`** (`src/server/protocol.ts`): 新增 `{ name, timeoutSec, charPool, handSize }` + `normalizeRoomConfig` 规范化 + `DEFAULT_ROOM_CONFIG`。
 - **协议扩展**: 新增消息 `update_room_config`(客户端→服务端)、`room_config`/`room_state`/`player_ready`(服务端→客户端);`create_debug_room` 改为接收 `config` 且不立即开局;`room_joined` 增加 `seatIndex`。
 - **`Room` 增加 `config`** (`src/server/room.ts`): `createRoom`/`createDebugRoom` 接收 config;新增 `updateConfig`(普通房间仅房主、调试房间任意玩家);`getRoomList` 携带 config。
 - **调试房间流程改造** (`src/server/app.ts`): 移除 `pendingPlayerCount` 立即开局机制;`handleJoinDebugRoom` 进入配置阶段(分配座次但不 startGame);`handleStartGame` 支持 debug(不校验房主、复用占位 session、传 maxPlayers);新增 `handleCreateDebugRoom`(WS 入口)/`handleUpdateConfig`;`handleReady` 广播准备状态。
-- **引擎 `GameState.config`** (`src/engine/types.ts`+`create-engine.ts`): `GameConfig.timeoutScale` 注入 `state.config`;新增 `resolveTimeoutMs(state, baseSeconds)` helper,`createAndAwaitSlot` 与各 atom view 层统一应用 timeoutScale(Infinity=无限)。
+- **引擎 `GameState.config`** (`src/engine/types.ts`+`create-engine.ts`): `GameConfig.timeoutSec` 注入 `state.config`;新增 `resolveTimeoutMs(state, baseSeconds)` helper,`createAndAwaitSlot` 与各 atom view 层统一应用 timeoutSec(0=无限)。
 - **atom 超时统一** (`src/engine/atoms/`): 询问杀/询问闪/出牌窗口/请求回应/并行回应/选将 的 `toViewEvents`/`applyView` 统一走 `resolveTimeoutMs`,透传 `timeoutMs` 字段给前端(口径与后端真实定时器一致)。
 - **将池预设** (`src/server/session.ts`): `resolveCharPool(preset)` 解析 standard(各势力前8=32人)/extended/all(57人) 武将子集。
 - **前端配置面板** (`src/client/components/debug/RoomConfigPanel.tsx`): 新建组件,展示房间名/将池/倒计时/手牌数配置 + 座次准备列表 + 开始按钮。`useDebugMultiConnection` 扩展支持配置阶段(房间消息处理 + sendReady/sendStartGame/sendUpdateConfig)。`DebugLobby` 状态机接入:游戏未开始时渲染配置面板。

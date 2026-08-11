@@ -61,7 +61,7 @@ export interface PlayResult {
   lastActionResult: 'accepted' | 'rejected' | 'timeout' | 'not-applicable';
 }
 
-// 默认无限等待：服务端自有 pending 超时（30~50s × timeoutScale）推进状态，
+// 默认无限等待：服务端自有 pending 超时（30~50s × timeoutSec）推进状态，
 // runPlay 的 tick 每 TICK_MS 检查即可在 ended/needsAction 时返回。固定 deadline
 // 只在异常兜底时有意义——默认不设，由调用方按需传 waitTimeoutMs 设上限。
 const TICK_MS = 20;

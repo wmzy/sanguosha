@@ -112,7 +112,7 @@ export class GameSession {
       seed: state.rngSeed,
       gameId: this.room.id,
       handSize: this.room.config.handSize,
-      timeoutScale: this.room.config.timeoutScale,
+      timeoutSec: this.room.config.timeoutSec,
     };
     const fresh = create(config);
     await bootstrap(fresh, config);
@@ -141,7 +141,7 @@ export class GameSession {
     const count = this.debug ? (playerCount ?? this.room.players.size) : this.room.players.size;
     if (count < 2) return false;
 
-    // 从房间配置派生 GameConfig:将池预设 + 手牌数 + 超时倍率
+    // 从房间配置派生 GameConfig:将池预设 + 手牌数 + 操作倒时秒数
     const cfg = this.room.config;
     const config: GameConfig = {
       characters: resolveCharPool(cfg.charPool),
@@ -149,7 +149,7 @@ export class GameSession {
       seed: this.sessionSeed,
       gameId: this.room.id,
       handSize: cfg.handSize,
-      timeoutScale: cfg.timeoutScale,
+      timeoutSec: cfg.timeoutSec,
     };
     this.state = create(config);
     // 座次轮转偏移:决定主公(游戏座次 0)对应哪个物理座位。在 bootstrap 之前同步设置,

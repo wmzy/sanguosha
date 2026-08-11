@@ -81,7 +81,7 @@ Content-Type: application/json
 ```typescript
 interface RoomConfig {
   name: string;        // 房间名
-  timeoutScale: number; // 操作倒计时倍率(1=默认,0.6=快,1.8=慢,Infinity=无限)
+  timeoutSec: number; // 操作倒计时秒数(绝对值,0=无限,默认30)
   charPool: 'standard' | 'extended' | 'all'; // 将池预设
   handSize: number;    // 每人初始手牌数(默认 4)
 }

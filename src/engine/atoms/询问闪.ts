@@ -38,7 +38,7 @@ export const 询问闪: AtomDefinition<{ target: number; source: number }> = {
   effect: { blockUntilDone: true, duration: 200 },
   toViewEvents(state, atom): ViewEventSplit {
     const mode = evaluateCardResponseModeForTarget(state, '询问闪', atom.target, (c) => c.name === '闪');
-    // silent 用固定短延时(不走 timeoutScale);normal 用缩放后的正常超时;
+    // silent 用固定短延时(不走 timeoutSec);normal 用缩放后的正常超时;
     // skip 不设 pending(timeoutMs 不参与)。
     const timeoutMs =
       mode === 'silent' ? SHORT_DELAY_MS : resolveTimeoutMs(state, TIMEOUT_SEC);
