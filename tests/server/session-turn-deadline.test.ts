@@ -383,7 +383,21 @@ describe('checkGameOver:主公阵亡胜负判定', () => {
     expect(winner).toBe(0);
   });
 
-  it('多人存活且主公存活 → 游戏未结束', () => {
+  it('主忠残局:主公+忠臣存活、反贼内奸全死 → 主公方获胜(回归:曾不结束)', () => {
+    const state = makeState([
+      { index: 0, identity: '主公', alive: true },
+      { index: 1, identity: '忠臣', alive: true },
+      { index: 2, identity: '反贼', alive: false },
+      { index: 3, identity: '反贼', alive: false },
+      { index: 4, identity: '内奸', alive: false },
+    ]);
+    const { gameOver, winner } = checkGameOver(state);
+    expect(gameOver).toBe(true);
+    expect(winner).toBe(0);
+    expect(state.players[winner!].identity).toBe('主公');
+  });
+
+  it('主公存活、仍有反贼存活 → 游戏未结束', () => {
     const state = makeState([
       { index: 0, identity: '主公', alive: true },
       { index: 1, identity: '反贼', alive: true },
