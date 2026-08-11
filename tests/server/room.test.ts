@@ -31,6 +31,7 @@ import {
   requestSeatSwap,
   respondSeatSwap,
   kickPlayer,
+  ensureSeatOnReconnect,
   SEAT_SWAP_TIMEOUT_MS,
 } from '../../src/server/room';
 import { normalizeRoomConfig, DEFAULT_ROOM_CONFIG } from '../../src/server/protocol';
@@ -561,6 +562,109 @@ describe('旁观者管理', () => {
     expect(result!.id).toBe(room.id);
   });
 
+  it('旁观者重连覆盖后,旧连接断开不应删除新注册(修复刷新后"加入游戏失败")', () => {
+    // 场景:旁观者刷新页面 → 新 joinAsSpectator 覆盖 spectators[id]=sink2 →
+    // 旧 sink1 的 onAbort 延迟触发 → 若无 sink 守卫,removeSpectator 会删掉 sink2 →
+    // switchRole(spectator→player) 找不到该旁观者 → "加入游戏失败"。
+    // sse.ts 旁观分支 onAbort 已加守卫 `if (room.spectators.get(id) !== sink) return`,
+    // 此测试验证该守卫依赖的 joinAsSpectator 覆盖语义。
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    const sink1 = createMockSink();
+    const sink2 = createMockSink();
+
+    // 首次旁观
+    joinAsSpectator(room.id, 'spec1', sink1);
+    expect(room.spectators.get('spec1')).toBe(sink1);
+
+    // 刷新重连:新 sink 覆盖(joinAsSpectator 直接 set,不拒绝已存在)
+    joinAsSpectator(room.id, 'spec1', sink2);
+    expect(room.spectators.get('spec1')).toBe(sink2);
+
+    // 模拟旧 sink1 onAbort 的守卫逻辑(sse.ts):旧 sink 不再是当前 sink → 跳过删除
+    if (room.spectators.get('spec1') === sink1) {
+      removeSpectator(room.id, 'spec1');
+    }
+    expect(room.spectators.has('spec1')).toBe(true);
+    expect(room.spectators.get('spec1')).toBe(sink2);
+
+    // 后续 switchRole(spectator→player) 能找到 spec1 → 加入成功
+    const result = switchRole(room.id, 'spec1', 'player');
+    expect(result.success).toBe(true);
+  });
+
+  // ── 身份互斥（修复"旁观切换到空座位显示座位已满"）──
+  // 根因：joinRoom/joinAsSpectator/switchRole 不清理对方身份，导致同一 playerId
+  // 同时存在于 players 和 spectators，引发容量误判和 UI 身份歧义。
+  it('joinRoom 清理残留旁观身份：刷新前是旁观者，joinRoom 后不再同时存在两边', () => {
+    const room = createRoom('测试', 4, 'host', createMockSink());
+    // wmzy 先以旁观者身份进入
+    joinAsSpectator(room.id, 'wmzy', createMockSink());
+    expect(room.spectators.has('wmzy')).toBe(true);
+
+    // 刷新后 joinRoom（autoJoin）——应清理 spectator 身份
+    joinRoom(room.id, 'wmzy', createMockSink());
+
+    // 身份互斥：只在 players/seats，不在 spectators
+    expect(room.players.has('wmzy')).toBe(true);
+    expect(room.spectators.has('wmzy')).toBe(false);
+    expect(room.seats.includes('wmzy')).toBe(true);
+  });
+
+  it('joinAsSpectator 清理残留玩家身份：刷新前是玩家，降级旁观后释放座位', () => {
+    const room = createRoom('测试', 4, 'host', createMockSink());
+    joinRoom(room.id, 'wmzy', createMockSink());
+    expect(room.seats.includes('wmzy')).toBe(true);
+
+    // autoJoin 失败降级旁观——应释放 wmzy 的座位
+    joinAsSpectator(room.id, 'wmzy', createMockSink());
+
+    expect(room.spectators.has('wmzy')).toBe(true);
+    expect(room.players.has('wmzy')).toBe(false);
+    expect(room.seats.includes('wmzy')).toBe(false);
+  });
+
+  it('switchRole spectator→player 用 seats 占用数判满（非 players.size）', () => {
+    // 满员房间，wmzy 切旁观释放座位后，seats 有空位但 players 可能含幽灵
+    const room = createRoom('测试', 2, 'host', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+    // wmzy 无法加入（满员），改为旁观
+    joinAsSpectator(room.id, 'wmzy', createMockSink());
+
+    // p2 切旁观 → 释放座位，seats 有空位
+    switchRole(room.id, 'p2', 'spectator');
+    expect(room.seats.filter((s) => s !== null).length).toBe(1); // 只剩 host
+
+    // wmzy 切玩家 → 应成功（seats 有空位），即使 players.size 因幽灵偏高也不影响
+    const result = switchRole(room.id, 'wmzy', 'player');
+    expect(result.success).toBe(true);
+    expect(room.seats.includes('wmzy')).toBe(true);
+  });
+
+  it('switchRole 后身份严格互斥（player→spectator 不残留 players）', () => {
+    const room = createRoom('测试', 4, 'host', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+    setReady(room.id, 'p2');
+
+    switchRole(room.id, 'p2', 'spectator');
+
+    expect(room.players.has('p2')).toBe(false);
+    expect(room.readyPlayers.has('p2')).toBe(false);
+    expect(room.seats.includes('p2')).toBe(false);
+    expect(room.spectators.has('p2')).toBe(true);
+  });
+
+  it('容量判断与客户端一致：seats 占用数 >= maxPlayers 时拒绝加入', () => {
+    const room = createRoom('测试', 2, 'host', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+    // 模拟幽灵：p2 断线 players 删除但 seats 残留
+    room.players.delete('p2');
+
+    // 新玩家加入：seats 全占（occupiedSeatCount=2）→ 拒绝
+    // （旧逻辑用 players.size=1 会错误允许，导致与客户端 playerCount=2 不一致）
+    const result = joinRoom(room.id, 'p3', createMockSink());
+    expect(result).toBeNull();
+  });
+
   it('getRoomList 应包含旁观者数量', () => {
     setSessionChecker(() => true);
     const room = createRoom('旁观测试房', 4, 'host-spec-count', createMockSink());
@@ -1076,32 +1180,25 @@ describe('座位残留与重连', () => {
     expect(room.seats).toEqual(['host', 'p2', null, null]);
   });
 
-  it('joinRoom: 复用残留座位时不计入人数上限', () => {
+  it('joinRoom: seats 残留算占用（与客户端 playerCount 一致），断线残留期间拒绝新玩家', () => {
     const room = createRoom('房间', 2, 'host', createMockSink());
     joinRoom(room.id, 'p2', createMockSink());
     expect(room.seats).toEqual(['host', 'p2']);
     expect(room.players.size).toBe(2);
 
-    // p2 断线（players 删除，seats 残留）
+    // p2 断线（players 删除，seats 残留）——模拟 SSE onAbort 尚未触发 leaveRoom 的窗口
     room.players.delete('p2');
 
-    // p3 尝试加入 → 房间已满（players.size=1 < 2 但 seats 全占）
-    // p3 不在 seats 中，需要新座位，但 maxPlayers=2 且 players.size=1
+    // p3 尝试加入 → 被拒：seats 全占（host + p2 残留），occupiedSeatCount=2 >= maxPlayers=2。
+    // 这与客户端 playerCount（=seats 非空数）判断一致，避免"UI 显示满员但服务端允许加入"的歧义。
     const result = joinRoom(room.id, 'p3', createMockSink());
-    expect(result).not.toBeNull();
-    expect(room.players.size).toBe(2);
+    expect(result).toBeNull();
 
-    // p2 重连 → 复用座位 1，但 p3 已占了座位 1...
-    // 不对，p2 重连时检查 seats.indexOf('p2') = 1，但 p2 不在 players 中
-    // 让我们验证 p2 不重复入座
+    // p2 重连 → 复用残留座位 1（seats.indexOf('p2') >= 0），不重复入座
     const p2result = joinRoom(room.id, 'p2', createMockSink());
-    // p2 已在 seats 中但 seats[1] 可能已被 p3 占了
-    // seats 现在可能是 ['host', 'p3']（p2 被覆盖）
-    // 实际上 p2 的残留座位可能被其他玩家覆盖了
-    // 这个测试验证的是 joinRoom 不崩溃且不重复入座
     expect(p2result).not.toBeNull();
-    const p2count = room.seats.filter((s) => s === 'p2').length;
-    expect(p2count).toBeLessThanOrEqual(1);
+    expect(room.seats).toEqual(['host', 'p2']);
+    expect(room.players.size).toBe(2);
   });
 });
 
@@ -1228,5 +1325,49 @@ describe('踢出玩家', () => {
   it('房间不存在时返回 null', () => {
     const result = kickPlayer('NOPE', 'host', 'p2');
     expect(result).toBeNull();
+  });
+});
+
+// ─── SSE 重连补座次（根治幽灵连接）───
+describe('ensureSeatOnReconnect', () => {
+  it('等待中非调试,玩家不在 seats 且有空座 → 补到首个空座,返回 true', () => {
+    const room = createRoom('房间', 4, 'host', createMockSink());
+    // 模拟重启后状态:host 在 players 但 seats 全空
+    room.seats = Array(4).fill(null);
+    expect(ensureSeatOnReconnect(room, 'host')).toBe(true);
+    expect(room.seats[0]).toBe('host');
+  });
+
+  it('玩家已在 seats → 不补,返回 false', () => {
+    const room = createRoom('房间', 4, 'host', createMockSink());
+    // createRoom 已把 host 放入 seats[0]
+    expect(ensureSeatOnReconnect(room, 'host')).toBe(false);
+  });
+
+  it('无空座(seats 满) → 不补,返回 false', () => {
+    const room = createRoom('房间', 2, 'host', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+    // seats 已满,p3 是无座幽灵
+    expect(ensureSeatOnReconnect(room, 'p3')).toBe(false);
+  });
+
+  it('游戏进行中 → 不补,返回 false', () => {
+    const room = createRoom('房间', 4, 'host', createMockSink());
+    room.seats = Array(4).fill(null);
+    room.status = '进行中';
+    expect(ensureSeatOnReconnect(room, 'host')).toBe(false);
+  });
+
+  it('调试房间 → 不补,返回 false', () => {
+    const room = createDebugRoom('调试', 4);
+    room.seats = Array(4).fill(null);
+    expect(ensureSeatOnReconnect(room, 'p1')).toBe(false);
+  });
+
+  it('补到首个空座(中间有空位)', () => {
+    const room = createRoom('房间', 4, 'host', createMockSink());
+    room.seats = ['host', null, 'p3', null];
+    expect(ensureSeatOnReconnect(room, 'p2')).toBe(true);
+    expect(room.seats).toEqual(['host', 'p2', 'p3', null]);
   });
 });

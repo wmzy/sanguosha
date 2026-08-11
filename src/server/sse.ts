@@ -10,7 +10,7 @@ import { serialize } from './protocol';
 import type { ConnectionSink } from './connection';
 import { getRoom, removeSpectator, leaveRoom } from './room';
 import { broadcastMessage } from './room';
-import { getChatHistory, buildRoomState } from './room';
+import { getChatHistory, buildRoomState, ensureSeatOnReconnect } from './room';
 import { gameSessions, playerRoomMap } from './registry';
 import { generatePlayerId } from './utils';
 import { createLogger } from './logger';
@@ -131,6 +131,11 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
         log.info('SSE 旁观者连接断开', { roomId, playerId });
         stopHeartbeat();
         sink.close();
+        // 只在自己仍是当前 sink 时删除（刷新重连后旧连接的 onAbort 可能晚于新连接触发）。
+        // 缺少此守卫时,刷新重连会丢失旁观身份:新 joinAsSpectator 覆盖了 spectators[sid],
+        // 但旧 onAbort 仍触发 removeSpectator 删掉新注册,导致 switchRole(spectator→player)
+        // 找不到该玩家而失败("加入游戏失败")。
+        if (room.spectators.get(playerId) !== sink) return;
         removeSpectator(roomId, playerId);
         playerRoomMap.delete(playerId);
         // 广播 spectator_left
@@ -147,6 +152,13 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
       // 玩家连接（现有逻辑）
       room.players.set(playerId, sink);
       playerRoomMap.set(playerId, roomId);
+
+      // 修复 players/seats 一致性:服务器重启后 DB 不恢复 seats,客户端重连只走 SSE 时
+      // players.set 却不分配座次,导致 "players 满 / seats 空" 的幽灵连接锁死房间。
+      // 补座后广播,让房间内其他人(如旁观的房主)立即看到座位变化。
+      if (ensureSeatOnReconnect(room, playerId)) {
+        broadcastMessage(room, buildRoomState(room), playerId);
+      }
 
       log.info('SSE 连接建立', { roomId, playerId, lastSeq });
 

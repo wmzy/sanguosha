@@ -412,6 +412,83 @@ describe('useMultiplayerRoom', () => {
     expect(result.current.isSpectator).toBe(true);
   });
 
+  it('autoJoin 玩家加入失败(游戏已开始)时自动降级为旁观者(修复刷新死循环)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        fetchCalls.push({ url, method: 'POST', body: {} });
+        // /join(不含 -spectator)→ 400 游戏已开始
+        if (url.includes('/join') && !url.includes('-spectator')) {
+          return new Response(JSON.stringify({ error: '游戏已开始' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        // /join-spectator → 200 成功
+        return new Response(JSON.stringify({ roomId: 'ROOM1', playerId: 'pid-0' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }),
+    );
+    const { result } = renderHook(() => useMultiplayerRoom('ROOM1'));
+    // 第一次 flush:autoJoin joinRoom → 400 → catch → setCommand(spectate)
+    await flushConnect();
+    // 第二次 flush:spectate joinAsSpectator → 200 → openStream → EventSource
+    await flushConnect();
+    const es = MockEventSource.last!;
+    act(() => es.fireOpen());
+    act(() => vi.advanceTimersByTime(250));
+
+    // 降级成功:进入旁观阶段
+    expect(result.current.stage).toBe('spectating');
+    expect(result.current.isSpectator).toBe(true);
+    expect(result.current.notFound).toBe(false);
+    // 验证降级路径:先尝试 /join,失败后自动 /join-spectator
+    expect(fetchCalls.some((c) => c.url.includes('/join') && !c.url.includes('-spectator'))).toBe(true);
+    expect(fetchCalls.some((c) => c.url.includes('/join-spectator'))).toBe(true);
+  });
+
+  it('autoJoin 房间已满时也自动降级为旁观者', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/join') && !url.includes('-spectator')) {
+          return new Response(JSON.stringify({ error: '房间已满' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ roomId: 'ROOM1', playerId: 'pid-0' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }),
+    );
+    const { result } = renderHook(() => useMultiplayerRoom('ROOM1'));
+    await flushConnect();
+    await flushConnect();
+    const es = MockEventSource.last!;
+    act(() => es.fireOpen());
+    act(() => vi.advanceTimersByTime(250));
+
+    expect(result.current.stage).toBe('spectating');
+    expect(result.current.isSpectator).toBe(true);
+  });
+
+  it('spectate 命令 404 时设置 notFound(房间不存在)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({ error: '房间不存在' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ));
+    const { result } = renderHook(() => useMultiplayerRoom());
+    act(() => result.current.joinAsSpectator('GHOST-ROOM'));
+    await flushConnect();
+    expect(result.current.notFound).toBe(true);
+  });
+
   it('手动 joinRoom 房间不存在(404)时回到 lobby 并设置 error', async () => {
     vi.stubGlobal('fetch', vi.fn(async () =>
       new Response(JSON.stringify({ error: '房间不存在' }), {

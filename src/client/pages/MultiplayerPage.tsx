@@ -440,53 +440,6 @@ export function MultiplayerPage() {
     );
   }
 
-  // URL 直达(/play/:roomId)但房间存在且无法直接加入(如游戏进行中且玩家不在座次)。
-  // 不回退到 lobby:lobby 会渲染创建/加入表单 + 房间列表,与直达特定房间的意图相悖。
-  // 提供旁观入口,让用户仍能进入房间观战;不提供"进入房间"因为服务端已拒绝加入。
-  if (mp.joinFailed) {
-    return (
-      <div className={notFoundPage}>
-        <div className={notFoundCode}>!</div>
-        <div className={notFoundTitle}>无法进入房间</div>
-        <p className={notFoundDesc}>
-          房间码 <span className={notFoundRoomId}>{urlRoomId}</span> 无法加入:{mp.joinFailed}
-        </p>
-        <div className={buttonRow}>
-          {urlRoomId && (
-            <button
-              className={btnStyle}
-              style={{ '--btn-bg': colors.accent.blue } as React.CSSProperties}
-              onClick={() => {
-                // 旁观加入:绕过 join 路由,直接以 spectator 身份进入
-                mp.leaveRoom();
-                setTimeout(() => mp.joinAsSpectator(urlRoomId), 0);
-              }}
-            >
-              👁 旁观加入
-            </button>
-          )}
-          <button
-            className={btnStyle}
-            style={{ '--btn-bg': colors.accent.orange } as React.CSSProperties}
-            onClick={() => {
-              mp.leaveRoom();
-              navigate('/play');
-            }}
-          >
-            进入大厅
-          </button>
-          <button
-            className={btnStyle}
-            style={{ '--btn-bg': colors.disabled } as React.CSSProperties}
-            onClick={() => navigate('/')}
-          >
-            返回首页
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   if (mp.stage === 'spectating' && mp.view) {
     // 旁观者申请查看某玩家视角的下拉
     const viewGrants = mp.roomState?.viewGrants ?? {};
@@ -546,138 +499,6 @@ export function MultiplayerPage() {
             ingestedEvents={mp.ingestedEvents}
             disconnectedSeats={mp.disconnectedSeats}
           />
-        </div>
-      </>
-    );
-  }
-
-  // 旁观者在等待阶段（游戏未开始）
-  if (mp.stage === 'spectating') {
-    return (
-      <>
-        {reconnectBanner}
-        <div className={page}>
-          <h1 className={title}>旁观等待中</h1>
-          <p className={subtitle}>{mp.isHost ? '你是房主，可旁观或开始游戏' : '等待房主开始游戏'}</p>
-          <div className={card}>
-            <div className={roomCodeBox}>
-              <div className={roomCodeLabel}>房间码</div>
-              <div className={roomCode}>{mp.roomId ?? '加载中…'}</div>
-            </div>
-            <div className={readyInfo}>
-              玩家：{mp.roomState?.playerIds.length ?? 0} / {mp.roomState?.maxPlayers ?? 0}
-            </div>
-            {/* 玩家列表（旁观者可见谁在房间里） */}
-            {(() => {
-              const seats = mp.roomState?.seats ?? [];
-              const readyPlayers = mp.roomState?.readyPlayers ?? [];
-              if (seats.length === 0) return null;
-              return (
-                <div style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '14px', color: colors.text.muted, marginBottom: '8px' }}>当前玩家</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {seats.map((seatPlayerId, i) => {
-                      const isEmpty = seatPlayerId === null;
-                      const isReady = seatPlayerId !== null && readyPlayers.includes(seatPlayerId);
-                      return (
-                        <div
-                          key={i}
-                          className={btnStyle}
-                          style={{
-                            cursor: 'default',
-                            '--btn-bg': isEmpty
-                              ? colors.bg.input
-                              : isReady
-                                ? colors.accent.green
-                                : colors.accent.darkRed,
-                          } as React.CSSProperties}
-                        >
-                          {isEmpty ? (
-                            <span style={{ color: colors.text.muted }}>P{i + 1} 空位</span>
-                          ) : (
-                            <span>
-                              P{i + 1} {seatPlayerId}
-                              {isReady ? '（已准备）' : '（未准备）'}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-            {/* 旁观者列表 */}
-            {(mp.roomState?.spectatorIds.length ?? 0) > 0 && (
-              <div className={readyInfo} style={{ fontSize: '13px', color: colors.text.muted }}>
-                👁 旁观者：{mp.roomState?.spectatorIds.join('、')}
-              </div>
-            )}
-            {/* 房间配置（旁观者可见） */}
-            {mp.roomState?.config && (
-              <div className={configGrid}>
-                <div className={configItem}>
-                  <span className={configKey}>房间名</span>
-                  <span className={configVal}>{mp.roomState.config.name}</span>
-                </div>
-                <div className={configItem}>
-                  <span className={configKey}>将池</span>
-                  <span className={configVal}>{POOL_LABELS[mp.roomState.config.charPool] ?? mp.roomState.config.charPool}</span>
-                </div>
-                <div className={configItem}>
-                  <span className={configKey}>操作倒计时</span>
-                  <span className={configVal}>{timeoutLabel(mp.roomState.config.timeoutScale)}</span>
-                </div>
-                <div className={configItem}>
-                  <span className={configKey}>初始手牌</span>
-                  <span className={configVal}>{mp.roomState.config.handSize} 张</span>
-                </div>
-                <div className={configItem}>
-                  <span className={configKey}>聊天</span>
-                  <span className={configVal}>{mp.roomState.config.chat?.enabled ? '开启' : '关闭'}</span>
-                </div>
-              </div>
-            )}
-            <div className={buttonRow}>
-              {/* 加入游戏：旁观者切回玩家（房间未满时） */}
-              {playerCount < maxPlayers && (
-                <button
-                  className={btnStyle}
-                  style={{ '--btn-bg': colors.accent.green } as React.CSSProperties}
-                  onClick={() => mp.switchRole('player')}
-                >
-                  加入游戏
-                </button>
-              )}
-              {/* 房主旁观时仍可开始游戏（hostId 不变） */}
-              {mp.isHost && (
-                <button
-                  className={btnStyle}
-                  style={
-                    {
-                      '--btn-bg': allReady ? colors.accent.orange : colors.disabled,
-                      '--btn-cursor': allReady ? 'pointer' : 'not-allowed',
-                    } as React.CSSProperties
-                  }
-                  disabled={!allReady}
-                  onClick={mp.startGame}
-                >
-                  开始游戏
-                </button>
-              )}
-              <button
-                className={btnStyle}
-                style={{ '--btn-bg': colors.disabled } as React.CSSProperties}
-                onClick={() => {
-                  mp.leaveRoom();
-                  navigate('/');
-                }}
-              >
-                退出
-              </button>
-            </div>
-          </div>
-          {mp.error && <div className={errorToastStyle}>{mp.error}</div>}
         </div>
       </>
     );
@@ -759,7 +580,9 @@ export function MultiplayerPage() {
     );
   }
 
-  if (mp.stage === 'waiting') {
+  // 玩家等待 + 旁观等待共用同一个大厅视图,用 mp.isSpectator 区分身份。
+  // 旁观者游戏开始后 stage 仍为 'spectating' 但有 mp.view,由上方 spectating+view 分支处理。
+  if (mp.stage === 'waiting' || mp.stage === 'spectating') {
     return (
       <>
         {reconnectBanner}
@@ -1127,11 +950,20 @@ export function MultiplayerPage() {
               </button>
             )}
             {mp.isSpectator ? (
-              <span
-                style={{ color: colors.accent.gold, fontSize: '13px', alignSelf: 'center', padding: '0 8px' }}
+              <button
+                className={btnStyle}
+                style={
+                  {
+                    '--btn-bg': playerCount < maxPlayers ? colors.accent.gold : colors.disabled,
+                    '--btn-cursor': playerCount < maxPlayers ? 'pointer' : 'not-allowed',
+                  } as React.CSSProperties
+                }
+                disabled={playerCount >= maxPlayers}
+                onClick={() => mp.switchRole('player')}
+                title={playerCount < maxPlayers ? '点击加入游戏' : '房间已满，无法加入'}
               >
-                👁 旁观中
-              </span>
+                👁 旁观中（加入游戏）
+              </button>
             ) : (
               <button
                 className={btnStyle}
