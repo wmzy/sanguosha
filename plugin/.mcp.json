@@ -1,6 +1,7 @@
 {
   "sanguosha": {
     "command": "node",
-    "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/sanguosha-mcp.mjs"]
+    "args": ["${CLAUDE_PLUGIN_ROOT}/mcp/sanguosha-mcp.mjs"],
+    "timeout": 86400000
   }
 }
