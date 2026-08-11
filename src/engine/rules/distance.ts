@@ -29,9 +29,9 @@ function seatDistance(aliveCount: number, fromIdx: number, toIdx: number): numbe
  * 扩展点:registerDistanceExemptor 注册的豁免器命中时返回 1(视为无距离限制)。
  * 用于"特定条件下用牌无距离限制"类效果(界陷阵拼点赢后对其用牌无距离等)。
  */
-export function effectiveDistance(state: GameState, from: number, to: number): number {
+export function effectiveDistance(state: GameState, from: number, to: number, cardId?: string): number {
   // 豁免器命中视为距离 1(可被所有距离检查放行)。
-  if (isDistanceExempted(state, from, to)) return 1;
+  if (isDistanceExempted(state, from, to, cardId)) return 1;
   const alive = state.players.filter((p) => p.alive);
   const aliveFrom = alive.findIndex((p) => p.index === from);
   const aliveTo = alive.findIndex((p) => p.index === to);
@@ -87,11 +87,15 @@ export type AttackRangeExemptor = (
  * 用于"用牌无距离限制"类效果(界陷阵:拼点赢后对其用牌无距离)。
  * 与 AttackRangeExemptor 的区别:后者只覆盖【杀】;前者覆盖所有 distance-based 检查
  * (顺手牵羊/过河拆桥等)。效果重叠时(如界陷阵同时覆盖杀与其他牌),应同时注册两者。
+ *
+ * cardId 可选,用于 per-card 距离豁免(如成略:同花色牌无距离限制)。
+ * 调用方(isDistanceExempted→effectiveDistance)在已知当前使用牌时传入。
  */
 export type DistanceExemptor = (
   state: GameState,
   from: number,
   to: number,
+  cardId?: string,
 ) => boolean;
 
 interface DistanceRegistry {
@@ -177,12 +181,13 @@ export function registerDistanceExemptor(
   };
 }
 
-/** 该 from→to 是否被任一通用距离豁免器放行(任一返回 true 即视为距离 1)。 */
-export function isDistanceExempted(state: GameState, from: number, to: number): boolean {
+/** 该 from→to 是否被任一通用距离豁免器放行(任一返回 true 即视为距离 1)。
+ *  cardId 可选:已知当前使用牌时传入,供 per-card 距离豁免(成略:同花色牌无距离)。 */
+export function isDistanceExempted(state: GameState, from: number, to: number, cardId?: string): boolean {
   const set = getDistanceRegistry(state).distanceExemptors.get(from);
   if (!set) return false;
   for (const fn of set) {
-    if (fn(state, from, to)) return true;
+    if (fn(state, from, to, cardId)) return true;
   }
   return false;
 }

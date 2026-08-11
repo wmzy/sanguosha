@@ -93,7 +93,7 @@ export type MoveReason =
 
 export type Atom =
   // 卡牌/资源
-  | { type: '摸牌'; player: number; count: number }
+  | { type: '摸牌'; player: number; count: number; fromBottom?: boolean }
   | { type: '弃置'; player: number; cardIds: string[]; voluntary?: boolean }
   | { type: '移动牌'; cardId: string; from: ZoneLoc; to: ZoneLoc }
   // 移动牌编排时机标记(对齐 出牌流程重设计.md 模块 F / move.md):事件标记型,

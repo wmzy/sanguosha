@@ -40,6 +40,10 @@ export function viewEffectiveDistance(
   // 注:GameView 不携带 currentPlayerIndex 区分发起方,这里宽松返回 1(可被所有距离检查放行)。
   // 后端 distance.ts effectiveDistance 严格按 turn.vars 校验(仅对持有界陷阵技能的发起方生效)。
   if (players.some((p) => p.turnUsage?.['陷阵/winTarget'] === toIdx)) return 1;
+  // 成略(许攸):本阶段同花色牌无距离限制。turnUsage['成略/suits'] 由回合用量 atom 同步。
+  // 前端 filter 无法感知选中卡的花色,保持宽松(成略激活时一律放行);
+  // 后端 distance.ts 的 DistanceExemptor 按 cardId 花色严格校验(仅同花色放行)。
+  if (players[fromIdx]?.turnUsage?.['成略/suits']) return 1;
   let dist = viewSeatDistance(players, fromIdx, toIdx);
   const fromP = players[fromIdx];
   const toP = players[toIdx];
@@ -66,6 +70,10 @@ export function viewCanAttack(
   // 前端 filter 无法感知当前选中的卡色(签名只收 view/target),这里保持宽松——
   // 诈降激活时一律放行(UI 提示);后端 杀.validate 按卡色严格校验(仅红杀放行)。
   if (players[fromIdx]?.turnUsage?.['杀/extra/诈降']) return true;
+  // 成略(许攸):本阶段同花色牌无距离和次数限制。turnUsage['成略/suits'] 由回合用量 atom 同步。
+  // 前端 filter 无法感知选中杀的花色,保持宽松(成略激活时所有目标可点);
+  // 后端 AttackRangeExemptor/SlashExemptor 按 cardId 花色严格校验(仅同花色放行)。
+  if (players[fromIdx]?.turnUsage?.['成略/suits']) return true;
   // 界武圣(界关羽):你使用的方片【杀】无距离限制。前端 filter 无法感知选中卡色,
   // 保持宽松(所有目标可点);后端 杀.validate 按花色严格校验(仅方片杀放行)。
   if (players[fromIdx]?.skills?.includes('界武圣')) return true;

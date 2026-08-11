@@ -397,6 +397,58 @@ export const skillLoaders: Record<string, Loader> = {
   // 界限突破·群国·界高顺(独立技能文件,不修改标技能;标版陷阵/禁酒未实现)
   界陷阵: load(() => import('./界陷阵')),
   界禁酒: load(() => import('./界禁酒')),
+  // 标准版·群雄·华雄
+  耀武: load(() => import('./耀武')),
+  // 风林火山·魏国·毌丘俭
+  征荣: load(() => import('./征荣')),
+  鸿举: load(() => import('./鸿举')),
+  // 风林火山·魏国·王基
+  奇制: load(() => import('./奇制')),
+  进趋: load(() => import('./进趋')),
+  // 风林火山·魏国·蒯越蒯良
+  荐降: load(() => import('./荐降')),
+  审时: load(() => import('./审时')),
+  // 风林火山·魏国·郝昭
+  镇骨: load(() => import('./镇骨')),
+  // 风林火山·蜀国·王平
+  飞军: load(() => import('./飞军')),
+  兵略: load(() => import('./兵略')),
+  // 风林火山·蜀国·诸葛瞻
+  罪论: load(() => import('./罪论')),
+  父荫: load(() => import('./父荫')),
+  // 风林火山·蜀国·陈到
+  往烈: load(() => import('./往烈')),
+  // 风林火山·蜀国·严颜
+  拒战: load(() => import('./拒战')),
+  // 风林火山·吴国·陆抗
+  谦节: load(() => import('./谦节')),
+  决堰: load(() => import('./决堰')),
+  破势: load(() => import('./破势')),
+  // 风林火山·吴国·陆绩
+  怀橘: load(() => import('./怀橘')),
+  遗礼: load(() => import('./遗礼')),
+  整论: load(() => import('./整论')),
+  // 风林火山·吴国·张昭张弘 (复用标版直谏/固政，技能效果相同)
+  // 风林火山·吴国·周妃
+  良姻: load(() => import('./良姻')),
+  箜声: load(() => import('./箜声')),
+  // 风林火山·吴国·孙亮
+  溃诛: load(() => import('./溃诛')),
+  掣政: load(() => import('./掣政')),
+  立军: load(() => import('./立军')),
+  // 风林火山·群雄·袁术
+  庸肆: load(() => import('./庸肆')),
+  伪帝: load(() => import('./伪帝')),
+  // 风林火山·群雄·卢植
+  明任: load(() => import('./明任')),
+  贞良: load(() => import('./贞良')),
+  // 风林火山·群雄·张绣
+  雄乱: load(() => import('./雄乱')),
+  从谏: load(() => import('./从谏')),
+  // 风林火山·群雄·许攸
+  成略: load(() => import('./成略')),
+  恃才: load(() => import('./恃才')),
+  寸目: load(() => import('./寸目')),
 };
 
 // 系统规则的全局 hooks 已移至 index 的 bootstrap/registerSkillsFromState 中,

@@ -10,6 +10,8 @@ export function isCardBanned(state: GameState, ownerId: number, _cardName: strin
   const player = state.players[ownerId];
   if (!player) return false;
   if (player.tags.includes('义绝/禁出牌')) return true;
+  // 往烈(陈到):发动不可响应后本阶段不能再使用牌(turn-scoped,回合结束自动清空)
+  if (state.turn.vars['往烈/禁出牌'] === ownerId) return true;
   return false;
 }
 
@@ -31,6 +33,7 @@ export function isLegalTarget(
   ownerId: number,
   cardName: string,
   target: number,
+  cardId?: string,
 ): boolean {
   const effect = getCardEffect(cardName);
   if (!effect) return false;
@@ -56,7 +59,7 @@ export function isLegalTarget(
       return inAttackRange(state, ownerId, target);
     case 'distance': {
       if (state.players[ownerId]?.tags.includes('奇才/无距离限制')) return true;
-      return effectiveDistance(state, ownerId, target) <= spec.dist;
+      return effectiveDistance(state, ownerId, target, cardId) <= spec.dist;
     }
     case 'allOthers':
     case 'allPlayers':
@@ -96,10 +99,11 @@ export function findLegalTargets(
   state: GameState,
   ownerId: number,
   cardName: string,
+  cardId?: string,
 ): number[] {
   const result: number[] = [];
   for (let i = 0; i < state.players.length; i++) {
-    if (isLegalTarget(state, ownerId, cardName, i)) result.push(i);
+    if (isLegalTarget(state, ownerId, cardName, i, cardId)) result.push(i);
   }
   return result;
 }
@@ -132,7 +136,8 @@ export function validateCardUse(
   const effect = getCardEffect(cardName);
   if (!effect) return `${cardName} 尚未注册 CardEffect`;
   if (effect.target.kind !== 'self' && effect.target.kind !== 'effect') {
-    const legalTargets = findLegalTargets(state, ownerId, cardName);
+    const cardId = params.cardId as string | undefined;
+    const legalTargets = findLegalTargets(state, ownerId, cardName, cardId);
     if (legalTargets.length === 0) return '没有合法目标';
   }
 

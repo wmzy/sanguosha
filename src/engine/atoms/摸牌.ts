@@ -24,9 +24,16 @@ interface DrawPlan {
 function planDraw(
   state: { zones: { deck: string[]; discardPile: string[] }; rngSeed: number },
   count: number,
+  fromBottom = false,
 ): DrawPlan {
   if (state.zones.deck.length >= count) {
-    return { drawn: state.zones.deck.slice(-count).reverse(), reshuffled: false };
+    // 牌堆方向约定:deck[0]=牌堆底(最后摸),deck[末尾]=牌堆顶(最先摸)。
+    // 从牌堆顶摸:取末尾 count 张并倒序(末尾最先摸)。
+    // 从牌堆底摸(寸目):取开头 count 张并保持顺序(deck[0] 最先摸)。
+    return {
+      drawn: fromBottom ? state.zones.deck.slice(0, count) : state.zones.deck.slice(-count).reverse(),
+      reshuffled: false,
+    };
   }
   // 牌堆不足:合并 deck + discardPile,Fisher–Yates 洗牌
   const combined = [...state.zones.deck, ...state.zones.discardPile];
@@ -36,14 +43,14 @@ function planDraw(
     [combined[i], combined[j]] = [combined[j], combined[i]];
   }
   return {
-    drawn: combined.slice(-count).reverse(),
-    newDeck: combined.slice(0, -count),
+    drawn: fromBottom ? combined.slice(0, count) : combined.slice(-count).reverse(),
+    newDeck: fromBottom ? combined.slice(count) : combined.slice(0, -count),
     reshuffled: true,
     newSeed: rng.getState(),
   };
 }
 
-export const 摸牌: AtomDefinition<{ player: number; count: number }> = {
+export const 摸牌: AtomDefinition<{ player: number; count: number; fromBottom?: boolean }> = {
   type: '摸牌',
   validate(state, atom) {
     if (!state.players[atom.player]) return `player ${atom.player} not found`;
@@ -54,20 +61,23 @@ export const 摸牌: AtomDefinition<{ player: number; count: number }> = {
     return null;
   },
   apply(state, atom) {
-    const plan = planDraw(state, atom.count);
+    const fromBottom = !!atom.fromBottom;
+    const plan = planDraw(state, atom.count, fromBottom);
     if (plan.reshuffled) {
       state.zones.deck = plan.newDeck!;
       state.zones.discardPile = [];
       state.rngSeed = plan.newSeed!;
     } else {
-      state.zones.deck = state.zones.deck.slice(0, -atom.count);
+      state.zones.deck = fromBottom
+        ? state.zones.deck.slice(atom.count)
+        : state.zones.deck.slice(0, -atom.count);
     }
     state.players[atom.player].hand.push(...plan.drawn);
   },
   effect: { sound: 'flip', animation: 'slide', duration: 600 },
   toViewEvents(state, atom): ViewEventSplit {
     const effect = { sound: 'flip' as const, animation: 'slide' as const, duration: 600 };
-    const plan = planDraw(state, atom.count);
+    const plan = planDraw(state, atom.count, !!atom.fromBottom);
     const cards = plan.drawn.map((id) => state.cardMap[id]).filter(Boolean);
     const base = {
       type: '摸牌' as const,

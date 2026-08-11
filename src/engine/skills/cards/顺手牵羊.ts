@@ -22,7 +22,8 @@ function canUseSnatch(
   if (!state.players[target]?.alive) return '目标已死亡';
   // 距离检查:isLegalTarget 统一处理(含奇才豁免),canUse 也需检查具体目标
   const ignoreDistance = !!state.players[ownerId]?.tags.includes('奇才/无距离限制');
-  if (!ignoreDistance && effectiveDistance(state, ownerId, target) > 1) return '距离太远';
+  const useCardId = params.cardId as string | undefined;
+  if (!ignoreDistance && effectiveDistance(state, ownerId, target, useCardId) > 1) return '距离太远';
   const p = state.players[target];
   if (!p) return '目标不合法';
   const hasCards =

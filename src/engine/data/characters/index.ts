@@ -153,6 +153,25 @@ export { 界沮授 } from './界沮授';
 export { 界蔡夫人 } from './界蔡夫人';
 export { 界陈宫 } from './界陈宫';
 export { 界高顺 } from './界高顺';
+export { 华雄 } from './华雄';
+export { 毌丘俭 } from './毌丘俭';
+export { 王基 } from './王基';
+export { 蒯越蒯良 } from './蒯越蒯良';
+export { 郝昭 } from './郝昭';
+export { 王平 } from './王平';
+export { 诸葛瞻 } from './诸葛瞻';
+export { 陈到 } from './陈到';
+export { 卧龙诸葛亮 } from './卧龙诸葛亮';
+export { 严颜 } from './严颜';
+export { 陆抗 } from './陆抗';
+export { 陆绩 } from './陆绩';
+export { 张昭张弘 } from './张昭张弘';
+export { 周妃 } from './周妃';
+export { 孙亮 } from './孙亮';
+export { 袁术 } from './袁术';
+export { 卢植 } from './卢植';
+export { 张绣 } from './张绣';
+export { 许攸 } from './许攸';
 
 // 阵营列表
 import { 曹操 } from './曹操';
@@ -202,6 +221,7 @@ import { 张飞 } from './张飞';
 import { 界张飞 } from './界张飞';
 import { 赵云 } from './赵云';
 import { 界赵云 } from './界赵云';
+import { 诸葛亮 } from './诸葛亮';
 import { 界诸葛亮 } from './界诸葛亮';
 import { 黄月英 } from './黄月英';
 import { 界黄月英 } from './界黄月英';
@@ -300,6 +320,25 @@ import { 界沮授 } from './界沮授';
 import { 界蔡夫人 } from './界蔡夫人';
 import { 界陈宫 } from './界陈宫';
 import { 界高顺 } from './界高顺';
+import { 华雄 } from './华雄';
+import { 毌丘俭 } from './毌丘俭';
+import { 王基 } from './王基';
+import { 蒯越蒯良 } from './蒯越蒯良';
+import { 郝昭 } from './郝昭';
+import { 王平 } from './王平';
+import { 诸葛瞻 } from './诸葛瞻';
+import { 陈到 } from './陈到';
+import { 卧龙诸葛亮 } from './卧龙诸葛亮';
+import { 严颜 } from './严颜';
+import { 陆抗 } from './陆抗';
+import { 陆绩 } from './陆绩';
+import { 张昭张弘 } from './张昭张弘';
+import { 周妃 } from './周妃';
+import { 孙亮 } from './孙亮';
+import { 袁术 } from './袁术';
+import { 卢植 } from './卢植';
+import { 张绣 } from './张绣';
+import { 许攸 } from './许攸';
 
 export const weiCharacters = [
   曹操,
@@ -341,6 +380,10 @@ export const weiCharacters = [
   界王异,
   界郭淮,
   界郭皇后,
+  毌丘俭,
+  王基,
+  蒯越蒯良,
+  郝昭,
 ];
 export const shuCharacters = [
   刘备,
@@ -362,6 +405,7 @@ export const shuCharacters = [
   界魏延,
   卧龙诸葛,
   界卧龙诸葛,
+  诸葛亮,
   界诸葛亮,
   庞统,
   界庞统,
@@ -380,6 +424,11 @@ export const shuCharacters = [
   界徐庶,
   界法正,
   界简雍,
+  王平,
+  诸葛瞻,
+  陈到,
+  卧龙诸葛亮,
+  严颜,
 ];
 export const wuCharacters = [
   孙权,
@@ -418,6 +467,11 @@ export const wuCharacters = [
   界程普,
   界虞翻,
   界韩当,
+  陆抗,
+  陆绩,
+  张昭张弘,
+  周妃,
+  孙亮,
 ];
 export const qunCharacters = [
   华佗,
@@ -453,6 +507,11 @@ export const qunCharacters = [
   界蔡夫人,
   界陈宫,
   界高顺,
+  华雄,
+  袁术,
+  卢植,
+  张绣,
+  许攸,
 ];
 export const allCharacters = [
   ...weiCharacters,
