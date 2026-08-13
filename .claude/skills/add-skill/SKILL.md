@@ -118,6 +118,52 @@ metadata:
 - 根因:中文函数名(`醇列表`)割裂全仓库约定(`shadowIdOf`);英文装备槽 key 违反领域命名
 - 正解:函数/局部变量用英文(`shadowIdOf`/`getNeighbors`);业务常量保留中文(武将名/atom 类型/卡牌名);装备槽 key 用中文(`'武器'`/`'防具'`/`'进攻马'`/`'防御马'`/`'宝物'`)。[90df9e06]
 
+**T12. "限一次"vars 必须同时投影到 view.turnUsage（经「回合用量」atom），否则 activeWhen 永远 true**
+- 症状:玩家用过技能后按钮仍亮着，点击被后端 validate 拒绝（前端 activeWhen 与后端 state 脱钩）
+- 根因:只在 `player.vars[KEY]` 写标记，未调 `applyAtom({type:'回合用量', player:from, key:KEY, value:true})`
+- 正解:写 vars 的同时调「回合用量」atom 投影到 `view.players[i].turnUsage[KEY]`。`activeUnlessUsedThisTurn` 读 turnUsage（前端），validate 读 vars（后端），两端一致。[界弓骑/界当先]
+- 例外:**持久限定技**（整局一次）不能存 turnUsage（每回合清空），用 `player.vars` + 后端 validate 拦截（对齐乱武/界乱武约定）。
+
+**T13. defaultChoice:true 用 `!== false`；false 用 `=== true`。禁止 truthy 检查**
+- 症状:超时后行为错误——defaultChoice:true 超时应默认确认，但 `if (!localVars[KEY])` 把 undefined 当 false
+- 根因:引擎 `请求回应.onTimeout` 对非 `__弃牌` 型 RT 不调 respond → execute 不执行 → localVars[KEY] 保持 undefined
+- 正解:defaultChoice:true → `if (localVars[KEY] !== false)`（undefined 视为默认确认）；defaultChoice:false → `if (localVars[KEY] === true)`（undefined 视为默认取消）。[界献图×2处/界强识/界甘露]
+
+**T14. respond execute 读 `params.choice`（前端 confirm prompt 提交 choice），不是 `params.confirmed`**
+- 症状:玩家点确认后技能不发动——KEY 恒为 false
+- 根因:前端 AwaitingPrompt.tsx 发送 `{choice:true/false}`，引擎无 choice→confirmed 归一化
+- 正解:`params.choice === true || params.confirmed === true`（后者为防御性兜底，但 choice 是主要路径）。[界血裔 CRITICAL]
+
+**T15. 强制弃牌/给牌必须 `mandatory:true` + 超时兜底；cardIds 校验无重复**
+- 症状:玩家可跳过强制弃牌义务（白嫖）；提交重复 cardId 污染弃牌堆
+- 根因:请求回应 atom 缺 `mandatory:true`（前端显示"不回应"按钮）；超时无自动补弃；validate 未校验 `new Set(cardIds).size`
+- 正解:① 加 `mandatory:true`；② 超时兜底 `hand.slice(0, N)` 自动补弃；③ validate 加 `if (new Set(cardIds).size !== cardIds.length) return '不能选择重复的牌'`。[界灭计/界甘露/界焚城/界缔盟/界节命/界自守]
+
+**T16. 从弃牌堆取牌前必须检查 `discardPile.includes(cardId)`，防止其他技能已取走导致卡牌复制**
+- 症状:同一张牌同时出现在两个玩家手牌中（状态损坏）
+- 根因:移动牌 atom 的 apply 对 from='弃牌堆' 只做 filter（不在则 no-op）却仍 hand.push
+- 正解:取牌前 `if (state.zones.discardPile.includes(cardId))` 守卫；或重排顺序使取牌原子化（先取牌再做后续 await）。[界悲歌/界惴恐/界暴虐]
+
+**T17. onInit cleanup 必须包含所有 hook/provider 的 unloader，不能返回空函数**
+- 症状:技能卸载后 hook 仍触发 → 残留/重复注册 → 每次伤害触发两次
+- 根因:`registerAfterHook` 返回的 unloader 被丢弃，onInit 返回 `() => {}`
+- 正解:收集所有 unloader 到数组，onInit 返回 `() => unloaders.forEach(fn => fn())`。例外:仅注册 respond action 的技能可返回空函数（`unregisterActionsForInstance` 按 skillId 前缀自动清理 action+hook）。[界节命/界耀武]
+
+**T18. 阶段结束交互式触发器用 before-hook（非 after-hook）**
+- 症状:触发时机在 phase 已推进后才执行，与弃牌阶段 pending 错位
+- 根因:回合管理是系统技能（注册序在角色技能前），其 阶段结束 after-hook 先执行并推进 phase
+- 正解:交互式阶段结束触发器挂 `registerBeforeHook(state, skill.id, ownerId, '阶段结束', ...)`。非交互的 after-hook（仅调归还牌等）可保持 after。[界燕语→after改before]
+
+**T19. 手牌变动触发型技能必须覆盖所有手牌减少路径**
+- 症状:某些路径的手牌减少不触发技能（如给予/移出至暂存区/拼点扣置）
+- 根因:只挂了 `移动牌`（手牌→处理区），遗漏 `给予`（手牌→他人手牌）、`移出至暂存区`（手牌→vars）、`拼点扣置`（手牌→处理区面朝下）、`获得`（被他人获得）
+- 正解:逐路径检查并挂对应 after-hook。参考连营/界连营 的完整覆盖模式。[界伤逝 +3 hooks]
+
+**T20. 偷牌必须随机盲取（Math.random），不能固定取第一张；手牌盲选须调 spliceHandOrderEntry**
+- 症状:固定取 hand[0] 破坏隐藏信息不变量；重放时手牌顺序不一致导致结果不同
+- 根因:代码用 `target.hand[0]` 而非随机索引；自实现选牌面板漏调 `spliceHandOrderEntry`
+- 正解:① `const idx = Math.floor(Math.random() * target.hand.length)`；② 自实现 pickTargetCard 面板前调 `spliceHandOrderEntry(state, target)`（与 runPickTargetCardPanel 一致）。[界巧变/界补益/界趫猛]
+
 ---
 
 ## 详细模板和通用机制
