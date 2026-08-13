@@ -32,7 +32,7 @@ import { applyAtom } from '../core/apply';
 import { registerBeforeHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import type { SkillModule } from '../types';
-import { handLimitBonusKey } from '../rules/vars-keys';
+import { getHandLimitBonus } from '../rules/vars-keys';
 
 const DISPLAY_NAME = '宗室';
 
@@ -81,7 +81,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (player !== ownerId) return undefined;
     const p = st.players[player];
     if (!p) return undefined;
-    const bonus = (st.turn.vars[handLimitBonusKey(player)] as number | undefined) ?? 0;
+    const bonus = getHandLimitBonus(st.turn.vars, player) ?? 0;
     return getHealthValue(p) + bonus + countFactions(st);
   });
 

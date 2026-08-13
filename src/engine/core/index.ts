@@ -160,7 +160,8 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
     params: { ...gameConfig },
     baseSeq: 0,
   });
-  await settle;
+  const settleError = await settle;
+  if (settleError) throw settleError;
 }
 
 /**
@@ -189,7 +190,8 @@ export async function restore(
     await clock.advanceTo(entry.timestamp);
     // 重放该命令:dispatch 后等 execute 挂起(slot 创建)或执行完成。
     const { settle } = await dispatch(state, msg);
-    await settle;
+    const settleError = await settle;
+    if (settleError) throw settleError;
   }
   // 重放完毕:排空开局 execute 的异步 resume 链,并触发残留阻塞型 pending 的超时。
   // 开局 execute 跨多个 respond 的 resume 不被任何单次 settle 覆盖(settle 只覆盖
@@ -245,24 +247,26 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
 export interface DispatchResult {
   /** validate 通过且 execute 已启动(或 skip 已处理)。false = 拒绝。 */
   accepted: boolean;
-  /** execute 到达挂起点(slot 创建)或执行完成时 resolve。拒绝路径立即 resolve。 */
-  settle: Promise<void>;
+  /** execute 到达挂起点(slot 创建)或执行完成时 resolve;resolve 时若 execute 抛错则携带该错误,否则为 undefined。validate 拒绝路径立即 resolve(undefined)。 */
+  settle: Promise<Error | undefined>;
 }
 
 export async function dispatch(state: GameState, message: ClientMessage): Promise<DispatchResult> {
   // settle 信号:execute 是 fire-and-forget,restore 需要知道它何时「挂起或完成」。
   // 挂起点由 createAndAwaitSlot 在 slot 入 pendingSlots 后调 state.onExecuteSettle 通知;
-  // 执行完成由下方 .finally(signalSettle) 通知。两处竞争,settled 防重入只 resolve 一次。
-  let settleResolve!: () => void;
-  const settle = new Promise<void>((r) => {
+  // 执行完成由下方 .finally(settleAfterDrain) 通知。两处竞争,settled 防重入只 resolve 一次。
+  // settle 携带 execute 错误(若有):挂起点(onExecuteSettle)与 validate 拒绝(reject)
+  // 都是无错误路径,resolve(undefined);只有 execute 自身抛错才 resolve(error)。
+  let settleResolve!: (error?: Error) => void;
+  const settle = new Promise<Error | undefined>((r) => {
     settleResolve = r;
   });
   let settled = false;
-  const signalSettle = () => {
+  const signalSettle = (error?: Error) => {
     if (settled) return;
     settled = true;
     state.onExecuteSettle = null;
-    settleResolve();
+    settleResolve(error);
   };
   state.onExecuteSettle = signalSettle;
   const reject = (): DispatchResult => {
@@ -415,27 +419,30 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   // then/finally 都走 cleanupSlot。safeResolve 防重入 + 删除幂等 → 无副作用重复执行。
   // 注意:不 return execute 的 promise——execute 内 await pending slot 可能阻塞到玩家回应,
   // 如果 dispatch 返回该 promise,session/harness 的 await 会死锁。
-  // dispatch 返回 { accepted, settle }。execute 无人 await,其 rejection 只能通过 onError 回调暴露。
-  // settle 在「execute 完成且排空父 execute 的异步 resume」后 resolve:
+  // dispatch 返回 { accepted, settle }。execute 抛错由链首 .catch 捕获:同步 onError 上报,
+  // 并记到 executeError;不 rethrow(避免无人 await 的 unhandled rejection)。
+  // settle 在「execute 完成/挂起且排空父 execute 的异步 resume」后 resolve:
   //   respond execute 的 cleanupSlot resolve 旧 slot,触发父 execute(如开局)的异步 resume 链。
   //   若直接 signalSettle,restore 的下一条 respond 会在父 resume 创建的新 slot 出现前被拒。
   //   故先排空微任务让 resume 推进到下一个挂起点(slot 创建触发 onExecuteSettle)或完成。
+  //   settleAfterDrain 把 executeError 传给 signalSettle,使 await settle 方能感知 execute 错误。
+  let executeError: Error | undefined;
   const settleAfterDrain = async (): Promise<void> => {
     for (let i = 0; i < 20 && !settled; i++) {
       await new Promise((r) => setTimeout(r, 0));
     }
-    signalSettle();
+    signalSettle(executeError);
   };
   entry
     .execute(state, message.params)
-    .then(cleanupSlot)
-    .finally(cleanupSlot)
-    .finally(settleAfterDrain)
     .catch((err: unknown) => {
       const e = err instanceof Error ? err : new Error(String(err));
       state.onError?.(e);
-      throw err;
-    });
+      executeError = e;
+    })
+    .then(cleanupSlot)
+    .finally(cleanupSlot)
+    .finally(settleAfterDrain);
   return accept();
 }
 

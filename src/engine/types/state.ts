@@ -199,7 +199,8 @@ export interface GameState {
 
   /** 引擎错误回调:execute fire-and-forget 抛错时触发。
    *  session 订阅后记录完整堆栈,避免错误被静默吞掉。
-   *  fire-and-forget 的 execute promise 无人 await,其 rejection 只能通过此回调暴露。 */
+   *  fire-and-forget 的 execute promise 无人 await:其错误现在同时通过 dispatch 的 settle
+   *  (Promise<Error | undefined>,供 restore 在重放时感知并中断)和此回调双通道暴露。 */
   onError?: (error: Error) => void;
 }
 

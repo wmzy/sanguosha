@@ -7,7 +7,7 @@
 // 注册表为 state-bound(WeakMap 外挂),随 state 自动隔离/GC,与 slash-quota/hand-limit 同构。
 
 import type { GameState } from '../types';
-import { DISTANCE_ATTACK_MOD_KEY, DISTANCE_DEFENSE_MOD_KEY, DISTANCE_ATTACK_RANGE_KEY } from './vars-keys';
+import { getDistanceAttackMod, getDistanceDefenseMod, getDistanceAttackRange } from './vars-keys';
 
 /**
  * 环形座位距离(只算存活玩家)。
@@ -39,10 +39,10 @@ export function effectiveDistance(state: GameState, from: number, to: number, ca
   if (aliveFrom < 0 || aliveTo < 0) return Infinity;
   let dist = seatDistance(alive.length, aliveFrom, aliveTo);
   // 进攻修正:缩短距离(进攻马/马术)
-  const attackMod = (state.players[from].vars[DISTANCE_ATTACK_MOD_KEY] as number) ?? 0;
+  const attackMod = getDistanceAttackMod(state.players[from].vars) ?? 0;
   dist -= attackMod;
   // 防御修正:增加距离(防御马)
-  const defenseMod = (state.players[to].vars[DISTANCE_DEFENSE_MOD_KEY] as number) ?? 0;
+  const defenseMod = getDistanceDefenseMod(state.players[to].vars) ?? 0;
   dist += defenseMod;
   return Math.max(1, dist);
 }
@@ -65,7 +65,7 @@ export function inAttackRange(
 ): boolean {
   if (from === to) return false;
   if (isAttackRangeExempted(state, from, to, cardId)) return true;
-  const range = (state.players[from].vars[DISTANCE_ATTACK_RANGE_KEY] as number) ?? 1;
+  const range = getDistanceAttackRange(state.players[from].vars) ?? 1;
   return effectiveDistance(state, from, to) <= range;
 }
 

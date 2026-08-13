@@ -21,7 +21,7 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { performYinghunPrepare } from './英魂';
-import { HUNZI_AWAKENED_KEY as AWAKENED_KEY } from '../rules/vars-keys';
+import { HUNZI_AWAKENED_KEY as AWAKENED_KEY, getHunziAwakened } from '../rules/vars-keys';
 
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -43,7 +43,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 仅准备阶段触发(文档「准备阶段」)
     if (atom.phase !== '准备') return;
     // 觉醒技:整局一次
-    if (ctx.state.players[ownerId]?.vars[AWAKENED_KEY]) return;
+    if (getHunziAwakened(ctx.state.players[ownerId]?.vars)) return;
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
     // 体力条件:文档「体力为1」

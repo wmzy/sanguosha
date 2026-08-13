@@ -31,7 +31,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { performYinghunPrepare } from './英魂';
-import { HUNZI_AWAKENED_KEY as AWAKENED_KEY } from '../rules/vars-keys';
+import { HUNZI_AWAKENED_KEY as AWAKENED_KEY, getHunziAwakened } from '../rules/vars-keys';
 
 // 觉醒标记:沿用标版键名 '魂姿/awakened',供复用的标 制霸/界制霸 读取觉醒状态。
 // 觉醒当回合结束阶段收益标记:准备阶段觉醒成功后置 true,结束阶段消费后清空。
@@ -54,7 +54,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 /** 界魂姿觉醒主逻辑。 */
 async function awaken(state: GameState, ownerId: number): Promise<void> {
   // 觉醒技:整局一次
-  if (state.players[ownerId]?.vars[AWAKENED_KEY]) return;
+  if (getHunziAwakened(state.players[ownerId]?.vars)) return;
   const self = state.players[ownerId];
   if (!self?.alive) return;
   // 体力条件:为1(存活玩家 health<=1 ⟺ ===1)

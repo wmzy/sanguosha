@@ -264,7 +264,7 @@ export class GameSession {
     const result = await dispatch(this.state, action).catch((err) => {
       const e = err instanceof Error ? err : new Error(String(err));
       this.logger.error('dispatch error', { error: e.stack ?? String(e) });
-      return { accepted: false, settle: Promise.resolve() } as const;
+      return { accepted: false, settle: Promise.resolve<Error | undefined>(undefined) } as const;
     });
     if (!result.accepted) {
       this.sendToPlayer(playerId, { type: 'actionRejected' });

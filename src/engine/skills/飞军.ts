@@ -33,7 +33,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
-import { BINGLUE_TARGETS_KEY } from '../rules/vars-keys';
+import { BINGLUE_TARGETS_KEY, getBinglueTargets } from '../rules/vars-keys';
 
 // 请求类型(requestType 前缀 = skillId,见 T1)
 const OPTION_RT = '飞军/option'; // owner:选择效果
@@ -209,8 +209,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // ── 兵略触发:首次对该目标发动飞军 → 摸两张 ──
       // 兵略是锁定技,效果在飞军 execute 内触发(检查 owner 是否拥有兵略技能)
       if (st.players[ownerId]?.skills.includes('兵略')) {
-        const binglueTargets =
-          (st.players[ownerId].vars[BINGLUE_TARGETS_KEY] as number[] | undefined) ?? [];
+        const binglueTargets = getBinglueTargets(st.players[ownerId].vars) ?? [];
         if (!binglueTargets.includes(target)) {
           st.players[ownerId].vars[BINGLUE_TARGETS_KEY] = [...binglueTargets, target];
           await applyAtom(st, { type: '摸牌', player: ownerId, count: 2 });

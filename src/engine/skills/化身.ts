@@ -55,7 +55,7 @@ import { createRng } from '../util/rng';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
 import { getCharacterMeta } from '../data/character-meta';
-import { HUASHEN_POOL_KEY as POOL_KEY } from '../rules/vars-keys';
+import { HUASHEN_POOL_KEY as POOL_KEY, getHuashenPool } from '../rules/vars-keys';
 
 // ── 角色分派 ──
 const JIE_CHAR = '界左慈';
@@ -133,7 +133,7 @@ function debutedCharacters(state: GameState): Set<string> {
  */
 function draw化身Cards(state: GameState, ownerId: number, n: number): string[] {
   const debuted = debutedCharacters(state);
-  const existingPool = (state.players[ownerId]?.vars[POOL_KEY] as string[] | undefined) ?? [];
+  const existingPool = getHuashenPool(state.players[ownerId]?.vars) ?? [];
   const taken = new Set<string>([...debuted, ...existingPool]);
   const available = allCharacters.map((c) => c.name).filter((name) => !taken.has(name));
   if (available.length === 0) return [];
@@ -188,7 +188,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (!Number.isInteger(action) || ![ACTION_REPLACE, ACTION_SWAP, ACTION_SKIP].includes(action)) {
           return '需要 option(1=替换, 2=移去, 3=不操作)';
         }
-        const pool = (st.players[ownerId]?.vars[POOL_KEY] as string[] | undefined) ?? [];
+        const pool = getHuashenPool(st.players[ownerId]?.vars) ?? [];
         if (action === ACTION_REPLACE && pool.length < 2) return '化身牌不足,无法替换';
         if (action === ACTION_SWAP && pool.length < 2) return '化身牌不足,无法移去';
         return null;
@@ -197,7 +197,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt === SWAP_COUNT_REQUEST) {
         const count = Number(params.option);
         if (!Number.isInteger(count) || ![1, 2].includes(count)) return '需要 option(1 或 2)';
-        const pool = (st.players[ownerId]?.vars[POOL_KEY] as string[] | undefined) ?? [];
+        const pool = getHuashenPool(st.players[ownerId]?.vars) ?? [];
         const maxRemovable = Math.min(2, pool.length - 1); // 保留展示牌
         if (count > maxRemovable) return `最多移去 ${maxRemovable} 张`;
         return null;
@@ -209,7 +209,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
       // ── 选化身牌(option = 武将名,必须在牌池中) ──
       if (rt === CHARACTER_REQUEST) {
-        const pool = (st.players[ownerId]?.vars[POOL_KEY] as string[] | undefined) ?? [];
+        const pool = getHuashenPool(st.players[ownerId]?.vars) ?? [];
         const charName = params.option as string | undefined;
         if (typeof charName !== 'string') return '需要 option(武将名)';
         if (!pool.includes(charName)) return '该武将不在化身牌池中';
@@ -298,7 +298,7 @@ async function lightAndGainSkill(
 ): Promise<void> {
   const player = state.players[ownerId];
   if (!player) return;
-  const pool = player.vars[POOL_KEY] as string[] | undefined;
+  const pool = getHuashenPool(player.vars);
   if (!pool || pool.length === 0) return;
 
   // 找出所有有可选技能的武将牌(排除指定索引,如替换时排除当前展示)
@@ -345,7 +345,7 @@ async function offerTurnAction(state: GameState, ownerId: number): Promise<void>
 async function offerSwitch(state: GameState, ownerId: number): Promise<void> {
   const player = state.players[ownerId];
   if (!player) return;
-  const pool = player.vars[POOL_KEY] as string[] | undefined;
+  const pool = getHuashenPool(player.vars);
   if (!pool || pool.length < 2) return; // 不足两张无法更换
 
   delete state.localVars[SWITCH_CHOICE_KEY];
@@ -389,7 +389,7 @@ async function offerSwitch(state: GameState, ownerId: number): Promise<void> {
 async function offerJieTurnAction(state: GameState, ownerId: number): Promise<void> {
   const player = state.players[ownerId];
   if (!player) return;
-  const pool = player.vars[POOL_KEY] as string[] | undefined;
+  const pool = getHuashenPool(player.vars);
   if (!pool || pool.length < 2) return; // 不足两张:无法替换也无法移去,跳过
 
   delete state.localVars[ACTION_CHOICE_KEY];
@@ -426,7 +426,7 @@ async function offerJieTurnAction(state: GameState, ownerId: number): Promise<vo
 async function doReplace(state: GameState, ownerId: number): Promise<void> {
   const player = state.players[ownerId];
   if (!player) return;
-  const pool = player.vars[POOL_KEY] as string[] | undefined;
+  const pool = getHuashenPool(player.vars);
   if (!pool || pool.length < 2) return;
 
   const curLit = (player.vars[LIT_KEY] as number | undefined) ?? 0;
@@ -454,7 +454,7 @@ async function doReplace(state: GameState, ownerId: number): Promise<void> {
 async function doSwap(state: GameState, ownerId: number): Promise<void> {
   const player = state.players[ownerId];
   if (!player) return;
-  const pool = player.vars[POOL_KEY] as string[] | undefined;
+  const pool = getHuashenPool(player.vars);
   if (!pool || pool.length < 2) return;
 
   const litIdx = (player.vars[LIT_KEY] as number | undefined) ?? 0;

@@ -33,7 +33,7 @@ import type {
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { mijiPendingKey } from '../rules/vars-keys';
+import { mijiPendingKey, getMijiPending } from '../rules/vars-keys';
 
 const _SKILL_ID = '界秘计';
 const DISPLAY_NAME = '秘计';
@@ -146,7 +146,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 注意:标志须跨回合持久(贞烈常在他人的回合触发,秘计要到王异自己的结束阶段才消费),
       // 故存于 player.vars(turn.vars 会被「回合结束」atom 每回合清空,跨回合会丢失)。
       const pendingKey = mijiPendingKey(ownerId);
-      const forced = st.players[ownerId].vars[pendingKey] === true;
+      const forced = getMijiPending(st.players[ownerId].vars, ownerId);
       if (forced) {
         delete st.players[ownerId].vars[pendingKey];
         await runMijiOnce(st, ownerId, /* askActivate */ false);

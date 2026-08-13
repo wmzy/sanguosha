@@ -91,7 +91,7 @@ describe('pending-scoped 版本控制', () => {
       params: {},
       baseSeq: 7,
       pendingSeq: 7,
-    }).catch(() => ({ accepted: false, settle: Promise.resolve() }));
+    }).catch(() => ({ accepted: false, settle: Promise.resolve<Error | undefined>(undefined) }));
     expect(accepted).toBe(false);
 
     slot.resolve();
@@ -139,7 +139,7 @@ describe('pending-scoped 版本控制', () => {
       ownerId: 0,
       params: {},
       baseSeq: 7,
-    }).catch(() => ({ accepted: false, settle: Promise.resolve() }));
+    }).catch(() => ({ accepted: false, settle: Promise.resolve<Error | undefined>(undefined) }));
     // 无 entry → false，但不是因为 pendingSeq
     expect(accepted).toBe(false);
 
@@ -347,7 +347,7 @@ describe('pending-scoped 版本控制', () => {
       params: {},
       baseSeq: state.seq,
       pendingSeq: 7, // 故意与 createdSeq=999 不匹配
-    }).catch(() => ({ accepted: false, settle: Promise.resolve() }));
+    }).catch(() => ({ accepted: false, settle: Promise.resolve<Error | undefined>(undefined) }));
     expect(accepted).toBe(true);
 
     // 清理：resolve 出牌窗口 + 注销测试 action

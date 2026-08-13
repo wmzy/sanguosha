@@ -26,7 +26,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { QIZHI_COUNT_KEY as QIZHI_COUNT_VAR } from '../rules/vars-keys';
+import { getQizhiCount } from '../rules/vars-keys';
 
 const SKILL_ID = '进趋';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -104,7 +104,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!self?.alive) return;
 
       // X = 本回合奇制发动次数(此时 turn.vars 尚未被 回合结束 atom 清空)
-      const x = (ctx.state.turn.vars[QIZHI_COUNT_VAR] as number | undefined) ?? 0;
+      const x = getQizhiCount(ctx.state.turn.vars) ?? 0;
 
       // 1. 询问是否发动进趋
       delete ctx.state.localVars[CONFIRM_KEY];

@@ -28,7 +28,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
-import { QIZHI_COUNT_KEY as COUNT_VAR, PICK_RESULT_KEY } from '../rules/vars-keys';
+import { QIZHI_COUNT_KEY as COUNT_VAR, PICK_RESULT_KEY, getQizhiCount } from '../rules/vars-keys';
 
 const SKILL_ID = '奇制';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -212,7 +212,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     }
 
     // 6. 累加奇制发动次数(供进趋读取)
-    const prev = (ctx.state.turn.vars[COUNT_VAR] as number | undefined) ?? 0;
+    const prev = getQizhiCount(ctx.state.turn.vars) ?? 0;
     ctx.state.turn.vars[COUNT_VAR] = prev + 1;
   });
 

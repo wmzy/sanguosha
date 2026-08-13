@@ -23,7 +23,7 @@ import type {
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
+import { getDistanceAttackRange } from '../rules/vars-keys';
 
 const TAG = '烈弓/禁闪';
 const CONFIRM = '烈弓/confirmed';
@@ -75,7 +75,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!self?.alive || !targetPlayer?.alive) return;
 
     // 发动条件(官方):目标手牌数 ≥ 自己体力值,或 目标手牌数 ≤ 自己攻击范围
-    const attackRange = (self.vars[DISTANCE_ATTACK_RANGE_KEY] as number) ?? 1;
+    const attackRange = getDistanceAttackRange(self.vars) ?? 1;
     const condMet =
       targetPlayer.hand.length >= getHealthValue(self) || targetPlayer.hand.length <= attackRange;
     if (!condMet) return;

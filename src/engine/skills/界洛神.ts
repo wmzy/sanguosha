@@ -26,7 +26,7 @@ import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
-import { handLimitBonusKey } from '../rules/vars-keys';
+import { getHandLimitBonus } from '../rules/vars-keys';
 
 /** turn.vars key:本回合经洛神获得的判定牌 id 列表(随「回合结束」自动清空) */
 const EXEMPT_VAR = '界洛神/豁免牌';
@@ -106,7 +106,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const hand = st.players[player]?.hand ?? [];
     const inHand = exempt.filter((id) => hand.includes(id)).length;
     if (inHand === 0) return undefined;
-    const bonus = (st.turn.vars[handLimitBonusKey(player)] as number | undefined) ?? 0;
+    const bonus = getHandLimitBonus(st.turn.vars, player) ?? 0;
     const health = getHealthValue(st.players[player]);
     return health + bonus + inHand;
   });

@@ -36,7 +36,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
-import { HUNZI_AWAKENED_KEY as AWAKENED_KEY } from '../rules/vars-keys';
+import { getHunziAwakened } from '../rules/vars-keys';
 
 
 // respond requestTypes(孙策回应)
@@ -118,7 +118,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const lord = st.players[ownerId];
 
         // 觉醒后可拒绝拼点:询问孙策(未觉醒则直接接受)
-        if (lord.vars[AWAKENED_KEY]) {
+        if (getHunziAwakened(lord.vars)) {
           delete st.localVars[REFUSE_KEY];
           await applyAtom(st, {
             type: '请求回应',

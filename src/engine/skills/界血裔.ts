@@ -33,7 +33,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import type { SkillModule } from '../types';
-import { handLimitBonusKey } from '../rules/vars-keys';
+import { getHandLimitBonus } from '../rules/vars-keys';
 
 const SKILL_ID = '界血裔';
 const DISPLAY_NAME = '血裔';
@@ -100,7 +100,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (ownerId !== 0) return undefined; // 主公技:仅主公
     const p = st.players[player];
     if (!p) return undefined;
-    const bonus = (st.turn.vars[handLimitBonusKey(player)] as number | undefined) ?? 0;
+    const bonus = getHandLimitBonus(st.turn.vars, player) ?? 0;
     return getHealthValue(p) + bonus + yiCount(st, player);
   });
 

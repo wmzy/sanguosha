@@ -37,7 +37,7 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { handLimitBonusKey } from '../rules/vars-keys';
+import { handLimitBonusKey, getHandLimitBonus } from '../rules/vars-keys';
 
 /** 非延时锦囊牌名集合 */
 const NON_DELAY_TRICKS = new Set([
@@ -177,7 +177,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
     // 本回合手牌上限+1(turn.vars['手牌上限/bonus:<owner>'])
     const bonusKey = handLimitBonusKey(ownerId);
-    const current = (ctx.state.turn.vars[bonusKey] as number | undefined) ?? 0;
+    const current = getHandLimitBonus(ctx.state.turn.vars, ownerId) ?? 0;
     ctx.state.turn.vars[bonusKey] = current + 1;
   });
 

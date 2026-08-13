@@ -26,7 +26,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
 import { createRng } from '../util/rng';
-import { HUASHEN_POOL_KEY as POOL_KEY } from '../rules/vars-keys';
+import { HUASHEN_POOL_KEY as POOL_KEY, getHuashenPool } from '../rules/vars-keys';
 
 const CONFIRM_REQUEST = '新生/confirm';
 const CHOICE_KEY = '新生/choice';
@@ -47,7 +47,7 @@ function debutedCharacters(state: GameState): Set<string> {
  */
 function drawNew化身Card(state: GameState, ownerId: number): string | null {
   const debuted = debutedCharacters(state);
-  const existingPool = (state.players[ownerId]?.vars[POOL_KEY] as string[] | undefined) ?? [];
+  const existingPool = getHuashenPool(state.players[ownerId]?.vars) ?? [];
   const taken = new Set<string>([...debuted, ...existingPool]);
   const available = allCharacters.map((c) => c.name).filter((name) => !taken.has(name));
   if (available.length === 0) return null;
@@ -124,7 +124,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const drawn = drawNew化身Card(st, ownerId);
     if (drawn === null) return;
     const player = st.players[ownerId];
-    const pool = (player.vars[POOL_KEY] as string[] | undefined) ?? [];
+    const pool = getHuashenPool(player.vars) ?? [];
     pool.push(drawn);
     player.vars[POOL_KEY] = pool;
   });
@@ -138,7 +138,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
  */
 function drawNew化身CardSnapshot(state: GameState, ownerId: number): string | null {
   const debuted = debutedCharacters(state);
-  const existingPool = (state.players[ownerId]?.vars[POOL_KEY] as string[] | undefined) ?? [];
+  const existingPool = getHuashenPool(state.players[ownerId]?.vars) ?? [];
   const taken = new Set<string>([...debuted, ...existingPool]);
   const available = allCharacters.map((c) => c.name).filter((name) => !taken.has(name));
   return available.length > 0 ? available[0] : null;

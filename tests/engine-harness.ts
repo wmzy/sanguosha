@@ -45,9 +45,11 @@ import { getAtomDef } from '../src/engine/core/atom';
 import { getSkillModule, isSkillModuleRegistered } from '../src/engine/skills/lifecycle';
 
 // ─── 引擎异常收集器(消灭盲区 2)──────────────────────────────
-// dispatch 的 execute 是 fire-and-forget:其 .catch 调 state.onError?.(e) 后 throw,
-// 但该 throw 无人 await → unhandledRejection,在 vitest forks pool 下可能被吞。
-// 收集器在首次接触 state 时注入 onError,把异常存到 WeakMap,在断言点统一检查。
+// dispatch 的 execute 是 fire-and-forget:execute 抛错时 dispatch 的 .catch 调
+// state.onError?.(e) 并把错误塞进 settle(供 restore 中断重放)。但 harness 的
+// dispatchAndWait/tryDispatch 不 await settle(主动 action 的 execute 会挂在 pending 上
+// 永不 resolve),故仍需独立机制感知 execute 错误。收集器在首次接触 state 时注入 onError,
+// 把异常存到 WeakMap,在断言点(waitForStable)统一检查。settle 携带错误后收集器与之互补。
 // 幂等:同一 state 只注入一次(WeakSet 标记),避免多次调用链式叠加 onError。
 
 const engineErrorMap = new WeakMap<GameState, Error[]>();
@@ -618,7 +620,7 @@ export class PlayerSession {
       ...msg,
       ownerId: this.playerIndex,
       baseSeq: this.harness.state.seq,
-    }).catch(() => ({ accepted: false, settle: Promise.resolve() }) as const);
+    }).catch(() => ({ accepted: false, settle: Promise.resolve<Error | undefined>(undefined) }) as const);
     await this.harness.waitForStable();
     return result.accepted;
   }

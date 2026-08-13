@@ -23,7 +23,7 @@
 // 无模块级全局状态泄漏(与 skill.ts 的 registries 同构)。
 
 import type { GameState } from '../types';
-import { SLASH_QUOTA_USED_KEY as QUOTA_USED_VAR, SLASH_EXTRA_USED_KEY as EXTRA_USED_VAR } from './vars-keys';
+import { SLASH_QUOTA_USED_KEY as QUOTA_USED_VAR, SLASH_EXTRA_USED_KEY as EXTRA_USED_VAR, getSlashQuotaUsed, getSlashExtraUsed } from './vars-keys';
 
 /**
  * view 侧"已出杀次数"投影 key(由「回合用量」atom 同步到 view.turnUsage)。
@@ -231,14 +231,12 @@ export function slashMax(state: GameState, player: number): number {
 
 /** 该玩家本回合额定已用次数(默认 0) */
 export function slashQuotaUsed(state: GameState): number {
-  const used = state.turn.vars[QUOTA_USED_VAR] as number | undefined;
-  return typeof used === 'number' ? used : 0;
+  return getSlashQuotaUsed(state.turn.vars) ?? 0;
 }
 
 /** 该玩家本回合额外已用次数(默认 0) */
 export function slashExtraUsed(state: GameState): number {
-  const used = state.turn.vars[EXTRA_USED_VAR] as number | undefined;
-  return typeof used === 'number' ? used : 0;
+  return getSlashExtraUsed(state.turn.vars) ?? 0;
 }
 
 /** 当前玩家本回合已出杀次数(额定 + 额外,默认 0) */

@@ -14,7 +14,7 @@
 // (可能被过滤后的)prompt.equipment 重算默认选择,避免超时 fallback 命中受保护装备。
 import type { ActionLogEntry, GameState, Json } from '../types';
 import { applyAtom } from '../core/apply';
-import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { PICK_RESULT_KEY, getPickResult } from '../rules/vars-keys';
 
 /** 在 actionLog 中当前(最后一条)条目之前插入一条"设置手牌顺序"条目。
  *  重放时该条目先执行 → 目标 hand 顺序恢复 → 后续盲选取 hand[K] 确定性正确。
@@ -134,9 +134,7 @@ export async function runPickTargetCardPanel(
   await applyAtom(state, pickAtom);
 
   // 读取使用者选择
-  const result = state.localVars[PICK_RESULT_KEY] as
-    | { zone: string; cardId: string | null; handIndex: number | null }
-    | undefined;
+  const result = getPickResult(state.localVars);
   delete state.localVars[PICK_RESULT_KEY];
 
   // before-hook(界奇才)可能已就地过滤 prompt.equipment 中的受保护装备;

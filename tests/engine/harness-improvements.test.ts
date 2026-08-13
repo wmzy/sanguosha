@@ -9,6 +9,8 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { 展示型atoms } from '../../src/engine/atoms';
 import type { Atom, Card, GameState, ViewEvent } from '../../src/engine/types';
+import { dispatch } from '../../src/engine/index';
+import { registerAction } from '../../src/engine/core/skill';
 
 function build(): GameState {
   const slash: Card = { id: 's0', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
@@ -137,5 +139,54 @@ describe('harness 改进:引擎异常不再静默吞掉', () => {
     // processAllEvents 应该抛出 applyView 错误(同时匹配两个模式)
     expect(() => harness.processAllEvents()).toThrow(/applyView 抛错[\S\s]*applyView 故意抛错/);
     delete 展示型atoms[FAKE_TYPE];
+  });
+});
+
+// 回归:dispatch 的 settle 携带 execute 错误(而非静默吞掉)。
+// execute 是 fire-and-forget;settle 改为 resolve(Error) 后,await settle 方(如 restore)
+// 才能感知 execute 抛错并中断。validate 拒绝非 execute 错误,settle 应 resolve(undefined)。
+describe('dispatch settle 携带 execute 错误', () => {
+  it('execute 抛错 → settle resolve 该错误,且 onError 同步上报', async () => {
+    const state = build();
+    const errors: Error[] = [];
+    state.onError = (e: Error) => errors.push(e);
+    const unregister = registerAction(state, '测试', 0, 'boom', () => null, async () => {
+      throw new Error('execute 内部抛错');
+    });
+    const { settle } = await dispatch(state, {
+      skillId: '测试',
+      actionType: 'boom',
+      ownerId: 0,
+      params: {},
+      baseSeq: state.seq,
+    });
+    const settleError = await settle;
+    expect(settleError).toBeInstanceOf(Error);
+    expect(settleError?.message).toBe('execute 内部抛错');
+    // onError 回调仍同步上报(双通道:settle 携带 + onError 上报)
+    expect(errors.some((e) => e.message === 'execute 内部抛错')).toBe(true);
+    unregister();
+  });
+
+  it('validate 拒绝 → settle resolve undefined(非 execute 错误)', async () => {
+    const state = build();
+    const unregister = registerAction(
+      state,
+      '测试',
+      0,
+      'reject',
+      () => 'validate 拒绝',
+      async () => {},
+    );
+    const { accepted, settle } = await dispatch(state, {
+      skillId: '测试',
+      actionType: 'reject',
+      ownerId: 0,
+      params: {},
+      baseSeq: state.seq,
+    });
+    expect(accepted).toBe(false);
+    expect(await settle).toBeUndefined();
+    unregister();
   });
 });
