@@ -59,7 +59,7 @@ export const 亮身份牌: AtomDefinition<{ player: number }> = {
   type: '亮身份牌',
   validate: validateDeathTiming,
   apply() {},
-  effect: { sound: 'death', animation: 'fade', duration: 1500 },
+  effect: { sound: 'death', animation: 'fade', duration: 1500, vfx: 'card/killer' },
   toViewEvents(state, atom): ViewEventSplit {
     // 携带阵亡玩家身份——死亡即公开,所有视角都需揭示(与原 击杀.toViewEvents 一致)
     const identity = state.players[atom.player]?.identity;

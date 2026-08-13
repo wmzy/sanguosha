@@ -14,9 +14,8 @@
 //     后续不再发请求,console 不输出任何 error/warn(避免刷屏)。
 //   - 快速连发(如一帧内多个事件)可重叠播放:每次 play 创建独立 BufferSource。
 //   - 非浏览器环境(node 测试/jsdom 无 AudioContext)安全降级:所有方法 no-op。
-//
-// TODO(可选增强):同一事件声音单调时可加入轻微随机变调(playbackRate 抖动),
-//                避免重复听感疲劳。本次不实现。
+//   - 同一音效反复播放时,对 playbackRate 加 ±3% 随机抖动,缓解重复听感疲劳。
+//   - unlock 后可预加载高频音效(flip/出杀/闪避等),消除首次播放的 fetch+解码延迟。
 
 import { resolveSoundUrl } from './soundMap';
 
@@ -127,27 +126,29 @@ class AudioEngine {
     }
     if (cached?.status === 'missing') return; // 负缓存:跳过
 
-    // 异步路径:首次请求该音效 → 触发加载
-    if (!cached) {
-      const promise = this.loadBuffer(soundId, url);
-      this.bufferCache.set(soundId, { status: 'pending', promise });
-      // 缓存上限保护
-      if (this.bufferCache.size > BUFFER_CACHE_LIMIT) {
-        this.evictOldest();
-      }
+    // 异步路径:pending(可能由 preload 触发)或首次请求 → 确保加载,就绪后补播本次
+    const promise = this.ensureBuffer(soundId, url);
+    if (promise) {
       void promise.then((buffer) => {
-        if (buffer) {
-          // 加载成功后立即补播本次(用户延迟感知在可接受范围)
-          this.bufferCache.set(soundId, { status: 'ok', buffer });
-          if (this.unlocked && !this.muted) {
-            this.startSource(buffer, evVol);
-          }
-        } else {
-          this.bufferCache.set(soundId, { status: 'missing' });
+        // 加载成功后立即补播本次(用户延迟感知在可接受范围)
+        if (buffer && this.unlocked && !this.muted) {
+          this.startSource(buffer, evVol);
         }
       });
     }
-    // pending 状态:加载完成后上面的 then 会补播,无需在此重复
+  }
+
+  /**
+   * 预加载一批音效到 buffer 缓存(不播放)。供 unlock 后预热高频音效。
+   * 仅在已解锁(AudioContext 可用)时生效;未解锁/已缓存(任意状态)的无副作用。
+   * fire-and-forget:不阻塞、不改变 play 语义 —— 加载进行中的音效,play 仍会正常补播。
+   */
+  preload(soundIds: readonly string[]): void {
+    if (!this.unlocked || !this.ctx) return; // decodeAudioData 依赖 ctx
+    for (const soundId of soundIds) {
+      const url = resolveSoundUrl(soundId);
+      if (url) this.ensureBuffer(soundId, url);
+    }
   }
 
   /** 创建并启动一个 BufferSource(per-event gain → master gain → destination) */
@@ -156,8 +157,9 @@ class AudioEngine {
     try {
       const src = this.ctx.createBufferSource();
       src.buffer = buffer;
-      // TODO(可选):随机变调避免单调
-      // src.playbackRate.value = 1 + (Math.random() - 0.5) * 0.05;
+      // 随机变调(±3%):同一音效反复播放时轻微抖动 playbackRate,缓解重复听感疲劳。
+      // 幅度约 50 音分(半个半音),低于人耳对瞬时音高的可辨阈,听感自然、不改变语义。
+      src.playbackRate.value = 1 + (Math.random() - 0.5) * 0.06;
       if (effectVolume >= 1) {
         // per-event 音量为 1 时直接接 master,省一个 GainNode
         src.connect(this.masterGain);
@@ -179,6 +181,29 @@ class AudioEngine {
     } catch {
       /* start 失败静默(如 context 已关闭) */
     }
+  }
+
+  /**
+   * 确保 soundId 的 buffer 正在/已加载,返回其加载 promise(供调用方就绪后补播)。
+   * - 已 ok/missing:返回 null(无需再加载)。
+   * - 已 pending:返回现有 promise(preload 与 play 共用同一次加载,避免重复请求)。
+   * - 未缓存:启动 loadBuffer,缓存 pending,挂载「缓存写入」then,返回新 promise。
+   * 调用方(play)自行在 promise 上挂「补播」then,从而 preload 只加载不播放、不丢音。
+   */
+  private ensureBuffer(soundId: string, url: string): Promise<AudioBuffer | null> | null {
+    const cached = this.bufferCache.get(soundId);
+    if (cached?.status === 'ok' || cached?.status === 'missing') return null;
+    if (cached?.status === 'pending') return cached.promise;
+    const promise = this.loadBuffer(soundId, url);
+    this.bufferCache.set(soundId, { status: 'pending', promise });
+    // 缓存上限保护
+    if (this.bufferCache.size > BUFFER_CACHE_LIMIT) {
+      this.evictOldest();
+    }
+    void promise.then((buffer) => {
+      this.bufferCache.set(soundId, buffer ? { status: 'ok', buffer } : { status: 'missing' });
+    });
+    return promise;
   }
 
   /**

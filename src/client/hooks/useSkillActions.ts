@@ -46,7 +46,12 @@ export function useSkillActions(view: GameView, perspectiveIdx: number): UseSkil
     return () => {
       cancelled = true;
     };
-  }, [skillActionsKey, perspectiveIdx, view.players]);
+    // 依赖只含 skillActionsKey(已编码 players 的 name/skills 组合)+ perspectiveIdx,
+    // 而非 view.players 引用:view 每次 WebSocket 消息都是全新对象,若依赖 view.players,
+    // 每次 view 变化(即使仅血量/手牌变化)都会 clearRegistry + 全量异步重注册,
+    // async 间隙 skillActions 短暂为空 → 技能按钮闪烁。skillActionsKey 不变时
+    // name/skills 未变,无需重注册(registerSkillActions 只用 p.index 与 p.skills)。
+  }, [skillActionsKey, perspectiveIdx]);
 
   return { skillActions };
 }

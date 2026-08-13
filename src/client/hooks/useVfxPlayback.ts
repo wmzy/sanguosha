@@ -34,8 +34,9 @@ function extractVfx(event: ViewEvent, cardMap: Record<string, Card>): string | n
     const ev = event as { cardName?: string; cardId?: string };
     const cardName = ev.cardName;
     if (!cardName) return null;
-    const damageType = ev.cardId ? cardMap[ev.cardId]?.damageType : undefined;
-    return getCardVfx(cardName, damageType);
+    const card = ev.cardId ? cardMap[ev.cardId] : undefined;
+    // 出杀动效按花色区分黑(♠♣)/红(♥♦):从 cardMap 取 suit 传入 getCardVfx。
+    return getCardVfx(cardName, card?.damageType, card?.suit);
   }
   const atomType = (event as { atomType?: string }).atomType ?? event.type;
   let staticEffect: EventEffect;
