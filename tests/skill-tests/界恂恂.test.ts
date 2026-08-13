@@ -9,12 +9,13 @@
 //   2. respond validate:ARRANGE 下 top+bottom 非完整划分 → 拒绝
 //   3. respond validate:ARRANGE 下含观察范围外的牌 → 拒绝
 //   4. respond validate:ARRANGE 下 top/bottom 含重复牌 → 拒绝
+//   4b. respond validate:ARRANGE 下 top 张数≠2 → 拒绝(OL 官方须恰好2张置顶)
 //   5. respond execute:CONFIRM choice=true → 写入 localVars
 //   6. 端到端:摸牌阶段开始 → confirm → arrange(2 顶 2 底) → 牌堆重排
-//   7. 端到端:全置顶 → 牌堆顶 4 张按指定顺序
-//   8. 端到端:全置底 → 牌堆顶为原观察范围下方的牌
+//   7. 端到端:2 张置顶(指定顺序) → 牌堆重排
+//   8. 端到端:2 张置顶(另一组,含底牌顺序) → 牌堆重排
 //   9. 端到端:confirm=false → 牌堆不变
-//  10. 端到端:牌堆不足 4 张 → 观看可用张数
+//  10. 端到端:牌堆不足 4 张 → 观看可用张数(2 顶 1 底)
 //  11. 端到端:牌堆为空 → 不触发
 //  12. 端到端:其他玩家的摸牌阶段不触发本玩家
 //
@@ -207,6 +208,46 @@ describe('界恂恂', () => {
     });
   });
 
+  it('respond:ARRANGE 下 top 张数≠2 → 拒绝(OL 官方须恰好2张置顶)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', skills: ['界恂恂'] }),
+        makePlayer({ index: 1, name: 'P2', skills: ['杀'] }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    injectPending(state, 0, '界恂恂/arrange', {
+      type: 'distribute',
+      mode: 'select',
+      cardIds: ['a', 'b', 'c', 'd'],
+    });
+
+    // top=3 张(超过 2)→ 拒绝
+    await P1.expectRejected({
+      skillId: '界恂恂',
+      actionType: 'respond',
+      params: { top: ['a', 'b', 'c'], bottom: ['d'] },
+    });
+    // top=1 张(不足 2)→ 拒绝
+    await P1.expectRejected({
+      skillId: '界恂恂',
+      actionType: 'respond',
+      params: { top: ['a'], bottom: ['b', 'c', 'd'] },
+    });
+    // top=0(全置底)→ 拒绝
+    await P1.expectRejected({
+      skillId: '界恂恂',
+      actionType: 'respond',
+      params: { top: [], bottom: ['a', 'b', 'c', 'd'] },
+    });
+  });
+
   // ─── respond execute ─────────────────────────
 
   it('respond:CONFIRM choice=true 写入 localVars', async () => {
@@ -291,8 +332,8 @@ describe('界恂恂', () => {
     expect(harness.state.zones.deck).toEqual(['o3', 'o2', 'm1', 'o1', 'o4']);
   });
 
-  it('端到端:全置顶 → 牌堆顶 4 张按指定顺序', async () => {
-    // deck: [m1, o1, o2, o3, o4(顶)] → 全置顶,顺序 [o2, o3, o4, o1]
+  it('端到端:2张置顶(指定顺序) → 牌堆重排', async () => {
+    // deck: [m1, o1, o2, o3, o4(顶)] → top=[o2,o1], bottom=[o3,o4]
     const m1 = makeCard('m1', '桃', '♥');
     const o1 = makeCard('o1', '杀', '♠');
     const o2 = makeCard('o2', '闪', '♣');
@@ -317,17 +358,17 @@ describe('界恂恂', () => {
     await harness.waitForStable();
     harness.processAllEvents();
 
-    await P1.respond('界恂恂', { top: ['o2', 'o3', 'o4', 'o1'], bottom: [] });
+    await P1.respond('界恂恂', { top: ['o2', 'o1'], bottom: ['o3', 'o4'] });
     await harness.waitForStable();
     harness.processAllEvents();
 
-    // newDeck = [...bottom=[], ...middle=[m1], ...top.reverse()=[o1,o4,o3,o2]]
-    //   = [m1, o1, o4, o3, o2]
-    expect(harness.state.zones.deck).toEqual(['m1', 'o1', 'o4', 'o3', 'o2']);
+    // newDeck = [...bottom=[o3,o4], ...middle=[m1], ...top.reverse()=[o1,o2]]
+    //   = [o3, o4, m1, o1, o2]; 顶=o2
+    expect(harness.state.zones.deck).toEqual(['o3', 'o4', 'm1', 'o1', 'o2']);
   });
 
-  it('端到端:全置底 → 牌堆顶为原观察范围下方的牌', async () => {
-    // deck: [m1, m2, o1, o2, o3, o4(顶)] → 全置底
+  it('端到端:2张置顶(另一组,含底牌顺序) → 牌堆重排', async () => {
+    // deck: [m1, m2, o1, o2, o3, o4(顶)] → top=[o4,o3], bottom=[o2,o1]
     const m1 = makeCard('m1', '桃', '♥');
     const m2 = makeCard('m2', '桃', '♦');
     const o1 = makeCard('o1', '杀', '♠');
@@ -357,13 +398,13 @@ describe('界恂恂', () => {
     await harness.waitForStable();
     harness.processAllEvents();
 
-    await P1.respond('界恂恂', { top: [], bottom: ['o1', 'o2', 'o3', 'o4'] });
+    await P1.respond('界恂恂', { top: ['o4', 'o3'], bottom: ['o2', 'o1'] });
     await harness.waitForStable();
     harness.processAllEvents();
 
-    // newDeck = [...bottom=[o1,o2,o3,o4], ...middle=[m1,m2], ...top.reverse()=[]]
-    //   = [o1, o2, o3, o4, m1, m2]; 顶=m2
-    expect(harness.state.zones.deck).toEqual(['o1', 'o2', 'o3', 'o4', 'm1', 'm2']);
+    // newDeck = [...bottom=[o2,o1], ...middle=[m1,m2], ...top.reverse()=[o3,o4]]
+    //   = [o2, o1, m1, m2, o3, o4]; 顶=o4
+    expect(harness.state.zones.deck).toEqual(['o2', 'o1', 'm1', 'm2', 'o3', 'o4']);
   });
 
   it('端到端:confirm=false → 牌堆不变', async () => {
@@ -427,13 +468,13 @@ describe('界恂恂', () => {
     const aAtom = aslot.atom as { prompt?: { cardIds?: string[] } };
     expect(aAtom.prompt?.cardIds).toEqual(['o1', 'o2', 'o3']);
 
-    // 玩家选 o3 置顶,o1,o2 置底
-    await P1.respond('界恂恂', { top: ['o3'], bottom: ['o1', 'o2'] });
+    // 玩家选 o3,o1 置顶(须恰好 min(2,3)=2 张),o2 置底
+    await P1.respond('界恂恂', { top: ['o3', 'o1'], bottom: ['o2'] });
     await harness.waitForStable();
     harness.processAllEvents();
 
-    // newDeck = [...bottom=[o1,o2], ...middle=[], ...top.reverse()=[o3]] = [o1, o2, o3]
-    expect(harness.state.zones.deck).toEqual(['o1', 'o2', 'o3']);
+    // newDeck = [...bottom=[o2], ...middle=[], ...top.reverse()=[o1,o3]] = [o2, o1, o3]
+    expect(harness.state.zones.deck).toEqual(['o2', 'o1', 'o3']);
   });
 
   it('端到端:牌堆为空 → 不触发', async () => {

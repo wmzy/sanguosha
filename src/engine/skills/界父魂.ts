@@ -42,7 +42,7 @@ import type {
   FrontendAPI,
   HookResult,
 } from '../types';
-import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../core/skill';
+import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
 import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
@@ -111,7 +111,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const c1 = state.cardMap[id1];
       const c2 = state.cardMap[id2];
       const cardsExist = !!c1 && !!c2;
-      const ok = myTurn && inActPhase && free && selfAlive && cardsOwned && cardsExist;
+      // 时机由两条路径之一满足:
+      //   1. 出杀路径(自己回合 + 出牌阶段 + 无阻塞 pending):preceding 在 杀.use 前
+      //   2. 回应路径(被询问杀:南蛮入侵/决斗):preceding 在 杀.respond 前
+      const slot = state.pendingSlots.get(ownerId);
+      const atomType = (slot?.atom as { type?: string })?.type;
+      const reqType = (slot?.atom as { requestType?: string })?.requestType;
+      const atomTarget = (slot?.atom as { target?: number })?.target;
+      const askedKill =
+        !!slot &&
+        atomTarget === ownerId &&
+        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+      const contextOk = (myTurn && inActPhase && free) || askedKill;
+      const ok = contextOk && selfAlive && cardsOwned && cardsExist;
       return ok ? null : '父魂转化条件不满足';
     },
     async (state: GameState, params: Record<string, Json>) => {
@@ -158,8 +170,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (unequipped) {
         for (const { slot, cardId } of unequipped) {
           // 若已被其他流程占用槽位,退回手牌兜底
-          if (self.equipment[slot] === undefined) self.equipment[slot] = cardId;
-          else self.hand.push(cardId);
+          if (self.equipment[slot] === undefined) {
+            self.equipment[slot] = cardId;
+            // 卸下武器时清除了 vars['距离/出杀范围'](由 卸下 atom 设值,不会重算),
+            // 回滚必须还原,否则武器已归位但攻击范围退化为徒手(1)。镜像 界武圣 回滚。
+            if (slot === '武器') {
+              const card = state.cardMap[cardId];
+              self.vars['距离/出杀范围'] = card?.range ?? 1;
+            }
+          } else {
+            self.hand.push(cardId);
+          }
         }
       }
       // 手牌原卡还原(当作把手牌过滤掉了)
@@ -190,7 +211,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const card = cardIdOk ? state.cardMap[cardId] : undefined;
       const cardInHand = cardIdOk && self.hand.includes(cardId);
       const isRed = !!card && card.color === '红';
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && isRed;
+      // 时机:出杀路径(自己回合 + 出牌阶段 + 无阻塞)或回应路径(决斗中被询问杀)
+      const slot = state.pendingSlots.get(ownerId);
+      const atomType = (slot?.atom as { type?: string })?.type;
+      const reqType = (slot?.atom as { requestType?: string })?.requestType;
+      const atomTarget = (slot?.atom as { target?: number })?.target;
+      const askedKill =
+        !!slot &&
+        atomTarget === ownerId &&
+        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+      const contextOk = (myTurn && inActPhase && free) || askedKill;
+      const ok = contextOk && selfAlive && cardInHand && isRed;
       return ok ? null : '现在不能使用武圣';
     },
     async (state: GameState, params: Record<string, Json>) => {
@@ -287,6 +318,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
+  // ── 声明替代回应:被询问杀(南蛮入侵/决斗 等)时,可用父魂/granted 武圣
+  //    把两张牌/红色手牌当杀打出。与武圣/龙胆同构:声明后 询问杀 的可用性检测
+  //    不再 skip/silent,建立回应窗口。
+  const unregAlt = declareAlternativeResponse(state, ownerId, '询问杀');
+
   return () => {
     unregTransform();
     unregWusheng();
@@ -294,6 +330,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     unregDmgHook();
     unregBeforeDodge();
     unregAfterDodge();
+    unregAlt();
   };
 }
 
@@ -315,13 +352,23 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     },
     transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id }),
     activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
       const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p) return false;
+      if (!p?.alive) return false;
       // 手牌 + 装备区合计 ≥ 2
       const equipCount = Object.values(p.equipment ?? {}).filter(Boolean).length;
       const total = (p.handCount ?? 0) + equipCount;
-      return total >= 2 && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+      if (total < 2) return false;
+      // 出杀路径(自己回合 + 出牌阶段 + 还能出杀)
+      const ownTurnCanSlash = defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+      // 回应路径(被询问杀:南蛮入侵/决斗):与武圣/龙胆同构
+      const slot = ctx.view.pending;
+      const atomType = (slot?.atom as { type?: string })?.type;
+      const reqType = (slot?.atom as { requestType?: string })?.requestType;
+      const askedKill =
+        !!slot &&
+        slot.target === ctx.perspectiveIdx &&
+        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+      return ownTurnCanSlash || askedKill;
     },
   });
 
@@ -342,13 +389,23 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     },
     transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id }),
     activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
-      // 仅在获得武圣时显示
       const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p) return false;
+      if (!p?.alive) return false;
+      // 仅在获得武圣时显示
       if (!p.turnUsage?.['杀/unlimited/父魂']) return false;
       const hasRed = p.hand?.some((c) => c.color === '红') ?? false;
-      return hasRed && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+      if (!hasRed) return false;
+      // 出杀路径(自己回合 + 出牌阶段 + 还能出杀)
+      const ownTurnCanSlash = defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+      // 回应路径(决斗中被询问杀):与武圣/龙胆同构
+      const slot = ctx.view.pending;
+      const atomType = (slot?.atom as { type?: string })?.type;
+      const reqType = (slot?.atom as { requestType?: string })?.requestType;
+      const askedKill =
+        !!slot &&
+        slot.target === ctx.perspectiveIdx &&
+        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+      return ownTurnCanSlash || askedKill;
     },
   });
 

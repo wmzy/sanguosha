@@ -183,8 +183,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
         prompt: {
           type: 'useCardAndTarget',
           title: '界天香:弃一张红桃牌(手牌或装备区),选择一名其他角色',
+          // 显式提供 candidates(手牌+装备区):投影层 resolveCardFilterCandidates 仅遍历
+          // player.hand,会漏掉装备区红桃牌 → view-projection desync。界版核心差异是允许
+          // 弃装备区红桃牌,故必须显式下发含装备区的权威候选列表。
           cardFilter: {
             filter: (c) => c.suit === '♥' || (hasHongyan && c.suit === '♠'),
+            candidates: validCards,
             min: 1,
             max: 1,
           },
@@ -234,9 +238,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 5) 执行所选选项
       if (isDamage) {
-        // 选项①:该角色受到伤害来源的伤害(保留原来源/原属性/原伤害值——转移伤害六要素同原伤害)
+        // 选项①:该角色受到伤害来源的「1 点」伤害(官方:固定 1 点,保留原来源/原伤害属性,
+        //   非原伤害值。界天香/天香 header 与 天香.test 注释均明确"1点伤害/固定1点不是原伤害量")
         const source = atom.source ?? ownerId;
-        await runDamageFlow(ctx.state, source, newTarget, amount, undefined, atom.damageType);
+        await runDamageFlow(ctx.state, source, newTarget, 1, undefined, atom.damageType);
         // 摸 X 张牌(X = 已损失体力值,至多 5;伤害结算后)
         if (targetPlayer.alive) {
           const lostHealth = targetPlayer.maxHealth - getHealthValue(targetPlayer);

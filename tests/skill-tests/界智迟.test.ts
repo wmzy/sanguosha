@@ -367,4 +367,79 @@ describe('界智迟', () => {
     expect(harness.state.turn.vars['智迟/active']).toBeUndefined();
     expect(harness.state.players[0].health).toBe(2);
   });
+
+  // ─── ⑦ 智迟激活时,owner 打出的【无懈可击】(响应锦囊)不被自身 cancel ──
+  // 回归:isNormalTrick 曾把"响应锦囊"误判为普通锦囊,导致 owner 自己打出无懈可击时
+  //       被 智迟 的「检测有效性」hook cancel(owner 无法使用无懈可击)。
+  it('⑦:智迟激活时,owner 打出无懈可击不被自身 cancel(响应锦囊不受智迟影响)', async () => {
+    const triggerKill = makeCard('k1', '杀', '♠', '7');
+    const trick = makeCard('t1', '顺手牵羊', '♠', '3', '锦囊牌', '普通锦囊');
+    const wuxie = makeCard('w1', '无懈可击', '♣', 'K', '锦囊牌', '响应锦囊');
+    const p2Card = makeCard('p2c1', '闪', '♥', '5');
+    const state: GameState = createGameState({
+      players: [
+        // P0 = 界陈宫(智迟 owner),持无懈可击
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['w1'],
+          skills: ['界智迟'],
+          health: 3,
+          maxHealth: 3,
+        }),
+        // P1 = 当前玩家(攻击方)
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: ['k1', 't1'],
+          skills: ['杀', '顺手牵羊'],
+          health: 4,
+          maxHealth: 4,
+        }),
+        // P2 = 顺手牵羊目标(非 owner)
+        makePlayer({
+          index: 2,
+          name: 'P2',
+          hand: ['p2c1'],
+          skills: [],
+          health: 4,
+          maxHealth: 4,
+        }),
+      ],
+      cardMap: { k1: triggerKill, t1: trick, w1: wuxie, p2c1: p2Card },
+      currentPlayerIndex: 1, // P1 回合,P0 回合外
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+
+    // 触发智迟:P1 出杀 P0
+    await harness.player('P1').useCardAndTarget('杀', 'k1', [0]);
+    await harness.player('P0').pass(); // 不出闪
+    await harness.waitForStable();
+    expect(harness.state.turn.vars['智迟/active']).toBe(0);
+
+    // P1 对 P2 用顺手牵羊(P2 非 owner,智迟不影响 P2)
+    await harness.player('P1').triggerAction('顺手牵羊', 'use', {
+      cardId: 't1',
+      target: 2,
+    });
+    await harness.waitForStable();
+
+    // 无懈可击广播窗口:P0 打出无懈可击取消顺手牵羊
+    await harness.player('P0').respond('无懈可击', { cardId: 'w1' });
+    await harness.waitForStable();
+
+    // 反无懈广播窗口:无人反无懈 → 超时
+    await harness.player('P1').pass();
+    await harness.waitForStable();
+
+    // 断言:P0 的无懈可击生效 → 顺手牵羊被取消 → P2 的闪未被拿走
+    expect(harness.state.players[2].hand).toContain('p2c1');
+    expect(harness.state.players[1].hand).not.toContain('p2c1');
+    // P0 的无懈可击已消耗(入弃牌堆)
+    expect(harness.state.zones.discardPile).toContain('w1');
+    // 顺手牵羊也入弃牌堆
+    expect(harness.state.zones.discardPile).toContain('t1');
+  });
 });

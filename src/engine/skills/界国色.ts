@@ -201,8 +201,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         st.localVars[OPTION_KEY] = confirmed ? 'use' : 'remove';
       } else if (rt === USE_RT) {
         st.localVars[CARD_KEY] = params.cardId ?? null;
+        // 用 ?? (nullish) 而非 truthy 判断:target===0 是合法座次,
+        // truthy 写法会错误地 fall-through 到 targets[0](与上方 validate 不一致)
         st.localVars[TARGET_KEY] =
-          (params.target) ??
+          (params.target as number | undefined) ??
           (params.targets as number[] | undefined)?.[0] ??
           null;
       } else if (rt === REMOVE_CARD_RT) {
@@ -229,7 +231,7 @@ async function executeOptionUse(st: GameState, ownerId: number): Promise<void> {
     target: ownerId,
     prompt: {
       type: 'useCardAndTarget',
-      title: '界国色:选一张方片牌当乐不思蜀,选一名距离1内的其他角色',
+      title: '界国色:选一张方片牌当乐不思蜀,选一名其他角色(无距离限制)',
       cardFilter: {
         filter: (c) => c.suit === '♦',
         min: 1,
@@ -321,6 +323,13 @@ async function executeOptionRemove(st: GameState, ownerId: number): Promise<void
 
   // 选场上乐所在玩家
   delete st.localVars[TRICK_TARGET_KEY];
+  // 预计算候选座次(权威):view.pendingTricks 仅存 cardId,
+  // 经国色/界国色转化的乐不思蜀原卡 name !== '乐不思蜀',filter 按 cardMap.name 查会漏选。
+  // 故从 state 直接查 PendingTrick.name,显式传 candidates(投影层不再跑 filter)。
+  const trickCandidates = st.players
+    .map((p, i) => ({ p, i }))
+    .filter(({ p, i }) => i !== ownerId && p.alive && p.pendingTricks.some((t) => t.name === TRICK_NAME))
+    .map(({ i }) => i);
   await applyAtom(st, {
     type: '请求回应',
     requestType: REMOVE_TARGET_RT,
@@ -330,12 +339,7 @@ async function executeOptionRemove(st: GameState, ownerId: number): Promise<void
       title: '界国色:选择要弃置其乐不思蜀的角色',
       min: 1,
       max: 1,
-      filter: (view, t) =>
-        view.players[t]?.alive === true &&
-        view.players[t]?.pendingTricks?.some((id) => {
-          const c = view.cardMap[id];
-          return c?.name === TRICK_NAME;
-        }) === true,
+      candidates: trickCandidates,
     },
     timeout: 20,
   });

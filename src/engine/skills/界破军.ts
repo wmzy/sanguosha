@@ -25,7 +25,9 @@
 //   - target 须在 指定目标 时仍存活(杀结算时可能因前一目标死亡而中断,但 指定目标 是先逐个声明)
 //   - 移出 0 张等价于不发动(confirm 询问的"不发动"分支)
 //   - 增伤效果在造成伤害前即时校验,反映移出后的牌区状态(如目标已被破军搬空,更易触发+1)
-//   - 归还时机:徐盛的回合结束(破军只在徐盛回合出杀时触发,故 turn 一定是徐盛的)
+//   - 归还时机:移出所在回合的回合结束(破军规则"直到回合结束")。
+//     破军可能在他人回合触发(借刀杀人/乱武 逼徐盛出杀,source 仍为徐盛),
+//     故按 EXILE_TURN_KEY 记录的移出回合精确归还,而非固定徐盛回合结束。
 //   - 归还目标已死亡:牌进弃牌堆(由 归还暂存牌 atom 处理)
 //
 // 跨 atom 通信:
@@ -52,6 +54,11 @@ const SKILL_ID = '界破军';
 const DISPLAY_NAME = '破军';
 /** target.vars 键:被破军移出的牌列表(per-target) */
 const EXILE_VARS_KEY = '界破军/移出';
+/** target.vars 键:移出发生时所在的回合主(player 座次)。
+ *  破军规则"直到回合结束"指移出所在回合结束;移出可能发生在他人回合
+ *  (借刀杀人/乱武 逼徐盛出杀,source 仍为徐盛),故须按移出回合归还,
+ *  而非固定在徐盛回合结束。 */
+const EXILE_TURN_KEY = '界破军/移出回合';
 
 /** 询问 requestTypes */
 const RT_ASK_USE = `${SKILL_ID}/askUse`; // 发动?
@@ -238,6 +245,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         cardIds: picked,
         varsKey: EXILE_VARS_KEY,
       });
+      // 记录移出所在回合(用于回合结束按正确回合归还;借刀/乱武逼杀时可能是他人回合)
+      ctx.state.players[target].vars[EXILE_TURN_KEY] = ctx.state.currentPlayerIndex;
     } finally {
       await popFrame(ctx.state);
     }
@@ -275,15 +284,20 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   registerAfterHook(state, skill.id, ownerId, '回合结束', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '回合结束') return;
-    if (atom.player !== ownerId) return; // 仅徐盛回合结束(破军只在徐盛回合触发)
-    // 遍历所有玩家,归还其 vars 中破军移出的牌
+    const turnOwner = atom.player;
+    // 遍历所有玩家,归还"移出所在回合 = 当前回合主"的暂存牌。
+    // 破军可能在他人回合触发(借刀杀人/乱武 逼徐盛出杀),故按 EXILE_TURN_KEY
+    // 精确匹配当前回合主,而非固定徐盛回合结束。
     for (let i = 0; i < ctx.state.players.length; i++) {
       const p = ctx.state.players[i];
       if (!p) continue;
+      const exiledTurn = p.vars[EXILE_TURN_KEY];
+      if (typeof exiledTurn !== 'number' || exiledTurn !== turnOwner) continue;
       const exiled = p.vars[EXILE_VARS_KEY];
       if (Array.isArray(exiled) && exiled.length > 0) {
         await applyAtom(ctx.state, { type: '归还暂存牌', player: i, varsKey: EXILE_VARS_KEY });
       }
+      delete p.vars[EXILE_TURN_KEY];
     }
   });
 

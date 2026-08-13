@@ -34,7 +34,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
-import { isDelayedTrick } from '../data/card-meta';
+import { isDelayedTrick, isRespondOnly } from '../data/card-meta';
 import {
   registerAction,
   registerBeforeHook,
@@ -342,8 +342,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (!cardId) return;
         const card = st.cardMap[cardId];
         if (!card) return;
-        // 排除延时锦囊(被动仅对普通锦囊触发)
-        if (isDelayedTrick(card)) return;
+        // 排除非普通锦囊(延时锦囊/响应锦囊如无懈可击):被动仅对普通锦囊触发
+        // 无懈可击的反击窗口 cancelTarget=使用者,若不排除会误触发被动
+        if (isDelayedTrick(card) || isRespondOnly(card)) return;
 
         // 防重入:同一张锦囊只触发一次
         const processedKey = `${PASSIVE_PROCESSED_PREFIX}${cardId}`;

@@ -479,3 +479,63 @@ describe('HeadlessGameClient — 自动跳过决策(通用)', () => {
     vi.useRealTimers();
   });
 });
+
+// 界天香弃红桃装备:useCardAndTarget 的 cardFilter.candidates 由投影层下发,
+// 含装备区牌(不在 me.hand)。旧实现 me.hand.filter(cset.has) 会漏掉装备 →
+// AI 无法选装备弃牌(界小乔仅持红桃装备时触发后卡死/超时)。
+describe('HeadlessGameClient — useCardAndTarget candidates 含装备区(界天香)', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('候选含装备牌(操作者空手牌)→ getAvailableActions 生成该装备的 respond action', () => {
+    const heartEquip: Card = {
+      id: 'eq1',
+      name: '白银狮子',
+      suit: '♥',
+      color: '红',
+      rank: 'A',
+      type: '装备牌',
+    };
+    const pending: PendingView = {
+      type: 'awaits',
+      atom: {
+        type: '请求回应',
+        requestType: '界天香/choose',
+        target: 1,
+        prompt: {
+          type: 'useCardAndTarget',
+          title: '界天香:弃一张红桃牌',
+          cardFilter: { candidates: ['eq1'], min: 1, max: 1 },
+          targetFilter: { min: 1, max: 1 },
+        },
+      },
+      prompt: {
+        type: 'useCardAndTarget',
+        title: '界天香:弃一张红桃牌',
+        cardFilter: { candidates: ['eq1'], min: 1, max: 1 },
+        targetFilter: { min: 1, max: 1 },
+      },
+      target: 1,
+      isBlocking: true,
+      deadline: Date.now() + 15000,
+      totalMs: 15000,
+    };
+    const view = makeView(pending, 1);
+    // 操作者(P1)无手牌(hand 缺省),装备牌只在 cardMap 中(投影层候选含装备 id)
+    view.cardMap['eq1'] = heartEquip;
+
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 1;
+    (hgc as unknown as { _view: GameView | null })._view = view;
+
+    const actions = hgc.getAvailableActions();
+    const respond = actions.find(
+      (a) =>
+        a.message.actionType === 'respond' &&
+        (a.message.params as { cardId?: string }).cardId === 'eq1',
+    );
+    expect(respond).toBeDefined();
+    expect(respond!.message.skillId).toBe('界天香');
+  });
+});

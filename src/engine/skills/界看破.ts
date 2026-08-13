@@ -7,26 +7,24 @@
 //
 // 与标版看破区别:
 //   - 牌范围:界版"黑色牌"(含装备区),标版限定"黑色手牌"。
-//   - 转化出的无懈"不能被响应":他人不可对此无懈再打出反无懈。
-//     标版转化出的无懈仍可被反无懈(标准 close-reopen 流程)。
+//   - 你的无懈"不能被响应":他人不可对你(界卧龙诸葛)使用的无懈再打出反无懈,
+//     涵盖实际无懈牌与界看破转化的无懈。标版的无懈仍可被反无懈(标准 close-reopen)。
 //
 // 模型:
 //   ① transform action(preceding,界看破.transform):黑色牌(手牌或装备)→
 //        卸下(若装备)→ 当作 → 影子无懈。同标版看破 transform,但允许装备区。
-//        转化执行后,在 localVars 打标记 `界看破/${shadowId}`=true,供 respond override 识别。
-//   ② respond action(覆盖无懈可击.respond,仅本座次):区分界看破转化无懈 vs 实际无懈:
-//        - 界看破转化的无懈:不设 已回应 标志 → 询问无懈可击 循环不再开新窗口(不可被响应)。
-//        - 普通(实际)无懈:走标版行为(设 已回应=true → 循环开新窗口允许反无懈)。
+//   ② respond action(覆盖标版无懈可击.respond,仅本座次):本座次发出的无懈
+//        (界看破转化或实际无懈牌)一律传 skipCancelQuery=true → 不开反无懈窗口。
+//        官方:"你的【无懈可击】不能被响应"——涵盖所有来源的无懈,不限转化。
 //
 // 覆盖机制:无懈可击在 DEFAULT_SKILLS 中,先实例化标版无懈.respond;界看破.onInit 后实例化,
 //   registerAction('无懈可击', ownerId, 'respond', ...) 覆盖标版注册(同 key 覆盖)。
 //   仅影响本座次(界卧龙诸葛)发出的无懈,其他座次仍走标版。
 //
-// 不可被响应机制(基于 close-reopen 的 询问无懈可击 循环):
-//   询问无懈可击 while-loop 每轮:respondedKey=false → 请求回应 → 检查 respondedKey。
-//   标版无懈 respond execute 设 respondedKey=true → 循环开新窗口(允许反无懈)。
-//   界看破 respond execute 不设 respondedKey(保持 false)→ 循环 break(无新窗口)。
-//   翻转 cancelKey(抵消状态)的逻辑两者一致;差异仅在是否触发 close-reopen。
+// 不可被响应机制:respond override 调 runUseFlow({skipCancelQuery:true}),runSettlementPhase
+//   对无懈自身跳过 cancel(反无懈)询问 → 无懈必然生效(不被反无懈)。
+//   询问抵消 close-reopen 循环:respond 设 已回应=true,无懈 resolve 设下层帧 cancelled=true →
+//   循环检测到已抵消即退出(无新窗口)。
 import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, findPendingSlot } from '../core/skill';
 import { applyAtom } from '../core/apply';
@@ -37,18 +35,13 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '界看破',
-    description: '你可以将一张黑色牌当【无懈可击】使用;转化出的无懈不能被响应',
+    description: '你可以将一张黑色牌当【无懈可击】使用;你的【无懈可击】不能被响应',
   };
 }
 
 /** 影子卡 id:${原id}#界看破 */
 function shadowIdOf(cardId: string): string {
   return `${cardId}#界看破`;
-}
-
-/** localVars 标记键:标明某 shadowId 是界看破转化的无懈(供 respond override 识别) */
-function shadowMarkKey(shadowId: string): string {
-  return `界看破/${shadowId}`;
 }
 
 /** 当前是否存在无懈可击广播窗口(玩家可回应) */
@@ -118,8 +111,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
         shadowId,
         outputName: '无懈可击',
       });
-      // 标记此影子为界看破转化(供 respond override 识别 → 不可被响应)
-      state.localVars[shadowMarkKey(shadowId)] = true;
     },
     // rollback:主 action validate 失败时,撤销转化(删影子,牌还原,清标记)
     (state: GameState, params: Record<string, Json>) => {
@@ -128,7 +119,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const self = state.players[ownerId];
       const origSlot = params['_origSlot'] as EquipSlot | undefined;
       delete state.cardMap[sId];
-      delete state.localVars[shadowMarkKey(sId)];
       const idx = self.hand.indexOf(sId);
       if (idx >= 0) {
         if (origSlot) {
@@ -169,16 +159,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
     async (state: GameState, params: Record<string, Json>) => {
       const cardId = params.cardId as string;
-      // 标记本次询问已 respond（询问抵消 循环据此决定是否开新窗口）
+      // 标记本次询问已 respond（询问抵消 循环据此决定是否退出）
       state.localVars['抵消/已回应'] = true;
-
-      // 区分:界看破转化的无懈 vs 普通(实际)无懈。
-      // 界看破转化:skipCancelQuery=true → runSettlementPhase 不询问反无懈（不可被响应）。
-      // 普通无懈:正常 runUseFlow（允许反无懈）。
-      const isJieKanPo = state.localVars[shadowMarkKey(cardId)] === true;
-      delete state.localVars[shadowMarkKey(cardId)];
-      await runUseFlow(state, ownerId, cardId, [ownerId], '无懈可击',
-        isJieKanPo ? { skipCancelQuery: true } : undefined);
+      // 官方:"你的【无懈可击】不能被响应"——涵盖本座次所有来源的无懈
+      // (界看破转化或实际无懈牌),故一律 skipCancelQuery=true,不开反无懈窗口。
+      await runUseFlow(state, ownerId, cardId, [ownerId], '无懈可击', { skipCancelQuery: true });
     },
   );
 

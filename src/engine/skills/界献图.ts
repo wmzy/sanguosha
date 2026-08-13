@@ -170,7 +170,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       defaultChoice: true,
       timeout: 15,
     });
-    if (st.localVars[CONFIRM_KEY]) {
+    // defaultChoice:true → 超时时 CONFIRM_KEY 仍为 undefined,须按 !== false 判定
+    // (undefined !== false → 默认摸 2),仅显式取消(choice===false)才进少摸分支
+    // 注:用 as Json|undefined 断言读取,避免 Record 索引类型被先前真值检查收窄
+    // (收窄后排除 false,导致 !== false 误报 TS2367 无重叠)
+    const draw2Confirmed = st.localVars[CONFIRM_KEY] as Json | undefined;
+    if (draw2Confirmed !== false) {
       drawN = 2;
     } else {
       delete st.localVars[CONFIRM_KEY];
@@ -187,7 +192,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         defaultChoice: true,
         timeout: 15,
       });
-      drawN = st.localVars[CONFIRM_KEY] ? 1 : 0;
+      // defaultChoice:true → 超时(undefined)默认摸 1,仅显式取消摸 0
+      const draw1Confirmed = st.localVars[CONFIRM_KEY] as Json | undefined;
+      drawN = draw1Confirmed !== false ? 1 : 0;
     }
     delete st.localVars[CONFIRM_KEY];
 
@@ -245,6 +252,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         title: `献图:选择 ${giveN} 张手牌给予 ${st.players[currentPlayer]?.name}`,
         cardFilter: { min: giveN, max: giveN },
       },
+      // 强制给牌:摸牌后必须给等量牌,禁止跳过
+      mandatory: true,
       timeout: 30,
     });
     delete st.localVars[GIVE_N_VAR];
@@ -258,6 +267,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!st.players[ownerId].hand.includes(cid)) continue;
       await applyAtom(st, { type: '给予', cardId: cid, from: ownerId, to: currentPlayer });
       actuallyGiven++;
+    }
+    // 超时/异常未给足时,自动从剩余手牌补足 giveN 张(强制给牌,不能白摸)
+    if (actuallyGiven < giveN) {
+      for (const cid of [...st.players[ownerId].hand]) {
+        if (actuallyGiven >= giveN) break;
+        await applyAtom(st, { type: '给予', cardId: cid, from: ownerId, to: currentPlayer });
+        actuallyGiven++;
+      }
     }
     st.turn.vars[givenKey(currentPlayer)] = actuallyGiven;
 

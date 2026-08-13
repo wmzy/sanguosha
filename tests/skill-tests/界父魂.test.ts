@@ -19,12 +19,13 @@
 //   12. 转化 rollback:杀.use validate 失败 → 两张原卡还原
 //   13. 转化负向:1 张牌/同张牌/敌方牌 → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import { applyAtom } from '../../src/engine/core/apply';
 
 function makeCard(
   id: string,
@@ -491,5 +492,90 @@ describe('界父魂', () => {
       actionType: 'transform',
       params: { cardIds: ['c1', 'c2'] },
     });
+  });
+
+  // ─── 14. 回应(打出)路径:被询问杀时,父魂转化两张牌当杀打出 ──────────
+  // Bug:父魂缺少 declareAlternativeResponse('询问杀'),且 transform validate/activeWhen
+  // 仅允许"使用"路径(自己回合+出牌阶段+无阻塞),导致被南蛮入侵/决斗询问出杀时
+  // 询问杀窗口被 skip(无 pending),无法用父魂转化杀回应。修复:与武圣/龙胆同构。
+  it('回应路径:被询问杀时,父魂转化两张牌当杀回应', async () => {
+    // 直接 applyAtom(询问杀) 不经南蛮/决斗父流程,杀牌留在处理区无父级清理,
+    // 会触发视图自动对比的 transient 处理区差异(真实对局父流程会消费处理区杀牌),
+    // 故临时关闭自动对比。核心断言在 state 层(pendingSlots/hand)。
+    const restoreAutoCompare = disableAutoCompare();
+    try {
+      const c1 = makeCard('c1', '闪', '♠', '2'); // 无字面杀
+      const c2 = makeCard('c2', '桃', '♣', '3'); // 无字面杀
+      const state: GameState = createGameState({
+        players: [
+          makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'], skills: ['界父魂'] }),
+          makePlayer({ index: 1, name: 'P2', hand: [], skills: [] }),
+        ],
+        cardMap: { c1, c2 },
+        currentPlayerIndex: 1, // P2 的回合(模拟南蛮/决斗询问 P1 出杀)
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      });
+      await harness.setup(state);
+      const P1 = harness.player('P1');
+
+      // 模拟南蛮入侵/决斗:询问 P1 出杀(fire-and-forget,等待回应)
+      void applyAtom(harness.state, { type: '询问杀', target: 0, source: 1 });
+      await harness.waitForStable();
+
+      // 修复前:询问杀 skip(无字面杀 + 未声明替代回应)→ 无 pending,P1 永远无法回应。
+      // 修复后:建立 P1 的询问杀回应窗口。
+      expect(harness.state.pendingSlots.has(0)).toBe(true);
+
+      // P1 用父魂:两张牌 c1+c2 → 杀,preceding=[界父魂.transform] + 主=杀.respond
+      await P1.tryDispatch({
+        skillId: '杀',
+        actionType: 'respond',
+        params: { cardId: 'c1#c2#父魂' },
+        preceding: [
+          { skillId: '界父魂', actionType: 'transform', params: { cardIds: ['c1', 'c2'] } },
+        ],
+      });
+      await harness.waitForStable();
+
+      // 回应成功:询问杀窗口已 resolve(无 pending 残留),两张原卡已合为影子杀打出
+      expect(harness.state.pendingSlots.has(0)).toBe(false);
+      expect(harness.state.players[0].hand).toEqual([]);
+      // 影子杀进处理区(供调用方南蛮/决斗检测)
+      expect(harness.state.cardMap['c1#c2#父魂']).toBeDefined();
+      expect(harness.state.cardMap['c1#c2#父魂'].name).toBe('杀');
+    } finally {
+      restoreAutoCompare();
+    }
+  });
+
+  // ─── 15. 装备转化 rollback:还原武器攻击范围 vars ──────────
+  // Bug:卸下武器时 卸下 atom 清除了 vars['距离/出杀范围'],rollback 还原武器槽
+  // 时未还原该 var,导致武器归位但攻击范围退化为徒手(1)。镜像 界武圣 rollback。
+  it('rollback(含武器):杀.use 失败 → 武器还原且攻击范围 vars 恢复', async () => {
+    const c1 = makeCard('c1', '闪', '♠', '2'); // 手牌
+    const weapon: Card = { id: 'w1', name: '丈八蛇矛', suit: '♠', color: '黑', rank: 'A', type: '装备牌', range: 3 };
+    const state = makeState({
+      p1Hand: ['c1'],
+      p1Equip: { 武器: 'w1' },
+      cardMap: { c1, w1: weapon },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 转化后 杀.use 无 targets → validate 失败 → rollback
+    await P1.expectRejected({
+      skillId: '杀',
+      actionType: 'use',
+      params: { cardId: 'c1#w1#父魂' },
+      preceding: [
+        { skillId: '界父魂', actionType: 'transform', params: { cardIds: ['c1', 'w1'] } },
+      ],
+    });
+
+    // 武器还原到槽位
+    expect(harness.state.players[0].equipment['武器']).toBe('w1');
+    // 攻击范围 vars 恢复(非退化)
+    expect(harness.state.players[0].vars['距离/出杀范围']).toBe(3);
   });
 });

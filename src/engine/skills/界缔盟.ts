@@ -13,7 +13,7 @@
 //
 // 实现:
 //   use action: 选两名角色 → 校验差值 ≤ 鲁肃牌数 → 立即交换手牌 → 记录 X
-//   阶段结束 after hook: 出牌阶段结束时,鲁肃弃 X 张牌(X=交换时记录的手牌数差)
+//   阶段结束 before hook: 出牌阶段结束时,鲁肃弃 X 张牌(X=交换时记录的手牌数差)
 //
 // 命名:文件名/loader key/character name = '界缔盟';内部 Skill.name = '缔盟'。
 import type {
@@ -227,10 +227,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             title: `缔盟:出牌阶段结束,弃置 ${actualDiscard} 张牌`,
             cardFilter: { filter: () => true, min: actualDiscard, max: actualDiscard },
           },
+          // 强制型弃牌:前端隐藏"不回应"按钮;headless 不生成 skip
+          mandatory: true,
           timeout: 30,
         });
-        const discardCards = st.localVars[DISCARD_KEY] as string[] | undefined;
+        let discardCards = st.localVars[DISCARD_KEY] as string[] | undefined;
         delete st.localVars[DISCARD_KEY];
+        // 强制弃牌:超时未回应 → 自动从手牌首张起补弃(不放弃弃牌义务)
+        if ((!discardCards || discardCards.length === 0) && actualDiscard > 0) {
+          discardCards = st.players[ownerId]?.hand.slice(0, actualDiscard) ?? [];
+        }
         if (discardCards && discardCards.length > 0) {
           await applyAtom(st, { type: '弃置', player: ownerId, cardIds: discardCards, voluntary: true });
         }

@@ -30,8 +30,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply'
-import { popFrame, pushFrame, frameCards } from '../core/frame';
-import { runDamageFlow } from '../flows/damage';
+import { popFrame, pushFrame } from '../core/frame';
+import { runUseFlow } from './cards/use-card';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
 
@@ -86,10 +86,13 @@ function canOptionGain(state: GameState, x: number): boolean {
 }
 
 /**
- * 执行一次【杀】结算(镜像 界诛害.runSlashResolution):
- * 指定目标→成为目标→检测有效性→询问闪→伤害/抵消→收尾。
- * 真实杀牌:手牌→处理区→(结算末尾)弃牌堆。不计出杀次数(回合外触发)。
- * 无距离限制(眩惑特例)。
+ * 执行一次【杀】的完整结算(镜像 界诛害.runSlashResolution / 借刀杀人 / 乱武 强制出杀):
+ * 走 runUseFlow('杀'),覆盖全部时机(选择目标时→使用时→指定目标→成为目标→指定目标后→
+ * 成为目标后→检测有效性→生效前[询问闪]→生效时→生效后[伤害]→使用结算结束时→使用结算结束后),
+ * 保证 无双/贞烈/铁骑/肉林/贯石斧/谦逊 等横切技能正确交互。此前手写实现(移动牌+指定目标+
+ * 检测有效性+询问闪+runDamageFlow)遗漏了 指定目标后/成为目标后/生效前/生效时/生效后 等时机。
+ * 真实杀牌(从 X 手牌):不计出杀次数(runUseFlow 不累加 quota,仅 杀.use 主动出杀时累加);
+ * 无距离限制(距离由 杀.use validate 校验,眩惑绕过主动出杀入口)。
  */
 async function runSlashResolution(
   state: GameState,
@@ -98,48 +101,7 @@ async function runSlashResolution(
   cardId: string,
 ): Promise<void> {
   if (!state.players[target]?.alive) return;
-  const damageType = state.cardMap[cardId]?.damageType;
-  const frame = await pushFrame(state, SKILL_ID, source, { target, cardId });
-  try {
-    await applyAtom(state, {
-      type: '移动牌',
-      cardId,
-      from: { zone: '手牌', player: source },
-      to: { zone: '处理区' },
-    });
-    await applyAtom(state, { type: '指定目标', source, target, cardId });
-    const becameTarget = await applyAtom(state, {
-      type: '成为目标',
-      source,
-      target,
-      cardId,
-    });
-    if (!becameTarget) return;
-    const valid = await applyAtom(state, {
-      type: '检测有效性',
-      source,
-      target,
-      cardId,
-    });
-    if (!valid) return;
-    await applyAtom(state, { type: '询问闪', target, source });
-    // 闪走 runUseFlow → resolve 设本帧 cancelled=true;闪牌已自动入弃牌堆(无需手动移牌)。
-    if (frame.cancelled) {
-      await applyAtom(state, { type: '被抵消', source, target, cardId });
-    } else if (state.players[target]?.alive) {
-      await runDamageFlow(state, source, target, 1, cardId, damageType);
-    }
-  } finally {
-    if (frameCards(state).includes(cardId)) {
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-    }
-    await popFrame(state);
-  }
+  await runUseFlow(state, source, cardId, [target], '杀');
 }
 
 /** 选项 1 流程:法正指定 Y → X 出杀对 Y */
@@ -360,6 +322,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!Array.isArray(cards) || cards.length !== 2) return;
       const validCards = cards.filter((id) => self.hand.includes(id));
       if (validCards.length !== 2) return;
+      // 防御:不允许重复选同一张牌(如 ['c1','c1']),否则第二次「移动牌」会因牌已离开手牌而失败
+      if (new Set(validCards).size !== 2) return;
 
       await pushFrame(ctx.state, SKILL_ID, ownerId, { target: X, cards: validCards });
       try {

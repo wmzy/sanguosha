@@ -49,12 +49,18 @@ function isSlash(card: Card | undefined): boolean {
   return !!card && card.name === '杀';
 }
 
-/** 判定一张卡是否为普通锦囊牌(排除延时锦囊) */
+/** 判定一张卡是否为普通锦囊牌(排除延时锦囊与响应锦囊)。
+ *  响应锦囊(无懈可击)与延时锦囊(乐不思蜀/兵粮寸断/闪电)均不属于"普通锦囊",
+ *  不受智迟影响。与 validateUseCard 的普通锦囊定义一致。
+ *  关键:无懈可击走 runUseFlow(effect-target)→runSettlementPhase→检测有效性,
+ *  若不排除响应锦囊,智迟激活时 owner 自己打出无懈可击会被自身 检测有效性 hook cancel,
+ *  导致 owner 无法使用无懈可击。 */
 function isNormalTrick(card: Card | undefined): boolean {
   return (
     !!card &&
     card.type === '锦囊牌' &&
-    card.trickSubtype !== '延时锦囊'
+    card.trickSubtype !== '延时锦囊' &&
+    card.trickSubtype !== '响应锦囊'
   );
 }
 

@@ -120,6 +120,7 @@ export async function runPickTargetCardPanel(
     target: from,
     prompt: {
       type: 'pickTargetCard' as const,
+      mode: opts.mode,
       title: opts.title,
       target,
       equipment,

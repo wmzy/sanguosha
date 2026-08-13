@@ -432,4 +432,155 @@ describe('界伤逝', () => {
     expect(harness.state.players[0].health).toBe(2);
     expect(harness.state.players[0].hand.length).toBe(1);
   });
+
+  // ─── 9. 春华被强制给牌(给予 atom)后 hand<X → 触发 ────────────
+  // 回归:给予 atom 不发 移动牌,旧实现的 移动牌 hook 漏覆盖。
+  //   触发场景:审时②/界求援/飞军/界好施 等强制春华给牌。
+  it('春华被强制给牌(给予 atom)后 hand<X → 触发', async () => {
+    const c1 = makeCard('c1', '桃', '♥', '5');
+    const d1 = makeCard('d1', '杀', '♠', '8');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '春华',
+          hand: ['c1'],
+          skills: ['界伤逝'],
+          health: 2,
+          maxHealth: 3,
+        }),
+        makePlayer({
+          index: 1,
+          name: '友',
+          character: '刘备',
+          hand: [],
+          skills: [],
+        }),
+      ],
+      cardMap: { c1, d1 },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('春华');
+
+    // 春华 health=2(X=1),hand={c1}。被强制把 c1 给友 → hand=0 < 1 → 触发
+    void applyAtom(harness.state, { type: '给予', cardId: 'c1', from: 0, to: 1 });
+    await waitForStable(harness.state);
+
+    const slot = [...harness.state.pendingSlots.values()][0];
+    const atom = slot.atom as { type: string; requestType?: string };
+    expect(atom.type).toBe('请求回应');
+    expect(atom.requestType).toBe('界伤逝/confirm');
+
+    await P0.respond('界伤逝', { choice: true });
+    await waitForStable(harness.state);
+
+    expect(harness.state.players[0].hand.length).toBe(1); // 摸至 X=1
+  });
+
+  // ─── 10. 春华手牌被暂存(移出至暂存区 atom)后 hand<X → 触发 ────
+  // 回归:移出至暂存区 atom 直接搬运手牌/装备到 vars[varsKey],不发 移动牌。
+  //   触发场景:界破军/界谦逊/箜声 等把春华手牌移出。
+  it('春华手牌被暂存(移出至暂存区 atom)后 hand<X → 触发', async () => {
+    const c1 = makeCard('c1', '桃', '♥', '5');
+    const d1 = makeCard('d1', '杀', '♠', '8');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '春华',
+          hand: ['c1'],
+          skills: ['界伤逝'],
+          health: 2,
+          maxHealth: 3,
+        }),
+        makePlayer({
+          index: 1,
+          name: '友',
+          character: '刘备',
+          hand: [],
+          skills: [],
+        }),
+      ],
+      cardMap: { c1, d1 },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('春华');
+
+    // 春华 health=2(X=1),hand={c1}。c1 被暂存 → hand=0 < 1 → 触发
+    void applyAtom(harness.state, {
+      type: '移出至暂存区',
+      source: 1,
+      target: 0,
+      cardIds: ['c1'],
+      varsKey: '测试/暂存',
+    });
+    await waitForStable(harness.state);
+
+    const slot = [...harness.state.pendingSlots.values()][0];
+    const atom = slot.atom as { type: string; requestType?: string };
+    expect(atom.type).toBe('请求回应');
+    expect(atom.requestType).toBe('界伤逝/confirm');
+
+    await P0.respond('界伤逝', { choice: true });
+    await waitForStable(harness.state);
+
+    expect(harness.state.players[0].hand.length).toBe(1); // 摸至 X=1
+  });
+
+  // ─── 11. 春华参与拼点(拼点扣置 atom)后 hand<X → 触发 ─────────
+  // 回归:拼点扣置 atom 直接搬运手牌→处理区(面朝下),不发 移动牌;
+  //   后续 处理区→弃牌堆 的 移动牌 from.zone≠'手牌',也不会触发本技。
+  //   触发场景:天义/烈刃/巧说/惴恐/陷阵/驱虎/制霸 等以春华为拼点目标。
+  it('春华参与拼点(拼点扣置 atom)后 hand<X → 触发', async () => {
+    const c1 = makeCard('c1', '桃', '♥', '5');
+    const c2 = makeCard('c2', '杀', '♠', '7');
+    const d1 = makeCard('d1', '杀', '♠', '8');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '春华',
+          hand: ['c1'],
+          skills: ['界伤逝'],
+          health: 2,
+          maxHealth: 3,
+        }),
+        makePlayer({
+          index: 1,
+          name: '友',
+          character: '刘备',
+          hand: ['c2'],
+          skills: [],
+        }),
+      ],
+      cardMap: { c1, c2, d1 },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('春华');
+
+    // 春华 health=2(X=1),hand={c1}。经 runRankCompareFlow 完整拼点流程,
+    // 拼点扣置 atom 把 c1 移入处理区 → 春华 hand=0 < 1 → 触发伤逝
+    const { runRankCompareFlow } = await import('../../src/engine/flows/rank');
+    void runRankCompareFlow(harness.state, 1, 0, 'c2', 'c1');
+    await waitForStable(harness.state);
+
+    const slot = [...harness.state.pendingSlots.values()][0];
+    const atom = slot.atom as { type: string; requestType?: string };
+    expect(atom.type).toBe('请求回应');
+    expect(atom.requestType).toBe('界伤逝/confirm');
+
+    await P0.respond('界伤逝', { choice: true });
+    await waitForStable(harness.state);
+
+    expect(harness.state.players[0].hand.length).toBe(1); // 摸至 X=1
+  });
 });

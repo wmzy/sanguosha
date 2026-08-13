@@ -667,4 +667,65 @@ describe('界破军', () => {
     // 增伤条件不满足:P1 装备 1(防具) > P0 装备 0 → 只受 1 点
     expect(harness.state.players[1].health).toBe(3);
   });
+
+  // ─── 12. 借刀杀人/乱武逼杀(他人回合):按移出所在回合归还 ────────────────────
+  it('破军在他人回合触发(逼杀)→ 按移出所在回合归还,非徐盛回合', async () => {
+    const slash = makeCard('s1', '杀', '♠', '5');
+    const t1 = makeCard('t1', '闪', '♥', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [], skills: ['杀', '界破军'], health: 4 }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: ['t1'],
+          skills: [],
+          character: '曹操',
+        }),
+      ],
+      cardMap: { s1: slash, t1 },
+      // 模拟借刀杀人/乱武:当前是 P1 回合,逼徐盛(P0)出杀(source=P0)
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: [], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    // 直接发 指定目标(source=P0=徐盛),触发破军 after-hook
+    const settleP = applyAtom(harness.state, {
+      type: '指定目标',
+      source: 0,
+      target: 1,
+      cardId: 's1',
+    });
+
+    // 破军询问发动(指定目标 after-hook,source=P0)
+    await harness.waitForStable();
+    P0.expectPending('请求回应');
+    await P0.respond('界破军', { choice: true });
+    await harness.waitForStable();
+    P0.expectPending('请求回应');
+    await P0.respond('界破军', { cardIds: ['t1'] });
+    await harness.waitForStable();
+    await settleP;
+
+    // 牌已移出,且移出回合记录为 P1(=1,当前回合主)
+    expect(harness.state.players[1].hand).toEqual([]);
+    expect(harness.state.players[1].vars['界破军/移出']).toEqual(['t1']);
+    expect(harness.state.players[1].vars['界破军/移出回合']).toBe(1);
+
+    // 徐盛(P0)回合结束 → 不应归还(移出发生在 P1 回合)
+    void applyAtom(harness.state, { type: '回合结束', player: 0 });
+    await harness.waitForStable();
+    expect(harness.state.players[1].vars['界破军/移出']).toEqual(['t1']); // 仍未归还
+
+    // P1 回合结束 → 按移出所在回合归还
+    void applyAtom(harness.state, { type: '回合结束', player: 1 });
+    await harness.waitForStable();
+    expect(harness.state.players[1].vars['界破军/移出']).toBeUndefined();
+    expect(harness.state.players[1].vars['界破军/移出回合']).toBeUndefined();
+    expect(harness.state.players[1].hand).toEqual(['t1']);
+  });
 });

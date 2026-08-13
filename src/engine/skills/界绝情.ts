@@ -3,12 +3,15 @@
 //
 // 与标版 张春华·绝情 描述一致,但标版未实现,故仍独立创建界版文件。
 //
-// 实现:before-hook 挂「造成伤害」。
+// 实现:before-hook 挂「伤害结算开始时」(伤害流程第 1 时机,引擎专为绝情设计的 cancel 点)。
 //   - 触发条件:atom.source === ownerId(春华是伤害来源)
-//   - 效果:return { kind: 'modify', atom: { type: '失去体力', target, amount } }
-//   - modify 语义:管线用新 atom(失去体力)重新走 validate/apply/after hooks,
-//     造成伤害 的 after hooks(反馈/奸雄/防具穿透等)不再触发——这正是"视为失去体力"
-//     的语义(不触发伤害来源技)。失去体力 的 after hooks 照常触发(系统规则濒死检查等)。
+//   - 效果:applyAtom(失去体力, target, amount) 后 return { kind: 'cancel' }
+//   - cancel 跳过整个伤害流程(时机2~8 不再触发),故 造成伤害后/受到伤害后 等
+//     after hooks(反馈/奸雄/狂骨/防具穿透)均不触发——这正是"视为失去体力"的语义
+//     (不触发伤害来源技)。失去体力 自身走完整 pipeline,其 after hooks(系统规则濒死
+//     检查)照常触发,目标体力归零仍走求桃流程。
+//   - 注意:不能用 modify 把 atom 改为 失去体力——modify 只替换当前 atom 并继续同一
+//     pipeline,不会 cancel 外层 runDamageFlow,会导致目标先失体力再受伤害(双重结算)。
 //
 // 关键点:
 //   - 锁定技,无需询问,无需次数限制。

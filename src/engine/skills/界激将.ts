@@ -48,6 +48,9 @@ const PER_TURN_VAR = '界激将/triggered';
 const USE_REQUEST_TYPE = '界激将/出杀';
 const USE_CHOICE_VAR = '界激将/出杀选择';
 const USE_KILL_TARGET_VAR = '界激将/killTarget';
+// 代打出路径 localVars 键:主公被询问杀时,记录替主公打出杀的蜀角色座次
+// (询问杀 after-hook 读此键判定"替你打出"触发;代打出 execute 写,询问杀 hook 读后即删)
+const SUBSTITUTE_PLAYER_VAR = '界激将/代打出者';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -222,12 +225,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // ── 询问杀 after hook:蜀角色回合外「打出」杀(南蛮入侵/决斗)→ 询问是否令主公摸1张 ──
   //   使用杀走 runUseFlow→「指定目标」(由上面的 hook 覆盖);打出杀(被询问后把杀移入
   //   处理区)不走「指定目标」,故另挂「询问杀」after-hook。
-  //   · atom.target = 被询问出杀者(打出方);须确认其确实打出了一张杀(处理区有杀——
-  //     调用方的 consumePlayedSlashes 在本 after-hook 之后才清理,故 frameCards 仍含杀)。
-  //   · 与「指定目标」hook 共享 PER_TURN_VAR,同一回合只摸一次(同一张杀不可能同时触发
-  //     使用与打出两条路径,且 PER_TURN_VAR 防止多次触发)。
-  //   · 代打出(主公被询问杀,蜀盟友代打)时 atom.target=主公=ownerId,被早期 return 跳过
-  //     (本 hook 仅覆盖蜀角色本人直接打出的路径)。
+  //   触发者(打出方)分两种:
+  //   · 直接打出:atom.target=蜀角色本人(被决斗/南蛮询问杀)→ triggerIdx=askedIdx。
+  //   · 代打出(替你打出):atom.target=主公(主公被询问杀,经激将 respond 令蜀盟友替打)→
+  //     激将 代打出 execute 已把替打蜀角色记入 SUBSTITUTE_PLAYER_VAR,hook 读此键得 triggerIdx。
+  //     (OL:"替你使用或打出杀时"含代打出,故此处须覆盖。)
+  //   · 须确认确实打出了一张杀(处理区有杀——调用方的 consumePlayedSlashes 在本 after-hook
+  //     之后才清理,故 frameCards 仍含杀)。
+  //   · 与「指定目标」hook 共享 PER_TURN_VAR,同一回合只摸一次。
   offs.push(
     registerAfterHook(
       state,
@@ -237,15 +242,25 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       async (ctx): Promise<void> => {
         if (ownerId !== 0) return;
         const atom = ctx.atom;
-        // 打出方 = 被询问者(询问杀 atom.target)
         const askedIdx = atom.target;
         if (typeof askedIdx !== 'number') return;
-        if (askedIdx === ownerId) return; // 主公本人不算"其他蜀角色"
-        const asked = ctx.state.players[askedIdx];
-        if (!asked?.alive) return;
-        if (asked.faction !== '蜀') return;
-        // 必须是蜀角色"回合外"
-        if (ctx.state.currentPlayerIndex === askedIdx) return;
+        // 确定触发者(打出方):
+        //   askedIdx !== ownerId → 蜀角色本人直接打出;
+        //   askedIdx === ownerId → 代打出(主公被询问杀),替打蜀角色经 SUBSTITUTE_PLAYER_VAR 传递。
+        let triggerIdx: number;
+        if (askedIdx === ownerId) {
+          const sub = ctx.state.localVars[SUBSTITUTE_PLAYER_VAR] as number | undefined;
+          delete ctx.state.localVars[SUBSTITUTE_PLAYER_VAR];
+          if (typeof sub !== 'number') return; // 主公自己打出/无人替打
+          triggerIdx = sub;
+        } else {
+          triggerIdx = askedIdx;
+        }
+        const trigger = ctx.state.players[triggerIdx];
+        if (!trigger?.alive) return;
+        if (trigger.faction !== '蜀') return;
+        // 必须是该蜀角色"回合外"
+        if (ctx.state.currentPlayerIndex === triggerIdx) return;
         // 必须实际打出了一张杀(询问杀 resolve 后杀牌仍在处理区)
         const playedKill = frameCards(ctx.state).some(
           (id) => ctx.state.cardMap[id]?.name === '杀',
@@ -268,7 +283,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         await applyAtom(ctx.state, {
           type: '请求回应',
           requestType: REQUEST_TYPE,
-          target: askedIdx,
+          target: triggerIdx,
           prompt: {
             type: 'confirm',
             title: `界激将:是否令${lord.name}摸一张牌?`,
@@ -385,7 +400,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
                 const c = st.cardMap[id];
                 return c?.name === '杀';
               });
-              if (killCardId) return;
+              if (killCardId) {
+                // 记录替打的蜀角色,供 询问杀 after-hook 判定"替你打出"触发(OL:
+                // "替你使用或打出杀时"含代打出)。询问杀 atom.target=主公,故 hook 无法
+                // 从 atom 直接得知代打者,经此 localVars 传递。
+                st.localVars[SUBSTITUTE_PLAYER_VAR] = allyIdx;
+                return;
+              }
               // 该角色拒绝/无杀,继续询问下一个
             }
             // 全部拒绝:处理区无杀,execute 结束,主公承受原结算

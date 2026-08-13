@@ -88,8 +88,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       await pushFrame(st, SKILL_ID, from, { ...params });
 
       try {
-        // 目标(其他角色)视为对华雄使用决斗:from=目标(发起者/出杀后手),
-        // target=华雄(目标/出杀先手)。虚拟使用模式(无实体牌)。
+        // 其他角色(target 变量)视为对华雄(from 变量)使用决斗:
+        //   source=target(其他角色)=决斗发起者(出杀后手),
+        //   [from]=[华雄]=决斗目标(出杀先手)。虚拟使用模式(无实体牌)。
         if (st.players[from]?.alive && st.players[target]?.alive) {
           const virtualCardId = `${SKILL_ID}:决斗:${target}:${from}:${st.seq}`;
           st.cardMap[virtualCardId] = { id: virtualCardId, name: '决斗', suit: '', color: '无色', rank: 'A', type: '锦囊牌' };

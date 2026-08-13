@@ -188,7 +188,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      st.localVars[USE_CHOICE_KEY] = params.confirmed === true;
+      // 前端 confirm prompt 提交 { choice: true/false }(见 AwaitingPrompt.tsx)。
+      // 兼容 confirmed 别名(与八卦阵/奸雄/再起等同构)。
+      st.localVars[USE_CHOICE_KEY] = params.choice === true || params.confirmed === true;
     },
   );
 

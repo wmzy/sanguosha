@@ -31,6 +31,7 @@ import type {
   Card,
   FrontendAPI,
   GameState,
+  Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply'
@@ -67,34 +68,38 @@ export function createSkill(id: string, ownerId: number): Skill {
 function gainCountKey(from: number): string {
   return `${SKILL_ID}/gainCount/${from}`;
 }
-/** 获得计数所在 depth key(per source) */
-function gainDepthKey(from: number): string {
-  return `${SKILL_ID}/gainDepth/${from}`;
+/** 获得批次标识 key(per source)——存栈顶结算帧对象引用(无帧时回退 depth) */
+function gainBatchKey(from: number): string {
+  return `${SKILL_ID}/gainBatch/${from}`;
 }
 
 /**
  * 记录一次"法正从 from 获得 1 张牌",返回是否触发 effect A(计数达 2)。
- * 同一 depth 内累计;跨 depth(新批次)重置。仅在恰好达到 2 时触发一次——
- * 之后继续累加但不再触发(避免同批次≥4 张时每 2 张重复触发)。
+ * 批次识别按「栈顶结算帧对象」隔离:同一帧内多次获得=同批次;不同帧(即便 stack 深度
+ * 相同,例如同一回合内两次独立的顺手牵羊)视为新批次,计数重置。仅在恰好达到 2 时
+ * 触发一次——之后继续累加但不再触发(避免同批次≥4 张时每 2 张重复触发)。
+ *
+ * 注意:不能用 settlementStack.length 作批次标识——两次独立出牌(各自 push/pop 一帧)
+ * 的 depth 相同,会被误判为同批次而错误累加触发。帧对象引用天然唯一,每次入栈都是
+ * 新对象,故以栈顶帧引用区分批次。无帧时(罕见:技能直接 applyAtom 未 pushFrame)
+ * 回退到 depth,保持单帧内多牌仍可累计。
  */
 function trackGainAndCheck(state: GameState, from: number): boolean {
-  const depth = state.settlementStack.length;
-  const depthK = gainDepthKey(from);
+  const stack = state.settlementStack;
+  const top = stack[stack.length - 1];
+  const batchK = gainBatchKey(from);
   const countK = gainCountKey(from);
-  const storedDepth = state.localVars[depthK] as number | undefined;
-  let count: number;
-  if (storedDepth !== depth) {
-    count = 1;
-    state.localVars[depthK] = depth;
-  } else {
-    count = ((state.localVars[countK] as number | undefined) ?? 0) + 1;
+  const marker = (top ?? stack.length) as unknown as Json;
+  if (state.localVars[batchK] !== marker) {
+    // 新批次:重置计数
+    state.localVars[batchK] = marker;
+    state.localVars[countK] = 1;
+    return false;
   }
+  const count = ((state.localVars[countK] as number | undefined) ?? 0) + 1;
   state.localVars[countK] = count;
   // 仅在恰好达到 2 时触发一次;不清零,后续累加不再命中 2(避免≥4 张重复触发)
-  if (count === 2) {
-    return true;
-  }
-  return false;
+  return count === 2;
 }
 
 /** 来源手牌中是否有红色牌 */
@@ -146,6 +151,10 @@ function extractGainEvent(
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
+  // per-seat respond action 以 seatId(非技能 owner)为 key 注册,
+  // unloadSkillInstance 的前缀清理(`skillId:ownerId:`)覆盖不到这些座次,
+  // 故显式捕获卸载函数,随技能实例卸载时一并清掉(与 刚烈/反间 一致)。
+  const unloaders: Array<() => void> = [];
 
   // ── 所有座次统一注册一个 respond(同 (skillId, ownerId, actionType) 只能一个 entry)──
   //    · 法正座次:confirm A / confirm B(法正是否发动)
@@ -153,7 +162,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   for (const p of state.players) {
     const seatId = p.index;
     const isOwner = seatId === ownerId;
-    registerAction(
+    const u = registerAction(
       state,
       skill.id,
       seatId,
@@ -184,6 +193,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         }
       },
     );
+    unloaders.push(u);
   }
 
   // ── effect A: 获得牌后 hook(获得/给予/移动牌) ──
@@ -316,7 +326,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
   });
 
-  return () => {};
+  return () => {
+    unloaders.forEach((fn) => fn());
+  };
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {

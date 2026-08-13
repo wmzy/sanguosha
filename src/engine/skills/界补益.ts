@@ -28,6 +28,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { spliceHandOrderEntry } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 
 const _SKILL_NAME = '界补益';
@@ -173,6 +174,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
     // 询问选目标一张牌(装备区明选 + 手牌盲选)
     delete ctx.state.localVars[PICK_KEY];
+    // 手牌盲选需快照手牌顺序(actionLog 重放确定性,同 runPickTargetCardPanel)
+    if (handCountAfter > 0) {
+      spliceHandOrderEntry(ctx.state, target);
+    }
     await applyAtom(ctx.state, {
       type: '请求回应',
       requestType: PICK_RT,
@@ -192,11 +197,19 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       timeout: 20,
     });
 
-    const result = ctx.state.localVars[PICK_KEY] as
+    let result = ctx.state.localVars[PICK_KEY] as
       | { zone: string; cardId: string | null; handIndex: number | null }
       | undefined;
     delete ctx.state.localVars[PICK_KEY];
-    if (!result) return;
+    // 超时未选(玩家确认发动后未在选牌窗口回应)→ 回退 defaultChoice(装备优先,否则手牌[0])。
+    // 与 runPickTargetCardPanel/固政 一致;请求回应.onTimeout 对非弃牌型询问无操作,
+    // defaultChoice 仅由技能自身在此兜底,引擎不会自动提交。
+    if (!result) {
+      result =
+        equipmentAfter.length > 0
+          ? { zone: 'equipment', cardId: equipmentAfter[0].cardId, handIndex: null }
+          : { zone: 'hand', cardId: null, handIndex: 0 };
+    }
 
     // 解析选择 → 拿到具体 cardId
     let pickedCardId: string | undefined;

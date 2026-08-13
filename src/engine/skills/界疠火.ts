@@ -20,12 +20,13 @@
 //      + 已造成伤害 → 询问 owner 弃1手牌;若 owner 超时(选择"失去体力")或手牌为空,
 //      则失去 1 体力。
 //      询问 requestType='疠火/cost';respond 写入 COST_CARD_KEY。
-//   ④ 多目标:owner 注册 slashTargetProvider,使用火杀(原始或疠火转化)时返回 3,
-//      canUseSlash 据此放宽目标数上限。前端 targetFilter max=3 配合动态收窄。
+//   ④ 多目标:owner 注册 slashTargetProvider,使用火杀(原始或疠火转化)时返回 2
+//      (默认 1 + 火杀额外 1),canUseSlash 据此放宽目标数上限。前端 targetFilter max=2 配合。
 //
 // 命名:文件名/loader key/character skill name 均为 '界疠火'(避开标疠火冲突);
 //   内部 Skill.name = '疠火'(OL 官方技能名,玩家可见)。
 import type {
+  Card,
   FrontendAPI,
   GameState,
   GameView,
@@ -81,12 +82,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     owner.tags.push(FIRE_TAG);
   }
 
-  // ─── 杀目标数提供者:owner 的火杀可多指定一个目标(≤3) ──
+  // ─── 杀目标数提供者:owner 的火杀可多指定一个目标(默认 1 + 1 = 2) ──
   // 原始火杀与疠火转化影子均 damageType='火焰',统一识别。
   const unloadTarget = registerSlashTargetProvider(state, ownerId, (st, _player, cardId) => {
     if (!cardId) return 0;
     const card = st.cardMap[cardId];
-    return card?.name === '杀' && card.damageType === '火焰' ? 3 : 0;
+    return card?.name === '杀' && card.damageType === '火焰' ? 2 : 0;
   });
 
   // ─── transform action:把非火杀转化为火杀影子(preceding,杀.use 之前) ──
@@ -232,7 +233,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   };
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
+export function onMount(skill: Skill, api: FrontendAPI): void {
   // transform:前端选非火杀 → 选目标 → 点疠火按钮 → 提交 preceding=[疠火.transform] + 主 action=杀.use
   api.defineAction('transform', {
     label: DISPLAY_NAME,
@@ -248,8 +249,8 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
       },
       targetFilter: {
         min: 1,
-        // 火杀可多指定一个目标,前端 max=3 已允许(参考方天画戟注释)
-        max: 3,
+        // 火杀可多指定一个目标(默认 1 + 1 = 2);后端 slashTargetProvider 权威校验
+        max: 2,
         filter: (view: GameView, t: number) => {
           // 排除自己;具体距离校验由后端 杀.use validate 处理
           const cp = view.currentPlayerIndex;
@@ -257,6 +258,8 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
         },
       },
     },
+    // 转化技前端入口:缺 transform 字段则前端无法进入转化模式(不会发 preceding + 影子 cardId)
+    transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id }),
     activeWhen: (ctx) => defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx),
   });
   // respond:代价选择(弃1张牌或放弃=失去1体力)

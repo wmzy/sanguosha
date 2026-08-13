@@ -799,8 +799,12 @@ export class HeadlessGameClient {
         const candidateIds = prompt.cardFilter.candidates;
         let candidates: Card[];
         if (candidateIds) {
-          const cset = new Set(candidateIds);
-          candidates = me?.hand?.filter((c) => cset.has(c.id)) ?? [];
+          // candidates 是权威候选(可能含装备区等非手牌来源,如界天香弃红桃装备)。
+          // 按 id 从 cardMap 取 Card,不限定于 me.hand —— 否则装备区候选被滤掉,
+          // AI 永远无法选装备弃牌(界天香只持红桃装备时触发后卡死/超时)。
+          candidates = candidateIds
+            .map((id) => view.cardMap[id])
+            .filter((c): c is Card => !!c);
         } else if (info.cardFilter) {
           candidates = me?.hand?.filter((c) => info.cardFilter!(c)) ?? [];
         } else {

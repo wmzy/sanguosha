@@ -101,6 +101,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (ctx.state.players[ownerId]?.vars[USED_KEY]) return;
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
+    // 重入保护:若其他救援技(不屈/仁心/补益等)已在本 陷入濒死 中先行救活(health>0),则跳过
+    // (与标版涅槃/界涅槃一致——同为 陷入濒死 自救型限定技,均含此守卫。)
+    if (self.health > 0) return;
 
     // 询问是否发动
     delete ctx.state.localVars[CONFIRMED_KEY];

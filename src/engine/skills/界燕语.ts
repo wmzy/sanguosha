@@ -15,9 +15,9 @@
 //     生产者:
 //       移动牌 after-hook(from.zone='手牌' && from.player=owner && card.name='杀')
 //       弃置 after-hook(player=owner, 统计 cardIds 中杀的数量)
-//     消费者:阶段结束(出牌) after-hook,≥2 则触发
+//     消费者:阶段结束(出牌) before-hook,≥2 则触发
 //     重置:阶段开始(出牌) after-hook(player=owner) → 置 0
-//   - 触发时机:阶段结束(出牌) after-hook(player=owner)。
+//   - 触发时机:阶段结束(出牌) before-hook(player=owner)。
 //   - 男性角色判定:getGender(character) === '男';界夏侯氏为女性,天然排除自身。
 //   - 非锁定技(描述以"你可以"开头):受 界铁骑/义绝 非锁定技压制影响。
 //   - "失去过"覆盖使用/重铸/弃置/转化后打出/被偷 等手牌→他处路径。
@@ -32,6 +32,7 @@ import { recastCard } from '../flows/recast';
 import {
   registerAction,
   registerAfterHook,
+  registerBeforeHook,
   hasBlockingPending,
 } from '../core/skill';
 import { getGender } from '../data/character-meta';
@@ -186,8 +187,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (shaCount > 0) addLostSha(ctx.state, ownerId, shaCount);
   });
 
-  // ── 阶段结束(出牌) after-hook:owner 出牌阶段结束 → 若 lostSha≥2 触发 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
+  // ── 阶段结束(出牌) before-hook:owner 出牌阶段结束 → 若 lostSha≥2 触发 ──
+  //   用 before-hook(同掣政/固政/溃诛):回合管理 的 阶段结束 after-hook 注册早于角色技能
+  //   (DEFAULT_SKILLS 排在角色技能前),会先把 state.phase 推进到「弃牌」并创建 __弃牌
+  //   pending;若本技挂 after-hook 会晚于它执行,导致询问 pending 与弃牌阶段错位。
+  //   before-hook 先于 atom apply 与所有 after-hook,return void = 不 cancel,阶段正常推进。
+  registerBeforeHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.phase !== '出牌') return;

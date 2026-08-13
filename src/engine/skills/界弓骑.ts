@@ -141,7 +141,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const discardedCard = st.cardMap[cardId];
 
       // 计数 +1(同步设 vars,防 dispatch 重入)。后缀 /usedThisTurn → 回合结束自动清空。
+      // 必须同步投影 view.turnUsage,否则 activeWhen(读 turnUsage[USED_KEY])无法在
+      // 发动后禁用按钮——玩家点击被后端 validate 拒绝(view-projection desync)。
       st.players[from].vars[USED_KEY] = true;
+      await applyAtom(st, {
+        type: '回合用量',
+        player: from,
+        key: USED_KEY,
+        value: true,
+      });
 
       await pushFrame(st, SKILL_ID, from, { ...params });
 

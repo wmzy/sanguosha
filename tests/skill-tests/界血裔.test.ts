@@ -138,7 +138,7 @@ describe('界血裔', () => {
     // 询问是否发动
     expect(currentRequestType(harness.state)).toBe('界血裔/use');
     const P0 = harness.player('界袁绍');
-    await P0.respond('界血裔', { confirmed: true });
+    await P0.respond('界血裔', { choice: true });
     await harness.waitForStable();
 
     expect(yiCount(harness.state, 0)).toBe(3); // 移除 1 裔
@@ -176,7 +176,7 @@ describe('界血裔', () => {
     await harness.waitForStable();
 
     const P0 = harness.player('界袁绍');
-    await P0.respond('界血裔', { confirmed: false }); // 不发动
+    await P0.respond('界血裔', { choice: false }); // 不发动
     await harness.waitForStable();
 
     expect(yiCount(harness.state, 0)).toBe(initialYi); // 裔数不变
@@ -392,7 +392,7 @@ describe('界血裔', () => {
     void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '出牌' });
     await harness.waitForStable();
     const P0 = harness.player('界袁绍');
-    await P0.respond('界血裔', { confirmed: true });
+    await P0.respond('界血裔', { choice: true });
     await harness.waitForStable();
 
     expect(yiCount(harness.state, 0)).toBe(3);

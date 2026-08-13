@@ -222,6 +222,43 @@ describe('界仁德', () => {
     expect(hasWineMark).toBe(true);
   });
 
+  // ─── 酒增伤每回合限一次:已用过酒 → 选酒不再生效 ─────────
+
+  it('负面:本回合已用酒增伤 → 选酒不再生效(酒每回合限一次)', async () => {
+    const c1 = makeCard('c1', '杀', '♠', 'A');
+    const c2 = makeCard('c2', '杀', '♠', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'], health: 4, maxHealth: 4 }),
+        makePlayer({ index: 1, name: 'P2', hand: [], health: 4, maxHealth: 4 }),
+      ],
+      cardMap: { c1, c2 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    // 模拟本回合已用过酒增伤(真实酒或先前虚拟酒):resolveWine 经 markOncePerTurn 写入
+    harness.state.players[0].vars['酒/usedThisTurn'] = true;
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('界仁德', 'use', {
+      targets: [{ target: 1, cardIds: ['c1', 'c2'] }],
+    });
+
+    // 选酒
+    await P1.respond('界仁德', { option: '酒' });
+    await harness.waitForStable();
+
+    // 已用酒增伤 → 视为使用酒被跳过,不获得 酒/nextKillDamageBonus 标记(避免一回合二次增伤)
+    const hasWineMark = harness.state.players[0].marks.some(
+      (m) => m.id === '酒/nextKillDamageBonus',
+    );
+    expect(hasWineMark).toBe(false);
+    // 自己不回血(界仁德无回血)
+    expect(harness.state.players[0].health).toBe(4);
+  });
+
   // ─── 给2张:拒绝使用基本牌 → 无任何效果(不回血) ──────────
 
   it('给 2 张牌 → 拒绝视为使用基本牌 → 无效果(不回血)', async () => {

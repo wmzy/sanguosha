@@ -1,12 +1,12 @@
 // 界看破(界卧龙诸葛·转化技)测试:
 //   transform:把一张黑色牌(手牌或装备区)当【无懈可击】使用。
-//   respond override(覆盖无懈可击.respond):转化出的无懈不可被响应(无反无懈窗口)。
+//   respond override(覆盖无懈可击.respond):本座次的无懈(转化或实际牌)均不可被响应。
 //
 // 验证:
 //   1. 正面:P2 出无中生有 → 无懈窗口 → P1 界看破(黑牌当无懈)→ 抵消 + 不开第二窗口(不可被响应)
 //   2. 正面:♣黑牌(非黑桃)也可转化
 //   3. 正面:装备区黑牌也可转化
-//   4. 正面:实际无懈牌(非界看破转化)仍走标版(开第二窗口,允许反无懈)
+//   4. 正面:实际无懈牌(非界看破转化)也不开反无懈窗口(你的无懈可击不能被响应)
 //   5. rollback:transform + 无懈.respond 失败 → 原卡还原
 //   6. 负面:红牌 transform 被拒
 //   7. 负面:无无懈窗口时 transform 被拒
@@ -205,9 +205,9 @@ describe('界看破', () => {
     expect(drawEvents.length).toBe(0);
   });
 
-  // ─── 4. 正面:实际无懈牌仍走标版(开反无懈窗口) ──────────────────
-  // 验证 respond override 不影响真实无懈牌(非界看破转化)的反无懈流程。
-  it('实际无懈(非界看破转化)→ 仍开反无懈窗口(标版行为)', async () => {
+  // ─── 4. 正面:实际无懈牌同样不可被响应(官方"你的无懈可击不能被响应") ─
+  // 验证 respond override 对真实无懈牌(非界看破转化)同样跳过反无懈窗口。
+  it('实际无懈(非界看破转化)→ 也不开反无懈窗口(界卧龙诸葛的无懈均不可被响应)', async () => {
     const wzsy = makeCard('wz', '无中生有', '♥', '2', '锦囊牌');
     const realWuxie = makeCard('rw', '无懈可击', '♠', 'J', '锦囊牌'); // 实际无懈牌
     const state = buildState({
@@ -223,15 +223,15 @@ describe('界看破', () => {
     await P2.useCardAndTarget('无中生有', 'wz', [1]);
     P2.expectPending('请求回应');
 
-    // P1 用实际无懈牌(非界看破转化):应走标版,设 已回应=true → 开反无懈窗口
-    // 注意:回应无懈广播用 respond(不是 use)
+    // P1 用实际无懈牌(非界看破转化):官方"你的无懈可击不能被响应" → 同样不开反无懈窗口
     await P1.respond('无懈可击', { cardId: 'rw' });
 
-    // 标版行为:开反无懈窗口
-    P2.expectPending('请求回应');
-    // P2 pass 反无懈 → 无中生有被抵消
-    await P2.pass();
-    await harness.waitForStable();
+    // 全程仅 1 个无懈询问窗口(无中生有的),无第二个反无懈窗口
+    const respondRequests = harness.state.atomHistory.filter(
+      (e) => e.kind === 'atom' && (e.atom as { type?: string }).type === '请求回应',
+    );
+    expect(respondRequests.length).toBe(1);
+    // 无中生有被抵消 → P2 不摸牌
     const drawEvents = harness.state.atomHistory.filter(
       (e) => e.kind === 'atom' && (e.atom as { type?: string }).type === '摸牌',
     );

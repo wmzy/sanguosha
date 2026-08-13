@@ -279,12 +279,10 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
         filter: (_view, _t) => true, // 任意存活角色(后端 validate 校验)
       },
     },
-    activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
-      // 限定技未用过才显示
-      const used = ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.[USED_KEY];
-      return used !== true;
-    },
+    activeWhen: (ctx) => defaultPlayActive(ctx),
+    // 限定技"已使用"由后端 validate(player.vars[USED_KEY])兜底拦截;
+    // view.turnUsage 每回合被「回合结束」atom 整体清空,无法承载整局一次的持久标记,
+    // 故不在此读取(与 乱武/界乱武/界焚城/界献州 等限定技一致)。
   });
   api.defineAction('respond', {
     label: DISPLAY_NAME,

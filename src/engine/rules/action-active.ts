@@ -68,9 +68,9 @@ export function viewSlashTargetMax(
   for (const [k, v] of Object.entries(tu)) {
     if (k.startsWith('杀/target/') && typeof v === 'number') max += v;
   }
-  // 持久技能 tag:火杀多目标
+  // 持久技能 tag:火杀多指定一个目标(疠火 +1 目标 → 上限 2)
   if (card?.name === '杀' && card.damageType === '火焰' && p.tags?.includes('杀/火杀多目标'))
-    max = Math.max(max, 3);
+    max = Math.max(max, 2);
   return max;
 }
 

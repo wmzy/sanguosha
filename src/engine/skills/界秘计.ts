@@ -259,7 +259,9 @@ async function runMijiOnce(
     prompt: {
       type: 'useCard',
       title: `秘计:选择至多 ${x} 张手牌给予 P${target}(可不选)`,
-      cardFilter: { min: 0, max: x },
+      // filter:()=>true 让投影层(resolveCardFilterCandidates)下发全手牌 candidates;
+      // 缺失则前端/headless derive 出 c.name==='界秘计' 匹配 0 张,玩家无法选牌分发。
+      cardFilter: { filter: () => true, min: 0, max: x },
     },
     defaultChoice: { cardIds: [] as Json[] },
     timeout: 30,

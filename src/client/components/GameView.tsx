@@ -131,6 +131,8 @@ export function GameViewComponentImpl({
   // 旁观者看不到任何手牌(buildView 按原始 viewer=-1 过滤 hand),仅借用座次 0 做展示视角。
   const perspectiveIdx =
     view.viewer >= 0 && view.viewer < view.players.length ? view.viewer : 0;
+  // 旁观者公开视图(viewer<0):看不到任何手牌,底栏借用座次 0 仅做展示视角。
+  const isSpectating = view.viewer < 0;
   const [showIdentityReveal, setShowIdentityReveal] = useState(
     () => !sessionStorage.getItem('sgs_identity_shown'),
   );
@@ -852,7 +854,9 @@ export function GameViewComponentImpl({
             <div className={styles.phaseStrip}>
               <span className={styles.phaseStripBadge}>{view.phase}</span>
               <span className={styles.handTitle}>
-                手牌 ({perspectiveHand.length})
+                {isSpectating
+                  ? `👁 旁观 · ${perspectiveName} 手牌 ${perspectivePlayer.handCount} 张`
+                  : `手牌 (${perspectiveHand.length})`}
                 {isDistributeActive && activeDistribute && (
                   <span className={cx(styles.debugHint, styles.distHint)}>
                     {' '}
@@ -976,7 +980,11 @@ export function GameViewComponentImpl({
                 </div>
               );
             })}
-            {perspectiveHand.length === 0 && <div className={styles.emptyHand}>无手牌</div>}
+            {isSpectating ? (
+              <div className={styles.emptyHand}>手牌已隐藏 · 申请查看该玩家视角可见手牌</div>
+            ) : (
+              perspectiveHand.length === 0 && <div className={styles.emptyHand}>无手牌</div>
+            )}
           </div>
         </div>
 

@@ -12,11 +12,11 @@
 //     加/减经 加标记/去标记 atom(view 自动同步)。
 //   - 游戏开始初始化(化身/界巧变先例):'回合开始' after-hook,首次触发时给本玩家
 //     加 3 枚护甲 mark。主公首回合开始 ≈ 游戏开始,所有玩家实例同步初始化。
-//   - 护甲减伤(before-hook on 造成伤害):
+//   - 护甲减伤(before-hook on 受到伤害时):
 //       absorbed = min(护甲数, 伤害值)
 //       移除 absorbed 枚护甲 mark(经 去标记 atom)
 //       modify atom.amount -= absorbed(可能为 0,表示全部吸收)
-//   - 首伤回血/再伤失血(after-hook on 造成伤害):
+//   - 首伤回血/再伤失血(after-hook on 受到伤害后):
 //       仅当最终 amount > 0 触发(护甲全吸收 → 未"受到伤害" → 不计)
 //       count = player.vars['界矢北/damageCount/usedThisTurn'] ?? 0(/usedThisTurn 由 回合结束 自动清空)
 //       count==0(首次受伤):回复体力 1
@@ -97,7 +97,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     await addArmor(st, ownerId);
   });
 
-  // ── 护甲减伤:before-hook on 造成伤害,吸收伤害、扣减护甲 ──
+  // ── 护甲减伤:before-hook on 受到伤害时,吸收伤害、扣减护甲 ──
   registerBeforeHook(
     state,
     skill.id,
@@ -118,10 +118,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     },
   );
 
-  // ── 首伤回血/再伤失血:after-hook on 造成伤害 ──
-  // 仅当最终 amount > 0 触发(护甲全吸收则未"受到伤害")。
-  // 在引擎濒死检查(系统规则 after-hook,ownerId=-1,最后执行)之前运行,
-  // 故"首伤回 1 血"可避免 owner 因本次伤害进入濒死。
+  // ── 首伤回血/再伤失血:after-hook on 受到伤害后 ──
+  // 仅当最终 amount > 0 触发(护甲全吸收 → runDamageFlow 于 受到伤害时 折叠 amount=0,
+  //   跳过扣减与 受到伤害后,本 hook 不触发)。
+  // 濒死检查在 扣减体力 的 after-hook(时机4)中执行,先于 受到伤害后(时机6):
+  //   若本次伤害致 owner 濒死,求桃流程先结算;回血在濒死结算之后才执行,无法替代救援。
+  //   owner 未被救活(死亡)时 alive=false,下方 !alive 检查跳过回血。
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;

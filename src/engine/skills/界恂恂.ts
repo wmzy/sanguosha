@@ -8,7 +8,8 @@
 //     after-hook 在 phase 切换后、实际摸牌前执行,故重排可影响本次摸牌。
 //   - X = 4(固定),牌堆不足时仅观看可用张数;牌堆空则跳过。
 //   - 询问是否发动(confirm);发动后询问排列(distribute select mode)。
-//   - 玩家回应 { top: [...], bottom: [...] } —— top/bottom 为观察范围的无重复划分;
+//   - 玩家回应 { top: [...], bottom: [...] } —— top 恰好 min(2,观察张数) 张(OL 官方
+//     "将其中两张置于牌堆顶"),bottom 为剩余牌;top/bottom 为观察范围的无重复完整划分;
 //     top 顺序即摸牌顺序(top[0] 最先摸)。超时或非法划分时保持原序,不调整牌堆。
 //   - 牌堆方向约定(与 摸牌 atom 一致):deck[0]=牌堆底(最后摸),deck[len-1]=牌堆顶(最先摸)。
 //     newDeck = [...bottom, ...middle, ...top.reverse()]
@@ -71,6 +72,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const bottom = params.bottom as string[];
         const combined = [...top, ...bottom];
         if (combined.length !== observed.length) return '恂恂:必须划分全部观察的牌';
+        const requiredTop = Math.min(2, observed.length);
+        if (top.length !== requiredTop) return `恂恂:须将 ${requiredTop} 张置于牌堆顶`;
         const seen = new Set<string>();
         for (const cid of combined) {
           if (!observedSet.has(cid)) return '恂恂:牌不在观察范围内';
@@ -132,7 +135,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 观察牌堆顶 drawCount 张(deck 末尾为顶,与 摸牌 atom 一致)
     const observed = deck.slice(-drawCount);
 
-    // 询问排列
+    // 询问排列:必须恰好将 min(2,观察张数) 张置于牌堆顶(OL 官方"将其中两张置于牌堆顶")
+    const requiredTop = Math.min(2, drawCount);
     delete ctx.state.localVars[ARRANGE_KEY];
     await applyAtom(ctx.state, {
       type: '请求回应',
@@ -141,10 +145,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       prompt: {
         type: 'distribute',
         mode: 'select',
-        title: '恂恂:选择置于牌堆顶的牌(顺序即摸牌顺序),其余置于牌堆底',
+        title: `恂恂:选择 ${requiredTop} 张置于牌堆顶(顺序即摸牌顺序),其余置于牌堆底`,
         cardIds: observed,
-        minTotal: 0,
-        maxTotal: drawCount,
+        minTotal: requiredTop,
+        maxTotal: requiredTop,
       },
       defaultChoice: false,
       timeout: 30,
@@ -163,6 +167,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const observedSet = new Set(observed);
     const combined = [...top, ...bottom];
     const valid =
+      top.length === requiredTop &&
       combined.length === observed.length &&
       new Set(combined).size === combined.length &&
       combined.every((id) => observedSet.has(id));

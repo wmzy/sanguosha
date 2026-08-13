@@ -99,8 +99,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!Array.isArray(cardIds) || cardIds.length === 0) return '请选择要弃置的牌';
       const self = st.players[ownerId];
       if (!self) return '玩家不存在';
+      const seen = new Set<string>();
       for (const id of cardIds) {
         if (typeof id !== 'string' || !self.hand.includes(id)) return `牌 ${id} 不在手牌中`;
+        if (seen.has(id)) return '不能选择重复的牌';
+        seen.add(id);
       }
       return null;
     },

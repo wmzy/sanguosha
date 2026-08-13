@@ -106,6 +106,36 @@ describe('界弓骑', () => {
     expect(harness.state.players[0].hand).not.toContain('s1');
   });
 
+  // ─── turnUsage view 同步(前端 activeWhen 禁用重复发动的数据源)─────────────
+  // 回归:USED_KEY 曾只写 player.vars 未投影 view.turnUsage,导致 activeWhen
+  // (读 turnUsage[USED_KEY])在发动后仍放行,按钮不灰,玩家点击被 validate 拒绝。
+  it('turnUsage:发动后 usedThisTurn 同步到 view(event 流 + buildView)', async () => {
+    const slash = makeCard('s1', '杀', '♠', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['s1'], skills: ['界弓骑', '杀'] }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操' }),
+      ],
+      cardMap: { s1: slash },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    // 初始:未发动弓骑
+    P0.processEvents();
+    expect(P0.processedView.players[0].turnUsage?.['界弓骑/usedThisTurn']).toBeUndefined();
+
+    await P0.triggerAction('界弓骑', 'use', { cardId: 's1' });
+
+    // 发动后:usedThisTurn=true(event 流与 buildView 双路径一致)
+    P0.processEvents();
+    expect(P0.processedView.players[0].turnUsage?.['界弓骑/usedThisTurn']).toBe(true);
+    expect(P0.view.players[0].turnUsage?.['界弓骑/usedThisTurn']).toBe(true);
+  });
+
   // ─── 弃装备牌 + 选不弃他人牌:设标记,无副作用 ────────────
   it('弃装备牌 + 选不弃他人牌:仅设标记', async () => {
     const weapon = makeWeapon('w1', '青釭剑', '♠', 2);

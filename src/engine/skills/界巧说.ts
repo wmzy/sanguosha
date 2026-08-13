@@ -14,11 +14,12 @@
 //       2) runRankCompareFlow(扣置→亮出→后→弃牌堆,两张牌面朝下同时扣置)
 //       3) 结算输赢 → 设对应 turn.vars
 //   - 赢效果:turn.vars['巧说/winNext'] = owner。语义"下一张牌可多/少指定一个目标":
-//     · +1 目标:杀 validate 本不限目标数(参考方天画戟注释),前端据此 tag 放宽多选;
-//       单目标锦囊(过河拆桥/顺手牵羊等)的 targetFilter 也可消费此 tag 允许 2 个目标。
-//     · -1 目标:语义较窄(对必须指定目标的牌意义有限),引擎层记 tag 表态即可。
+//     · +1 目标(杀):注册 slashTargetProvider,winNext 生效时返回 2(与天义/方天画戟同构,
+//       后端 canUseSlash→slashTargetMax 权威放行);并投影 turnUsage['杀/target/界巧说']=1
+//       供前端 viewSlashTargetMax 放宽多选(否则前端只允许选 1 个目标)。
+//     · -1 目标:语义较窄(杀默认 min=1,少选即可),引擎层无需额外实现。
 //     · "下一张"语义:after-hook 挂「移动牌」—— owner 从手牌打出一张牌到处理区时,
-//       清除 winNext(本回合下一张牌的 +/- 目标效果已被消费)。
+//       清除 winNext + turnUsage 投影(本回合下一张牌的 +/- 目标效果已被消费)。
 //   - 没赢效果:turn.vars['巧说/lost'] = owner + 注册 trickBlocker。
 //     trickBlocker 是查询型谓词(state-bound,WeakMap 注册表),
 //     validateUseCard 在校验普通锦囊 use 时查询;生效后 owner 不能使用任何普通锦囊牌。
@@ -38,6 +39,7 @@ import { runRankCompareFlow } from '../flows/rank';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { registerTrickBlocker } from '../rules/trick-quota';
+import { registerSlashTargetProvider } from '../rules/slash-target';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界巧说';
@@ -49,6 +51,8 @@ const PD_RT = `${SKILL_ID}/拼点`;
 const WIN_NEXT_VAR = '巧说/winNext';
 /** 没赢效果标记:owner 本回合不能使用普通锦囊牌。 */
 const LOST_VAR = '巧说/lost';
+/** 杀目标数 view 投影 key:赢后下一张杀可多指定一个目标(前端 viewSlashTargetMax 读 '杀/target/' 前缀叠加)。 */
+const SLASH_TARGET_TU = '杀/target/界巧说';
 
 /** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13。 */
 function rankValue(rank: string): number {
@@ -79,6 +83,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     state,
     ownerId,
     (st: GameState, player: number) => st.turn.vars[LOST_VAR] === player,
+  );
+
+  // ─── 赢效果提供者:杀目标数 +1(winNext 生效时返回 2,与天义同构) ───
+  // 后端 canUseSlash→slashTargetMax 权威放行;"下一张"消费语义由 移动牌 after-hook
+  // 清 winNext 落实:打出第一张牌后 provider 归 0。
+  const unloadTargetProvider = registerSlashTargetProvider(
+    state,
+    ownerId,
+    (st: GameState, player: number) => (st.turn.vars[WIN_NEXT_VAR] === player ? 2 : 0),
   );
 
   // ─── use action:owner 主动发动巧说拼点 ────────────────────────
@@ -153,10 +166,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       // 3) 结算输赢:发起方点数严格大于目标 = 赢;否则(输或平)没赢
       if (win) {
-        // 赢:下一张牌可 +/-1 目标(由 turn.vars['巧说/winNext'] 驱动;
-        // 移动牌 after-hook 在 owner 下张牌打出时清除)
+        // 赢:下一张牌可 +/-1 目标。turn.vars['巧说/winNext'] 驱动 slashTargetProvider(+1 杀目标);
+        // 投影 turnUsage['杀/target/界巧说']=1 供前端 viewSlashTargetMax 放宽多选。
+        // 移动牌 after-hook 在 owner 下张牌打出时清除 winNext + 投影(消费"下一张")。
         st.turn.vars[WIN_NEXT_VAR] = from;
-        await applyAtom(st, { type: '回合用量', player: from, key: WIN_NEXT_VAR, value: true });
+        await applyAtom(st, { type: '回合用量', player: from, key: SLASH_TARGET_TU, value: 1 });
       } else {
         // 没赢:本回合不能使用锦囊牌(由 trickBlocker + validateUseCard 落实)
         st.turn.vars[LOST_VAR] = from;
@@ -210,13 +224,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (atom.from.zone !== '手牌') return;
     if (atom.from.player !== ownerId) return;
     if (atom.to.zone !== '处理区') return;
-    // 仅在 winNext 当前生效时清除
+    // 仅在 winNext 当前生效时清除(消费"下一张牌"的 +/- 目标效果)
     if (ctx.state.turn.vars[WIN_NEXT_VAR] === ownerId) {
       delete ctx.state.turn.vars[WIN_NEXT_VAR];
       await applyAtom(ctx.state, {
         type: '回合用量',
         player: ownerId,
-        key: WIN_NEXT_VAR,
+        key: SLASH_TARGET_TU,
         value: false,
       });
     }
@@ -224,6 +238,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   return () => {
     unloadBlocker();
+    unloadTargetProvider();
   };
 }
 

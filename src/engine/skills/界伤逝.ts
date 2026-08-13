@@ -16,6 +16,14 @@
 //   5. 获得(from=春华)/装备(player=春华):被偷/被拿(顺手牵羊等)、
 //      装备手牌中的装备牌,均让手牌数减少
 //      (获得/装备 atom 自带 apply、不发 移动牌,故独立 hook)
+//   6. 给予(from=春华):被审时②/界求援/飞军/界好施 等强制给牌 → 手牌数减少
+//      (给予 atom 自带 apply、不发 移动牌,故需独立 hook)
+//   7. 移出至暂存区(target=春华):界破军/界谦逊/箜声 把春华手牌暂存 → 手牌数减少
+//      (atom 直接搬运手牌/装备到 vars[varsKey],不发 移动牌,故需独立 hook)
+//   8. 拼点扣置(initiator 或 target=春华):天义/烈刃/巧说/惴恐/陷阵/驱虎/制霸 等
+//      拼点技把春华的手牌扣置入处理区(面朝下) → 手牌数减少
+//      (拼点扣置 atom 直接搬运手牌→处理区,不发 移动牌;后续 处理区→弃牌堆 的
+//      移动牌 from.zone≠'手牌',不会触发本技的 移动牌 hook,故需独立 hook)
 //
 // 每次任意 hook 触发,统一调 checkTrigger(state, ownerId):
 //   X = max(0, maxHealth - health); hand = hand.length
@@ -141,6 +149,34 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   registerAfterHook(state, skill.id, ownerId, '获得', async (ctx) => {
     const atom = ctx.atom;
     if (atom.from !== ownerId) return;
+    await checkTrigger(ctx.state, ownerId);
+  });
+
+  // ── 给予 after:春华被强制给牌(审时②/界求援/飞军/界好施 等) → 手牌数减少 ──
+  // 注:给予 atom 自带 apply(手牌→手牌)、不发 移动牌(仅 afterApply 发 移动到目标区域后 标记),
+  // 故 移动牌 hook 无法覆盖,需独立 hook。
+  registerAfterHook(state, skill.id, ownerId, '给予', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.from !== ownerId) return;
+    if (atom.to === ownerId) return; // 给自己不算失去
+    await checkTrigger(ctx.state, ownerId);
+  });
+
+  // ── 移出至暂存区 after:春华的牌被暂存(界破军/界谦逊/箜声 等) → 手牌数可能减少 ──
+  // 注:atom 直接把手牌/装备搬运到 vars[varsKey],不发 移动牌。cardIds 可能只含装备
+  // (此时手牌未减),checkTrigger 的 hand<X 条件会自动过滤,无需在此精确判断。
+  registerAfterHook(state, skill.id, ownerId, '移出至暂存区', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.target !== ownerId) return;
+    await checkTrigger(ctx.state, ownerId);
+  });
+
+  // ── 拼点扣置 after:春华参与拼点(天义/烈刃/巧说/惴恐/陷阵/驱虎/制霸) → 手牌数减少 ──
+  // 注:拼点扣置 atom 把双方各一张手牌直接搬运到处理区(面朝下),不发 移动牌。
+  // 后续 处理区→弃牌堆 的 移动牌 from.zone='处理区'≠'手牌',不会触发本技的 移动牌 hook。
+  registerAfterHook(state, skill.id, ownerId, '拼点扣置', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.initiator !== ownerId && atom.target !== ownerId) return;
     await checkTrigger(ctx.state, ownerId);
   });
 

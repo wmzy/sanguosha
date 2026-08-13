@@ -158,7 +158,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
 
         if (effect === 'trick') {
-          // 请求目标弃一张锦囊
+          // 请求目标弃一张锦囊(强制型:弃牌是义务,不可"不回应")
           delete st.localVars[CARD_KEY];
           await applyAtom(st, {
             type: '请求回应',
@@ -169,20 +169,28 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
               title: '灭计:弃置一张锦囊牌',
               cardFilter: { filter: (c: Card) => isTrickCard(c), min: 1, max: 1 },
             },
+            mandatory: true,
             timeout: 30,
           });
           const picked = st.localVars[CARD_KEY] as string | undefined;
           delete st.localVars[CARD_KEY];
-          // 二次校验:仍在手中 + 仍是锦囊(防超时兜底/竞态)
+          // 二次校验:仍在手中 + 仍是锦囊(防竞态);超时未回应则自动弃首张锦囊
+          // (强制型弃牌不放弃义务,与英魂/良姻 同款 mandatory 兜底)
+          let trickId = picked;
+          const tpTrick = st.players[target];
           if (
-            picked &&
-            st.players[target]?.hand.includes(picked) &&
-            isTrickCard(st.cardMap[picked])
+            (!trickId ||
+              !tpTrick?.hand.includes(trickId) ||
+              !isTrickCard(st.cardMap[trickId])) &&
+            tpTrick?.alive
           ) {
-            await applyAtom(st, { type: '弃置', player: target, cardIds: [picked] });
+            trickId = tpTrick.hand.find((id) => isTrickCard(st.cardMap[id]));
+          }
+          if (trickId && tpTrick?.hand.includes(trickId)) {
+            await applyAtom(st, { type: '弃置', player: target, cardIds: [trickId] });
           }
         } else {
-          // 依次弃两张任意牌
+          // 依次弃两张任意牌(强制型:弃牌是义务,不可"不回应")
           for (let i = 0; i < 2; i++) {
             const tpNow = st.players[target];
             if (!tpNow?.alive || tpNow.hand.length === 0) break; // 中途死亡/无牌则停止
@@ -196,15 +204,20 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
                 title: `灭计:依次弃置两张牌(第 ${i + 1}/2 张)`,
                 cardFilter: { filter: () => true, min: 1, max: 1 },
               },
+              mandatory: true,
               timeout: 30,
             });
             const picked = st.localVars[CARD_KEY] as string | undefined;
             delete st.localVars[CARD_KEY];
-            if (picked && st.players[target]?.hand.includes(picked)) {
-              await applyAtom(st, { type: '弃置', player: target, cardIds: [picked] });
+            // 强制型弃牌:超时未回应则自动弃首张(不放弃弃牌义务)
+            let cardId = picked;
+            if ((!cardId || !tpNow.hand.includes(cardId)) && tpNow.alive) {
+              cardId = tpNow.hand[0];
+            }
+            if (cardId && st.players[target]?.hand.includes(cardId)) {
+              await applyAtom(st, { type: '弃置', player: target, cardIds: [cardId] });
             } else {
-              // 超时/放弃:按规则仍需弃第二张,但实际超时则停止避免死循环
-              break;
+              break; // 无牌可弃(中途死亡/无牌)
             }
           }
         }
@@ -231,7 +244,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           const rt = atom['requestType'];
           if (rt === CHOOSE_RT) return null; // confirm:任意 params 均接受
           if (rt === PICK_TRICK_RT || rt === PICK_ONE_RT) {
-            const cardId = params.cardId as string | undefined;
+            // 强制型弃牌走多牌选择 UI,提交 cardIds(数组);兼容单 cardId
+            const ids = params.cardIds as string[] | undefined;
+            const cardId = (Array.isArray(ids) ? ids[0] : params.cardId) as
+              | string
+              | undefined;
             if (typeof cardId !== 'string') return '请选择一张牌';
             if (!st.players[seat]?.hand.includes(cardId)) return '牌不在手牌中';
             if (rt === PICK_TRICK_RT && !isTrickCard(st.cardMap[cardId])) {
@@ -249,7 +266,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             st.localVars[CHOICE_KEY] =
               params.choice === true || params.confirmed === true ? 'trick' : 'twoCards';
           } else if (rt === PICK_TRICK_RT || rt === PICK_ONE_RT) {
-            const cardId = params.cardId as string | undefined;
+            const ids = params.cardIds as string[] | undefined;
+            const cardId = (Array.isArray(ids) ? ids[0] : params.cardId) as
+              | string
+              | undefined;
             if (typeof cardId === 'string') st.localVars[CARD_KEY] = cardId;
           }
         },

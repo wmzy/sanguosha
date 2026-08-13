@@ -58,12 +58,13 @@ async function pickAndDiscard(state: GameState, picker: number, victim: number):
 
   state.localVars[DISCARD_TARGET_VAR] = victim;
   delete state.localVars[PICK_VAR];
-  await applyAtom(state, {
-    type: '请求回应',
+  const pickAtom = {
+    type: '请求回应' as const,
     requestType: PICK_REQUEST_TYPE,
     target: picker,
     prompt: {
-      type: 'pickTargetCard',
+      type: 'pickTargetCard' as const,
+      mode: 'discard' as const,
       title: `挑衅:弃置 ${vp.name} 的一张牌`,
       target: victim,
       equipment,
@@ -72,7 +73,8 @@ async function pickAndDiscard(state: GameState, picker: number, victim: number):
     },
     defaultChoice: defaultZone as unknown as Json,
     timeout: 20,
-  });
+  };
+  await applyAtom(state, pickAtom);
 
   const result = state.localVars[PICK_VAR] as
     | { zone: string; cardId: string | null; handIndex: number | null }
@@ -80,10 +82,24 @@ async function pickAndDiscard(state: GameState, picker: number, victim: number):
   delete state.localVars[PICK_VAR];
   delete state.localVars[DISCARD_TARGET_VAR];
 
-  const zone = result?.zone ?? defaultZone.zone;
+  // 界奇才 before-hook 可能已就地过滤 prompt.equipment 中的防具/宝物;
+  // 若默认选择指向被过滤掉的装备,重算为过滤后列表首项(或手牌)
+  const filteredEquip = (pickAtom.prompt.equipment ?? []) as Array<{ cardId: string }>;
+  let fallback = defaultZone as { zone: string; cardId?: string; handIndex?: number };
+  if (fallback.zone === 'equipment') {
+    const stillThere = filteredEquip.some((e) => e.cardId === fallback.cardId);
+    if (!stillThere) {
+      fallback =
+        filteredEquip.length > 0
+          ? { zone: 'equipment', cardId: filteredEquip[0].cardId }
+          : { zone: 'hand', handIndex: 0 };
+    }
+  }
+
+  const zone = result?.zone ?? fallback.zone;
   let discardId: string | undefined;
   if (zone === 'equipment') {
-    discardId = (result?.cardId ?? defaultZone.cardId);
+    discardId = (result?.cardId ?? fallback.cardId) ?? undefined;
   } else {
     // 手牌盲选
     const idx = result?.handIndex ?? 0;
@@ -206,6 +222,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
             const zone = params.zone;
             if (zone === 'equipment') {
               if (typeof params.cardId !== 'string') return 'cardId required';
+              // 界奇才 hook 可能已从 prompt.equipment 过滤受保护装备(防具/宝物)
+              const promptEquip = (
+                slot.atom as { prompt?: { equipment?: Array<{ cardId: string }> } }
+              )?.prompt?.equipment;
+              if (promptEquip && !promptEquip.some((e) => e.cardId === params.cardId))
+                return '该装备不可选';
               if (!Object.values(vp.equipment).includes(params.cardId))
                 return '该牌不在目标装备区';
               return null;

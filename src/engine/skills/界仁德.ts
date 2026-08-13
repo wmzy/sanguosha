@@ -27,6 +27,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { canSlash } from '../rules/slash-quota';
+import { usedThisTurn } from '../rules/once-per-turn';
 import { runUseFlow, chargeOnSettle } from './cards/use-card';
 import type { SkillModule } from '../types';
 
@@ -315,8 +316,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             await virtualPeach(state, from, peachTarget);
           }
         } else if (choice === '酒') {
-          // 酒:仅对自己,标记下一张杀+1伤害
-          await virtualWine(state, from);
+          // 酒增伤(使用方法Ⅰ)每回合限一次:已用过且无"酒/无次数限制"豁免则不使用
+          // (与 杀 的 canSlash 预检对称;canUseWine 同款判定)。否则视为使用一张酒。
+          if (
+            usedThisTurn(state, from, '酒') &&
+            !state.players[from]?.tags.includes('酒/无次数限制')
+          ) {
+            // 本回合已用酒增伤:不使用,直接结束
+          } else {
+            await virtualWine(state, from);
+          }
         }
         // choice === '不使用' / 超时 → 不使用,直接结束
       }

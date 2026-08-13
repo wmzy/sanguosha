@@ -148,6 +148,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const targetPlayer = ctx.state.players[target];
       if (!targetPlayer?.alive) return;
 
+      // 自己必须存活(描述主体是"你")。受伤目标可能在扣减体力(时机4)的濒死→死亡
+      // 流程中触发致死型技能(如神关羽武魂)令来源死亡,此时 造成伤害后(时机5)才触发,
+      // 不应为已死亡的吕布创建询问 pending。
+      if (!ctx.state.players[ownerId]?.alive) return;
+
       // 目标区域必须有牌(手牌/装备/判定区任一)
       const hasCards =
         targetPlayer.hand.length > 0 ||

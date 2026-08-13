@@ -229,12 +229,14 @@ describe('界刚烈', () => {
     expect(harness.state.pendingSlots.size).toBe(0);
   });
 
-  // ─── 2点伤害:两次都发动红色 → 来源受2点伤害 ────────────────────
-  it('2点伤害:两次发动红色判定 → 来源受2点伤害', async () => {
+  // ─── 2点伤害仅按事件触发一次(红色):来源受1伤而非2伤 ────────────────────
+  // 回归守护:界刚烈触发条件为"受到伤害后"(无"1点"),应按事件触发一次,
+  // 而非像 遗计/节命("受到1点伤害后")那样按点触发 N 次。
+  it('2点伤害仅触发一次:发动红色 → 来源受1伤(非2伤)', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
     const wine = makeCard('w1', '酒', '♦', '5');
-    const judge1 = makeCard('j1', '杀', '♥', '5'); // 第1次判定:红色
-    const judge2 = makeCard('j2', '杀', '♦', '5'); // 第2次判定:红色
+    const judge1 = makeCard('j1', '杀', '♥', '5'); // 判定:红色
+    const judge2 = makeCard('j2', '杀', '♦', '5'); // 不应被用到
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['w1', 'k1'], skills: ['酒', '杀'] }),
@@ -255,28 +257,26 @@ describe('界刚烈', () => {
     await harness.waitForStable();
     harness.processAllEvents();
 
-    // P0 出杀(伤害=2)→ P1 不闪 → 界刚烈触发2次
+    // P0 出杀(伤害=2)→ P1 不闪 → 界刚烈仅触发一次
     await P0.useCardAndTarget('杀', 'k1', [1]);
     await P1.pass();
 
-    // 第1次:发动 → 红色 → P0 受1伤
+    // 仅一次询问,发动 → 红色 → P0 受1伤
     P1.expectPending('请求回应');
     await P1.respond('界刚烈', { choice: true });
-    // 第2次:发动 → 红色 → P0 受1伤
-    P1.expectPending('请求回应');
-    await P1.respond('界刚烈', { choice: true });
-
+    // 不应有第二次询问
     expect(harness.state.pendingSlots.size).toBe(0);
+
     expect(harness.state.players[1].health).toBe(2); // P1 受杀 2 伤
-    expect(harness.state.players[0].health).toBe(2); // P0 受界刚烈 2 次 1 伤
+    expect(harness.state.players[0].health).toBe(3); // P0 仅受界刚烈 1 次伤害(非 2 次)
   });
 
-  // ─── 2点伤害:第一次发动,第二次不发动 ────────────────────
-  it('2点伤害:第一次发动红色,第二次不发动', async () => {
+  // ─── 2点伤害仅触发一次:不发动则无第二次询问 ────────────────────
+  it('2点伤害仅触发一次:不发动 → 无第二次询问', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
     const wine = makeCard('w1', '酒', '♦', '5');
-    const judge1 = makeCard('j1', '杀', '♥', '5'); // 第1次判定:红色
-    const judge2 = makeCard('j2', '杀', '♠', '5'); // 第2次判定牌(不会判定,不发动)
+    const judge1 = makeCard('j1', '杀', '♥', '5');
+    const judge2 = makeCard('j2', '杀', '♠', '5'); // 不应被用到
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['w1', 'k1'], skills: ['酒', '杀'] }),
@@ -299,27 +299,24 @@ describe('界刚烈', () => {
     await P0.useCardAndTarget('杀', 'k1', [1]);
     await P1.pass();
 
-    // 第1次:发动 → 红色 → P0 受1伤
-    P1.expectPending('请求回应');
-    await P1.respond('界刚烈', { choice: true });
-    // 第2次:不发动
+    // 仅一次询问,不发动 → 无事(无第二次询问)
     P1.expectPending('请求回应');
     await P1.respond('界刚烈', { choice: false });
-
     expect(harness.state.pendingSlots.size).toBe(0);
+
     expect(harness.state.players[1].health).toBe(2); // P1 受杀 2 伤
-    expect(harness.state.players[0].health).toBe(3); // P0 仅受1次界刚烈伤害
+    expect(harness.state.players[0].health).toBe(4); // P0 无伤
   });
 
-  // ─── 2点伤害:第一次红色造伤致死来源 → 第二次不再触发 ────────────────────
-  it('2点伤害:来源仅剩1血,第一次红色造伤致死 → 第二次不触发', async () => {
+  // ─── 2点伤害:来源1血,发动红色致死(仅一次触发) ────────────────────
+  it('2点伤害:来源仅剩1血,发动红色致死(仅一次触发)', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
     const wine = makeCard('w1', '酒', '♦', '5');
-    const judge1 = makeCard('j1', '杀', '♥', '5'); // 第1次判定:红色
-    const judge2 = makeCard('j2', '杀', '♦', '5'); // 第2次判定牌(不会用到)
+    const judge1 = makeCard('j1', '杀', '♥', '5'); // 判定:红色
+    const judge2 = makeCard('j2', '杀', '♦', '5'); // 不应被用到
     const state: GameState = createGameState({
       players: [
-        // P0 初始 1 血:第一次红色造伤即死 → 第二次不再触发
+        // P0 初始 1 血:红色造伤即死
         makePlayer({ index: 0, name: 'P0', hand: ['w1', 'k1'], skills: ['酒', '杀'], health: 1 }),
         makePlayer({ index: 1, name: 'P1', hand: ['p1sh'], skills: ['界刚烈', '闪'] }),
       ],
@@ -340,7 +337,7 @@ describe('界刚烈', () => {
     await P0.useCardAndTarget('杀', 'k1', [1]);
     await P1.pass();
 
-    // 第1次:发动 → 红色 → P0 受1伤 → P0 濒死(0血)
+    // 仅一次询问,发动 → 红色 → P0 受1伤 → P0 濒死(0血)
     P1.expectPending('请求回应');
     await P1.respond('界刚烈', { choice: true });
 
@@ -352,7 +349,6 @@ describe('界刚烈', () => {
 
     expect(harness.state.players[0].alive).toBe(false); // P0 死亡
     expect(harness.state.players[1].health).toBe(2); // P1 受杀 2 伤
-    // 来源死亡后第二次不再触发
     expect(harness.state.pendingSlots.size).toBe(0);
   });
 });

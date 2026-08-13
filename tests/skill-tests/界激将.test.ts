@@ -236,6 +236,14 @@ describe('界激将', () => {
     await P1.respond('杀', { cardId: 'k1' });
     await harness.waitForStable();
 
+    // 代打出触发界激将被动(OL"替你打出杀时")→ 询问 P1 是否令主公摸1张
+    const drawSlot = harness.state.pendingSlots.get(1);
+    expect(drawSlot?.atom.type).toBe('请求回应');
+    expect((drawSlot?.atom as { requestType?: string }).requestType).toBe('界激将/drawChoice');
+    // P1 拒绝令主公摸牌(避免影响后续手牌/血量断言)
+    await P1.respond('界激将', { choice: false });
+    await harness.waitForStable();
+
     // 决斗结算:P0 出了杀(经界激将),轮到 P2 出杀
     // P2 手牌已空 → 询问杀 skip,P2 输决斗直接扣血
     expect(harness.state.pendingSlots.size).toBe(0);
@@ -248,6 +256,71 @@ describe('界激将', () => {
     expect(harness.state.zones.discardPile).toContain('k1');
     // P1 的杀已消耗
     expect(harness.state.players[1].hand).not.toContain('k1');
+    restoreAutoCompare();
+  });
+
+  // ─── 被动(代打出 / 替你打出):主公被决斗 → 蜀盟友代打杀 → 确认 → 主公摸1张 ──
+  //   回归:修复前 询问杀 after-hook 因 atom.target=主公=ownerId 早期 return,代打出不触发
+  //   摸牌(违反 OL"替你...打出杀时")。修复后 hook 经 SUBSTITUTE_PLAYER_VAR 识别替打蜀角色
+  //   并触发摸牌。本用例覆盖代打出 → 确认 → 主公摸牌 的完整正向路径(与用例3的拒绝路径互补)。
+  it('被动(代打出):主公被决斗 → 蜀盟友代打杀 → 确认 → 主公摸1张', async () => {
+    const restoreAutoCompare = disableAutoCompare();
+    const duel: Card = {
+      id: 'jd1',
+      name: '决斗',
+      suit: '♠',
+      color: '黑',
+      rank: 'A',
+      type: '锦囊牌',
+    };
+    const slash = makeCard('k1', '杀', '♠', '5');
+    const draw = makeCard('draw1', '杀', '♠', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['界激将'], faction: '蜀' }),
+        makePlayer({ index: 1, name: 'P1', hand: ['k1'], skills: ['杀'], faction: '蜀' }),
+        makePlayer({ index: 2, name: 'P2', hand: ['jd1'], skills: ['决斗'], faction: '魏' }),
+      ],
+      cardMap: { jd1: duel, k1: slash, draw1: draw },
+      zones: { deck: ['draw1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 2,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P2 对 P0 出决斗
+    await P2.useCardAndTarget('决斗', 'jd1', [0]);
+    await harness.waitForStable();
+    // 无懈可击窗口 → pass
+    await P0.pass();
+    await harness.waitForStable();
+
+    // P0 被询问杀 → 发动界激将(代打出)
+    P0.expectPending('询问杀');
+    await P0.respond('界激将', {});
+    await harness.waitForStable();
+
+    // P1 代打杀
+    await P1.respond('杀', { cardId: 'k1' });
+    await harness.waitForStable();
+
+    // 代打出触发界激将被动 → 询问 P1 是否令主公摸1张
+    const drawSlot = harness.state.pendingSlots.get(1);
+    expect(drawSlot?.atom.type).toBe('请求回应');
+    expect((drawSlot?.atom as { requestType?: string }).requestType).toBe('界激将/drawChoice');
+    // P1 确认 → 主公摸1张
+    await P1.respond('界激将', { choice: true });
+    await harness.waitForStable();
+
+    // 主公摸1张;决斗结算:P2 输扣1血,P0 未受伤
+    expect(harness.state.players[0].hand).toEqual(['draw1']);
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[2].health).toBe(3);
+    expect(harness.state.zones.discardPile).toContain('k1');
     restoreAutoCompare();
   });
 

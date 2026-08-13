@@ -14,8 +14,8 @@
 //     不跳→3张按原序放回牌堆顶(默认摸牌照常进行,增伤标签已挂)。
 //   - 造成伤害 before-hook:source=自己 + 增伤标签 + 牌为杀/决斗 → modify(amount+1)。
 //   - 回合开始 after-hook:严格在 ownerId 自己的下回合开始时清标签(官方"直到你的下回合开始")。
-//   - 限一次/回合:裸衣/usedThisTurn(后缀约定,回合结束 atom 自动清空)。
-//   - 内部 localVars/requestType 键名沿用 '裸衣/xxx' 前缀(界版规范)。
+//   - 限一次/回合:界裸衣/usedThisTurn(后缀约定,回合结束 atom 自动清空)。
+//   - 内部 localVars/requestType/标签键名统一用 '界裸衣/xxx' 前缀(界版规范,与标版裸衣隔离)。
 //   - 镜像先例:再起/突袭/双雄的「阶段开始(摸牌) before-hook + 询问 + skipPhase」模式。
 import type {
   FrontendAPI,
@@ -30,13 +30,13 @@ import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 
-const BONUS_TAG = '裸衣/bonus';
+const BONUS_TAG = '界裸衣/bonus';
 /** 询问①:是否发动界裸衣(亮牌+增伤) */
 const ACTIVATE_RT = '界裸衣/activate';
 /** 询问②:是否跳过摸牌阶段获得匹配牌 */
 const SKIP_RT = '界裸衣/skip';
-const ACTIVATED_KEY = '裸衣/activated';
-const SKIP_KEY = '裸衣/skipChoice';
+const ACTIVATED_KEY = '界裸衣/activated';
+const SKIP_KEY = '界裸衣/skipChoice';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -103,7 +103,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (ctx.state.currentPlayerIndex !== ownerId) return;
       const self = ctx.state.players[ownerId];
       if (!self?.alive) return;
-      if (usedThisTurn(ctx.state, ownerId, '裸衣')) return; // 本回合已发动
+      if (usedThisTurn(ctx.state, ownerId, '界裸衣')) return; // 本回合已发动
       // 牌堆至少 3 张才能亮出;不足则放弃发动,走默认摸牌(摸牌 atom 会自动重洗)
       if (ctx.state.zones.deck.length < 3) return;
 
@@ -124,8 +124,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       });
       if (ctx.state.localVars[ACTIVATED_KEY] !== true) return; // 不发动 → 默认摸牌
 
-      // 标记本回合已用(防 hook 重入;裸衣/usedThisTurn 回合结束自动清)
-      await markOncePerTurn(ctx.state, ownerId, '裸衣');
+      // 标记本回合已用(防 hook 重入;界裸衣/usedThisTurn 回合结束自动清)
+      await markOncePerTurn(ctx.state, ownerId, '界裸衣');
 
       // ── 亮出+二段询问+清牌 整段在一个结算帧内:buildView 的 zones.processing 真相源
       //     是 settlementStack.flatMap(f=>f.cards),无帧时亮出的牌(state.zones.processing

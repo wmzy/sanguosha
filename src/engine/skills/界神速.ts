@@ -97,12 +97,16 @@ function equipCardIds(state: GameState, player: number): string[] {
   return Object.values(p.equipment).filter((id): id is string => !!id);
 }
 
-/** 询问选择一个虚拟杀目标(其他存活角色) */
+/** 询问选择一个虚拟杀目标(其他存活角色)。
+ *  无其他存活角色时直接返回 undefined,避免创建 0 候选的 choosePlayer 询问
+ *  (preResolve 不处理 choosePlayer filter,会导致玩家卡等超时)。 */
 async function askKillTarget(
   state: GameState,
   ownerId: number,
   label: string,
 ): Promise<number | undefined> {
+  const hasTarget = state.players.some((p, i) => i !== ownerId && p.alive);
+  if (!hasTarget) return undefined;
   delete state.localVars[TARGET_KEY];
   await applyAtom(state, {
     type: '请求回应',
@@ -245,20 +249,24 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 标记已发动(本回合不再触发)
       self.vars[USED_KEY] = true;
 
+      let opt1Settled = false;
       await pushFrame(ctx.state, '界神速', ownerId, { opt1, opt2, opt3 });
       try {
         // ── 逐项结算:付代价 → 虚拟杀(顺序①→②→③) ──
 
-        // 选项1:加跳过摸牌标签 → 虚拟杀
+        // 选项1:选目标 → 加跳过摸牌标签 → 虚拟杀
+        // (先确认目标再付代价,避免超时/无目标白付跳过代价;同标版先选目标后结算)
         if (opt1 && self.alive) {
-          await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_MO_TAG });
           const target = await askKillTarget(ctx.state, ownerId, '界神速①');
           if (typeof target === 'number' && ctx.state.players[target]?.alive) {
+            await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_MO_TAG });
             await virtualKill(ctx.state, ownerId, target);
+            opt1Settled = true;
           }
         }
 
-        // 选项2:弃装备 + 加跳过出牌标签 → 虚拟杀
+        // 选项2:选装备 → 选目标 → 弃装备 + 加跳过出牌标签 → 虚拟杀
+        // (先确认目标再弃装备,避免超时/无目标白付弃牌代价)
         if (opt2 && self.alive) {
           delete ctx.state.localVars[EQUIP_KEY];
           await applyAtom(ctx.state, {
@@ -278,22 +286,23 @@ export function onInit(skill: Skill, state: GameState): () => void {
           const equipCardIdRaw = ctx.state.localVars[EQUIP_KEY] as string | undefined;
           delete ctx.state.localVars[EQUIP_KEY];
           if (equipCardIdRaw && equipCardIds(ctx.state, ownerId).includes(equipCardIdRaw)) {
-            await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_PLAY_TAG });
-            await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [equipCardIdRaw], voluntary: true });
             const target = await askKillTarget(ctx.state, ownerId, '界神速②');
             if (typeof target === 'number' && ctx.state.players[target]?.alive) {
+              await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_PLAY_TAG });
+              await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [equipCardIdRaw], voluntary: true });
               await virtualKill(ctx.state, ownerId, target);
             }
           }
-          // 无效选择 → 选项2未生效(不弃牌、不跳过出牌、不虚拟杀)
+          // 无效选择/无目标 → 选项2未生效(不弃牌、不跳过出牌、不虚拟杀)
         }
 
-        // 选项3:加跳过弃牌标签 + 翻面(加翻面标签) → 虚拟杀
+        // 选项3:选目标 → 加跳过弃牌标签 + 翻面(加翻面标签) → 虚拟杀
+        // (先确认目标再付翻面代价,避免超时/无目标白付翻面代价)
         if (opt3 && self.alive) {
-          await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_DISCARD_TAG });
-          await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: FLIP_TAG });
           const target = await askKillTarget(ctx.state, ownerId, '界神速③');
           if (typeof target === 'number' && ctx.state.players[target]?.alive) {
+            await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_DISCARD_TAG });
+            await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: FLIP_TAG });
             await virtualKill(ctx.state, ownerId, target);
           }
         }
@@ -302,7 +311,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
 
       // ── 选项1生效:当场跳过判定阶段 ──
-      if (opt1) {
+      if (opt1Settled) {
         return skipPhase(ctx.state, atom);
       }
       // 选项1未选:判定阶段正常进行(神速②③的效果已通过标签作用于后续阶段)

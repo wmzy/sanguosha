@@ -288,6 +288,44 @@ describe('界强识(OL 界限突破版)', () => {
     expect(harness.state.players[0].hand.length).toBe(0);
   });
 
+  // ─── 6b. 同类别使用,超时(defaultChoice=true)→ 默认摸牌 ─────────
+  it('用同类别的牌,超时不选 → 默认摸一张', async () => {
+    const p0Card = makeCard('p0s', '杀', '♠', '2', '基本牌');
+    const p1Card = makeCard('p1s', '杀', '♠', 'A', '基本牌');
+    const dTop = makeCard('dTop', '桃', '♥', '5', '基本牌');
+    const state = buildState({
+      p0Hand: ['p0s'],
+      p1Hand: ['p1s'],
+      extraCards: { p0s: p0Card, p1s: p1Card, dTop },
+      deck: ['dTop'],
+    });
+    await harness.setup(state);
+    const P0 = harness.player('界张松');
+
+    await triggerPlayPhaseStart(harness, 0);
+    await P0.respond('界强识', { choice: true });
+    await harness.waitForStable();
+    await P0.respond('界强识', { target: 1 });
+    await harness.waitForStable();
+    await P0.respond('界强识', { cardId: 'p1s' });
+    await harness.waitForStable();
+
+    void applyAtom(harness.state, {
+      type: '移动牌',
+      cardId: 'p0s',
+      from: { zone: '手牌', player: 0 },
+      to: { zone: '弃牌堆' },
+    });
+    await harness.waitForStable();
+    // 超时(pass 触发 onTimeout,defaultChoice=true → DRAW_KEY 未设 → 应默认摸牌)
+    P0.expectPending('请求回应');
+    await P0.pass();
+    await harness.waitForStable();
+
+    // 摸到 deck 顶 dTop
+    expect(harness.state.players[0].hand).toContain('dTop');
+  });
+
   // ─── 7. 不同类别使用 → 不触发摸牌 ─────────
   it('用不同类别的牌 → 不触发摸牌', async () => {
     // 展示 P1 的杀(基本牌),owner 出一张锦囊(过河拆桥)

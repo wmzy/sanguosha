@@ -585,8 +585,10 @@ export function applyRestRoutes(app: Hono): void {
     const room = requestView(roomId, spectatorId, targetSeat);
     if (!room) return c.json({ error: '申请失败' }, 400);
 
-    // 广播给所有连接（目标座次玩家会收到）
+    // 广播 view_request(客户端日志) + room_state(含更新后的 pendingViewRequests,
+    // 驱动审批 UI——客户端从 room_state 同步 pendingViewRequests,而非 view_request 消息)
     broadcastMessage(room, { type: 'view_request', spectatorId, targetSeat });
+    broadcastRoomState(room);
     return c.json({ success: true });
   });
 

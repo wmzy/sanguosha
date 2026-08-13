@@ -77,6 +77,11 @@ export function viewCanAttack(
   // 界武圣(界关羽):你使用的方片【杀】无距离限制。前端 filter 无法感知选中卡色,
   // 保持宽松(所有目标可点);后端 杀.validate 按花色严格校验(仅方片杀放行)。
   if (players[fromIdx]?.skills?.includes('界武圣')) return true;
+  // 界烈弓(界黄忠):你【杀】的攻击范围为此杀点数(max(武器范围, 杀点数))。
+  // 前端 filter 无法感知选中杀的点数,保持宽松(所有目标可点);
+  // 后端 distance.ts 的 AttackRangeExemptor 按 cardId 点数严格校验
+  // (仅 effectiveDistance ≤ 杀点数 的目标放行)。
+  if (players[fromIdx]?.skills?.includes('界烈弓')) return true;
   // 界将驰(界曹彰)选项②:本回合使用【杀】无距离限制。
   // turnUsage 由回合用量 atom 同步;激活时前端宽松放行(UI 提示),
   // 后端 杀.validate 严格校验。

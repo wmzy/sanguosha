@@ -170,14 +170,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
           requestType: SKIP_TARGET_RT,
           target: from,
           prompt: {
-            type: 'selectTarget',
+            // choosePlayer(非 selectTarget):服务端驱动的 pending 目标选择只有
+            // choosePlayer 被投影层(resolveChoosePlayerCandidates)、前端 AwaitingPrompt
+            // 和 headless appendRespondActions 支持。selectTarget 仅用于前端 bundle 内的
+            // 主动 use action(filter 函数无法跨进程序列化,pending 下发后前端拿不到)。
+            type: 'choosePlayer',
             title: '界乱击:可少选一个目标(选 0 或 1 名排除)',
             description: '可放弃(不排除任何目标)',
-            targetFilter: {
-              min: 0,
-              max: 1,
-              filter: (_view, t) => defaultTargets.includes(t),
-            },
+            min: 0,
+            max: 1,
+            filter: (_view, t) => defaultTargets.includes(t),
           },
           timeout: 20,
         });
@@ -213,16 +215,21 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const atom = slot.atom as { type?: string; requestType?: string };
       if (atom.type !== '请求回应') return '当前不是界乱击询问';
       if (atom.requestType !== SKIP_TARGET_RT) return '当前不是界乱击询问';
+      // choosePlayer 契约:单选发 {target,targets:[t]};「不选择」发 {targets:[]}。
       // params.target:未选(undefined/null)=不排除;选了 = 座次号
-      const target = params.target;
+      const target =
+        (params.target as number | undefined) ??
+        (Array.isArray(params.targets) ? (params.targets as number[])[0] : undefined);
       if (target === undefined || target === null) return null;
       if (typeof target !== 'number') return 'target 必须为数字';
       if (!state.players[target]?.alive) return '目标不存在或已死亡';
-      // target 必须在候选目标中(由 prompt.targetFilter 限制,后端兜底)
+      // target 必须在候选目标中(由 prompt.filter 限制,后端兜底)
       return null;
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const target = params.target;
+      const target =
+        (params.target as number | undefined) ??
+        (Array.isArray(params.targets) ? (params.targets as number[])[0] : undefined);
       state.localVars[SKIP_TARGET_KEY] =
         typeof target === 'number' ? target : null;
     },
@@ -266,14 +273,15 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       return false;
     },
   });
-  // respond action:"少选一个目标" selectTarget 询问
+  // respond action:"少选一个目标" choosePlayer 询问
   api.defineAction('respond', {
     label: DISPLAY_NAME,
     style: 'danger',
     prompt: {
-      type: 'selectTarget',
+      type: 'choosePlayer',
       title: '界乱击:少选一个目标(可选)',
-      targetFilter: { min: 0, max: 1 },
+      min: 0,
+      max: 1,
     },
   });
   return;

@@ -82,7 +82,6 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     } else if (isUpstreamOf(st, discarder, ownerId)) {
       // 上家弃置——每回合首次
       if (st.turn.vars[upstreamKey]) return;
-      st.turn.vars[upstreamKey] = true;
       isUpstream = true;
     } else {
       // 非自己非上家——不触发
@@ -92,6 +91,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // 过滤仍在弃牌堆的牌(防御性:理论上不会被中途移走)
     const eligible = atom.cardIds.filter((id) => st.zones.discardPile.includes(id));
     if (eligible.length === 0) return;
+
+    // 消费「每回合首次」标记:仅当确有可置于牌堆顶的牌时才消耗。
+    // 若全部牌已被更高优先级技能(连营/落英等在 弃置.afterApply 阶段先行)取走,
+    // 不浪费本回合的上家触发机会。
+    if (isUpstream) {
+      st.turn.vars[upstreamKey] = true;
+    }
 
     await pushFrame(st, SKILL_ID, ownerId, { cardIds: [...eligible] });
     try {

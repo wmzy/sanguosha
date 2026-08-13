@@ -9,7 +9,7 @@
 //   2. 不发动:confirm=false → 无标签、无展示、无增伤
 //   3. 黑牌分支:展示黑牌 → 距离1目标加禁黑标签
 //   4. 增伤:owner 使用展示牌造伤 → +1
-//   5. 增伤不重复:同一展示牌第二次造伤不再 +1
+//   5. 增伤整回合持续:同一展示牌每次造伤均 +1(AOE/传导/复用同构)
 //   6. 禁色-全为禁色闪 → 询问闪被 cancel(目标无法闪,强制命中)
 //   7. 禁色-有非禁色闪 → 询问闪放行(目标可出非禁色闪)
 //   8. 距离 >1 不受影响:4 人局中距离 2 的目标不加标签
@@ -235,20 +235,21 @@ describe('界潜袭', () => {
 
     // P2 应受 2 点伤害(1 基础 + 1 增伤)
     expect(harness.state.players[1].health).toBe(2);
-    // turn.vars 中的 cardId 已被消费
-    expect(harness.state.turn.vars['界潜袭/cardId']).toBeUndefined();
+    // turn.vars 中的 cardId 整回合持续(不消费,供后续伤害匹配)
+    expect(harness.state.turn.vars['界潜袭/cardId']).toBe('s1');
   });
 
-  // ─── 5. 增伤不重复:第二次不再 +1(已消费) ─────────────────────────────
+  // ─── 5. 增伤整回合持续:每次造伤均 +1 ─────────────────────────────
 
-  it('增伤单次:同一潜袭牌只 +1 一次', async () => {
-    // 直接造伤害验证单次消费:不通过完整 杀 流程,避免多次 杀 的复杂性
-    // 手动设 turn.vars 模拟已展示,然后造两次伤害
+  it('增伤持续:同一潜袭牌每次造伤均 +1(AOE/传导/复用同构)', async () => {
+    // 直接造伤害验证整回合持续:不通过完整 杀 流程,避免多次 杀 的复杂性
+    // 手动设 turn.vars 模拟已展示,然后造两次伤害(模拟 AOE 多目标/牌复用场景)
+    // P2 体力设 6:两次各 2 点(1+1)→ 4 → 2,避免触发濒死/求桃导致超时
     const slash = makeCard('s1', '杀', '♠', 'A');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P1', hand: [], skills: ['界潜袭'] }),
-        makePlayer({ index: 1, name: 'P2', character: '曹操', hand: [], skills: [], health: 4 }),
+        makePlayer({ index: 1, name: 'P2', character: '曹操', hand: [], skills: [], health: 6, maxHealth: 6 }),
       ],
       cardMap: { s1: slash },
       zones: { deck: ['s1'], discardPile: [], processing: [] },
@@ -260,14 +261,14 @@ describe('界潜袭', () => {
 
     // 第一次造伤:source=owner, cardId=s1 → 应 +1(2 点)
     await runDamageFlow(harness.state, 0, 1, 1, 's1');
-    expect(harness.state.players[1].health).toBe(2);
+    expect(harness.state.players[1].health).toBe(4);
 
-    // turn.vars 中的 cardId 已被消费
-    expect(harness.state.turn.vars['界潜袭/cardId']).toBeUndefined();
+    // turn.vars 中的 cardId 整回合持续(不消费)
+    expect(harness.state.turn.vars['界潜袭/cardId']).toBe('s1');
 
-    // 第二次造伤:不再 +1(1 点)
+    // 第二次造伤:整回合持续,仍 +1(2 点)
     await runDamageFlow(harness.state, 0, 1, 1, 's1');
-    expect(harness.state.players[1].health).toBe(1);
+    expect(harness.state.players[1].health).toBe(2);
   });
 
   // ─── 6. 禁色-询问闪全为禁色 → cancel ─────────────────────────────

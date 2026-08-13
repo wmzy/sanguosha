@@ -30,6 +30,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { spliceHandOrderEntry } from '../flows/pick-card-panel';
 
 /** 是否发动趫猛的 requestType */
 const CONFIRM_REQUEST = '界趫猛/confirm';
@@ -189,14 +190,24 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (ctx.state.localVars[CONFIRMED_KEY] !== true) return; // 不发动 → 无效果
 
     // 2. 弹选牌面板:从目标区域选一张牌(明牌装备/判定 + 暗牌手牌)
+    //    mode='discard':趫猛主效果是"弃置",触发 界奇才 before-hook 就地过滤目标
+    //    防具/宝物(其他角色不能弃置界黄月英装备区的防具/宝物);坐骑(进攻马/防御马)
+    //    非防具/宝物不被过滤,选中后改为"获得"。
     const defaultZone = defaultPickZone(pickOpts);
     delete ctx.state.localVars[PICK_RESULT_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
+    // 手牌盲选需快照手牌顺序(actionLog 重放确定性,同 runPickTargetCardPanel/界补益)
+    if (pickOpts.handCount > 0) {
+      spliceHandOrderEntry(ctx.state, target);
+    }
+    // 保留 atom 引用:界奇才 before-hook 会就地过滤 prompt.equipment,applyAtom 后回读
+    // 以重算默认选择,避免超时 fallback 命中被过滤掉的受保护装备。
+    const pickAtom = {
+      type: '请求回应' as const,
       requestType: PICK_REQUEST,
       target: ownerId,
       prompt: {
-        type: 'pickTargetCard',
+        type: 'pickTargetCard' as const,
+        mode: 'discard' as const,
         title: '趫猛:选择目标一张牌(若是坐骑,获得之)',
         target,
         equipment: pickOpts.equipment,
@@ -205,7 +216,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       },
       defaultChoice: defaultZone as unknown as Json,
       timeout: 20,
-    });
+    };
+    await applyAtom(ctx.state, pickAtom);
 
     // 3. 读取选择并执行弃置/获得
     const result = ctx.state.localVars[PICK_RESULT_KEY] as
@@ -213,13 +225,30 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       | undefined;
     delete ctx.state.localVars[PICK_RESULT_KEY];
 
-    const zone = (result?.zone ?? defaultZone.zone);
+    // 界奇才 before-hook 可能已就地过滤 prompt.equipment(防具/宝物);
+    // 若默认选择指向被过滤的装备,重算为过滤后列表首项(或判定/手牌),
+    // 避免超时 fallback 命中受保护装备(同 runPickTargetCardPanel)。
+    const filteredEquip = pickAtom.prompt.equipment;
+    let fallback = defaultZone;
+    if (fallback.zone === 'equipment') {
+      const stillThere = filteredEquip.some((e) => e.cardId === fallback.cardId);
+      if (!stillThere) {
+        fallback =
+          filteredEquip.length > 0
+            ? { zone: 'equipment', cardId: filteredEquip[0].cardId }
+            : pickOpts.judge.length > 0
+              ? { zone: 'judge', cardId: pickOpts.judge[0].cardId }
+              : { zone: 'hand', handIndex: 0 };
+      }
+    }
+
+    const zone = (result?.zone ?? fallback.zone);
     let pickedCardId: string | undefined;
     if (zone === 'equipment' || zone === 'judge') {
-      pickedCardId = (result?.cardId ?? (defaultZone as { cardId?: string }).cardId) ?? undefined;
+      pickedCardId = (result?.cardId ?? fallback.cardId) ?? undefined;
     } else {
       // hand:盲选第 K 张(超时或缺省→0)
-      const handIndex = (result?.handIndex ?? (defaultZone.handIndex ?? 0));
+      const handIndex = (result?.handIndex ?? (fallback.handIndex ?? 0));
       const tp = ctx.state.players[target];
       pickedCardId = tp?.hand[handIndex] ?? tp?.hand[0];
     }

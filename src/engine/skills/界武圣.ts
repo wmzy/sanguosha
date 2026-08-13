@@ -7,7 +7,7 @@
 //
 // 界限突破:红色牌包括装备区(原版仅手牌)。装备区红色牌转化时先卸下到手牌再「当作」。
 import type { Card, EquipSlot, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { applyAtom } from '../core/apply';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
@@ -37,9 +37,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'transform',
     (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 无 pending + 存活 + 红牌
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const free = !hasBlockingPending(state);
+      // 通用合法条件:存活 + 红牌(手牌或装备区)。时机由两条路径之一满足:
+      //   1. 出杀路径(自己回合 + 无阻塞 pending):preceding 在 杀.use 前
+      //   2. 回应路径(被询问杀:南蛮入侵/决斗):preceding 在 杀.respond 前
       const self = state.players[ownerId];
       const selfAlive = self.alive === true;
       const cardId = params.cardId as string;
@@ -49,7 +49,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const cardInHand = cardIdOk && self.hand.includes(cardId);
       const cardInEquip = cardIdOk && Object.values(self.equipment).some((id) => id === cardId);
       const isRed = !!card && card.color === '红';
-      const ok = myTurn && free && selfAlive && (cardInHand || cardInEquip) && isRed;
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const free = !hasBlockingPending(state);
+      const slot = state.pendingSlots.get(ownerId);
+      const atomType = (slot?.atom as { type?: string })?.type;
+      const reqType = (slot?.atom as { requestType?: string })?.requestType;
+      const atomTarget = (slot?.atom as { target?: number })?.target;
+      // 与 杀.respond 的 pending 判定同构:询问杀 或 请求回应(杀/respondKill,激将/挑衅)
+      const askedKill =
+        !!slot &&
+        atomTarget === ownerId &&
+        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+      const contextOk = (myTurn && free) || askedKill;
+      const ok = selfAlive && (cardInHand || cardInEquip) && isRed && contextOk;
       return ok ? null : '现在不能使用武圣';
     },
     async (state: GameState, params: Record<string, Json>) => {
@@ -101,6 +113,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
+  // 声明替代回应:被询问杀(南蛮入侵/决斗 等)时,可用武圣把红色牌(手牌或装备区)当杀打出。
+  // 与标版武圣/龙胆/倾国同构:声明后 询问杀 的可用性检测不再 skip,建立回应窗口。
+  const unloadAlt = declareAlternativeResponse(state, ownerId, '询问杀');
+
   // ─── 距离豁免器:界武圣转化的方片杀无距离限制 ─────────────────────
   //   官方"你使用的方片【杀】无距离限制"(被动增益,任何方片杀生效,
   //   含物理方片杀与武圣/丈八转化出的方片杀)。
@@ -116,6 +132,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   return () => {
+    unloadAlt();
     unloadRangeExemptor();
   };
 }
@@ -140,16 +157,26 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     },
     transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id }),
     activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
       const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p) return false;
+      if (!p?.alive) return false;
       const hasRedInHand = p.hand?.some((c) => c.color === '红') ?? false;
       // 界关羽武圣:装备区红色牌也可转化
       const hasRedEquip = Object.values(p.equipment ?? {}).some((id) => {
         const card = id ? ctx.view.cardMap[id] : undefined;
         return card?.color === '红';
       });
-      return (hasRedInHand || hasRedEquip) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+      if (!hasRedInHand && !hasRedEquip) return false;
+      // 出杀路径(自己回合 + 出牌阶段 + 还能出杀)
+      const ownTurnCanSlash = defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+      // 回应路径(被询问杀:南蛮入侵/决斗):与标版武圣/龙胆同构
+      const slot = ctx.view.pending;
+      const atomType = (slot?.atom as { type?: string })?.type;
+      const reqType = (slot?.atom as { requestType?: string })?.requestType;
+      const askedKill =
+        !!slot &&
+        slot.target === ctx.perspectiveIdx &&
+        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+      return ownTurnCanSlash || askedKill;
     },
   });
   return;

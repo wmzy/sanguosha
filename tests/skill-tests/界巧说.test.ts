@@ -19,6 +19,7 @@ import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { isTrickBlocked } from '../../src/engine/rules/trick-quota';
+import { slashTargetMax } from '../../src/engine/rules/slash-target';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -165,6 +166,51 @@ describe('界巧说', () => {
 
     // winNext 已被消费清除
     expect(harness.state.turn.vars['巧说/winNext']).toBeUndefined();
+  });
+
+  // ─── 2b. 赢 → 下一张杀可多指定一个目标(slashTargetMax 放宽到 2)──
+  it('拼点赢 → slashTargetMax 放宽到 2;打出一张牌后回归 1', async () => {
+    const pdWin = makeCard('c1', '杀', '♠', 'K');
+    const pdLow = makeCard('c2', '闪', '♥', '2');
+    const slash = makeCard('s1', '杀', '♣', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['c1', 's1'],
+          skills: ['界巧说', '杀'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: ['c2'],
+          skills: ['回合管理'],
+        }),
+      ],
+      cardMap: { c1: pdWin, c2: pdLow, s1: slash },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.triggerAction('界巧说', 'use', { cardId: 'c1', target: 1 });
+    await waitForStable(harness.state);
+    await P1.respond('界巧说', { cardId: 'c2' });
+    await waitForStable(harness.state);
+
+    // 赢后:杀目标数上限放宽到 2(本回合下一张杀可多指定一个目标)
+    expect(slashTargetMax(harness.state, 0)).toBe(2);
+
+    // 打出一张牌(杀)→ 效果消费 → 上限回归 1
+    await P0.useCardAndTarget('杀', 's1', [1]);
+    await P1.pass();
+    await waitForStable(harness.state);
+
+    expect(slashTargetMax(harness.state, 0)).toBe(1);
   });
 
   // ─── 3. 输 → lost 置位 + 不能使用普通锦囊 ─────────────────────

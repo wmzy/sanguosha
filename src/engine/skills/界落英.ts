@@ -28,6 +28,7 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
+import { flipFaceUpAll } from '../flows/face-down';
 import {
   registerAction,
   registerAfterHook,
@@ -171,11 +172,11 @@ async function recordGainAndMaybeFlipBack(
   delete state.localVars['酒诗/flipChoice'];
   if (!flip) return;
 
-  // 翻回正面:清除所有 '/翻面' 后缀标签
-  const flipTags = self.tags.filter((t) => t.endsWith('/翻面'));
-  for (const tag of flipTags) {
-    await applyAtom(state, { type: '去标签', player: ownerId, tag });
-  }
+  // 翻回正面:清除所有 '/翻面' 后缀标签 + 补发「翻面后」(faceDown=false) 时机。
+  // 复用 flows/face-down 的 canonical helper,与界酒诗 受伤翻回路径(flipBackToFaceUp)
+  // 行为一致——否则落英路径翻回不发「翻面后」,与受伤路径不对称(解围等 hook 消费者
+  // 感知不到落英触发的翻回正面)。
+  await flipFaceUpAll(state, ownerId);
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {

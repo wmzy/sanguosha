@@ -15,12 +15,13 @@
 //      对应标签:有则将防具/宝物从可弃置列表中过滤。卸载时清除标签。
 //
 // 注:即时锦囊仅【顺手牵羊】受距离限制;【借刀杀人】的约束是武器/杀目标,非距离。
-//     过河拆桥是唯一能"弃置"其他角色装备的途径(顺手牵羊是"获得",不受防具保护影响)。
+//     顺手牵羊是"获得",不受防具保护影响。能"弃置"其他角色装备的途径很多
+//     (过河拆桥/寒冰剑/挑衅/奇制/界弓骑/涯角/界刚烈/界旋风 等),故保护逻辑
+//     按 prompt.mode='discard' 统一拦截,不限定单个 requestType。
 //
 //   2b. 防具/宝物保护(主动拦截):onInit 注册 before-hook 到「请求回应」atom,
-//       拦截过河拆桥选牌请求(requestType='过河拆桥_选牌',目标为 owner),在 toViewEvents
+//       拦截所有 discard 模式的选牌面板(过河拆桥/寒冰剑/挑衅/奇制等),在 toViewEvents
 //       之前就地过滤 prompt.equipment 中的防具/宝物 → 前端不展示、不可选。
-//       选牌面板/过河拆桥 不再 import 本模块(解耦),保护逻辑收敛到本 hook。
 import type { Skill, GameState } from '../types';
 import { registerBeforeHook } from '../core/skill';
 
@@ -52,19 +53,23 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!player.tags.includes(QICAI_TREASURE_TAG)) player.tags.push(QICAI_TREASURE_TAG);
   }
 
-  // 主动拦截:过河拆桥选牌请求(目标为 owner)时,在 toViewEvents 前就地过滤
-  // prompt.equipment 中的防具/宝物 → 前端不展示、不可选、超时 fallback 也不命中。
-  // 顺手牵羊(获得,requestType='顺手牵羊_选牌')不拦截 → 仍可获得装备。
+  // 主动拦截:任何 discard 模式的选牌面板(过河拆桥/寒冰剑/挑衅/奇制/界弓骑/涯角/
+  // 界刚烈/界旋风 等)目标为 owner 时,在 toViewEvents 前就地过滤 prompt.equipment 中的
+  // 防具/宝物 → 前端不展示、不可选、超时 fallback 也不命中。
+  // obtain 模式(顺手牵羊/反馈/征荣 等)不拦截 → 仍可获得装备。
   const unloadHook = registerBeforeHook(state, skill.id, ownerId, '请求回应', async (ctx) => {
     const atom = ctx.atom as {
       requestType?: string;
       prompt?: {
+        type?: string;
+        mode?: string;
         target?: number;
         equipment?: Array<{ slot: string; cardId: string }>;
       };
     };
-    // 仅拦截过河拆桥的弃置选牌请求
-    if (atom.requestType !== '过河拆桥_选牌') return;
+    // 仅拦截 discard 模式的选牌面板(弃置他人装备的途径远不止过河拆桥)
+    if (atom.prompt?.type !== 'pickTargetCard') return;
+    if (atom.prompt?.mode !== 'discard') return;
     const targetIdx = atom.prompt?.target;
     if (typeof targetIdx !== 'number') return;
     // 仅保护 owner 自己的装备

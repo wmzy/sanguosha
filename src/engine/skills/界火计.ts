@@ -36,7 +36,7 @@
 // 关键:界版的"随机展示"由本技能直接选牌 + 展示 atom 广播,不经 请求回应(目标无选择权)。
 // "同颜色"判定用 card.color(红/黑);标版用 card.suit(花色)。
 import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction, hasBlockingPending, validateUseCard } from '../core/skill';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
@@ -137,16 +137,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'use',
     (state: GameState, params: Record<string, Json>) => {
-      // 校验同标版火攻.use:火攻 + 单目标 + 目标有手牌(可对自己使用)
-      if (state.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (state.phase !== '出牌') return '不是出牌阶段';
-      if (hasBlockingPending(state)) return '当前有等待响应';
-      const self = state.players[ownerId];
-      if (!self.alive) return '你已死亡';
-      const cardId = params.cardId as string;
-      if (!cardId) return 'cardId required';
-      if (!self.hand.includes(cardId)) return '牌不在手牌中';
-      if (state.cardMap[cardId]?.name !== '火攻') return '不是火攻';
+      // 校验同标版火攻.use(validateUseCard 含回合/阶段/阻塞/存活/手牌/牌名/普通锦囊阻断器):
+      // 必须用 validateUseCard 而非手写,否则漏掉 isTrickBlocked(界巧说禁锦囊)等通用阻断。
+      const base = validateUseCard(state, ownerId, params, { cardName: '火攻' });
+      if (base) return base;
       const targets = params.targets as number[] | undefined;
       if (!Array.isArray(targets) || targets.length !== 1) return '火攻只能指定一名目标';
       const target = targets[0];

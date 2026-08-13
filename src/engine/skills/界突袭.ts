@@ -18,8 +18,8 @@
 //   modify 摸牌 count 为 baseCount-N(N=baseCount 时 cancel,本次不摸牌)。
 //   不发动 / 无有效目标 / 未选到有效目标 → 不 modify,默认摸牌。
 //
-// 内部 localVars/requestType 键名保持原前缀 '突袭/xxx'(不改为 '界突袭/xxx'):
-//   界版与标版互斥不共存(同一武将只会实例化其一),键名沿用便于对照。
+// 内部 localVars/requestType 键名统一使用 '界突袭/xxx' 前缀(T1:界版不得复用标版前缀):
+//   requestType 与 localVars 键均独立于标版突袭,避免同对局两版本共存时的命名空间冲突。
 import type {
   FrontendAPI,
   GameView,
@@ -32,8 +32,8 @@ import { registerAction, registerBeforeHook } from '../core/skill';
 
 const TRIGGER_RT = '界突袭/trigger';
 const SELECT_RT = '界突袭/select';
-const TRIGGERED_KEY = '突袭/triggered';
-const TARGETS_KEY = '突袭/targets';
+const TRIGGERED_KEY = '界突袭/triggered';
+const TARGETS_KEY = '界突袭/targets';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

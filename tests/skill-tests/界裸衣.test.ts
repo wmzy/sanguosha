@@ -100,7 +100,7 @@ describe('界裸衣', () => {
           name: 'P0',
           hand: ['k1'],
           skills: ['杀', '界裸衣'],
-          tags: ['裸衣/bonus'],
+          tags: ['界裸衣/bonus'],
         }),
         makePlayer({ index: 1, name: 'P1', skills: ['闪'] }),
       ],
@@ -150,7 +150,7 @@ describe('界裸衣', () => {
           name: 'P0',
           hand: ['duel1'],
           skills: ['决斗', '界裸衣'],
-          tags: ['裸衣/bonus'],
+          tags: ['界裸衣/bonus'],
         }),
         makePlayer({ index: 1, name: 'P1', skills: ['杀'] }),
       ],
@@ -181,7 +181,7 @@ describe('界裸衣', () => {
           index: 0,
           name: 'P0',
           skills: ['界裸衣'],
-          tags: ['裸衣/bonus'],
+          tags: ['界裸衣/bonus'],
         }),
         makePlayer({ index: 1, name: 'P1', skills: [] }),
       ],
@@ -229,7 +229,7 @@ describe('界裸衣', () => {
 
     // 默认摸牌未被执行(本测试只 applyAtom 阶段开始;hook 直接 return,无后续摸牌)
     // 关键断言:无标签 + 无 询问②(SKIP_RT)
-    expect(harness.state.players[0].tags).not.toContain('裸衣/bonus');
+    expect(harness.state.players[0].tags).not.toContain('界裸衣/bonus');
     const hasSkip = [...harness.state.pendingSlots.values()].some((s) => {
       const rt = (s.atom as { requestType?: string }).requestType;
       return rt === '界裸衣/skip';
@@ -271,7 +271,7 @@ describe('界裸衣', () => {
     expect(harness.state.zones.deck).toEqual(['d1', 'd2', 'd3']);
     expect(harness.state.zones.processing).toEqual([]);
     // 增伤标签已挂(发动即生效,与跳过无关)
-    expect(harness.state.players[0].tags).toContain('裸衣/bonus');
+    expect(harness.state.players[0].tags).toContain('界裸衣/bonus');
     // 手牌未变化(默认摸牌由回合管理 after-hook 触发,此测试不验证)
     expect(harness.state.players[0].hand).toEqual([]);
   });
@@ -316,7 +316,7 @@ describe('界裸衣', () => {
     expect(harness.state.zones.deck).toEqual([]);
     expect(harness.state.zones.processing).toEqual([]);
     // 增伤标签已挂
-    expect(harness.state.players[0].tags).toContain('裸衣/bonus');
+    expect(harness.state.players[0].tags).toContain('界裸衣/bonus');
   });
 
   it('发动 + 跳过:决斗也入手(亮出含决斗)', async () => {
@@ -391,7 +391,7 @@ describe('界裸衣', () => {
           index: 0,
           name: 'P0',
           skills: ['界裸衣'],
-          tags: ['裸衣/bonus'],
+          tags: ['界裸衣/bonus'],
         }),
         makePlayer({ index: 1, name: 'P1', skills: [] }),
       ],
@@ -405,12 +405,12 @@ describe('界裸衣', () => {
     // P1 回合开始 → 不应清 P0 的标签(其他玩家的回合开始不清)
     void applyAtom(harness.state, { type: '回合开始', player: 1 });
     await harness.waitForStable();
-    expect(harness.state.players[0].tags).toContain('裸衣/bonus');
+    expect(harness.state.players[0].tags).toContain('界裸衣/bonus');
 
     // P0 自己的下回合开始 → 清标签
     void applyAtom(harness.state, { type: '回合开始', player: 0 });
     await harness.waitForStable();
-    expect(harness.state.players[0].tags).not.toContain('裸衣/bonus');
+    expect(harness.state.players[0].tags).not.toContain('界裸衣/bonus');
   });
 
   // ─── 限一次/回合:发动后再次进入摸牌阶段不再触发 ────────────────────
@@ -454,8 +454,8 @@ describe('界裸衣', () => {
     await harness.waitForStable();
 
     // 标签已挂,本回合已用标记已写
-    expect(harness.state.players[0].tags).toContain('裸衣/bonus');
-    expect(harness.state.players[0].vars['裸衣/usedThisTurn']).toBe(true);
+    expect(harness.state.players[0].tags).toContain('界裸衣/bonus');
+    expect(harness.state.players[0].vars['界裸衣/usedThisTurn']).toBe(true);
 
     // 第二次摸牌阶段(同回合模拟):hook 应早退(usedThisTurn=true)
     void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '摸牌' });
@@ -494,7 +494,7 @@ describe('界裸衣', () => {
       return rt === '界裸衣/activate';
     });
     expect(hasJieLuoYi).toBe(false);
-    expect(harness.state.players[0].tags).not.toContain('裸衣/bonus');
+    expect(harness.state.players[0].tags).not.toContain('界裸衣/bonus');
   });
 
   // ─── defineAction 声明验证 ─────────────────────────

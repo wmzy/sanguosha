@@ -100,9 +100,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const asked = atom.target;
         if (typeof asked !== 'number') return;
         if (asked === ownerId) return; // 贾诩本人可使用桃
-        // 濒死者本人可对自己使用桃
-        const dying = ctx.state.players.findIndex((p) => p.alive && p.health <= 0);
-        if (asked === dying) return;
+        // 濒死者本人可使用桃:直接检查被问询者是否处于濒死(health<=0)。
+        // 不用 findIndex——嵌套濒死(濒死结算中死亡触发型技能又致他人濒死)时,
+        // findIndex 只返回第一个濒死者,其余濒死者会被误 cancel。
+        const askedPlayer = ctx.state.players[asked];
+        if (askedPlayer?.alive && askedPlayer.health <= 0) return;
         // 其余角色:不能使用桃 → 跳过对该角色的问询
         return { kind: 'cancel' };
       },
@@ -121,14 +123,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         // 仅在贾诩回合内生效
         if (ctx.state.currentPlayerIndex !== ownerId) return;
         const atom = ctx.atom;
-        const dyingIdx = atom.target;
-        if (typeof dyingIdx !== 'number') return;
+        if (typeof atom.target !== 'number') return;
         // 为"非贾诩且非濒死者"的存活玩家加 tag(若未持有)
+        // 濒死者(health<=0)本人不压制——覆盖嵌套濒死(濒死结算中死亡触发型
+        // 技能又致他人濒死)场景:所有濒死者均应豁免,而非仅当前 atom.target。
         for (let i = 0; i < ctx.state.players.length; i++) {
           if (i === ownerId) continue;
-          if (i === dyingIdx) continue;
           const p = ctx.state.players[i];
           if (!p?.alive) continue;
+          if (p.health <= 0) continue; // 濒死者(含嵌套濒死)本人不压制
           if (!p.tags.includes(SUPPRESSION_TAG)) p.tags.push(SUPPRESSION_TAG);
         }
         return; // pass:不阻止陷入濒死 atom 本身

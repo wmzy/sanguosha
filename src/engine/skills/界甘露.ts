@@ -207,7 +207,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 3) 若 X > lostHp:须弃 X 张手牌(选择角色时支付代价)
       if (X > lostHp) {
         const handCount = st.players[ownerId].hand.length;
-        // 手牌不足 → 无法支付代价,流程中止(不交换、不消耗)
+        // 手牌不足 → 无法支付代价,流程中止(TARGET_RT validate 已拦截此情况,此处为防御)
         if (handCount < X) {
           await popFrame(st);
           return;
@@ -229,11 +229,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         });
         const discardCards = st.localVars[DISCARD_KEY] as string[] | undefined;
         delete st.localVars[DISCARD_KEY];
-        if (!Array.isArray(discardCards) || discardCards.length !== X) {
-          await popFrame(st);
-          return; // 未选或超时,中止
-        }
-        await applyAtom(st, { type: '弃置', player: ownerId, cardIds: discardCards });
+        // 强制弃牌:超时未回应 → 自动从手牌首张起补弃(不放弃弃牌义务,与英魂一致)
+        const toDiscard =
+          Array.isArray(discardCards) && discardCards.length === X
+            ? discardCards
+            : (st.players[ownerId]?.hand.slice(0, X) ?? []);
+        await applyAtom(st, { type: '弃置', player: ownerId, cardIds: toDiscard });
       }
 
       // 4) 交换 A、B 装备区牌
@@ -266,6 +267,17 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           if (!st.players[t]?.alive) return '目标已死亡';
         }
         if (targets[0] === targets[1]) return '不能选同一名角色';
+        // 装备数差 X > 已损失体力时须弃 X 张手牌;手牌不足则禁止选此组目标
+        // (避免选了却付不起代价,白白消耗限一次)
+        const xDiff = Math.abs(
+          equipmentCount(st, targets[0] as number) - equipmentCount(st, targets[1] as number),
+        );
+        if (
+          xDiff > lostHealth(st, ownerId) &&
+          (st.players[ownerId]?.hand.length ?? 0) < xDiff
+        ) {
+          return '手牌不足,无法支付弃牌代价';
+        }
       } else {
         // DISCARD_RT
         const cardIds = params.cardIds;
@@ -274,6 +286,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const min = (slot.atom as unknown as { prompt?: { cardFilter?: { min?: number } } }).prompt
           ?.cardFilter?.min ?? 0;
         if (cardIds.length !== min) return `需要弃 ${min} 张牌`;
+        if (new Set(cardIds).size !== cardIds.length) return '不能选择重复的牌';
         for (const cid of cardIds) {
           if (typeof cid !== 'string' || !self.hand.includes(cid)) return '牌不在手牌中';
         }
@@ -299,12 +312,10 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     label: DISPLAY_NAME,
     style: 'primary',
     prompt: {
-      type: 'selectTarget',
-      title: '甘露:令两名角色交换装备区里的牌(若装备数差>已损失体力值,须弃等量牌)',
-      targetFilter: {
-        min: 2,
-        max: 2,
-      },
+      type: 'confirm',
+      title: '甘露',
+      description: '令两名角色交换装备区里的牌(若装备数差>已损失体力值,须弃等量牌)',
+      confirmLabel: '发动',
     },
     activeWhen: (ctx) => activeUnlessUsedThisTurn(SKILL_NAME)(ctx),
   });

@@ -23,7 +23,7 @@
 //     当目标手中同时持有禁色与非禁色闪/杀时,引擎层不强制过滤,依赖前端 UI 不让玩家点禁色牌。
 //     这是已知边界,与义绝 BAN_TAG 的"全 cancel"语义不同(义绝禁所有色,本技仅禁一色)。
 //   - 增伤 before-hook on '造成伤害时':source===ownerId + cardId===turn.vars['界潜袭/cardId']
-//     + amount>0 → amount+1(单次消费,清掉 turn.vars['界潜袭/cardId'] 防重入)。
+//     + amount>0 → amount+1(整回合持续;与义绝/古锭刀同构,AOE 多目标/传导各段均 +1)。
 //   - 回合结束 after-hook:清所有玩家的界潜袭禁色标签(本回合生效,回合结束失效)。
 //
 // 命名:文件名/loader key/character skill name 均为 '界潜袭'(避开标潜袭冲突);
@@ -341,7 +341,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   registerBeforeHook(state, skill.id, ownerId, '询问闪', askHandler('闪'));
   registerBeforeHook(state, skill.id, ownerId, '询问杀', askHandler('杀'));
 
-  // ── 增伤 before-hook on '造成伤害时':owner 用潜袭牌造伤 +1(单次消费) ──
+  // ── 增伤 before-hook on '造成伤害时':owner 用潜袭牌造伤 +1(整回合持续) ──
+  //    与义绝/古锭刀/界裸衣同构:匹配条件持续整回合,每次伤害事件 +1(before-hook 每次
+  //    伤害只执行一次,无重入风险)。AOE(万箭/南蛮)多目标、铁索传导多段均各自 +1。
+  //    CARDID_VAR 随 turn.vars 在回合结束自动清空。
   registerBeforeHook(
     state,
     skill.id,
@@ -355,8 +358,6 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (typeof cardId !== 'string') return;
       // 匹配本回合潜袭牌(影子卡场景 cardId 不同,不计入——按字面"潜袭牌"解释)
       if (ctx.state.turn.vars[CARDID_VAR] !== cardId) return;
-      // 单次消费:清掉 turn.vars 中的 cardId,防同一牌多次触发(理论上牌入弃牌堆后不再造伤)
-      delete ctx.state.turn.vars[CARDID_VAR];
       return {
         kind: 'modify',
         atom: { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as typeof ctx.atom,

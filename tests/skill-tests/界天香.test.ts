@@ -437,4 +437,59 @@ describe('界天香', () => {
     // 已损失 = 8 - 2 = 6,但摸牌数封顶为 5
     expect(harness.state.players[2].hand.length).toBe(5);
   });
+
+  // ─── 9. 选项①固定1点伤害:酒+杀(2伤)来源 → 目标仅受1伤(非原伤害量) ─
+  it('选项①:来源酒+杀造成2点伤害 → 目标仅受1点伤害(固定1点,非原伤害量)', async () => {
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const wine = makeCard('w1', '酒', '♦', '5');
+    const heartCard = makeCard('h1', '闪', '♥', '5');
+    // P2 受1伤后 3/4,已损失1 → 摸1
+    const d1 = makeCard('d1', '桃', '♥', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['w1', 'k1'], skills: ['酒', '杀'] }),
+        makePlayer({
+          index: 1,
+          name: '界小乔',
+          hand: ['h1'],
+          skills: ['界天香', '界红颜'],
+          health: 3,
+          maxHealth: 3,
+        }),
+        makePlayer({ index: 2, name: 'P2', health: 4, maxHealth: 4, skills: [] }),
+      ],
+      cardMap: { k1: slash, w1: wine, h1: heartCard, d1 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: ['d1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('界小乔');
+
+    // P0 喝酒(下一杀+1伤害 → 杀将造成2点伤害)
+    await P0.useCard('酒', 'w1');
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // P0 出杀(2点伤害)→ 界小乔不闪 → 界天香 before hook 触发
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P1.pass();
+
+    P1.expectPending('请求回应');
+    await P1.respond('界天香', { choice: true });
+    P1.expectPending('请求回应');
+    await P1.respond('界天香', { cardId: 'h1', target: 2 });
+    P1.expectPending('请求回应');
+    await P1.respond('界天香', { choice: true }); // 选项①
+
+    // 界小乔未受伤(2点伤害被防止)
+    expect(harness.state.players[1].health).toBe(3);
+    // P2 仅受1点伤害(固定1点,非原2点):4 → 3。若误用原伤害量则会是 4 → 2。
+    expect(harness.state.players[2].health).toBe(3);
+    // P2 摸 X=1(已损失 4-3=1)
+    expect(harness.state.players[2].hand.length).toBe(1);
+    expect(harness.state.players[2].hand).toContain('d1');
+  });
 });

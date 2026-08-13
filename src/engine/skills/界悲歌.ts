@@ -215,12 +215,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
 
     // 奖励:若弃置了牌,比较花色/点数获得对应牌(判定牌与弃置牌此时都在弃牌堆)
+    // 防御:判定牌/弃置牌可能在奖励结算前被其他技能从弃牌堆取走
+    //   (如落英/界落英抢夺被弃置的梅花牌),须校验仍在弃牌堆再移动,否则 移动牌
+    //   会盲取(弃牌堆 filter 为 no-op + 手牌 push)导致该牌同时出现在多人手牌中。
     if (typeof discardCardId === 'string' && judgeCardId) {
       const judgeCard = ctx.state.cardMap[judgeCardId];
       const discardCard = ctx.state.cardMap[discardCardId];
       if (judgeCard && discardCard) {
         // 花色相同 → 获得判定牌
-        if (judgeCard.suit === discardCard.suit) {
+        if (judgeCard.suit === discardCard.suit && ctx.state.zones.discardPile.includes(judgeCardId)) {
           await applyAtom(ctx.state, {
             type: '移动牌',
             cardId: judgeCardId,
@@ -229,7 +232,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           });
         }
         // 点数相同 → 获得你弃置的牌
-        if (judgeCard.rank === discardCard.rank) {
+        if (judgeCard.rank === discardCard.rank && ctx.state.zones.discardPile.includes(discardCardId)) {
           await applyAtom(ctx.state, {
             type: '移动牌',
             cardId: discardCardId,

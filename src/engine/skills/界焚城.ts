@@ -241,6 +241,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             if (!self) return '玩家不存在';
             const prev = lastCount(st);
             if (cardIds.length <= prev) return `须弃置至少 ${prev + 1} 张`;
+            // 不能重复选牌(否则弃置 atom 会向弃牌堆压入幻影副本且 lastCount 虚高)
+            if (new Set(cardIds).size !== cardIds.length) return '不能重复选牌';
             for (const id of cardIds) {
               if (!self.hand.includes(id)) return '牌不在手牌中';
             }

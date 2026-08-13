@@ -82,7 +82,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       defaultChoice: true,
       timeout: 15,
     });
-    if (!st.localVars[DRAW_KEY]) {
+    // defaultChoice=true:超时(未设 localVars)应按默认摸牌处理,
+    // 故仅在玩家明确选「不摸」(DRAW_KEY===false)时跳过,与 制霸/洛神 defaultChoice=true 模式一致。
+    if (st.localVars[DRAW_KEY] === false) {
       delete st.localVars[DRAW_KEY];
       return;
     }

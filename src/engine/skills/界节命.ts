@@ -122,10 +122,16 @@ async function runJieMing(state: GameState, ownerId: number): Promise<void> {
         title: `节命:需弃置 ${excess} 张手牌(将手牌弃至 ${x} 张)`,
         cardFilter: { filter: () => true, min: excess, max: excess },
       },
+      // 强制型弃牌:前端隐藏"不回应"按钮 + 走多牌选择 UI;headless 不生成 skip
+      mandatory: true,
       timeout: 15,
     });
-    const discardIds = state.localVars[DISCARD_KEY] as string[] | undefined;
+    let discardIds = state.localVars[DISCARD_KEY] as string[] | undefined;
     delete state.localVars[DISCARD_KEY];
+    // 强制弃牌:超时未回应 → 自动从手牌首张起补弃(不放弃弃牌义务)
+    if ((!discardIds || discardIds.length === 0) && excess > 0) {
+      discardIds = state.players[target]?.hand.slice(0, excess) ?? [];
+    }
     if (discardIds && discardIds.length > 0) {
       await applyAtom(state, { type: '弃置', player: target, cardIds: discardIds });
     }
@@ -203,7 +209,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // 濒死检查在扣减体力时(先于 受到伤害后)执行:若荀彧被救活(health>0)则此处触发;
   // 若荀彧未被救活(死亡),此处因 !alive 跳过,改由 死亡时 hook 触发。
   // 对所有存活伤害统一触发节命并置标记;若随后荀彧死亡,死亡时 hook 见标记去重跳过。
-  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
+  unloaders.push(registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
@@ -211,13 +217,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!self?.alive) return;
     ctx.state.localVars[DAMAGE_HANDLED_KEY] = true;
     await runJieMing(ctx.state, ownerId);
-  });
+  }));
 
   // ── 死亡时 after:荀彧死亡时触发(系统处理牌之前)──
   // 伤害致死时,濒死检查先于 受到伤害后 执行:荀彧已死亡(alive=false),
   // 受到伤害后 hook 因 !alive 跳过(DAMAGE_HANDLED_KEY 未置)→ 死亡时 hook 触发节命。
   // 非伤害致死(失去体力/减上限等):死亡时 hook 直接触发。
-  registerAfterHook(state, skill.id, ownerId, '死亡时', async (ctx) => {
+  unloaders.push(registerAfterHook(state, skill.id, ownerId, '死亡时', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '死亡时') return;
     if (atom.player !== ownerId) return; // 仅荀彧本人死亡时触发
@@ -228,16 +234,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // 荀彧 即将死亡(alive 仍为 true,系统处理牌随后置 false)
     // 不 cancel:让 系统处理牌 正常执行(荀彧仍死亡,技能只发挥一次最后作用)
     await runJieMing(ctx.state, ownerId);
-  });
+  }));
 
   // ── 伤害结算结束后 after:清除伤害标记 ──
   // 荀彧受伤害但未死(非致死 或 致死被桃救活)时清除标记,避免残留导致日后
   // 非伤害致死时 死亡时 hook 误判为「已由伤害触发」而跳过。
   // 仅清本座次(荀彧为目标)的伤害结算,不受其他玩家伤害结算干扰。
-  registerAfterHook(state, skill.id, ownerId, '伤害结算结束后', async (ctx) => {
+  unloaders.push(registerAfterHook(state, skill.id, ownerId, '伤害结算结束后', async (ctx) => {
     if (ctx.atom.target !== ownerId) return;
     delete ctx.state.localVars[DAMAGE_HANDLED_KEY];
-  });
+  }));
 
   return () => {
     for (const off of unloaders) off();

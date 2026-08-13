@@ -296,13 +296,18 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         } else {
           // owner 没赢:获得其拼点牌(从弃牌堆移到 owner 手牌)
           //   runRankCompareFlow 已把两张牌移入弃牌堆,此处从弃牌堆取回 targetCardId。
-          await applyAtom(st, {
-            type: '移动牌',
-            cardId: targetCardId,
-            from: { zone: '弃牌堆' },
-            to: { zone: '手牌', player: ownerId },
-          });
-          // 其视为对 owner 使用一张杀
+          //   牌可能已被「拼点后」钩子(纵适/酣战)从弃牌堆取走 → 校验后再移动,
+          //   否则 移动牌 apply 的 from 过滤为空却仍 push 入手牌,导致同一张牌重复存在于两个手牌中。
+          //   (与 界纵适/酣战 的 discardPile.includes 守卫同构。)
+          if (st.zones.discardPile.includes(targetCardId)) {
+            await applyAtom(st, {
+              type: '移动牌',
+              cardId: targetCardId,
+              from: { zone: '弃牌堆' },
+              to: { zone: '手牌', player: ownerId },
+            });
+          }
+          // 其视为对 owner 使用一张杀(牌已被取走不影响虚拟杀结算)
           await virtualKill(st, turnPlayer, ownerId);
         }
       },

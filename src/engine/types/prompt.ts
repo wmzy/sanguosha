@@ -194,6 +194,9 @@ export interface PickTargetCardPrompt {
   description?: string;
   /** 被选牌的玩家座次 */
   target: number;
+  /** 选牌模式:discard=弃置所选牌(过河拆桥/寒冰剑等),obtain=获得所选牌(顺手牵羊/反馈等)。
+   *  界奇才等装备保护技据此判断是否过滤防具/宝物(仅 discard 模式保护)。 */
+  mode?: 'discard' | 'obtain';
   /** 装备区明牌候选(使用者可见) */
   equipment: Array<{ slot: string; cardId: string; cardName: string }>;
   /** 判定区明牌候选(使用者可见) */

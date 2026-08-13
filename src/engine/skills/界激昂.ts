@@ -190,8 +190,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 发动:失去1点体力(非伤害,不触发伤害技;体力归零由系统规则进入濒死)
       await applyAtom(ctx.state, { type: '失去体力', target: ownerId, amount: 1 });
+      // 失血致死(无人救援)→ 不再获得牌(对齐 界天香/奋激/武烈 失血致死早退)
+      if (!ctx.state.players[ownerId]?.alive) return;
       // 获得全部符合条件的牌:弃牌堆 → 手牌(移动牌 atom 一次一张,逐张移动)
+      // 逐张校验 discardPile.includes:失去体力触发的濒死/死亡流程可能移走弃牌堆中的牌
       for (const cid of targets) {
+        if (!ctx.state.zones.discardPile.includes(cid)) continue;
         await applyAtom(ctx.state, {
           type: '移动牌',
           cardId: cid,

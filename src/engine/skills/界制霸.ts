@@ -383,11 +383,13 @@ async function resolveAfterCompare(
   }
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  // 方向 B:孙策(主公)出牌阶段主动发起拼点。前端按 defineAction 注册表 filter-based
-  // 查找 use action(见 gameViewHelpers),故必须声明 use,否则方向 B 无 UI 入口不可达
-  // (参考天义/制衡等自启 use 技能均声明 defineAction('use'))。前端不暴露 faction,
-  // targetFilter 仅近似过滤(非自己+存活+有手牌),吴势力由后端 validate 校验。
+export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
+  const ownerId = skill.ownerId;
+  // 同一 defineAction('use') 同时服务两个方向(各座次按自身注册的 use action 查此配置):
+  //   方向 B:孙策(主公)出牌阶段主动发起拼点。必须声明 use,否则方向 B 无 UI 入口不可达
+  //     (参考天义/制衡等自启 use 技能均声明 defineAction('use'))。
+  //   方向 A:盟友(其他吴势力)在自己出牌阶段主动发起拼点(同标制霸)。
+  // 前端不暴露 faction,targetFilter 仅近似过滤(非自己+存活+有手牌),吴势力由后端 validate 校验。
   api.defineAction('use', {
     label: DISPLAY_NAME,
     style: 'primary',
@@ -407,9 +409,14 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
         },
       },
     },
-    activeWhen: (ctx) =>
-      activeUnlessUsedThisTurn(LORD_USED)(ctx) &&
-      (ctx.view.players[ctx.perspectiveIdx]?.hand?.length ?? 0) > 0,
+    // 双向 use 的限一次键必须按视角区分,否则视图 activeWhen 与后端 usedThisTurn 脱钩:
+    //   孙策(方向 B)读 LORD_USED('界制霸/主动');盟友(方向 A)读 ALLY_USED('界制霸')。
+    // 若统一读 LORD_USED,盟友用过方向 A 后按钮仍亮(其 '界制霸/主动/usedThisTurn' 永不置位)。
+    activeWhen: (ctx) => {
+      const me = ctx.perspectiveIdx;
+      if ((ctx.view.players[me]?.hand?.length ?? 0) === 0) return false;
+      return activeUnlessUsedThisTurn(me === ownerId ? LORD_USED : ALLY_USED)(ctx);
+    },
   });
 
   api.defineAction('respond', {

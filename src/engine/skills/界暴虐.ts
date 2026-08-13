@@ -127,18 +127,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 非黑桃不回复/不获得
     if (judgeCard.suit !== '♠') return;
 
-    // 黑桃 → 回复1点体力
-    await applyAtom(ctx.state, { type: '回复体力', target: ownerId, amount: 1 });
-
-    // 获得此判定牌:从弃牌堆移入手牌。
-    // 此时判定 atom 已完成,视图已记录 discardPile+1;
-    // 此 移动牌 atom 的 applyView 会同时 discardPileCount-1 + handCount+1,保持视图一致。
+    // 黑桃 → 获得此判定牌(弃牌堆→手牌)+ 回复1点体力。
+    // 必须先取判定牌:读 judgeCardId 与 移动牌 之间不得有任何 await,否则若其间触发的
+    // 其他技能已把判定牌移出弃牌堆,移动牌 atom 仍会无条件 hand.push 造成卡牌复制。
+    // 移动牌 的 applyView 会同时 discardPileCount-1 + handCount+1,保持视图一致。
     await applyAtom(ctx.state, {
       type: '移动牌',
       cardId: judgeCardId,
       from: { zone: '弃牌堆' },
       to: { zone: '手牌', player: ownerId },
     });
+
+    // 回复1点体力
+    await applyAtom(ctx.state, { type: '回复体力', target: ownerId, amount: 1 });
   });
 
   return () => {};

@@ -53,6 +53,10 @@ const DMG_IN_PHASE_KEY = '当先/damageInPhase';
 const NORANGE_KILL_KEY = '当先/noRangeKillCardId';
 /** turn.vars + view.turnUsage:无距离杀激活(布尔投影,供前端 viewCanAttack 宽松放行)。 */
 const NORANGE_ACTIVE_KEY = '当先/noRangeActive';
+/** view.turnUsage:额外出牌阶段激活(布尔投影,供前端 'end' action activeWhen 精确 gating)。
+ *  后端用 turn.vars[ACTIVE_KEY] 判断;前端无法读 turn.vars,须经 回合用量 atom 同步投影,
+ *  否则 'end' 按钮会在所有正常出牌阶段误显示(activeWhen 仅凭 phase 无法区分额外/正常阶段)。 */
+const EXTRA_PHASE_TU = '当先/extraPhase';
 
 /** localVars:玩家是否选择获得杀。 */
 const CONFIRMED_KEY = '当先/confirmed';
@@ -150,6 +154,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ctx.state.turn.vars[ACTIVE_KEY] = true;
     ctx.state.turn.vars[DMG_IN_PHASE_KEY] = 0;
     delete ctx.state.turn.vars[EXITING_KEY];
+    // 同步投影到 view.turnUsage:前端 'end' action activeWhen 据此判断是否处于额外阶段
+    await applyAtom(ctx.state, {
+      type: '回合用量',
+      player: ownerId,
+      key: EXTRA_PHASE_TU,
+      value: true,
+    });
 
     // 2) 进入出牌阶段(触发相关 before/after hook)
     await applyAtom(ctx.state, { type: '阶段开始', player: ownerId, phase: '出牌' });
@@ -252,6 +263,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
         value: false,
       });
     }
+    // 同步清除额外出牌阶段前端投影(否则 'end' 按钮会在后续正常出牌阶段误显示)
+    await applyAtom(ctx.state, {
+      type: '回合用量',
+      player: ownerId,
+      key: EXTRA_PHASE_TU,
+      value: false,
+    });
     delete ctx.state.turn.vars[ACTIVE_KEY];
     delete ctx.state.turn.vars[DMG_IN_PHASE_KEY];
     delete ctx.state.turn.vars[EXITING_KEY];
@@ -377,9 +395,12 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       confirmLabel: '结束',
       cancelLabel: '继续出牌',
     },
-    // turn.vars 不投影到 view,前端无法直接判断额外阶段;后端 validate 兜底
+    // activeWhen 读 view.turnUsage 投影(经 回合用量 atom 同步),精确区分额外/正常出牌阶段;
+    // 缺失投影时按钮会在所有出牌阶段误显示,后端 validate 兜底拒绝但 UX 混乱。
     activeWhen: (ctx) =>
-      ctx.view.currentPlayerIndex === ctx.perspectiveIdx && ctx.view.phase === '出牌',
+      ctx.view.currentPlayerIndex === ctx.perspectiveIdx &&
+      ctx.view.phase === '出牌' &&
+      ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.[EXTRA_PHASE_TU] === true,
   });
   return;
 }

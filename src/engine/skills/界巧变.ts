@@ -352,7 +352,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
             for (const t of targets.slice(0, 2)) {
               const target = ctx.state.players[t];
               if (!target?.alive || target.hand.length === 0) continue;
-              const cardId = target.hand[0]; // 取手牌第 0 张
+              // 手牌不公开:盲取一张随机手牌(与突袭/标版巧变一致,不展示)
+              const idx = Math.floor(Math.random() * target.hand.length);
+              const cardId = target.hand[idx];
               await applyAtom(ctx.state, {
                 type: '获得',
                 player: ownerId,

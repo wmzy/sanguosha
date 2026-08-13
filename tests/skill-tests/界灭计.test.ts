@@ -119,10 +119,10 @@ describe('界灭计', () => {
     await P1.respond('界灭计', { choice: false });
     P1.expectPending('请求回应'); // 第 1 张
 
-    await P1.respond('界灭计', { cardId: 'p1a' });
+    await P1.respond('界灭计', { cardIds: ['p1a'] });
     P1.expectPending('请求回应'); // 第 2 张
 
-    await P1.respond('界灭计', { cardId: 'p1b' });
+    await P1.respond('界灭计', { cardIds: ['p1b'] });
     await harness.waitForStable();
 
     // 置顶:t0 从 P0 手牌 → 牌堆顶(deck 末尾)
@@ -177,7 +177,7 @@ describe('界灭计', () => {
     await P1.respond('界灭计', { choice: true });
     P1.expectPending('请求回应'); // 选锦囊牌
 
-    await P1.respond('界灭计', { cardId: 't1' });
+    await P1.respond('界灭计', { cardIds: ['t1'] });
     await harness.waitForStable();
 
     expect(harness.state.zones.deck[harness.state.zones.deck.length - 1]).toBe('t0');
@@ -220,7 +220,7 @@ describe('界灭计', () => {
     await P0.triggerAction('界灭计', 'use', { cardId: 't0', target: 1 });
     // 跳过 confirm,直接弹"弃一张锦囊"
     P1.expectPending('请求回应');
-    await P1.respond('界灭计', { cardId: 't1' });
+    await P1.respond('界灭计', { cardIds: ['t1'] });
     await harness.waitForStable();
 
     expect(harness.state.zones.deck[harness.state.zones.deck.length - 1]).toBe('t0');
@@ -263,9 +263,9 @@ describe('界灭计', () => {
     await P0.triggerAction('界灭计', 'use', { cardId: 't0', target: 1 });
     // 跳过 confirm,直接弹"弃两张"
     P1.expectPending('请求回应');
-    await P1.respond('界灭计', { cardId: 'p1a' });
+    await P1.respond('界灭计', { cardIds: ['p1a'] });
     P1.expectPending('请求回应');
-    await P1.respond('界灭计', { cardId: 'p1b' });
+    await P1.respond('界灭计', { cardIds: ['p1b'] });
     await harness.waitForStable();
 
     expect(harness.state.zones.deck[harness.state.zones.deck.length - 1]).toBe('t0');
@@ -505,5 +505,101 @@ describe('界灭计', () => {
       actionType: 'use',
       params: { cardId: 't0', target: 1 },
     });
+  });
+
+  // ─── 11. 强制弃牌:目标超时也不能逃避(PICK_ONE 自动弃首张) ──
+  //    弃牌是义务,mandatory + 超时兜底:目标不回应 → 自动弃首张,仍弃满两张。
+  it('强制弃牌:目标超时(不回应)→ 自动弃首张,仍弃满两张', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['t0'],
+          skills: ['界灭计'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          hand: ['p1a', 'p1b'], // 仅基本牌 → 强制选 2
+          skills: [],
+        }),
+      ],
+      cardMap: {
+        t0: trick('t0'),
+        p1a: basic('p1a'),
+        p1b: basic('p1b', '闪'),
+      },
+      zones: { deck: [], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.triggerAction('界灭计', 'use', { cardId: 't0', target: 1 });
+    P1.expectPending('请求回应'); // 第 1 张
+
+    // 目标超时(不回应)→ 自动弃首张
+    await P1.pass();
+    P1.expectPending('请求回应'); // 第 2 张
+
+    // 再次超时 → 自动弃首张
+    await P1.pass();
+    await harness.waitForStable();
+
+    // 置顶已收
+    expect(harness.state.zones.deck[harness.state.zones.deck.length - 1]).toBe('t0');
+    // 两张牌都被自动弃置(目标无法逃避弃牌义务)
+    expect(harness.state.players[1].hand).toEqual([]);
+    expect(harness.state.zones.discardPile).toEqual(
+      expect.arrayContaining(['p1a', 'p1b']),
+    );
+  });
+
+  // ─── 12. 强制弃牌:目标超时也不能逃避(PICK_TRICK 自动弃首张锦囊) ─
+  it('强制弃牌:目标超时(不回应)→ 自动弃首张锦囊', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['t0'],
+          skills: ['界灭计'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          hand: ['t1'], // 仅 1 张锦囊 → 强制选 1
+          skills: [],
+        }),
+      ],
+      cardMap: {
+        t0: trick('t0'),
+        t1: trick('t1', '无中生有'),
+      },
+      zones: { deck: [], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P0.triggerAction('界灭计', 'use', { cardId: 't0', target: 1 });
+    P1.expectPending('请求回应'); // 弃一张锦囊
+
+    // 目标超时(不回应)→ 自动弃首张锦囊
+    await P1.pass();
+    await harness.waitForStable();
+
+    expect(harness.state.zones.deck[harness.state.zones.deck.length - 1]).toBe('t0');
+    expect(harness.state.players[1].hand).toEqual([]);
+    expect(harness.state.zones.discardPile).toContain('t1');
   });
 });

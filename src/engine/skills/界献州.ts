@@ -108,6 +108,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       await pushFrame(st, SKILL_ID, from, { ...params });
 
+      try {
       // ── 1. 把装备区所有牌交给 target ──
       const cardIds = equippedCardIds(st, from);
       const X = cardIds.length;
@@ -192,7 +193,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       delete st.localVars[COUNT_KEY];
       delete st.localVars[TARGET_KEY];
-      await popFrame(st);
+      } finally {
+        await popFrame(st);
+      }
     },
   );
 

@@ -28,7 +28,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界禁酒'(避开标版潜在冲突);
 //   内部 Skill.name = '禁酒'(OL 官方技能名,玩家可见)。
-import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { Card, FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import {
   registerAction,
   registerAfterHook,
@@ -38,7 +38,8 @@ import {
 } from '../core/skill';
 import type { ActionEntry } from '../types';
 import { applyAtom } from '../core/apply';
-import { defaultPlayActive } from '../rules/action-active';
+import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
+import { viewCanAttack } from '../rules/viewDistance';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界禁酒';
@@ -186,19 +187,30 @@ function wrapWineRespond(state: GameState, ownerId: number): void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  // 前端:界禁酒是转化技,defineAction 声明【酒】手牌。
-  // 前端 UI 流程:选【酒】手牌 → 点禁酒 → 提交 preceding=[界禁酒.transform] + 主 action=杀.use。
-  // 主 action=杀.use 自带目标选择(useCardAndTarget),转化出的 K 杀按 杀.use 正常结算。
+  // 前端:界禁酒是转化技(酒→杀),与武圣(红→杀)同构。transform action 的 prompt.type
+  // 必须是 useCardAndTarget + targetFilter——否则两处前端约定会使其不可用:
+  //   - PlayerCardLarge.triggerableActions 过滤 (useCardAndTarget && transform):useCard
+  //     不会渲染为可点技能按钮,玩家无法触发禁酒。
+  //   - availableActions(AI) 转化枚举要求 prompt.type===useCardAndTarget,否则 cardFilter=null
+  //     被跳过,AI 无法构造 preceding + 目标。
+  // 前端 UI 流程:选【酒】手牌 → 选目标 → 点禁酒 → 提交 preceding=[界禁酒.transform] + 杀.use。
   api.defineAction('transform', {
     label: DISPLAY_NAME,
     style: 'passive',
     prompt: {
-      type: 'useCard',
+      type: 'useCardAndTarget',
       title: '选择一张【酒】当点数K的【杀】使用',
       cardFilter: {
         filter: (c: Card) => c.name === '酒',
         min: 1,
         max: 1,
+      },
+      targetFilter: {
+        min: 1,
+        max: 1,
+        // 攻击范围检查(转化出的杀同样需距离):filter 仅为前端 UI 提示,后端 杀.use 权威校验
+        filter: (view: GameView, t: number) =>
+          viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
       },
     },
     transform: (card: Card) => ({
@@ -207,10 +219,12 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       fromSkill: skill.id,
     }),
     activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
       const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p) return false;
-      return p.hand?.some((c) => c.name === '酒') ?? false;
+      if (!p?.alive) return false;
+      const hasWine = p.hand?.some((c) => c.name === '酒') ?? false;
+      if (!hasWine) return false;
+      // 转化出的是【杀】,需遵守出杀次数上限(与武圣一致),否则按钮在已用尽杀次数时仍亮起
+      return defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
     },
   });
   return;

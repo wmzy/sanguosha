@@ -125,6 +125,32 @@ describe('界蛊惑', () => {
     expect(harness.state.players[0].hand).not.toContain('s1');
   });
 
+  it('蛊惑杀·目标出真闪 → 杀被抵消(目标不受伤)', async () => {
+    const s1 = mkCard('s1', '杀', '♠', '7'); // 真杀
+    const p2dodge = mkCard('p2dodge', '闪', '♥', '2');
+    await harness.setup(
+      baseState({ yujiHand: ['s1'], p2Hand: ['p2dodge'], cardMap: { s1, p2dodge } }),
+    );
+    const YJ = harness.player('界于吉');
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // 界于吉扣置真杀,声明为杀,目标 P2
+    await YJ.triggerAction('界蛊惑', 'use', { cardId: 's1', declaredName: '杀', target: 2 });
+    await P1.pass(); // 不质疑
+    await P2.pass(); // 不质疑 → 无人质疑 → 杀生效
+    await harness.waitForStable();
+
+    // 杀生效 → 询问 P2 闪 → P2 出真闪(走 runUseFlow,设杀帧 cancelled=true,牌入弃牌堆)
+    await P2.respond('闪', { cardId: 'p2dodge' });
+    await harness.waitForStable();
+
+    // 真闪抵消杀 → P2 不受伤
+    expect(harness.state.players[2].health).toBe(4);
+    expect(harness.state.zones.discardPile).toContain('s1'); // 扣牌已使用
+    expect(harness.state.zones.discardPile).toContain('p2dodge'); // 真闪进弃牌堆
+  });
+
   it('同时质疑·真牌 → 质疑者获缠怨标记 + 选择弃牌,声明杀仍生效', async () => {
     const s1 = mkCard('s1', '杀', '♠', '7'); // 真杀
     const p1x = mkCard('p1x', '闪', '♥', '2');

@@ -387,4 +387,51 @@ describe('界悲歌', () => {
     // 判定作用于 P2:j1 已入弃牌堆
     expect(harness.state.zones.discardPile).toContain('j1');
   });
+
+  // ─── 11. 弃置牌被其他技能(界落英)抢走时,点数奖励不得复制该牌 ────
+  // 界蔡文姬弃一张与判定牌同点数的 ♣ 牌(触发点数奖励)→ 界落英抢走该 ♣ 牌
+  // → 界悲歌点数奖励须校验弃牌堆仍在,不得盲取复制(否则该牌同时出现在
+  // 界蔡文姬与界曹植手牌中)。
+  it('弃置牌被界落英抢走:点数奖励不复制该牌', async () => {
+    // 判定牌 ♥5(♥ 回血);界蔡文姬弃 ♣5(点数同 5,触发点数奖励;♣ 触发界落英)
+    const judge = makeCard('j1', '杀', '♥', '5');
+    const cost = makeCard('d1', '闪', '♣', '5');
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: '界蔡文姬', hand: ['d1'], skills: ['界悲歌', '断肠'] }),
+        makePlayer({ index: 1, name: 'P1', character: '张飞', hand: ['k1'], skills: ['杀'] }),
+        makePlayer({ index: 2, name: '界曹植', hand: [], skills: ['界落英'] }),
+      ],
+      cardMap: { k1: slash, d1: cost, j1: judge },
+      zones: { deck: ['j1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('界蔡文姬');
+    const P1 = harness.player('P1');
+    const P2 = harness.player('界曹植');
+
+    await P1.useCardAndTarget('杀', 'k1', [0]); // P1 出杀打 P0
+    await P0.pass(); // 不出闪
+
+    // 界悲歌:发动 + 弃 ♣5(点数同判定牌,意图触发点数奖励)
+    await P0.respond('界悲歌', { choice: true });
+    await P0.respond('界悲歌', { cardId: 'd1' });
+
+    // ♣5 入弃牌堆 → 界落英询问界曹植 → 获得(从弃牌堆拿走 d1)
+    await P2.respond('界落英', { choice: true });
+
+    // ♥ 主效果:P0 回血(3→2→3)
+    expect(harness.state.players[0].health).toBe(3);
+    // ♣5 被界落英抢走 → 在界曹植手牌中
+    expect(harness.state.players[2].hand).toContain('d1');
+    // 回归关键:♣5 不得被界悲歌点数奖励复制到界蔡文姬手牌(盲取复制 bug)
+    expect(harness.state.players[0].hand).not.toContain('d1');
+    // ♣5 已离开弃牌堆(界落英取走),判定牌 ♥5 因花色不同未被奖励、正常入弃牌堆
+    expect(harness.state.zones.discardPile).not.toContain('d1');
+    expect(harness.state.zones.discardPile).toContain('j1');
+  });
 });

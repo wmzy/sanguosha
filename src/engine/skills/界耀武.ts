@@ -42,39 +42,48 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
+  const unloads: Array<() => void> = [];
 
-  registerAfterHook(
-    state,
-    skill.id,
-    ownerId,
-    '受到伤害后',
-    async (ctx) => {
-      const atom = ctx.atom;
-      if (atom.target !== ownerId) return;
-      if ((atom.amount ?? 0) <= 0) return;
+  // ─── after-hook:受到伤害后(华雄受伤后,按伤害牌颜色分支摸牌) ───
+  // 必须捕获 unloader 并在返回的清理函数中调用——引擎无自动 hook 清理机制,
+  // 仅靠 onInit 返回的清理函数卸载 hook(unloadSkillInstance 只清 action,不清 hook)。
+  // 否则技能被移除/重载时 hook 残留 → 重复触发(摸双倍牌)或已移除仍触发。
+  unloads.push(
+    registerAfterHook(
+      state,
+      skill.id,
+      ownerId,
+      '受到伤害后',
+      async (ctx) => {
+        const atom = ctx.atom;
+        if (atom.target !== ownerId) return;
+        if ((atom.amount ?? 0) <= 0) return;
 
-      const damageCardId = atom.cardId;
-      const damageCard = damageCardId ? ctx.state.cardMap[damageCardId] : undefined;
-      const isRed = !!damageCard && damageCard.color === '红';
+        const damageCardId = atom.cardId;
+        const damageCard = damageCardId ? ctx.state.cardMap[damageCardId] : undefined;
+        const isRed = !!damageCard && damageCard.color === '红';
 
-      if (isRed) {
-        // 红色伤害牌:来源摸一张牌(若来源存活;否则降级为华雄自己摸一张)
-        const source = atom.source;
-        const sourceAlive =
-          typeof source === 'number' && ctx.state.players[source]?.alive;
-        await applyAtom(ctx.state, {
-          type: '摸牌',
-          player: sourceAlive ? source : ownerId,
-          count: 1,
-        });
-      } else {
-        // 非红色或无牌:华雄摸一张牌
-        await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
-      }
-    },
+        if (isRed) {
+          // 红色伤害牌:来源摸一张牌(若来源存活;否则降级为华雄自己摸一张)
+          const source = atom.source;
+          const sourceAlive =
+            typeof source === 'number' && ctx.state.players[source]?.alive;
+          await applyAtom(ctx.state, {
+            type: '摸牌',
+            player: sourceAlive ? source : ownerId,
+            count: 1,
+          });
+        } else {
+          // 非红色或无牌:华雄摸一张牌
+          await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
+        }
+      },
+    ),
   );
 
-  return () => {};
+  return () => {
+    for (const u of unloads) u();
+  };
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
