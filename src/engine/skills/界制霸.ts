@@ -34,10 +34,10 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
+import { HUNZI_AWAKENED_KEY as AWAKENED_KEY } from '../rules/vars-keys';
 
 const SKILL_ID = '界制霸';
 const DISPLAY_NAME = '制霸';
-const AWAKENED_KEY = '魂姿/awakened';
 
 // 限一次 key(两个方向独立)
 const ALLY_USED = SKILL_ID; // 盟友主动:vars['界制霸/usedThisTurn']

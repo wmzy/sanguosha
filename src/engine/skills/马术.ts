@@ -5,8 +5,8 @@
 //   distance.ts 的 effectiveDistance 读取该 vars 做进攻修正(正值=缩短距离)。
 //   卸载时清除。区别:进攻马是装备技能(装备/卸载时实例化),马术是武将锁定技(开局即生效)。
 import type { Skill, GameState } from '../types';
+import { DISTANCE_ATTACK_MOD_KEY as VAR_KEY } from '../rules/vars-keys';
 
-const VAR_KEY = '距离/进攻修正';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '马术', description: '锁定技:你与其他角色的距离-1', isLocked: true };

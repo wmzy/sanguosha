@@ -48,6 +48,7 @@ import { topFrame } from '../core/frame';
 import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
+import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
 
 const GRANT_VAR = '父魂/granted';
 const COLOR_LIMIT_VAR = '闪/色限制';
@@ -172,11 +173,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
           // 若已被其他流程占用槽位,退回手牌兜底
           if (self.equipment[slot] === undefined) {
             self.equipment[slot] = cardId;
-            // 卸下武器时清除了 vars['距离/出杀范围'](由 卸下 atom 设值,不会重算),
+            // 卸下武器时清除了 vars[DISTANCE_ATTACK_RANGE_KEY](由 卸下 atom 设值,不会重算),
             // 回滚必须还原,否则武器已归位但攻击范围退化为徒手(1)。镜像 界武圣 回滚。
             if (slot === '武器') {
               const card = state.cardMap[cardId];
-              self.vars['距离/出杀范围'] = card?.range ?? 1;
+              self.vars[DISTANCE_ATTACK_RANGE_KEY] = card?.range ?? 1;
             }
           } else {
             self.hand.push(cardId);

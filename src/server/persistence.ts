@@ -2,6 +2,7 @@
 import { writeFile, readFile, unlink, mkdir, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ActionLogEntry, GameState } from '../engine/types';
+import { RealClock } from '../engine/core/clock';
 import { register as registerLifecycle } from './lifecycles';
 import { createLogger } from './logger';
 
@@ -135,6 +136,9 @@ export function sanitizeState(state: GameState): GameState {
     // restore 路径走 bootstrap 重放 actionLog,会重建 pending。
     pendingSlots: new Map(),
     atomStack: [],
+    // clock 是执行环境(含 setTimeout/虚拟事件队列),非游戏状态,不持久化。
+    // 恢复时由 create(config) 重新注入 RealClock。
+    clock: new RealClock(),
     settlementStack: state.settlementStack.map((f) => {
       // SettlementFrame 运行时挂有 _executor 函数引用(不可序列化),持久化时剩离。
       // 经 unknown 中转:SettlementFrame 与 Record 结构重叠不足,TS 要求显式两步转换。

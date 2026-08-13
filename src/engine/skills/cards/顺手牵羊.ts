@@ -9,6 +9,7 @@ import { effectiveDistance } from '../../rules/distance';
 import { viewEffectiveDistance } from '../../rules/viewDistance';
 import { runPickTargetCardPanel } from '../../flows/pick-card-panel';
 import type { CardEffect, ResolveCtx } from '../../types';
+import { PICK_RESULT_KEY } from '../../rules/vars-keys';
 
 function canUseSnatch(
   state: import('../../types').GameState,
@@ -71,7 +72,7 @@ export const snatchEffect: CardEffect = {
       return null;
     },
     execute: async (state, _ownerId, params) => {
-      state.localVars['选牌/结果'] = {
+      state.localVars[PICK_RESULT_KEY] = {
         zone: params.zone,
         cardId: params.cardId ?? null,
         handIndex: params.handIndex ?? null,

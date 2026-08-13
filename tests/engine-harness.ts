@@ -610,17 +610,17 @@ export class PlayerSession {
   }
 
   /**
-   * 发出 action 并返回是否被接受(dispatch 返回 boolean)。
-   * validate 拒绝时 dispatch 返回 false,execute 成功时返回 true。
+   * 发出 action 并返回是否被接受(dispatch 返回 DispatchResult)。
+   * validate 拒绝时 dispatch 返回 accepted=false,execute 成功时返回 true。
    */
   async tryDispatch(msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>): Promise<boolean> {
-    const accepted = await engineDispatch(this.harness.state, {
+    const result = await engineDispatch(this.harness.state, {
       ...msg,
       ownerId: this.playerIndex,
       baseSeq: this.harness.state.seq,
-    }).catch(() => false);
+    }).catch(() => ({ accepted: false, settle: Promise.resolve() }) as const);
     await this.harness.waitForStable();
-    return accepted;
+    return result.accepted;
   }
 
   private async dispatch(msg: Omit<ClientMessage, 'ownerId' | 'baseSeq'>): Promise<void> {

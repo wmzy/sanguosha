@@ -37,6 +37,7 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { handLimitBonusKey } from '../rules/vars-keys';
 
 /** 非延时锦囊牌名集合 */
 const NON_DELAY_TRICKS = new Set([
@@ -54,11 +55,6 @@ const NON_DELAY_TRICKS = new Set([
 
 const CONFIRM_REQUEST = '界集智/confirm'; // 是否摸一张牌
 const DISCARD_REQUEST = '界集智/discard'; // 是否弃置基本牌令本回合手牌上限+1
-
-/** 手牌上限 bonus 的 turn.vars 键(与 hand-limit.ts 默认公式一致) */
-function handLimitBonusKey(ownerId: number): string {
-  return `手牌上限/bonus:${ownerId}`;
-}
 
 /** 读取当前 pending 的 requestType(类型安全) */
 function currentRequestType(state: GameState, ownerId: number): string | undefined {

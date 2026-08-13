@@ -38,6 +38,7 @@ import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rule
 import { registerSlashExtraProvider } from '../rules/slash-quota';
 import { registerDistanceExemptor } from '../rules/distance';
 import type { SkillModule } from '../types';
+import { handLimitBonusKey } from '../rules/vars-keys';
 
 const SKILL_NAME = '决堰';
 
@@ -147,7 +148,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         // 摸三张牌
         await applyAtom(st, { type: '摸牌', player: ownerId, count: 3 });
         // 手牌上限+3(本回合):hand-limit.ts 读 turn.vars['手牌上限/bonus:<player>']
-        const bonusKey = `手牌上限/bonus:${ownerId}`;
+        const bonusKey = handLimitBonusKey(ownerId);
         const cur = (st.turn.vars[bonusKey] as number | undefined) ?? 0;
         st.turn.vars[bonusKey] = cur + 3;
       } else if (group === '坐骑') {

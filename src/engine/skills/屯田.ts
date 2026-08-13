@@ -30,6 +30,7 @@ import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { DISTANCE_ATTACK_MOD_KEY } from '../rules/vars-keys';
 
 const CONFIRM_RT = '屯田/confirm';
 const CONFIRMED_KEY = '屯田/confirmed';
@@ -55,9 +56,9 @@ function tianCount(state: GameState, player: number): number {
 function syncDistanceMod(state: GameState, player: number): void {
   const count = tianCount(state, player);
   if (count > 0) {
-    state.players[player].vars['距离/进攻修正'] = count;
+    state.players[player].vars[DISTANCE_ATTACK_MOD_KEY] = count;
   } else {
-    delete state.players[player].vars['距离/进攻修正'];
+    delete state.players[player].vars[DISTANCE_ATTACK_MOD_KEY];
   }
 }
 

@@ -17,6 +17,7 @@ import type { FrontendAPI, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
+import { PICK_RESULT_KEY } from '../rules/vars-keys';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -31,7 +32,7 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
   const ownerId = skill.ownerId;
   // respond:被询问时回应。按 requestType 分两步:
   //   '反馈/confirm' → 设 localVars 标记是否发动
-  //   '反馈/选牌'    → 设 localVars['选牌/结果'](由 选牌面板.ts 读取)
+  //   '反馈/选牌'    → 设 localVars[PICK_RESULT_KEY](由 选牌面板.ts 读取)
   registerAction(
     state,
     skill.id,
@@ -67,7 +68,7 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
         state.localVars['反馈/confirmed'] =
           params.choice === true || params.confirmed === true;
       } else if (requestType === '反馈/选牌') {
-        state.localVars['选牌/结果'] = {
+        state.localVars[PICK_RESULT_KEY] = {
           zone: params.zone,
           cardId: params.cardId ?? null,
           handIndex: params.handIndex ?? null,

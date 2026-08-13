@@ -21,8 +21,8 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { performYinghunPrepare } from './英魂';
+import { HUNZI_AWAKENED_KEY as AWAKENED_KEY } from '../rules/vars-keys';
 
-const AWAKENED_KEY = '魂姿/awakened';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

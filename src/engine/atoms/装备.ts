@@ -4,6 +4,7 @@
 // 添加技能/移除技能 hook 设置 vars(距离/进攻修正|距离/防御修正),与马术等武将技能一致。
 // 对应 卸下 atom 负责清除武器范围;马匹 vars 由技能卸载清理。
 import type { AtomDefinition, EquipSlot, GameState, ViewEventSplit, ViewEvent, Card } from '../types';
+import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
 
 function inferSlot(cardType: string | undefined): EquipSlot | null {
   switch (cardType) {
@@ -31,7 +32,7 @@ function applyEquipVars(
 ): void {
   const vars = state.players[playerIdx].vars;
   if (slot === '武器') {
-    vars['距离/出杀范围'] = card.range ?? 1;
+    vars[DISTANCE_ATTACK_RANGE_KEY] = card.range ?? 1;
   }
 }
 

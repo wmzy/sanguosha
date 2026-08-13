@@ -2,12 +2,13 @@
 // 副作用:清除武器攻击范围 vars(距离/出杀范围)。
 // 进攻马/防御马的 vars 由马匹技能的 移除技能 hook 清理,不在此硬编码。
 import type { AtomDefinition, EquipSlot, GameState, ViewEventSplit, ViewEvent } from '../types';
+import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
 
 /** 清除装备带来的 vars(仅武器范围;马匹由技能处理) */
 function clearEquipVars(state: GameState, playerIdx: number, slot: EquipSlot): void {
   const vars = state.players[playerIdx].vars;
   if (slot === '武器') {
-    delete vars['距离/出杀范围'];
+    delete vars[DISTANCE_ATTACK_RANGE_KEY];
   }
 }
 

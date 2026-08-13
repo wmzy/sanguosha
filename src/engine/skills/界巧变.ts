@@ -41,6 +41,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
+import { createRng } from '../util/rng';
 
 // ── requestType 常量(用于 请求回应 atom 的 requestType 字段) ──
 const CONFIRM_RT = '界巧变/confirm';
@@ -353,7 +354,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
               const target = ctx.state.players[t];
               if (!target?.alive || target.hand.length === 0) continue;
               // 手牌不公开:盲取一张随机手牌(与突袭/标版巧变一致,不展示)
-              const idx = Math.floor(Math.random() * target.hand.length);
+              const rng = createRng(ctx.state.rngSeed);
+              const idx = rng.nextInt(target.hand.length);
+              ctx.state.rngSeed = rng.getState();
               const cardId = target.hand[idx];
               await applyAtom(ctx.state, {
                 type: '获得',

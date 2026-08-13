@@ -11,6 +11,7 @@
 
 import type { GameState } from '../types';
 import { getHealthValue } from '../types';
+import { handLimitBonusKey } from './vars-keys';
 
 /**
  * 手牌上限覆盖提供者:返回该玩家手牌上限的绝对值(undefined = 不覆盖)。
@@ -80,7 +81,7 @@ export function handLimit(state: GameState, player: number): number {
     }
     if (maxOverride !== -Infinity) return maxOverride;
   }
-  const bonus = (state.turn.vars[`手牌上限/bonus:${player}`] as number | undefined) ?? 0;
+  const bonus = (state.turn.vars[handLimitBonusKey(player)] as number | undefined) ?? 0;
   // 手牌上限基于「体力值」（封底为 0），非原始「体力」（可负）。
   return getHealthValue(state.players[player]) + bonus;
 }

@@ -39,6 +39,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { handLimitBonusKey } from '../rules/vars-keys';
 
 const SKILL_ID = '界精策';
 const DISPLAY_NAME = '精策';
@@ -111,9 +112,9 @@ function recordCardUse(state: GameState, ownerId: number, card: { suit?: string;
 function syncHandLimitBonus(state: GameState, ownerId: number): void {
   const bonus = usedSuits(state, ownerId).length;
   if (bonus > 0) {
-    state.turn.vars[`手牌上限/bonus:${ownerId}`] = bonus;
+    state.turn.vars[handLimitBonusKey(ownerId)] = bonus;
   } else {
-    delete state.turn.vars[`手牌上限/bonus:${ownerId}`];
+    delete state.turn.vars[handLimitBonusKey(ownerId)];
   }
 }
 

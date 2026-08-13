@@ -48,6 +48,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
+import { PICK_RESULT_KEY } from '../rules/vars-keys';
 
 const SKILL_ID = '界利驭';
 const DISPLAY_NAME = '利驭';
@@ -120,7 +121,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           if (requestType === CONFIRM_RT) {
             s.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
           } else if (requestType === PICK_RT) {
-            s.localVars['选牌/结果'] = {
+            s.localVars[PICK_RESULT_KEY] = {
               zone: params.zone,
               cardId: params.cardId ?? null,
               handIndex: params.handIndex ?? null,

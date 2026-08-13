@@ -22,6 +22,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
+import { PICK_RESULT_KEY } from '../rules/vars-keys';
 
 /** localVars keys */
 const CONFIRMED_KEY = '涯角/confirmed';
@@ -84,7 +85,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         st.localVars[TARGET_KEY] = params.target ?? null;
       } else if (rt === DISCARD_RT) {
         // pickTargetCard 选牌结果:由 选牌面板.ts 的 runPickTargetCardPanel 读取
-        st.localVars['选牌/结果'] = {
+        st.localVars[PICK_RESULT_KEY] = {
           zone: params.zone,
           cardId: params.cardId ?? null,
           handIndex: params.handIndex ?? null,

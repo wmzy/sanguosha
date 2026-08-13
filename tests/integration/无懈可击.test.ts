@@ -392,7 +392,7 @@ describe('无懈可击链路', () => {
     // 修复前:findPendingSlot 第一步 get(0) 命中出牌窗口非阻塞 slot → validate 误判
     //         「当前不是无懈窗口」→ dispatch 返回 false(拒绝),无懈未打出。
     // 修复后:findPendingSlot 跳过非阻塞出牌窗口 → 命中广播无懈 slot → 接受。
-    const accepted = await engineDispatch(state, {
+    const { accepted } = await engineDispatch(state, {
       skillId: '无懈可击',
       actionType: 'respond',
       ownerId: 0,
@@ -468,7 +468,7 @@ describe('无懈可击链路', () => {
     expect(counterSlot).toBeDefined();
 
     // P0(出牌者本人)出反无懈。修复前同样被 validate 拒绝,修复后被接受。
-    const accepted = await engineDispatch(state, {
+    const { accepted } = await engineDispatch(state, {
       skillId: '无懈可击',
       actionType: 'respond',
       ownerId: 0,
@@ -817,7 +817,7 @@ describe('skip 机制:广播型 pending 放弃回应', () => {
     expect(atomTarget).toBeLessThan(0); // 广播型
 
     // P0 skip → 被接受(true),slot 仍存在(P1 还没 skip)
-    const accepted0 = await engineDispatch(state, {
+    const { accepted: accepted0 } = await engineDispatch(state, {
       skillId: '__skip',
       actionType: 'skip',
       ownerId: 0,
@@ -830,7 +830,7 @@ describe('skip 机制:广播型 pending 放弃回应', () => {
     expect(slot.skippedPlayers?.has(1)).toBe(false);
 
     // P1 skip → 被接受(true),全员 skip → 触发超时 → slot resolve
-    const accepted1 = await engineDispatch(state, {
+    const { accepted: accepted1 } = await engineDispatch(state, {
       skillId: '__skip',
       actionType: 'skip',
       ownerId: 1,

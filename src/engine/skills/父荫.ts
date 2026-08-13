@@ -15,7 +15,7 @@
 //   若其手牌数 >= 自己手牌数 → cancel(此牌对你无效);否则牌正常结算。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { registerBeforeHook } from '../core/skill';
-import { usedThisTurn } from '../rules/once-per-turn';
+import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '父荫';
@@ -52,9 +52,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 每回合首次:已触发过则不再生效
       if (usedThisTurn(ctx.state, ownerId, SKILL_ID)) return;
 
-      // 消耗本回合唯一机会(无论后续手牌条件是否满足)——直接写 vars,
-      // 由 回合结束 atom 按 '/usedThisTurn' 后缀自动清空
-      ctx.state.players[ownerId].vars[`${SKILL_ID}/usedThisTurn`] = true;
+      // 消耗本回合唯一机会(无论后续手牌条件是否满足)——markOncePerTurn 同步写 vars
+      // (后缀 /usedThisTurn,由「回合结束」atom 自动清空)并经「回合用量」atom 投影
+      // view.turnUsage,保证 view 与 state 一致(否则 view-projection desync)。
+      await markOncePerTurn(ctx.state, ownerId, SKILL_ID);
 
       const sourcePlayer = ctx.state.players[source];
       const selfPlayer = ctx.state.players[ownerId];

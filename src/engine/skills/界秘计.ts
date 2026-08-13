@@ -33,12 +33,11 @@ import type {
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { mijiPendingKey } from '../rules/vars-keys';
 
 const _SKILL_ID = '界秘计';
 const DISPLAY_NAME = '秘计';
 
-/** player.vars key 前缀:贞烈选项②挂起,界秘计消费(由 界贞烈.ts 写入;持久至王异结束阶段) */
-const MIJI_PENDING_PREFIX = '秘计/pendingFrom贞烈/';
 /** 本次分发最大张数(供 giveCards validate 上限校验) */
 const GIVE_MAX_VAR = '界秘计/giveMax';
 /** 请求回应 requestType 常量 */
@@ -146,7 +145,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 贞烈挂起的强制发动(优先于主动询问,确保 "本回合结束阶段发动一次秘计")
       // 注意:标志须跨回合持久(贞烈常在他人的回合触发,秘计要到王异自己的结束阶段才消费),
       // 故存于 player.vars(turn.vars 会被「回合结束」atom 每回合清空,跨回合会丢失)。
-      const pendingKey = `${MIJI_PENDING_PREFIX}${ownerId}`;
+      const pendingKey = mijiPendingKey(ownerId);
       const forced = st.players[ownerId].vars[pendingKey] === true;
       if (forced) {
         delete st.players[ownerId].vars[pendingKey];

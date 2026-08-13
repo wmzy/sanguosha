@@ -3,6 +3,7 @@
 
 import type { Atom } from './atom';
 import type { ActionLogEntry, AppliedAtomEntry, PendingSlot, SettlementFrame } from './skill';
+import { RealClock, type Clock } from '../core/clock';
 
 // ─── 牌面基础类型(原 shared/types,随 shared/ 清退并入引擎) ─────────
 export type Suit = '♠' | '♥' | '♣' | '♦';
@@ -156,6 +157,12 @@ export interface GameState {
   cardMap: Record<string, Card>;
   cardWrappers: Record<string, CardWrapper>;
   rngSeed: number;
+  /** 时间源(执行环境依赖,非序列化)。createGameState 默认 RealClock;
+   *  restore 路径在 bootstrap 前注入 VirtualClock 实现确定性超时重放。 */
+  clock: Clock;
+  /** dispatch 期间:execute 到达挂起点(slot 创建)时的一次性通知(restore 重放同步用)。
+   *  dispatch 设置,createAndAwaitSlot 在 slot 入 pendingSlots 后调用并清空。 */
+  onExecuteSettle?: (() => void) | null;
   /** 座次轮转偏移:物理座位 i → 游戏座次 (i + seatRotation) % playerCount。
  *  由 session 在 startGame 时基于 seed 派生(确定性,恢复可复现),用于 playerId↔座次映射,
  *  使主公(游戏座次 0)落到随机物理座位——房主不再恒为主公。0=无偏移。 */
@@ -212,6 +219,7 @@ export function createGameState(
     pendingSlots: new Map(),
     cardWrappers: {},
     rngSeed: 0,
+    clock: new RealClock(),
     seatRotation: 0,
     marks: [],
     localVars: {},

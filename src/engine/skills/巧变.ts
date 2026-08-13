@@ -28,6 +28,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
+import { createRng } from '../util/rng';
 
 const CONFIRM_RT = '巧变/confirm';
 const DISCARD_RT = '巧变/discard';
@@ -235,7 +236,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
               const target = ctx.state.players[t];
               if (!target?.alive || target.hand.length === 0) continue;
               // 手牌不公开:盲取一张随机手牌(与突袭一致,不展示)
-              const idx = Math.floor(Math.random() * target.hand.length);
+              const rng = createRng(ctx.state.rngSeed);
+              const idx = rng.nextInt(target.hand.length);
+              ctx.state.rngSeed = rng.getState();
               const cardId = target.hand[idx];
               await applyAtom(ctx.state, {
                 type: '获得',

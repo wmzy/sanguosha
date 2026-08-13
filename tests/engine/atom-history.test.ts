@@ -186,7 +186,7 @@ describe('dispatch 返回 boolean', () => {
       params: {},
       baseSeq: 0,
     };
-    const result = await dispatch(state, msg);
+    const { accepted: result } = await dispatch(state, msg);
     expect(result).toBe(false);
   });
 });

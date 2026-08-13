@@ -36,8 +36,8 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
+import { HUNZI_AWAKENED_KEY as AWAKENED_KEY } from '../rules/vars-keys';
 
-const AWAKENED_KEY = '魂姿/awakened';
 
 // respond requestTypes(孙策回应)
 const REFUSE_RT = '制霸/refuse'; // 觉醒后是否拒绝拼点(confirm)

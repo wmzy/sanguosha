@@ -55,6 +55,7 @@ import { createRng } from '../util/rng';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
 import { getCharacterMeta } from '../data/character-meta';
+import { HUASHEN_POOL_KEY as POOL_KEY } from '../rules/vars-keys';
 
 // ── 角色分派 ──
 const JIE_CHAR = '界左慈';
@@ -65,7 +66,6 @@ function isJie版(state: GameState, ownerId: number): boolean {
 }
 
 // ── player.vars / localVars 命名空间(标版与界版共用) ──
-const POOL_KEY = '化身/牌池';
 const LIT_KEY = '化身/亮出';
 const CURRENT_KEY = '化身/当前技能';
 const INIT_KEY = (ownerId: number) => `化身/init/${ownerId}`;

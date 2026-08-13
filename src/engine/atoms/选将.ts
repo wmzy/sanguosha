@@ -233,8 +233,8 @@ export const 选将询问: AtomDefinition<{
       candidates,
       timeoutMs,
       pending: {
-        startTime: Date.now(),
-        deadline: Date.now() + timeoutMs,
+        startTime: state.clock.now(),
+        deadline: state.clock.now() + timeoutMs,
         prompt: { type: 'chooseCharacter', title: '请选择武将', candidates },
       },
     };
@@ -340,8 +340,8 @@ export const 并行选将: AtomDefinition<{
         lordName,
         timeoutMs,
         pending: {
-          startTime: Date.now(),
-          deadline: Date.now() + timeoutMs,
+          startTime: state.clock.now(),
+          deadline: state.clock.now() + timeoutMs,
           prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: s.candidates },
         },
       });

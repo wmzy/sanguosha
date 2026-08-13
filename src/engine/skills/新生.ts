@@ -26,10 +26,10 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
 import { createRng } from '../util/rng';
+import { HUASHEN_POOL_KEY as POOL_KEY } from '../rules/vars-keys';
 
 const CONFIRM_REQUEST = '新生/confirm';
 const CHOICE_KEY = '新生/choice';
-const POOL_KEY = '化身/牌池';
 
 /** 本局已登场武将名集合。 */
 function debutedCharacters(state: GameState): Set<string> {

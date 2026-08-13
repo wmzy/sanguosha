@@ -31,9 +31,9 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { performYinghunPrepare } from './英魂';
+import { HUNZI_AWAKENED_KEY as AWAKENED_KEY } from '../rules/vars-keys';
 
 // 觉醒标记:沿用标版键名 '魂姿/awakened',供复用的标 制霸/界制霸 读取觉醒状态。
-const AWAKENED_KEY = '魂姿/awakened';
 // 觉醒当回合结束阶段收益标记:准备阶段觉醒成功后置 true,结束阶段消费后清空。
 // (不放 /usedThisTurn 后缀:结束阶段 hook 在「回合结束」atom 清 vars 之前触发并主动清空。)
 const END_BONUS_KEY = '界魂姿/endBonus';

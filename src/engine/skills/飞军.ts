@@ -33,6 +33,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
+import { BINGLUE_TARGETS_KEY } from '../rules/vars-keys';
 
 // 请求类型(requestType 前缀 = skillId,见 T1)
 const OPTION_RT = '飞军/option'; // owner:选择效果
@@ -47,7 +48,6 @@ const GIVE_KEY = '飞军/giveCardId';
 const DISCARD_EQUIP_KEY = '飞军/discardEquipCardId';
 
 // player.vars:兵略已触发的目标列表(整局,跨回合)。由飞军.ts 写入并触发兵略效果。
-const BINGLUE_TARGETS_KEY = '兵略/已飞军目标';
 
 /** 计算玩家装备区牌数 */
 function equipCount(equipment: Partial<Record<EquipSlot, string>>): number {

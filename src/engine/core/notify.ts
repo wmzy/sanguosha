@@ -36,7 +36,7 @@ export function notifyPendingResolved(state: GameState, slot: PendingSlot): void
   state.atomHistory.push({
     kind: 'notify',
     seq: state.seq,
-    timestamp: Date.now() - state.startedAt,
+    timestamp: state.clock.now() - state.startedAt,
     skillId: '',
     eventType: 'pendingResolved',
     data: { target, atomType: slot.atom.type },
@@ -50,7 +50,7 @@ export function pushNotify(state: GameState, event: NotifyEvent): void {
   state.atomHistory.push({
     kind: 'notify',
     seq: state.seq,
-    timestamp: Date.now() - state.startedAt,
+    timestamp: state.clock.now() - state.startedAt,
     ...event,
   });
 }
@@ -59,7 +59,7 @@ export function pushNotify(state: GameState, event: NotifyEvent): void {
 export function logAction(state: GameState, message: ClientMessage): void {
   state.actionLog.push({
     id: String(state.actionLog.length),
-    timestamp: Date.now() - state.startedAt,
+    timestamp: state.clock.now() - state.startedAt,
     message,
     baseSeq: message.baseSeq ?? -1,
   });

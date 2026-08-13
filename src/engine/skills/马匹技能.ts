@@ -11,13 +11,14 @@
 //   - 返回的卸载函数(移除技能/卸下时):清 vars
 import type { GameState, Skill } from '../types';
 import type { SkillModule } from '../types';
+import { DISTANCE_ATTACK_MOD_KEY, DISTANCE_DEFENSE_MOD_KEY } from '../rules/vars-keys';
 
 /** 距离修正类型:进攻(缩短你到他人的距离)/防御(增加他人到你的距离) */
 type MountKind = '进攻' | '防御';
 
 const VAR_KEY: Record<MountKind, string> = {
-  进攻: '距离/进攻修正',
-  防御: '距离/防御修正',
+  进攻: DISTANCE_ATTACK_MOD_KEY,
+  防御: DISTANCE_DEFENSE_MOD_KEY,
 };
 
 /**

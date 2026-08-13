@@ -29,6 +29,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
+import { createRng } from '../util/rng';
 
 const TRIGGER_RT = '界突袭/trigger';
 const SELECT_RT = '界突袭/select';
@@ -153,7 +154,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       for (const target of targets) {
         const tp = ctx.state.players[target];
         if (!tp || !tp.alive || tp.hand.length === 0) continue;
-        const idx = Math.floor(Math.random() * tp.hand.length);
+        const rng = createRng(ctx.state.rngSeed);
+        const idx = rng.nextInt(tp.hand.length);
+        ctx.state.rngSeed = rng.getState();
         const cardId = tp.hand[idx];
         await applyAtom(ctx.state, { type: '获得', player: ownerId, cardId, from: target });
       }

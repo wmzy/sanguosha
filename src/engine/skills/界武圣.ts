@@ -12,6 +12,7 @@ import { applyAtom } from '../core/apply';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
 import { registerAttackRangeExemptor } from '../rules/distance';
+import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -99,11 +100,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
           // 原是装备牌:从手牌移除影子,还原装备槽位
           self.hand.splice(idx, 1);
           self.equipment[origSlot] = cardId;
-          // 卸下武器时清除了 vars['距离/出杀范围'](该 var 仅由 装备 atom 在装备时设值,不会重算),
+          // 卸下武器时清除了 vars[DISTANCE_ATTACK_RANGE_KEY](该 var 仅由 装备 atom 在装备时设值,不会重算),
           // 回滚必须还原,否则武器已归位但攻击范围退化为徒手(1)。镜像 装备 atom 的设值逻辑。
           if (origSlot === '武器') {
             const card = state.cardMap[cardId];
-            self.vars['距离/出杀范围'] = card?.range ?? 1;
+            self.vars[DISTANCE_ATTACK_RANGE_KEY] = card?.range ?? 1;
           }
         } else {
           // 原是手牌:影子替换回原卡

@@ -7,6 +7,7 @@
 // 注册表为 state-bound(WeakMap 外挂),随 state 自动隔离/GC,与 slash-quota/hand-limit 同构。
 
 import type { GameState } from '../types';
+import { DISTANCE_ATTACK_MOD_KEY, DISTANCE_DEFENSE_MOD_KEY, DISTANCE_ATTACK_RANGE_KEY } from './vars-keys';
 
 /**
  * 环形座位距离(只算存活玩家)。
@@ -23,8 +24,8 @@ function seatDistance(aliveCount: number, fromIdx: number, toIdx: number): numbe
  * = 座位距离 + to 的防御修正 - from 的进攻修正，最小 1。
  *
  * 修正来源(技能/装备通过 player.vars 设置):
- *   vars['距离/进攻修正'] — 进攻马、马术等缩短距离的技能(正值=缩短)
- *   vars['距离/防御修正'] — 防御马等增加距离的技能(正值=增加)
+ *   vars[DISTANCE_ATTACK_MOD_KEY] — 进攻马、马术等缩短距离的技能(正值=缩短)
+ *   vars[DISTANCE_DEFENSE_MOD_KEY] — 防御马等增加距离的技能(正值=增加)
  *
  * 扩展点:registerDistanceExemptor 注册的豁免器命中时返回 1(视为无距离限制)。
  * 用于"特定条件下用牌无距离限制"类效果(界陷阵拼点赢后对其用牌无距离等)。
@@ -38,10 +39,10 @@ export function effectiveDistance(state: GameState, from: number, to: number, ca
   if (aliveFrom < 0 || aliveTo < 0) return Infinity;
   let dist = seatDistance(alive.length, aliveFrom, aliveTo);
   // 进攻修正:缩短距离(进攻马/马术)
-  const attackMod = (state.players[from].vars['距离/进攻修正'] as number) ?? 0;
+  const attackMod = (state.players[from].vars[DISTANCE_ATTACK_MOD_KEY] as number) ?? 0;
   dist -= attackMod;
   // 防御修正:增加距离(防御马)
-  const defenseMod = (state.players[to].vars['距离/防御修正'] as number) ?? 0;
+  const defenseMod = (state.players[to].vars[DISTANCE_DEFENSE_MOD_KEY] as number) ?? 0;
   dist += defenseMod;
   return Math.max(1, dist);
 }
@@ -51,7 +52,7 @@ export function effectiveDistance(state: GameState, from: number, to: number, ca
  * = effectiveDistance(from, to) <= from 的出杀范围
  *
  * 出杀范围来源(技能/装备通过 player.vars 设置):
- *   vars['距离/出杀范围'] — 武器攻击范围,默认 1(徒手)。诸葛连弩/青釭剑等在装备时设值
+ *   vars[DISTANCE_ATTACK_RANGE_KEY] — 武器攻击范围,默认 1(徒手)。诸葛连弩/青釭剑等在装备时设值
  *
  * cardId 可选:用于 per-card 距离豁免(如界当先特定卡牌无距离、界武圣方片杀无距离)。
  * 豁免逻辑由 registerAttackRangeExemptor 注册的 provider 提供,本函数不感知具体技能。
@@ -64,7 +65,7 @@ export function inAttackRange(
 ): boolean {
   if (from === to) return false;
   if (isAttackRangeExempted(state, from, to, cardId)) return true;
-  const range = (state.players[from].vars['距离/出杀范围'] as number) ?? 1;
+  const range = (state.players[from].vars[DISTANCE_ATTACK_RANGE_KEY] as number) ?? 1;
   return effectiveDistance(state, from, to) <= range;
 }
 

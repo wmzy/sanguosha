@@ -8,14 +8,11 @@
 //   - 触发时机:造成伤害 after-hook,target===owner && currentPlayerIndex!==owner(回合外)
 //   - 激活后写 turn.vars[ACTIVE_KEY]=ownerId(回合结束 atom 自动清空 turn.vars,天然每回合重置)
 //
-// "本回合杀和普通锦囊牌对你无效"实现(多 before-hook 拦截,模型参考 界帷幕/界贞烈):
-//   1. 成为目标 before:杀/决斗 在 成为目标 atom 阶段即 cancel(杀流程检测到 false 跳过)
-//   2. 检测有效性 before:杀/决斗 的备援拦截(防其他流程绕过 成为目标)
-//   3. 询问杀 before:南蛮入侵 不询问 owner 出杀
-//   4. 受到伤害 before:南蛮/万箭/决斗/火攻/AOE 等伤害被 cancel(含 杀 备援)
-//   5. 获得 before:顺手牵羊/借刀杀人(获武器)不能从 owner 处获得
-//   6. 弃置 before:过河拆桥 不弃置 owner 的牌
-//   7. 设横置 before:铁索连环 不对 owner 横置
+// "本回合杀和普通锦囊牌对你无效"实现(registerCardInvalidation 原语统一拦截 7 个点):
+//   成为目标/检测有效性/询问杀/受到伤害时/获得/弃置/设横置。
+//   谓词:isActiveFor(state,owner) && isAffectingCard(card)(杀或普通锦囊)。
+//   cardId 来源(逐 atom):成为目标/检测有效性/受到伤害时 用 atom.cardId;
+//   询问杀/获得/弃置/设横置 用 topFrame(state).params.cardId(由原语内部解析)。
 //
 // 卡类型判定:
 //   - 杀:card.name === '杀'(含物理杀与武圣/丈八转化杀——通过 cardMap 影子卡判定)
@@ -28,15 +25,9 @@
 //   两者都不存在时,不视为杀/锦囊(可能是反馈/刚烈等技能造成的伤害,智迟不影响)
 //
 // 命名:文件名/loader key/character skill name 均为 '界智迟';内部 Skill.name='智迟'(OL 官方名)。
-import type {
-  Card,
-  GameState,
-  HookResult,
-  Skill,
-  SkillModule,
-} from '../types';
-import { topFrame } from '../core/frame';
-import { registerAfterHook, registerBeforeHook } from '../core/skill';
+import type { Card, GameState, Skill, SkillModule } from '../types';
+import { registerAfterHook } from '../core/skill';
+import { registerCardInvalidation } from '../core/card-invalidation';
 
 const _SKILL_ID = '界智迟';
 const DISPLAY_NAME = '智迟';
@@ -74,17 +65,6 @@ function isActiveFor(state: GameState, ownerId: number): boolean {
   return state.turn.vars[ACTIVE_KEY] === ownerId;
 }
 
-/**
- * 取与当前 atom 关联的卡(用于判定是否为杀/普通锦囊)。
- * 优先 atom 直接携带的 cardId;否则回退到顶帧 params.cardId(普通锦囊 use 帧携带)。
- */
-function relevantCard(state: GameState, atomCardId: string | undefined): Card | undefined {
-  if (typeof atomCardId === 'string') return state.cardMap[atomCardId];
-  const frameCardId = topFrame(state)?.params?.cardId;
-  if (typeof frameCardId === 'string') return state.cardMap[frameCardId];
-  return undefined;
-}
-
 export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
@@ -112,134 +92,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     }),
   );
 
-  // ── 拦截 1:成为目标(杀/决斗)── 杀流程在成为目标 false 时跳过该目标 ──
+  // ── 拦截:本回合杀和普通锦囊对 owner 无效(7 个拦截点统一交给 registerCardInvalidation)──
+  //   谓词:智迟已激活 且 当前关联卡为杀/普通锦囊。
+  //   cardId 来源(逐 atom):成为目标/检测有效性/受到伤害时 用 atom.cardId;
+  //   询问杀/获得/弃置/设横置 用 topFrame(state).params.cardId(由原语内部解析)。
   unloaders.push(
-    registerBeforeHook(
-      state,
-      skill.id,
-      ownerId,
-      '成为目标',
-      async (ctx): Promise<HookResult | void> => {
-        if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom;
-        if (atom.target !== ownerId) return;
-        const card = relevantCard(ctx.state, atom.cardId);
-        if (!isAffectingCard(card)) return;
-        return { kind: 'cancel' };
-      },
-    ),
-  );
-
-  // ── 拦截 2:检测有效性(杀备援;某些流程可能绕过成为目标)──
-  unloaders.push(
-    registerBeforeHook(
-      state,
-      skill.id,
-      ownerId,
-      '检测有效性',
-      async (ctx): Promise<HookResult | void> => {
-        if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom;
-        if (atom.target !== ownerId) return;
-        const card = relevantCard(ctx.state, atom.cardId);
-        if (!isAffectingCard(card)) return;
-        return { kind: 'cancel' };
-      },
-    ),
-  );
-
-  // ── 拦截 3:询问杀(南蛮入侵)── 不询问 owner 出杀 ──
-  unloaders.push(
-    registerBeforeHook(
-      state,
-      skill.id,
-      ownerId,
-      '询问杀',
-      async (ctx): Promise<HookResult | void> => {
-        if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom;
-        if (atom.target !== ownerId) return;
-        // 顶帧 cardId 应为普通锦囊(南蛮);非普通锦囊不拦截
-        const card = relevantCard(ctx.state, undefined);
-        if (!isNormalTrick(card)) return;
-        return { kind: 'cancel' };
-      },
-    ),
-  );
-
-  // ── 拦截 4:受到伤害(南蛮/万箭/决斗/火攻/AOE;含 杀 备援)──
-  //    必须用「受到伤害时」(时机3,目标方);damage-flow 仅在 伤害结算开始时/受到伤害时
-  //    这两个时机检查 cancel 返回值,「造成伤害时」(时机2,来源方)的 cancel 会被忽略。
-  unloaders.push(
-    registerBeforeHook(
-      state,
-      skill.id,
-      ownerId,
-      '受到伤害时',
-      async (ctx): Promise<HookResult | void> => {
-        if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom;
-        if (atom.target !== ownerId) return;
-        const card = relevantCard(ctx.state, atom.cardId);
-        if (!isAffectingCard(card)) return;
-        return { kind: 'cancel' };
-      },
-    ),
-  );
-
-  // ── 拦截 5:获得(顺手牵羊/借刀杀人 获武器)── 不能从 owner 处获得 ──
-  unloaders.push(
-    registerBeforeHook(
-      state,
-      skill.id,
-      ownerId,
-      '获得',
-      async (ctx): Promise<HookResult | void> => {
-        if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom;
-        if (atom.from !== ownerId) return; // 别人从 owner 处获得
-        if (atom.player === ownerId) return; // 自己获得自己不算
-        const card = relevantCard(ctx.state, undefined);
-        if (!isNormalTrick(card)) return;
-        return { kind: 'cancel' };
-      },
-    ),
-  );
-
-  // ── 拦截 6:弃置(过河拆桥)── 不弃置 owner 的牌 ──
-  unloaders.push(
-    registerBeforeHook(
-      state,
-      skill.id,
-      ownerId,
-      '弃置',
-      async (ctx): Promise<HookResult | void> => {
-        if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom;
-        if (atom.player !== ownerId) return;
-        const card = relevantCard(ctx.state, undefined);
-        if (!isNormalTrick(card)) return;
-        return { kind: 'cancel' };
-      },
-    ),
-  );
-
-  // ── 拦截 7:设横置(铁索连环)── 不对 owner 横置 ──
-  unloaders.push(
-    registerBeforeHook(
-      state,
-      skill.id,
-      ownerId,
-      '设横置',
-      async (ctx): Promise<HookResult | void> => {
-        if (!isActiveFor(ctx.state, ownerId)) return;
-        const atom = ctx.atom;
-        if (atom.player !== ownerId) return;
-        const card = relevantCard(ctx.state, undefined);
-        if (!isNormalTrick(card)) return;
-        return { kind: 'cancel' };
-      },
-    ),
+    registerCardInvalidation(state, skill.id, ownerId, (st, card) => {
+      if (!isActiveFor(st, ownerId)) return false;
+      return isAffectingCard(card);
+    }),
   );
 
   return () => {

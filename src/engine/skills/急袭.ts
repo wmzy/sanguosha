@@ -22,6 +22,7 @@ import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction } from '../core/skill';
+import { DISTANCE_ATTACK_MOD_KEY } from '../rules/vars-keys';
 
 const TIAN_PREFIX = '屯田/田:';
 
@@ -43,9 +44,9 @@ function tianCount(state: GameState, player: number): number {
 function syncDistanceMod(state: GameState, player: number): void {
   const count = tianCount(state, player);
   if (count > 0) {
-    state.players[player].vars['距离/进攻修正'] = count;
+    state.players[player].vars[DISTANCE_ATTACK_MOD_KEY] = count;
   } else {
-    delete state.players[player].vars['距离/进攻修正'];
+    delete state.players[player].vars[DISTANCE_ATTACK_MOD_KEY];
   }
 }
 

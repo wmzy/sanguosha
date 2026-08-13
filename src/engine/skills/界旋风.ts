@@ -46,6 +46,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
+import { PICK_RESULT_KEY } from '../rules/vars-keys';
 
 const _SKILL_ID = '界旋风';
 const DISPLAY_NAME = '旋风';
@@ -223,7 +224,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         } else {
           return;
         }
-        st.localVars['选牌/结果'] = {
+        st.localVars[PICK_RESULT_KEY] = {
           zone: params.zone,
           cardId: params.cardId ?? null,
           handIndex: params.handIndex ?? null,

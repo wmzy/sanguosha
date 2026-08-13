@@ -31,6 +31,7 @@ import { createLogger } from './logger';
 import { setRoomStatus } from './room';
 import { saveRoom, deletePersistedRoom } from './persistence';
 import { createRng } from '../engine/util/rng';
+import { VirtualClock, RealClock } from '../engine/core/clock';
 
 /** 计算座次轮转偏移:物理座位 i → 游戏座次 (i + offset) % n。
  *  用 seed 派生(确定性,持久化/恢复可复现),使主公(游戏座次 0)随机分布到各物理座位——
@@ -115,8 +116,14 @@ export class GameSession {
       timeoutSec: this.room.config.timeoutSec,
     };
     const fresh = create(config);
+    // 注入虚拟时钟:重放期间超时按 actionLog 时间戳确定性推导,不依赖真实系统时间。
+    // startedAt 归零对齐 VirtualClock(相对时间从 0 起)。
+    fresh.clock = new VirtualClock();
+    fresh.startedAt = fresh.clock.now();
     await bootstrap(fresh, config);
     await restore(fresh, config, actionLog);
+    // 重放完成:切回真实时钟,继续正常对局(超时由真实 setTimeout 驱动)。
+    fresh.clock = new RealClock();
     this.state = fresh;
     // 恢复座次轮转偏移:与 startGame 一致(同 seed 派生),保证重连后视角不错位。
     this.state.seatRotation = computeSeatRotation(config.seed, this.state.players.length);
@@ -252,14 +259,14 @@ export class GameSession {
       });
       return;
     }
-    // dispatch 返回 boolean:true=accepted,false=rejected。
+    // dispatch 返回 DispatchResult:{ accepted, settle }。settle 供重放用,正常对局忽略。
     // state 变更的广播/持久化/结束检查由 onStateChange 回调驱动(见 attachStateListener)。
-    const accepted = await dispatch(this.state, action).catch((err) => {
+    const result = await dispatch(this.state, action).catch((err) => {
       const e = err instanceof Error ? err : new Error(String(err));
       this.logger.error('dispatch error', { error: e.stack ?? String(e) });
-      return false;
+      return { accepted: false, settle: Promise.resolve() } as const;
     });
-    if (!accepted) {
+    if (!result.accepted) {
       this.sendToPlayer(playerId, { type: 'actionRejected' });
     }
   }

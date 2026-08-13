@@ -40,6 +40,7 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import { registerSlashExemptor } from '../rules/slash-quota';
 import type { SkillModule } from '../types';
+import { PICK_RESULT_KEY } from '../rules/vars-keys';
 
 const SKILL_ID = '界弓骑';
 const DISPLAY_NAME = '弓骑';
@@ -229,7 +230,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         } else {
           return;
         }
-        st.localVars['选牌/结果'] = {
+        st.localVars[PICK_RESULT_KEY] = {
           zone: params.zone,
           cardId: params.cardId ?? null,
           handIndex: params.handIndex ?? null,

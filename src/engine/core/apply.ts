@@ -165,7 +165,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
   state.atomHistory.push({
     kind: 'atom',
     seq: state.seq,
-    timestamp: Date.now() - state.startedAt,
+    timestamp: state.clock.now() - state.startedAt,
     atom: current,
     viewEvents: viewEvents!,
   });
@@ -281,14 +281,14 @@ function createAndAwaitSlot(
     const safeResolve = () => {
       if (resolveCalled) return;
       resolveCalled = true;
-      clearTimeout(timer);
+      cancelTimer();
       resolve();
     };
     const slot: PendingSlot = {
       atom,
       definition: def,
-      startTime: Date.now() - state.startedAt,
-      deadline: Date.now() - state.startedAt + timeoutMs,
+      startTime: state.clock.now() - state.startedAt,
+      deadline: state.clock.now() - state.startedAt + timeoutMs,
       resolvedTimeoutMs: timeoutMs,
       createdSeq: state.seq,
       isBlocking: pending.isBlocking !== false,
@@ -302,14 +302,14 @@ function createAndAwaitSlot(
       pause() {
         if (timedOut) return;
         paused = true;
-        clearTimeout(timer);
+        cancelTimer();
       },
     };
     const fireTimeoutNow = async (): Promise<void> => {
       if (state.pendingSlots.get(target) !== slot) return;
       if (paused) return;
       timedOut = true;
-      clearTimeout(timer);
+      cancelTimer();
       try {
         // 超时行为:调用 atom 定义的 onTimeout 编排函数。
         // 内部可自由编排 applyAtom(支持多步操作),每个 applyAtom 走完整 pipeline(hooks 正常触发)。
@@ -330,10 +330,13 @@ function createAndAwaitSlot(
       }
     };
     slot._fireTimeoutNow = fireTimeoutNow;
-    const timer: ReturnType<typeof setTimeout> = setTimeout(fireTimeoutNow, timeoutMs);
+    const cancelTimer = state.clock.schedule(timeoutMs, fireTimeoutNow);
 
     // 存入 pendingSlots Map(按 target 索引)。不同 target 的 slot 共存,各自独立 resolve。
     state.pendingSlots.set(target, slot);
     notifyStateChange(state);
+    // 通知 dispatch:execute 已到达挂起点(slot 创建)。restore 用其替代轮询等待。
+    state.onExecuteSettle?.();
+    state.onExecuteSettle = null;
   });
 }

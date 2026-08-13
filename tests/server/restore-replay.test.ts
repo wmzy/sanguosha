@@ -9,6 +9,7 @@ import '../../src/engine/atoms';
 import '../../src/engine/skills';
 import { bootstrap, dispatch, restore, fireTimeout, type GameConfig } from '../../src/engine/index';
 import { createGameState } from '../../src/engine/types';
+import { VirtualClock } from '../../src/engine/core/clock';
 import type { GameState } from '../../src/engine/types';
 import { allCharacters } from '../../src/engine/data/characters';
 import { GameSession } from '../../src/server/session';
@@ -40,6 +41,9 @@ function makeState(playerCount: number): GameState {
     judgeZone: [],
   }));
   const state = createGameState({ players, cardMap: {} });
+  // 模拟 create():startedAt 非零,使 actionLog timestamp 为相对时间(Date.now()-startedAt)。
+  // 否则 restore 的 VirtualClock(从 0 起)会 advanceTo 绝对时间戳 → 立即超时所有 slot。
+  state.startedAt = state.clock.now();
   for (let i = 0; i < 60; i++) {
     const id = `deck_${i}`;
     state.cardMap[id] = { id, name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
@@ -179,6 +183,9 @@ describe('restore 重放交互式选将 actionLog', () => {
 
     // ── 第二局:create(已在 makeState)→ bootstrap → restore 重放 ──
     const state2 = makeState(4);
+    // restore 契约:bootstrap 前注入 VirtualClock,重放按 actionLog 时间戳确定性推导超时。
+    state2.clock = new VirtualClock();
+    state2.startedAt = state2.clock.now();
     await bootstrap(state2, config);
     await restore(state2, config, actionLog);
 
@@ -202,8 +209,14 @@ describe('restore 重放交互式选将 actionLog', () => {
     const config = makeConfig(4);
     const state1 = makeState(4);
     await playThroughCharSelect(state1, config);
-    // 等出牌窗口
-    for (let i = 0; i < 300 && state1.pendingSlots.size === 0; i++) await sleep(10);
+    // 界放权(主公界刘禅)在出牌阶段开始前触发询问:respond 不发动,推进到出牌窗口。
+    const lordIdx = state1.players.findIndex((p) => p.identity === '主公');
+    for (let i = 0; i < 300 && ![...state1.pendingSlots.values()].some((s) => (s.atom as { requestType?: string }).requestType === '界放权/trigger'); i++) await sleep(10);
+    if ([...state1.pendingSlots.values()].some((s) => (s.atom as { requestType?: string }).requestType === '界放权/trigger')) {
+      void dispatch(state1, { skillId: '界放权', actionType: 'respond', ownerId: lordIdx, params: { choice: false }, baseSeq: state1.seq });
+    }
+    // 等出牌窗口(界放权询问 respond 后,开局 execute resume 到出牌窗口)
+    for (let i = 0; i < 300 && ![...state1.pendingSlots.values()].some((s) => (s.atom as { type?: string }).type === '出牌窗口'); i++) await sleep(10);
     const playSlot = [...state1.pendingSlots.values()].find(
       (s) => (s.atom as { type?: string }).type === '出牌窗口',
     );
@@ -248,6 +261,9 @@ describe('restore 重放交互式选将 actionLog', () => {
 
     // 第二局:create + bootstrap + restore 重放
     const state2 = makeState(4);
+    // restore 契约:bootstrap 前注入 VirtualClock,重放按 actionLog 时间戳确定性推导超时。
+    state2.clock = new VirtualClock();
+    state2.startedAt = state2.clock.now();
     await bootstrap(state2, config);
     await restore(state2, config, actionLog);
 

@@ -28,9 +28,8 @@
 import type { Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
+import { DISTANCE_ATTACK_MOD_KEY as ATTACK_KEY, DISTANCE_DEFENSE_MOD_KEY as DEFENSE_KEY } from '../rules/vars-keys';
 
-const ATTACK_KEY = '距离/进攻修正';
-const DEFENSE_KEY = '距离/防御修正';
 /** 体力阈值:≤此值时启动防御修正 */
 const LOW_HEALTH_THRESHOLD = 2;
 /** UI 可见的"义从低血防御"标记;同时用作 view 同步的 bookend */

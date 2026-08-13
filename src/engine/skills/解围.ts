@@ -26,6 +26,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { instantiateSkill } from './lifecycle';
 import { skillLoaders } from './index';
+import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
 
 // ── 效果①:装备→无懈可击 转化 ──
 const SHADOW_SUFFIX = '解围';
@@ -222,11 +223,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
           // 原是装备牌:从手牌移除影子,还原装备槽位
           self.hand.splice(idx, 1);
           self.equipment[origSlot] = cardId;
-          // 卸下武器时清除了 vars['距离/出杀范围'](该 var 仅由 装备 atom 在装备时设值,不会重算),
+          // 卸下武器时清除了 vars[DISTANCE_ATTACK_RANGE_KEY](该 var 仅由 装备 atom 在装备时设值,不会重算),
           // 回滚必须还原,否则武器已归位但攻击范围退化为徒手(1)。镜像 奇袭 的回滚逻辑。
           if (origSlot === '武器') {
             const card = state.cardMap[cardId];
-            self.vars['距离/出杀范围'] = card?.range ?? 1;
+            self.vars[DISTANCE_ATTACK_RANGE_KEY] = card?.range ?? 1;
           }
           // 重新挂载装备技能(transform execute 用 applyAtom(移除技能) 卸载了实例)。
           // rollback 现在是 async,可以 await instantiateSkill。同时还原 player.skills。

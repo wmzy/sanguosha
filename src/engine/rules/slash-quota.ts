@@ -23,11 +23,8 @@
 // 无模块级全局状态泄漏(与 skill.ts 的 registries 同构)。
 
 import type { GameState } from '../types';
+import { SLASH_QUOTA_USED_KEY as QUOTA_USED_VAR, SLASH_EXTRA_USED_KEY as EXTRA_USED_VAR } from './vars-keys';
 
-/** 额定已用次数的 vars key */
-const QUOTA_USED_VAR = '杀/quotaUsed';
-/** 额外已用次数的 vars key */
-const EXTRA_USED_VAR = '杀/extraUsed';
 /**
  * view 侧"已出杀次数"投影 key(由「回合用量」atom 同步到 view.turnUsage)。
  * 历史上也是 state 计数 vars key;模块 K 拆分后 state 改用 杀/quotaUsed + 杀/extraUsed,

@@ -23,6 +23,7 @@ import { topFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
+import { PICK_RESULT_KEY } from '../rules/vars-keys';
 
 const CONFIRM_RT = '征荣/confirm';
 const PICK_TARGET_RT = '征荣/选目标';
@@ -101,7 +102,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const target = params.target ?? params.choice;
         if (typeof target === 'number') st.localVars[TARGET_KEY] = target;
       } else if (rt === PICK_CARD_RT) {
-        st.localVars['选牌/结果'] = {
+        st.localVars[PICK_RESULT_KEY] = {
           zone: params.zone,
           cardId: params.cardId ?? null,
           handIndex: params.handIndex ?? null,

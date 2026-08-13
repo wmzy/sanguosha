@@ -18,14 +18,12 @@
 //      「设横置」before-hook(atom.player=ownerId && 顶帧=铁索连环)合并触发与拦截
 //      ——铁索连环 execute 内逐目标 applyAtom(设横置),此处既是"成为目标"也是"效果生效"
 //
-// 令此牌对王异无效(per-cardId 局部标记 + 多 before-hook 拦截效果 atom):
+// 令此牌对王异无效(per-cardId 局部标记 + registerCardInvalidation 原语统一拦截):
 //   - 激活后写 localVars[`贞烈/无效/${cardId}/${ownerId}`] = true
-//   - 检测有效性 before-hook(杀):atom.target=owner && atom.cardId 匹配 → cancel
-//   - 造成伤害 before-hook(南蛮/万箭/决斗/火攻):atom.target=owner && atom.cardId 匹配 → cancel
-//   - 询问杀 before-hook(南蛮入侵):atom.target=owner && 顶帧 cardId 匹配 → cancel
-//   - 获得 before-hook(顺手牵羊):atom.from=owner && 顶帧 cardId 匹配 → cancel
-//   - 弃置 before-hook(过河拆桥):atom.player=owner && 顶帧 cardId 匹配 → cancel
-//   - 设横置 before-hook(铁索连环):atom.player=owner && 顶帧 cardId 匹配 → cancel
+//   - 谓词 isInvalidFor(state, card.id, owner):此牌已标记无效则 cancel
+//   - 原语在 7 个拦截点(成为目标/检测有效性/询问杀/受到伤害时/获得/弃置/设横置)统一 cancel
+//     cardId 来源:成为目标/检测有效性/受到伤害时 用 atom.cardId;询问杀/获得/弃置/设横置
+//     用 topFrame(state).params.cardId(由原语内部解析)
 //
 // 选项 ①(获得使用者一张牌):复用 runPickTargetCardPanel
 //   - mode='obtain',requestType='贞烈/选牌',includeJudge=false(经典规则仅手牌+装备)
@@ -49,9 +47,11 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
+import { registerCardInvalidation } from '../core/card-invalidation';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { isDelayedTrick } from '../data/card-meta';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
+import { PICK_RESULT_KEY, mijiPendingKey } from '../rules/vars-keys';
 
 const _SKILL_ID = '界贞烈';
 const DISPLAY_NAME = '贞烈';
@@ -71,8 +71,6 @@ const CHOOSE_KEY = '贞烈/choice';
 const INVALID_PREFIX = '贞烈/无效/';
 /** localVars 前缀:此牌对此 owner 已触发过贞烈(防同一张牌重复触发)。 */
 const PROCESSED_PREFIX = '贞烈/已处理/';
-/** player.vars key:本回合结束阶段需发动一次秘计(由 界秘计.ts 消费)。 */
-const MIJI_PENDING_PREFIX = '秘计/pendingFrom贞烈/';
 
 /** 完整无效 key */
 function invalidKey(cardId: string, ownerId: number): string {
@@ -189,7 +187,7 @@ async function runZhenlie(
     });
   } else {
     // ② 本回合结束阶段发动一次秘计:写 player.vars(持久至王异结束阶段消费)
-    state.players[ownerId].vars[`${MIJI_PENDING_PREFIX}${ownerId}`] = true;
+    state.players[ownerId].vars[mijiPendingKey(ownerId)] = true;
   }
 }
 
@@ -248,7 +246,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         st.localVars[CHOOSE_KEY] =
           params.choice === true || params.confirmed === true ? 'gain' : 'miji';
       } else if (rt === PICK_RT) {
-        st.localVars['选牌/结果'] = {
+        st.localVars[PICK_RESULT_KEY] = {
           zone: params.zone,
           cardId: params.cardId ?? null,
           handIndex: params.handIndex ?? null,
@@ -306,81 +304,17 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     },
   );
 
-  // ── 检测有效性 before:杀无效化(仁王盾同位) ────────────────
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '检测有效性',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.target !== ownerId) return;
-      if (isInvalidFor(ctx.state, atom.cardId, ownerId)) return { kind: 'cancel' };
-    },
+  // ── 拦截:贞烈激活后令此牌对 owner 无效(7 个拦截点统一交给 registerCardInvalidation)──
+  //   谓词:此牌已标记为对 owner 无效(localVars[`贞烈/无效/${cardId}/${ownerId}`]===true)。
+  //   cardId 来源(逐 atom):成为目标/检测有效性/受到伤害时 用 atom.cardId;
+  //   询问杀/获得/弃置/设横置 用 topFrame(state).params.cardId(由原语内部解析)。
+  registerCardInvalidation(state, skill.id, ownerId, (st, card) =>
+    isInvalidFor(st, card?.id, ownerId),
   );
 
-  // ── 受到伤害时 before:AOE/决斗/火攻 无效化 ──────────────────
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '受到伤害时',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.target !== ownerId) return;
-      if (isInvalidFor(ctx.state, atom.cardId, ownerId)) return { kind: 'cancel' };
-    },
-  );
-
-  // ── 询问杀 before:南蛮入侵 无效化(不询问出杀) ─────────────
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '询问杀',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.target !== ownerId) return;
-      const frame = topFrame(ctx.state);
-      const cardId = frame?.params?.cardId as string | undefined;
-      if (isInvalidFor(ctx.state, cardId, ownerId)) return { kind: 'cancel' };
-    },
-  );
-
-  // ── 获得 before:顺手牵羊/桃园/五谷 无效化(别人从王异处获得) ─
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '获得',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.from !== ownerId) return; // 别人从王异处获得
-      if (atom.player === ownerId) return; // 自己获得自己不算
-      const frame = topFrame(ctx.state);
-      const cardId = frame?.params?.cardId as string | undefined;
-      if (isInvalidFor(ctx.state, cardId, ownerId)) return { kind: 'cancel' };
-    },
-  );
-
-  // ── 弃置 before:过河拆桥 无效化(弃王异的牌) ──────────────
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '弃置',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.player !== ownerId) return;
-      const frame = topFrame(ctx.state);
-      const cardId = frame?.params?.cardId as string | undefined;
-      if (isInvalidFor(ctx.state, cardId, ownerId)) return { kind: 'cancel' };
-    },
-  );
-
-  // ── 设横置 before:铁索连环 触发点 + 无效化 ─────────────────
-  //   铁索连环无目标级无懈窗口(整卡一次, cancelTarget=from),上面两个触发点都
-  //   覆盖不到。此处既是"成为目标"也是"效果生效":若已激活则 cancel,否则触发。
+  // ── 设横置 before:铁索连环 触发点(无效化已由 registerCardInvalidation 处理)──
+  //   铁索连环无目标级无懈窗口(整卡一次, cancelTarget=from),成为目标/请求回应两个
+  //   触发点都覆盖不到,故在此触发贞烈。本 hook 只负责"触发",无效化由原语统一拦截。
   registerBeforeHook(
     state,
     skill.id,
@@ -394,15 +328,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (frame.from === ownerId) return; // 自己用铁索连环不触发
       const cardId = frame.params?.cardId as string | undefined;
       if (!cardId) return;
-      // 已无效化 → cancel
-      if (isInvalidFor(ctx.state, cardId, ownerId)) return { kind: 'cancel' };
+      // 已无效化 → 已由原语 cancel,此处不重复触发
+      if (isInvalidFor(ctx.state, cardId, ownerId)) return;
       if (!ctx.state.players[ownerId]?.alive) return;
       if (isProcessedFor(ctx.state, cardId, ownerId)) return;
       ctx.state.localVars[processedKey(cardId, ownerId)] = true;
-      // 触发贞烈(若激活则同时设置无效标记 → 上方 isInvalidFor 检查会在下次进入时 cancel;
-      //   本次直接 cancel 避免本次设横置生效)
+      // 触发贞烈(可能令此牌无效)
       await runZhenlie(ctx.state, ownerId, cardId, frame.from);
-      // 若激活,本次设横置也要 cancel(已在 runZhenlie 内设置无效标记)
+      // runZhenlie 令此牌无效后,本次设横置也须 cancel(下次进入由原语拦截)
       if (isInvalidFor(ctx.state, cardId, ownerId)) return { kind: 'cancel' };
     },
   );

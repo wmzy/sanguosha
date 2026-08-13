@@ -28,6 +28,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
+import { QIZHI_COUNT_KEY as COUNT_VAR, PICK_RESULT_KEY } from '../rules/vars-keys';
 
 const SKILL_ID = '奇制';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -36,8 +37,6 @@ const PICK_CARD_RT = `${SKILL_ID}/选牌`;
 
 const CONFIRM_KEY = `${SKILL_ID}/confirmed`;
 const TARGET_KEY = `${SKILL_ID}/target`;
-/** turn.vars key:本回合奇制发动次数(进趋读取)。回合结束 atom 自动清空。 */
-const COUNT_VAR = `${SKILL_ID}/count`;
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -124,7 +123,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
       if (rt === PICK_CARD_RT) {
         // 选牌面板结果(与过河拆桥/反馈共用 '选牌/结果' 契约)
-        st.localVars['选牌/结果'] = {
+        st.localVars[PICK_RESULT_KEY] = {
           zone: params.zone,
           cardId: params.cardId ?? null,
           handIndex: params.handIndex ?? null,

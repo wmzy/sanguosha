@@ -84,14 +84,14 @@ describe('pending-scoped 版本控制', () => {
     slot.createdSeq = 99;
 
     // dispatch respond，pendingSeq=7（旧）但 slot.createdSeq=99 → 拒绝
-    const accepted = await dispatch(state, {
+    const { accepted } = await dispatch(state, {
       skillId: '系统规则',
       actionType: 'test',
       ownerId: 0,
       params: {},
       baseSeq: 7,
       pendingSeq: 7,
-    }).catch(() => false);
+    }).catch(() => ({ accepted: false, settle: Promise.resolve() }));
     expect(accepted).toBe(false);
 
     slot.resolve();
@@ -133,13 +133,13 @@ describe('pending-scoped 版本控制', () => {
     // 不带 pendingSeq → 不校验（向后兼容）
     // actionType='test' 无 entry → 返回 false 是因为无 entry，不是 pendingSeq
     // 这个测试验证的是"不带 pendingSeq 不报错"
-    const accepted = await dispatch(state, {
+    const { accepted } = await dispatch(state, {
       skillId: '系统规则',
       actionType: 'test',
       ownerId: 0,
       params: {},
       baseSeq: 7,
-    }).catch(() => false);
+    }).catch(() => ({ accepted: false, settle: Promise.resolve() }));
     // 无 entry → false，但不是因为 pendingSeq
     expect(accepted).toBe(false);
 
@@ -257,7 +257,7 @@ describe('pending-scoped 版本控制', () => {
     expect(w2.createdSeq).not.toBe(w1Seq);
 
     // P0 用 W1 的旧 pendingSeq 尝试 respond → 被拒绝
-    const rejected = await dispatch(state, {
+    const { accepted: rejected } = await dispatch(state, {
       skillId: '无懈可击',
       actionType: 'respond',
       ownerId: 0,
@@ -268,7 +268,7 @@ describe('pending-scoped 版本控制', () => {
     expect(rejected).toBe(false);
 
     // P0 用 W2 的正确 pendingSeq respond → 成功
-    const accepted = await dispatch(state, {
+    const { accepted } = await dispatch(state, {
       skillId: '无懈可击',
       actionType: 'respond',
       ownerId: 0,
@@ -340,14 +340,14 @@ describe('pending-scoped 版本控制', () => {
 
     // 主动 action 路径：oldSlot 存在但 isBlocking===false → 守卫跳过 pendingSeq 校验
     // 旧逻辑(无 isBlocking 守卫)会在此 rollback 返回 false；新逻辑应返回 true。
-    const accepted = await dispatch(state, {
+    const { accepted } = await dispatch(state, {
       skillId: '测试',
       actionType: 'probe',
       ownerId: 0,
       params: {},
       baseSeq: state.seq,
       pendingSeq: 7, // 故意与 createdSeq=999 不匹配
-    }).catch(() => false);
+    }).catch(() => ({ accepted: false, settle: Promise.resolve() }));
     expect(accepted).toBe(true);
 
     // 清理：resolve 出牌窗口 + 注销测试 action

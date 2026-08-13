@@ -59,6 +59,7 @@ import { registerHandLimitProvider } from '../rules/hand-limit';
 import { registerDistanceExemptor } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
 import type { SkillModule } from '../types';
+import { handLimitBonusKey } from '../rules/vars-keys';
 
 const SKILL_ID = '界陷阵';
 const DISPLAY_NAME = '陷阵';
@@ -143,7 +144,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!p) return undefined;
     const slashCount = p.hand.filter((cid) => st.cardMap[cid]?.name === '杀').length;
     if (slashCount === 0) return undefined;
-    const bonus = (st.turn.vars[`手牌上限/bonus:${player}`] as number | undefined) ?? 0;
+    const bonus = (st.turn.vars[handLimitBonusKey(player)] as number | undefined) ?? 0;
     const health = getHealthValue(p);
     return health + bonus + slashCount;
   });

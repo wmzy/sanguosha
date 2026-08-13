@@ -26,6 +26,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { QIZHI_COUNT_KEY as QIZHI_COUNT_VAR } from '../rules/vars-keys';
 
 const SKILL_ID = '进趋';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -33,8 +34,6 @@ const DISCARD_RT = `${SKILL_ID}/弃牌`;
 
 const CONFIRM_KEY = `${SKILL_ID}/confirmed`;
 const DISCARD_KEY = `${SKILL_ID}/discardCards`;
-/** turn.vars key:本回合奇制发动次数(由奇制.ts 写,本技读)。 */
-const QIZHI_COUNT_VAR = '奇制/count';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

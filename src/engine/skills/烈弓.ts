@@ -5,7 +5,7 @@
 // 发动条件(两分支均基于目标手牌数):
 //   分支1: target.hand.length >= owner.health   (目标手牌数 ≥ 自己体力值)
 //   分支2: target.hand.length <= owner.attackRange (目标手牌数 ≤ 自己攻击范围)
-//   攻击范围取 owner.vars['距离/出杀范围'],默认 1(徒手)。
+//   攻击范围取 owner.vars[DISTANCE_ATTACK_RANGE_KEY],默认 1(徒手)。
 //
 // 实现(与铁骑同构的禁闪横切机制):
 //   1. 指定目标 after hook(source===ownerId, card 是杀):
@@ -23,6 +23,7 @@ import type {
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
 
 const TAG = '烈弓/禁闪';
 const CONFIRM = '烈弓/confirmed';
@@ -74,7 +75,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!self?.alive || !targetPlayer?.alive) return;
 
     // 发动条件(官方):目标手牌数 ≥ 自己体力值,或 目标手牌数 ≤ 自己攻击范围
-    const attackRange = (self.vars['距离/出杀范围'] as number) ?? 1;
+    const attackRange = (self.vars[DISTANCE_ATTACK_RANGE_KEY] as number) ?? 1;
     const condMet =
       targetPlayer.hand.length >= getHealthValue(self) || targetPlayer.hand.length <= attackRange;
     if (!condMet) return;

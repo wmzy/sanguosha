@@ -42,6 +42,7 @@ import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { promptCancel } from '../flows/cancel';
 import { defaultPlayActive } from '../rules/action-active';
+import { createRng } from '../util/rng';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -177,7 +178,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
             // ── 1) 随机展示目标一张手牌(界版:目标无选择权) ──
             const handLen = targetPlayer.hand.length;
-            const randomIdx = Math.floor(Math.random() * handLen);
+            const rng = createRng(state.rngSeed);
+            const randomIdx = rng.nextInt(handLen);
+            state.rngSeed = rng.getState();
             const revealedCardId = targetPlayer.hand[randomIdx];
             const revealedCard = state.cardMap[revealedCardId];
             const revealedColor = revealedCard?.color ?? '无色';

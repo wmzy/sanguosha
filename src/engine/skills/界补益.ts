@@ -30,13 +30,13 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { spliceHandOrderEntry } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
+import { PICK_RESULT_KEY as PICK_KEY } from '../rules/vars-keys';
 
 const _SKILL_NAME = '界补益';
 const DISPLAY_NAME = '补益';
 const CONFIRM_RT = '界补益/confirm'; // 是否发动
 const PICK_RT = '界补益/pick'; // 选目标一张牌
 const CONFIRM_KEY = '界补益/confirmed';
-const PICK_KEY = '选牌/结果'; // 与选牌面板共用 key
 
 const EQUIP_SLOTS = ['武器', '防具', '进攻马', '防御马', '宝物'] as const;
 

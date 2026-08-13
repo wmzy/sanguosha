@@ -6,6 +6,7 @@ import { resolveChoosePlayerCandidates } from './choosePlayerCandidates';
 import { resolveCardFilterCandidates } from './cardFilterCandidates';
 import { slashUsed } from '../rules/slash-quota';
 import { getCardResponseMode, SILENT_RESPONSE_PROMPT } from '../core/card-response-availability';
+import { DISTANCE_ATTACK_MOD_KEY, DISTANCE_DEFENSE_MOD_KEY, DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
 
 /** 从 ClientMessage 生成可读日志文本(不含玩家名——player 字段单独携带,由展示层映射) */
 export function formatLogEntry(msg: ClientMessage): string {
@@ -175,9 +176,9 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       tags: [...p.tags],
       // 距离修正 vars(只投影距离相关三个 key,不暴露身份等敏感 vars)
       distanceVars: {
-        attackMod: p.vars['距离/进攻修正'] as number | undefined,
-        defenseMod: p.vars['距离/防御修正'] as number | undefined,
-        attackRange: p.vars['距离/出杀范围'] as number | undefined,
+        attackMod: p.vars[DISTANCE_ATTACK_MOD_KEY] as number | undefined,
+        defenseMod: p.vars[DISTANCE_DEFENSE_MOD_KEY] as number | undefined,
+        attackRange: p.vars[DISTANCE_ATTACK_RANGE_KEY] as number | undefined,
       },
       // 本回合用量(出杀计数 + 限一次标记)的 view 投影。
       // baseline/重连时从此处初值;运行期由「回合用量」atom applyView 增量维护。
