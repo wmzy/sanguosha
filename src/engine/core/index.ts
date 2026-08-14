@@ -173,11 +173,41 @@ export async function restore(
 ): Promise<GameState> {
   const clock = state.clock as VirtualClock;
   const entries = actionLog.slice(1);
+  // 旧格式日志(缺陷①修复前)不含 skip 条目:广播槽(无懈可击)被全员快速 skip 的事实
+  // 未被记录。兜底:重放非无懈 action 前,若广播槽仍滞留(时间戳未推进到其超时时刻,
+  // 说明原局是快速 skip 而非超时 resolve),替所有存活玩家补发 skip,等价原局全员
+  // 放弃无懈。新格式日志自带 skip 条目,广播按条目忠实 resolve,不进入此分支。
+  const legacyLog = !entries.some((e) => e.message.actionType === 'skip');
   for (const entry of entries) {
     const msg = entry.message;
     // 先推进虚拟时钟到该命令的时间戳:触发所有到期超时。
     // 超时 resolve 上一条 execute 的 slot → 其 resume 到下一个挂起点或完成。
     await clock.advanceTo(entry.timestamp);
+    // 「设置手牌顺序」是盲选流程(pick-card-panel.spliceHandOrderEntry)splice 进
+    // actionLog 的服务端内部快照,原对局从不走 dispatch(同 session.handleReorderHand
+    // 的纯 mutate)。若当普通 action dispatch,findPendingSlot(ownerId) 会误命中该
+    // owner 此刻的无关 pending(广播型无懈/选牌面板)并 pause+resolve 它,提前消费
+    // pending → 后续 respond 被 validate 拒绝 → 整局发散(UDFJRA 实证)。这里直接
+    // mutate 目标手牌(排列校验镜像 handleReorderHand:order 须为当前 hand 的合法
+    // 排列,否则说明重放已错位,静默跳过),并把条目原样保留进重放后的 actionLog ——
+    // session.restoreState 用 fresh.actionLog 作为后续持久化/再次恢复的权威日志,
+    // 丢弃 splice 条目会让二次重启丢失盲选顺序。
+    if (msg.actionType === '设置手牌顺序') {
+      const target = msg.params?.target;
+      const order = msg.params?.order;
+      const player = typeof target === 'number' ? state.players[target] : undefined;
+      if (
+        player &&
+        Array.isArray(order) &&
+        order.length === player.hand.length &&
+        order.every((id) => typeof id === 'string' && player.hand.includes(id))
+      ) {
+        player.hand = [...(order as string[])];
+      }
+      state.actionLog.push({ ...entry, id: String(state.actionLog.length) });
+      continue;
+    }
+    if (legacyLog) await autoSkipLingeringBroadcast(state, msg);
     // 重放该命令:dispatch 后等 execute 挂起(slot 创建)或执行完成。
     const { settle } = await dispatch(state, msg);
     const settleError = await settle;
@@ -198,6 +228,39 @@ export async function restore(
     }
   }
   return state;
+}
+
+/** 旧格式日志(无 skip 条目)兜底:重放 msg 前,若广播型槽(无懈可击)滞留且 msg
+ *  不是对它的无懈回应,替所有存活玩家补发 skip——原局全员放弃无懈的事实未被记录,
+ *  不补发则 msg 会在广播 resolve 前被 validate 拒绝(hasBlockingPending),respond
+ *  丢失 → 整局发散。最后一名玩家 skip 后广播 fireTimeoutNow resolve,父 execute 经
+ *  settle 排空 resume 到下一挂起点,随后 msg 的 dispatch 不会误命中已消亡的 pending。
+ *  补发的 skip 走 dispatch 正常路径,会记入重放后的 actionLog(旧格式自此转为新格式)。 */
+async function autoSkipLingeringBroadcast(state: GameState, msg: ClientMessage): Promise<void> {
+  const hasBroadcast = () =>
+    [...state.pendingSlots.values()].some((s) => {
+      const t = (s.atom as { target?: unknown }).target;
+      return typeof t === 'number' && t < 0;
+    });
+  for (let guard = 0; guard < 10; guard++) {
+    if (!hasBroadcast()) return;
+    // msg 本身是对该广播的无懈回应:直接 dispatch 让它 resolve,不替玩家放弃。
+    if (msg.skillId === '无懈可击') return;
+    for (const p of state.players) {
+      if (!p.alive) continue;
+      // 广播可能已被上一条 skip resolve(全员放弃):补发前重新确认仍滞留,
+      // 避免误 skip 后续新出现的非广播 pending(如选牌面板)。
+      if (!hasBroadcast()) break;
+      const { settle } = await dispatch(state, {
+        skillId: '__skip',
+        actionType: 'skip',
+        ownerId: p.index,
+        params: {},
+        baseSeq: state.seq,
+      });
+      await settle;
+    }
+  }
 }
 
 /** 测试/工具用:给预构造 state(未走 bootstrap)注册所有 player.skills 实例 + 选将/弃牌 respond action */
@@ -262,6 +325,18 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     return { accepted: false, settle };
   };
   const accept = (): DispatchResult => ({ accepted: true, settle });
+  // 排空微任务直到 settle(execute resume 后创建 slot 触发 onExecuteSettle)或预算耗尽。
+  // skip 触发超时的路径需要:fireTimeoutNow resolve 广播/阻塞 slot → 父 execute 跨微任务
+  // resume 到下一挂起点;若不等它,restore 的下一条 action 会在 resume 创建的新 slot
+  // 出现前被 validate 拒绝(与下方 respond 路径的 settleAfterDrain 同理)。
+  // 预算取宽(1000 次 macrotask ≈ ≥1s):父 resume 链可能含技能模块的首次动态 import,
+  // vitest 下按需转换可达数百毫秒,预算不足会让 restore 抢跑(后续条目被静默拒绝)。
+  // 排空只影响 settle 信号时机,不触碰任何游戏状态,不破坏重放确定性。
+  const drainUntilSettled = async (): Promise<void> => {
+    for (let i = 0; i < 1000 && !settled; i++) {
+      await new Promise((r) => setTimeout(r, 0));
+    }
+  };
 
   const rollbacks: Array<{ entry: ActionEntry; params: Record<string, Json> }> = [];
   // ── view 缓冲:preceding 的 ViewEvent 缓冲,主 validate 失败时截断 atomHistory,不广播 ──
@@ -320,19 +395,28 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
     const atomTarget = (slot.atom as { target?: number }).target;
     const isBroadcast = typeof atomTarget === 'number' && atomTarget < 0;
     if (isBroadcast) {
-      // 广播型:记录该玩家已 skip,全员 skip 时提前触发超时
+      // 广播型:记录该玩家已 skip,全员 skip 时提前触发超时。
+      // skip 是真实玩家决策,记入 actionLog(缺陷①:此前不记录,服务端重启重放时
+      // 「全员快速放弃无懈」的事实丢失,只能靠虚拟时钟超时兜底,resolve 时序与原局
+      // 错位 → RNG 链发散)。重放时照常 dispatch 这些 skip 条目即可在广播槽上
+      // 忠实累积 skippedPlayers 并在全员 skip 时触发超时;旧日志无 skip 条目则由
+      // restore 的兜底逻辑补发(向后兼容)。
+      logAction(state, message);
       slot.skippedPlayers ??= new Set();
       slot.skippedPlayers.add(message.ownerId);
       const alivePlayers = state.players.filter((p) => p.alive).map((p) => p.index);
       if (alivePlayers.every((idx) => slot.skippedPlayers!.has(idx))) {
         await slot._fireTimeoutNow?.();
+        await drainUntilSettled();
       }
       signalSettle();
       return accept();
     }
     // 非广播型阻塞 pending:触发超时(onTimeout 处理,如弃牌自动弃牌)
     if (slot.isBlocking) {
+      logAction(state, message);
       await slot._fireTimeoutNow?.();
+      await drainUntilSettled();
       signalSettle();
       return accept();
     }
@@ -416,9 +500,7 @@ export async function dispatch(state: GameState, message: ClientMessage): Promis
   //   settleAfterDrain 把 executeError 传给 signalSettle,使 await settle 方能感知 execute 错误。
   let executeError: Error | undefined;
   const settleAfterDrain = async (): Promise<void> => {
-    for (let i = 0; i < 20 && !settled; i++) {
-      await new Promise((r) => setTimeout(r, 0));
-    }
+    await drainUntilSettled();
     signalSettle(executeError);
   };
   entry

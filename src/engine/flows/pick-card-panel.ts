@@ -17,8 +17,9 @@ import { applyAtom } from '../core/apply';
 import { PICK_RESULT_KEY, getPickResult } from '../rules/vars-keys';
 
 /** 在 actionLog 中当前(最后一条)条目之前插入一条"设置手牌顺序"条目。
- *  重放时该条目先执行 → 目标 hand 顺序恢复 → 后续盲选取 hand[K] 确定性正确。
- *  去重:若前一条已是同 target 的设置手牌顺序且 order 一致,跳过(避免重放二次插入)。 */
+ *  重放时 restore() 识别该条目后直接恢复目标 hand 顺序(不走 dispatch)→ 后续盲选
+ *  取 hand[K] 确定性正确。去重:若前一条已是同 target 的设置手牌顺序且 order 一致,
+ *  跳过(避免重放二次插入)。 */
 export function spliceHandOrderEntry(state: GameState, target: number): void {
   const player = state.players[target];
   if (!player) return;
