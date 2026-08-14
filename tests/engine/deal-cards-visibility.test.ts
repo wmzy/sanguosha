@@ -9,7 +9,6 @@
 // 且 applyView 更新 owner 的 hand 数组。
 import { describe, it, expect, beforeEach } from 'vitest';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
 import type { Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';

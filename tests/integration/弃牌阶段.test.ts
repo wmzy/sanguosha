@@ -13,7 +13,6 @@ import { registerSkillsFromState } from '../../src/engine/index';
 import { findActionEntry } from '../../src/engine/core/skill';
 import { dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import type { GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 

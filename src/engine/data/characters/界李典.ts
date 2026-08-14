@@ -4,7 +4,7 @@ export const 界李典 = {
   gender: '男',
   faction: '魏',
   skills: [
-    { name: '界恂恂', path: '../skills/界恂恂' },
-    { name: '界忘隙', path: '../skills/界忘隙' },
+    { name: '界恂恂', path: '../../skills/界恂恂' },
+    { name: '界忘隙', path: '../../skills/界忘隙' },
   ],
 };

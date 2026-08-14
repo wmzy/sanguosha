@@ -105,7 +105,7 @@ describe('getEquipmentSkillNames', () => {
 
   it('不包含非装备牌名称(如基本牌)', () => {
     const names = getEquipmentSkillNames();
-    // 基本牌不在 skillLoaders 中
+    // 基本牌不在技能声明注册表中
     expect(names.has('杀')).toBe(false);
     expect(names.has('闪')).toBe(false);
   });

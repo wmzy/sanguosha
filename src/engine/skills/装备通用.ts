@@ -5,7 +5,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, hasBlockingPending } from '../core/skill';
-import { skillLoaders } from './index';
+import { hasSkillModule } from './registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '装备', description: '装备到对应栏位' };
@@ -43,7 +43,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (currentEquip) {
           // 替换前先卸下旧装备的自带技能实例(防止旧技能 hook 残留,见 Bug1)
           const oldCard = state.cardMap[currentEquip];
-          if (oldCard?.name && skillLoaders[oldCard.name]) {
+          if (oldCard?.name && hasSkillModule(oldCard.name)) {
             await applyAtom(state, { type: '移除技能', player: from, skillId: oldCard.name });
           }
           await applyAtom(state, { type: '卸下', player: from, slot });
@@ -58,7 +58,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 装备
       await applyAtom(state, { type: '装备', player: from, cardId });
       // 若装备牌自带技能(以 card.name 作 skillId),动态挂载技能实例
-      if (card?.name && skillLoaders[card.name]) {
+      if (card?.name && hasSkillModule(card.name)) {
         await applyAtom(state, { type: '添加技能', player: from, skillId: card.name });
       }
       await popFrame(state);

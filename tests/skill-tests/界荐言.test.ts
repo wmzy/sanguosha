@@ -15,11 +15,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 // 临时注册界荐言(主 agent 会统一注册到 index.ts)
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 界荐言Module from '../../src/engine/skills/界荐言';
-skillLoaders['界荐言'] = async () => 界荐言Module;
+setSkillModuleOverride('界荐言', async () => 界荐言Module);
 
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';

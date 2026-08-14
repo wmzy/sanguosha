@@ -29,7 +29,7 @@ import {
   registerAction,
   hasBlockingPending,
 } from '../core/skill';
-import { skillLoaders } from './index';
+import { hasSkillModule } from './registry';
 import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive } from '../rules/action-active';
@@ -117,7 +117,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const card = st.cardMap[cardId];
         const slot = EQUIP_SLOTS.find((s) => st.players[from].equipment[s] === cardId);
         if (!slot) continue;
-        if (card?.name && skillLoaders[card.name]) {
+        if (card?.name && hasSkillModule(card.name)) {
           await applyAtom(st, { type: '移除技能', player: from, skillId: card.name });
         }
         await applyAtom(st, { type: '卸下', player: from, slot });

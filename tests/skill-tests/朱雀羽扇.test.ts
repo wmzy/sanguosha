@@ -14,7 +14,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { createGameState, suitColor } from '../../src/engine/types';
 import type { Card, GameState, DamageType, Json, PlayerState } from '../../src/engine/types';
 

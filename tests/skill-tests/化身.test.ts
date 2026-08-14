@@ -16,7 +16,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import type { GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';

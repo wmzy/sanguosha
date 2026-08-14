@@ -4,7 +4,6 @@
 // 故归入 tests/engine(引擎杂项)。如未来 skill.ts 增加更多工具函数测试,在此扩展。
 import { describe, it, expect } from 'vitest';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import {
   getSkillDescription,
   getSkillDescriptionAsync,

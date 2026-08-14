@@ -222,3 +222,11 @@ export const 装备牌列表 = [...武器列表, ...防具列表, ...马列表];
 export const 马匹距离修正表: ReadonlyMap<string, { attackMod?: number; defenseMod?: number }> = new Map(
   马列表.map((c) => [c.name, c.subtype === '进攻马' ? { attackMod: 1 } : { defenseMod: 1 }]),
 );
+
+/** 装备技能模块例外表(卡名 → moduleSpec,见 skills/registry.ts)。
+ *  马匹技能为工厂模块:7 匹马共享 skills/马匹技能.ts,按卡名取命名导出('#名字' 语法)。
+ *  其余装备(武器/防具)技能名与文件名一致,走 registry 的缺省规则,无需在此列出。
+ *  从 马列表 派生,新增马匹零维护。 */
+export const EQUIPMENT_SKILL_MODULE_SPECS: Readonly<Record<string, string>> = Object.fromEntries(
+  马列表.map((c) => [c.name, `skills/马匹技能#${c.name}`]),
+);

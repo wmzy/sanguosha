@@ -6,7 +6,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { instantiateSkill, unloadSkillInstance } from './lifecycle';
 import { DEFAULT_SKILLS } from '../atoms/选将';
-import { skillLoaders } from './index';
+import { hasSkillModule } from './registry';
 import { runDeathFlow } from '../flows/death';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -157,7 +157,7 @@ export function onInit(_skill: Skill, state: GameState): () => void {
   // 但 制衡/寒冰剑/麒麟弓/过河拆桥/弃牌阶段 等用 弃置 atom 直接 equipment→弃牌堆,
   // 没走 装备通用 → 装备技能实例(hook/vars/action)残留。这里统一兜底:
   // 弃置 apply 后,被弃的牌若原属装备区且其 name 是已挂载的装备技能,触发 移除技能 卸载。
-  // apply 后 equipment 已不含该牌,用 skillLoaders(name 判据)+ player.skills(是否挂载)双判。
+  // apply 后 equipment 已不含该牌,用 hasSkillModule(name 判据)+ player.skills(是否挂载)双判。
   registerAfterHook(state, '系统规则', -1, '弃置', async (ctx) => {
     const atom = ctx.atom;
     const player = ctx.state.players[atom.player];
@@ -166,12 +166,12 @@ export function onInit(_skill: Skill, state: GameState): () => void {
       const card = ctx.state.cardMap[cardId];
       // 只处理装备牌且其 name 是已挂载的装备技能(双重过滤):
       //   card.type==='装备牌' 排除同名基本牌(如 弃一张 name='杀' 的牌不应卸载 杀 技能);
-      //   skillLoaders[name] 判断该装备是否自带技能;
+      //   hasSkillModule(name) 判断该装备是否自带技能;
       //   player.skills.includes 确认确实挂载着(避免对未挂载的装备多发 移除技能)。
       if (
         card?.type === '装备牌' &&
         card?.name &&
-        skillLoaders[card.name] &&
+        hasSkillModule(card.name) &&
         player.skills.includes(card.name)
       ) {
         await applyAtom(ctx.state, { type: '移除技能', player: atom.player, skillId: card.name });
@@ -193,7 +193,7 @@ export function onInit(_skill: Skill, state: GameState): () => void {
     if (
       card?.type === '装备牌' &&
       card?.name &&
-      skillLoaders[card.name] &&
+      hasSkillModule(card.name) &&
       fromPlayer.skills.includes(card.name)
     ) {
       await applyAtom(ctx.state, { type: '移除技能', player: atom.from, skillId: card.name });

@@ -9,8 +9,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import 明任Mod from '../../src/engine/skills/明任';
 import 贞良Mod from '../../src/engine/skills/贞良';
 import { createGameState, suitColor } from '../../src/engine/types';
@@ -18,8 +17,8 @@ import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, GameState, Json, Mark, PlayerState } from '../../src/engine/types';
 
 // 本地注册(subagent 不碰 index.ts;主 agent 统一注册)
-skillLoaders['明任'] = async () => 明任Mod;
-skillLoaders['贞良'] = async () => 贞良Mod;
+setSkillModuleOverride('明任', async () => 明任Mod);
+setSkillModuleOverride('贞良', async () => 贞良Mod);
 
 const REN_MARK_ID = '明任/任';
 

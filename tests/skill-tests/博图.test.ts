@@ -13,7 +13,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { applyAtom } from '../../src/engine/core/apply';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';

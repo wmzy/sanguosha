@@ -7,7 +7,7 @@ export const 界祝融 = {
   gender: '女',
   faction: '蜀',
   skills: [
-    { name: '巨象', path: '../skills/巨象' },
-    { name: '烈刃', path: '../skills/烈刃' },
+    { name: '巨象', path: '../../skills/巨象' },
+    { name: '烈刃', path: '../../skills/烈刃' },
   ],
 };

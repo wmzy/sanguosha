@@ -16,7 +16,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { slashMax, slashUsed } from '../../src/engine/rules/slash-quota';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';

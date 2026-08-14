@@ -4,6 +4,6 @@ export const 界许褚 = {
   gender: '男',
   faction: '魏',
   skills: [
-    { name: '界裸衣', path: '../skills/界裸衣' }
+    { name: '界裸衣', path: '../../skills/界裸衣' }
   ],
 };

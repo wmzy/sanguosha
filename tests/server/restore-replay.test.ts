@@ -6,7 +6,6 @@
 // 归并建议:未来持久化恢复测试统一后,可与 tests/server/persistence.test.ts 合并。
 import { describe, it, expect, afterEach } from 'vitest';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { bootstrap, dispatch, restore, fireTimeout, type GameConfig } from '../../src/engine/index';
 import { createGameState } from '../../src/engine/types';
 import { VirtualClock } from '../../src/engine/core/clock';

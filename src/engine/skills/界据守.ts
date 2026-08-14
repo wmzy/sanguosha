@@ -17,7 +17,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/skill';
-import { skillLoaders } from './index';
+import { hasSkillModule } from './registry';
 
 const SKIP_TAG = '据守/翻面';
 const SKIP_FLAG = '据守/skipAll';
@@ -109,7 +109,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
               const currentEquip = state.players[ownerId].equipment[slot];
               if (currentEquip) {
                 const oldCard = state.cardMap[currentEquip];
-                if (oldCard?.name && skillLoaders[oldCard.name]) {
+                if (oldCard?.name && hasSkillModule(oldCard.name)) {
                   await applyAtom(state, {
                     type: '移除技能',
                     player: ownerId,
@@ -125,7 +125,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
                 });
               }
               await applyAtom(state, { type: '装备', player: ownerId, cardId: chosenId });
-              if (card?.name && skillLoaders[card.name]) {
+              if (card?.name && hasSkillModule(card.name)) {
                 await applyAtom(state, {
                   type: '添加技能',
                   player: ownerId,

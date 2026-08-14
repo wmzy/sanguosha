@@ -11,7 +11,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { checkGameOver } from '../../src/engine/index';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
 import { deletePersistedRoom } from '../../src/server/persistence';
 import { buildView } from '../../src/engine/view/buildView';

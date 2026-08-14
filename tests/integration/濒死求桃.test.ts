@@ -18,7 +18,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/index';
 import { fireTimeoutAndWait, dispatchAndWait, SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';

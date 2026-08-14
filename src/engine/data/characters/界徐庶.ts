@@ -4,7 +4,7 @@ export const 界徐庶 = {
   gender: '男',
   faction: '蜀',
   skills: [
-    { name: '界诛害', path: '../skills/界诛害' },
-    { name: '界潜心', path: '../skills/界潜心' },
+    { name: '界诛害', path: '../../skills/界诛害' },
+    { name: '界潜心', path: '../../skills/界潜心' },
   ],
 };

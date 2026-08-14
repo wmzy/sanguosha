@@ -11,16 +11,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, assertNoEngineErrors } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, Faction, PlayerState } from '../../src/engine/types';
 
 // 注册许攸三技能(subagent 不碰 index.ts,测试中直接赋值)
-skillLoaders['成略'] = () => import('../../src/engine/skills/成略').then((m) => m.default);
-skillLoaders['恃才'] = () => import('../../src/engine/skills/恃才').then((m) => m.default);
-skillLoaders['寸目'] = () => import('../../src/engine/skills/寸目').then((m) => m.default);
+setSkillModuleOverride('成略', () => import('../../src/engine/skills/成略').then((m) => m.default));
+setSkillModuleOverride('恃才', () => import('../../src/engine/skills/恃才').then((m) => m.default));
+setSkillModuleOverride('寸目', () => import('../../src/engine/skills/寸目').then((m) => m.default));
 
 function makeCard(
   id: string,

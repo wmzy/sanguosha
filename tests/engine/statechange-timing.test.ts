@@ -8,7 +8,6 @@
 //   4. 解围方向修正:翻成背面(flipFaceDown)时触发,翻回正面(flipFaceUp)时不触发
 import { describe, it, expect, beforeEach } from 'vitest';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import type { Atom, Card, GameState, PlayerState } from '../../src/engine/types';
 import { registerBeforeHook } from '../../src/engine/core/skill';

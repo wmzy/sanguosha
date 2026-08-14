@@ -15,7 +15,6 @@ import { SkillTestHarness } from '../engine-harness';
 import { pushFrame, popFrame } from '../../src/engine/core/frame';
 import { runJudgeFlow } from '../../src/engine/flows/judge';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, EquipSlot, GameState, PlayerState } from '../../src/engine/types';

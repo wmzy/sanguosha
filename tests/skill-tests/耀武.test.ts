@@ -13,8 +13,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 耀武Module from '../../src/engine/skills/耀武';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -22,7 +21,7 @@ import type { Card, GameState } from '../../src/engine/types';
 import type { SkillModule } from '../../src/engine/types';
 
 // 本地注册 耀武 技能模块(主 agent 统一在 skills/index.ts 注册;测试本地兜底)
-skillLoaders['耀武'] = async () => 耀武Module as unknown as SkillModule;
+setSkillModuleOverride('耀武', async () => 耀武Module as unknown as SkillModule);
 
 function makePlayer(opts: {
   index: number;

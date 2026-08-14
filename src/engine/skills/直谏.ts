@@ -16,7 +16,7 @@ import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, hasBlockingPending } from '../core/skill';
-import { skillLoaders } from './index';
+import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
 
 /** 装备牌 subtype → 装备栏位(与 装备 atom 的 inferSlot 一致) */
@@ -105,7 +105,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 2. 装备到目标(从目标手牌移入目标装备区)
       await applyAtom(st, { type: '装备', player: target, cardId });
       // 3. 若装备自带技能(以 card.name 作 skillId),动态挂载(与 装备通用 一致)
-      if (card?.name && skillLoaders[card.name]) {
+      if (card?.name && hasSkillModule(card.name)) {
         await applyAtom(st, { type: '添加技能', player: target, skillId: card.name });
       }
       // 4. 摸一张牌

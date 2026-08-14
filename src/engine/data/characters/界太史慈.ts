@@ -10,7 +10,7 @@ export const 界太史慈 = {
   gender: '男',
   faction: '吴',
   skills: [
-    { name: '天义', path: '../skills/天义' }, // 复用标版(已含界版全部效果)
-    { name: '酣战', path: '../skills/酣战' },
+    { name: '天义', path: '../../skills/天义' }, // 复用标版(已含界版全部效果)
+    { name: '酣战', path: '../../skills/酣战' },
   ],
 };

@@ -6,5 +6,5 @@ export const 界凌统 = {
   maxHealth: 4,
   gender: '男',
   faction: '吴',
-  skills: [{ name: '界旋风', path: '../skills/界旋风' }],
+  skills: [{ name: '界旋风', path: '../../skills/界旋风' }],
 };

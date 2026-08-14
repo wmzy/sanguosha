@@ -24,7 +24,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
-import { skillLoaders } from './index';
+import { hasSkillModule } from './registry';
 
 const USED_KEY = '据守/usedThisTurn';
 const DISCARD_RT = '据守/弃牌';
@@ -111,7 +111,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
               const currentEquip = state.players[ownerId].equipment[slot];
               if (currentEquip) {
                 const oldCard = state.cardMap[currentEquip];
-                if (oldCard?.name && skillLoaders[oldCard.name]) {
+                if (oldCard?.name && hasSkillModule(oldCard.name)) {
                   await applyAtom(state, {
                     type: '移除技能',
                     player: ownerId,
@@ -127,7 +127,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
                 });
               }
               await applyAtom(state, { type: '装备', player: ownerId, cardId: chosenId });
-              if (card?.name && skillLoaders[card.name]) {
+              if (card?.name && hasSkillModule(card.name)) {
                 await applyAtom(state, {
                   type: '添加技能',
                   player: ownerId,

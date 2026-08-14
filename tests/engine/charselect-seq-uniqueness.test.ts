@@ -11,7 +11,6 @@ import { describe, it, expect } from 'vitest';
 import { createGameState } from '../../src/engine/types';
 import { eventsForViewer } from '../../src/engine/view/events-for-viewer';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 
 describe('atomHistory seq 唯一性:同一 dispatch 内多 atom 不丢事件', () => {
   it('连续 applyAtom 的 atomHistory entry 各有唯一 seq', async () => {

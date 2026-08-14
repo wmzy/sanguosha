@@ -8,7 +8,7 @@ export const 张昭张弘 = {
   gender: '男',
   faction: '吴',
   skills: [
-    { name: '直谏', path: '../skills/直谏' },
-    { name: '固政', path: '../skills/固政' },
+    { name: '直谏', path: '../../skills/直谏' },
+    { name: '固政', path: '../../skills/固政' },
   ],
 };

@@ -6,7 +6,7 @@ export const 卢植 = {
   gender: '男',
   faction: '群',
   skills: [
-    { name: '明任', path: '../skills/明任' },
-    { name: '贞良', path: '../skills/贞良' },
+    { name: '明任', path: '../../skills/明任' },
+    { name: '贞良', path: '../../skills/贞良' },
   ],
 };

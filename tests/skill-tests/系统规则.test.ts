@@ -1,7 +1,7 @@
 // 系统规则(系统级):注册引擎级 after hooks——判定清理、技能生命周期、濒死流程。
 // 以及选将/弃牌 respond action(注册到每个玩家座次)。
 //
-// 注意:系统规则不在 skillLoaders 中,player.skills 不应包含 '系统规则'。
+// 注意:系统规则不走技能模块注册表,player.skills 不应包含 '系统规则'。
 // 它的 respond action 由 registerSkillsFromState 自动注册。
 //
 // 验证:
@@ -15,7 +15,6 @@ import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import { findActionEntry } from '../../src/engine/core/skill';
 import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';

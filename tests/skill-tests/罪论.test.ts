@@ -9,13 +9,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 // 临时注册罪论/父荫(主 agent 会统一注册到 index.ts)
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 罪论Module from '../../src/engine/skills/罪论';
 import * as 父荫Module from '../../src/engine/skills/父荫';
-skillLoaders['罪论'] = async () => 罪论Module;
-skillLoaders['父荫'] = async () => 父荫Module;
+setSkillModuleOverride('罪论', async () => 罪论Module);
+setSkillModuleOverride('父荫', async () => 父荫Module);
 
 import { createGameState, suitColor } from '../../src/engine/types';
 import type { Card, GameState, Json } from '../../src/engine/types';

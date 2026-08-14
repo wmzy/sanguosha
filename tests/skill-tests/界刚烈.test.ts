@@ -11,11 +11,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 // 临时注册界刚烈(主 agent 会统一注册到 index.ts)
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 界刚烈Module from '../../src/engine/skills/界刚烈';
-skillLoaders['界刚烈'] = async () => 界刚烈Module;
+setSkillModuleOverride('界刚烈', async () => 界刚烈Module);
 
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';

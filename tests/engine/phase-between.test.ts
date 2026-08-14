@@ -7,7 +7,6 @@
 //   3. 阶段间 before-hook cancel → 跳过下一阶段(不 apply 阶段开始(next))
 import { describe, it, expect } from 'vitest';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import type { Atom, GameState, PlayerState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';

@@ -15,7 +15,6 @@ import { frameCards } from '../../src/engine/core/frame'
 import { applyAtom } from '../../src/engine/core/apply';
 import { fireTimeoutAndWait, dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import type { GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 

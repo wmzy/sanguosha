@@ -3,7 +3,7 @@
 
 import type { Card } from '../types';
 import { 装备牌列表 } from './card-defs/equipment';
-import { skillLoaders } from '../skills';
+import { hasSkillModule } from '../skills/registry';
 
 /** 装备牌 */
 export function isEquipment(c: Card): boolean {
@@ -34,13 +34,13 @@ export function getWeaponRange(c: Card): number {
 
 // ─── 装备技能名(从卡牌数据派生,非写死) ───
 // 装备牌装上时会以 card.name 作 skillId 动态挂载技能实例(见 装备通用.ts)。
-// 哪些装备牌「自带技能」的唯一判据是:卡牌名能在 skillLoaders 里查到。
-// 这里取 装备牌列表.name ∩ skillLoaders 的 key,避免前端写死名单漂移。
-// 马匹(赤兔等)不在 skillLoaders 中,自动排除;未实现技能的装备(如麒麟弓)同理排除。
+// 哪些装备牌「自带技能」的唯一判据是:卡牌名能在技能声明注册表中查到。
+// 这里取 装备牌列表.name ∩ 技能声明注册表的 key,避免前端写死名单漂移。
+// 马匹(赤兔等)无独立技能声明,自动排除;未实现技能的装备(如麒麟弓)同理排除。
 const EQUIPMENT_SKILL_NAMES_CACHE: ReadonlySet<string> = new Set(
   装备牌列表
     .map((def) => def.name)
-    .filter((name) => Object.prototype.hasOwnProperty.call(skillLoaders, name)),
+    .filter((name) => hasSkillModule(name)),
 );
 
 /** 装备牌自带的技能名集合(从卡牌数据 + 技能注册表派生)。 */

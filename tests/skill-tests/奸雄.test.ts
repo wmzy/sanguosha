@@ -6,7 +6,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { TARGET_SYSTEM } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';

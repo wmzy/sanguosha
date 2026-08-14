@@ -20,7 +20,7 @@
 //       * 若 A 或 B 任一方在该 slot 有装备:先 卸下 双方该 slot(若有),
 //         再把对方原装备 装备 到该 slot(若原属技能需挂载,通过 添加技能 atom)。
 //       * 已 卸下 的牌进入手牌,装备时从手牌取出 → 走 装备 atom validate。
-//   - 装备技能挂载/卸载:若装备牌 name 在 skillLoaders 中,装备/卸下时配对
+//   - 装备技能挂载/卸载:若装备牌 name 在技能声明注册表中,装备/卸下时配对
 //     添加技能/移除技能 atom(参考 界结姻 的置装备序列)。
 //
 // 命名:文件名/loader key 为 '界甘露';内部 Skill.name = '甘露'(OL 官方技能名)。
@@ -40,7 +40,7 @@ import {
   activeUnlessUsedThisTurn,
 } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
-import { skillLoaders } from './index';
+import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
 
 const SKILL_NAME = '界甘露';
@@ -76,7 +76,7 @@ async function unloadSkillAt(state: GameState, idx: number, slot: EquipSlot): Pr
   const cardId = equippedAt(state, idx, slot);
   if (!cardId) return;
   const card = state.cardMap[cardId];
-  if (card?.name && skillLoaders[card.name] && state.players[idx].skills.includes(card.name)) {
+  if (card?.name && hasSkillModule(card.name) && state.players[idx].skills.includes(card.name)) {
     await applyAtom(state, { type: '移除技能', player: idx, skillId: card.name });
   }
 }
@@ -86,7 +86,7 @@ async function unloadSkillAt(state: GameState, idx: number, slot: EquipSlot): Pr
 async function equipWithSkill(state: GameState, idx: number, cardId: string): Promise<void> {
   await applyAtom(state, { type: '装备', player: idx, cardId });
   const card = state.cardMap[cardId];
-  if (card?.name && skillLoaders[card.name]) {
+  if (card?.name && hasSkillModule(card.name)) {
     await applyAtom(state, { type: '添加技能', player: idx, skillId: card.name });
   }
 }

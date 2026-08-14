@@ -16,7 +16,6 @@ import { registerSkillsFromState } from '../../src/engine/index';
 import { dispatchAndWait } from '../engine-harness';
 import { slashMax } from '../../src/engine/rules/slash-quota';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 

@@ -17,8 +17,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 征荣Module from '../../src/engine/skills/征荣';
 import * as 鸿举Module from '../../src/engine/skills/鸿举';
 import { createGameState } from '../../src/engine/types';
@@ -27,8 +26,8 @@ import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 // 本地注册 征荣/鸿举 技能模块(主 agent 统一在 skills/index.ts 注册;测试本地兜底)
-skillLoaders['征荣'] = async () => 征荣Module;
-skillLoaders['鸿举'] = async () => 鸿举Module;
+setSkillModuleOverride('征荣', async () => 征荣Module);
+setSkillModuleOverride('鸿举', async () => 鸿举Module);
 
 const RONG_PREFIX = '征荣/荣:';
 

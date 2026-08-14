@@ -7,7 +7,6 @@
 // 5. 追加描述:不存在的 snapshotId → 404
 import { describe, it, expect, afterEach } from 'vitest';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
 import { deletePersistedRoom } from '../../src/server/persistence';
 import { createSnapshot, patchSnapshotDescription } from '../../src/server/snapshot';

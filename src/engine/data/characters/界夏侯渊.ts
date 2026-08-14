@@ -4,6 +4,6 @@ export const 界夏侯渊 = {
   gender: '男',
   faction: '魏',
   skills: [
-    { name: '界神速', path: '../skills/界神速' }
+    { name: '界神速', path: '../../skills/界神速' }
   ],
 };

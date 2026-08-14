@@ -7,7 +7,7 @@ export const 界甘宁 = {
   gender: '男',
   faction: '吴',
   skills: [
-    { name: '奇袭', path: '../skills/奇袭' },
-    { name: '奋威', path: '../skills/奋威' },
+    { name: '奇袭', path: '../../skills/奇袭' },
+    { name: '奋威', path: '../../skills/奋威' },
   ],
 };

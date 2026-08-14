@@ -13,7 +13,6 @@ import { bootstrap, type GameConfig } from '../../src/engine/index'
 import { applyAtom } from '../../src/engine/core/apply';
 import { dispatchAndWait, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import type { GameState, PlayerState } from '../../src/engine/types';
 import { allCharacters } from '../../src/engine/data/characters';

@@ -6,8 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 溃诛Module from '../../src/engine/skills/溃诛';
 import * as 掣政Module from '../../src/engine/skills/掣政';
 import * as 立军Module from '../../src/engine/skills/立军';
@@ -18,9 +17,9 @@ import { createGameState, suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState, SkillModule } from '../../src/engine/types';
 
 // 本地注册技能模块(主 agent 统一在 skills/index.ts 注册;测试本地兜底)
-skillLoaders['溃诛'] = async () => 溃诛Module as unknown as SkillModule;
-skillLoaders['掣政'] = async () => 掣政Module as unknown as SkillModule;
-skillLoaders['立军'] = async () => 立军Module as unknown as SkillModule;
+setSkillModuleOverride('溃诛', async () => 溃诛Module as unknown as SkillModule);
+setSkillModuleOverride('掣政', async () => 掣政Module as unknown as SkillModule);
+setSkillModuleOverride('立军', async () => 立军Module as unknown as SkillModule);
 
 function mkCard(
   id: string,

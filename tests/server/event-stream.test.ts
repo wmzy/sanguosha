@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
 import { deletePersistedRoom } from '../../src/server/persistence';
 import { joinDebugRoom, createDebugRoom, addRoom, type Room } from '../../src/server/room';

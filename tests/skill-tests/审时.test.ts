@@ -13,8 +13,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import 荐降Mod from '../../src/engine/skills/荐降';
 import 审时Mod from '../../src/engine/skills/审时';
 import { createGameState } from '../../src/engine/types';
@@ -22,8 +21,8 @@ import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
 
 // 运行时注册(subagent 不碰 index.ts 源文件;主 agent 统一注册)
-skillLoaders['荐降'] = async () => 荐降Mod;
-skillLoaders['审时'] = async () => 审时Mod;
+setSkillModuleOverride('荐降', async () => 荐降Mod);
+setSkillModuleOverride('审时', async () => 审时Mod);
 
 function makeCard(
   id: string,

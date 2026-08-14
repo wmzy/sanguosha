@@ -7,7 +7,6 @@
 // TTL 后被踢出房间。cleanupIdleRooms 必须以 room.players 非空为「保留」信号。
 import { describe, it, expect, beforeEach } from 'vitest';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
 import { addRoom, getRoom, type Room } from '../../src/server/room';
 import { gameSessions, playerRoomMap } from '../../src/server/registry';

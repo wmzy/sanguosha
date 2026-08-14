@@ -6,7 +6,6 @@ import { createGameState } from '../../src/engine/types';
 
 import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 
 describe('pending-scoped 版本控制', () => {
   it('PendingSlot 有 createdSeq 字段，值=创建时 state.seq', async () => {

@@ -6,7 +6,7 @@ export const 周妃 = {
   gender: '男',
   faction: '吴',
   skills: [
-    { name: '良姻', path: '../skills/良姻' },
-    { name: '箜声', path: '../skills/箜声' },
+    { name: '良姻', path: '../../skills/良姻' },
+    { name: '箜声', path: '../../skills/箜声' },
   ],
 };

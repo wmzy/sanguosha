@@ -17,7 +17,6 @@ import {
   type JoinRoomOpts,
   type SpectateRoomOpts,
 } from '../../src/ai-mcp/mcpServer';
-import '../../src/engine/skills';
 import type { HeadlessGameClient } from '../../src/client/headless/HeadlessGameClient';
 import type { ClientPhase } from '../../src/client/headless/types';
 import {

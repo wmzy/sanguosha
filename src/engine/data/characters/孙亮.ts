@@ -6,8 +6,8 @@ export const 孙亮 = {
   gender: '男',
   faction: '吴',
   skills: [
-    { name: '溃诛', path: '../skills/溃诛' },
-    { name: '掣政', path: '../skills/掣政' },
-    { name: '立军', path: '../skills/立军' },
+    { name: '溃诛', path: '../../skills/溃诛' },
+    { name: '掣政', path: '../../skills/掣政' },
+    { name: '立军', path: '../../skills/立军' },
   ],
 };

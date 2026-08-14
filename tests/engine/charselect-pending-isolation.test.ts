@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { bootstrap, dispatch, buildView } from '../../src/engine/index';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
 import { allCharacters } from '../../src/engine/data/characters';

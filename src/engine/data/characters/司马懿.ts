@@ -4,7 +4,7 @@ export const 司马懿 = {
   gender: '男',
   faction: '魏',
   skills: [
-    { name: '反馈', path: '../skills/反馈' },
-    { name: '鬼才', path: '../skills/鬼才' },
+    { name: '反馈', path: '../../skills/反馈' },
+    { name: '鬼才', path: '../../skills/鬼才' },
   ],
 };

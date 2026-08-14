@@ -27,7 +27,7 @@
 import type { FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { skillLoaders } from './index';
+import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界窃听';
@@ -130,7 +130,7 @@ async function executeStealEquip(
   if (!card) return;
 
   // 1. 移除 target 该装备的自带技能(若有)
-  if (card.name && skillLoaders[card.name]) {
+  if (card.name && hasSkillModule(card.name)) {
     await applyAtom(state, { type: '移除技能', player: turnPlayer, skillId: card.name });
   }
   // 2. 从 target 装备区取到 owner 手牌(获得 atom 同时清理 target.equipment[slot])
@@ -140,7 +140,7 @@ async function executeStealEquip(
   const myOld = state.players[ownerId].equipment[slot];
   if (myOld) {
     const oldCard = state.cardMap[myOld];
-    if (oldCard?.name && skillLoaders[oldCard.name]) {
+    if (oldCard?.name && hasSkillModule(oldCard.name)) {
       await applyAtom(state, { type: '移除技能', player: ownerId, skillId: oldCard.name });
     }
     await applyAtom(state, { type: '卸下', player: ownerId, slot });
@@ -155,7 +155,7 @@ async function executeStealEquip(
   // 4. 装备 stolen card(此时牌已在 owner 手牌)
   await applyAtom(state, { type: '装备', player: ownerId, cardId });
   // 5. 添加 stolen card 的自带技能(若有)
-  if (card.name && skillLoaders[card.name]) {
+  if (card.name && hasSkillModule(card.name)) {
     await applyAtom(state, { type: '添加技能', player: ownerId, skillId: card.name });
   }
 }

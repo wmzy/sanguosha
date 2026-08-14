@@ -10,15 +10,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 // 临时注册怀橘/遗礼/整论(主 agent 会统一注册到 index.ts)
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 怀橘Module from '../../src/engine/skills/怀橘';
 import * as 遗礼Module from '../../src/engine/skills/遗礼';
 import * as 整论Module from '../../src/engine/skills/整论';
-skillLoaders['怀橘'] = async () => 怀橘Module;
-skillLoaders['遗礼'] = async () => 遗礼Module;
-skillLoaders['整论'] = async () => 整论Module;
+setSkillModuleOverride('怀橘', async () => 怀橘Module);
+setSkillModuleOverride('遗礼', async () => 遗礼Module);
+setSkillModuleOverride('整论', async () => 整论Module);
 
 import { createGameState, suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';

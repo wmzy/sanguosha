@@ -15,14 +15,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, Faction, GameState, PlayerState } from '../../src/engine/types';
 
 // 注册拒战技能(subagent 不碰 index.ts,测试中直接赋值)
-skillLoaders['拒战'] = () => import('../../src/engine/skills/拒战').then((m) => m.default);
+setSkillModuleOverride('拒战', () => import('../../src/engine/skills/拒战').then((m) => m.default));
 
 function makeCard(
   id: string,

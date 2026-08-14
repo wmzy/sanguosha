@@ -6,8 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, fireTimeoutAndWait } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 雄乱Module from '../../src/engine/skills/雄乱';
 import * as 从谏Module from '../../src/engine/skills/从谏';
 import { createGameState, suitColor } from '../../src/engine/types';
@@ -16,8 +15,8 @@ import { isDistanceExempted } from '../../src/engine/rules/distance';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 // 本地注册技能模块(主 agent 统一在 skills/index.ts 注册;测试本地兜底)
-skillLoaders['雄乱'] = async () => 雄乱Module;
-skillLoaders['从谏'] = async () => 从谏Module;
+setSkillModuleOverride('雄乱', async () => 雄乱Module);
+setSkillModuleOverride('从谏', async () => 从谏Module);
 
 const ABOLISH_PREFIX = '雄乱/废除:';
 const TARGET_VAR = '雄乱/目标';

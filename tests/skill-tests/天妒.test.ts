@@ -4,7 +4,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable, disableAutoCompare } from '../engine-harness';
 import { runJudgeFlow } from '../../src/engine/flows/judge';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';

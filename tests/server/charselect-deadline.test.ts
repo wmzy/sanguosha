@@ -7,7 +7,6 @@
 // 选将期间的 deadline 完全来自选将 pending slot,本测试验证其独立性。
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
 import { deletePersistedRoom } from '../../src/server/persistence';
 import type { Room } from '../../src/server/room';

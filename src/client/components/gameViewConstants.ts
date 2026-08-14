@@ -16,7 +16,7 @@ export const PHASE_LABELS: Record<string, string> = {
 };
 
 /** 装备牌自带的技能名集合。
- *  从卡牌数据(装备牌列表)与技能注册表(skillLoaders)派生,见 card-meta.ts。
+ *  从卡牌数据(装备牌列表)与技能声明注册表(registry)派生,见 card-meta.ts。
  *  用于从 player.skills 过滤掉装备技能,使其在装备区而非技能区显示。 */
 export const EQUIPMENT_SKILL_NAMES: ReadonlySet<string> = getEquipmentSkillNames();
 

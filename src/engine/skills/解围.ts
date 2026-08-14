@@ -25,7 +25,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { instantiateSkill } from './lifecycle';
-import { skillLoaders } from './index';
+import { hasSkillModule } from './registry';
 import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
 
 // ── 效果①:装备→无懈可击 转化 ──
@@ -193,7 +193,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         params['_origSlot'] = slot;
         // 移除装备自带技能(与 装备通用 一致,卸下 atom 不自动移除技能)
         const card = state.cardMap[cardId];
-        if (card?.name && skillLoaders[card.name]) {
+        if (card?.name && hasSkillModule(card.name)) {
           await applyAtom(state, { type: '移除技能', player: ownerId, skillId: card.name });
         }
         await applyAtom(state, { type: '卸下', player: ownerId, slot });
@@ -232,7 +232,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           // 重新挂载装备技能(transform execute 用 applyAtom(移除技能) 卸载了实例)。
           // rollback 现在是 async,可以 await instantiateSkill。同时还原 player.skills。
           const card = state.cardMap[cardId];
-          if (card?.name && skillLoaders[card.name]) {
+          if (card?.name && hasSkillModule(card.name)) {
             if (!self.skills.includes(card.name)) {
               self.skills.push(card.name);
             }

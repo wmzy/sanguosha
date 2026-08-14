@@ -4,7 +4,7 @@ export const 界沮授 = {
   gender: '男',
   faction: '群',
   skills: [
-    { name: '界矢北', path: '../skills/界矢北' },
-    { name: '界渐营', path: '../skills/界渐营' },
+    { name: '界矢北', path: '../../skills/界矢北' },
+    { name: '界渐营', path: '../../skills/界渐营' },
   ],
 };

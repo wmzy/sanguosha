@@ -18,7 +18,6 @@ import { SkillTestHarness, waitForStable, disableAutoCompare } from '../engine-h
 import { applyAtom } from '../../src/engine/core/apply';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, Mark, PlayerState } from '../../src/engine/types';

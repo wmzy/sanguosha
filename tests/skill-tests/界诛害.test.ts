@@ -12,11 +12,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 // 临时注册界诛害(主 agent 会统一注册到 index.ts)
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 界诛害Module from '../../src/engine/skills/界诛害';
-skillLoaders['界诛害'] = async () => 界诛害Module;
+setSkillModuleOverride('界诛害', async () => 界诛害Module);
 
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';

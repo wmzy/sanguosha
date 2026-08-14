@@ -14,12 +14,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import { applyAtom } from '../../src/engine/core/apply';
 
 // 注册镇骨技能模块(主 agent 统一注册 index.ts,此处测试内直接挂载)
-skillLoaders['镇骨'] = () => import('../../src/engine/skills/镇骨');
+setSkillModuleOverride('镇骨', () => import('../../src/engine/skills/镇骨'));
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 

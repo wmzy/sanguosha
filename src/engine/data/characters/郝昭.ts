@@ -6,5 +6,5 @@ export const 郝昭 = {
   maxHealth: 4,
   gender: '男',
   faction: '魏',
-  skills: [{ name: '镇骨', path: '../skills/镇骨' }],
+  skills: [{ name: '镇骨', path: '../../skills/镇骨' }],
 };

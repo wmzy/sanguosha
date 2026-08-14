@@ -14,7 +14,7 @@
 //     "移出游戏"通用机制,会触发良姻(挂在其 after-hook 上)。
 //   - 结束阶段先用 归还暂存牌 把全部箜声牌取回手牌(=获得非装备牌);
 //     再把其中的装备牌给予目标并装备之(=使用剩余牌)。
-//   - 装备自带技能(以 card.name 为 skillId 且在 skillLoaders 中)需手动 添加技能/
+//   - 装备自带技能(以 card.name 为 skillId 且在技能声明注册表中)需手动 添加技能/
 //     移除技能——直接 applyAtom(装备) 不会自动加载技能(与 直谏/界直言 一致)。
 //   - 装备替换:目标同槽已有装备时,先 移除技能+卸下+弃置 旧装备,再装备新牌。
 //   - 箜声牌每回合在结束阶段全部处理(非装备获得、装备使用),不跨回合持久。
@@ -28,7 +28,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { skillLoaders } from './index';
+import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
 
 /** owner.vars key:箜声牌 cardId 列表(与良姻共享) */
@@ -194,7 +194,7 @@ async function performKongshengEnd(
     const current = state.players[target].equipment[slot];
     if (current) {
       const oldCard = state.cardMap[current];
-      if (oldCard?.name && skillLoaders[oldCard.name]) {
+      if (oldCard?.name && hasSkillModule(oldCard.name)) {
         await applyAtom(state, {
           type: '移除技能',
           player: target,
@@ -210,7 +210,7 @@ async function performKongshengEnd(
       });
     }
     await applyAtom(state, { type: '装备', player: target, cardId });
-    if (card?.name && skillLoaders[card.name]) {
+    if (card?.name && hasSkillModule(card.name)) {
       await applyAtom(state, {
         type: '添加技能',
         player: target,

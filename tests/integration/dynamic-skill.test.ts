@@ -6,7 +6,6 @@ import { registerSkillsFromState } from '../../src/engine/index';
 import { applyAtom } from '../../src/engine/core/apply';
 import { findActionEntry } from '../../src/engine/core/skill';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
 

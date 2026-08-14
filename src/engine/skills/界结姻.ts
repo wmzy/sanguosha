@@ -42,7 +42,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { getGender } from '../data/character-meta';
-import { skillLoaders } from './index';
+import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
 
 const SKILL_NAME = '界结姻';
@@ -177,7 +177,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           // 若装备来自 owner 装备区:先卸下(牌回 owner 手牌)+ 移除其技能
           const ownerSlot = findEquipSlot(st, from, cardId);
           if (ownerSlot !== null) {
-            if (card?.name && skillLoaders[card.name]) {
+            if (card?.name && hasSkillModule(card.name)) {
               await applyAtom(st, { type: '移除技能', player: from, skillId: card.name });
             }
             await applyAtom(st, { type: '卸下', player: from, slot: ownerSlot });
@@ -194,7 +194,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           const currentEquip = st.players[target].equipment[slot];
           if (currentEquip) {
             const oldCard = st.cardMap[currentEquip];
-            if (oldCard?.name && skillLoaders[oldCard.name]) {
+            if (oldCard?.name && hasSkillModule(oldCard.name)) {
               await applyAtom(st, { type: '移除技能', player: target, skillId: oldCard.name });
             }
             await applyAtom(st, { type: '卸下', player: target, slot });
@@ -207,7 +207,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           }
 
           await applyAtom(st, { type: '装备', player: target, cardId });
-          if (card?.name && skillLoaders[card.name]) {
+          if (card?.name && hasSkillModule(card.name)) {
             await applyAtom(st, { type: '添加技能', player: target, skillId: card.name });
           }
         } else {

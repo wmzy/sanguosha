@@ -9,7 +9,6 @@ import {
 } from '../../src/engine/index';
 import { waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 

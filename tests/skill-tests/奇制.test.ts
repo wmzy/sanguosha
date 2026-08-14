@@ -16,13 +16,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 // 临时注册奇制/进趋(主 agent 会统一注册到 index.ts)
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 奇制Module from '../../src/engine/skills/奇制';
 import * as 进趋Module from '../../src/engine/skills/进趋';
-skillLoaders['奇制'] = async () => 奇制Module;
-skillLoaders['进趋'] = async () => 进趋Module;
+setSkillModuleOverride('奇制', async () => 奇制Module);
+setSkillModuleOverride('进趋', async () => 进趋Module);
 
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';

@@ -1,13 +1,13 @@
 // skills/lifecycle.ts — 技能模块加载 + 实例生命周期管理。
 //
-// 从 core/skill.ts 迁出:这些函数依赖 skillLoaders（技能模块表）和 cardEffectMap
+// 从 core/skill.ts 迁出:这些函数依赖技能模块声明注册表(registry/loaders)和 cardEffectMap
 // （卡名判断），两者都在 skills/ 层。放在 core 会被迫发明 setter（service locator）
 // 跨层获取数据——本文件直接 import，消除 3 个全局可变 setter：
 //   setSkillModuleResolver / setSkillModuleChecker / setCardNameChecker
 //
 // 依赖方向（单向 DAG）:
 //   skills/lifecycle.ts → core/skill.ts      (注册表 CRUD)
-//   skills/lifecycle.ts → skills/index.ts    (skillLoaders)
+//   skills/lifecycle.ts → skills/loaders.ts  (按声明动态加载)
 //   skills/lifecycle.ts → skills/cards       (hasCardEffect)
 //
 // core/skill.ts 不感知 skills/ 的存在（纯注册表 + state-bound 操作）。
@@ -20,12 +20,17 @@ import {
   unregisterActionsForInstance,
   setSkillLocked,
 } from '../core/skill';
-import { skillLoaders } from './index';
+import { importSkillModuleById } from './loaders';
+import { hasSkillModule } from './registry';
 import { hasCardEffect } from './cards';
 
 // ─── moduleCache ───────────────────────────────────────────
 
 const moduleCache = new Map<string, SkillModule>();
+
+/** 测试专用模块注入(替代旧 `skillLoaders[id] = loader` 直接改表)。
+ *  生产代码禁止使用;getSkillModule 查找顺序:cache → override → 声明导入。 */
+const moduleOverrides = new Map<string, () => Promise<SkillModule>>();
 
 let moduleCacheVersion = 0;
 const moduleCacheListeners = new Set<() => void>();
@@ -44,19 +49,24 @@ export function getModuleCacheVersion(): number {
 export async function getSkillModule(id: string): Promise<SkillModule> {
   const cached = moduleCache.get(id);
   if (cached) return cached;
-  const loader = skillLoaders[id];
-  if (!loader) throw new Error(`Skill module "${id}" not found in skillLoaders`);
-  const mod = await loader();
+  const override = moduleOverrides.get(id);
+  const mod = override ? await override() : await importSkillModuleById(id);
   moduleCache.set(id, mod);
   moduleCacheVersion++;
   moduleCacheListeners.forEach((cb) => cb());
   return mod;
 }
 
-/** 同步检查技能模块是否已注册（在 skillLoaders 中）。
- *  用于跳过未注册的技能 id（如已删除的 per-card 技能），避免 getSkillModule 拑错。 */
+/** 注入测试用技能模块(取代旧 skillLoaders 赋值)。仅测试使用。 */
+export function setSkillModuleOverride(id: string, loader: () => Promise<SkillModule>): void {
+  moduleOverrides.set(id, loader);
+  moduleCache.delete(id);
+}
+
+/** 同步检查技能模块是否已声明(registry 聚合结果中存在)。
+ *  用于跳过未声明的技能 id（如已删除的 per-card 技能），避免 getSkillModule 拑错。 */
 export function isSkillModuleRegistered(id: string): boolean {
-  return id in skillLoaders;
+  return moduleOverrides.has(id) || hasSkillModule(id);
 }
 
 export function getCachedSkillModule(id: string): SkillModule | undefined {

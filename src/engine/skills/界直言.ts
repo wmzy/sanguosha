@@ -36,7 +36,7 @@ import type {
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { skillLoaders } from './index';
+import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界直言';
@@ -172,7 +172,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const currentEquip = st.players[target].equipment[slot];
         if (currentEquip) {
           const oldCard = st.cardMap[currentEquip];
-          if (oldCard?.name && skillLoaders[oldCard.name]) {
+          if (oldCard?.name && hasSkillModule(oldCard.name)) {
             await applyAtom(st, { type: '移除技能', player: target, skillId: oldCard.name });
           }
           await applyAtom(st, { type: '卸下', player: target, slot });
@@ -185,7 +185,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
         // 装备新牌
         await applyAtom(st, { type: '装备', player: target, cardId: drawnId });
-        if (drawnCard?.name && skillLoaders[drawnCard.name]) {
+        if (drawnCard?.name && hasSkillModule(drawnCard.name)) {
           await applyAtom(st, {
             type: '添加技能',
             player: target,

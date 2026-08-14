@@ -3,7 +3,6 @@ import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import { eventsForViewer } from '../../src/engine/view/events-for-viewer';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 
 describe('GameState.atomHistory', () => {
   it('createGameState 初始化 atomHistory 为空数组', () => {

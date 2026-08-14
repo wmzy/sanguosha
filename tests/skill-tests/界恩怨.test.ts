@@ -20,10 +20,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 界恩怨Module from '../../src/engine/skills/界恩怨';
-skillLoaders['界恩怨'] = async () => 界恩怨Module;
+setSkillModuleOverride('界恩怨', async () => 界恩怨Module);
 
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';

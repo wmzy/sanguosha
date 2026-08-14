@@ -4,7 +4,6 @@
 // 这些 bug 之前测不出来，因为绝大多数测试断言 harness.state（绝对真实）而非 processedView。
 import { describe, it, expect } from 'vitest';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { viewReducer } from '../../src/client/view/reducer';
 import { getAtomDef } from '../../src/engine/core/atom';
 import { applyAtom } from '../../src/engine/core/apply';

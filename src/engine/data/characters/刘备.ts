@@ -4,7 +4,7 @@ export const 刘备 = {
   gender: '男',
   faction: '蜀',
   skills: [
-    { name: '仁德', path: '../skills/仁德' },
-    { name: '激将', path: '../skills/激将' },
+    { name: '仁德', path: '../../skills/仁德' },
+    { name: '激将', path: '../../skills/激将' },
   ],
 };

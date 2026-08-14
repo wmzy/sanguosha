@@ -8,17 +8,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import { applyAtom } from '../../src/engine/core/apply';
 import { createGameState } from '../../src/engine/types';
 import type { Card, Faction, GameState, PlayerState } from '../../src/engine/types';
 
-// 注册周妃技能(subagent 不碰 index.ts,测试中直接赋值)
-skillLoaders['良姻'] = () =>
-  import('../../src/engine/skills/良姻').then((m) => m.default);
-skillLoaders['箜声'] = () =>
-  import('../../src/engine/skills/箜声').then((m) => m.default);
+// 注册周妃技能(测试注入,见 lifecycle.setSkillModuleOverride)
+setSkillModuleOverride('良姻', () =>
+  import('../../src/engine/skills/良姻').then((m) => m.default));
+setSkillModuleOverride('箜声', () =>
+  import('../../src/engine/skills/箜声').then((m) => m.default));
 
 function makeCard(
   id: string,

@@ -17,7 +17,7 @@ import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, hasBlockingPending } from '../core/skill';
-import { skillLoaders } from './index';
+import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
 
 const SKILL_NAME = '界直谏';
@@ -109,7 +109,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const currentEquip = st.players[target].equipment[slot];
       if (currentEquip) {
         const oldCard = st.cardMap[currentEquip];
-        if (oldCard?.name && skillLoaders[oldCard.name]) {
+        if (oldCard?.name && hasSkillModule(oldCard.name)) {
           await applyAtom(st, { type: '移除技能', player: target, skillId: oldCard.name });
         }
         await applyAtom(st, { type: '卸下', player: target, slot });
@@ -123,7 +123,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 3. 装备到目标(从目标手牌移入目标装备区)
       await applyAtom(st, { type: '装备', player: target, cardId });
       // 4. 若装备自带技能(以 card.name 作 skillId),动态挂载(与 装备通用 一致)
-      if (card?.name && skillLoaders[card.name]) {
+      if (card?.name && hasSkillModule(card.name)) {
         await applyAtom(st, { type: '添加技能', player: target, skillId: card.name });
       }
       // 5. 摸一张牌

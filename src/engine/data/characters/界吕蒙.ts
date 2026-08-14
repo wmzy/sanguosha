@@ -10,9 +10,9 @@ export const 界吕蒙 = {
   gender: '男',
   faction: '吴',
   skills: [
-    { name: '界克己', path: '../skills/界克己' }, // 界版独立文件,严格按官方"出牌阶段内"
-    { name: '勤学', path: '../skills/勤学' },
-    { name: '博图', path: '../skills/博图' },
+    { name: '界克己', path: '../../skills/界克己' }, // 界版独立文件,严格按官方"出牌阶段内"
+    { name: '勤学', path: '../../skills/勤学' },
+    { name: '博图', path: '../../skills/博图' },
     // 攻心为勤学衍生技,觉醒后动态获得,不在此静态注册
   ],
 };

@@ -8,7 +8,6 @@
 // 测试通过 reflection 访问 session.state(私有),用真实 dispatch 路径验证。
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { GameSession } from '../../src/server/session';
 import { deletePersistedRoom } from '../../src/server/persistence';
 import type { Room } from '../../src/server/room';

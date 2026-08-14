@@ -3,7 +3,6 @@
 // 验证:grace period、playerId 迁移、重连后 action 可用。
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import { GameSession, RECONNECT_GRACE_MS } from '../../src/server/session';
 import { deletePersistedRoom } from '../../src/server/persistence';
 import { addRoom, type Room } from '../../src/server/room';

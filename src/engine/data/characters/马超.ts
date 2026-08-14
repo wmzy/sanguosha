@@ -4,7 +4,7 @@ export const 马超 = {
   gender: '男',
   faction: '蜀',
   skills: [
-    { name: '马术', path: '../skills/马术' },
-    { name: '铁骑', path: '../skills/铁骑' },
+    { name: '马术', path: '../../skills/马术' },
+    { name: '铁骑', path: '../../skills/铁骑' },
   ],
 };

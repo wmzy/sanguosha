@@ -16,8 +16,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 庸肆Module from '../../src/engine/skills/庸肆';
 import * as 伪帝Module from '../../src/engine/skills/伪帝';
 import { applyAtom } from '../../src/engine/core/apply';
@@ -25,8 +24,8 @@ import { createGameState, suitColor } from '../../src/engine/types';
 import type { Card, PlayerState } from '../../src/engine/types';
 
 // 本地注册技能模块(主 agent 统一在 skills/index.ts 注册;测试本地兜底)
-skillLoaders['庸肆'] = async () => 庸肆Module;
-skillLoaders['伪帝'] = async () => 伪帝Module;
+setSkillModuleOverride('庸肆', async () => 庸肆Module);
+setSkillModuleOverride('伪帝', async () => 伪帝Module);
 
 function makeCard(
   id: string,

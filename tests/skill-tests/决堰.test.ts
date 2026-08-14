@@ -5,8 +5,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
-import { skillLoaders } from '../../src/engine/skills';
+import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 谦节Module from '../../src/engine/skills/谦节';
 import * as 决堰Module from '../../src/engine/skills/决堰';
 import * as 破势Module from '../../src/engine/skills/破势';
@@ -18,9 +17,9 @@ import { isDistanceExempted } from '../../src/engine/rules/distance';
 import type { Card, PlayerState } from '../../src/engine/types';
 
 // 本地注册技能模块(主 agent 统一在 skills/index.ts 注册;测试本地兜底)
-skillLoaders['谦节'] = async () => 谦节Module;
-skillLoaders['决堰'] = async () => 决堰Module;
-skillLoaders['破势'] = async () => 破势Module;
+setSkillModuleOverride('谦节', async () => 谦节Module);
+setSkillModuleOverride('决堰', async () => 决堰Module);
+setSkillModuleOverride('破势', async () => 破势Module);
 
 const ABOLISH_PREFIX = '决堰/废除:';
 

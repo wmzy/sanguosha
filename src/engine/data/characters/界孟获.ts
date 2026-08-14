@@ -4,7 +4,7 @@ export const 界孟获 = {
   gender: '男',
   faction: '蜀',
   skills: [
-    { name: '祸首', path: '../skills/祸首' },
-    { name: '界再起', path: '../skills/界再起' },
+    { name: '祸首', path: '../../skills/祸首' },
+    { name: '界再起', path: '../../skills/界再起' },
   ],
 };

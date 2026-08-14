@@ -6,7 +6,7 @@ export const 毌丘俭 = {
   gender: '男',
   faction: '魏',
   skills: [
-    { name: '征荣', path: '../skills/征荣' },
-    { name: '鸿举', path: '../skills/鸿举' },
+    { name: '征荣', path: '../../skills/征荣' },
+    { name: '鸿举', path: '../../skills/鸿举' },
   ],
 };

@@ -4,7 +4,7 @@ export const 界黄盖 = {
   gender: '男',
   faction: '吴',
   skills: [
-    { name: '界苦肉', path: '../skills/界苦肉' },
-    { name: '诈降', path: '../skills/诈降' },
+    { name: '界苦肉', path: '../../skills/界苦肉' },
+    { name: '诈降', path: '../../skills/诈降' },
   ],
 };

@@ -22,7 +22,6 @@ import { runJudgeFlow } from '../../src/engine/flows/judge';
 import { SkillTestHarness } from '../engine-harness';
 import { getAtomDef } from '../../src/engine/core/atom';
 import '../../src/engine/atoms';
-import '../../src/engine/skills';
 import type { Card, GameState, PendingTrick } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';

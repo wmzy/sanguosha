@@ -5,5 +5,5 @@ export const 严颜 = {
   maxHealth: 4,
   gender: '男',
   faction: '蜀',
-  skills: [{ name: '拒战', path: '../skills/拒战' }],
+  skills: [{ name: '拒战', path: '../../skills/拒战' }],
 };

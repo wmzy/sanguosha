@@ -10,7 +10,7 @@ export const 界袁绍 = {
   // LORD_CANDIDATES),此处显式声明 isLord 让选将主公候选池与 isLord() 判定正确识别。
   isLord: true,
   skills: [
-    { name: '界乱击', path: '../skills/界乱击' },
-    { name: '界血裔', path: '../skills/界血裔' },
+    { name: '界乱击', path: '../../skills/界乱击' },
+    { name: '界血裔', path: '../../skills/界血裔' },
   ],
 };
