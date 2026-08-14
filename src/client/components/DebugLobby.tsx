@@ -179,7 +179,7 @@ function DebugGameViewInner({
     return (
       <RoomConfigPanel
         config={
-          conn.roomState?.config ?? { name: '', timeoutSec: 30, charPool: 'all', handSize: 4, chat: { ...DEFAULT_CHAT_CONFIG } }
+          conn.roomState?.config ?? { name: '', timeoutSec: 30, charPool: 'all', handSize: 4, chat: { ...DEFAULT_CHAT_CONFIG }, gameMode: '身份局' }
         }
         readyPlayers={conn.roomState?.readyPlayers ?? []}
         playerIds={conn.roomState?.playerIds ?? []}

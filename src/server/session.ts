@@ -106,7 +106,8 @@ export class GameSession {
    *  config 从 state(rngSeed/playerCount)+ 全局 CHARACTERS 重构。 */
   async restoreState(state: GameState, actionLog: ActionLogEntry[] = []): Promise<void> {
     this.lastActivityAt = Date.now();
-    // config 重构:seed 来自 state,playerCount 从 state.players,characters 用全局表
+    // config 重构:seed 来自 state,playerCount 从 state.players,characters 用全局表,
+    // mode 用房间配置(与开局一致;state.config.mode 由 create 写入快照,二者一致)
     const config: GameConfig = {
       characters: resolveCharPool(this.room.config.charPool),
       playerCount: state.players.length,
@@ -114,6 +115,7 @@ export class GameSession {
       gameId: this.room.id,
       handSize: this.room.config.handSize,
       timeoutSec: this.room.config.timeoutSec,
+      mode: this.room.config.gameMode,
     };
     const fresh = create(config);
     // 注入虚拟时钟:重放期间超时按 actionLog 时间戳确定性推导,不依赖真实系统时间。
@@ -148,7 +150,7 @@ export class GameSession {
     const count = this.debug ? (playerCount ?? this.room.players.size) : this.room.players.size;
     if (count < 2) return false;
 
-    // 从房间配置派生 GameConfig:将池预设 + 手牌数 + 操作倒时秒数
+    // 从房间配置派生 GameConfig:将池预设 + 手牌数 + 操作倒时秒数 + 游戏模式(规则包)
     const cfg = this.room.config;
     const config: GameConfig = {
       characters: resolveCharPool(cfg.charPool),
@@ -157,6 +159,7 @@ export class GameSession {
       gameId: this.room.id,
       handSize: cfg.handSize,
       timeoutSec: cfg.timeoutSec,
+      mode: cfg.gameMode,
     };
     this.state = create(config);
     // 座次轮转偏移:决定主公(游戏座次 0)对应哪个物理座位。在 bootstrap 之前同步设置,
@@ -337,6 +340,8 @@ export class GameSession {
    * 挂载 state.onStateChange 回调:每次 applyAtom 结束后同步 broadcastNewState +
    * persistAsync + checkGameOver。dispatch fire-and-forget 模型下,所有 session
    * 副作用由本回调驱动。幂等:重复挂载会覆盖旧回调。
+   * checkGameOver 经规则包动态加载(异步):ES 模块缓存后近零开销;onStateChange
+   * 是同步回调,胜负检查以 fire-and-forget 异步执行,gameOverHandled 标记兜底竞态。
    */
   private attachStateListener(): void {
     if (!this.state) return;
@@ -350,12 +355,14 @@ export class GameSession {
       this.lastActivityAt = Date.now();
       this.broadcastNewState();
       this.persistAsync();
-      const { gameOver, winner } = checkGameOver(this.state);
-      if (gameOver) {
-        // handleGameOver 内部设 gameOverHandled=true:本次已广播触发 gameOver 的 atom
-        // (如 击杀主公),后续 atom(移动牌/popFrame/出牌窗口)的 onStateChange 被 return 拦截。
-        this.handleGameOver(winner);
-      }
+      void checkGameOver(this.state).then(({ gameOver, winner }) => {
+        if (this.destroyed || this.gameOverHandled) return;
+        if (gameOver) {
+          // handleGameOver 内部设 gameOverHandled=true:本次已广播触发 gameOver 的 atom
+          // (如 击杀主公),后续 atom(移动牌/popFrame/出牌窗口)的 onStateChange 被 return 拦截。
+          this.handleGameOver(winner);
+        }
+      });
     };
     this.state.onError = (error: Error) => {
       this.logger.error('引擎 execute 抛错', { error: error.stack ?? String(error) });

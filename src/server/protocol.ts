@@ -9,12 +9,16 @@ import type {
   Json,
   ViewEvent,
 } from '../engine/types';
+import type { GameMode } from '../engine/rules/types';
 export type { GameEventEnvelope } from '../engine/types';
 
 export type EventSeq = number;
 
 /** 将池预设 */
 export type CharPoolPreset = 'standard' | 'extended' | 'all';
+
+/** 合法游戏模式集合(normalize 校验用)。新模式在引擎 rules/ 注册后在此扩。 */
+const GAME_MODES: readonly GameMode[] = ['身份局', '1v1'];
 
 /** 聊天配置。房主在等待大厅设置，增加游戏趣味性(暗示/欺骗等)。 */
 export interface ChatConfig {
@@ -68,6 +72,8 @@ export interface RoomConfig {
   handSize: number;
   /** 聊天配置 */
   chat: ChatConfig;
+  /** 游戏模式(规则包):身份局 / 1v1。默认身份局。 */
+  gameMode: GameMode;
 }
 
 /** 默认房间配置 */
@@ -77,6 +83,7 @@ export const DEFAULT_ROOM_CONFIG: RoomConfig = {
   charPool: 'all',
   handSize: 4,
   chat: { ...DEFAULT_CHAT_CONFIG },
+  gameMode: '身份局',
 };
 
 /** 校验并规范化 ChatConfig:修正非法字段为默认值。 */
@@ -131,7 +138,13 @@ export function normalizeRoomConfig(raw: unknown): RoomConfig {
       ? Math.floor(r['handSize'])
       : DEFAULT_ROOM_CONFIG.handSize;
   const chat = r['chat'] !== undefined ? normalizeChatConfig(r['chat']) : { ...DEFAULT_CHAT_CONFIG };
-  return { name, timeoutSec, charPool, handSize, chat };
+  // gameMode: 旧房间/非法值回退 身份局。
+  const rawMode = r['gameMode'];
+  const gameMode: GameMode =
+    typeof rawMode === 'string' && (GAME_MODES as readonly string[]).includes(rawMode)
+      ? (rawMode as GameMode)
+      : DEFAULT_ROOM_CONFIG.gameMode;
+  return { name, timeoutSec, charPool, handSize, chat, gameMode };
 }
 
 /** 倒计时信息(pending 优先,否则出牌/弃牌阶段的 idleDeadline)。

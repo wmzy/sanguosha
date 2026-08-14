@@ -3,6 +3,7 @@
 
 import type { Atom } from './atom';
 import type { ActionLogEntry, AppliedAtomEntry, PendingSlot, SettlementFrame } from './skill';
+import type { GameMode } from '../rules/types';
 import { RealClock, type Clock } from '../core/clock';
 
 // ─── 牌面基础类型(原 shared/types,随 shared/ 清退并入引擎) ─────────
@@ -172,8 +173,9 @@ export interface GameState {
   meta: { gameId: string; createdAt: number };
   /** 房间级游戏配置(由 session 在 create 时注入)。原子操作/视图层据此调整超时等行为。
    *  timeoutSec: 操作倒计时秒数(绝对值)。正值=秒数; 0=无限。
-   *  若未设置(旧测试 state)各 atom 用自身默认秒数。 */
-  config?: { timeoutSec: number };
+   *  mode: 游戏模式(规则包标识),随快照持久化;checkGameOver/开局流程据此选择规则。
+   *  若未设置(旧测试 state)各 atom 用自身默认秒数/身份局规则。 */
+  config?: { timeoutSec?: number; mode?: GameMode };
 
   /** 调试开关:置为 true 时,applyAtom 在每个「正常完成」路径调用
    *  assertCardInvariants,护栏「同一张牌出现在多个区」的重复 bug。

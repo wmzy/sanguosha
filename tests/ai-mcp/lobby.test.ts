@@ -12,7 +12,7 @@ const fullReady2p: RoomState = {
   playerIds: ['p-host', 'p2'],
   hostId: 'p-host',
   maxPlayers: 2,
-  config: { name: '测试', timeoutSec: 30, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 } },
+  config: { name: '测试', timeoutSec: 30, charPool: 'all', handSize: 4, chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 }, gameMode: '身份局' },
   spectatorIds: [],
   viewGrants: {},
   pendingViewRequests: {},
@@ -173,6 +173,7 @@ const BASE_CONFIG: RoomConfig = {
   timeoutSec: 30,
   charPool: 'all',
   handSize: 4,
+  gameMode: '身份局',
   chat: { enabled: true, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 },
 };
 

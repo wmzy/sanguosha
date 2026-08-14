@@ -30,7 +30,9 @@ import {
   logAction,
 } from './notify';
 
-import * as 系统规则mod from '../skills/系统规则';
+// 规则包(游戏模式)动态加载:core 不静态依赖任何具体模式规则(ADR 0029)。
+import { loadRuleset } from '../rules/registry';
+import type { GameMode } from '../rules/types';
 
 export interface GameConfig {
   characters: Array<{ name: string; skills: string[] }>;
@@ -40,40 +42,23 @@ export interface GameConfig {
   handSize?: number;
   /** 操作倒计时秒数(房间配置,绝对值)。正值=秒数; 0=无限。未设置时各 atom 用自身默认秒数。 */
   timeoutSec?: number;
+  /** 游戏模式(规则包)。默认 身份局。restore 时用于从快照恢复模式。 */
+  mode?: GameMode;
 }
 
-/** 检查游戏是否结束。纯函数,基于 state 计算。
- *  结束条件:主公死亡,或主公存活但所有反贼/内奸均已死亡,或存活 ≤ 1 人。
- *  胜方判定:winner 为某阵营代表座次,前端按其 identity 推导获胜阵营文案。
- *  - 主公阵亡:反贼仍存活 → 反贼胜;反贼全灭且内奸存活(内奸清场单挑残局)→ 内奸胜;
- *    极端(反贼/内奸均无存活)→ 仍判反贼胜。
- *  - 主公存活但反贼/内奸全灭:主公方(主忠)胜,winner=主公座次。
- *  - 仅剩一人存活:winner=存活者(主公→主公方,反贼→反贼,内奸→内奸)。 */
-export function checkGameOver(state: GameState): { gameOver: boolean; winner?: number } {
-  // 主公死亡 → 游戏立即结束
-  const lord = state.players.find((p) => p.identity === '主公');
-  if (lord && !lord.alive) {
-    const aliveRebel = state.players.find((p) => p.alive && p.identity === '反贼');
-    if (aliveRebel) return { gameOver: true, winner: aliveRebel.index };
-    const aliveRenegade = state.players.find((p) => p.alive && p.identity === '内奸');
-    if (aliveRenegade) return { gameOver: true, winner: aliveRenegade.index };
-    // 极端(反贼/内奸均无存活,如闪电连劈)→ 仍判反贼获胜,取任一反贼座次作阵营代表
-    const anyRebel = state.players.find((p) => p.identity === '反贼');
-    return { gameOver: true, winner: anyRebel?.index };
-  }
-  // 主公存活:所有反贼和内奸均已死亡 → 主公方(主忠)获胜
-  if (lord && lord.alive) {
-    const aliveEnemy = state.players.find(
-      (p) => p.alive && (p.identity === '反贼' || p.identity === '内奸'),
-    );
-    if (!aliveEnemy) return { gameOver: true, winner: lord.index };
-  }
-  const aliveCount = state.players.filter((p) => p.alive).length;
-  if (aliveCount <= 1) {
-    const winner = state.players.find((p) => p.alive);
-    return { gameOver: true, winner: winner?.index };
-  }
-  return { gameOver: false };
+/** 解析 state.config 中持久化的模式,缺省回退 身份局(兼容旧快照)。 */
+export function resolveGameMode(state: GameState): GameMode {
+  return state.config?.mode ?? '身份局';
+}
+
+/** 检查游戏是否结束。基于 state.config.mode 加载对应规则包判定(默认身份局)。
+ *  异步(动态 import):session 在 onStateChange 中 await。具体判定逻辑见
+ *  rules/身份局.ts(身份局与 1v1 共用)——core 层不再内嵌模式规则(ADR 0029)。 */
+export async function checkGameOver(
+  state: GameState,
+): Promise<{ gameOver: boolean; winner?: number }> {
+  const ruleset = await loadRuleset(resolveGameMode(state));
+  return ruleset.checkGameOver(state);
 }
 export function create(gameConfig: GameConfig): GameState {
   const playerCount = Math.max(2, Math.min(8, gameConfig.playerCount));
@@ -102,9 +87,12 @@ export function create(gameConfig: GameConfig): GameState {
 
   const state = createGameState({ players: stubPlayers, cardMap });
   state.startedAt = state.clock.now();
-  if (gameConfig.timeoutSec !== undefined) {
-    state.config = { timeoutSec: gameConfig.timeoutSec };
-  }
+  // config 持久化到 state(随快照序列化):mode 供 checkGameOver/开局 ruleset 解析,
+  // timeoutSec 供各 atom 读取。timeoutSec 未设置时仍写入 config(仅含 mode)。
+  state.config = {
+    ...(gameConfig.timeoutSec !== undefined ? { timeoutSec: gameConfig.timeoutSec } : {}),
+    ...(gameConfig.mode !== undefined ? { mode: gameConfig.mode } : {}),
+  };
   return state;
 }
 
@@ -142,13 +130,15 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   );
 
   // 3. dispatch 开局 start(dispatch 返回 boolean:validate 拒绝返回 false,开局失败通过后续 state 检查暴露)
-  // 先为每个玩家注册选将/弃牌 respond action(注册到具体座次,开局流程内会等待这些 respond)
-  // 系统规则mod 为模块顶部静态导入(见文件头)
-  // 注册系统规则全局 hooks(添加技能/移除技能/弃置/濒死检查)到本 state(state-bound 注册表)
-  系统规则mod.onInit(系统规则mod.createSkill('系统规则', TARGET_SYSTEM), state);
-  for (const player of state.players) {
-    系统规则mod.registerSystemRespondActions(state, player.index);
-  }
+  // 规则包(按 gameConfig.mode 动态加载,默认身份局):注册系统规则全局 hooks
+  // (添加技能/移除技能/弃置/濒死检查)+ 每座次 选将/弃牌 respond action。
+  // core 不静态依赖具体规则实现(ADR 0029);开局 skill 同样经 registry 读
+  // ruleset.opening 驱动选将流程。mode 同时持久化到 state.config——
+  // 开局 execute/checkGameOver 均从 state.config.mode 解析(快照恢复同样依赖)。
+  const mode = gameConfig.mode ?? resolveGameMode(state);
+  state.config = { ...state.config, mode };
+  const ruleset = await loadRuleset(mode);
+  ruleset.onInit(state);
   // 酒增伤/延时锦囊判定/连环传导 全局 hooks 由 使用牌 skill 的 onInit 注册
   // (首次实例化时注册,后续座次跳过)
   // dispatch 后 await settle:等开局 execute 挂起(选将 slot 创建)再返回。
@@ -225,12 +215,10 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
   }
   const { registerSkillsFromState: registerSkills } = await import('../skills/lifecycle');
   await registerSkills(state);
-  // 注册系统规则全局 hooks + 为每个玩家注册选将/弃牌 respond action(与 bootstrap 一致)
-  // 系统规则mod 为模块顶部静态导入(见文件头)
-  系统规则mod.onInit(系统规则mod.createSkill('系统规则', TARGET_SYSTEM), state);
-  for (const player of state.players) {
-    系统规则mod.registerSystemRespondActions(state, player.index);
-  }
+  // 注册规则包全局 hooks + 为每个玩家注册选将/弃牌 respond action(与 bootstrap 一致)。
+  // 模式取 state.config(测试构造的 state 未走 create 时缺省身份局)。
+  const ruleset = await loadRuleset(resolveGameMode(state));
+  ruleset.onInit(state);
   // 酒增伤/延时锦囊判定/连环传导 全局 hooks 由 使用牌 skill 的 onInit 注册
   // (registerSkills 内部按座次逐个实例化,首次实例化的座次负责注册)
 }

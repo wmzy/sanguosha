@@ -256,7 +256,7 @@ describe('session:gameOver 后拦截后续广播(回归:主公阵亡后仍下发
     (session as unknown as { attachStateListener: () => void }).attachStateListener();
   });
 
-  it('主公阵亡:广播 gameOver,且 gameOver 之后的 onStateChange 不再广播', () => {
+  it('主公阵亡:广播 gameOver,且 gameOver 之后的 onStateChange 不再广播', async () => {
     const state = getState(session);
     const s = session as unknown as {
       broadcast: (m: ServerMessage) => void;
@@ -266,9 +266,13 @@ describe('session:gameOver 后拦截后续广播(回归:主公阵亡后仍下发
     const broadcastSpy = vi.spyOn(s, 'broadcast');
     const broadcastNewStateSpy = vi.spyOn(s, 'broadcastNewState');
 
-    // 主公阵亡,触发 onStateChange(模拟 击杀 atom 末尾的 notifyStateChange)
+    // 主公阵亡,触发 onStateChange(模拟 击杀 atom 末尾的 notifyStateChange)。
+    // checkGameOver 经规则包动态加载(异步),排空微任务等 gameOver 广播落地。
     state.players[0].alive = false;
     state.onStateChange!();
+    for (let i = 0; i < 50 && !s.gameOverHandled; i++) {
+      await new Promise((r) => setTimeout(r, 1));
+    }
 
     expect(s.gameOverHandled).toBe(true);
     expect(broadcastSpy.mock.calls.some((c) => c[0].type === 'gameOver')).toBe(true);
@@ -333,56 +337,56 @@ describe('checkGameOver:主公阵亡胜负判定', () => {
     });
   }
 
-  it('主公阵亡且反贼存活 → 反贼获胜(winner=存活反贼座次)', () => {
+  it('主公阵亡且反贼存活 → 反贼获胜(winner=存活反贼座次)', async () => {
     const state = makeState([
       { index: 0, identity: '主公', alive: false },
       { index: 1, identity: '忠臣', alive: true },
       { index: 2, identity: '反贼', alive: true },
       { index: 3, identity: '内奸', alive: true },
     ]);
-    const { gameOver, winner } = checkGameOver(state);
+    const { gameOver, winner } = await checkGameOver(state);
     expect(gameOver).toBe(true);
     expect(winner).toBe(2);
     expect(state.players[winner!].identity).toBe('反贼');
   });
 
-  it('主公阵亡、反贼全灭、内奸存活 → 内奸获胜(内奸清场残局)', () => {
+  it('主公阵亡、反贼全灭、内奸存活 → 内奸获胜(内奸清场残局)', async () => {
     const state = makeState([
       { index: 0, identity: '主公', alive: false },
       { index: 1, identity: '反贼', alive: false },
       { index: 2, identity: '内奸', alive: true },
     ]);
-    const { gameOver, winner } = checkGameOver(state);
+    const { gameOver, winner } = await checkGameOver(state);
     expect(gameOver).toBe(true);
     expect(winner).toBe(2);
     expect(state.players[winner!].identity).toBe('内奸');
   });
 
-  it('主公阵亡、反贼/内奸均无存活 → 仍判反贼获胜(取任一反贼座次)', () => {
+  it('主公阵亡、反贼/内奸均无存活 → 仍判反贼获胜(取任一反贼座次)', async () => {
     const state = makeState([
       { index: 0, identity: '主公', alive: false },
       { index: 1, identity: '反贼', alive: false },
       { index: 2, identity: '内奸', alive: false },
       { index: 3, identity: '忠臣', alive: true },
     ]);
-    const { gameOver, winner } = checkGameOver(state);
+    const { gameOver, winner } = await checkGameOver(state);
     expect(gameOver).toBe(true);
     expect(winner).toBeDefined();
     expect(state.players[winner!].identity).toBe('反贼');
   });
 
-  it('主公存活、仅剩主公一人 → 主公方获胜', () => {
+  it('主公存活、仅剩主公一人 → 主公方获胜', async () => {
     const state = makeState([
       { index: 0, identity: '主公', alive: true },
       { index: 1, identity: '反贼', alive: false },
       { index: 2, identity: '内奸', alive: false },
     ]);
-    const { gameOver, winner } = checkGameOver(state);
+    const { gameOver, winner } = await checkGameOver(state);
     expect(gameOver).toBe(true);
     expect(winner).toBe(0);
   });
 
-  it('主忠残局:主公+忠臣存活、反贼内奸全死 → 主公方获胜(回归:曾不结束)', () => {
+  it('主忠残局:主公+忠臣存活、反贼内奸全死 → 主公方获胜(回归:曾不结束)', async () => {
     const state = makeState([
       { index: 0, identity: '主公', alive: true },
       { index: 1, identity: '忠臣', alive: true },
@@ -390,19 +394,19 @@ describe('checkGameOver:主公阵亡胜负判定', () => {
       { index: 3, identity: '反贼', alive: false },
       { index: 4, identity: '内奸', alive: false },
     ]);
-    const { gameOver, winner } = checkGameOver(state);
+    const { gameOver, winner } = await checkGameOver(state);
     expect(gameOver).toBe(true);
     expect(winner).toBe(0);
     expect(state.players[winner!].identity).toBe('主公');
   });
 
-  it('主公存活、仍有反贼存活 → 游戏未结束', () => {
+  it('主公存活、仍有反贼存活 → 游戏未结束', async () => {
     const state = makeState([
       { index: 0, identity: '主公', alive: true },
       { index: 1, identity: '反贼', alive: true },
       { index: 2, identity: '内奸', alive: true },
     ]);
-    expect(checkGameOver(state).gameOver).toBe(false);
+    expect((await checkGameOver(state)).gameOver).toBe(false);
   });
 });
 
@@ -456,16 +460,19 @@ describe('session.resetToLobby:游戏结束后重新进入准备阶段', () => {
     (session as unknown as { attachStateListener: () => void }).attachStateListener();
   });
 
-  it('resetToLobby:房间回到等待中,清除 gameOverHandled,清空准备,广播 game_reset', () => {
+  it('resetToLobby:房间回到等待中,清除 gameOverHandled,清空准备,广播 game_reset', async () => {
     const state = getState(session);
     const s = session as unknown as {
       broadcast: (m: ServerMessage) => void;
       gameOverHandled: boolean;
       room: Room;
     };
-    // 触发游戏结束
+    // 触发游戏结束。checkGameOver 经规则包动态加载(异步),排空微任务等标记置位。
     state.players[0].alive = false;
     state.onStateChange!();
+    for (let i = 0; i < 50 && !s.gameOverHandled; i++) {
+      await new Promise((r) => setTimeout(r, 1));
+    }
     expect(s.gameOverHandled).toBe(true);
 
     const broadcastSpy = vi.spyOn(s, 'broadcast');

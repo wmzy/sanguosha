@@ -53,6 +53,7 @@ function buildRoomConfig(opts: { timeoutSec?: number; name?: string }, defaultNa
     charPool: 'all',
     handSize: 4,
     chat: DEFAULT_CHAT_CONFIG,
+    gameMode: '身份局',
   };
 }
 

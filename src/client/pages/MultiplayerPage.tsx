@@ -16,6 +16,7 @@ import { apiFetch, ApiError } from '../api/client';
 import type { ReplayMeta } from '../replay/types';
 import type { ActionMsg } from '../types';
 import type { RoomInfo, RoomConfig, CharPoolPreset } from '../../server/protocol';
+import type { GameMode } from '../../engine/rules/types';
 
 const page = css`
   ${pageStyle}
@@ -127,7 +128,18 @@ const configVal = css`
   font-weight: bold;
 `;
 
+const GAME_MODE_OPTIONS: Array<{ label: string; value: GameMode }> = [
+  { label: '身份局（经典 2-8 人）', value: '身份局' },
+  { label: '1v1 对决（两人速战）', value: '1v1' },
+];
+
+const GAME_MODE_LABELS: Record<string, string> = {
+  身份局: '身份局',
+  '1v1': '1v1 对决',
+};
+
 const POOL_LABELS: Record<string, string> = {
+
   standard: '标准池 (~32人)',
   extended: '扩展池',
   all: '全武将 (60人)',
@@ -281,6 +293,7 @@ export function MultiplayerPage() {
   const [createName, setCreateName] = useState('');
   const [createMax, setCreateMax] = useState(2);
   const [createRoomType, setCreateRoomType] = useState<'quick' | 'normal'>('quick');
+  const [createGameMode, setCreateGameMode] = useState<GameMode>('身份局');
   const [joinCode, setJoinCode] = useState('');
   const [spectateCode, setSpectateCode] = useState('');
 
@@ -339,7 +352,9 @@ export function MultiplayerPage() {
   }, [mp.roomId, urlRoomId, navigate]);
 
   const handleCreate = () => {
-    mp.createRoom(createName.trim(), createMax, undefined, createRoomType);
+    // 1v1 固定两人;身份局沿用所选人数。config 传部分字段,服务端 normalizeRoomConfig 补全。
+    const max = createGameMode === '1v1' ? 2 : createMax;
+    mp.createRoom(createName.trim(), max, { gameMode: createGameMode } as unknown as RoomConfig, createRoomType);
   };
 
   const handleJoin = () => {
@@ -649,6 +664,26 @@ export function MultiplayerPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                 <div>
+                  <label className={label}>游戏模式</label>
+                  <select
+                    className={inputStyle}
+                    value={editConfig.gameMode}
+                    onChange={(e) => {
+                      const v = e.target.value as GameMode;
+                      handleConfigField('gameMode', v);
+                      // 1v1 强制两人:同步收紧人数上限
+                      const nextMax = v === '1v1' ? 2 : undefined;
+                      mp.updateConfig({ ...editConfig, gameMode: v }, nextMax);
+                    }}
+                  >
+                    {GAME_MODE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className={label}>将池</label>
                   <select
                     className={inputStyle}
@@ -721,6 +756,10 @@ export function MultiplayerPage() {
               <div className={configItem}>
                 <span className={configKey}>房间名</span>
                 <span className={configVal}>{mp.roomState.config.name}</span>
+              </div>
+              <div className={configItem}>
+                <span className={configKey}>游戏模式</span>
+                <span className={configVal}>{GAME_MODE_LABELS[mp.roomState.config.gameMode] ?? mp.roomState.config.gameMode ?? '身份局'}</span>
               </div>
               <div className={configItem}>
                 <span className={configKey}>将池</span>
@@ -1043,16 +1082,6 @@ export function MultiplayerPage() {
               onChange={(e) => setCreateName(e.target.value)}
               placeholder="自动生成房间名"
             />
-            <label className={label}>玩家人数（2-8）</label>
-            <input
-              className={inputStyle}
-              type="number"
-              min={2}
-              max={8}
-              value={createMax}
-              onChange={(e) => setCreateMax(Number(e.target.value) || 0)}
-              onBlur={() => setCreateMax(Math.min(Math.max(createMax || 2, 2), 8))}
-            />
             <label className={label}>房间类型</label>
             <select
               className={inputStyle}
@@ -1062,6 +1091,32 @@ export function MultiplayerPage() {
               <option value="quick">快速房间（人走自动销毁）</option>
               <option value="normal">普通房间（持久保留）</option>
             </select>
+            <label className={label}>游戏模式</label>
+            <select
+              className={inputStyle}
+              value={createGameMode}
+              onChange={(e) => setCreateGameMode(e.target.value as GameMode)}
+            >
+              {GAME_MODE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            {createGameMode === '身份局' && (
+              <>
+                <label className={label}>玩家人数（2-8）</label>
+                <input
+                  className={inputStyle}
+                  type="number"
+                  min={2}
+                  max={8}
+                  value={createMax}
+                  onChange={(e) => setCreateMax(Number(e.target.value) || 0)}
+                  onBlur={() => setCreateMax(Math.min(Math.max(createMax || 2, 2), 8))}
+                />
+              </>
+            )}
             <button
               className={btnStyle}
               style={{ '--btn-bg': colors.accent.orange } as React.CSSProperties}

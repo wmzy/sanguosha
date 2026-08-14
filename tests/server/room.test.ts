@@ -280,6 +280,7 @@ describe('房间配置', () => {
       timeoutSec: 15,
       charPool: 'standard' as const,
       handSize: 5,
+      gameMode: '身份局' as const,
       chat: { enabled: false, whitelistOnly: false, whitelist: [], maxPerGame: 0, maxPerMinute: 5, maxChars: 30 },
     };
     const room = createRoom('x', 4, 'h', sink, customConfig);
