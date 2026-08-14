@@ -13,6 +13,7 @@ import type { Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
+import { slashUnlimitedKey } from '../rules/vars-keys';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -41,7 +42,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await applyAtom(ctx.state, {
       type: '回合用量',
       player: ownerId,
-      key: '杀/unlimited/界咆哮',
+      key: slashUnlimitedKey('界咆哮'),
       value: true,
     });
   });

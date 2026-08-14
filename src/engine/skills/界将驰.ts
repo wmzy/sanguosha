@@ -45,7 +45,7 @@ import { registerSlashQuotaProvider, registerSlashBlocker } from '../rules/slash
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import type { SkillModule } from '../types';
-import { getHandLimitBonus } from '../rules/vars-keys';
+import { getHandLimitBonus, JIANGCHI_CHOICE2_VIEW_KEY, slashBlockedKey, slashExtraKey } from '../rules/vars-keys';
 
 const _SKILL_ID = '界将驰';
 const DISPLAY_NAME = '将驰';
@@ -67,7 +67,7 @@ const PICK_RT = '界将驰/pick';
 /** turn.vars key:选项1激活(值=激活者 ownerId) */
 const CHOICE1_VAR = '将驰/choice1';
 /** turn.vars key:选项2激活(值=激活者 ownerId) */
-const CHOICE2_VAR = '将驰/choice2';
+const CHOICE2_VAR = JIANGCHI_CHOICE2_VIEW_KEY;
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -225,7 +225,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       await applyAtom(ctx.state, {
         type: '回合用量',
         player: ownerId,
-        key: '杀/blocked/界将驰',
+        key: slashBlockedKey('界将驰'),
         value: true,
       });
       return;
@@ -268,7 +268,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     await applyAtom(ctx.state, {
       type: '回合用量',
       player: ownerId,
-      key: '杀/extra/界将驰',
+      key: slashExtraKey('界将驰'),
       value: 1,
     });
   });

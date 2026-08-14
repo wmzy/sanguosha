@@ -6,6 +6,14 @@
 // 会形成 engine→client 反向依赖。故放 engine 层,与 ActionContext(engine/types)同层。
 // client/utils/gameViewHelpers 的 DEFAULT_PLAY_ACTIVE 复用此处,消除重复。
 import type { ActionContext } from '../types';
+import {
+  SLASH_USED_COUNT_KEY,
+  SLASH_EXEMPT_SUIT_KEY,
+  SLASH_UNLIMITED_PREFIX,
+  SLASH_EXTRA_PREFIX,
+  SLASH_BLOCKED_PREFIX,
+  SLASH_TARGET_PREFIX,
+} from './vars-keys';
 
 /** 默认出牌激活条件:当前视角回合 + 出牌阶段 + 无阻塞型 pending。
  *  非阻塞型 pending(出牌窗口)不阻止出牌/用技。这是绝大多数主动出牌/用技场景的
@@ -37,11 +45,11 @@ export function viewSlashMax(view: ActionContext['view'], player: number): numbe
   // 回合制效果:前缀聚合('杀/unlimited/' 任一 true → ∞)
   const tu = p.turnUsage ?? {};
   for (const [k, v] of Object.entries(tu)) {
-    if (k.startsWith('杀/unlimited/') && v) return Infinity;
+    if (k.startsWith(SLASH_UNLIMITED_PREFIX) && v) return Infinity;
   }
   let max = 1;
   for (const [k, v] of Object.entries(tu)) {
-    if (k.startsWith('杀/extra/') && typeof v === 'number') max += v;
+    if (k.startsWith(SLASH_EXTRA_PREFIX) && typeof v === 'number') max += v;
   }
   return max;
 }
@@ -66,7 +74,7 @@ export function viewSlashTargetMax(
   // 回合制效果:额外卖目标('杀/target/' 叠加)
   const tu = p.turnUsage ?? {};
   for (const [k, v] of Object.entries(tu)) {
-    if (k.startsWith('杀/target/') && typeof v === 'number') max += v;
+    if (k.startsWith(SLASH_TARGET_PREFIX) && typeof v === 'number') max += v;
   }
   // 持久技能 tag:火杀多指定一个目标(疠火 +1 目标 → 上限 2)
   if (card?.name === '杀' && card.damageType === '火焰' && p.tags?.includes('杀/火杀多目标'))
@@ -77,7 +85,7 @@ export function viewSlashTargetMax(
 /** 前端视角下某玩家本回合已出杀次数(从 view.turnUsage 投影读)。
  *  turnUsage 由「回合用量」atom 实时同步,与后端 slashUsed()(额定+额外 合计)一致。 */
 export function viewSlashUsed(view: ActionContext['view'], player: number): number {
-  const used = view.players[player]?.turnUsage?.['杀/usedCount'];
+  const used = view.players[player]?.turnUsage?.[SLASH_USED_COUNT_KEY];
   return typeof used === 'number' ? used : 0;
 }
 
@@ -88,10 +96,10 @@ export function viewCanSlash(view: ActionContext['view'], player: number): boole
   const tu = p.turnUsage ?? {};
   // 回合制阻断('杀/blocked/' 任一 true → 禁杀)
   for (const [k, v] of Object.entries(tu)) {
-    if (k.startsWith('杀/blocked/') && v) return false;
+    if (k.startsWith(SLASH_BLOCKED_PREFIX) && v) return false;
   }
   // 花色豁免:同花色杀无次数限制
-  const exemptSuit = tu['杀/exemptSuit'];
+  const exemptSuit = tu[SLASH_EXEMPT_SUIT_KEY];
   if (typeof exemptSuit === 'string' && exemptSuit !== '') {
     if (view.viewer === player) {
       const hand = p.hand;

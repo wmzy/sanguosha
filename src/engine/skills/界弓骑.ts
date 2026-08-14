@@ -40,7 +40,7 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import { registerSlashExemptor } from '../rules/slash-quota';
 import type { SkillModule } from '../types';
-import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { PICK_RESULT_KEY, GONGQI_ACTIVE_VIEW_KEY, SLASH_EXEMPT_SUIT_KEY } from '../rules/vars-keys';
 
 const SKILL_ID = '界弓骑';
 const DISPLAY_NAME = '弓骑';
@@ -48,7 +48,7 @@ const DISPLAY_NAME = '弓骑';
 /** player.vars key:本回合已发动(后缀 /usedThisTurn → 回合结束自动清空) */
 const USED_KEY = `${SKILL_ID}/usedThisTurn`;
 /** turn.vars key:本回合攻击范围无限激活(值=激活者 ownerId) */
-const ACTIVE_VAR = `${SKILL_ID}/active`;
+const ACTIVE_VAR = GONGQI_ACTIVE_VIEW_KEY;
 /** turn.vars key:本回合无次数限制的杀花色(值=花色字符串) */
 const SUIT_VAR = `${SKILL_ID}/suit`;
 
@@ -171,7 +171,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         await applyAtom(st, {
           type: '回合用量',
           player: from,
-          key: '杀/exemptSuit',
+          key: SLASH_EXEMPT_SUIT_KEY,
           value: discardedCard.suit,
         });
       }

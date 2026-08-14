@@ -18,6 +18,7 @@ import { incSlashUsed, isSlashExempted, slashUsed } from '../../rules/slash-quot
 import { slashTargetMax } from '../../rules/slash-target';
 import { defaultPlayActive, viewCanSlash } from '../../rules/action-active';
 import type { CardEffect, ResolveCtx } from '../../types';
+import { SLASH_USED_COUNT_KEY } from '../../rules/vars-keys';
 
 /** 杀的合法性追加检测：仅校验目标在攻击范围内。
  *  出杀次数限制（slash-quota）不由此处检查——由 validateCardUse.checkUsageLimit
@@ -63,7 +64,7 @@ async function onSettleSlash(
     await applyAtom(state, {
       type: '回合用量',
       player: source,
-      key: '杀/usedCount',
+      key: SLASH_USED_COUNT_KEY,
       value: slashUsed(state),
     });
   }

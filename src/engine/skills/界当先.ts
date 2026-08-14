@@ -40,6 +40,7 @@ import { applyAtom } from '../core/apply';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { registerAttackRangeExemptor } from '../rules/distance';
+import { DANGXIAN_NO_RANGE_VIEW_KEY } from '../rules/vars-keys';
 
 const DISPLAY_NAME = '当先';
 
@@ -52,7 +53,7 @@ const DMG_IN_PHASE_KEY = '当先/damageInPhase';
 /** turn.vars:无距离限制杀的 cardId(仅对当先获得的该张杀生效)。 */
 const NORANGE_KILL_KEY = '当先/noRangeKillCardId';
 /** turn.vars + view.turnUsage:无距离杀激活(布尔投影,供前端 viewCanAttack 宽松放行)。 */
-const NORANGE_ACTIVE_KEY = '当先/noRangeActive';
+const NORANGE_ACTIVE_KEY = DANGXIAN_NO_RANGE_VIEW_KEY;
 /** view.turnUsage:额外出牌阶段激活(布尔投影,供前端 'end' action activeWhen 精确 gating)。
  *  后端用 turn.vars[ACTIVE_KEY] 判断;前端无法读 turn.vars,须经 回合用量 atom 同步投影,
  *  否则 'end' 按钮会在所有正常出牌阶段误显示(activeWhen 仅凭 phase 无法区分额外/正常阶段)。 */

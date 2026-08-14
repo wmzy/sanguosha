@@ -26,6 +26,7 @@ import { registerAction } from '../core/skill';
 import { registerSlashExtraProvider, registerSlashBlocker } from '../rules/slash-quota';
 import { registerSlashTargetProvider } from '../rules/slash-target';
 import { registerAttackRangeExemptor } from '../rules/distance';
+import { slashExtraKey, slashTargetKey, slashBlockedKey } from '../rules/vars-keys';
 
 /** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
 function rankValue(rank: string): number {
@@ -159,12 +160,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         // 赢:三项效果(攻击范围无限 / +1 杀 / 额外目标)统一由 turn.vars['天义/win'] 驱动
         st.turn.vars[WIN_VAR] = from;
         // 投影到 view.turnUsage,供前端 viewSlashMax/viewSlashTargetMax 推断(通用前缀 key)
-        await applyAtom(st, { type: '回合用量', player: from, key: '杀/extra/天义', value: 1 });
-        await applyAtom(st, { type: '回合用量', player: from, key: '杀/target/天义', value: 1 });
+        await applyAtom(st, { type: '回合用量', player: from, key: slashExtraKey('天义'), value: 1 });
+        await applyAtom(st, { type: '回合用量', player: from, key: slashTargetKey('天义'), value: 1 });
       } else {
         // 没赢:本回合不能使用杀(由 slashBlocker 落实)
         st.turn.vars[LOST_VAR] = from;
-        await applyAtom(st, { type: '回合用量', player: from, key: '杀/blocked/天义', value: true });
+        await applyAtom(st, { type: '回合用量', player: from, key: slashBlockedKey('天义'), value: true });
       }
 
       await popFrame(st);

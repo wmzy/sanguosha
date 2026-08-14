@@ -59,7 +59,7 @@ import { registerHandLimitProvider } from '../rules/hand-limit';
 import { registerDistanceExemptor } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
 import type { SkillModule } from '../types';
-import { getHandLimitBonus } from '../rules/vars-keys';
+import { getHandLimitBonus, XIANZHEN_WIN_TARGET_VIEW_KEY } from '../rules/vars-keys';
 
 const SKILL_ID = '界陷阵';
 const DISPLAY_NAME = '陷阵';
@@ -67,7 +67,7 @@ const DISPLAY_NAME = '陷阵';
 const TARGET_CARD_KEY = `${SKILL_ID}/targetCard`;
 const PD_RT = `${SKILL_ID}/拼点`;
 /** 赢效果标记:owner 本回合对 target 使用牌无距离/次数限制且无视防具。值=目标座次。 */
-const WIN_VAR = '陷阵/winTarget';
+const WIN_VAR = XIANZHEN_WIN_TARGET_VIEW_KEY;
 /** 没赢效果标记:owner 本回合不能对 target 使用杀。值=目标座次。 */
 const LOST_VAR = '陷阵/lostTarget';
 

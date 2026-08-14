@@ -41,6 +41,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { registerTrickBlocker } from '../rules/trick-quota';
 import { registerSlashTargetProvider } from '../rules/slash-target';
 import type { SkillModule } from '../types';
+import { slashTargetKey } from '../rules/vars-keys';
 
 const SKILL_ID = '界巧说';
 const DISPLAY_NAME = '巧说';
@@ -52,7 +53,7 @@ const WIN_NEXT_VAR = '巧说/winNext';
 /** 没赢效果标记:owner 本回合不能使用普通锦囊牌。 */
 const LOST_VAR = '巧说/lost';
 /** 杀目标数 view 投影 key:赢后下一张杀可多指定一个目标(前端 viewSlashTargetMax 读 '杀/target/' 前缀叠加)。 */
-const SLASH_TARGET_TU = '杀/target/界巧说';
+const SLASH_TARGET_TU = slashTargetKey('界巧说');
 
 /** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13。 */
 function rankValue(rank: string): number {

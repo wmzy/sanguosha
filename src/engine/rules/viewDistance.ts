@@ -12,6 +12,14 @@
 // 也可继续用 client util(两者基于同一套 distanceVars 投影)。
 
 import type { GameView } from '../types';
+import {
+  XIANZHEN_WIN_TARGET_VIEW_KEY,
+  CHENGLUE_SUITS_VIEW_KEY,
+  JIANGCHI_CHOICE2_VIEW_KEY,
+  GONGQI_ACTIVE_VIEW_KEY,
+  DANGXIAN_NO_RANGE_VIEW_KEY,
+  slashExtraKey,
+} from './vars-keys';
 
 /** GameView 上 from 到 to 的环形座位距离(只算存活玩家) */
 export function viewSeatDistance(
@@ -39,11 +47,11 @@ export function viewEffectiveDistance(
   // turnUsage 由 回合用量 atom 同步;winTarget 存目标座次。
   // 注:GameView 不携带 currentPlayerIndex 区分发起方,这里宽松返回 1(可被所有距离检查放行)。
   // 后端 distance.ts effectiveDistance 严格按 turn.vars 校验(仅对持有界陷阵技能的发起方生效)。
-  if (players.some((p) => p.turnUsage?.['陷阵/winTarget'] === toIdx)) return 1;
+  if (players.some((p) => p.turnUsage?.[XIANZHEN_WIN_TARGET_VIEW_KEY] === toIdx)) return 1;
   // 成略(许攸):本阶段同花色牌无距离限制。turnUsage['成略/suits'] 由回合用量 atom 同步。
   // 前端 filter 无法感知选中卡的花色,保持宽松(成略激活时一律放行);
   // 后端 distance.ts 的 DistanceExemptor 按 cardId 花色严格校验(仅同花色放行)。
-  if (players[fromIdx]?.turnUsage?.['成略/suits']) return 1;
+  if (players[fromIdx]?.turnUsage?.[CHENGLUE_SUITS_VIEW_KEY]) return 1;
   let dist = viewSeatDistance(players, fromIdx, toIdx);
   const fromP = players[fromIdx];
   const toP = players[toIdx];
@@ -65,15 +73,15 @@ export function viewCanAttack(
   if (fromIdx === toIdx) return false;
   // 界陷阵(界高顺):拼点赢后本回合对 winTarget 使用牌无距离限制。
   // turnUsage 由 回合用量 atom 同步;winTarget 存目标座次。
-  if (players.some((p) => p.turnUsage?.['陷阵/winTarget'] === toIdx)) return true;
+  if (players.some((p) => p.turnUsage?.[XIANZHEN_WIN_TARGET_VIEW_KEY] === toIdx)) return true;
   // 诈降(界黄盖):失去体力后本回合【红色杀】无距离限制。turnUsage 由回合用量 atom 同步。
   // 前端 filter 无法感知当前选中的卡色(签名只收 view/target),这里保持宽松——
   // 诈降激活时一律放行(UI 提示);后端 杀.validate 按卡色严格校验(仅红杀放行)。
-  if (players[fromIdx]?.turnUsage?.['杀/extra/诈降']) return true;
+  if (players[fromIdx]?.turnUsage?.[slashExtraKey('诈降')]) return true;
   // 成略(许攸):本阶段同花色牌无距离和次数限制。turnUsage['成略/suits'] 由回合用量 atom 同步。
   // 前端 filter 无法感知选中杀的花色,保持宽松(成略激活时所有目标可点);
   // 后端 AttackRangeExemptor/SlashExemptor 按 cardId 花色严格校验(仅同花色放行)。
-  if (players[fromIdx]?.turnUsage?.['成略/suits']) return true;
+  if (players[fromIdx]?.turnUsage?.[CHENGLUE_SUITS_VIEW_KEY]) return true;
   // 界武圣(界关羽):你使用的方片【杀】无距离限制。前端 filter 无法感知选中卡色,
   // 保持宽松(所有目标可点);后端 杀.validate 按花色严格校验(仅方片杀放行)。
   if (players[fromIdx]?.skills?.includes('界武圣')) return true;
@@ -85,15 +93,15 @@ export function viewCanAttack(
   // 界将驰(界曹彰)选项②:本回合使用【杀】无距离限制。
   // turnUsage 由回合用量 atom 同步;激活时前端宽松放行(UI 提示),
   // 后端 杀.validate 严格校验。
-  if (players[fromIdx]?.turnUsage?.['将驰/choice2']) return true;
+  if (players[fromIdx]?.turnUsage?.[JIANGCHI_CHOICE2_VIEW_KEY]) return true;
   // 界弓骑(界韩当):弃牌后本回合攻击范围无限。
   // turnUsage 由 回合用量 atom 同步;激活时前端宽松放行(UI 提示),
   // 后端 distance.ts inAttackRange 严格校验。
-  if (players[fromIdx]?.turnUsage?.['界弓骑/active']) return true;
+  if (players[fromIdx]?.turnUsage?.[GONGQI_ACTIVE_VIEW_KEY]) return true;
   // 当先(界廖化):额外出牌阶段获得的该张杀无距离限制。
   // turnUsage 由 回合用量 atom 同步;激活时前端宽松放行(所有目标可点),
   // 后端 distance.ts 的攻击范围豁免器按 cardId 严格校验(仅该张杀放行)。
-  if (players[fromIdx]?.turnUsage?.['当先/noRangeActive']) return true;
+  if (players[fromIdx]?.turnUsage?.[DANGXIAN_NO_RANGE_VIEW_KEY]) return true;
   const range = players[fromIdx]?.distanceVars?.attackRange ?? 1;
   return viewEffectiveDistance(players, fromIdx, toIdx) <= range;
 }

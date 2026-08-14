@@ -55,6 +55,60 @@ export const DISTANCE_ATTACK_RANGE_KEY = '距离/出杀范围';
 /** 选牌面板结果({ zone, cardId, handIndex })。读:flows/pick-card-panel.ts;写:10+ 技能/cards。 */
 export const PICK_RESULT_KEY = '选牌/结果';
 
+// ── view.turnUsage:回合用量投影 key(跨文件读写的 view 侧契约) ──────────
+//
+// turnUsage 是 state 侧限次/回合状态 vars 的 view 投影(写:「回合用量」atom +
+// buildView 初值;清:「回合结束」atom 整体清空)。跨文件读写时 key 同样是
+// 隐式契约,拼错即 view-projection desync(activeWhen 永远 false / 前端推断失效),
+// 与 state 侧 vars 同理收敛于此。读方主要为 rules/action-active.ts(杀/* 前缀聚合)、
+// rules/viewDistance.ts(具名 key)与各技能 activeWhen(限一次)。
+// 局部 key(仅单文件读写,如各技能自己的 COUNT_KEY/STATE_VIEW_KEY)仍不收入。
+
+/** 出杀已用次数(数字,= slashUsed() 合计)。写:cards/杀、蛊惑/界蛊惑(当作杀)、buildView;读:action-active.viewSlashUsed。 */
+export const SLASH_USED_COUNT_KEY = '杀/usedCount';
+/** 花色豁免(花色字符串:该花色的杀不占出杀次数)。写:界弓骑;读:action-active.viewCanSlash。 */
+export const SLASH_EXEMPT_SUIT_KEY = '杀/exemptSuit';
+
+/** 前缀:'杀/unlimited/<来源>' — 任一真值 → 无限出杀(action-active.viewSlashMax 前缀聚合)。 */
+export const SLASH_UNLIMITED_PREFIX = '杀/unlimited/';
+/** 前缀:'杀/extra/<来源>' — 数字,叠加到出杀上限。 */
+export const SLASH_EXTRA_PREFIX = '杀/extra/';
+/** 前缀:'杀/blocked/<来源>' — 任一真值 → 禁止出杀。 */
+export const SLASH_BLOCKED_PREFIX = '杀/blocked/';
+/** 前缀:'杀/target/<来源>' — 数字,叠加到杀目标数上限。 */
+export const SLASH_TARGET_PREFIX = '杀/target/';
+
+export function slashUnlimitedKey(source: string): string {
+  return SLASH_UNLIMITED_PREFIX + source;
+}
+export function slashExtraKey(source: string): string {
+  return SLASH_EXTRA_PREFIX + source;
+}
+export function slashBlockedKey(source: string): string {
+  return SLASH_BLOCKED_PREFIX + source;
+}
+export function slashTargetKey(source: string): string {
+  return SLASH_TARGET_PREFIX + source;
+}
+
+/** 限一次后缀。「回合结束」atom 按此后缀清空 state vars;buildView 初值投影按此后缀过滤 player.vars。 */
+export const USED_THIS_TURN_SUFFIX = '/usedThisTurn';
+/** 限一次投影 key。写:once-per-turn.markOncePerTurn(参数为技能名,动态);读:各技能 activeWhen。 */
+export function usedThisTurnKey(skillName: string): string {
+  return skillName + USED_THIS_TURN_SUFFIX;
+}
+
+/** 拼点赢后本回合对其用牌无距离限制(值=目标座次)。写:界陷阵(WIN_VAR 别名);读:viewDistance。 */
+export const XIANZHEN_WIN_TARGET_VIEW_KEY = '陷阵/winTarget';
+/** 本回合弃置牌花色数组(同花色牌无距离/次数限制,前端宽松放行)。写:成略(SUITS_VAR 别名);读:viewDistance。 */
+export const CHENGLUE_SUITS_VIEW_KEY = '成略/suits';
+/** 选项②激活:杀无距离限制。写:界将驰(CHOICE2_VAR 别名);读:viewDistance。 */
+export const JIANGCHI_CHOICE2_VIEW_KEY = '将驰/choice2';
+/** 弃牌后本回合攻击范围无限。写:界弓骑(ACTIVE_VAR 别名);读:viewDistance。 */
+export const GONGQI_ACTIVE_VIEW_KEY = '界弓骑/active';
+/** 额外出牌阶段获得的杀无距离限制。写:界当先(NORANGE_ACTIVE_KEY 别名);读:viewDistance。 */
+export const DANGXIAN_NO_RANGE_VIEW_KEY = '当先/noRangeActive';
+
 // ── helpers:带后缀/前缀的拼接 key ──────────────────────────
 
 /**

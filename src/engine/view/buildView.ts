@@ -6,7 +6,7 @@ import { resolveChoosePlayerCandidates } from './choosePlayerCandidates';
 import { resolveCardFilterCandidates } from './cardFilterCandidates';
 import { slashUsed } from '../rules/slash-quota';
 import { getCardResponseMode, SILENT_RESPONSE_PROMPT } from '../core/card-response-availability';
-import { getDistanceAttackMod, getDistanceDefenseMod, getDistanceAttackRange } from '../rules/vars-keys';
+import { getDistanceAttackMod, getDistanceDefenseMod, getDistanceAttackRange, SLASH_USED_COUNT_KEY, USED_THIS_TURN_SUFFIX } from '../rules/vars-keys';
 
 /** 从 ClientMessage 生成可读日志文本(不含玩家名——player 字段单独携带,由展示层映射) */
 export function formatLogEntry(msg: ClientMessage): string {
@@ -184,9 +184,9 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       // baseline/重连时从此处初值;运行期由「回合用量」atom applyView 增量维护。
       // 出杀计数后端拆为 杀/quotaUsed + 杀/extraUsed(模块 K),view 仍投影为合计 '杀/usedCount'。
       turnUsage: {
-        ...(slashUsed(state) > 0 ? { '杀/usedCount': slashUsed(state) } : {}),
+        ...(slashUsed(state) > 0 ? { [SLASH_USED_COUNT_KEY]: slashUsed(state) } : {}),
         ...Object.fromEntries(
-          Object.entries(p.vars).filter(([k, v]) => k.endsWith('/usedThisTurn') && v),
+          Object.entries(p.vars).filter(([k, v]) => k.endsWith(USED_THIS_TURN_SUFFIX) && v).map(([k, v]) => [k, v]),
         ),
       },
       // 判定区:延时锦囊的 cardId 列表(乐不思蜀/闪电/兵粮寸断)

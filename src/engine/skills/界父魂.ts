@@ -48,7 +48,7 @@ import { topFrame } from '../core/frame';
 import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
-import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
+import { DISTANCE_ATTACK_RANGE_KEY, slashUnlimitedKey } from '../rules/vars-keys';
 
 const GRANT_VAR = '父魂/granted';
 const COLOR_LIMIT_VAR = '闪/色限制';
@@ -275,7 +275,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await applyAtom(ctx.state, {
         type: '回合用量',
         player: ownerId,
-        key: '杀/unlimited/父魂',
+        key: slashUnlimitedKey('父魂'),
         value: true,
       });
     },
@@ -393,7 +393,7 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
       const p = ctx.view.players[ctx.perspectiveIdx];
       if (!p?.alive) return false;
       // 仅在获得武圣时显示
-      if (!p.turnUsage?.['杀/unlimited/父魂']) return false;
+      if (!p.turnUsage?.[slashUnlimitedKey('父魂')]) return false;
       const hasRed = p.hand?.some((c) => c.color === '红') ?? false;
       if (!hasRed) return false;
       // 出杀路径(自己回合 + 出牌阶段 + 还能出杀)

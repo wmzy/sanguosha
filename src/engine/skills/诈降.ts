@@ -25,6 +25,7 @@ import { registerBeforeHook, registerAfterHook } from '../core/skill';
 import { registerSlashExtraProvider } from '../rules/slash-quota';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import type { SkillModule } from '../types';
+import { slashExtraKey } from '../rules/vars-keys';
 
 /** 本回合诈降杀增益是否激活的 turn.vars key(值为激活者座次 number)。
  *  仅在 owner 出牌阶段失去体力后设置;杀技能/action-active/distance 据此分支红色杀增益。 */
@@ -109,7 +110,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       await applyAtom(ctx.state, {
         type: '回合用量',
         player: ownerId,
-        key: '杀/extra/诈降',
+        key: slashExtraKey('诈降'),
         value: 1,
       });
     }

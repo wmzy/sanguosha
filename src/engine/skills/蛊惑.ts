@@ -49,6 +49,7 @@ import { registerAction, hasBlockingPending, declareAlternativeResponse } from '
 import { inAttackRange } from '../rules/distance';
 import { canSlash, incSlashUsed, slashUsed } from '../rules/slash-quota';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
+import { SLASH_USED_COUNT_KEY, usedThisTurnKey } from '../rules/vars-keys';
 
 const REQUEST_TYPE = '蛊惑/质疑';
 const QUESTIONER_VAR = '蛊惑/质疑者';
@@ -125,7 +126,7 @@ async function resolveGuSlash(
   }
   // 蛊惑-杀 成功计入出杀次数(标准 FAQ:真牌/无人质疑=正常使用)
   incSlashUsed(state);
-  await applyAtom(state, { type: '回合用量', player: source, key: '杀/usedCount', value: slashUsed(state) });
+  await applyAtom(state, { type: '回合用量', player: source, key: SLASH_USED_COUNT_KEY, value: slashUsed(state) });
 }
 
 /** 将扣牌(在弃牌堆)经 弃牌堆→手牌→当作(影子 outputName)→手牌→处理区 提供到当前结算帧。
@@ -481,7 +482,7 @@ function activeUseActive(ctx: ActionContext): boolean {
   const pending = view.pending;
   const blocked = pending != null && pending.isBlocking !== false;
   if (blocked) return false;
-  if (p.turnUsage?.['蛊惑/usedThisTurn']) return false;
+  if (p.turnUsage?.[usedThisTurnKey('蛊惑')]) return false;
   return (p.hand?.length ?? 0) > 0;
 }
 
@@ -490,7 +491,7 @@ function dodgeActive(ctx: ActionContext): boolean {
   const { view, perspectiveIdx } = ctx;
   const p = view.players[perspectiveIdx];
   if (!p) return false;
-  if (p.turnUsage?.['蛊惑/usedThisTurn']) return false;
+  if (p.turnUsage?.[usedThisTurnKey('蛊惑')]) return false;
   if ((p.hand?.length ?? 0) === 0) return false;
   const pending = view.pending;
   return (
@@ -504,7 +505,7 @@ function rescueActive(ctx: ActionContext): boolean {
   const { view, perspectiveIdx } = ctx;
   const p = view.players[perspectiveIdx];
   if (!p) return false;
-  if (p.turnUsage?.['蛊惑/usedThisTurn']) return false;
+  if (p.turnUsage?.[usedThisTurnKey('蛊惑')]) return false;
   if ((p.hand?.length ?? 0) === 0) return false;
   const pending = view.pending;
   const atom = pending?.atom as { type?: string; requestType?: string } | null;

@@ -38,7 +38,7 @@ import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rule
 import { registerSlashExtraProvider } from '../rules/slash-quota';
 import { registerDistanceExemptor } from '../rules/distance';
 import type { SkillModule } from '../types';
-import { handLimitBonusKey, getHandLimitBonus } from '../rules/vars-keys';
+import { handLimitBonusKey, getHandLimitBonus, slashExtraKey } from '../rules/vars-keys';
 
 const SKILL_NAME = '决堰';
 
@@ -143,7 +143,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         // 杀限制次数+3(本回合):slashExtraProvider 读此标记
         st.turn.vars[TURN_WEAPON] = true;
         // 投影 view.turnUsage,供前端 viewSlashMax 推断
-        await applyAtom(st, { type: '回合用量', player: ownerId, key: '杀/extra/决堰', value: 3 });
+        await applyAtom(st, { type: '回合用量', player: ownerId, key: slashExtraKey('决堰'), value: 3 });
       } else if (group === '防具') {
         // 摸三张牌
         await applyAtom(st, { type: '摸牌', player: ownerId, count: 3 });
