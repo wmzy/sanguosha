@@ -499,4 +499,62 @@ describe('界将驰', () => {
       expect(viewSlashMax(v, 0)).toBe(2);
     });
   });
+
+  // ─── 回归:UDFJRA 对局卡死(2026-08-14) ────────────
+  // 旧 bug:将驰挂在 阶段结束(摸牌) after-hook,晚于 回合管理 的同 atom after-hook
+  // (后者已推进 phase 到出牌并启动出牌窗口循环)。将驰的阻塞型 请求回应 slot(target=0)
+  // 覆盖 pendingSlots[0] 里的出牌窗口 slot → 窗口 slot 孤立(不在 Map 中,超时
+  // fireTimeoutNow 因 get(0)!==slot 而 bail)→ 回合循环 await 永不返回 → 应答将驰后
+  // 出牌窗口不再重建,游戏冻结在无 pending 状态。
+  // 修复:改 before-hook(镜像 截辎/界双雄),询问在回合管理推进阶段之前完成。
+  // 本用例带 回合管理 走完整阶段机(现有用例均手动 applyAtom,覆盖不到此冲突)。
+  it('摸牌阶段结束的将驰询问不孤儿化出牌窗口(完整阶段机回归)', async () => {
+    const t1 = makeCard('t1', '闪', '♥', '5');
+    const w1 = makeCard('w1', '桃', '♦', '6');
+    const d1 = makeCard('d1', '桃', '♦', '7'); // 选项①的摸牌牌
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['回合管理', '界将驰'] }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操' }),
+      ],
+      cardMap: { t1, w1, d1 },
+      zones: { deck: ['t1', 'w1', 'd1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '摸牌',
+      turn: { round: 1, phase: '摸牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    // 完整摸牌阶段:阶段开始(设 normalDrawPhase 标记)→ 摸 2 → 阶段结束
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '摸牌' });
+    await harness.waitForStable();
+    await applyAtom(harness.state, { type: '摸牌', player: 0, count: 2 });
+    void applyAtom(harness.state, { type: '阶段结束', player: 0, phase: '摸牌' });
+    await harness.waitForStable();
+
+    // 将驰询问① — before-hook 语义:询问发生在 阶段结束(摸牌) apply 之前,phase 仍是 摸牌
+    P0.expectPending('请求回应');
+    expect(harness.state.phase).toBe('摸牌');
+    await P0.respond('界将驰', { choice: true }); // 发动
+    await harness.waitForStable();
+    // 将驰询问②(手牌非空:摸了 2 张)
+    P0.expectPending('请求回应');
+    await P0.respond('界将驰', { choice: true }); // 选①
+    await harness.waitForStable();
+
+    // 询问全部结束后:阶段结束 apply + 回合管理 after-hook 推进到出牌,启动窗口循环
+    expect(harness.state.phase).toBe('出牌');
+
+    // 核心断言:将驰询问全部结束后,出牌窗口 slot 必须存在于 pendingSlots
+    // (旧 bug:窗口 slot 被将驰的请求回应覆盖后孤立,应答后 pendingSlots 里再无窗口)
+    const windowSlot = [...harness.state.pendingSlots.values()].find(
+      (s) => (s.atom as { type?: string }).type === '出牌窗口',
+    );
+    expect(windowSlot).toBeDefined();
+    expect(harness.state.phase).toBe('出牌');
+    // 选项①效果照常生效(摸了 d1,choice1 标记就位)
+    expect(harness.state.players[0].hand).toContain('d1');
+    expect(harness.state.turn.vars['将驰/choice1']).toBe(0);
+  });
 });

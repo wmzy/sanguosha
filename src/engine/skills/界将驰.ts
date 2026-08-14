@@ -11,9 +11,11 @@
 //   - 界版②:"重铸一张牌"(弃+摸一张,资源无损;转化出"无距离限制"杀)
 //
 // 实现要点:
-//   - 触发时机:阶段结束(摸牌) after-hook。需区分"正常结束"vs"被跳过"——
+//   - 触发时机:阶段结束(摸牌) before-hook(先于回合管理的同 atom after-hook,避免
+//     阻塞型 pending 与出牌窗口 slot 同 target 覆盖导致卡死,详见核心 hook 处注释)。
+//     需区分"正常结束"vs"被跳过"——
 //     仿 截辎.ts:阶段开始(摸牌) after-hook 设 normalDrawPhase 标记(被跳过的
-//     摸牌阶段 cancel 阶段开始,after-hook 不执行,标记缺失)。阶段结束 after-hook
+//     摸牌阶段 cancel 阶段开始,after-hook 不执行,标记缺失)。阶段结束 hook
 //     校验标记存在才触发,确保兵粮寸断/神速/巧变/再起跳过时不误触发。
 //   - 选项1 杀次数-1:slash-quota.ts 的 slashMax 额定默认 1,仅可覆盖不可减。
 //     用 registerSlashBlocker 直接阻断出杀(canSlash=false),等效"次数变 0"。
@@ -40,7 +42,7 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { recastCard } from '../flows/recast';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerSlashQuotaProvider, registerSlashBlocker } from '../rules/slash-quota';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import { registerAttackRangeExemptor } from '../rules/distance';
@@ -163,8 +165,17 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ctx.state.localVars[NORMAL_KEY] = ownerId;
   });
 
-  // ── 阶段结束(摸牌) after-hook:核心触发,询问并执行选择 ──
-  registerAfterHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
+  // ── 阶段结束(摸牌) before-hook:核心触发,询问并执行选择 ──
+  // 必须用 before-hook(非 after-hook):回合管理 的 阶段结束(摸牌) after-hook 会把
+  // state.phase 推进到"出牌"并以 fire-and-forget 启动出牌窗口循环(创建非阻塞 slot)。
+  // 回合管理 注册早于角色技能(DEFAULT_SKILLS 排在前),after-hook 中本技能晚于它执行,
+  // 其阻塞型 pending(ACTIVATE_RT/CHOOSE_RT/PICK_RT)会与出牌窗口 slot 冲突——pendingSlots
+  // 按 target 索引,两者同 target 互相覆盖,被覆盖的出牌窗口 slot 孤立、超时 fireTimeoutNow
+  // 因 pendingSlots.get(target)!==slot 而 bail → 回合循环永不 resolve → 游戏卡死
+  // (UDFJRA 对局实证:将驰应答后出牌窗口不再重建,整局冻结在无 pending 状态)。
+  // 改用 before-hook:本技能先于 atom apply 与回合管理 after-hook 结算,pending 在出牌
+  // 窗口创建前完成。(镜像 截辎/界双雄 的同款手法)
+  registerBeforeHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '阶段结束') return;
     if (atom.phase !== '摸牌') return;
