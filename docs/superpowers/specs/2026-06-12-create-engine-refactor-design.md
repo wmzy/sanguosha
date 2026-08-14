@@ -4,7 +4,7 @@
 
 **日期**: 2026-06-12
 **状态**: 设计完成,待用户 review
-**前置依赖**: `src/engine/create-engine.ts` 当前实现、ADR-0013(技能/角色解耦)、`docs/superpowers/specs/2026-06-09-engine-rewrite-design.md`
+**前置依赖**: `src/engine/create-engine.ts` 当前实现、ADR-0030(技能/角色解耦)、`docs/superpowers/specs/2026-06-09-engine-rewrite-design.md`
 
 ---
 

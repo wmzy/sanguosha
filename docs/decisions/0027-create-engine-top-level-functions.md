@@ -232,7 +232,7 @@ return { gameOver, winner };
 ## 与现有 ADR 的关系
 
 - **取代**：旧的 `createEngine(): EngineInstance` 闭包工厂模式
-- **依赖**：ADR 0012（atom apply void / 原地变更）、ADR 0013（skill/character 解耦，模块注册机制）
+- **依赖**：ADR 0012（atom apply void / 原地变更）、ADR 0030（skill/character 解耦，模块注册机制）
 - **配合**：ADR 0026（统一引擎架构）规划中 —— 0026 提到 `GameAction` 简化和 handler 层消失，0027 提前把 engine 入口的闭包依赖拆掉为 0026 铺路
 - **影响**：`src/server/session.ts`（game lifecycle 改为 state 持有而非 engine 持有）；`tests/engine-harness.ts`（改用 state 直接持有）
 

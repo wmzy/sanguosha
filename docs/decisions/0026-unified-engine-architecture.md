@@ -279,4 +279,4 @@ ADR 0025 的异步 hook（`async function onBefore/onAfter` + `await pending(...
 - **取代**：`card-handlers.ts` 的 switch-case 分发模式、ADR 0025（异步 hook PoC）
 - **依赖**：ADR 0012（统一 applyAtoms）、ADR 0015（3 原子）、ADR 0016（useCard 3 原子）
 - **包含**：atom-as-event 迁移（serverLog 存 AtomLogEntry）作为本 ADR 的一部分
-- **被影响**：ADR 0013（技能-角色解耦）的 `SkillDef` 接口需扩展
+- **被影响**：ADR 0030（技能-角色解耦）的 `SkillDef` 接口需扩展
