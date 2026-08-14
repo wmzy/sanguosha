@@ -54,6 +54,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
         roomId={c.activeRoomId}
         playerCount={c.playerCount}
         onDeleteRoom={c.handleDeleteRoom}
+        onRoomGone={c.handleRoomGone}
       />
     );
   }
@@ -66,6 +67,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
         playerCount={c.playerCount}
         onPlayerCountChange={c.setPlayerCount}
         onCreateRoom={c.handleCreateDebugRoom}
+        isCreating={c.isCreating}
         rooms={rooms}
         onRefresh={c.refreshRoomList}
         onJoin={c.handleJoinDebugRoom}
@@ -81,14 +83,22 @@ function DebugGameView({
   roomId,
   playerCount,
   onDeleteRoom,
+  onRoomGone,
 }: {
   roomId: string;
   playerCount: number;
   onDeleteRoom: () => void;
+  /** 连接失败(房间被回收等):由控制器清理会话并回大厅 */
+  onRoomGone: (err?: unknown) => void;
 }) {
   return (
     <SubmittedCharSelectProvider>
-      <DebugGameViewInner roomId={roomId} playerCount={playerCount} onDeleteRoom={onDeleteRoom} />
+      <DebugGameViewInner
+        roomId={roomId}
+        playerCount={playerCount}
+        onDeleteRoom={onDeleteRoom}
+        onRoomGone={onRoomGone}
+      />
     </SubmittedCharSelectProvider>
   );
 }
@@ -97,10 +107,13 @@ function DebugGameViewInner({
   roomId,
   playerCount,
   onDeleteRoom,
+  onRoomGone,
 }: {
   roomId: string;
   playerCount: number;
   onDeleteRoom: () => void;
+  /** 连接失败(房间被回收等):由控制器清理会话并回大厅 */
+  onRoomGone: (err?: unknown) => void;
 }) {
   const [perspective, setPerspective] = useState(0);
   const conn = useDebugMultiConnection({
@@ -108,6 +121,7 @@ function DebugGameViewInner({
     playerCount,
     perspective,
     onFirstView: (v) => setPerspective(v),
+    onConnectError: (err) => onRoomGone(err),
   });
 
   // 安装遥测:debug 游戏视图挂载时启动,卸载时清理。

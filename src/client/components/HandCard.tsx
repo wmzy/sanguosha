@@ -1,9 +1,24 @@
 import { memo } from 'react';
-import { cx } from '@linaria/core';
+import { cx, css } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import { SUIT_COLOR } from './gameViewConstants';
 import { CardFace } from './CardFace';
 import type { Card } from '../../engine/types';
+
+/**
+ * hover 抬升补强:transform 位移 + 阴影加深(纯视觉,不改事件处理,
+ * 不影响 HTML5 拖拽重排——draggable/落点由 GameView 的 DnD 事件驱动)。
+ * 用 :hover:hover 提升一档优先级,确定性覆盖 gameViewStyles/hand.ts 中
+ * handCard:hover 的 margin-bottom 抬升(margin 布局回流换成 GPU transform);
+ * rotate(var(--fan-angle)) 必须保留,否则破坏扇形手牌排布。
+ */
+const handCardHoverLift = css`
+  &:hover:hover {
+    margin-bottom: 0;
+    transform: rotate(var(--fan-angle, 0deg)) translateY(-8px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.65);
+  }
+`;
 
 export interface HandCardProps {
   card: Card;
@@ -70,6 +85,7 @@ export function HandCardImpl(props: HandCardProps) {
       data-card-id={card.id}
       className={cx(
         styles.handCard,
+        handCardHoverLift,
         isSelected && styles.handCardSelected,
         !canPlay &&
           !isAwaiting &&

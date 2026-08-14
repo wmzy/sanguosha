@@ -18,6 +18,7 @@ import { useMarkCharSelectSubmitted, useClearSubmittedCharSelects } from './useS
 import { createLogger } from '../utils/logger';
 import { logWsMessage, logUserAction } from '../utils/debugTelemetry';
 import { getPlayerId } from '../utils/playerIdentity';
+import { isRoomNotFound } from '../utils/roomErrors';
 import type { GameView } from '../../engine/types';
 import { suitColor, type Suit } from '../../engine/types';
 import type { ServerMessage, ClientMessage } from '../../server/protocol';
@@ -36,6 +37,8 @@ export interface UseDebugMultiConnectionParams {
   playerCount: number;
   perspective: number;
   onFirstView?: (viewer: number) => void;
+  /** 座次连接失败(如房间被服务端回收后 join 404)。触发一次后由调用方决定退路。 */
+  onConnectError?: (err: unknown) => void;
 }
 
 /** 房间准备状态(配置阶段)。由 room_state 消息驱动更新。 */
@@ -78,6 +81,8 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   connectedCount: number;
   /** 正在重连的座次数(0=全部已连接) */
   reconnectingCount: number;
+  /** 座次连接失败原因(房间不存在/网络错误等;null=无)。触发 onConnectError 时同步设置。 */
+  connectError: string | null;
   /** 录像录制器:finalize 导出录像文件,hasData 检查是否有数据 */
   recorder: {
     finalize: (meta: import('../replay/types').ReplayMeta) => import('../replay/types').ReplayFile;
@@ -115,6 +120,13 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   useEffect(() => {
     onFirstViewRef.current = params.onFirstView;
   }, [params.onFirstView]);
+  const onConnectErrorRef = useRef(params.onConnectError);
+  useEffect(() => {
+    onConnectErrorRef.current = params.onConnectError;
+  }, [params.onConnectError]);
+  /** 连接失败提示(多座次只报第一条;null=无) */
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const connectErrorFiredRef = useRef(false);
   const markSubmitted = useMarkCharSelectSubmitted();
   const clearSubmitted = useClearSubmittedCharSelects();
   /** HGC 首次收到 initialView 的座次集合，用于触发 onFirstView（仅 viewer=0 一次） */
@@ -139,6 +151,8 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     setGameOver(null);
     setSeatPlayerIds(new Map());
     firstViewFiredRef.current = false;
+    connectErrorFiredRef.current = false;
+    setConnectError(null);
 
     // StrictMode 安全：cleanup 后不再 join，避免幽灵连接占用座次
     let cancelled = false;
@@ -208,7 +222,24 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
         },
       });
       clientsRef.current.set(viewerIndex, hgc);
-      hgc.connect(roomId, viewerIndex, baseId ? `${baseId}#${viewerIndex}` : undefined);
+      // connect 是 async:房间被服务端回收后 join 404 会 throw。
+      // 必须 catch,否则 unhandled rejection 且 UI 永远停在「0/N 已连接」。
+      hgc.connect(roomId, viewerIndex, baseId ? `${baseId}#${viewerIndex}` : undefined).catch(
+        (err: unknown) => {
+          if (cancelled) return;
+          const message = isRoomNotFound(err)
+            ? '房间已不存在或已关闭'
+            : err instanceof Error
+              ? err.message
+              : String(err);
+          log.error('connect failed', { roomId, viewer: viewerIndex, error: message });
+          // 多座次并发失败只上报一次(其余座次多为同一原因)
+          if (connectErrorFiredRef.current) return;
+          connectErrorFiredRef.current = true;
+          setConnectError(message);
+          onConnectErrorRef.current?.(err);
+        },
+      );
       cleanups.push(() => {
         try {
           hgc.disconnect();
@@ -436,6 +467,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     sendUpdateConfig,
     connectedCount,
     reconnectingCount,
+    connectError,
     recorder: {
       finalize: (meta) => recorderRef.current.finalize(meta),
       hasData: () => recorderRef.current.hasData(),

@@ -15,6 +15,8 @@ interface DebugRoomListProps {
   onPlayerCountChange: (n: number) => void;
   /** 点击"创建调试房间" */
   onCreateRoom: () => void;
+  /** 创建请求进行中(按钮禁用防重复提交) */
+  isCreating?: boolean;
   /** 来自服务端的调试房间列表 */
   rooms: RoomInfo[];
   /** 刷新列表（点击"刷新列表"或创建/删除后） */
@@ -63,6 +65,11 @@ const createBtnBase = css`
   border-radius: 6px;
   font-size: 16px;
   font-weight: bold;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
 `;
 
 const createBtn = css`
@@ -74,6 +81,7 @@ export function DebugRoomList({
   playerCount,
   onPlayerCountChange,
   onCreateRoom,
+  isCreating = false,
   rooms,
   onRefresh,
   onJoin,
@@ -99,8 +107,8 @@ export function DebugRoomList({
             <option value={8}>8人</option>
           </select>
         </div>
-        <button onClick={onCreateRoom} className={cx(createBtnBase, createBtn)}>
-          创建调试房间
+        <button onClick={onCreateRoom} className={cx(createBtnBase, createBtn)} disabled={isCreating}>
+          {isCreating ? '创建中…' : '创建调试房间'}
         </button>
       </div>
       <RoomListPanel

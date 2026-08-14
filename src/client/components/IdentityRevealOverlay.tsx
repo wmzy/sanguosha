@@ -3,6 +3,7 @@
 // 从 GameView.tsx 抽出,组件自包含样式,纯 props 控制。
 
 import { css } from '@linaria/core';
+import { colors } from '../theme';
 import { IDENTITY_COLORS } from './gameViewConstants';
 
 interface IdentityRevealOverlayProps {
@@ -13,19 +14,27 @@ interface IdentityRevealOverlayProps {
 }
 
 /**
- * 身份揭示遮罩。开局时弹出一张身份牌,玩家点击「确认」后消失。
+ * 身份揭示遮罩。开局时弹出一张身份牌,玩家点击「确认」或遮罩背景任意处后消失。
+ * - 点击背景/卡片(冒泡)即确认,避免用户找不到按钮被卡住;
  * - zIndex 高于选将遮罩(10000 vs 9999),先入后出;
  * - 翻牌 + 渐入动画在 animations.css 中定义(`identityCardFlip`/`overlayFadeIn`)。
  */
 export function IdentityRevealOverlay({ identity, onConfirm }: IdentityRevealOverlayProps) {
   const color = IDENTITY_COLORS[identity] || '#888';
   return (
-    <div className={overlayRoot}>
+    <div className={overlayRoot} onClick={onConfirm}>
       <div className={identityCard} style={{ '--identity-color': color } as React.CSSProperties}>
         <div className={identityLabel}>你的身份</div>
         <div className={identityName}>{identity}</div>
       </div>
-      <button className={confirmBtn} onClick={onConfirm}>
+      <button
+        className={confirmBtn}
+        onClick={(e) => {
+          // 阻止冒泡到遮罩根节点,避免 onConfirm 被触发两次
+          e.stopPropagation();
+          onConfirm();
+        }}
+      >
         确认
       </button>
     </div>
@@ -44,6 +53,8 @@ const overlayRoot = css`
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
   animation: overlayFadeIn 0.5s ease-out both;
 `;
 
@@ -78,20 +89,21 @@ const identityName = css`
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 `;
 
-/** 确认按钮:半透明边框 + hover 高亮 */
+/** 确认按钮:金色主题(高对比深色文字)+ hover 提亮 */
 const confirmBtn = css`
   margin-top: 32px;
   padding: 10px 48px;
   font-size: 16px;
   font-weight: bold;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: ${colors.bg.page};
+  background: ${colors.accent.gold};
+  border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s;
+  box-shadow: 0 2px 12px rgba(241, 196, 15, 0.35);
+  transition: filter 0.2s;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.25);
+    filter: brightness(1.12);
   }
 `;

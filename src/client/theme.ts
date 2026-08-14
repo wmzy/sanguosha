@@ -95,3 +95,55 @@ export const errorToastStyle = css`
   border-radius: 8px;
   z-index: 1000;
 `;
+
+// ─── 视觉升级 token:深色卡牌质感(只增不删,纯 CSS 离线可用) ───
+
+/** 金色主强调色系(accent.gold 的深浅/透明变体) */
+export const goldColors = {
+  light: '#ffe9a0',
+  base: colors.accent.gold,
+  soft: '#d4a017',
+  deep: '#9a7208',
+  faint: 'rgba(241, 196, 15, 0.12)',
+  border: 'rgba(241, 196, 15, 0.32)',
+} as const;
+
+/** 阴影层级 token */
+export const shadows = {
+  panel: '0 8px 24px rgba(0, 0, 0, 0.35)',
+  raise: '0 14px 36px rgba(0, 0, 0, 0.5)',
+  glow: '0 0 18px rgba(241, 196, 15, 0.18)',
+} as const;
+
+/**
+ * 页面背景:深蓝黑径向渐变层次。
+ * 只含 background-image(不含 background-color),可与任意底色组合;
+ * 需要深底时由使用方自行设置 background-color(如 #0d1220)。
+ */
+export const pageBgStyle = css`
+  background-image:
+    radial-gradient(1100px 620px at 50% -12%, rgba(58, 74, 120, 0.38), transparent 62%),
+    radial-gradient(900px 520px at 86% 112%, rgba(122, 92, 40, 0.16), transparent 66%),
+    radial-gradient(720px 420px at 6% 92%, rgba(40, 60, 100, 0.24), transparent 62%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+`;
+
+/** 玻璃质感面板:半透明背景 + 模糊 + 1px 亮边框(圆角/内边距由使用方控制) */
+export const glassPanelStyle = css`
+  background-color: rgba(28, 36, 58, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(241, 196, 15, 0.16);
+  border-radius: 14px;
+  box-shadow: ${shadows.panel};
+`;
+
+/** 页面主标题装饰:底部金色渐隐下边线(宽度固定 140px,不随标题拉伸) */
+export const goldHeadingStyle = css`
+  padding-bottom: 10px;
+  background-image: linear-gradient(90deg, ${goldColors.soft}, rgba(241, 196, 15, 0));
+  background-size: 140px 2px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+`;

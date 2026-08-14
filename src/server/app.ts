@@ -11,7 +11,7 @@ import { createLogger } from './logger';
 import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } from './persistence';
 import { normalizeRoomConfig } from './protocol';
 import { addRoom, getRoom, type Room } from './room';
-import { cleanupIdleRooms } from './cleanup';
+import { cleanupIdleRooms, cleanupDisconnectedRooms } from './cleanup';
 import { initRoomStore, loadAllRoomsFromDb } from './roomStore';
 import { resetRoomToLobby } from './teardown';
 
@@ -27,6 +27,9 @@ app.onError(errorHandler);
 applyRestRoutes(app);
 
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+/** 无连接快速/debug 房间扫描间隔。
+ *  与 TTL(60s)配合,实际回收延迟在 [TTL, TTL+间隔] 内。 */
+const DISCONNECTED_ROOM_SCAN_MS = 30 * 1000;
 
 /** 启动服务器生命周期副作用:闲置清理定时器 + 持久化房间恢复。
  *  必须由运行时入口(index.ts 独立运行 / vite-plugin configureServer dev 模式)显式调用。
@@ -34,6 +37,11 @@ const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
  *  导致 build 进程意外启动游戏 session 并反复写持久化文件。 */
 export function startServerLifecycle(): void {
   setInterval(cleanupIdleRooms, CLEANUP_INTERVAL_MS).unref();
+  // 无连接快速/debug 房间回收(30s 扫描):unref 保证不阻止进程退出,
+  // ssrLoadModule 环境下随 vite dev server 生命周期存续,无需显式 teardown。
+  setInterval(() => {
+    cleanupDisconnectedRooms();
+  }, DISCONNECTED_ROOM_SCAN_MS).unref();
   void (async () => {
     await initRoomStore();
     await restoreNormalRoomsFromDb();
@@ -47,6 +55,8 @@ export function startServerLifecycle(): void {
     downgradeStaleNormalRooms();
     // 恢复后立即清理僵尸房间(无 seats 的进行中房间),避免它们出现在房间列表。
     cleanupIdleRooms();
+    // 基线扫描:为恢复出的无连接房间记录计时起点(60s 后仍未重连则回收)。
+    cleanupDisconnectedRooms();
   })();
 }
 

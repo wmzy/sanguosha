@@ -10,7 +10,7 @@ import { GameViewComponent } from '../components/GameView';
 import { GameResultOverlay } from '../components/GameResultOverlay';
 import { RoomListPanel } from '../components/RoomListPanel';
 import { ChatConfigSection } from '../components/ChatConfigSection';
-import { colors, pageStyle, btnStyle, inputStyle, errorToastStyle } from '../theme';
+import { colors, pageStyle, btnStyle, inputStyle, errorToastStyle, pageBgStyle, glassPanelStyle, goldHeadingStyle, goldColors } from '../theme';
 import { saveReplay } from '../replay/replayFile';
 import { apiFetch, ApiError } from '../api/client';
 import type { ReplayMeta } from '../replay/types';
@@ -19,19 +19,23 @@ import type { RoomInfo, RoomConfig, CharPoolPreset } from '../../server/protocol
 import type { GameMode } from '../../engine/rules/types';
 
 const page = css`
-  ${pageStyle}
+  ${pageBgStyle}
+  background-color: #0d1220;
   display: flex;
   flex-direction: column;
   align-items: center;
   min-height: 100vh;
   padding: 40px 20px;
+  color: #eee;
 `;
 
+/** 页面主标题:金色 + 底部金色下边线 */
 const title = css`
+  ${goldHeadingStyle}
   font-size: 36px;
   margin: 0 0 8px;
   letter-spacing: 4px;
-  color: ${colors.accent.gold};
+  color: ${goldColors.base};
 `;
 
 const subtitle = css`
@@ -40,19 +44,30 @@ const subtitle = css`
 `;
 
 const card = css`
-  background-color: ${colors.bg.panel};
-  border-radius: 12px;
+  ${glassPanelStyle}
   padding: 28px;
   width: 100%;
   max-width: 420px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 `;
 
+/** 区块标题:左侧金色竖条 */
 const sectionTitle = css`
   font-size: 18px;
   font-weight: bold;
   margin: 0 0 16px;
-  color: ${colors.text.primary};
+  color: ${goldColors.light};
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &::before {
+    content: '';
+    flex-shrink: 0;
+    width: 3px;
+    height: 16px;
+    border-radius: 2px;
+    background: linear-gradient(180deg, ${goldColors.base}, ${goldColors.deep});
+  }
 `;
 
 const formRow = css`
@@ -68,17 +83,20 @@ const label = css`
 `;
 
 const divider = css`
-  border-top: 1px solid #3a4a5e;
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(241, 196, 15, 0.28), rgba(241, 196, 15, 0.04));
   margin: 24px 0;
 `;
 
 const roomCodeBox = css`
-  background-color: ${colors.bg.input};
-  border: 2px dashed ${colors.accent.gold};
-  border-radius: 8px;
+  background-color: rgba(18, 24, 40, 0.6);
+  border: 2px dashed rgba(241, 196, 15, 0.45);
+  border-radius: 10px;
   padding: 20px;
   text-align: center;
   margin-bottom: 20px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 `;
 
 const roomCodeLabel = css`
@@ -177,6 +195,7 @@ const winnerText = css`
 
 const gameWrap = css`
   min-height: 100vh;
+  ${pageBgStyle}
   background-color: ${colors.bg.page};
 `;
 
@@ -235,6 +254,7 @@ const reconnectSpinner = css`
 
 const notFoundPage = css`
   ${pageStyle}
+  ${pageBgStyle}
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1121,8 +1141,9 @@ export function MultiplayerPage() {
               className={btnStyle}
               style={{ '--btn-bg': colors.accent.orange } as React.CSSProperties}
               onClick={handleCreate}
+              disabled={mp.isCreating}
             >
-              创建房间
+              {mp.isCreating ? '创建中…' : '创建房间'}
             </button>
           </div>
           <div className={divider} />

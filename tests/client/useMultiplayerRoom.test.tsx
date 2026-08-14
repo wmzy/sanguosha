@@ -503,4 +503,60 @@ describe('useMultiplayerRoom', () => {
     expect(result.current.stage).toBe('lobby');
     expect(result.current.error).toBe('房间不存在');
   });
+
+  it('createRoom 期间 isCreating 为 true,创建 settle 后复位(防重复提交)', async () => {
+    // 用可控 Promise 挂起 POST /api/rooms,验证请求在途时 isCreating 保持 true
+    let resolveCreate: (r: Response) => void = () => {};
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, opts?: RequestInit) => {
+        if (url.endsWith('/api/rooms') && opts?.method === 'POST') {
+          return new Promise<Response>((res) => {
+            resolveCreate = res;
+          });
+        }
+        return new Response('{}', { status: 200 });
+      }),
+    );
+    const { result } = renderHook(() => useMultiplayerRoom());
+    expect(result.current.isCreating).toBe(false);
+    act(() => result.current.createRoom('房', 2));
+    expect(result.current.isCreating).toBe(true);
+    await act(async () => {
+      resolveCreate(
+        new Response(JSON.stringify({ roomId: 'ROOM1', playerId: 'pid-0' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.isCreating).toBe(false);
+    expect(result.current.stage).toBe('waiting');
+  });
+
+  it('createRoom 失败(500)后 isCreating 复位并回到 lobby', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({ error: '创建失败' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ));
+    const { result } = renderHook(() => useMultiplayerRoom());
+    act(() => result.current.createRoom('房', 2));
+    await flushConnect();
+    expect(result.current.isCreating).toBe(false);
+    expect(result.current.stage).toBe('lobby');
+    expect(result.current.error).toBe('创建失败');
+  });
+
+  it('autoJoin 房间不存在(文案命中,无 status 属性)时也设置 notFound(isRoomNotFound 文案兜底)', async () => {
+    // 模拟错误只有文案没有 status 属性的兜底路径:isRoomNotFound 应按「房间不存在」文案命中
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('房间不存在或已关闭');
+    }));
+    const { result } = renderHook(() => useMultiplayerRoom('GHOST-ROOM'));
+    await flushConnect();
+    expect(result.current.notFound).toBe(true);
+  });
 });

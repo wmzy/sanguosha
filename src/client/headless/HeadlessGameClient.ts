@@ -176,6 +176,7 @@ export class HeadlessGameClient {
     this.canReconnect = true;
 
     this.openStream();
+    this.setPhase('lobby');
   }
 
   /** 创建普通(多人)房间:本连接成为房主。roomType: 'normal'=持久化, 'quick'=纯内存(默认)。 */
@@ -245,7 +246,7 @@ export class HeadlessGameClient {
     if (this.intentionalDisconnect) return;
     void this.ensureEventSource().then((EventSourceImpl) => {
       if (this.intentionalDisconnect || !this._roomId || !this._playerId) return;
-      const url = `${this.baseUrl}/api/rooms/${this._roomId}/stream?playerId=${this._playerId}`;
+      const url = `${this.baseUrl}/api/rooms/${this._roomId}/stream?playerId=${encodeURIComponent(this._playerId)}`;
       this.eventSource = new EventSourceImpl(url);
       this.attachEventSourceHandlers();
     });

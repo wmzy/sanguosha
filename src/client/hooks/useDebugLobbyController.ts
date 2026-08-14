@@ -9,6 +9,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { storeSession, clearSession } from '../utils/debugSession';
 import { apiFetch, ApiError } from '../api/client';
+import { isRoomNotFound } from '../utils/roomErrors';
 import type { RoomInfo } from '../../server/protocol';
 
 export interface DebugLobbyController {
@@ -16,6 +17,8 @@ export interface DebugLobbyController {
   activeRoomId: string | null;
   debugRooms: RoomInfo[];
   error: string | null;
+  /** 创建房间请求进行中(POST /api/debug-room 期间为 true,防重复提交) */
+  isCreating: boolean;
   playerCount: number;
   setPlayerCount: (n: number) => void;
   refreshRoomList: () => void;
@@ -23,6 +26,8 @@ export interface DebugLobbyController {
   handleDeleteRoom: () => void;
   handleJoinDebugRoom: (roomId: string) => void;
   handleDeleteDebugRoom: (roomId: string) => void;
+  /** 房间连接失败(如房间已被服务端回收,join 404):清理会话回调试大厅并提示。 */
+  handleRoomGone: (err?: unknown) => void;
   handleExit: () => void;
 }
 
@@ -42,6 +47,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
   const [debugRooms, setDebugRooms] = useState<RoomInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [playerCount, setPlayerCount] = useState(5);
+  const [isCreating, setIsCreating] = useState(false);
 
   const fetchRooms = useCallback(async () => {
     try {
@@ -83,6 +89,8 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
   }, [fetchRooms]);
 
   const handleCreateDebugRoom = useCallback(async () => {
+    if (isCreating) return;
+    setIsCreating(true);
     try {
       const data = await apiFetch<{ roomId: string }>('/api/debug-room', {
         method: 'POST',
@@ -94,8 +102,32 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
       setActiveRoomId(data.roomId);
     } catch (err) {
       showErrorFor(err, '创建失败', setError);
+    } finally {
+      setIsCreating(false);
     }
-  }, [playerCount, navigate]);
+  }, [isCreating, playerCount, navigate]);
+
+  /** 房间连接失败(房间被服务端回收/关闭,join 404):
+   *  清理 debugSession、退出房间状态并回调试大厅,同时给出错误提示,
+   *  避免 UI 永远卡在「0/N 已连接」且无任何反馈。 */
+  const handleRoomGone = useCallback(
+    (err?: unknown) => {
+      const message =
+        err == null || isRoomNotFound(err)
+          ? '房间已不存在或已关闭'
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      clearSession();
+      // 重置 URL 自动加入的去重标记,允许用户再次进入同一路径
+      prevRoomRef.current = undefined;
+      setActiveRoomId(null);
+      setError(message);
+      setTimeout(() => setError(null), 3000);
+      navigate('/debug', { replace: true });
+    },
+    [navigate],
+  );
 
   const handleDeleteRoom = useCallback(() => {
     if (!activeRoomId) return;
@@ -127,6 +159,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     activeRoomId,
     debugRooms,
     error,
+    isCreating,
     playerCount,
     setPlayerCount,
     refreshRoomList,
@@ -134,6 +167,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     handleDeleteRoom,
     handleJoinDebugRoom,
     handleDeleteDebugRoom,
+    handleRoomGone,
     handleExit,
   };
 }

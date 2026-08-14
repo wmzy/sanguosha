@@ -37,8 +37,8 @@ const refreshRow = css`
 `;
 
 const scrollList = css`
-  max-height: 300px;
-  overflow: auto;
+  max-height: 420px;
+  overflow-y: auto;
 `;
 
 const emptyTextStyle = css`
@@ -140,6 +140,13 @@ export const RoomListPanel = memo(
     allowJoinAlways = false,
   }: RoomListPanelProps) => {
     const [activeTab, setActiveTab] = useState<'all' | 'mine'>('all');
+    // 加入中防重复:点击「加入/进入」后到组件卸载(进入房间)前,再点不重复触发 onJoin
+    const [joiningId, setJoiningId] = useState<string | null>(null);
+    const handleJoinClick = (roomId: string) => {
+      if (joiningId) return;
+      setJoiningId(roomId);
+      onJoin(roomId);
+    };
 
     // join 可点条件: 房间未满,且(status 是等待中 或 allowJoinAlways 开启)
     const isJoinable = (room: RoomInfo) => {
@@ -226,7 +233,8 @@ export const RoomListPanel = memo(
                   <div className={roomActions}>
                     {isInRoom ? (
                       <button
-                        onClick={() => onJoin(room.id)}
+                        onClick={() => handleJoinClick(room.id)}
+                        disabled={joiningId === room.id}
                         className={btnStyle}
                         style={
                           {
@@ -241,8 +249,8 @@ export const RoomListPanel = memo(
                     ) : (
                       <>
                         <button
-                          onClick={() => onJoin(room.id)}
-                          disabled={!isJoinable(room)}
+                          onClick={() => handleJoinClick(room.id)}
+                          disabled={!isJoinable(room) || joiningId === room.id}
                           className={btnStyle}
                           style={
                             {
@@ -253,7 +261,7 @@ export const RoomListPanel = memo(
                             } as React.CSSProperties
                           }
                         >
-                          加入
+                          {joiningId === room.id ? '加入中…' : '加入'}
                         </button>
                         {onSpectate && (
                           <button

@@ -157,3 +157,38 @@ describe('RoomListPanel — 已在房间时显示「进入」按钮', () => {
     expect(screen.getByText('加入')).toBeInTheDocument();
   });
 });
+
+describe('RoomListPanel — 加入中防重复点击', () => {
+  it('点击「加入」后按钮禁用并显示「加入中…」,重复点击不再触发 onJoin', () => {
+    const onJoin = vi.fn();
+    render(
+      <RoomListPanel rooms={[makeRoom()]} onRefresh={noop} onJoin={onJoin} />,
+    );
+    fireEvent.click(screen.getByText('加入'));
+    expect(onJoin).toHaveBeenCalledTimes(1);
+    // 加入中:文案切换 + 按钮禁用
+    const joiningBtn = screen.getByRole('button', { name: '加入中…' });
+    expect(joiningBtn).toBeDisabled();
+    fireEvent.click(joiningBtn);
+    expect(onJoin).toHaveBeenCalledTimes(1);
+  });
+
+  it('点击「进入」后按钮禁用,重复点击不再触发 onJoin', () => {
+    const onJoin = vi.fn();
+    const rooms = [makeRoom({ id: 'ENTER2', playerIds: ['赵子龙'] })];
+    render(
+      <RoomListPanel
+        rooms={rooms}
+        onRefresh={noop}
+        onJoin={onJoin}
+        currentPlayerId="赵子龙"
+      />,
+    );
+    const enterBtn = screen.getByText('进入');
+    fireEvent.click(enterBtn);
+    expect(onJoin).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('进入')).toBeDisabled();
+    fireEvent.click(screen.getByText('进入'));
+    expect(onJoin).toHaveBeenCalledTimes(1);
+  });
+});

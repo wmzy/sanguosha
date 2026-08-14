@@ -4,7 +4,7 @@
 // 两套视图共用，差异仅在 `onDeleteRoom` 是否提供。
 
 import { css } from '@linaria/core';
-import { colors } from '../../theme';
+import { colors, goldColors } from '../../theme';
 
 interface DebugControlsProps {
   /** "← 退出" / "← 返回" 按钮的回调 */
@@ -18,22 +18,35 @@ const navBar = css`
   align-items: center;
   gap: 16px;
   padding: 12px 20px;
-  background-color: ${colors.bg.nav};
-  border-bottom: 1px solid ${colors.bg.input};
+  background-color: rgba(22, 33, 62, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(241, 196, 15, 0.22);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
 `;
 
 const navLink = css`
-  color: ${colors.accent.blue};
+  color: ${goldColors.light};
   text-decoration: none;
   font-size: 14px;
   background: none;
   border: none;
   cursor: pointer;
   padding: 0;
+  transition: color 0.15s ease;
+
+  &:hover {
+    color: ${goldColors.base};
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
 `;
 
 const navLabel = css`
   color: ${colors.text.muted};
+  margin-left: auto;
+  font-size: 13px;
+  letter-spacing: 2px;
 `;
 
 export function DebugControls({ onBack, onDeleteRoom }: DebugControlsProps) {

@@ -101,4 +101,52 @@ describe.skipIf(!serverUp)('HeadlessGameClient 集成', () => {
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0]).toContain('开局');
   }, 12000);
+
+  // 回归：connect() 补 setPhase('lobby') —— debug 模式多座次经 connect 加入后
+  // phase 必须推进到 lobby，否则前端 connectedCount 永远 0、无法开局（实测卡死）。
+  it('connect() 加入已有房间后 phase 推进到 lobby', async () => {
+    const host = new HeadlessGameClient(SERVER);
+    await host.createDebugRoom(2);
+    const roomId = host.roomId!;
+
+    const joiner = new HeadlessGameClient(SERVER);
+    expect(joiner.phase).toBe('connecting');
+    await joiner.connect(roomId, 1, `regress#${Date.now()}`);
+    const reachedLobby = joiner.phase === 'lobby';
+
+    host.disconnect();
+    joiner.disconnect();
+    expect(reachedLobby).toBe(true);
+  }, 10000);
+
+  // 回归：SSE stream URL 的 playerId 必须 URL 编码 —— playerId 含 '#' 时
+  // 未编码会被浏览器当 fragment 截断，服务端把多个座次折叠到同一 seat（串座）。
+  it('playerId 含 # 时 connect 不串座（seatIndex 互不相同）', async () => {
+    const host = new HeadlessGameClient(SERVER);
+    await host.createDebugRoom(3);
+    const roomId = host.roomId!;
+    const tag = `enc${Date.now()}`;
+
+    const seats: number[] = [];
+    const joiners = [1, 2].map((i) =>
+      new HeadlessGameClient(SERVER, {
+        onMessage: (msg) => {
+          if (msg.type === 'room_joined') seats.push((msg as { seatIndex: number }).seatIndex);
+        },
+      }),
+    );
+    // host 已占 seat 0（createDebugRoom autoJoin）；两个 joiner 带 '#' 后缀 playerId 加入。
+    // 关键断言：两者拿到的 seatIndex 不因 '#' 截断而折叠成同一座。
+    await joiners[0].connect(roomId, 1, `${tag}#1`);
+    await joiners[1].connect(roomId, 2, `${tag}#2`);
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline && seats.length < 2) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    host.disconnect();
+    joiners.forEach((j) => j.disconnect());
+
+    expect(seats).toHaveLength(2);
+    expect(new Set(seats).size).toBe(2); // 两个座次必须互不相同
+  }, 12000);
 });

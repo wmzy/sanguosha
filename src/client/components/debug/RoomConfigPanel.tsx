@@ -219,6 +219,13 @@ const btnSecondary = css`
   font-size: 14px;
 `;
 
+/** 「等待全部准备」禁用时按钮下方的进度原因说明 */
+const waitHint = css`
+  margin-top: 10px;
+  font-size: 13px;
+  color: ${colors.text.dim};
+`;
+
 const errorBox = css`
   position: fixed;
   top: 20px;
@@ -278,6 +285,19 @@ export function RoomConfigPanel({
       if (!pid || !readyPlayers.includes(pid)) return false;
     }
     return true;
+  }, [connectedCount, maxPlayers, seatPlayerIds, readyPlayers]);
+
+  // 「等待全部准备」禁用原因:优先报连接进度,其次列出未准备座次
+  const waitingReason = useMemo(() => {
+    if (connectedCount < maxPlayers) return `等待连接 ${connectedCount}/${maxPlayers}…`;
+    const notReadySeats: number[] = [];
+    for (let i = 0; i < maxPlayers; i++) {
+      const pid = seatPlayerIds.get(i);
+      if (!pid || !readyPlayers.includes(pid)) notReadySeats.push(i + 1);
+    }
+    return notReadySeats.length > 0
+      ? `等待座次 ${notReadySeats.join('、')} 准备…`
+      : '等待全部准备…';
   }, [connectedCount, maxPlayers, seatPlayerIds, readyPlayers]);
 
   return (
@@ -443,6 +463,7 @@ export function RoomConfigPanel({
             退出
           </button>
         </div>
+        {!allSeatsReady && <div className={waitHint}>{waitingReason}</div>}
       </div>
       {error && <div className={errorBox}>{error}</div>}
     </div>

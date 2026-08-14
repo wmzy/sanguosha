@@ -8,9 +8,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import '../../src/engine/atoms';
 import { GameSession } from '../../src/server/session';
-import { addRoom, getRoom, type Room } from '../../src/server/room';
+import { addRoom, deleteRoom, getAllRooms, getRoom, type Room } from '../../src/server/room';
 import { gameSessions, playerRoomMap } from '../../src/server/registry';
-import { cleanupIdleRooms, IDLE_ROOM_TTL_MS } from '../../src/server/cleanup';
+import { cleanupIdleRooms, cleanupDisconnectedRooms, IDLE_ROOM_TTL_MS } from '../../src/server/cleanup';
 import { downgradeStaleNormalRooms } from '../../src/server/app';
 import type { ServerMessage } from '../../src/server/protocol';
 import type { ConnectionSink } from '../../src/server/connection';
@@ -240,5 +240,101 @@ describe('downgradeStaleNormalRooms — 普通房间不自动销毁', () => {
     await downgradeStaleNormalRooms();
 
     expect(getRoom(room.id)!.status).toBe('已结束');
+  });
+});
+
+// 回归:无连接快速/debug 房间回收(cleanupDisconnectedRooms)。
+// 原Bug: cleanupIdleRooms 只遍历 gameSessions,「等待中且未开局」的 debug 房间
+// 没有 session,永远不会被清理——dev server 运行数日后积累 44+ 死房间(玩家数 0)。
+// 修复:直接扫描 roomList,以「players + spectators 全空」为无连接信号,持续超过
+// TTL(默认 60s)即完全销毁,不论等待中/进行中;normal 房间不受影响。
+describe('cleanupDisconnectedRooms — 无连接快速房间回收', () => {
+  const TTL = 1_000; // 注入短 TTL
+  let t0: number;
+
+  beforeEach(() => {
+    gameSessions.clear();
+    playerRoomMap.clear();
+    // 清空全局 roomList,保证用例间互不干扰(本 describe 私有)
+    for (const r of getAllRooms()) deleteRoom(r.id);
+    t0 = Date.now();
+  });
+
+  it('debug 房无 SSE 连接持续 TTL 后销毁(等待中,无 session)', () => {
+    const room = makeRoom([]); // quick + isDebug,无连接
+    room.status = '等待中'; // 模拟 POST /api/debug-room 后从未有连接
+
+    // 首次扫描:仅记录计时起点,不销毁
+    expect(cleanupDisconnectedRooms(t0, TTL)).not.toContain(room.id);
+    expect(getRoom(room.id)).not.toBeNull();
+
+    // TTL 内:不销毁
+    expect(cleanupDisconnectedRooms(t0 + TTL - 1, TTL)).not.toContain(room.id);
+    expect(getRoom(room.id)).not.toBeNull();
+
+    // 达到 TTL:销毁,GET /api/rooms/:id 将 404
+    expect(cleanupDisconnectedRooms(t0 + TTL, TTL)).toContain(room.id);
+    expect(getRoom(room.id)).toBeNull();
+  });
+
+  it('有 SSE 连接时不销毁(玩家在房间)', () => {
+    const room = makeRoom(['p1', 'p2']);
+    room.status = '等待中';
+
+    expect(cleanupDisconnectedRooms(t0, TTL)).not.toContain(room.id);
+    // 远超 TTL 的时间点再扫:只要仍有连接就保留
+    expect(cleanupDisconnectedRooms(t0 + TTL * 10, TTL)).not.toContain(room.id);
+    expect(getRoom(room.id)).not.toBeNull();
+    expect(getRoom(room.id)!.players.size).toBe(2);
+  });
+
+  it('有旁观者连接时同样不销毁', () => {
+    const room = makeRoom([]);
+    room.status = '等待中';
+    room.spectators.set('spec-1', new FakeSink());
+
+    expect(cleanupDisconnectedRooms(t0 + TTL * 10, TTL)).not.toContain(room.id);
+    expect(getRoom(room.id)).not.toBeNull();
+  });
+
+  it('计时中重连会清零:重新断开后重新计满 TTL 才销毁', () => {
+    const room = makeRoom([]);
+    room.status = '等待中';
+
+    cleanupDisconnectedRooms(t0, TTL); // 记录起点
+
+    // 玩家重连 → 计时清零
+    const sink = new FakeSink();
+    room.players.set('p1', sink);
+    expect(cleanupDisconnectedRooms(t0 + TTL * 2, TTL)).not.toContain(room.id);
+
+    // 再次断开,从新起点重新计时
+    room.players.delete('p1');
+    expect(cleanupDisconnectedRooms(t0 + TTL * 3, TTL)).not.toContain(room.id); // 新起点刚记录
+    expect(cleanupDisconnectedRooms(t0 + TTL * 3 + TTL, TTL)).toContain(room.id); // 计满
+    expect(getRoom(room.id)).toBeNull();
+  });
+
+  it('进行中的无连接房间同样销毁,且 session 被释放', () => {
+    const room = makeRoom([]);
+    room.status = '进行中';
+    const session = new GameSession(room, true, 42);
+    gameSessions.set(room.id, session);
+
+    expect(cleanupDisconnectedRooms(t0, TTL)).not.toContain(room.id);
+    expect(cleanupDisconnectedRooms(t0 + TTL, TTL)).toContain(room.id);
+
+    // 走 destroyRoomCompletely:session 从 gameSessions 移除,room 删除
+    expect(gameSessions.has(room.id)).toBe(false);
+    expect(getRoom(room.id)).toBeNull();
+  });
+
+  it('normal 房间不受无连接回收影响(即使远超 TTL)', () => {
+    const room = makeRoom([], 'normal');
+    room.status = '等待中';
+
+    expect(cleanupDisconnectedRooms(t0, TTL)).not.toContain(room.id);
+    expect(cleanupDisconnectedRooms(t0 + TTL * 100, TTL)).not.toContain(room.id);
+    expect(getRoom(room.id)).not.toBeNull();
   });
 });

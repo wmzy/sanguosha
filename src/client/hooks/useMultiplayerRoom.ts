@@ -17,6 +17,7 @@ import { ReplayRecorder } from '../replay/recorder';
 import type { ReplayMeta } from '../replay/types';
 import { apiFetch } from '../api/client';
 import { getPlayerId } from '../utils/playerIdentity';
+import { isRoomNotFound } from '../utils/roomErrors';
 import { useEventPlayback } from './useEventPlayback';
 import { appendIngestedEvents } from '../utils/appendIngestedEvents';
 
@@ -51,6 +52,8 @@ export interface MultiplayerRoom {
   isSpectator: boolean;
   /** 本人是否已准备 */
   ready: boolean;
+  /** 创建房间请求进行中(供创建表单禁用防重复提交) */
+  isCreating: boolean;
   createRoom: (name: string, maxPlayers: number, config?: RoomConfig, roomType?: 'normal' | 'quick') => void;
   joinRoom: (roomId: string) => void;
   joinAsSpectator: (roomId: string) => void;
@@ -119,6 +122,8 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const [error, setError] = useState<string | null>(null);
   /** 房间不存在(URL 直达 /play/:roomId 但房间已销毁) */
   const [notFound, setNotFound] = useState(false);
+  /** 创建房间请求进行中(createRoom 发起 → create 命令 settle) */
+  const [isCreating, setIsCreating] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -303,13 +308,19 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     // playerId 取自本地身份(门禁已确保设置);未设置时 undefined → 服务端自动生成
     const pid = getPlayerId() ?? undefined;
     if (command.type === 'create') {
-      hgc.createRoom(command.name, command.maxPlayers, command.config, pid, command.roomType).catch((err) => {
-        if (hgcRef.current !== hgc) return;
-        const msg = err instanceof Error ? err.message : String(err);
-        log.error('createRoom failed', { error: msg });
-        setError(msg);
-        setStage('lobby');
-      });
+      hgc.createRoom(command.name, command.maxPlayers, command.config, pid, command.roomType)
+        .catch((err) => {
+          if (hgcRef.current !== hgc) return;
+          const msg = err instanceof Error ? err.message : String(err);
+          log.error('createRoom failed', { error: msg });
+          setError(msg);
+          setStage('lobby');
+        })
+        .finally(() => {
+          // 创建 settle(成功进入 waiting / 失败回 lobby)后解除按钮禁用。
+          // cleanup 后的迟到 settle 不再触碰当前状态。
+          if (hgcRef.current === hgc) setIsCreating(false);
+        });
       setStage('waiting');
     } else if (command.type === 'join' || command.type === 'autoJoin') {
       hgc.joinRoom(command.roomId, pid).catch((err) => {
@@ -318,14 +329,14 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         const msg = err instanceof Error ? err.message : String(err);
         log.error('joinRoom failed', { status, error: msg });
         // URL 直达(/play/:roomId)时:
-        // 404 → notFound(房间已销毁)。
+        // 房间不存在(404) → notFound。
         // 其他失败(游戏已开始/房间已满)→ 自动降级为旁观者加入。
         // 理由:URL 直达的核心诉求是"进入房间";无法以玩家身份进入时,旁观是
         // 唯一可行的进入方式。这也修复了"先旁观再刷新反复回到错误页"的死循环
         // (刷新只触发 autoJoin 玩家加入,旁观状态不会被 URL 记住)。
         // 旁观加入无人数上限,不会因容量失败(仅 404)。
         if (command.type === 'autoJoin') {
-          if (status === 404) setNotFound(true);
+          if (isRoomNotFound(err)) setNotFound(true);
           else setCommand({ type: 'spectate', roomId: command.roomId });
         } else {
           setError(msg);
@@ -339,7 +350,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         const status = (err as { status?: number })?.status;
         const msg = err instanceof Error ? err.message : String(err);
         log.error('joinAsSpectator failed', { status, error: msg });
-        if (status === 404) setNotFound(true);
+        if (isRoomNotFound(err)) setNotFound(true);
         else {
           setError(msg);
           setStage('lobby');
@@ -375,9 +386,10 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setError(null);
     setGameOver(null);
     setView(null);
-    
+
     setRoomState(null);
     setHgcIsSpectator(false);
+    setIsCreating(true);
     setCommand({
       type: 'create',
       name: name || `房间${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
@@ -427,6 +439,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setCommand({ type: 'idle' });
     setStage('lobby');
     setNotFound(false);
+    setIsCreating(false);
     setRoomId(null);
     setRoomState(null);
     setHgcIsSpectator(false);
@@ -593,6 +606,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     isHost,
     isSpectator,
     ready,
+    isCreating,
     createRoom,
     joinRoom,
     joinAsSpectator,

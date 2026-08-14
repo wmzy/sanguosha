@@ -342,3 +342,9 @@
   30% { opacity: 0.8; }
   100% { opacity: 0; }
 }
+
+/* ─── 倒计时紧急脉冲:剩余时间 <30% 时进度条呼吸提醒(CountdownBar) ─── */
+@keyframes countdownUrgentPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
