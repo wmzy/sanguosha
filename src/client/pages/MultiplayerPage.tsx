@@ -210,17 +210,94 @@ const gameWrap = css`
   background-color: ${colors.bg.page};
 `;
 
-const lobbyRow = css`
+/**
+ * lobby 页容器:顶栏贴顶常驻,主体两栏(左表单/右房间列表)限宽居中。
+ * 与 `page` 的居中单列范式分开,避免影响游戏结束等居中分支。
+ */
+const lobbyPage = css`
+  ${pageBgStyle}
+  background-color: #0d1220;
+  min-height: 100vh;
   display: flex;
-  gap: 24px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
+  color: #eee;
 `;
 
-const returnHomeRow = css`
-  ${buttonRow}
-  margin-top: 8px;
+/** 顶栏:sticky 常驻页面顶部,左侧返回首页,右侧页面标识 */
+const topBar = css`
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  background-color: rgba(13, 18, 32, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(241, 196, 15, 0.16);
+`;
+
+/** 顶栏返回按钮:金色描边幽灵按钮(独立于 btnStyle,避免 border 声明顺序不稳) */
+const topBarBtn = css`
+  padding: 6px 18px;
+  background-color: rgba(241, 196, 15, 0.12);
+  color: ${goldColors.light};
+  border: 1px solid rgba(241, 196, 15, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: bold;
+  transition: background-color 0.15s;
+
+  &:hover {
+    background-color: rgba(241, 196, 15, 0.24);
+  }
+`;
+
+/** 顶栏右侧页面标识:淡金小字,撑到最右 */
+const topBarTag = css`
+  margin-left: auto;
+  font-size: 13px;
+  letter-spacing: 3px;
+  color: ${goldColors.soft};
+`;
+
+/** 主体两栏:左列创建/加入表单,右列房间列表;窄屏退化为单列(列表在下) */
+const lobbyLayout = css`
+  display: grid;
+  grid-template-columns: minmax(0, 460px) minmax(300px, 400px);
+  gap: 48px;
+  justify-content: center;
+  align-items: start;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 40px 24px 48px;
+
+  @media (max-width: 960px) {
+    grid-template-columns: minmax(0, 460px);
+  }
+`;
+
+/** 左列:标题 + 表单卡 */
+const lobbyMain = css`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+`;
+
+/** 右列房间列表:主内容较长时吸附视口跟随滚动 */
+const lobbySide = css`
+  position: sticky;
+  top: 84px;
+  max-height: calc(100vh - 108px);
+  overflow-y: auto;
+
+  @media (max-width: 960px) {
+    position: static;
+    max-height: none;
+  }
 `;
 
 /** 重连提示覆盖层(非阻塞,固定顶部) */
@@ -1210,11 +1287,19 @@ export function MultiplayerPage() {
 
   // lobby 阶段
   return (
-    <div className={page}>
-      <h1 className={title}>多人游戏</h1>
-      <p className={subtitle}>创建房间或选择房间加入</p>
-      <div className={lobbyRow}>
-        <div className={card}>
+    <div className={lobbyPage}>
+      {/* 顶栏:返回首页常驻页面顶部(滚动跟随) */}
+      <header className={topBar}>
+        <button className={topBarBtn} onClick={() => navigate('/')}>
+          ← 返回首页
+        </button>
+        <span className={topBarTag}>多人对战</span>
+      </header>
+      <div className={lobbyLayout}>
+        <div className={lobbyMain}>
+          <h1 className={title}>多人游戏</h1>
+          <p className={subtitle}>创建房间或选择房间加入</p>
+          <div className={card}>
           <div className={sectionTitle}>创建房间</div>
           <div className={formRow}>
             <label className={label}>房间名（可选）</label>
@@ -1290,15 +1375,6 @@ export function MultiplayerPage() {
               加入房间
             </button>
           </div>
-          <div className={returnHomeRow}>
-            <button
-              className={btnStyle}
-              style={{ '--btn-bg': colors.disabled } as React.CSSProperties}
-              onClick={() => navigate('/')}
-            >
-              返回首页
-            </button>
-          </div>
           <div className={divider} />
           <div className={sectionTitle}>旁观房间</div>
           <div className={formRow}>
@@ -1321,16 +1397,19 @@ export function MultiplayerPage() {
               👁 旁观加入
             </button>
           </div>
+          </div>
         </div>
-        <RoomListPanel
-          rooms={rooms}
-          onRefresh={fetchRooms}
-          onJoin={mp.joinRoom}
-          onDelete={handleDeleteRoom}
-          onSpectate={mp.joinAsSpectator}
-          emptyText="暂无公开房间"
-          currentPlayerId={mp.playerId}
-        />
+        <aside className={lobbySide}>
+          <RoomListPanel
+            rooms={rooms}
+            onRefresh={fetchRooms}
+            onJoin={mp.joinRoom}
+            onDelete={handleDeleteRoom}
+            onSpectate={mp.joinAsSpectator}
+            emptyText="暂无公开房间"
+            currentPlayerId={mp.playerId}
+          />
+        </aside>
       </div>
       {mp.error && (
         <div
