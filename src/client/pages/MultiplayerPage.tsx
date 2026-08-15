@@ -9,6 +9,8 @@ import { useMultiplayerRoom } from '../hooks/useMultiplayerRoom';
 import { GameViewComponent } from '../components/GameView';
 import { GameResultOverlay } from '../components/GameResultOverlay';
 import { RoomListPanel } from '../components/RoomListPanel';
+import { RoomHistoryPanel } from '../components/RoomHistoryPanel';
+import { useRoomHistory } from '../hooks/useRoomHistory';
 import { ChatConfigSection } from '../components/ChatConfigSection';
 import { OnboardingGuide } from '../components/OnboardingGuide';
 import { colors, pageStyle, btnStyle, inputStyle, errorToastStyle, pageBgStyle, glassPanelStyle, goldHeadingStyle, goldColors } from '../theme';
@@ -383,6 +385,12 @@ export function MultiplayerPage() {
   const navigate = useNavigate();
   const { roomId: urlRoomId } = useParams<{ roomId?: string }>();
   const mp = useMultiplayerRoom(urlRoomId);
+  // 对局历史:等待大厅展示;对局结束(gameOver)/回到等待(stage)时刷新
+  const history = useRoomHistory(
+    mp.roomId,
+    mp.playerId,
+    mp.gameOver ? 'over' : mp.stage,
+  );
 
   const handleDownloadReplay = useCallback(() => {
     if (!mp.recorder.hasData() || !mp.view) return;
@@ -989,6 +997,13 @@ export function MultiplayerPage() {
           )}
           {/* 新手教程（房间码/配置区之后，纯静态图文，无副作用） */}
           <OnboardingGuide />
+          {/* 对局历史:本房间历史结果/重放/下载;房主可删除清空 */}
+          <RoomHistoryPanel
+            roomId={mp.roomId}
+            playerId={mp.playerId}
+            history={history}
+            isHost={mp.isHost}
+          />
           <div className={readyInfo}>
             已就绪：{readyCount} / {playerCount}（满 {maxPlayers} 人）
           </div>

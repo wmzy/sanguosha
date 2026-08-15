@@ -11,6 +11,7 @@ import { gameSessions, playerRoomMap } from './registry';
 import { getRoom, leaveRoom, deleteRoom, setRoomStatus } from './room';
 import { deletePersistedRoom } from './persistence';
 import { deleteRoomFromDb } from './roomStore';
+import { deleteRoomHistory } from './gameHistory';
 import { createLogger } from './logger';
 
 const log = createLogger('teardown');
@@ -64,6 +65,14 @@ export async function destroyRoomCompletely(roomId: string): Promise<void> {
   } catch (err) {
     const e = err instanceof Error ? err : new Error(String(err));
     log.error(`deleteRoomFromDb failed for ${roomId}`, { error: e.stack ?? String(e) });
+  }
+
+  // 7. 删除对局历史目录(幂等)
+  try {
+    await deleteRoomHistory(roomId);
+  } catch (err) {
+    const e = err instanceof Error ? err : new Error(String(err));
+    log.error(`deleteRoomHistory failed for ${roomId}`, { error: e.stack ?? String(e) });
   }
 
   log.info(`完全销毁房间 ${roomId}`);

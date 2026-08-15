@@ -250,3 +250,16 @@ pnpm test:watch        # 监听模式
 - Node.js >= 22
 - pnpm
 - 开发服务器：`pnpm dev`（端口 3930）
+
+### 端口测试规范（CRITICAL）
+
+- **所有本地 HTTP/REST/SSE 测试一律走 3930 端口**（`http://localhost:3930`）——这是 vite dev server 的唯一监听端口，前端和 Hono REST API 共享该端口。
+- 启动 dev server 前必须先确认 3930 端口空闲；**若已有实例在跑，先 kill 掉再启动**，否则新实例会因端口占用失败、或请求被打到旧实例（携带过时的 SSR 模块缓存，表现为新加路由 404）。
+  ```bash
+  # 检查并清理 3930 占用
+  ss -ltnp 2>/dev/null | grep 3930 && pkill -f 'vite.*3930|node.*vite' || true
+  ```
+- vite dev server 的 SSR 模块缓存（`server.ssrLoadModule`）在进程内首次加载后固定，**改 server 代码后仅靠重启进程不一定够**：若遇到新路由/新逻辑不生效（如新端点 404），清 vite 缓存目录再重启：
+  ```bash
+  rm -rf node_modules/.vite node_modules/.vite-temp && pnpm dev
+  ```

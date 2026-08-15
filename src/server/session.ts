@@ -30,6 +30,7 @@ import type { Room } from './room';
 import { createLogger } from './logger';
 import { setRoomStatus } from './room';
 import { saveRoom, deletePersistedRoom } from './persistence';
+import { appendGameHistory, buildHistoryEntry, buildReplayFile } from './gameHistory';
 import { createRng } from '../engine/util/rng';
 import { VirtualClock, RealClock } from '../engine/core/clock';
 
@@ -94,6 +95,12 @@ export class GameSession {
   private baselineSent = new Set<string>();
   /** per-player 上次发送的 deadline 缓存,避免重复发送不变的倒计时 */
   private lastSentDeadline = new Map<string, string | null>();
+  /** 录像基线:开局(选将完成)逐座次捕获的完整视图深拷贝,游戏结束组装房间历史录像用 */
+  private replayBaseline: GameView[] = [];
+  /** 录像基线捕获时的 state.seq(此后的 atomHistory 事件逐条进录像) */
+  private replayBaselineSeq = 0;
+  /** 本局开始时刻(历史条目 startedAt) */
+  private gameStartedAt = 0;
   constructor(room: Room, debug = false, sessionSeed?: number) {
     this.room = room;
     this.roomName = room.name;
@@ -143,6 +150,10 @@ export class GameSession {
         this.playerNames.set(pid, (i + offset) % n);
       }
     }
+    // 恢复局也记录历史:基线取恢复时刻的视图(若选将已完成则立即捕获;否则等
+    // onStateChange 在选将完成后捕获)。startedAt 用恢复时刻近似。
+    this.gameStartedAt = Date.now();
+    this.maybeCaptureReplayBaseline();
   }
 
   async startGame(playerCount?: number): Promise<boolean> {
@@ -173,11 +184,16 @@ export class GameSession {
     setRoomStatus(this.room.id, '进行中');
     // bootstrap 可能因选将 pending 而挂起(fire-and-forget dispatch)
     // 不 await — 让 startGame 立即返回,客户端收到选将 pending 后响应
+    this.gameStartedAt = Date.now();
+    this.replayBaseline = [];
+    this.replayBaselineSeq = 0;
     void bootstrap(this.state, config)
       .then(() => {
         // bootstrap 完成后:所有角色/手牌/技能已就绪,强制刷新 baseline
         this.baselineSent.clear();
         this.broadcastNewState();
+        // 录像基线不在此时捕获:bootstrap resolve 仅表示选将 slot 已创建(见 onStateChange 注释),
+        // 由 maybeCaptureReplayBaseline 在选将完成后的 onStateChange 中捕获
       })
       .catch((err) => {
         const e = err instanceof Error ? err : new Error(String(err));
@@ -305,7 +321,70 @@ export class GameSession {
     // 所有触发 gameOver 的路径(onStateChange/startGame/恢复)统一在此设值。
     this.gameOverHandled = true;
     setRoomStatus(this.room.id, '已结束');
+    this.recordGameHistory(winner, '正常');
     this.broadcast({ type: 'gameOver', winner: winner !== undefined ? String(winner) : '无人' });
+  }
+
+  /** 延迟捕获录像基线:仅在「所有玩家 character 已就绪」且「尚未捕获」时执行。
+   *  由 onStateChange 每次调用。bootstrap resolve 仅表示选将 slot 已创建(玩家未 respond,
+   *  character 全空),此刻捕获会得到空武将名的无效 baseline——必须等到选将完成后的
+   *  第一次 onStateChange。与客户端 ReplayRecorder.record 的 initialView 捕获条件一致。
+   *  深拷贝隔离后续 state 变更——buildView 结果虽是新对象,但 cardMap 等嵌套字段可能
+   *  共享 state 引用,JSON 往返是最可靠的快照手段(视图本身走 SSE JSON,可序列化)。 */
+  private maybeCaptureReplayBaseline(): void {
+    if (!this.state) return;
+    if (this.replayBaseline.length > 0) return; // 已捕获本局
+    const players = this.state.players;
+    if (players.length === 0 || !players.every((p) => p.character)) return;
+    const views: GameView[] = [];
+    for (let v = 0; v < players.length; v++) {
+      views.push(JSON.parse(JSON.stringify(buildView(this.state, v))) as GameView);
+    }
+    this.replayBaseline = views;
+    this.replayBaselineSeq = this.state.seq;
+  }
+
+  /** 游戏结束记录房间历史:结果条目 + 全座次录像,fire-and-forget 落盘。
+   *  winner=胜方座次(undefined=平局);reason '中断'=全员掉线宽限超时。
+   *  座次→playerId 反查自 playerNames(记录真实连接身份,而非引擎生成的 P0/P1)。 */
+  private recordGameHistory(winner: number | undefined, reason: '正常' | '中断'): void {
+    const state = this.state;
+    if (!state || state.players.length === 0) return;
+    try {
+      const seatPlayerIds = state.players.map((p) => {
+        for (const [pid, seat] of this.playerNames) {
+          if (seat === p.index) return pid;
+        }
+        return p.name;
+      });
+      const endedAt = Date.now();
+      const entry = buildHistoryEntry(state, seatPlayerIds, {
+        roomId: this.room.id,
+        roomName: this.roomName,
+        gameMode: this.room.config.gameMode ?? '身份局',
+        startedAt: this.gameStartedAt || endedAt,
+        endedAt,
+        winner,
+        reason,
+      });
+      const replay =
+        this.replayBaseline.length > 0
+          ? buildReplayFile(state, this.replayBaseline, this.replayBaselineSeq, {
+              createdAt: endedAt,
+              playerCount: state.players.length,
+              characters: state.players.map((p) => p.character ?? ''),
+              roomName: this.roomName,
+            })
+          : null;
+      entry.hasReplay = replay !== null;
+      void appendGameHistory(this.room.id, entry, replay).catch((err) => {
+        const e = err instanceof Error ? err : new Error(String(err));
+        this.logger.error('记录对局历史失败', { error: e.stack ?? String(e) });
+      });
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      this.logger.error('组装对局历史失败', { error: e.stack ?? String(e) });
+    }
   }
 
   /** 游戏结束后重置房间到「配置+准备」阶段,供「再来一局」复用同一 session。
@@ -321,6 +400,9 @@ export class GameSession {
     this.baselineSent.clear();
     this.lastSentDeadline.clear();
     this.lastBroadcastSeq = 0;
+    // 丢弃上一局的录像基线(下一局 startGame 重新捕获)
+    this.replayBaseline = [];
+    this.replayBaselineSeq = 0;
     // 重新生成 seed,新一局随机序列不同
     this.sessionSeed = Date.now();
     setRoomStatus(this.room.id, '等待中');
@@ -353,6 +435,11 @@ export class GameSession {
       if (this.gameOverHandled) return;
       this.actionLog = this.state.actionLog;
       this.lastActivityAt = Date.now();
+      // 录像基线延迟捕获:bootstrap resolve 仅表示选将 slot 已创建(玩家未 respond,
+      // character 全空)。与客户端 ReplayRecorder 一致,等「所有玩家 character 已就绪」
+      // 的第一次 onStateChange 再捕获——此时选将完成,武将名/势力/体力齐全,作为录像
+      // 起点语义完整;选将阶段事件(抽身份/选将/发牌)的结果均已体现在此 baseline。
+      this.maybeCaptureReplayBaseline();
       this.broadcastNewState();
       this.persistAsync();
       void checkGameOver(this.state).then(({ gameOver, winner }) => {
@@ -527,6 +614,8 @@ export class GameSession {
       })
       .join('、');
     setRoomStatus(this.room.id, '已结束');
+    // 记录中断历史(已在 handleGameOver 记录过的不再重复记)
+    if (!this.gameOverHandled) this.recordGameHistory(undefined, '中断');
     this.broadcast({ type: 'error', message: `${names} 在重连宽限期内未恢复,游戏结束` });
     this.broadcast({ type: 'gameOver', winner: '无人' });
     // 必须 destroy 以清理 idle timer，否则定时器会通过 onStateChange 自循环

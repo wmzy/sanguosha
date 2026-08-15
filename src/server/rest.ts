@@ -3,7 +3,7 @@
 // 通过 applyRestRoutes(app) 注册到主 app 实例(与原先直接 app.get/post 行为完全一致,
 // 主 app 上的 cors/requestLogger/rateLimit/errorHandler 中间件照常生效)。
 
-import type { Hono } from 'hono';
+import type { Hono, Context } from 'hono';
 import {
   createRoom,
   createDebugRoom,
@@ -43,6 +43,12 @@ import {
 } from './snapshot';
 import { normalizeRoomConfig } from './protocol';
 import type { RoomConfig } from './protocol';
+import {
+  listGameHistory,
+  getGameReplay,
+  deleteGameHistoryEntry,
+  clearGameHistory,
+} from './gameHistory';
 import { GameSession } from './session';
 import { gameSessions, playerRoomMap } from './registry';
 import { createLogger } from './logger';
@@ -721,5 +727,71 @@ export function applyRestRoutes(app: Hono): void {
     });
     broadcastRoomState(result.room);
     return c.json({ success: true, swapped: result.swapped });
+  });
+
+  // ── 对局历史路由 ──
+
+  /** 解析房主身份:DELETE 支持 ?playerId= 查询参数或 JSON body { playerId }。 */
+  async function resolvePlayerIdFromBodyOrQuery(c: Context): Promise<string | null> {
+    const q = c.req.query('playerId');
+    if (q) return q;
+    try {
+      const raw = await c.req.json<Record<string, unknown>>();
+      if (raw && typeof raw.playerId === 'string') return raw.playerId;
+    } catch {
+      /* DELETE 无 body 是合法情况 */
+    }
+    return null;
+  }
+
+  // GET /api/rooms/:id/history — 对局结果列表(最新在前,不含录像数据)
+  app.get('/api/rooms/:id/history', async (c) => {
+    const roomId = c.req.param('id');
+    const entries = await listGameHistory(roomId);
+    return c.json({ entries });
+  });
+
+  // GET /api/rooms/:id/history/:entryId — 单局录像(前端重放拉取;?download=1 触发浏览器下载)
+  app.get('/api/rooms/:id/history/:entryId', async (c) => {
+    const roomId = c.req.param('id');
+    const entryId = c.req.param('entryId');
+    const replay = await getGameReplay(roomId, entryId);
+    if (!replay) return c.json({ error: '录像不存在' }, 404);
+    if (c.req.query('download') === '1') {
+      const room = getRoom(roomId);
+      const name = `sanguosha-replay-${room?.name ?? roomId}-${entryId}.json`;
+      return c.body(JSON.stringify(replay), 200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(name)}"`,
+      });
+    }
+    return c.json(replay);
+  });
+
+  // DELETE /api/rooms/:id/history/:entryId — 房主删除单条历史(含录像文件)
+  app.delete('/api/rooms/:id/history/:entryId', async (c) => {
+    const roomId = c.req.param('id');
+    const room = getRoom(roomId);
+    if (!room) return c.json({ error: '房间不存在' }, 404);
+    const playerId = await resolvePlayerIdFromBodyOrQuery(c);
+    if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
+    if (room.hostId !== playerId) return c.json({ error: '只有房主可以删除历史' }, 403);
+
+    const ok = await deleteGameHistoryEntry(roomId, c.req.param('entryId'));
+    if (!ok) return c.json({ error: '历史条目不存在' }, 404);
+    return c.json({ success: true });
+  });
+
+  // DELETE /api/rooms/:id/history — 房主清空全部历史
+  app.delete('/api/rooms/:id/history', async (c) => {
+    const roomId = c.req.param('id');
+    const room = getRoom(roomId);
+    if (!room) return c.json({ error: '房间不存在' }, 404);
+    const playerId = await resolvePlayerIdFromBodyOrQuery(c);
+    if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
+    if (room.hostId !== playerId) return c.json({ error: '只有房主可以清空历史' }, 403);
+
+    await clearGameHistory(roomId);
+    return c.json({ success: true });
   });
 }

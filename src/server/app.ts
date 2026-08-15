@@ -10,10 +10,11 @@ import { GameSession } from './session';
 import { createLogger } from './logger';
 import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } from './persistence';
 import { normalizeRoomConfig } from './protocol';
-import { addRoom, getRoom, type Room } from './room';
+import { addRoom, getRoom, getAllRooms, type Room } from './room';
 import { cleanupIdleRooms, cleanupDisconnectedRooms } from './cleanup';
 import { initRoomStore, loadAllRoomsFromDb } from './roomStore';
 import { resetRoomToLobby } from './teardown';
+import { sweepOrphanHistory } from './gameHistory';
 
 const log = createLogger('ws');
 
@@ -57,6 +58,11 @@ export function startServerLifecycle(): void {
     cleanupIdleRooms();
     // 基线扫描:为恢复出的无连接房间记录计时起点(60s 后仍未重连则回收)。
     cleanupDisconnectedRooms();
+    // 清理孤儿对局历史:快速房重启后不恢复,其历史目录已无主。
+    void sweepOrphanHistory(getAllRooms().map((r) => r.id)).catch((err) => {
+      const e = err instanceof Error ? err : new Error(String(err));
+      log.error('sweepOrphanHistory failed', { error: e.stack ?? String(e) });
+    });
   })();
 }
 
