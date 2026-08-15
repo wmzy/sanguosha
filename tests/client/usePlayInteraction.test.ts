@@ -2161,10 +2161,11 @@ describe('usePlayInteraction · 桃满血限制(activeWhen)', () => {
   });
 });
 
-// ─── Bug: confirm 型主动技(据守等)发动前缺少确认弹窗 ───
-// prompt.type==='confirm' 的 use action 点击后不应直接 send,
-// 而应进入 pendingConfirm 确认状态,点「发动」才真正 send,点「不发动」取消。
-describe('usePlayInteraction · confirm 型主动技确认门控(据守)', () => {
+// ─── confirm 型主动技(据守/苦肉等):点按钮直接发动 ───
+// prompt.type==='confirm' 的 use action 点击后直接 send(无参数),
+// 不再弹二次确认框——「不点按钮」即「不发动」,弹窗属于冗余交互,已移除。
+// 被动询问(请求回应 pending 的 confirm 面板)不受影响,仍由 AwaitingPrompt 渲染。
+describe('usePlayInteraction · confirm 型主动技直发(据守)', () => {
   /** 据守 use action(与 engine/skills/据守.ts onMount 声明同源):prompt.type==='confirm' */
   function jushouAction(ownerId = 0): SkillActionDef {
     return {
@@ -2182,26 +2183,7 @@ describe('usePlayInteraction · confirm 型主动技确认门控(据守)', () =>
     };
   }
 
-  it('点 confirm 型 action 按钮:不直接 send,改为进入 pendingConfirm 状态', () => {
-    const send = vi.fn();
-    const { result } = renderPlay(
-      makePlayParams({
-        view: makePlayView(),
-        skillActions: [jushouAction()],
-        send,
-      }),
-    );
-    expect(result.current.pendingConfirm).toBeNull();
-    act(() => result.current.handleSkillAction(jushouAction()));
-    // 进入确认状态,但未发送
-    expect(result.current.pendingConfirm).not.toBeNull();
-    expect(result.current.pendingConfirm?.skillId).toBe('据守');
-    expect(result.current.pendingConfirm?.actionType).toBe('use');
-    expect(result.current.pendingConfirm?.prompt.title).toContain('据守');
-    expect(send).not.toHaveBeenCalled();
-  });
-
-  it('点「发动」(handleConfirmYes):发送 use action 且关闭弹窗', () => {
+  it('点 confirm 型 action 按钮:直接发送 use action(无二次确认)', () => {
     const send = vi.fn();
     const { result } = renderPlay(
       makePlayParams({
@@ -2211,44 +2193,9 @@ describe('usePlayInteraction · confirm 型主动技确认门控(据守)', () =>
       }),
     );
     act(() => result.current.handleSkillAction(jushouAction()));
-    act(() => result.current.handleConfirmYes());
-    // 发送 use action(confirm 型无额外参数)
+    // 直接发送 use action(confirm 型无额外参数),无中间确认状态
     expect(sentCalls(send)).toEqual([
       { skillId: '据守', actionType: 'use', params: {} },
     ]);
-    // 弹窗关闭
-    expect(result.current.pendingConfirm).toBeNull();
-  });
-
-  it('点「不发动」(handleConfirmNo):不发送且关闭弹窗', () => {
-    const send = vi.fn();
-    const { result } = renderPlay(
-      makePlayParams({
-        view: makePlayView(),
-        skillActions: [jushouAction()],
-        send,
-      }),
-    );
-    act(() => result.current.handleSkillAction(jushouAction()));
-    act(() => result.current.handleConfirmNo());
-    expect(send).not.toHaveBeenCalled();
-    expect(result.current.pendingConfirm).toBeNull();
-  });
-
-  it('未进入确认状态时 handleConfirmYes/handleConfirmNo 为空操作(不抛错)', () => {
-    const send = vi.fn();
-    const { result } = renderPlay(
-      makePlayParams({
-        view: makePlayView(),
-        skillActions: [],
-        send,
-      }),
-    );
-    expect(() => {
-      act(() => result.current.handleConfirmYes());
-      act(() => result.current.handleConfirmNo());
-    }).not.toThrow();
-    expect(send).not.toHaveBeenCalled();
-    expect(result.current.pendingConfirm).toBeNull();
   });
 });

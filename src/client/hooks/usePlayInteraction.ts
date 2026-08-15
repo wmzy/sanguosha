@@ -18,7 +18,6 @@ import type {
   GameView,
   Json,
   DistributePrompt,
-  ConfirmPrompt,
   PendingView,
   TargetFilter,
 } from '../../engine/types';
@@ -142,13 +141,6 @@ export interface PlayInteractionResult {
   transformMode: TransformMode | null;
   // ─── distribute ───
   distributeMode: { skillId: string; actionType: string; prompt: DistributePrompt } | null;
-  // ─── confirm 型主动技确认弹窗(据守等 prompt.type==='confirm' 的 action) ───
-  /** 待确认的 confirm 型 action;非 null 时 GameView 应渲染确认弹窗 */
-  pendingConfirm: {
-    skillId: string;
-    actionType: string;
-    prompt: ConfirmPrompt;
-  } | null;
   activeDistribute: ActiveDistribute | null;
   isDistributeActive: boolean;
   distSelected: Set<string>;
@@ -216,11 +208,6 @@ export interface PlayInteractionResult {
   setDistributeMode: (
     mode: { skillId: string; actionType: string; prompt: DistributePrompt } | null,
   ) => void;
-  // ─── confirm 型确认弹窗 handlers ───
-  /** 确认发动:send 后关闭弹窗 */
-  handleConfirmYes: () => void;
-  /** 不发动:仅关闭弹窗 */
-  handleConfirmNo: () => void;
 }
 
 /**
@@ -279,12 +266,6 @@ export function usePlayInteraction(
     skillId: string;
     actionType: string;
     prompt: DistributePrompt;
-  } | null>(null);
-  // confirm 型主动技(据守)确认弹窗状态:点按钮后先弹确认,确认才真正 send。
-  const [pendingConfirm, setPendingConfirm] = useState<{
-    skillId: string;
-    actionType: string;
-    prompt: ConfirmPrompt;
   } | null>(null);
   const [distSelected, setDistSelected] = useState<Set<string>>(new Set());
   const [distAllocations, setDistAllocations] = useState<
@@ -805,10 +786,6 @@ export function usePlayInteraction(
             }
           }
           break;
-        case 'confirm':
-          // 不直接 send:先弹确认框,点「发动」才真正 send。
-          setPendingConfirm({ skillId, actionType, prompt });
-          return;
         case 'choosePlayer':
           if (!selectedTarget) return;
           params.target = nameToIndex(selectedTarget);
@@ -1187,19 +1164,6 @@ export function usePlayInteraction(
     setSelectedTarget(null);
   }, []);
 
-  // ─── confirm 型确认弹窗 handlers ───
-  const handleConfirmYes = useCallback(() => {
-    setPendingConfirm((prev) => {
-      if (!prev) return null;
-      send(prev.skillId, prev.actionType, {});
-      return null;
-    });
-  }, [send]);
-
-  const handleConfirmNo = useCallback(() => {
-    setPendingConfirm(null);
-  }, []);
-
   const clearDiscard = useCallback(() => setSelectedForDiscard([]), []);
 
   return {
@@ -1210,7 +1174,6 @@ export function usePlayInteraction(
     selectedForDiscard,
     transformMode,
     distributeMode,
-    pendingConfirm,
     activeDistribute,
     isDistributeActive,
     distSelected,
@@ -1253,7 +1216,5 @@ export function usePlayInteraction(
     cancelSelection,
     clearDiscard,
     setDistributeMode,
-    handleConfirmYes,
-    handleConfirmNo,
   };
 }

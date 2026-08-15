@@ -191,42 +191,6 @@ export const autoSkipToggle = css`
   }
 `;
 
-// ─── confirm 型主动技确认弹窗(据守等:点按钮后二次确认)───
-// 固定居中遮罩 + 标题 + 发动/不发动 按钮。按钮文案取自 prompt.confirmLabel/cancelLabel,
-// 按钮样式复用 promptBtnPrimary / promptBtn。
-export const confirmOverlay = css`
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
-`;
-export const confirmDialog = css`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 20px 28px;
-  border-radius: 12px;
-  background: #2a2018;
-  border: 2px solid #f39c12;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-  width: min(420px, 90%);
-`;
-export const confirmDialogTitle = css`
-  font-size: 15px;
-  font-weight: bold;
-  color: #f1c40f;
-  text-align: center;
-  line-height: 1.5;
-`;
-export const confirmDialogActions = css`
-  display: flex;
-  gap: 12px;
-`; 
-
 // ─── 辅助状态样式 ───
 /** 自动切换按钮激活态(绿色)。 */
 export const autoSwitchActive = css`

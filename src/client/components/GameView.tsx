@@ -272,7 +272,6 @@ export function GameViewComponentImpl({
     selectedForDiscard,
     transformMode,
     distributeMode,
-    pendingConfirm,
     activeDistribute,
     isDistributeActive,
     distSelected,
@@ -310,8 +309,6 @@ export function GameViewComponentImpl({
     cancelSelection,
     clearDiscard,
     setDistributeMode,
-    handleConfirmYes,
-    handleConfirmNo,
   } = play;
 
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
@@ -1126,23 +1123,6 @@ export function GameViewComponentImpl({
 
       {/* ─── Lottie 特效层(顶层 fixed,不拦截交互)─── */}
       <VfxLayer items={vfxItems} view={view} />
-
-      {/* ─── confirm 型主动技确认弹窗(据守等:点技能按钮后的二次确认)─── */}
-      {pendingConfirm && (
-        <div className={styles.confirmOverlay}>
-          <div className={styles.confirmDialog}>
-            <div className={styles.confirmDialogTitle}>{pendingConfirm.prompt.title}</div>
-            <div className={styles.confirmDialogActions}>
-              <button className={styles.promptBtnPrimary} onClick={handleConfirmYes}>
-                {pendingConfirm.prompt.confirmLabel ?? '发动'}
-              </button>
-              <button className={styles.promptBtn} onClick={handleConfirmNo}>
-                {pendingConfirm.prompt.cancelLabel ?? '不发动'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
