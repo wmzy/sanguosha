@@ -45,6 +45,10 @@ async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
     state.localVars['火攻/展示'] = revealed;
     state.localVars['火攻/展示花色'] = revealed.suit;
   }
+  // 展示广播:全员可见被展示牌的牌面(牌仍在目标手牌,不移动)。
+  // 与 界火计/义绝/攻心 一致走 展示 atom——否则使用者以外的人完全看不到目标展示了什么,
+  // 使用者也只从弃牌询问标题得知花色、看不到具体牌面。
+  await applyAtom(state, { type: '展示', player: target, cardId: revealed.cardId });
   const revealedSuit = revealed.suit;
 
   // ── 2) 请求使用者弃一张同花色手牌 ──

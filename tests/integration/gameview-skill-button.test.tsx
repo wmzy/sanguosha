@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { GameViewComponent } from '../../src/client/components/GameView';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
+import type { QueuedEvent } from '../../src/client/hooks/useEventPlayback';
 import type { GameView, Card } from '../../src/engine/types';
 
 function makeCard(id: string, name: string): Card {
@@ -574,5 +575,68 @@ describe('GameView:贯石斧被动 distribute(杀被闪抵消后选 2 张弃置�
         }),
       );
     });
+  });
+
+  // 火攻等展示手牌操作的粘性展示卡:展示事件(useEventPlayback STICKY_REVEAL_TYPES)
+  // 退出 banner 定时队列,由 GameView 从 ingested 派生常驻显示——翻入后停住不淡出,
+  // 展示期间玩家照常操作(AwaitingPrompt 不被 isPlayingFlipAnim 门控),
+  // 任何动作提交(send 唯一出口)后立即消失。回归前:展示按 600ms/3s 定时淡出且
+  // 门控询问,玩家要么看不清、要么被迫干等动画播完才能弃牌。
+  // 来源:2026-08 前端体验修复;若未来有专门的横幅/EventBanner 测试文件可归并。
+  it('展示事件渲染粘性卡:常驻+不门控询问,提交动作后立即消失', async () => {
+    const view = makeView();
+    const withPending: GameView = {
+      ...view,
+      viewer: 0,
+      players: [
+        { ...view.players[0], name: 'P1', skills: ['使用牌', '打出牌'] },
+        { ...view.players[1], name: 'P2' },
+      ],
+      pending: {
+        type: 'awaits',
+        atom: { type: '请求回应', requestType: '火攻/弃牌', target: 0 } as GameView['pending'] extends infer P
+          ? P extends { atom: infer A } ? A : never : never,
+        // 火攻使用者视角:看完展示的♦后要挑同花色♦弃置——询问必须与展示同时可见
+        prompt: { type: 'confirm', title: '是否弃置一张♦牌?' },
+        target: 0,
+        isBlocking: true,
+      },
+    };
+    const ingested = [
+      {
+        seq: 1,
+        event: {
+          type: '展示',
+          player: 1,
+          cardId: 'r1',
+          card: { name: '杀', suit: '♦', rank: '3' },
+          effect: { sound: 'flip', animation: 'flip', duration: 700 },
+        },
+      },
+    ] as unknown as QueuedEvent[];
+    const onAction = vi.fn();
+    const { container } = render(
+      <GameViewComponent view={withPending} onAction={onAction} ingestedEvents={ingested} />,
+    );
+
+    // 1. 粘性卡渲染:入场动画时长取事件 duration(700ms),牌面 ♦3 杀 + 展示者标签可见
+    const revealEl = container.querySelector('[style*="--flip-duration"]');
+    expect(revealEl).not.toBeNull();
+    expect((revealEl as HTMLElement).style.getPropertyValue('--flip-duration')).toBe('700ms');
+    expect(revealEl!.textContent).toContain('P2 展示');
+    expect(revealEl!.textContent).toContain('杀');
+    expect(revealEl!.textContent).toContain('♦');
+    expect(revealEl!.textContent).toContain('3');
+
+    // 2. 不门控:询问标题与粘性卡同时可见(玩家边看展示边决策)
+    expect(screen.getAllByText(/是否弃置一张♦牌/).length).toBeGreaterThan(0);
+
+    // 3. 提交动作 → 粘性卡立即消失(confirm 按钮走 send 唯一出口)
+    const confirmBtn = await screen.findByRole('button', { name: '确认' });
+    fireEvent.click(confirmBtn);
+    expect(onAction).toHaveBeenCalled();
+    expect(container.querySelector('[style*="--flip-duration"]')).toBeNull();
+    // 询问面板仍在(消失的只是展示卡)
+    expect(screen.getAllByText(/是否弃置一张♦牌/).length).toBeGreaterThan(0);
   });
 });

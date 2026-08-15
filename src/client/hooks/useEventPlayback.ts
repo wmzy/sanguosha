@@ -46,6 +46,14 @@ const ARROW_MIN_MS = 1200;
 /** 需要延长播放时长的事件类型(携带 source+target 的箭头触发事件) */
 const ARROW_EVENT_TYPES = new Set(['指定目标', '成为目标']);
 
+/** 粘性展示事件类型:火攻/界火计/义绝/蛊惑 等「展示手牌」。
+ *  这类事件走「粘性展示卡」:由 GameView 从 ingested 派生常驻显示
+ *  (顶部中央翻入后停住,不淡出),玩家可同时操作,任何动作提交后立即消失。
+ *  不进 banner 队列的原因:队列按 duration 定时出队,展示会 (a) 占用定时槽、
+ *  (b) 经 isPlayingFlipAnim 门控 AwaitingPrompt 强制玩家干等动画播完——
+ *  火攻使用者恰恰要看着展示牌的花色去手牌里挑同花色,阻塞反而拖慢决策。 */
+const STICKY_REVEAL_TYPES = new Set(['展示']);
+
 /**
  * 结构性事件:回合/阶段开始·结束。这些事件无卡牌、无目标,中央横幅本就不渲染它们
  * (EventBanner 需 card 字段,ActionOverlay 需 target),进入播放队列只是 duration 空转,
@@ -143,7 +151,10 @@ export function useEventPlayback() {
       setIngested(fresh.map((e) => e));
       // 结构事件(回合/阶段)不进 banner 队列:它们无 card/target,横幅不渲染,
       // 入队只是 duration 空转,会阻塞后续牌操作事件。音效由 useSoundPlayback 跟 ingested 响。
-      const bannerEvents = fresh.filter((e) => !isStructural(e.event));
+      // 展示事件走粘性卡(见 STICKY_REVEAL_TYPES),同样退出定时队列。
+      const bannerEvents = fresh.filter(
+        (e) => !isStructural(e.event) && !STICKY_REVEAL_TYPES.has(e.event.type),
+      );
       if (bannerEvents.length > 0) {
         queueRef.current.push(...bannerEvents);
         // 若空闲,立即开始播放(用 ref 判断,避免闭包竞态)

@@ -57,6 +57,27 @@ export const eventCardPlayer = css`
   border-radius: 8px;
   border: 1px solid rgba(52, 152, 219, 0.4);
 `;
+// ─── 粘性展示卡(火攻等「展示手牌」):顶部中央常驻,翻入后停住不淡出 ───
+// 与中央事件横幅(eventCardLayer)分层:互不遮挡——事件照常播放,展示常驻可看。
+// 消失时机由 React 卸载驱动(玩家操作/新展示),不是 CSS 定时。
+export const revealCardLayer = css`
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+`;
+export const revealCard = css`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  perspective: 800px;
+  animation: revealCardIn var(--flip-duration, 700ms) cubic-bezier(0.22, 0.61, 0.36, 1) both;
+`;
 export const eventCardBody = css`
   position: relative;
   box-sizing: border-box;

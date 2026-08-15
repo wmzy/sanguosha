@@ -16,6 +16,7 @@ import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { buildView } from '../../src/engine/index';
+import { getAtomDef } from '../../src/engine/core/atom';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(
@@ -357,5 +358,64 @@ describe('火攻', () => {
       fullView.pending?.prompt as { cardFilter?: { candidates?: string[] } } | undefined
     )?.cardFilter?.candidates;
     expect(fullCands).toEqual(['r1', 'r2']);
+  });
+
+  // ─── 9. 展示广播:目标展示的牌全员可见(含牌面)且给足观看时长 ──────
+  // Bug:标版火攻的目标展示手牌后只写 localVars,不广播 展示 atom——使用者只从
+  // 弃牌询问标题得知花色,其他人完全看不到展示了什么(界火计/义绝/攻心 均有广播)。
+  // 修复:展示后走 展示 atom 全员广播牌面;展示时长 600ms → 3000ms 供玩家看清。
+  it('P2 展示手牌 → 全员收到 展示 ViewEvent(牌面+时长)→ GameLog 记录,牌不移动', async () => {
+    const hg = makeCard('hg', '火攻', '♥', '2');
+    const match = makeCard('m1', '桃', '♥', '5'); // P1 只有♥(与展示♦不同花色 → 不弃)
+    const reveal = makeCard('r1', '杀', '♦', '3'); // P2 展示的♦
+    const state = buildState({
+      p1Hand: ['hg', 'm1'],
+      p2Hand: ['r1'],
+      extraCards: { hg, m1: match, r1: reveal },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('火攻', 'hg', [1]);
+    await P1.pass(); // 无懈
+    P2.expectPending('请求回应');
+    await P2.respond('火攻', { cardId: 'r1' }); // 展示♦
+
+    // 1) 引擎广播了 展示 atom,事件全员可见(othersView 带 cardId + 牌面 + effect)
+    const entry = harness.state.atomHistory.find(
+      (e): e is typeof e & {
+        atom: Record<string, unknown>;
+        viewEvents?: { othersView?: Record<string, unknown> };
+      } => e.kind === 'atom' && (e.atom as Record<string, unknown>).type === '展示',
+    );
+    expect(entry).toBeDefined();
+    expect(entry!.atom).toMatchObject({ player: 1, cardId: 'r1' });
+    const revealEvent = entry!.viewEvents?.othersView;
+    expect(revealEvent).toMatchObject({
+      player: 1,
+      cardId: 'r1',
+      card: { name: '杀', suit: '♦', rank: '3' },
+    });
+    // 2) 事件自带 effect.duration(粘性展示卡的入场翻转动画时长,常驻期不受限)
+    expect((revealEvent?.effect as { duration?: number } | undefined)?.duration).toBe(700);
+
+    // 3) 展示牌不移动(仍在 P2 手牌)
+    expect(harness.state.players[1].hand).toContain('r1');
+
+    // 4) 视图层:双方 processedView 的 GameLog 均有展示条目(主人与旁观者同文案)
+    P1.expectView((v) => {
+      expect(v.log.some((l) => l.text.includes('展示:♦3'))).toBe(true);
+    });
+    P2.expectView((v) => {
+      expect(v.log.some((l) => l.text.includes('展示:♦3'))).toBe(true);
+    });
+  });
+
+  // ─── 10. 展示时长契约:atom 静态 effect(前端粘性卡入场动画按此播放) ──
+  it('展示 atom 静态 effect: flip 动画 + duration(粘性卡入场时长,常驻不受限)', () => {
+    const effect = getAtomDef('展示').effect;
+    expect(effect?.animation).toBe('flip');
+    expect(effect?.duration).toBeGreaterThan(0);
   });
 });

@@ -16,7 +16,7 @@
 import * as styles from './gameViewStyles';
 import { SUIT_COLOR } from './gameViewConstants';
 import { CardFace } from './CardFace';
-import type { GameView, Card } from '../../engine/types';
+import type { GameView, Card, ViewEvent } from '../../engine/types';
 import { getAtomDef } from '../../engine/core/atom';
 import type { QueuedEvent } from '../hooks/useEventPlayback';
 
@@ -27,9 +27,53 @@ export interface EventBannerProps {
   /** 当前播放的事件(null = 空闲,不渲染) */
   current: QueuedEvent | null;
   view: GameView;
+  /** 粘性展示卡(火攻等「展示手牌」):最新展示事件,常驻至玩家操作/新展示。
+   *  顶部中央翻入后停住(不淡出),不门控任何交互。 */
+  reveal?: ViewEvent | null;
 }
 
-export function EventBanner({ current }: EventBannerProps) {
+export function EventBanner({ current, reveal = null, view }: EventBannerProps) {
+  // 粘性展示卡:独立于定时队列渲染(即使队列空闲也常驻,不门控任何交互)
+  const revealNode = renderRevealCard(reveal, view);
+  return (
+    <>
+      {revealNode}
+      {renderBanner(current)}
+    </>
+  );
+}
+
+/** 粘性展示卡:火攻/界火计/义绝/蛊惑 等「展示手牌」事件的常驻渲染。
+ *  顶部中央翻入(revealCardIn)后停住,不淡出;消失由 React 卸载驱动
+ *  (玩家操作 send / 新展示事件替换),展示时长不受定时限制。 */
+function renderRevealCard(reveal: ViewEvent | null, view: GameView) {
+  if (!reveal) return null;
+  const card = reveal.card as Pick<Card, 'name' | 'suit' | 'rank'> | undefined;
+  if (!card) return null;
+  const effect = reveal.effect as EventEffect;
+  const ownerName = view.players[reveal.player as number]?.name;
+  return (
+    <div className={styles.revealCardLayer}>
+      <div
+        className={styles.revealCard}
+        style={
+          {
+            '--flip-duration': `${effect?.duration ?? 700}ms`,
+            '--suit-color': SUIT_COLOR[card.suit] ?? '#ccc',
+          } as React.CSSProperties
+        }
+      >
+        <div className={styles.eventCardLabel}>{ownerName ? `${ownerName} 展示` : '展示'}</div>
+        <div className={styles.eventCardBody}>
+          <CardFace name={card.name} suit={card.suit} rank={card.rank} size="large" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** 中央定时横幅(原 EventBanner 主体) */
+function renderBanner(current: QueuedEvent | null) {
   if (!current) return null;
 
   const atomType = current.event.atomType ?? current.event.type;

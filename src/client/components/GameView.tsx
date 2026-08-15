@@ -14,10 +14,10 @@
 //   均在上层,本组件不可见。
 //
 // 布局: GameHeader → [Battlefield: SeatRing + CenterTable | SideDock] → BottomBar(装备|手牌|武将)
-import { useState, useCallback, useRef, memo, type ReactNode } from 'react';
+import { useState, useCallback, useRef, useEffect, memo, type ReactNode } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
-import type { GameView as EngineGameView, Card, Json } from '../../engine/types';
+import type { GameView as EngineGameView, Card, Json, ViewEvent } from '../../engine/types';
 import { getAtomDef } from '../../engine/core/atom';
 import { CountdownBar } from './CountdownBar';
 import { DEFAULT_COUNTDOWN_TOTAL_MS } from '../hooks/useCountdown';
@@ -179,6 +179,17 @@ export function GameViewComponentImpl({
   // 资源包管理:发现 + 启停(localStorage 持久化),供顶部「📦」浮层调用
   const { packs, refresh, togglePack } = useResourcePacks();
   const [showPacks, setShowPacks] = useState(false);
+  // ─── 粘性展示卡(火攻/界火计/义绝/蛊惑 等「展示手牌」) ───
+  // 展示事件退出 banner 定时队列(useEventPlayback STICKY_REVEAL_TYPES),
+  // 从 ingested 立即批次派生:最新一条展示事件常驻显示(翻入后停住不淡出)。
+  // 玩家可同时操作(不门控任何 pending);任何动作提交(send)或新展示到达即消失/替换。
+  const [revealEvent, setRevealEvent] = useState<ViewEvent | null>(null);
+  useEffect(() => {
+    const reveals = (ingestedEvents ?? []).filter((e) => e.event.type === '展示');
+    if (reveals.length > 0) {
+      setRevealEvent(reveals[reveals.length - 1].event);
+    }
+  }, [ingestedEvents]);
   // 事件动效速度档位:useEventPlayback 的 playNext 每条事件实时读 localStorage,
   // 这里持 state 仅为了按钮图标即时刷新(不向 hook 传 props)。
   const [animSpeed, setAnimSpeedState] = useState<AnimSpeed>(() => getAnimSpeed());
@@ -210,7 +221,9 @@ export function GameViewComponentImpl({
   // 按钮均通过 canOperate 传导自动隐藏或 disabled。
   const canOperate = !readOnly;
 
-  // 发送 action(出牌交互状态机共享的底层函数)
+  // 发送 action(出牌交互状态机共享的底层函数)。
+  // 所有玩家动作(出牌/弃牌/技能/skip/结束回合)的唯一出口——在此清除粘性展示卡:
+  // 火攻等「展示手牌」常驻显示到玩家做出下一个操作为止,操作即取消(用户看完即决策)。
   const send = useCallback(
     (
       skillId: string,
@@ -218,6 +231,7 @@ export function GameViewComponentImpl({
       params: Record<string, Json>,
       preceding?: Array<{ skillId: string; actionType: string; params: Record<string, Json> }>,
     ) => {
+      setRevealEvent(null);
       onAction({ skillId, actionType, ownerId: perspectiveIdx, params, preceding });
     },
     [onAction, perspectiveIdx],
@@ -505,8 +519,8 @@ export function GameViewComponentImpl({
       {/* ─── 主内容:战场区 + 右侧边栏 ─── */}
       <div className={styles.mainContent}>
         <div className={styles.battleField}>
-          {/* ─── 事件横幅(延时展示,非阻塞) ─── */}
-          <EventBanner current={currentEvent ?? null} view={view} />
+          {/* ─── 事件横幅(延时展示,非阻塞)+ 粘性展示卡(常驻至操作) ─── */}
+          <EventBanner current={currentEvent ?? null} view={view} reveal={revealEvent} />
           {/* ─── 动作浮层+箭头(谁对谁用什么牌) ─── */}
           <ActionOverlay current={currentEvent ?? null} view={view} />
 

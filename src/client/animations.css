@@ -248,6 +248,34 @@
   }
 }
 
+/* ─── 粘性展示卡入场:从上方弹出 + 3D 翻转揭示,然后停住(不淡出) ───
+   与 cardFlipIn 的区别:cardFlipIn 是三阶段(入/停/淡出)定时动画,
+   revealCardIn 只做入场,停住后常驻——消失由 React 卸载(玩家操作/新事件)驱动,
+   展示时长不受限,玩家边看边决策。 */
+@keyframes revealCardIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.6) rotateY(180deg);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(-8px) scale(0.9) rotateY(120deg);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(0) scale(1.05) rotateY(-8deg);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(0) scale(0.99) rotateY(2deg);
+  }
+  80%,
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateY(0deg);
+  }
+}
+
 /* ─── 动作浮层入场:从上方弹出 ─── */
 @keyframes bannerIn {
   0% {
