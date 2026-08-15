@@ -3,6 +3,7 @@ import { cx, css } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import { SUIT_COLOR } from './gameViewConstants';
 import { CardFace } from './CardFace';
+import { cardTouchGuard, useCardDescOverlay } from './CardDescTooltip';
 import type { Card } from '../../engine/types';
 
 /**
@@ -80,12 +81,25 @@ export function HandCardImpl(props: HandCardProps) {
   const displayName = isTransformMatch && transformWrapperName ? transformWrapperName : card.name;
   const fanAngle = totalHand > 1 ? -10 + 20 * (index / (totalHand - 1)) : 0;
 
+  // 牌描述浮层(替代原生 title):桌面 hover / 触屏长按 500ms 触发。
+  // 状态全在组件内部,不新增 props,不影响 memo 比较;卸载自动清理计时器。
+  const tip = useCardDescOverlay({
+    name: displayName,
+    suit: card.suit,
+    rank: card.rank,
+    description: card.description,
+    originName: isTransformMatch && transformWrapperName ? card.name : undefined,
+    suitColor,
+  });
+
   return (
     <div
+      ref={tip.bind.ref}
       data-card-id={card.id}
       className={cx(
         styles.handCard,
         handCardHoverLift,
+        cardTouchGuard,
         isSelected && styles.handCardSelected,
         !canPlay &&
           !isAwaiting &&
@@ -110,12 +124,17 @@ export function HandCardImpl(props: HandCardProps) {
           '--suit-color': suitColor,
         } as React.CSSProperties
       }
-      onClick={() => canClick && !isTransformDisabled && !isDistributeDisabled && onCardClick(card)}
-      title={
-        isTransformMatch && transformWrapperName
-          ? `${displayName} ${card.suit}${card.rank}\n(原:${card.name}) ${card.description ?? ''}`.trim()
-          : `${card.name} ${card.suit}${card.rank}\n${card.description ?? ''}`
-      }
+      onClick={() => {
+        // 长按触发后抬起的 click / 浮层开着时点卡关闭:均被浮层吞掉,不选牌
+        if (tip.consumeClick()) return;
+        if (canClick && !isTransformDisabled && !isDistributeDisabled) onCardClick(card);
+      }}
+      onMouseEnter={tip.bind.onMouseEnter}
+      onMouseLeave={tip.bind.onMouseLeave}
+      onTouchStart={tip.bind.onTouchStart}
+      onTouchEnd={tip.bind.onTouchEnd}
+      onTouchMove={tip.bind.onTouchMove}
+      onContextMenu={tip.bind.onContextMenu}
     >
       {/* 卡牌牌面:cards-local 图片(object fallback)或 HTML 绘制牌面 */}
       <CardFace name={card.name} suit={card.suit} rank={card.rank} size="normal" damageType={card.damageType} />
@@ -126,6 +145,8 @@ export function HandCardImpl(props: HandCardProps) {
           <div className={styles.cardOrigin}>(原: {card.name})</div>
         </div>
       )}
+      {/* 牌描述浮层:portal 到 body,不受手牌区裁剪/扇形 z-index 影响 */}
+      {tip.overlay}
     </div>
   );
 }

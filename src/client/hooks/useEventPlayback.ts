@@ -11,6 +11,30 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { ViewEvent } from '../../engine/types';
 import { getAtomDef } from '../../engine/core/atom';
 
+/** 事件动效播放速度档位(localStorage 持久化) */
+export type AnimSpeed = 'normal' | 'fast';
+
+/** 速度档位存储 key */
+const ANIM_SPEED_KEY = 'sgs_anim_speed';
+
+/** 读取速度档位;无效/缺失值回退 'normal'(localStorage 抛异常如隐私模式也回退) */
+export function getAnimSpeed(): AnimSpeed {
+  try {
+    return localStorage.getItem(ANIM_SPEED_KEY) === 'fast' ? 'fast' : 'normal';
+  } catch {
+    return 'normal';
+  }
+}
+
+/** 写入速度档位(持久化,刷新后保持) */
+export function setAnimSpeed(s: AnimSpeed): void {
+  try {
+    localStorage.setItem(ANIM_SPEED_KEY, s);
+  } catch {
+    // 写入失败(隐私模式/存储满)静默忽略:本次会话内仍可经 state 生效
+  }
+}
+
 /** 最小可见时长(ms),保证事件能被看清,即便 effect.duration 偏短 */
 const MIN_VISIBLE_MS = 400;
 
@@ -93,7 +117,10 @@ export function useEventPlayback() {
     // 箭头来不及渲染。其他事件仍走 MIN_VISIBLE_MS 下限。
     const isArrowEvent = ARROW_EVENT_TYPES.has(next.event.type);
     const minMs = isArrowEvent ? ARROW_MIN_MS : MIN_VISIBLE_MS;
-    const wait = Math.max(duration, minMs);
+    // 每条事件播放时实时读速度档位:切换即时生效于「下一条」事件,
+    // 当前正在播的事件定时器不受影响(不打断,符合语义)。
+    const speedFactor = getAnimSpeed() === 'fast' ? 0.5 : 1;
+    const wait = Math.max(duration, minMs) * speedFactor;
     timerRef.current = setTimeout(() => {
       lastPlayedSeqRef.current = next.seq;
       playNext();

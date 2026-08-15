@@ -86,11 +86,18 @@ export function CharSelectOverlay({
   const [submittedChar, setSubmittedChar] = useState<string | null>(null);
   // 多版本组 hover 展开态:记录当前 hover 的组 baseId,null 表示无展开。
   const [hoveredGroupBaseId, setHoveredGroupBaseId] = useState<string | null>(null);
-  // pending/target 变化时清空选中态与锁定态(新选将窗口开启)
+  // 势力筛选:仅影响候选展示,不参与提交逻辑;'全部' 表示不过滤。
+  const [factionFilter, setFactionFilter] = useState('全部');
+  // 名称搜索关键字:仅做名称子串匹配(不做拼音转换,避免引入拼音表依赖)。
+  const [searchText, setSearchText] = useState('');
+  // pending/target 变化时清空选中态与锁定态(新选将窗口开启);
+  // 筛选/搜索态一并重置,避免上一轮的过滤条件遮住新一轮候选。
   useEffect(() => {
     setSelectedCharName(null);
     setSubmittedChar(null);
     setHoveredGroupBaseId(null);
+    setFactionFilter('全部');
+    setSearchText('');
   }, [isSelfSelecting, charSelectTarget]);
 
   const viewerColor = viewerIdentity ? IDENTITY_COLORS[viewerIdentity] || '#888' : null;
@@ -109,6 +116,35 @@ export function CharSelectOverlay({
     }
     return [...map.values()];
   })();
+
+  // 势力 chips 选项:固定主五项 + 候选中实际出现的其他势力(如 '神')动态补充,
+  // 避免硬编码遗漏冷门势力。势力缺失时回退 '群',与卡片渲染的回退口径一致。
+  const factionOptions = (() => {
+    const base = ['全部', '魏', '蜀', '吴', '群'];
+    const extra = new Set<string>();
+    for (const ch of candidates) {
+      const f = getCharacterMeta(ch.name)?.faction ?? '群';
+      if (!base.includes(f)) extra.add(f);
+    }
+    return [...base, ...extra];
+  })();
+
+  // 筛选 + 搜索叠加(AND),仅作用于展示:
+  // - 势力按组首版本的 meta 判定(同组多版本的势力视为一致);
+  // - 搜索匹配组内任一版本名或 baseId(如「甄姬」可命中「界甄姬」组)。
+  const visibleGroups = groups.filter((versions) => {
+    const faction = getCharacterMeta(versions[0].name)?.faction ?? '群';
+    if (factionFilter !== '全部' && faction !== factionFilter) return false;
+    const kw = searchText.trim();
+    if (
+      kw &&
+      !(versions[0].baseId ?? '').includes(kw) &&
+      !versions.some((v) => v.name.includes(kw))
+    ) {
+      return false;
+    }
+    return true;
+  });
 
   /** 渲染单张候选卡(单版本 / 多版本组展开态共用) */
   const renderCard = (
@@ -205,12 +241,39 @@ export function CharSelectOverlay({
 
       {isSelfSelecting ? (
         <>
+          {/* 筛选工具行:势力 chips + 名称搜索。仅自身选将时展示(他人选将无候选列表)。
+              注意 input 不设 autoFocus:避免抢焦点破坏确认按钮的 Enter 语义。 */}
+          <div className={filterToolbar}>
+            <div className={factionChips}>
+              {factionOptions.map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  className={cx(factionChip, factionFilter === f && factionChipActive)}
+                  onClick={() => setFactionFilter(f)}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+            <input
+              className={searchInput}
+              type="text"
+              value={searchText}
+              placeholder="搜索武将…"
+              onChange={(e) => setSearchText(e.target.value)}
+            />
+          </div>
+
           {/* 候选网格:按 baseId 分组,多版本组 hover 原地水平展开 */}
           <div
             className={candidateGrid}
-            style={{ '--cols': Math.min(groups.length, 5) } as React.CSSProperties}
+            style={
+              /* 空结果时列数兜底为 1,避免 repeat(0, 1fr) 非法值 */
+              { '--cols': Math.min(Math.max(visibleGroups.length, 1), 5) } as React.CSSProperties
+            }
           >
-            {groups.map((versions) => {
+            {visibleGroups.map((versions) => {
               const baseId = versions[0].baseId ?? versions[0].name;
               const isMulti = versions.length > 1;
               const isExpanded = isMulti && hoveredGroupBaseId === baseId;
@@ -311,6 +374,11 @@ export function CharSelectOverlay({
               );
             })}
           </div>
+
+          {/* 筛选/搜索无命中时给出明确提示,而非留白 */}
+          {visibleGroups.length === 0 && (
+            <div className={noMatchHint}>无匹配武将</div>
+          )}
 
           {/* 确认按钮:提交后锁定为「已选择 XXX」,禁止重复提交 */}
           <button
@@ -432,6 +500,82 @@ const badgeValue = css`
   font-size: 20px;
   font-weight: bold;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+`;
+
+/* ── 筛选工具行(势力 chips + 搜索框) ── */
+const filterToolbar = css`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-bottom: 12px;
+  max-width: 880px;
+  width: 90%;
+`;
+
+const factionChips = css`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+`;
+
+/* 暗色底 chip 与候选卡同风格;选中态用金色,呼应卡片选中边框与确认按钮 */
+const factionChip = css`
+  padding: 4px 14px;
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    color: #ffd700;
+    border-color: rgba(255, 215, 0, 0.5);
+  }
+`;
+
+const factionChipActive = css`
+  color: #000;
+  font-weight: bold;
+  background: linear-gradient(135deg, #ffd700, #f0c000);
+  border-color: #ffd700;
+
+  &:hover {
+    color: #000;
+    border-color: #ffd700;
+  }
+`;
+
+const searchInput = css`
+  box-sizing: border-box;
+  width: 150px;
+  padding: 5px 14px;
+  font-size: 13px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  outline: none;
+  transition: border-color 0.15s;
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.35);
+  }
+
+  &:focus {
+    border-color: #ffd700;
+  }
+`;
+
+const noMatchHint = css`
+  margin-top: 24px;
+  font-size: 15px;
+  color: #888;
+  letter-spacing: 2px;
 `;
 
 const candidateGrid = css`

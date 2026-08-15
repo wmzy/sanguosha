@@ -8,6 +8,7 @@
 //     主公/忠臣 → 主公方;反贼 → 反贼;内奸 → 内奸
 
 import type { GameView } from '../../engine/types';
+import type { BattleStats } from '../utils/battleStats';
 import { css, cx } from '@linaria/core';
 import { IDENTITY_COLORS, FACTION_BG } from './gameViewConstants';
 import { audioEngine } from '../sounds/audioEngine';
@@ -25,6 +26,8 @@ export interface GameResultOverlayProps {
   onExit: () => void;
   /** 下载录像(可选;调试/多人模式传入) */
   onDownloadReplay?: () => void;
+  /** 战报统计(可选;多人/调试模式从事件流累计)。传入时表格追加 伤害/承伤/击杀 三列 */
+  stats?: BattleStats;
 }
 
 /** 身份 → 阵营 */
@@ -64,6 +67,7 @@ export function GameResultOverlay({
   onRestart,
   onExit,
   onDownloadReplay,
+  stats,
 }: GameResultOverlayProps) {
   const isDraw = winner === '无人';
   const winCamp = winningCampOf(winner, players);
@@ -90,7 +94,10 @@ export function GameResultOverlay({
 
   return (
     <div className={overlayRoot}>
-      <div className={resultCard} style={{ '--camp-color': campColor } as React.CSSProperties}>
+      <div
+        className={cx(resultCard, stats && resultCardWide)}
+        style={{ '--camp-color': campColor } as React.CSSProperties}
+      >
         <div className={endLabel}>游戏结束</div>
         <div className={campName}>{campLabel}</div>
 
@@ -103,12 +110,20 @@ export function GameResultOverlay({
 
         <div className={playerList}>
           {/* 表头与数据行共用同一 grid 模板,列宽完全一致 */}
-          <div className={cx(rowGrid, listHeader)}>
+          <div className={cx(stats ? rowGridWide : rowGrid, listHeader)}>
             <span />
             <span>玩家</span>
             <span>武将</span>
             <span className={hdrCenter}>身份</span>
             <span className={hdrCenter}>体力</span>
+            {/* 战报列(仅 stats 传入时渲染,与数据行走同一分支保持对齐) */}
+            {stats && (
+              <>
+                <span className={hdrCenter}>伤害</span>
+                <span className={hdrCenter}>承伤</span>
+                <span className={hdrCenter}>击杀</span>
+              </>
+            )}
             <span className={hdrCenter}>结果</span>
           </div>
           {players.map((p, i) => {
@@ -117,16 +132,19 @@ export function GameResultOverlay({
             const pCamp = identityCamp(p.identity);
             const pWon: boolean | null =
               isDraw ? null : pCamp !== null && pCamp === winCamp;
+            // 本座次战报条目(stats 未覆盖的座次按 0 展示)
+            const st = stats?.[i];
             return (
               <div
                 key={i}
                 className={cx(
-                  rowGrid,
+                  stats ? rowGridWide : rowGrid,
                   playerRow,
                   isMe && playerRowMe,
                   pWon === true && playerRowWon,
                   pWon === false && playerRowLost,
                 )}
+                title={st ? `本局回合数:${st.turns}` : undefined}
               >
                 <span className={cx(rowStar, isMe && rowStarMe)}>{isMe ? '★' : ''}</span>
                 <span className={cx(rowName, isMe && rowNameMe)}>
@@ -150,6 +168,13 @@ export function GameResultOverlay({
                 <span className={rowHp}>
                   {p.alive ? `${p.health}/${p.maxHealth}` : '阵亡'}
                 </span>
+                {stats && (
+                  <>
+                    <span className={rowStat}>{st?.damageDealt ?? 0}</span>
+                    <span className={rowStat}>{st?.damageTaken ?? 0}</span>
+                    <span className={rowStat}>{st?.kills ?? 0}</span>
+                  </>
+                )}
                 <span className={cx(rowResult, pWon === true && resultWin, pWon === false && resultLose)}>
                   {pWon === null ? '—' : pWon ? '胜' : '负'}
                 </span>
@@ -208,6 +233,12 @@ const resultCard = css`
   gap: 16px;
 `;
 
+/** 战报版结算卡:多三列数据,放宽宽度上下限避免武将列被挤没 */
+const resultCardWide = css`
+  min-width: 520px;
+  max-width: 640px;
+`;
+
 const endLabel = css`
   font-size: 14px;
   letter-spacing: 4px;
@@ -257,6 +288,23 @@ const rowGrid = css`
   align-items: center;
   gap: 4px 10px;
   padding: 8px 12px;
+`;
+
+/** 战报版 9 列 grid 模板(传入 stats 时表头/数据行统一切换,列严格对齐)。
+ *  列: star(16) / name(min80~auto) / char(1fr) / identity(48) / hp(40)
+ *      / damage(36) / taken(36) / kills(30) / result(26) */
+const rowGridWide = css`
+  display: grid;
+  grid-template-columns: 16px minmax(80px, auto) 1fr 48px 40px 36px 36px 30px 26px;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 8px 12px;
+`;
+
+/** 战报数据单元格(伤害/承伤/击杀):居中,弱化色 */
+const rowStat = css`
+  text-align: center;
+  color: rgba(255, 255, 255, 0.75);
 `;
 
 const listHeader = css`

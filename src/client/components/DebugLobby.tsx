@@ -35,6 +35,7 @@ const connectingHint = css`
 `;
 import { installTelemetry, uninstallTelemetry, logUserAction } from '../utils/debugTelemetry';
 import { saveReplay } from '../replay/replayFile';
+import { summarizeBattleStats, useBattleStatsEvents } from '../utils/battleStats';
 import type { ReplayMeta } from '../replay/types';
 import type { RoomInfo } from '../../server/protocol';
 import { DEFAULT_CHAT_CONFIG } from '../../server/protocol';
@@ -188,6 +189,11 @@ function DebugGameViewInner({
   const currentView = conn.views.get(perspective) ?? null;
   const pctl = useDebugPerspective(conn.views, perspective, playerCount, handleSetPerspective);
 
+  // ── 战报统计(伤害/承伤/击杀/回合数)──
+  // 注意:debug 模式 ingestedEvents 只累计「当前视角」连接的事件,中途切换视角会产生
+  // 缺口(统计为下界近似);game_reset 后 gameStarted=false 自动清空。
+  const battleEvents = useBattleStatsEvents(conn.ingestedEvents, conn.gameStarted);
+
   // ── 配置阶段:游戏未开始时显示配置面板 ──
   if (!conn.gameStarted && !currentView) {
     return (
@@ -223,6 +229,10 @@ function DebugGameViewInner({
 
   const view = currentView;
   const perspectiveName = view.players[perspective]?.name ?? `P${perspective}`;
+  // 结算战报:无战报事件时传 undefined(战报列不渲染,优雅降级)
+  const resultStatsAll = summarizeBattleStats(battleEvents);
+  const resultStats =
+    Object.keys(resultStatsAll).length > 0 ? resultStatsAll : undefined;
 
   // debug 模式视角控制 UI:渲染到 GameViewComponent 的插槽,不进入组件内部。
   // headerSlot(顶部栏右侧):视角切换 / 跳转 / 自动跟随 / 退出。
@@ -276,6 +286,7 @@ function DebugGameViewInner({
           winner={conn.gameOver.winner}
           players={view.players}
           perspectiveIdx={perspective}
+          stats={resultStats}
           onRestart={conn.sendRestart}
           onExit={onDeleteRoom}
           onDownloadReplay={handleDownloadReplay}

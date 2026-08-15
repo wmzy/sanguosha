@@ -44,6 +44,8 @@ export interface MultiplayerRoom {
   view: GameView | null;
   gameOver: { winner: string } | null;
   error: string | null;
+  /** 手动关闭错误 toast(点击 toast 关闭) */
+  clearError: () => void;
   /** 房间不存在(URL 直达不存在的 roomId) */
   notFound: boolean;
   /** 是否房主 */
@@ -120,6 +122,35 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const [view, setView] = useState<GameView | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 错误 toast 的自动消失计时器:必须可清除——连发错误时若沿用旧的 setTimeout,
+  // 前一个计时器会提前清掉后一个 toast;卸载时也要清理避免泄漏。
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 清除待执行的自动消失计时器(不改变当前已显示的 error 内容)。 */
+  const clearErrorTimer = useCallback(() => {
+    if (errorTimerRef.current !== null) {
+      clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = null;
+    }
+  }, []);
+  /** 显示错误 toast,3 秒后自动消失;新错误到来先取消旧计时器,保证每条都展示完整时长。 */
+  const showError = useCallback(
+    (msg: string) => {
+      clearErrorTimer();
+      setError(msg);
+      errorTimerRef.current = setTimeout(() => {
+        errorTimerRef.current = null;
+        setError(null);
+      }, 3000);
+    },
+    [clearErrorTimer],
+  );
+  /** 手动关闭错误 toast(供 UI 点击关闭)。 */
+  const clearError = useCallback(() => {
+    clearErrorTimer();
+    setError(null);
+  }, [clearErrorTimer]);
+  // 卸载清理:防止计时器回调对已卸载组件 setState。
+  useEffect(() => clearErrorTimer, [clearErrorTimer]);
   /** 房间不存在(URL 直达 /play/:roomId 但房间已销毁) */
   const [notFound, setNotFound] = useState(false);
   /** 创建房间请求进行中(createRoom 发起 → create 命令 settle) */
@@ -201,8 +232,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         // WS 断连走 onReconnectStateChange，不会进入这里。
         const msg = err instanceof Error ? err.message : String(err);
         log.error('room op failed', { error: msg });
-        setError(msg);
-        setTimeout(() => setError(null), 3000);
+        showError(msg);
       },
       onReconnectStateChange: (state: ReconnectState, attempt: number) => {
         setReconnectAttempt(attempt);
@@ -245,8 +275,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
           playbackRef.current.enqueue([{ seq: msg.seq, event: msg.view }]);
         }
         if (msg.type === 'error') {
-          setError(msg.message);
-          setTimeout(() => setError(null), 3000);
+          showError(msg.message);
         }
         // 座位交换请求：仅当目标是当前玩家时显示通知
         if (msg.type === 'seat_swap_request' && msg.targetPlayerId === hgc.playerId) {
@@ -275,6 +304,8 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
           setIncomingSeatSwap(null);
           playbackRef.current.reset(0);
           setDisconnectedSeats(new Set());
+          // 持久提示(不自动消失):先清掉可能在途的自动消失计时器,避免旧 timer 提前清掉它
+          clearErrorTimer();
           setError('你已被房主移出房间');
         }
         // 玩家断线/重连:维护离线座次集合,供座位卡显示离线角标
@@ -313,6 +344,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
           if (hgcRef.current !== hgc) return;
           const msg = err instanceof Error ? err.message : String(err);
           log.error('createRoom failed', { error: msg });
+          clearErrorTimer();
           setError(msg);
           setStage('lobby');
         })
@@ -339,6 +371,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
           if (isRoomNotFound(err)) setNotFound(true);
           else setCommand({ type: 'spectate', roomId: command.roomId });
         } else {
+          clearErrorTimer();
           setError(msg);
           setStage('lobby');
         }
@@ -352,6 +385,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         log.error('joinAsSpectator failed', { status, error: msg });
         if (isRoomNotFound(err)) setNotFound(true);
         else {
+          clearErrorTimer();
           setError(msg);
           setStage('lobby');
         }
@@ -506,8 +540,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     }).catch((err) => {
       log.error('switchRole failed', { error: String(err) });
       const body = (err as { body?: { error?: string } }).body;
-      setError(body?.error ?? (role === 'spectator' ? '切换为旁观者失败' : '加入游戏失败（房间可能已满）'));
-      setTimeout(() => setError(null), 3000);
+      showError(body?.error ?? (role === 'spectator' ? '切换为旁观者失败' : '加入游戏失败（房间可能已满）'));
     });
   }, []);
 
@@ -602,6 +635,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     view,
     gameOver,
     error,
+    clearError,
     notFound,
     isHost,
     isSpectator,

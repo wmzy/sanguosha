@@ -49,7 +49,8 @@ export function CardFace({
     >
       <div className={`${corner} ${sz === 'small' ? cornerSmall : sz === 'large' ? cornerLarge : cornerNormal}`}>
         <span className={rankCls}>{rank}</span>
-        <span className={suitCls}>{suit}</span>
+        {/* 红色牌(♥♦)双重编码:符号底部横杠承载类别信息,不依赖红绿分辨 */}
+        <span className={`${suitCls} ${suit === '♥' || suit === '♦' ? redSuitCls : ''}`}>{suit}</span>
       </div>
       <div className={cardName}>{display}</div>
     </div>
@@ -127,6 +128,14 @@ const rankCls = css`
   font-weight: bold;
 `;
 const suitCls = css``;
+
+// 红色牌类别标记:花色符号底部一条横杠(沿用 currentColor 即花色红),
+// 形状本身携带「红色牌」类别,色弱玩家无需依赖红绿分辨;黑色牌不加。
+// corner 为绝对定位于左上角的纵向排列,横杠向下生长不会溢出牌面。
+const redSuitCls = css`
+  border-bottom: 2px solid currentColor;
+  padding-bottom: 1px;
+`;
 
 // normal(手牌 80×120)
 const nameNormal = css`

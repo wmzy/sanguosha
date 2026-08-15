@@ -58,6 +58,7 @@ import { useCharSelect } from '../hooks/useCharSelect';
 import { useSeatOrder } from '../hooks/useSeatOrder';
 import { useHandReorder } from '../hooks/useHandReorder';
 import { usePlayInteraction } from '../hooks/usePlayInteraction';
+import { useHotkeys } from '../hooks/useHotkeys';
 import { useProcessingPicks } from '../hooks/useProcessingPicks';
 import { usePlayHistory } from '../hooks/usePlayHistory';
 import { useSoundPlayback } from '../hooks/useSoundPlayback';
@@ -72,6 +73,7 @@ import { useAutoSkipPrefs } from '../hooks/useAutoSkipPrefs';
 import { useAutoSkip } from '../hooks/useAutoSkip';
 
 import type { QueuedEvent } from '../hooks/useEventPlayback';
+import { getAnimSpeed, setAnimSpeed, type AnimSpeed } from '../hooks/useEventPlayback';
 
 import type { ActionMsg } from '../types';
 
@@ -177,6 +179,16 @@ export function GameViewComponentImpl({
   // 资源包管理:发现 + 启停(localStorage 持久化),供顶部「📦」浮层调用
   const { packs, refresh, togglePack } = useResourcePacks();
   const [showPacks, setShowPacks] = useState(false);
+  // 事件动效速度档位:useEventPlayback 的 playNext 每条事件实时读 localStorage,
+  // 这里持 state 仅为了按钮图标即时刷新(不向 hook 传 props)。
+  const [animSpeed, setAnimSpeedState] = useState<AnimSpeed>(() => getAnimSpeed());
+  const toggleAnimSpeed = useCallback(() => {
+    setAnimSpeedState((s) => {
+      const next = s === 'fast' ? 'normal' : 'fast';
+      setAnimSpeed(next);
+      return next;
+    });
+  }, []);
 
   const handListRef = useRef<HTMLDivElement>(null);
 
@@ -353,6 +365,56 @@ export function GameViewComponentImpl({
     (canOperate && isDistributeActive && !!activeDistribute) ||
     (!!selectedCardId && !!selectedTarget && canOperate && isMyTurn);
 
+  // ─── 键盘快捷键 ───
+  // 语义与 actionBar 各按钮的 enabled 条件严格同源(复用同一批派生布尔量),
+  // 保证「按钮能点时快捷键才生效」。回放(readOnly)不注册任何快捷键:传空表即可,
+  // hook 内部无条件挂载,与 hooks 规则兼容。handlers 每次渲染重建闭包捕获最新状态,
+  // useHotkeys 用 ref 读取,无需担心重挂。
+  useHotkeys(
+    readOnly
+      ? {}
+      : {
+          // Enter:respond 窗口优先于出牌窗口(同时存在时回应询问更紧急)
+          enter: () => {
+            if (isRespondPending) {
+              if (selectedRespondCardId && respondTargetReady) handlePlayRespond();
+            } else if (playButtonState?.canPlay) {
+              handlePlayCard();
+            }
+          },
+          // Esc:转化模式最深,先退转化;其次取消已选牌
+          escape: () => {
+            if (transformMode) cancelTransform();
+            else if (showCancelSelection) cancelSelection();
+          },
+          // Space:不回应。preventDefault 阻止页面滚动(空格默认滚动行为)
+          space: (e) => {
+            if (isRespondPending) {
+              e.preventDefault();
+              handleRespond();
+            }
+          },
+          // E:结束回合(仅按钮可见时,即轮到本视角出牌且无 pending)
+          e: () => {
+            if (showEndTurn) handleEndTurn();
+          },
+          // 1-9:仅自由出牌窗口选第 n 张手牌(与按钮点击同一路径 handleCardClick)
+          ...Object.fromEntries(
+            [1, 2, 3, 4, 5, 6, 7, 8, 9].map(
+              (n): [string, () => void] => [
+                String(n),
+                () => {
+                  if (isMyTurn && view.phase === '出牌' && !pending) {
+                    const card = perspectiveHand[n - 1];
+                    if (card) handleCardClick(card);
+                  }
+                },
+              ],
+            ),
+          ),
+        },
+  );
+
   // 底栏自己的大卡是否可作为目标（铁索连环含自己）。与 SeatArcLayout 的
   // selectedNeedsTarget 同源：选目标阶段 + 自己可被选（allowSelf/selfTarget）。
   const selfInTargetMode =
@@ -401,6 +463,33 @@ export function GameViewComponentImpl({
                   aria-label="资源包管理"
                 >
                   📦
+                </button>
+                {/* 事件动效播放速度:点按 normal↔fast 切换;playNext 每条事件实时读档,
+                    当前播放中的事件不打断,下一条起生效 */}
+                <button
+                  type="button"
+                  className={styles.toolbarBtn}
+                  onClick={toggleAnimSpeed}
+                  title="事件动效播放速度"
+                  aria-label="事件动效播放速度"
+                >
+                  {animSpeed === 'fast' ? '🐇' : '🐢'}
+                </button>
+                {/* 快捷键说明:纯 title 悬停提示,无交互(不做弹窗) */}
+                <button
+                  type="button"
+                  className={styles.toolbarBtn}
+                  title={
+                    '键盘快捷键：\n' +
+                    'Enter — 出牌 / 打出回应牌\n' +
+                    'Esc — 取消转化 / 取消选择\n' +
+                    'Space — 不回应\n' +
+                    'E — 结束回合\n' +
+                    '1-9 — 选中第 n 张手牌（自由出牌时）'
+                  }
+                  aria-label="键盘快捷键说明"
+                >
+                  ⌨
                 </button>
                 {showPacks && (
                   <div className={styles.packDropdown}>

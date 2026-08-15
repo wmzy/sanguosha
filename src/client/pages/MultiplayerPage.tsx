@@ -10,9 +10,12 @@ import { GameViewComponent } from '../components/GameView';
 import { GameResultOverlay } from '../components/GameResultOverlay';
 import { RoomListPanel } from '../components/RoomListPanel';
 import { ChatConfigSection } from '../components/ChatConfigSection';
+import { OnboardingGuide } from '../components/OnboardingGuide';
 import { colors, pageStyle, btnStyle, inputStyle, errorToastStyle, pageBgStyle, glassPanelStyle, goldHeadingStyle, goldColors } from '../theme';
 import { saveReplay } from '../replay/replayFile';
 import { apiFetch, ApiError } from '../api/client';
+import { copyToClipboard } from '../utils/clipboard';
+import { summarizeBattleStats, useBattleStatsEvents } from '../utils/battleStats';
 import type { ReplayMeta } from '../replay/types';
 import type { ActionMsg } from '../types';
 import type { RoomInfo, RoomConfig, CharPoolPreset } from '../../server/protocol';
@@ -111,6 +114,14 @@ const roomCode = css`
   letter-spacing: 6px;
   color: ${colors.accent.gold};
   font-family: monospace;
+`;
+
+/** 房间码下方复制按钮行:居中排布、小巧,不喧宾夺主 */
+const copyBtnRow = css`
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 12px;
 `;
 
 const readyInfo = css`
@@ -320,6 +331,30 @@ export function MultiplayerPage() {
   // lobby 阶段房间列表(参考 DebugLobby)
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
 
+  // 房间码/邀请链接复制反馈:成功后按钮短暂显示 ✓,2 秒后恢复(范式同 DebugPerspectiveBar)。
+  // 用单一状态 + 可清除计时器:连续点两个按钮时,后点的反馈覆盖先点的,旧计时器不残留。
+  const [copiedKind, setCopiedKind] = useState<'code' | 'link' | null>(null);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    // 卸载清理计时器,避免对已卸载组件 setState
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+  }, []);
+  const handleCopyRoomInfo = useCallback(
+    async (kind: 'code' | 'link') => {
+      if (!mp.roomId) return;
+      // 邀请链接走 /play/:roomId 路由,App.tsx 已支持 autoJoin 直达
+      const text = kind === 'code' ? mp.roomId : `${window.location.origin}/play/${mp.roomId}`;
+      const ok = await copyToClipboard(text);
+      if (ok) {
+        setCopiedKind(kind);
+        if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+        copiedTimerRef.current = setTimeout(() => setCopiedKind(null), 2000);
+      }
+      // 复制失败静默:两条复制路径都失败时无可靠反馈手段,不弹错打扰用户
+    },
+    [mp.roomId],
+  );
+
   // waiting 阶段房主配置编辑状态（首次从服务端同步后由用户控制）
   const [editConfig, setEditConfig] = useState<RoomConfig | null>(null);
   const editConfigInitRef = useRef(false);
@@ -406,6 +441,15 @@ export function MultiplayerPage() {
     : [];
 
   const handleAction = (action: ActionMsg) => mp.sendAction(action);
+
+  // ── 战报统计(伤害/承伤/击杀/回合数)──
+  // mp.ingestedEvents 是 ~80 条滑动窗口,结算时一次性统计会丢早期事件;
+  // 这里按 seq 增量累计本局的战报相关事件(见 utils/battleStats.ts),
+  // 对局中/旁观/结算阶段启用,game_reset 回 waiting 后自动清空。
+  const battleEvents = useBattleStatsEvents(
+    mp.ingestedEvents,
+    mp.stage === 'playing' || mp.stage === 'spectating' || mp.stage === 'ended',
+  );
 
   // 重连提示覆盖层(非阻塞:显示在内容之上,不阻止渲染)
   const reconnectBanner =
@@ -538,6 +582,17 @@ export function MultiplayerPage() {
             ingestedEvents={mp.ingestedEvents}
             disconnectedSeats={mp.disconnectedSeats}
           />
+          {/* 对局中操作被后端拒绝时的错误反馈(此前该分支静默无提示) */}
+          {mp.error && (
+            <div
+              className={errorToastStyle}
+              style={{ cursor: 'pointer' }}
+              title="点击关闭"
+              onClick={mp.clearError}
+            >
+              {mp.error}
+            </div>
+          )}
         </div>
       </>
     );
@@ -585,6 +640,17 @@ export function MultiplayerPage() {
               </div>
             ) : undefined}
           />
+          {/* 对局中操作被后端拒绝时的错误反馈(此前该分支静默无提示) */}
+          {mp.error && (
+            <div
+              className={errorToastStyle}
+              style={{ cursor: 'pointer' }}
+              title="点击关闭"
+              onClick={mp.clearError}
+            >
+              {mp.error}
+            </div>
+          )}
         </div>
       </>
     );
@@ -594,6 +660,9 @@ export function MultiplayerPage() {
     const winner = mp.gameOver?.winner ?? '无人';
     // view 存在时用丰富的结算面板;缺失时回退到简洁文案。
     if (mp.view) {
+      // 战报统计:仅结算阶段计算,从本局累计的战报事件汇总(无相关事件则传 undefined,列不渲染)
+      const statsAll = summarizeBattleStats(battleEvents);
+      const stats = Object.keys(statsAll).length > 0 ? statsAll : undefined;
       return (
         <>
           {reconnectBanner}
@@ -601,6 +670,7 @@ export function MultiplayerPage() {
             winner={winner}
             players={mp.view.players}
             perspectiveIdx={mp.view.viewer}
+            stats={stats}
             onRestart={mp.sendRestart}
             onExit={() => {
               mp.leaveRoom();
@@ -608,6 +678,17 @@ export function MultiplayerPage() {
             }}
             onDownloadReplay={handleDownloadReplay}
           />
+          {/* 结算面板阶段的错误反馈,与其他 stage 分支行为一致 */}
+          {mp.error && (
+            <div
+              className={errorToastStyle}
+              style={{ cursor: 'pointer' }}
+              title="点击关闭"
+              onClick={mp.clearError}
+            >
+              {mp.error}
+            </div>
+          )}
         </>
       );
     }
@@ -658,6 +739,36 @@ export function MultiplayerPage() {
           <div className={roomCodeBox}>
             <div className={roomCodeLabel}>房间码（分享给其他玩家）</div>
             <div className={roomCode}>{mp.roomId ?? '加载中…'}</div>
+            <div className={copyBtnRow}>
+              <button
+                className={btnStyle}
+                disabled={!mp.roomId}
+                onClick={() => void handleCopyRoomInfo('code')}
+                style={{
+                  '--btn-bg': colors.bg.input,
+                  '--btn-padding': '4px 14px',
+                  '--btn-font-size': '12px',
+                  '--btn-cursor': mp.roomId ? 'pointer' : 'not-allowed',
+                  opacity: mp.roomId ? 1 : 0.6,
+                } as React.CSSProperties}
+              >
+                {copiedKind === 'code' ? '✓ 已复制' : '复制房间码'}
+              </button>
+              <button
+                className={btnStyle}
+                disabled={!mp.roomId}
+                onClick={() => void handleCopyRoomInfo('link')}
+                style={{
+                  '--btn-bg': colors.bg.input,
+                  '--btn-padding': '4px 14px',
+                  '--btn-font-size': '12px',
+                  '--btn-cursor': mp.roomId ? 'pointer' : 'not-allowed',
+                  opacity: mp.roomId ? 1 : 0.6,
+                } as React.CSSProperties}
+              >
+                {copiedKind === 'link' ? '✓ 已复制' : '复制邀请链接'}
+              </button>
+            </div>
           </div>
           <div className={readyInfo}>
             当前用户：{mp.playerId ?? '未知'}{mp.isHost ? '（房主）' : ''}
@@ -799,6 +910,8 @@ export function MultiplayerPage() {
               </div>
             </div>
           )}
+          {/* 新手教程（房间码/配置区之后，纯静态图文，无副作用） */}
+          <OnboardingGuide />
           <div className={readyInfo}>
             已就绪：{readyCount} / {playerCount}（满 {maxPlayers} 人）
           </div>
@@ -1080,7 +1193,16 @@ export function MultiplayerPage() {
             </button>
           </div>
         </div>
-        {mp.error && <div className={errorToastStyle}>{mp.error}</div>}
+        {mp.error && (
+          <div
+            className={errorToastStyle}
+            style={{ cursor: 'pointer' }}
+            title="点击关闭"
+            onClick={mp.clearError}
+          >
+            {mp.error}
+          </div>
+        )}
         </div>
       </>
     );
@@ -1210,7 +1332,16 @@ export function MultiplayerPage() {
           currentPlayerId={mp.playerId}
         />
       </div>
-      {mp.error && <div className={errorToastStyle}>{mp.error}</div>}
+      {mp.error && (
+        <div
+          className={errorToastStyle}
+          style={{ cursor: 'pointer' }}
+          title="点击关闭"
+          onClick={mp.clearError}
+        >
+          {mp.error}
+        </div>
+      )}
     </div>
   );
 }
