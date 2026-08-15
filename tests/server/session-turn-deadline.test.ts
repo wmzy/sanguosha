@@ -502,3 +502,299 @@ describe('session.resetToLobby:游戏结束后重新进入准备阶段', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// 断线重连差量补发:Last-Event-ID 携带 `<epoch>:<seq>`,epoch 匹配且缺口在
+// DIFF_RECONNECT_THRESHOLD 内 → 补发 event 差量;否则回退 initialView 快照。
+// ---------------------------------------------------------------------------
+import { parseLastEventId, SseSink } from '../../src/server/sse';
+import { DIFF_RECONNECT_THRESHOLD } from '../../src/server/session';
+import type { SSEStreamingApi } from 'hono/streaming';
+
+/** 固定局标识(测 gameStartedAt/eventEpoch 投影,避免依赖真实时钟) */
+const TEST_EPOCH = 1_720_000_000_000;
+
+/** 构造带重连所需私有状态的 session:state(2 人)+ playerNames('p1'→座次0) + eventEpoch */
+function makeReconnectSession(): { session: GameSession; sink: FakeSink } {
+  const session = new GameSession(makeRoom(), true, 42);
+  setState(session, makeActState());
+  (session as unknown as { playerNames: Map<string, number> }).playerNames.set('p1', 0);
+  (session as unknown as { gameStartedAt: number }).gameStartedAt = TEST_EPOCH;
+  const sink = new FakeSink();
+  return { session, sink };
+}
+
+/** 在 state.atomHistory 追加 seq ∈ [from,to] 的 notify 条目(全 viewer 可见) */
+function pushHistory(state: GameState, from: number, to: number): void {
+  for (let seq = from; seq <= to; seq++) {
+    state.atomHistory.push({
+      kind: 'notify',
+      seq,
+      timestamp: seq,
+      skillId: '测试',
+      eventType: 'test',
+      data: { seq },
+    });
+  }
+}
+
+describe('session:断线重连差量补发', () => {
+  it('eventEpoch 即 gameStartedAt(startGame/restoreState 各自设置的局标识)', () => {
+    const { session } = makeReconnectSession();
+    expect(session.eventEpoch).toBe(TEST_EPOCH);
+  });
+
+  it('小差量缺口:补发 event 差量(带 epoch)而非 initialView', () => {
+    const { session, sink } = makeReconnectSession();
+    const state = getState(session);
+    state.seq = 110;
+    pushHistory(state, 101, 110);
+
+    expect(session.reconnectPlayer('p1', sink, 100)).toBe(true);
+
+    expect(sink.messages.filter((m) => m.type === 'initialView')).toHaveLength(0);
+    const events = sink.messages.filter((m) => m.type === 'event');
+    expect(events.map((e) => (e as { seq: number }).seq)).toEqual([101, 102, 103, 104, 105, 106, 107, 108, 109, 110]);
+    // 每条 event 都携带局标识(供 SSE 生成 `<epoch>:<seq>` 格式 Last-Event-ID)
+    for (const e of events) {
+      expect((e as { epoch?: number }).epoch).toBe(TEST_EPOCH);
+    }
+    // baselineSent 已登记:后续 broadcastNewState 不会重发 initialView
+    expect(
+      (session as unknown as { baselineSent: Set<string> }).baselineSent.has('p1'),
+    ).toBe(true);
+  });
+
+  it(`缺口超过 DIFF_RECONNECT_THRESHOLD(${DIFF_RECONNECT_THRESHOLD}):回退 initialView 快照`, () => {
+    const { session, sink } = makeReconnectSession();
+    const state = getState(session);
+    state.seq = 100 + DIFF_RECONNECT_THRESHOLD + 1; // 301
+    pushHistory(state, 101, state.seq);
+
+    expect(session.reconnectPlayer('p1', sink, 100)).toBe(true);
+
+    expect(sink.messages.filter((m) => m.type === 'event')).toHaveLength(0);
+    const views = sink.messages.filter((m) => m.type === 'initialView');
+    expect(views).toHaveLength(1);
+    expect((views[0] as { lastSeq: number }).lastSeq).toBe(state.seq);
+  });
+
+  it('lastSeq 大于当前 state.seq(局间重置场景):回退 initialView 快照', () => {
+    const { session, sink } = makeReconnectSession();
+    const state = getState(session);
+    state.seq = 50; // 新局 seq 从头计数,客户端残留旧局高水位
+    pushHistory(state, 1, 50);
+
+    expect(session.reconnectPlayer('p1', sink, 100)).toBe(true);
+
+    expect(sink.messages.filter((m) => m.type === 'event')).toHaveLength(0);
+    expect(sink.messages.filter((m) => m.type === 'initialView')).toHaveLength(1);
+  });
+
+  it('跨局/跨进程 epoch 不匹配:parseLastEventId 归 0,强制 initialView 快照', () => {
+    // 新格式 `<epoch>:<seq>`:仅 epoch 与当前局一致才认可 seq
+    expect(parseLastEventId(`${TEST_EPOCH}:100`, TEST_EPOCH)).toBe(100);
+    // 跨局(epoch 不同)/跨进程(session 不存在,epoch undefined)
+    expect(parseLastEventId('999999:100', TEST_EPOCH)).toBe(0);
+    expect(parseLastEventId(`${TEST_EPOCH}:100`, undefined)).toBe(0);
+    // 旧格式纯数字/脏值/无 header:无法验证 epoch,一律归 0 安全过渡
+    expect(parseLastEventId('100', TEST_EPOCH)).toBe(0);
+    expect(parseLastEventId('abc', TEST_EPOCH)).toBe(0);
+    expect(parseLastEventId(undefined, TEST_EPOCH)).toBe(0);
+
+    // 端到端:epoch 不匹配 → lastSeq=0 → 走 initialView 快照分支
+    const { session, sink } = makeReconnectSession();
+    const state = getState(session);
+    state.seq = 110;
+    pushHistory(state, 101, 110);
+    const lastSeq = parseLastEventId('999999:100', TEST_EPOCH);
+    expect(session.reconnectPlayer('p1', sink, lastSeq)).toBe(true);
+    expect(sink.messages.filter((m) => m.type === 'event')).toHaveLength(0);
+    expect(sink.messages.filter((m) => m.type === 'initialView')).toHaveLength(1);
+  });
+
+  it('旁观者差量:sendSpectatorInitialView 同判定分支(viewGrants ?? -1)', () => {
+    const { session, sink } = makeReconnectSession();
+    const state = getState(session);
+    state.seq = 110;
+    pushHistory(state, 101, 110);
+    const room = (session as unknown as { room: Room }).room;
+    room.spectators.set('spec-1', sink);
+
+    session.sendSpectatorInitialView('spec-1', 100);
+    expect(sink.messages.filter((m) => m.type === 'initialView')).toHaveLength(0);
+    const events = sink.messages.filter((m) => m.type === 'event');
+    expect(events.map((e) => (e as { seq: number }).seq)).toHaveLength(10);
+    for (const e of events) {
+      expect((e as { epoch?: number }).epoch).toBe(TEST_EPOCH);
+    }
+
+    // 超阈值 → 回退 initialView
+    const sink2 = new FakeSink();
+    room.spectators.set('spec-2', sink2);
+    state.seq = 301;
+    pushHistory(state, 111, 301);
+    session.sendSpectatorInitialView('spec-2', 100);
+    expect(sink2.messages.filter((m) => m.type === 'initialView')).toHaveLength(1);
+  });
+
+  it('SseSink SSE id:event 带 epoch 用 `<epoch>:<seq>`,其余带 seq 消息维持纯数字', async () => {
+    const writes: Array<{ data: string; id?: string }> = [];
+    const stream = {
+      writeSSE: async (d: { data: string; id?: string }) => {
+        writes.push(d);
+      },
+      write: async () => {},
+      close: async () => {},
+      aborted: false,
+    } as unknown as SSEStreamingApi;
+    const sink = new SseSink(stream);
+
+    sink.send({ type: 'event', seq: 5, epoch: 42, timestamp: 0 });
+    sink.send({ type: 'event', seq: 6, timestamp: 0 }); // 无 epoch(协议可选)回退纯数字
+    sink.send({ type: 'initialView', state: {} as never, lastSeq: 6 });
+
+    await new Promise((r) => setTimeout(r, 0)); // writeSSE 异步
+    expect(writes.map((w) => w.id)).toEqual(['42:5', '6', undefined]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// atomHistory 裁剪 + eventJournal 落盘:内存只保留活跃窗口(EVENT_TRIM_WINDOW),
+// 被裁条目 append 到 data/rooms/<roomId>.events.jsonl;trimmedFloorSeq 记录可回溯下限,
+// canServeDifferential 据此判定重连回退 initialView。
+// ---------------------------------------------------------------------------
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { EVENT_TRIM_WINDOW } from '../../src/server/session';
+
+function journalPathOf(roomId: string): string {
+  return join(process.cwd(), 'data', 'rooms', `${roomId}.events.jsonl`);
+}
+
+/** 轮询等待条件为真(journal 落盘 fire-and-forget,需真实时钟等待)。支持同步/异步条件。 */
+async function waitUntil(cond: () => boolean | Promise<boolean>, ms = 3000): Promise<void> {
+  for (let i = 0; i < ms / 10 && !(await cond()); i++) {
+    await new Promise((r) => setTimeout(r, 10));
+  }
+}
+
+/** 构造已越过裁剪条件的 session:seq=800、atomHistory 1..800、录像基线=100
+ *  → floor = min(800-500, 100) = 100,被 baseline 钉住。 */
+function makeTrimSession(): { session: GameSession; state: GameState; roomId: string } {
+  const { session } = makeReconnectSession();
+  const state = getState(session);
+  state.seq = 800;
+  pushHistory(state, 1, 800);
+  (session as unknown as { replayBaselineSeq: number }).replayBaselineSeq = 100;
+  const roomId = (session as unknown as { room: Room }).room.id;
+  return { session, state, roomId };
+}
+
+describe('session:atomHistory 裁剪 + eventJournal 落盘', () => {
+  it(`EVENT_TRIM_WINDOW(${EVENT_TRIM_WINDOW}) ≥ DIFF_RECONNECT_THRESHOLD(${DIFF_RECONNECT_THRESHOLD})`, () => {
+    // 不变量 (b):窗口必须覆盖差量阈值,否则可服务差量的客户端会因条目被裁回退快照
+    expect(EVENT_TRIM_WINDOW).toBeGreaterThanOrEqual(DIFF_RECONNECT_THRESHOLD);
+  });
+
+  it('broadcast 触发裁剪:atomHistory 只剩 seq>floor 的条目,floor 被 baseline 钉住', () => {
+    const { session, state } = makeTrimSession();
+
+    (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
+
+    // floor = min(800 - 500, 100) = 100 = replayBaselineSeq(不变量 (a):不越过录像基线)
+    const s = session as unknown as { trimmedFloorSeq: number; replayBaselineSeq: number };
+    expect(s.trimmedFloorSeq).toBe(100);
+    expect(s.trimmedFloorSeq).toBe(s.replayBaselineSeq);
+    // 被裁 seq 1..100 共 100 条,存活 101..800 共 700 条
+    expect(state.atomHistory.length).toBe(700);
+    expect(state.atomHistory[0].seq).toBe(101);
+    expect(state.atomHistory[state.atomHistory.length - 1].seq).toBe(800);
+    expect(state.atomHistory.every((e) => e.seq > 100)).toBe(true);
+  });
+
+  it('窗口未越过时(选将未完成 baseline=0 → floor=0)不裁剪', () => {
+    const { session } = makeReconnectSession();
+    const state = getState(session);
+    state.seq = 300; // < EVENT_TRIM_WINDOW,replayBaselineSeq 仍为 0
+    pushHistory(state, 1, 300);
+
+    (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
+
+    expect(state.atomHistory.length).toBe(300); // 不变式 (c):开局阶段全量保留
+    expect((session as unknown as { trimmedFloorSeq: number }).trimmedFloorSeq).toBe(0);
+  });
+
+  it('裁剪后 canServeDifferential(lastSeq≤floor) 为假 → 回退 initialView;窗口内仍差量', () => {
+    const { session } = makeTrimSession();
+    (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
+
+    // lastSeq 恰等于 floor:已被裁,不可差量
+    const sink = new FakeSink();
+    expect(session.reconnectPlayer('p1', sink, 100)).toBe(true);
+    expect(sink.messages.filter((m) => m.type === 'initialView')).toHaveLength(1);
+    expect(sink.messages.filter((m) => m.type === 'event')).toHaveLength(0);
+
+    // lastSeq=700 在窗口内(trimmedFloorSeq=100 < 700 ≤ 800,缺口 100 ≤ 阈值):差量补发
+    const sink2 = new FakeSink();
+    expect(session.reconnectPlayer('p1', sink2, 700)).toBe(true);
+    expect(sink2.messages.filter((m) => m.type === 'initialView')).toHaveLength(0);
+    const events = sink2.messages.filter((m) => m.type === 'event');
+    expect(events.map((e) => (e as { seq: number }).seq)).toEqual(
+      Array.from({ length: 100 }, (_, i) => 701 + i),
+    );
+  });
+
+  it('被裁条目已写入 journal 文件(data/rooms/<roomId>.events.jsonl,每行含 epoch)', async () => {
+    const { session, roomId } = makeTrimSession();
+    (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
+
+    const path = journalPathOf(roomId);
+    const holder: { raw: string | null } = { raw: null };
+    await waitUntil(() =>
+      readFile(path, 'utf-8')
+        .then((t) => (holder.raw = t))
+        .then(() => true)
+        .catch(() => false),
+    );
+    expect(holder.raw).not.toBeNull();
+
+    const lines = (holder.raw as string).trim().split('\n');
+    expect(lines.length).toBe(100); // 被裁 seq 1..100
+    const parsed = lines.map((l) => JSON.parse(l) as { epoch: number; seq: number; kind: string });
+    expect(parsed.map((e) => e.seq)).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
+    for (const e of parsed) {
+      expect(e.epoch).toBe(TEST_EPOCH); // 局标识随条目落盘
+      expect(e.kind).toBe('notify');
+    }
+  });
+
+  it('viewBuffering=true 时 trimAtomHistory 不动数组(防御 dispatch 回滚竞争)', () => {
+    const { session, state } = makeTrimSession();
+    state.viewBuffering = true;
+
+    (session as unknown as { trimAtomHistory: (s: GameState) => void }).trimAtomHistory(state);
+
+    expect(state.atomHistory.length).toBe(800); // 数组未被裁
+    expect((session as unknown as { trimmedFloorSeq: number }).trimmedFloorSeq).toBe(0); // 水位未推进
+  });
+
+  it('deletePersistedRoom 后 journal 文件不存在', async () => {
+    const { session, roomId } = makeTrimSession();
+    (session as unknown as { broadcastNewState: () => void }).broadcastNewState();
+
+    const path = journalPathOf(roomId);
+    const holder: { exists: boolean } = { exists: false };
+    const check = () =>
+      readFile(path, 'utf-8')
+        .then(() => (holder.exists = true))
+        .catch(() => (holder.exists = false))
+        .then(() => holder.exists);
+    await waitUntil(check);
+    expect(holder.exists).toBe(true);
+
+    await deletePersistedRoom(roomId); // 清理收口:顺带删 journal(rm 异步,轮询确认)
+    await waitUntil(async () => !(await check()));
+    expect(holder.exists).toBe(false);
+  });
+});

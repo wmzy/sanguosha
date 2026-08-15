@@ -14,11 +14,10 @@ import { useRoomHistory } from '../hooks/useRoomHistory';
 import { ChatConfigSection } from '../components/ChatConfigSection';
 import { OnboardingGuide } from '../components/OnboardingGuide';
 import { colors, pageStyle, btnStyle, inputStyle, errorToastStyle, pageBgStyle, glassPanelStyle, goldHeadingStyle, goldColors } from '../theme';
-import { saveReplay } from '../replay/replayFile';
 import { apiFetch, ApiError } from '../api/client';
+import { downloadLatestReplay } from '../hooks/useRoomHistory';
 import { copyToClipboard } from '../utils/clipboard';
 import { summarizeBattleStats, useBattleStatsEvents } from '../utils/battleStats';
-import type { ReplayMeta } from '../replay/types';
 import type { ActionMsg } from '../types';
 import type { RoomInfo, RoomConfig, CharPoolPreset } from '../../server/protocol';
 import type { GameMode } from '../../engine/rules/types';
@@ -392,18 +391,21 @@ export function MultiplayerPage() {
     mp.gameOver ? 'over' : mp.stage,
   );
 
-  const handleDownloadReplay = useCallback(() => {
-    if (!mp.recorder.hasData() || !mp.view) return;
-    const characters = mp.view.players.map((p) => p.character || '');
-    const meta: ReplayMeta = {
-      createdAt: Date.now(),
-      playerCount: mp.view.players.length,
-      characters,
-      roomName: mp.roomId ?? undefined,
-    };
-    const file = mp.recorder.finalize(meta);
-    saveReplay(file);
-  }, [mp]);
+  // 录像生成中提示:服务端 appendGameHistory 落盘前列表为空时显示,3 秒自动消失
+  const [replayPending, setReplayPending] = useState(false);
+  useEffect(() => {
+    if (!replayPending) return;
+    const t = setTimeout(() => setReplayPending(false), 3000);
+    return () => clearTimeout(t);
+  }, [replayPending]);
+
+  // 录像下载统一走服务端导出:取房间最新一条对局历史触发浏览器下载。
+  // 按钮仅对局结束后可用(录像由服务端组装,不再依赖本地录制数据)。
+  const handleDownloadReplay = useCallback(async () => {
+    if (!mp.gameOver || !mp.roomId) return;
+    const ok = await downloadLatestReplay(mp.roomId);
+    if (!ok) setReplayPending(true);
+  }, [mp.gameOver, mp.roomId]);
 
   // lobby 阶段表单状态
   const [createName, setCreateName] = useState('');
@@ -761,7 +763,7 @@ export function MultiplayerPage() {
               mp.leaveRoom();
               navigate('/');
             }}
-            onDownloadReplay={handleDownloadReplay}
+            onDownloadReplay={mp.gameOver ? handleDownloadReplay : undefined}
           />
           {/* 结算面板阶段的错误反馈,与其他 stage 分支行为一致 */}
           {mp.error && (
@@ -774,6 +776,7 @@ export function MultiplayerPage() {
               {mp.error}
             </div>
           )}
+          {replayPending && <div className={errorToastStyle}>录像生成中，请稍后再试</div>}
         </>
       );
     }

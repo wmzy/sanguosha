@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useMultiplayerRoom } from '../../src/client/hooks/useMultiplayerRoom';
+import { downloadLatestReplay } from '../../src/client/hooks/useRoomHistory';
 import type { GameView } from '../../src/engine/types';
 import { DEFAULT_ROOM_CONFIG, type ServerMessage } from '../../src/server/protocol';
 
@@ -558,5 +559,73 @@ describe('useMultiplayerRoom', () => {
     const { result } = renderHook(() => useMultiplayerRoom('GHOST-ROOM'));
     await flushConnect();
     expect(result.current.notFound).toBe(true);
+  });
+
+  // ─── 录像服务端导出(downloadLatestReplay) ───
+
+  /** 构造一条历史条目(字段与服务端 GameHistoryEntry 对齐,列表接口只消费 id) */
+  function makeHistoryEntry(id: string) {
+    return {
+      id,
+      roomId: 'ROOM1',
+      roomName: '测试房',
+      gameMode: '身份局',
+      startedAt: 1,
+      endedAt: 2,
+      endedReason: '正常',
+      winnerLabel: '主公方',
+      players: [],
+      hasReplay: true,
+    };
+  }
+
+  it('downloadLatestReplay:历史列表含条目时请求最新录像的 download URL', async () => {
+    const fetchedUrls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      fetchedUrls.push(url);
+      return new Response(JSON.stringify({ entries: [makeHistoryEntry('entry-9')] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }));
+    // 录像下载通过 anchor href 触发浏览器下载(?download=1,Content-Disposition 由服务端
+    // 设置),不走 fetch;spy anchor.click 捕获生成的下载 href 作为等价断言
+    const clickedHrefs: string[] = [];
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        clickedHrefs.push(this.href);
+      });
+
+    const ok = await downloadLatestReplay('ROOM1');
+
+    expect(ok).toBe(true);
+    expect(fetchedUrls).toContain('/api/rooms/ROOM1/history');
+    // jsdom 把相对 href 解析为绝对地址;最新条目(时间降序 entries[0])触发下载
+    expect(clickedHrefs).toEqual([
+      `${window.location.origin}/api/rooms/ROOM1/history/entry-9?download=1`,
+    ]);
+    clickSpy.mockRestore();
+  });
+
+  it('downloadLatestReplay:录像尚未落盘(列表持续为空)时重试 5 次后返回 false', async () => {
+    const fetchedUrls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      fetchedUrls.push(url);
+      return new Response(JSON.stringify({ entries: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }));
+
+    const pending = downloadLatestReplay('ROOM1');
+    // 4 次重试间隔 500ms,推进足够时间让轮询链走完
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+    const ok = await pending;
+
+    expect(ok).toBe(false);
+    expect(fetchedUrls.length).toBe(5);
   });
 });

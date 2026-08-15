@@ -5,6 +5,9 @@ import type { ActionLogEntry, GameState } from '../engine/types';
 import { RealClock } from '../engine/core/clock';
 import { register as registerLifecycle } from './lifecycles';
 import { createLogger } from './logger';
+// 函数级循环依赖(persistence→eventJournal→snapshot→persistence):所有交叉引用均在
+// 函数体内调用,模块求值期无访问,ESM 下安全。详见 eventJournal.ts 头部注释。
+import { removeEventJournal } from './eventJournal';
 
 const DATA_DIR = join(process.cwd(), 'data', 'rooms');
 
@@ -135,6 +138,11 @@ export function sanitizeState(state: GameState): GameState {
     // pendingSlots 含 resolve/pause/定时器等函数引用,持久化时清空。
     // restore 路径走 bootstrap 重放 actionLog,会重建 pending。
     pendingSlots: new Map(),
+    // atomHistory 不持久化:恢复路径(restoreFromLog → restoreState → create+bootstrap+restore)
+    // 从不读取快照里的 atomHistory,重放后由 fresh state 重建——持久化它是死重
+    // (每局数百条含 viewEvents 分叉,体积可观)。完整事件流由服务端 eventJournal
+    // 落盘(data/rooms/<roomId>.events.jsonl),内存只保留活跃窗口(session 裁剪)。
+    atomHistory: [],
     atomStack: [],
     // clock 是执行环境(含 setTimeout/虚拟事件队列),非游戏状态,不持久化。
     // 恢复时由 create(config) 重新注入 RealClock。
@@ -266,6 +274,10 @@ export async function deletePersistedRoom(roomId: string): Promise<void> {
   const inflight = inflightWrites.get(roomId);
   if (inflight) await inflight;
   await deleteFile(roomId);
+  // 顺带清理事件 journal 文件(持久化清理唯一收口:resetToLobby/destroy/
+  // app.ts 恢复失败/teardown 全走这里)。await 确保 rm 完成后再返回,
+  // 避免进程退出竞态留下孤儿 journal。
+  await removeEventJournal(roomId);
   deletedRoomIds.delete(roomId);
 }
 

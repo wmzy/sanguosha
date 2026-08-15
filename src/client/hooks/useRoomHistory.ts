@@ -1,6 +1,7 @@
-// src/client/hooks/useRoomHistory.ts — 房间对局历史的加载/删除/清空。
+// src/client/hooks/useRoomHistory.ts — 房间对局历史的加载/删除/清空/录像下载。
 // 进入等待大厅时加载列表;房间状态变化(对局结束回到等待)时自动刷新。
 // 删除/清空成功后本地同步移除,避免再发一次列表请求。
+// downloadLatestReplay:录像下载统一走服务端导出(客户端本地录制已下线)。
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch, ApiError } from '../api/client';
@@ -8,6 +9,38 @@ import { createLogger } from '../utils/logger';
 import type { GameHistoryEntry } from '../../server/gameHistory';
 
 const log = createLogger('useRoomHistory');
+
+/**
+ * 从服务端导出最新一局录像并触发浏览器下载(录像统一走服务端导出,客户端不再本地录制)。
+ *
+ * 游戏结束时服务端 appendGameHistory 是 fire-and-forget 落盘,列表可能短暂为空:
+ * 最多 retries 次轮询(间隔 intervalMs)。取 entries[0](时间降序,最新在前),
+ * 用 anchor 指向 `?download=1` 下载端点触发浏览器下载(Content-Disposition 由服务端设置)。
+ *
+ * 返回 true=已触发下载;false=列表持续为空(调用方提示「录像生成中,请稍后再试」)。
+ */
+export async function downloadLatestReplay(
+  roomId: string,
+  opts: { retries?: number; intervalMs?: number } = {},
+): Promise<boolean> {
+  const { retries = 5, intervalMs = 500 } = opts;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const r = await apiFetch<{ entries: GameHistoryEntry[] }>(
+      `/api/rooms/${roomId}/history`,
+    );
+    const latest = r.entries[0];
+    if (latest) {
+      const a = document.createElement('a');
+      a.href = `/api/rooms/${roomId}/history/${latest.id}?download=1`;
+      a.click();
+      return true;
+    }
+    if (attempt < retries - 1) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  }
+  return false;
+}
 
 export interface RoomHistory {
   entries: GameHistoryEntry[];

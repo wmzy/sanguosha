@@ -112,8 +112,8 @@ function serializeViewEventSplit(split: ViewEventSplit): {
   };
 }
 
-/** 序列化 atomHistory:把 Map 结构转为数组对 */
-function serializeAtomHistory(history: AppliedAtomEntry[]): SnapshotBackend['atomHistory'] {
+/** 序列化 atomHistory:把 Map 结构转为数组对(eventJournal 落盘复用) */
+export function serializeAtomHistory(history: AppliedAtomEntry[]): SnapshotBackend['atomHistory'] {
   return history.map((entry) => {
     if (entry.kind === 'atom') {
       return {

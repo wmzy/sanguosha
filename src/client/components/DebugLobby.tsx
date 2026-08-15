@@ -34,9 +34,8 @@ const connectingHint = css`
   margin-top: 40px;
 `;
 import { installTelemetry, uninstallTelemetry, logUserAction } from '../utils/debugTelemetry';
-import { saveReplay } from '../replay/replayFile';
+import { downloadLatestReplay } from '../hooks/useRoomHistory';
 import { summarizeBattleStats, useBattleStatsEvents } from '../utils/battleStats';
-import type { ReplayMeta } from '../replay/types';
 import type { RoomInfo } from '../../server/protocol';
 import { DEFAULT_CHAT_CONFIG } from '../../server/protocol';
 
@@ -169,22 +168,19 @@ function DebugGameViewInner({
     }
   }, [snap.lastSnapshotPath, snap.error, clearSnapError]);
 
-  const handleDownloadReplay = useCallback(() => {
-    if (!conn.recorder.hasData()) return;
-    // 从当前 view 提取 meta(武将名按座次顺序)
-    const anyView = conn.views.values().next().value;
-    const characters = anyView
-      ? anyView.players.map((p) => p.character || '')
-      : [];
-    const meta: ReplayMeta = {
-      createdAt: Date.now(),
-      playerCount,
-      characters,
-      roomName: roomId,
-    };
-    const file = conn.recorder.finalize(meta);
-    saveReplay(file);
-  }, [conn, playerCount, roomId]);
+  // 录像生成中提示:服务端 appendGameHistory 落盘前列表为空时显示,3 秒自动消失
+  const [replayPending, setReplayPending] = useState(false);
+  useEffect(() => {
+    if (!replayPending) return;
+    const t = setTimeout(() => setReplayPending(false), 3000);
+    return () => clearTimeout(t);
+  }, [replayPending]);
+
+  // 录像下载统一走服务端导出:取房间最新一条对局历史触发浏览器下载
+  const handleDownloadReplay = useCallback(async () => {
+    const ok = await downloadLatestReplay(roomId);
+    if (!ok) setReplayPending(true);
+  }, [roomId]);
 
   const currentView = conn.views.get(perspective) ?? null;
   const pctl = useDebugPerspective(conn.views, perspective, playerCount, handleSetPerspective);
@@ -291,6 +287,9 @@ function DebugGameViewInner({
           onExit={onDeleteRoom}
           onDownloadReplay={handleDownloadReplay}
         />
+      )}
+      {replayPending && (
+        <div className={errorToastStyle}>录像生成中，请稍后再试</div>
       )}
     </>
   );

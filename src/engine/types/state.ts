@@ -187,7 +187,7 @@ export interface GameState {
 
   /** 引擎唯一权威事件源：apply 时写入 atom + 缓存的 ViewEventSplit。
    *  session 据此为任意 viewer 派生事件序列（广播/重连差量）。
-   *  永不清空——每局几百条，内存 <1MB，换取重连差量推送正确性。 */
+   *  session 层按水位裁剪，内存仅保留活跃窗口；完整事件流由服务端 eventJournal 落盘。 */
   atomHistory: AppliedAtomEntry[];
 
   /** state 变更回调:每次 applyAtom 完成(pushEvent 后)触发。

@@ -13,7 +13,7 @@ import { VirtualClock } from '../../src/engine/core/clock';
 import type { ActionLogEntry, GameState } from '../../src/engine/types';
 import { allCharacters } from '../../src/engine/data/characters';
 import { GameSession } from '../../src/server/session';
-import { deletePersistedRoom } from '../../src/server/persistence';
+import { deletePersistedRoom, sanitizeState, saveRoom, loadRoom, restoreFromLog } from '../../src/server/persistence';
 import type { Room } from '../../src/server/room';
 
 const CHARACTERS = allCharacters.map((c) => ({
@@ -620,5 +620,58 @@ describe('restore 重放 UDFJRA 真实对局日志', () => {
     }
     expect(b.state.seq).toBe(a.state.seq);
     expect(b.state.players.map((p) => [...p.hand])).toEqual(a.state.players.map((p) => [...p.hand]));
+  }, 30000);
+});
+
+// ── sanitizeState 剔除 atomHistory:持久化 wrapper 无死重,恢复路径仍完整 ──
+// 恢复路径(restoreFromLog → restoreState → create+bootstrap+restore)从不读取
+// 快照里的 atomHistory,重放后由 fresh state 重建;完整事件流由 eventJournal 落盘。
+describe('sanitizeState 剔除 atomHistory 后的持久化/恢复链路', () => {
+  it('落盘 wrapper 的 state.atomHistory 为空,重启恢复(走磁盘)仍端到端完整', async () => {
+    const room = makeRoom();
+    trackedRoomIds.push(room.id);
+
+    // ── session1:正常开局 + 交互式选将 ──
+    const session1 = new GameSession(room, true, 42);
+    await session1.startGame(4);
+    const state1 = getState(session1);
+    await driveCharSelectViaSession(session1, state1, 4);
+    expect(state1.players.every((p) => p.character)).toBe(true);
+    const expectedChars = state1.players.map((p) => p.character);
+    expect(state1.atomHistory.length).toBeGreaterThan(0);
+
+    // 内存 sanitize 后 atomHistory 为空(不再持久化死重)
+    expect(sanitizeState(state1).atomHistory).toEqual([]);
+
+    // ── 落盘(immediate)→ 读回:wrapper.state.atomHistory 为空 ──
+    await saveRoom(
+      room.id,
+      {
+        roomName: room.name,
+        maxPlayers: 4,
+        hostId: null,
+        debug: true,
+        seats: room.seats,
+      },
+      state1,
+      session1.getGameLog()!,
+      /* immediate */ true,
+    );
+    const persisted = await loadRoom(room.id);
+    expect(persisted).not.toBeNull();
+    expect(persisted!.state.atomHistory).toEqual([]);
+    expect(persisted!.actionLog.length).toBeGreaterThanOrEqual(5);
+
+    // ── session2:模拟服务端重启,与 app.ts 同路径(restoreFromLog → restoreState)──
+    const state = restoreFromLog(persisted!);
+    const session2 = new GameSession(room, true);
+    await session2.restoreState(state, persisted!.actionLog);
+    const state2 = getState(session2);
+
+    // 选将完成且确定性一致(恢复不依赖持久化的 atomHistory)
+    expect(state2.players.every((p) => p.character)).toBe(true);
+    expect(state2.players.map((p) => p.character)).toEqual(expectedChars);
+    // 重放后 atomHistory 由 fresh state 重建
+    expect(state2.atomHistory.length).toBeGreaterThan(0);
   }, 30000);
 });

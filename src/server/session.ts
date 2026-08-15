@@ -5,6 +5,7 @@ import type {
   ClientMessage as EngineClientMessage,
   GameState,
   GameView,
+  GameEventEnvelope,
 } from '../engine/types';
 import {
   create,
@@ -30,6 +31,7 @@ import type { Room } from './room';
 import { createLogger } from './logger';
 import { setRoomStatus } from './room';
 import { saveRoom, deletePersistedRoom } from './persistence';
+import { appendEventJournal, resetEventJournal } from './eventJournal';
 import { appendGameHistory, buildHistoryEntry, buildReplayFile } from './gameHistory';
 import { createRng } from '../engine/util/rng';
 import { VirtualClock, RealClock } from '../engine/core/clock';
@@ -72,6 +74,16 @@ function resolveCharPool(preset: string): Array<{ name: string; skills: string[]
 /** 玩家断线后的保活宽限期(ms)。在此期间重连可恢复座位,超时后正常清理。
  *  所有玩家离线超过此时长则自动终止游戏。30s 足以覆盖常见网络抖动(路由切换/WiFi 重连/页面刷新)。 */
 export const RECONNECT_GRACE_MS = 30_000;
+
+/** 差量重连阈值:客户端 lastSeq 距当前 state.seq 的缺口不超过该值时,
+ *  重连走 event 差量补发而非全量 initialView 快照(节省带宽/重建开销)。 */
+export const DIFF_RECONNECT_THRESHOLD = 200;
+
+/** atomHistory 内存活跃窗口大小:seq 低于 state.seq - 窗口 的条目会被裁剪落盘
+ *  (eventJournal)。必须 ≥ DIFF_RECONNECT_THRESHOLD——否则可服务差量重连的客户端
+ *  (缺口在阈值内)会因所需条目已被裁而被迫回退全量快照,差量通道形同虚设。 */
+export const EVENT_TRIM_WINDOW = 500;
+
 export class GameSession {
   private state: GameState | null = null;
   private actionLog: ActionLogEntry[] = [];
@@ -101,12 +113,23 @@ export class GameSession {
   private replayBaselineSeq = 0;
   /** 本局开始时刻(历史条目 startedAt) */
   private gameStartedAt = 0;
+  /** 事件历史可回溯下限:seq ≤ 它的 event 已从内存裁剪(落盘到 eventJournal),
+ *  不可差量补发。由 trimAtomHistory 在每次广播后推进;新一局(startGame/restoreState/
+ *  resetToLobby)归零。canServeDifferential 据此判定重连回退 initialView。 */
+  private trimmedFloorSeq = 0;
   constructor(room: Room, debug = false, sessionSeed?: number) {
     this.room = room;
     this.roomName = room.name;
     this.maxPlayers = room.maxPlayers;
     this.debug = debug;
     this.sessionSeed = sessionSeed ?? Date.now();
+  }
+
+  /** 局标识:每局唯一(startGame/restoreState 各自设置的 gameStartedAt)。
+   *  附在 event 消息上,SSE Last-Event-ID 用 `<epoch>:<seq>` 格式携带;
+   *  重连时 epoch 不匹配(跨局/跨进程重启)则强制走 initialView 快照。 */
+  get eventEpoch(): number {
+    return this.gameStartedAt;
   }
 
   /** 用持久化数据恢复:create(config) → bootstrap → 重放 actionLog,确定性重建完整 state。
@@ -153,6 +176,9 @@ export class GameSession {
     // 恢复局也记录历史:基线取恢复时刻的视图(若选将已完成则立即捕获;否则等
     // onStateChange 在选将完成后捕获)。startedAt 用恢复时刻近似。
     this.gameStartedAt = Date.now();
+    // 恢复 = 新一局起点(epoch 变化):journal 重新开始,裁剪水位归零
+    this.trimmedFloorSeq = 0;
+    resetEventJournal(this.room.id);
     this.maybeCaptureReplayBaseline();
   }
 
@@ -187,6 +213,9 @@ export class GameSession {
     this.gameStartedAt = Date.now();
     this.replayBaseline = [];
     this.replayBaselineSeq = 0;
+    // 新一局(epoch 变化):journal 重新开始,裁剪水位归零
+    this.trimmedFloorSeq = 0;
+    resetEventJournal(this.room.id);
     void bootstrap(this.state, config)
       .then(() => {
         // bootstrap 完成后:所有角色/手牌/技能已就绪,强制刷新 baseline
@@ -403,6 +432,8 @@ export class GameSession {
     // 丢弃上一局的录像基线(下一局 startGame 重新捕获)
     this.replayBaseline = [];
     this.replayBaselineSeq = 0;
+    // 裁剪水位归零(下一局 startGame 也会重置;此处先复位避免残留影响判空)
+    this.trimmedFloorSeq = 0;
     // 重新生成 seed,新一局随机序列不同
     this.sessionSeed = Date.now();
     setRoomStatus(this.room.id, '等待中');
@@ -491,6 +522,34 @@ export class GameSession {
     }
 
     this.lastBroadcastSeq = state.seq;
+    // 广播完成后裁剪 atomHistory(超出活跃窗口的旧条目落盘 journal)。
+    // viewBuffering 期间 dispatch 的 preceding 回滚会截断 atomHistory,与裁剪竞争;
+    // 防御性判 state.viewBuffering(正常路径 onStateChange 在 buffering 时被吞,不会到这)。
+    this.trimAtomHistory(state);
+  }
+
+  /** 裁剪 atomHistory:把 seq ≤ floor 的头部条目落盘 eventJournal 后从内存移除,
+   *  并推进 trimmedFloorSeq(可回溯下限)。三条不变量:
+   *  (a) floor = min(seq - EVENT_TRIM_WINDOW, replayBaselineSeq) ≤ replayBaselineSeq:
+   *      buildReplayFile 只需要 seq > replayBaselineSeq 的存活条目,裁剪永不越过
+   *      录像基线,终局录像组装不受影响;
+   *  (b) EVENT_TRIM_WINDOW ≥ DIFF_RECONNECT_THRESHOLD:缺口在差量阈值内的客户端
+   *      所需条目必然仍在窗口内,canServeDifferential 不会因裁剪误伤;
+   *  (c) 选将未完成时 replayBaselineSeq = 0 → floor = 0 ≤ trimmedFloorSeq(初值 0)
+   *      → 直接返回不裁剪,开局阶段事件全量保留。 */
+  private trimAtomHistory(state: GameState): void {
+    if (state.viewBuffering) return;
+    const floor = Math.min(state.seq - EVENT_TRIM_WINDOW, this.replayBaselineSeq);
+    if (floor <= this.trimmedFloorSeq) return;
+    // atomHistory 按 seq 升序,头部扫描统计 seq ≤ floor 的条数
+    let k = 0;
+    while (k < state.atomHistory.length && state.atomHistory[k].seq <= floor) k++;
+    if (k > 0) {
+      const evicted = state.atomHistory.slice(0, k);
+      appendEventJournal(this.room.id, this.eventEpoch, evicted);
+      state.atomHistory.splice(0, k);
+    }
+    this.trimmedFloorSeq = floor;
   }
 
   /** 向单个连接（玩家或旁观者）发送 baseline + 增量事件。 */
@@ -501,26 +560,36 @@ export class GameSession {
       this.baselineSent.add(connId);
       this.lastSentDeadline.set(connId, this.deadlineKey(this.effectiveDeadline(state, viewer)));
     }
-    const envelopes = eventsForViewer(state, viewer, this.lastBroadcastSeq);
-    if (envelopes.length > 0) {
-      const dl = this.effectiveDeadline(state, viewer);
-      const dlKey = this.deadlineKey(dl);
-      const prevKey = this.lastSentDeadline.get(connId) ?? undefined;
-      for (let i = 0; i < envelopes.length; i++) {
-        const env = envelopes[i];
-        const isLast = i === envelopes.length - 1;
-        const attachDeadline = isLast && dlKey !== prevKey;
-        this.sendToPlayer(connId, {
-          type: 'event',
-          seq: env.seq,
-          timestamp: env.timestamp,
-          ...(env.view ? { view: env.view } : {}),
-          ...(env.notify ? { notify: env.notify } : {}),
-          ...(attachDeadline ? { deadline: dl } : {}),
-        });
-      }
-      this.lastSentDeadline.set(connId, dlKey);
+    this.sendEventEnvelopes(connId, viewer, state, eventsForViewer(state, viewer, this.lastBroadcastSeq));
+  }
+
+  /** 逐条发送 event 消息(统一带 epoch 局标识;deadline 仅末条且变化时附加)。
+   *  常规广播与断线重连差量补发共用。 */
+  private sendEventEnvelopes(
+    connId: string,
+    viewer: number,
+    state: GameState,
+    envelopes: GameEventEnvelope[],
+  ): void {
+    if (envelopes.length === 0) return;
+    const dl = this.effectiveDeadline(state, viewer);
+    const dlKey = this.deadlineKey(dl);
+    const prevKey = this.lastSentDeadline.get(connId) ?? undefined;
+    for (let i = 0; i < envelopes.length; i++) {
+      const env = envelopes[i];
+      const isLast = i === envelopes.length - 1;
+      const attachDeadline = isLast && dlKey !== prevKey;
+      this.sendToPlayer(connId, {
+        type: 'event',
+        seq: env.seq,
+        epoch: this.eventEpoch,
+        timestamp: env.timestamp,
+        ...(env.view ? { view: env.view } : {}),
+        ...(env.notify ? { notify: env.notify } : {}),
+        ...(attachDeadline ? { deadline: dl } : {}),
+      });
     }
+    this.lastSentDeadline.set(connId, dlKey);
   }
 
   /**
@@ -537,16 +606,23 @@ export class GameSession {
     this.lastSentDeadline.set(playerId, this.deadlineKey(this.effectiveDeadline(state, viewer)));
   }
 
-  /** 旁观者连接 SSE：若游戏进行中则发送 initialView。 */
-  sendSpectatorInitialView(spectatorId: string): void {
+  /** 旁观者连接 SSE：若游戏进行中则发送 initialView(或小差量补发)。 */
+  sendSpectatorInitialView(spectatorId: string, lastSeq = 0): void {
     if (!this.state) return;
     const viewer = this.room.viewGrants.get(spectatorId) ?? -1;
     if (viewer >= 0 && viewer >= this.state.players.length) return;
     const state = this.state;
-    const view = buildView(state, viewer);
-    this.sendToPlayer(spectatorId, { type: 'initialView', state: view, lastSeq: state.seq });
+    if (this.canServeDifferential(lastSeq)) {
+      this.sendEventEnvelopes(spectatorId, viewer, state, eventsForViewer(state, viewer, lastSeq));
+    } else {
+      const view = buildView(state, viewer);
+      this.sendToPlayer(spectatorId, { type: 'initialView', state: view, lastSeq: state.seq });
+      this.lastSentDeadline.set(
+        spectatorId,
+        this.deadlineKey(this.effectiveDeadline(state, viewer)),
+      );
+    }
     this.baselineSent.add(spectatorId);
-    this.lastSentDeadline.set(spectatorId, this.deadlineKey(this.effectiveDeadline(state, viewer)));
   }
 
   /** 清除旁观者 baseline，强制下次 broadcastNewState 重发 initialView。
@@ -625,14 +701,28 @@ export class GameSession {
     });
   }
 
-  /** 玩家重连:恢复座位并发送当前完整 state。
+  /** 差量重连判定:lastSeq 落在可回溯窗口内(未被裁剪、不超过当前 seq、
+   *  缺口不超过 DIFF_RECONNECT_THRESHOLD)时可差量补发,否则回退全量快照。 */
+  private canServeDifferential(lastSeq: number): boolean {
+    return (
+      lastSeq > 0 &&
+      lastSeq > this.trimmedFloorSeq &&
+      this.state !== null &&
+      lastSeq <= this.state.seq &&
+      this.state.seq - lastSeq <= DIFF_RECONNECT_THRESHOLD
+    );
+  }
+
+  /** 玩家重连:恢复座位并发送当前完整 state(或小差量补发)。
    *  multiplayer 模式:新 WS 连接的 playerId 与断线前不同(服务端 onOpen 自动生成),
    *  需通过 previousPlayerId 迁移座次映射(旧 playerId → 新 playerId)。
-   *  debug 模式:不传 previousPlayerId,assignDebugSeat 已完成座次分配。 */
+   *  debug 模式:不传 previousPlayerId,assignDebugSeat 已完成座次分配。
+   *  lastSeq 来自 SSE Last-Event-ID(经 epoch 校验):窗口内差量补发 event,
+   *  否则发 initialView 全量快照。 */
   reconnectPlayer(
     playerId: string,
     sink: import('./connection').ConnectionSink,
-    _lastSeq = 0,
+    lastSeq = 0,
     previousPlayerId?: string,
   ): boolean {
     if (!this.state) return false;
@@ -652,10 +742,20 @@ export class GameSession {
     this.clearGraceTimer();
     this.disconnectedAt.delete(playerId);
     this.room.players.set(playerId, sink);
-    this.sendInitialViewToPlayer(playerId);
+    const viewer = this.playerNames.get(playerId);
+    const differential =
+      this.canServeDifferential(lastSeq) &&
+      viewer !== undefined &&
+      viewer >= 0 &&
+      viewer < this.state.players.length;
+    if (differential) {
+      this.sendEventEnvelopes(playerId, viewer, this.state, eventsForViewer(this.state, viewer, lastSeq));
+    } else {
+      this.sendInitialViewToPlayer(playerId);
+    }
     this.baselineSent.add(playerId);
-    // initialView 已是全量状态，不需要补推差量。
-    // 同步水位标记，避免后续 broadcastNewState 重发已含在 initialView 中的事件。
+    // initialView/diff 已覆盖到当前 seq,不需要补推差量。
+    // 同步水位标记,避免后续 broadcastNewState 重发已含在 initialView 中的事件。
     this.lastBroadcastSeq = Math.max(this.lastBroadcastSeq, this.state.seq);
     const reconSeatIndex = this.playerNames.get(playerId) ?? -1;
     this.broadcast({ type: 'player_reconnected', playerId, seatIndex: reconSeatIndex });

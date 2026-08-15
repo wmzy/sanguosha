@@ -45,8 +45,15 @@ export class SseSink implements ConnectionSink {
   send(message: ServerMessage): void {
     if (this.closed) return;
     const data = serialize(message);
-    // 有 seq 的消息设置 SSE id，供 Last-Event-ID 断线重连
-    const id = 'seq' in message ? String((message as { seq: EventSeq }).seq) : undefined;
+    // 有 seq 的消息设置 SSE id，供 Last-Event-ID 断线重连。
+    // event 消息带 epoch(局标识)时用 `<epoch>:<seq>` 格式,重连时据 epoch 校验
+    // 是否跨局(不匹配回退快照);其余带 seq 消息维持纯数字。
+    let id: string | undefined;
+    if (message.type === 'event' && message.epoch != null) {
+      id = `${message.epoch}:${message.seq}`;
+    } else if ('seq' in message) {
+      id = String((message as { seq: EventSeq }).seq);
+    }
     void this.stream.writeSSE({
       data,
       ...(id ? { id } : {}),
@@ -76,6 +83,17 @@ export class SseSink implements ConnectionSink {
   }
 }
 
+/** 解析 Last-Event-ID 为重连差量补发起点。
+ *  仅当能解析为 `<epoch>:<seq>` 且 epoch 与当前局(session.eventEpoch)一致时,
+ *  返回 seq;否则(跨局/跨进程 epoch 不匹配、旧格式纯数字、无 header)返回 0,
+ *  强制走 initialView 全量快照,保证安全过渡。 */
+export function parseLastEventId(raw: string | undefined, epoch: number | undefined): number {
+  if (!raw || epoch === undefined) return 0;
+  const m = /^(\d+):(\d+)$/.exec(raw);
+  if (!m) return 0;
+  return Number(m[1]) === epoch ? Number(m[2]) : 0;
+}
+
 /**
  * 注册 SSE stream 路由到 Hono app。
  * 在 rest.ts 中通过 app.get('/api/rooms/:id/stream', sseStreamHandler) 注册。
@@ -91,11 +109,13 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
   }
 
   const playerId: string = queryPlayerId ?? generatePlayerId();
-  const lastSeq = lastEventId ? parseInt(lastEventId, 10) || 0 : 0;
 
   return streamSSE(c, async (stream) => {
     try {
     const sink = new SseSink(stream);
+    const session = gameSessions.get(roomId);
+    // epoch 校验通过才认可 seq,否则 0(强制快照)
+    const lastSeq = parseLastEventId(lastEventId, session?.eventEpoch);
     sink.setSeq(lastSeq);
 
     // 判断连接身份：先查 spectators（旁观者），再查 players（玩家）
@@ -108,12 +128,10 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
 
       log.info('SSE 旁观者连接建立', { roomId, playerId });
 
-      const session = gameSessions.get(roomId);
-
       sink.send({ type: 'room_joined', roomId, playerId });
 
       if (session && room.status === '进行中') {
-        session.sendSpectatorInitialView(playerId);
+        session.sendSpectatorInitialView(playerId, lastSeq);
       }
 
       // 发送 room_state（含旁观者列表和授权）
@@ -162,8 +180,6 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
 
       log.info('SSE 连接建立', { roomId, playerId, lastSeq });
 
-      const session = gameSessions.get(roomId);
-
       let seatIndex: number | undefined;
       if (session) {
         const existingSeat = session.getPlayerName(playerId);
@@ -183,7 +199,7 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
       if (session && room.status === '进行中') {
         session.reconnectPlayer(playerId, sink, lastSeq);
       }
-      // 始终发送 room_state：reconnectPlayer 只发 initialView（游戏视图），
+      // 始终发送 room_state：reconnectPlayer 只发游戏视图（initialView 快照或差量 event），
       // 不含 config/chat 等房间元数据。页面刷新/HMR 重连时客户端 roomState 为 null，
       // 若不补发 room_state，ChatPanel 等依赖 roomState.config 的组件将不渲染。
       sink.send(buildRoomState(room));

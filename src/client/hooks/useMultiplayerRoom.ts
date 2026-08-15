@@ -13,8 +13,6 @@ import type { ServerMessage, RoomConfig } from '../../server/protocol';
 import type { ActionMsg } from '../types';
 import type { ChatMessage } from '../headless/types';
 import { createLogger } from '../utils/logger';
-import { ReplayRecorder } from '../replay/recorder';
-import type { ReplayMeta } from '../replay/types';
 import { apiFetch } from '../api/client';
 import { getPlayerId } from '../utils/playerIdentity';
 import { isRoomNotFound } from '../utils/roomErrors';
@@ -104,11 +102,6 @@ export interface MultiplayerRoom {
   reconnectAttempt: number;
   /** 手动取消重连 */
   cancelReconnect: () => void;
-  /** 录像录制器 */
-  recorder: {
-    finalize: (meta: ReplayMeta) => import('../replay/types').ReplayFile;
-    hasData: () => boolean;
-  };
 }
 
 export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
@@ -171,7 +164,6 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   );
 
   const hgcRef = useRef<HeadlessGameClient | null>(null);
-  const recorderRef = useRef<ReplayRecorder>(new ReplayRecorder());
 
   // 事件播放队列:把后端 event 消息按 seq 入队,逐个暴露给 GameViewComponent 中央动效。
   // 用 ref 在 onMessage 闭包中取最新 playback,避免闭包竞态。
@@ -207,8 +199,6 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
 
     const hgc = new HeadlessGameClient(serverUrl, {
       onView: (v, newEvents) => {
-        // 录制:单座次事件流
-        recorderRef.current.record(v.viewer, v, newEvents);
         setView(v);
         // 出牌历史:追加批次(不可替换——WS 连发时 React 会合并 setState 丢掉中间的打出)
         if (newEvents.length > 0) {
@@ -266,7 +256,6 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
           setChatMessages([]);
           setIngestedEvents([]);
           historySeqRef.current = 0;
-          recorderRef.current.reset();
           playbackRef.current.reset(0);
           setDisconnectedSeats(new Set());
         }
@@ -669,9 +658,5 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     cancelReconnect,
     currentEvent: playback.current,
     ingestedEvents,
-    recorder: {
-      finalize: (meta) => recorderRef.current.finalize(meta),
-      hasData: () => recorderRef.current.hasData(),
-    },
   };
 }

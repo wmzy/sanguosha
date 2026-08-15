@@ -1,8 +1,9 @@
 // src/client/replay/recorder.ts
-// 录制器:收集各座次的 ViewEvent,游戏结束时组装为 v2 ReplayFile(baseline + delta)。
+// 录制器:收集各座次的 ViewEvent,结束时组装为 v2 ReplayFile(baseline + delta)。
 //
-// 接入点:连接层(useDebugMultiConnection / useMultiplayerRoom)在 HGC onView
-// 回调中拿到 newEvents 后调用 record()。
+// 本类现为服务端对局历史组装专用(src/server/gameHistory.ts 复用它把
+// 「开局基线视图 + 差量事件」组装成与本地录制格式一致的录像),客户端不再接入
+// (录像下载统一走服务端导出,连接层已移除录制逻辑)。
 //
 // 内部仍逐座次收集完整 initialView(深拷贝),在 finalize 时:
 //   1. 取最小座次的 initialView 提取公共 baseline(cardMap/log/turn/公开玩家信息…)

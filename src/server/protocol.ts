@@ -1,7 +1,9 @@
 // src/server/protocol.ts
 // 服务端协议层 — 事件流广播。
 // 每次 atom apply 后,服务端逐条发送 event 消息给该 viewer 可见的事件。
-// 断线重连:拉 initialView baseline(全量 GameView),之后继续推 event。
+// 断线重连(差量优先,快照兜底):Last-Event-ID 携带 `<epoch>:<seq>`,epoch 与当前局
+// 匹配且缺口在阈值内时,仅补发 lastSeq 之后的 event 差量;否则(跨局/缺口过大/旧格式)
+// 回退 initialView 全量快照重建 baseline,之后继续推 event。
 // viewer 由 WS 连接标识,不需要在消息中携带。
 import type {
   ClientMessage as EngineClientMessage,
@@ -172,6 +174,9 @@ export type ServerMessage =
   | {
       type: 'event';
       seq: EventSeq;
+      /** 局标识(= session.eventEpoch,每局唯一)。SSE 侧据此生成 `<epoch>:<seq>`
+       *  格式的 Last-Event-ID,重连时校验 epoch 不匹配(跨局/跨进程)则强制快照。 */
+      epoch?: number;
       timestamp: number;
       view?: ViewEvent;
       notify?: { skillId: string; eventType: string; data: Json };
