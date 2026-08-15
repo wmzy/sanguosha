@@ -4,7 +4,62 @@
 
 import { memo } from 'react';
 import * as styles from './gameViewStyles';
-import type { GameView, Card } from '../../engine/types';
+import type { GameView, Card, PendingView } from '../../engine/types';
+import { viewSlashMax, viewSlashUsed } from '../../engine/rules/action-active';
+import { getPendingRequestType } from '../utils/pendingRespond';
+
+/** 当前回合玩家的杀次数徽标文案(纯函数,渲染与 memo 比较共用)。
+ *  数据源:view.players[currentPlayerIndex].turnUsage(「回合用量」atom 实时投影,
+ *  回合结束整体清空)。上限推断复用引擎 viewSlashMax(与后端 slashMax 同源:
+ *  诸葛连弩武器元数据 / '杀/unlimited/<来源>' 前缀任一真值 → ∞;'杀/extra/' 叠加)。
+ *  turnUsage 缺失(旧 view / 异常数据)时返回 null 不渲染,数字读取均有 typeof 兜底。 */
+function slashCountBadgeText(view: GameView): string | null {
+  const idx = view.currentPlayerIndex;
+  const p = view.players[idx];
+  if (!p || !p.turnUsage) return null;
+  const max = viewSlashMax(view, idx);
+  if (max === Infinity) return '杀 ∞';
+  return `杀 ${viewSlashUsed(view, idx)}/${max}`;
+}
+
+/** 从 pending 推导询问类型短语(观察者视角文案用):
+ *  询问闪/询问杀 → 闪/杀;'__弃牌' → 弃牌;'杀/respondKill'、'从谏/给牌' 等
+ *  带分隔符的 requestType → 取主名(杀/从谏)。推不出返回 null。 */
+function pendingAskLabel(pending: PendingView): string | null {
+  const atomType = pending.atom?.type;
+  if (typeof atomType === 'string' && atomType.startsWith('询问')) {
+    return atomType.slice(2) || null;
+  }
+  const reqType = getPendingRequestType(pending);
+  if (!reqType) return null;
+  if (reqType === '__弃牌') return '弃牌';
+  const main = reqType.split(/[/_]/)[0];
+  return main || null;
+}
+
+/** 等待提示的「被询问者」文案(纯函数,渲染与 memo 比较共用)。
+ *  数据源 view.pending(事件流模式下 applyView 对所有 viewer 投影:非 target
+ *  视角同样携带 atom.requestType/target,见 询问杀/请求回应 的 applyView)。
+ *  pending 指向非当前回合玩家时返回「等待 {targetName} 回应{询问类型}」,
+ *  如南蛮入侵询问张飞出杀时旁观者看到「等待 张飞 回应杀...」而非误导性的回合主人。
+ *  返回 null(维持原文案「等待 {currentPlayerName} 操作...」)的情形:
+ *  - 无 pending / 非阻塞型 pending(出牌窗口是控制权 token,不是询问);
+ *  - target 为 null(防御旧数据)或广播型(target<0,如无懈可击)——不指定具体座次;
+ *  - target 即当前回合玩家(等他出牌,原文案语义正确);
+ *  - view.players[target] 缺失(异常数据)。
+ *  注意座号 0 是合法座次:只用 nullish/负数判断,不能用 truthy。 */
+function waitingRespondText(view: GameView): string | null {
+  const pending = view.pending;
+  if (!pending || pending.isBlocking === false) return null;
+  // PendingView.target 类型为 number,但旧数据/异常投影可能缺省——nullish 兜底
+  const target = (pending as { target?: number | null }).target ?? null;
+  if (target === null || target < 0) return null;
+  if (target === view.currentPlayerIndex) return null;
+  const name = view.players[target]?.name;
+  if (!name) return null;
+  const label = pendingAskLabel(pending);
+  return `等待 ${name} ${label ? `回应${label}` : '回应'}...`;
+}
 
 export interface PlayPhasePromptProps {
   view: GameView;
@@ -43,17 +98,31 @@ export function PlayPhasePromptImpl(props: PlayPhasePromptProps) {
     selectedForDiscard,
   } = props;
 
+  // 出牌阶段标题行的杀次数徽标(数据缺失为 null,渲染端跳过)
+  const slashBadgeText = slashCountBadgeText(view);
+  // 被询问者等待文案(pending 指向他人时替换「等待 回合主人 操作...」)
+  const respondWaitText = waitingRespondText(view);
+
   return (
     <>
       {/* 1. 等待提示 */}
       {!isPerspectiveTurn && !isPerspectiveAwaiting && !isDiscardPhase && (
-        <div className={styles.waitingHint}>等待 {currentPlayerName} 操作...</div>
+        <div className={styles.waitingHint}>
+          {respondWaitText ?? `等待 ${currentPlayerName} 操作...`}
+        </div>
       )}
 
       {/* 2. 出牌阶段提示 */}
       {isPerspectiveTurn && view.phase === '出牌' && !isPerspectiveAwaiting && !isDiscardPhase && (
         <div className={styles.promptBox}>
-          <div className={styles.promptTitle}>🃏 {perspectiveName}的回合 — 出牌阶段</div>
+          <div className={styles.promptTitle}>
+            🃏 {perspectiveName}的回合 — 出牌阶段
+            {slashBadgeText !== null && (
+              <span className={styles.slashCountBadge} title="本回合【杀】已用次数/上限（无限杀生效时显示 ∞）">
+                ⚔️ {slashBadgeText}
+              </span>
+            )}
+          </div>
           <div className={styles.promptDesc}>
             {canOperate && selectedCardId
               ? selectedTarget
@@ -114,7 +183,9 @@ function playPhasePromptPropsEqual(
     prev.selectedTarget === next.selectedTarget &&
     prev.discardMin === next.discardMin &&
     prev.discardMax === next.discardMax &&
-    prev.selectedForDiscard.length === next.selectedForDiscard.length
+    prev.selectedForDiscard.length === next.selectedForDiscard.length &&
+    slashCountBadgeText(prev.view) === slashCountBadgeText(next.view) &&
+    waitingRespondText(prev.view) === waitingRespondText(next.view)
   );
 }
 

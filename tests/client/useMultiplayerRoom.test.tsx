@@ -126,7 +126,7 @@ describe('useMultiplayerRoom', () => {
     });
   }
 
-  /** 推送 SSE 消息并推进轮询定时器(同步 hgc.roomId/playerId 到 React state)。 */
+  /** 推送 SSE 消息(roomId/playerId/isSpectator 由 HGC onIdentityChange 回调同步到 React state)。 */
   function emitAndSync(es: MockEventSource, msg: ServerMessage) {
     act(() => es.emit(msg));
     act(() => {

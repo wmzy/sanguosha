@@ -380,6 +380,23 @@ const notFoundRoomId = css`
   letter-spacing: 2px;
 `;
 
+/**
+ * 错误提示 toast:统一各 stage 分支的错误反馈展示(固定右上角,样式来自 errorToastStyle)。
+ * 传 onClose 时可点击关闭(cursor + title);不传则为纯静态提示(如"录像生成中")。
+ */
+function ErrorToast({ message, onClose }: { message: string; onClose?: () => void }) {
+  return (
+    <div
+      className={errorToastStyle}
+      style={onClose ? { cursor: 'pointer' } : undefined}
+      title={onClose ? '点击关闭' : undefined}
+      onClick={onClose}
+    >
+      {message}
+    </div>
+  );
+}
+
 export function MultiplayerPage() {
   const navigate = useNavigate();
   const { roomId: urlRoomId } = useParams<{ roomId?: string }>();
@@ -667,19 +684,12 @@ export function MultiplayerPage() {
             onReorderHand={() => {}}
             currentEvent={mp.currentEvent}
             ingestedEvents={mp.ingestedEvents}
+            pendingCount={mp.pendingCount}
+            onSkipEvents={mp.skipEvents}
             disconnectedSeats={mp.disconnectedSeats}
           />
           {/* 对局中操作被后端拒绝时的错误反馈(此前该分支静默无提示) */}
-          {mp.error && (
-            <div
-              className={errorToastStyle}
-              style={{ cursor: 'pointer' }}
-              title="点击关闭"
-              onClick={mp.clearError}
-            >
-              {mp.error}
-            </div>
-          )}
+          {mp.error && <ErrorToast message={mp.error} onClose={mp.clearError} />}
         </div>
       </>
     );
@@ -696,6 +706,8 @@ export function MultiplayerPage() {
             onReorderHand={mp.reorderHand}
             currentEvent={mp.currentEvent}
             ingestedEvents={mp.ingestedEvents}
+            pendingCount={mp.pendingCount}
+            onSkipEvents={mp.skipEvents}
             chatMessages={mp.chatMessages}
             chatConfig={mp.roomState?.config?.chat}
             onSendChat={mp.sendChat}
@@ -728,16 +740,7 @@ export function MultiplayerPage() {
             ) : undefined}
           />
           {/* 对局中操作被后端拒绝时的错误反馈(此前该分支静默无提示) */}
-          {mp.error && (
-            <div
-              className={errorToastStyle}
-              style={{ cursor: 'pointer' }}
-              title="点击关闭"
-              onClick={mp.clearError}
-            >
-              {mp.error}
-            </div>
-          )}
+          {mp.error && <ErrorToast message={mp.error} onClose={mp.clearError} />}
         </div>
       </>
     );
@@ -766,17 +769,8 @@ export function MultiplayerPage() {
             onDownloadReplay={mp.gameOver ? handleDownloadReplay : undefined}
           />
           {/* 结算面板阶段的错误反馈,与其他 stage 分支行为一致 */}
-          {mp.error && (
-            <div
-              className={errorToastStyle}
-              style={{ cursor: 'pointer' }}
-              title="点击关闭"
-              onClick={mp.clearError}
-            >
-              {mp.error}
-            </div>
-          )}
-          {replayPending && <div className={errorToastStyle}>录像生成中，请稍后再试</div>}
+          {mp.error && <ErrorToast message={mp.error} onClose={mp.clearError} />}
+          {replayPending && <ErrorToast message="录像生成中，请稍后再试" />}
         </>
       );
     }
@@ -1288,16 +1282,7 @@ export function MultiplayerPage() {
             </button>
           </div>
         </div>
-        {mp.error && (
-          <div
-            className={errorToastStyle}
-            style={{ cursor: 'pointer' }}
-            title="点击关闭"
-            onClick={mp.clearError}
-          >
-            {mp.error}
-          </div>
-        )}
+        {mp.error && <ErrorToast message={mp.error} onClose={mp.clearError} />}
         </div>
       </>
     );
@@ -1429,16 +1414,7 @@ export function MultiplayerPage() {
           />
         </aside>
       </div>
-      {mp.error && (
-        <div
-          className={errorToastStyle}
-          style={{ cursor: 'pointer' }}
-          title="点击关闭"
-          onClick={mp.clearError}
-        >
-          {mp.error}
-        </div>
-      )}
+      {mp.error && <ErrorToast message={mp.error} onClose={mp.clearError} />}
     </div>
   );
 }

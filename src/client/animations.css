@@ -113,6 +113,30 @@
   }
 }
 
+/* ─── 体力变化漂浮数字:伤害「-N」红 / 回血「+N」绿,上浮渐隐 ───
+   元素以 left:50% 定位,keyframes 用 translateX(-50%) 保持水平居中。
+   总时长 1s,与 useAnimationState 的清除延时(1050ms)对齐。 */
+@keyframes hpFloatUp {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.6);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -8px) scale(1.2);
+  }
+  30% {
+    transform: translate(-50%, -12px) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -52px) scale(1);
+  }
+}
+
 /* ─── 回合切换:阶段标签淡入上滑 ─── */
 @keyframes phaseIn {
   0% {

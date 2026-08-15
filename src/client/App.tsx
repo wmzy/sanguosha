@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Loading } from './components/Loading';
+import { NarrowScreenHint } from './components/NarrowScreenHint';
 import { RequirePlayerId } from './components/RequirePlayerId';
 import { globalReset } from './theme';
 import { useAudioUnlock } from './hooks/useAudioUnlock';
@@ -22,6 +23,8 @@ export function App() {
   useResourcePacks();
   return (
     <div className={globalReset}>
+      {/* 窄屏提示条:全局常驻(fixed 覆盖层),关闭状态随会话存活,宽屏不渲染 */}
+      <NarrowScreenHint />
       <ErrorBoundary context="root">
         <BrowserRouter>
           <Suspense fallback={<Loading />}>

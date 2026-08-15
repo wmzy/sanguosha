@@ -120,6 +120,12 @@ const collapseBtn = css`
   font-size: 14px;
 `;
 
+/** 聊天未读徽标:「新增 N 条」提示,金色加粗以区别于普通计数 */
+const unreadBadge = css`
+  color: ${colors.accent.gold};
+  font-weight: bold;
+`;
+
 const body = css`
   flex: 1;
   display: flex;
@@ -295,11 +301,13 @@ function LogTab({ view }: { view: GameView }) {
 }
 
 function ChatTab({
+  view,
   messages,
   config,
   onSend,
   mySeatIndex,
 }: {
+  view: GameView;
   messages: ChatMessage[];
   config: ChatConfig | undefined;
   onSend: ((text: string) => void) | undefined;
@@ -342,8 +350,9 @@ function ChatTab({
         )}
         {messages.map((m, i) => {
           const mine = mySeatIndex !== undefined && m.seatIndex === mySeatIndex;
-          const name =
-            mySeatIndex !== undefined && m.seatIndex === mySeatIndex ? '我' : `P${m.seatIndex + 1}`;
+          // 发送者显示武将名,与 LogTab 同源(查 view.players);查不到时退回座次号。
+          const playerView = view.players.find((p) => p.index === m.seatIndex);
+          const name = `${playerView?.name ?? `P${m.seatIndex + 1}`}${mine ? '（我）' : ''}`;
           return (
             <div key={i} className={mine ? chatMsgRowMine : chatMsgRow}>
               <span className={chatMsgName}>{name}</span>
@@ -396,6 +405,19 @@ export const InfoDock = memo(({
   // 不自动展开:折叠态下有新消息只更新药丸计数(徽标颜色),不干扰操作区。
   // 玩家主动点击药丸展开查看。
 
+  // ── 聊天未读数 ──
+  // lastSeenCount 记录玩家已看过的消息数(初始挂载时的历史消息视为已读);
+  // 只有聊天 tab 实际渲染(未折叠 && tab==='chat')时才推进,切走/折叠期间的新消息
+  // 计入未读,在折叠药丸与非 chat tab 按钮上以「新增 N 条」提示,看过即归零。
+  const chatCount = chatMessages?.length ?? 0;
+  const [lastSeenCount, setLastSeenCount] = useState(chatCount);
+  const chatUnread = Math.max(0, chatCount - lastSeenCount);
+  useEffect(() => {
+    if (!collapsed && tab === 'chat') {
+      setLastSeenCount(chatCount);
+    }
+  }, [collapsed, tab, chatCount]);
+
   // 嵌入模式下使用 dockRootEmbedded,浮窗模式根据 collapsed 选择 dockRootCollapsed/dockRoot
   const rootClass = embedded
     ? dockRootEmbedded
@@ -424,7 +446,12 @@ export const InfoDock = memo(({
                 setCollapsed(false);
               }}
             >
-              💬 聊天 {chatMessages && chatMessages.length > 0 ? `(${chatMessages.length})` : ''}
+              💬 聊天{' '}
+              {chatUnread > 0 ? (
+                <span className={unreadBadge}>新增 {chatUnread} 条</span>
+              ) : chatCount > 0 ? (
+                `(${chatCount})`
+              ) : null}
             </button>
           )}
           {!embedded && (
@@ -440,6 +467,7 @@ export const InfoDock = memo(({
             <LogTab view={view} />
           ) : (
             <ChatTab
+              view={view}
               messages={chatMessages ?? []}
               config={chatConfig}
               onSend={onSendChat}
@@ -455,7 +483,12 @@ export const InfoDock = memo(({
           title="展开信息浮窗"
           style={{ borderRadius: '18px', padding: '6px 14px' }}
         >
-          {tab === 'log' ? '📜' : '💬'} {tab === 'log' ? view.log.length : (chatMessages?.length ?? 0)}
+          {/* 未读优先;无未读时不再显示恒增的消息总数,只保留当前 tab 图标/日志数 */}
+          {chatUnread > 0
+            ? `💬 新增 ${chatUnread} 条`
+            : tab === 'log'
+              ? `📜 ${view.log.length}`
+              : '💬'}
         </button>
       )}
     </div>

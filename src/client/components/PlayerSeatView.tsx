@@ -7,6 +7,7 @@ import { shallowArrayEqual, playerVisibleEqual } from '../utils/memo';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { getSkillDescription } from '../../engine/skills/lifecycle';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
+import type { HpChangeNumber } from '../hooks/useAnimationState';
 import { SkillTag } from './SkillTooltip';
 import {
   FACTION_BG,
@@ -42,6 +43,8 @@ export interface PlayerSeatProps {
   isHealed?: boolean;
   /** 回血动画版本号(每次回血递增,触发 key 变化重放动画) */
   healVersion?: number;
+  /** 该玩家刚发生的体力变化(伤害 -N 红 / 回血 +N 绿 漂浮数字,动画期间存在) */
+  hpChange?: HpChangeNumber;
   /** 是否触发新回合光环 */
   isTurnGlow?: boolean;
   turnGlowVersion?: number;
@@ -68,6 +71,7 @@ function PlayerSeatViewImpl({
   damageVersion = 0,
   isHealed = false,
   healVersion = 0,
+  hpChange,
   isTurnGlow = false,
   turnGlowVersion = 0,
   hideIdentity = true,
@@ -146,6 +150,16 @@ function PlayerSeatViewImpl({
           />
         )}
       </div>
+      {/* 体力变化漂浮数字:伤害「-N」红 / 回血「+N」绿,上浮渐隐(动画状态由 useAnimationState 定时清除) */}
+      {hpChange && (
+        <span
+          key={`hpnum-${hpChange.version}`}
+          className={cx(hpFloatNumber, hpChange.kind === 'heal' ? hpFloatHeal : hpFloatDamage)}
+          aria-hidden
+        >
+          {hpChange.kind === 'heal' ? `+${hpChange.amount}` : `-${hpChange.amount}`}
+        </span>
+      )}
       {/* 内容层:浮在立绘上,底部渐变蒙版保证文字可读 */}
       <div className={seatCardContent}>
       {/* 势力色顶部条:武将名 + 座号 + 身份(--faction-color 由根节点注入) */}
@@ -307,6 +321,9 @@ function playerSeatPropsEqual(prev: PlayerSeatProps, next: PlayerSeatProps): boo
     prev.damageVersion === next.damageVersion &&
     prev.isHealed === next.isHealed &&
     prev.healVersion === next.healVersion &&
+    prev.hpChange?.kind === next.hpChange?.kind &&
+    prev.hpChange?.amount === next.hpChange?.amount &&
+    prev.hpChange?.version === next.hpChange?.version &&
     prev.isTurnGlow === next.isTurnGlow &&
     prev.turnGlowVersion === next.turnGlowVersion &&
     prev.hideIdentity === next.hideIdentity &&
@@ -638,6 +655,26 @@ const turnGlowing = css`
 `;
 const hpHealFlash = css`
   animation: healFlash 0.6s ease-out both;
+`;
+// 体力变化漂浮数字:绝对定位在座位卡中上部,上浮渐隐 1s(与 useAnimationState 清除时序对齐)
+const hpFloatNumber = css`
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  z-index: 6;
+  font-size: 26px;
+  font-weight: 700;
+  font-family: inherit;
+  pointer-events: none;
+  animation: hpFloatUp 1s ease-out both;
+`;
+const hpFloatDamage = css`
+  color: #ff4d4f;
+  text-shadow: 0 0 6px rgba(255, 34, 34, 0.7), 0 1px 3px rgba(0, 0, 0, 0.9);
+`;
+const hpFloatHeal = css`
+  color: #52c41a;
+  text-shadow: 0 0 6px rgba(82, 196, 26, 0.7), 0 1px 3px rgba(0, 0, 0, 0.9);
 `;
 const seatHealOverlay = css`
   &::after {

@@ -54,6 +54,10 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   currentEvent: import('./useEventPlayback').QueuedEvent | null;
   /** 刚入队的事件批次:出牌历史条立即消费(不等播放队列) */
   ingestedEvents: import('./useEventPlayback').QueuedEvent[];
+  /** 待播事件队列积压数(>1 时 GameView 横幅显示「+N 排队中」角标) */
+  pendingCount: number;
+  /** 一键清空事件播放积压(横幅角标 ⏭,立即对齐到最新事件) */
+  skipEvents: () => void;
   sendAction: (action: ActionMsg) => void;
   reorderHand: (order: string[]) => void;
   disconnectAll: () => void;
@@ -440,6 +444,8 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     views,
     currentEvent: playback.current,
     ingestedEvents,
+    pendingCount: playback.pendingCount,
+    skipEvents: playback.skipAll,
     sendAction,
     reorderHand,
     disconnectAll,

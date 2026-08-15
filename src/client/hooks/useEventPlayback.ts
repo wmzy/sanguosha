@@ -81,14 +81,19 @@ export interface EventPlaybackState {
 /**
  * 事件播放队列。
  *
- * @returns { current, ingested, enqueue, reset }
+ * @returns { current, ingested, enqueue, reset, skipAll, pendingCount }
  *   - current: 当前延时播放中的事件(箭头/判定翻牌等)
  *   - ingested: 最近一次入队的新鲜事件批次(出牌历史条应立即消费,不等播放队列)
+ *   - pendingCount: 待播队列积压数(不含 current,供「+N 排队中」角标)
+ *   - skipAll: 一键清空积压并按最新 seq 对齐(供横幅跳过按钮)
  */
 export function useEventPlayback() {
   const [current, setCurrent] = useState<QueuedEvent | null>(null);
   /** 最近入队批次;每次 enqueue 新鲜事件时更新,供 PlayHistory 立即入条 */
   const [ingested, setIngested] = useState<QueuedEvent[]>([]);
+  /** 待播队列积压数(queueRef 长度,不含当前播放中事件)。
+   *  入队/出队/清空时同步,供 UI 显示「+N 排队中」角标与一键跳过入口。 */
+  const [pendingCount, setPendingCount] = useState(0);
   const queueRef = useRef<QueuedEvent[]>([]);
   const lastPlayedSeqRef = useRef(0);
   /** ingested 去重 seq:结构事件不入播放队列、不推进 lastPlayedSeqRef,
@@ -110,6 +115,7 @@ export function useEventPlayback() {
     }
     isPlayingRef.current = true;
     setCurrent(next);
+    setPendingCount(queueRef.current.length);
     // duration:ViewEvent 自带 effect → atom 静态 effect(atomType 优先)→ 下限
     // 注意:打出/弃牌 等 ViewEvent.type 不是 atom 名,必须用 atomType,且查表失败时不能抛。
     const type = next.event.atomType ?? next.event.type;
@@ -157,6 +163,7 @@ export function useEventPlayback() {
       );
       if (bannerEvents.length > 0) {
         queueRef.current.push(...bannerEvents);
+        setPendingCount(queueRef.current.length);
         // 若空闲,立即开始播放(用 ref 判断,避免闭包竞态)
         if (!isPlayingRef.current) {
           playNext();
@@ -173,12 +180,31 @@ export function useEventPlayback() {
       timerRef.current = null;
     }
     queueRef.current = [];
+    setPendingCount(0);
     isPlayingRef.current = false;
     setCurrent(null);
     setIngested([]);
     lastPlayedSeqRef.current = baselineSeq;
     ingestedSeqRef.current = baselineSeq;
   }, []);
+
+  /**
+   * 一键跳过积压:清空待播队列与当前横幅,seq 基线对齐到最新已摄入事件
+   * (ingestedSeqRef 是「已见过的最大 seq」,含结构/展示等退出 banner 队列的事件),
+   * 后续 seq 更大的新事件照常入队播放。
+   *
+   * 走既有 reset 路径,下游动画不会卡中间态:
+   *   - 伤害闪烁/回血漂浮数字由 useAnimationState 从 view.players HP diff 派生,
+   *     与本队列完全解耦(view 由 WS 独立更新,本就是最新,无需二次对齐);
+   *   - 横幅卡/箭头(ActionOverlay)挂在 current 上,current 置 null 即卸载,
+   *     CSS 动画随 DOM 节点销毁,不存在悬挂定时器;
+   *   - isPlayingFlipAnim(GameView 据此门控 AwaitingPrompt)随 current=null 立即
+   *     解除,待应答提示即刻可见——正是「对齐最新」的语义;
+   *   - 已起飞的飞牌/音效/特效消费的是 ingested 即时批次,fire-and-forget 自行播完。
+   */
+  const skipAll = useCallback(() => {
+    reset(ingestedSeqRef.current);
+  }, [reset]);
 
   // 清理定时器
   useEffect(() => {
@@ -189,5 +215,5 @@ export function useEventPlayback() {
     };
   }, []);
 
-  return { current, ingested, enqueue, reset };
+  return { current, ingested, enqueue, reset, skipAll, pendingCount };
 }

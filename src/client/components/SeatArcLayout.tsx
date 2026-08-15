@@ -10,6 +10,7 @@ import * as styles from './gameViewStyles';
 import { arcLayout } from '../utils/gameViewHelpers';
 import { PlayerSeatView } from './PlayerSeatView';
 import { CountdownBar } from './CountdownBar';
+import type { HpChangeNumber } from '../hooks/useAnimationState';
 import { DEFAULT_COUNTDOWN_TOTAL_MS } from '../hooks/useCountdown';
 
 /** 计算指定座次的倒计时 deadline。
@@ -44,9 +45,15 @@ export interface SeatArcLayoutProps {
   /** 动画 */
   damageFlashIndices: Map<number, number>;
   healFlashIndices: Map<number, number>;
+  /** 体力变化漂浮数字(伤害 -N / 回血 +N),透传给座位卡 */
+  hpChangeNumbers: Map<number, HpChangeNumber>;
   turnVersion: number;
   /** 游戏中已断线的座次集合(view player index),座位卡据此显示离线角标 */
   disconnectedSeats?: Set<number>;
+  /** 翻牌动画期间隐藏座位倒计时:与 AwaitingPrompt 的 isPlayingFlipAnim 门控同步,
+   *  避免牌还没翻完倒计时已扣掉 flip 时长(bar 与 prompt 不同步)。
+   *  不伪造暂停——deadline 仍是服务端真实时钟,动画结束后恢复显示真实剩余。 */
+  suppressCountdown?: boolean;
   /** 贴在座位区底部的操作坞(提示/倒计时/主按钮) */
   bottomSlot?: ReactNode;
 }
@@ -64,8 +71,10 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
     onSeatDoubleClick,
     damageFlashIndices,
     healFlashIndices,
+    hpChangeNumbers,
     turnVersion,
     disconnectedSeats,
+    suppressCountdown,
     bottomSlot,
   } = props;
 
@@ -76,7 +85,9 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
           const totalOthers = orderedPlayers.length - 1;
           const realIdx = view.players.findIndex((p) => p.name === player.name);
           const { leftPct, topPct } = arcLayout(totalOthers, i);
-          const seatDeadline = deadlineForSeat(view, realIdx);
+          // 门控集中在 deadline 派生这一处(渲染条件 seatDeadline !== null 不动),
+          // 翻牌动画期间所有座位条统一隐藏,动画结束自动恢复为真实剩余时间。
+          const seatDeadline = suppressCountdown ? null : deadlineForSeat(view, realIdx);
           const seatTotalMs = view.pending?.totalMs ?? DEFAULT_COUNTDOWN_TOTAL_MS;
           return (
             <div
@@ -101,6 +112,7 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
                 damageVersion={damageFlashIndices.get(realIdx) ?? 0}
                 isHealed={healFlashIndices.has(realIdx)}
                 healVersion={healFlashIndices.get(realIdx) ?? 0}
+                hpChange={hpChangeNumbers.get(realIdx)}
                 isTurnGlow={player.name === currentPlayerName && turnVersion > 0}
                 turnGlowVersion={turnVersion}
                 isDisconnected={disconnectedSeats?.has(realIdx) ?? false}

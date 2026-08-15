@@ -12,6 +12,9 @@
 //
 // 非 effect.animation='flip' 的事件不渲染(无卡牌动效需求)。
 // pointer-events: none —— 不拦截玩家交互。
+//
+// 队列积压指示:待播事件 >1 条时顶部中央渲染「+N 排队中」角标 + ⏭ 一键清空
+// (调用 useEventPlayback.skipAll,走 reset 按最新 seq 对齐;仅按钮开启命中)。
 
 import * as styles from './gameViewStyles';
 import { SUIT_COLOR } from './gameViewConstants';
@@ -30,16 +33,60 @@ export interface EventBannerProps {
   /** 粘性展示卡(火攻等「展示手牌」):最新展示事件,常驻至玩家操作/新展示。
    *  顶部中央翻入后停住(不淡出),不门控任何交互。 */
   reveal?: ViewEvent | null;
+  /** 待播队列积压数(useEventPlayback.pendingCount,不含当前播放中事件)。
+   *  >1 时显示「+N 排队中」角标(积压感知:串行播放每条 ≥400ms,箭头 1200ms)。 */
+  pendingCount?: number;
+  /** 一键清空积压:清空播放队列并按最新 seq 对齐,后续新事件照常播放。
+   *  不提供则不显示角标(回放等无队列场景)。 */
+  onSkip?: () => void;
 }
 
-export function EventBanner({ current, reveal = null, view }: EventBannerProps) {
+export function EventBanner({
+  current,
+  reveal = null,
+  view,
+  pendingCount = 0,
+  onSkip,
+}: EventBannerProps) {
   // 粘性展示卡:独立于定时队列渲染(即使队列空闲也常驻,不门控任何交互)
   const revealNode = renderRevealCard(reveal, view);
   return (
     <>
       {revealNode}
+      {renderBacklogBadge(pendingCount, onSkip, !!revealNode)}
       {renderBanner(current)}
     </>
+  );
+}
+
+/** 队列积压指示:待播 >1 条时顶部中央显示「+N 排队中」+ ⏭ 清空按钮。
+ *  粘性展示卡在场时下移避让(同占 top:8 中央位)。
+ *  容器 pointer-events:none,仅按钮可点(不挡座位/手牌交互)。 */
+function renderBacklogBadge(
+  pendingCount: number,
+  onSkip: (() => void) | undefined,
+  hasReveal: boolean,
+) {
+  if (pendingCount <= 1 || !onSkip) return null;
+  return (
+    <div
+      className={
+        hasReveal
+          ? `${styles.eventBacklogLayer} ${styles.eventBacklogBelowReveal}`
+          : styles.eventBacklogLayer
+      }
+    >
+      <span className={styles.eventBacklogBadge}>+{pendingCount} 排队中</span>
+      <button
+        type="button"
+        className={styles.eventBacklogSkipBtn}
+        onClick={onSkip}
+        title="清空积压事件，立即对齐到最新"
+        aria-label="清空积压事件"
+      >
+        ⏭
+      </button>
+    </div>
   );
 }
 

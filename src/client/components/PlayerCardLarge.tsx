@@ -6,12 +6,13 @@ import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import type { GameView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
-import { isActiveAction } from '../utils/gameViewHelpers';
+import { isActiveAction, isFreePlayWindow } from '../utils/gameViewHelpers';
 import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES } from './gameViewConstants';
 import { getCharacterMeta, LORD_SKILLS } from '../../engine/data/character-meta';
 import { getCharacterImage } from '../assets/imageAssets';
 import { getSkillDescription } from '../../engine/skills/lifecycle';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
+import type { HpChangeNumber } from '../hooks/useAnimationState';
 import { SkillTag } from './SkillTooltip';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 import { playerVisibleEqual } from '../utils/memo';
@@ -30,6 +31,8 @@ export interface PlayerCardLargeProps {
   damageFlashIndices: Map<number, number>;
   /** 回血动画状态(绿色闪烁) */
   healFlashIndices: Map<number, number>;
+  /** 刚发生的体力变化(伤害 -N 红 / 回血 +N 绿 漂浮数字,动画期间存在) */
+  hpChange?: HpChangeNumber;
   /** 是否可操作(debug 模式恒 true) */
   canOperate: boolean;
   /** 是否当前回合(用于「回合」徽章) */
@@ -53,6 +56,7 @@ export function PlayerCardLargeImpl({
   view,
   damageFlashIndices,
   healFlashIndices,
+  hpChange,
   canOperate,
   isPerspectiveTurn,
   skillActions,
@@ -90,6 +94,17 @@ export function PlayerCardLargeImpl({
   // canOperate(debug 可操作性开关)作为外层闸门;激活时机不再硬编码在组件里。
   const actionCtx = { view, perspectiveIdx };
   const isSkillActive = (a: SkillActionDef) => canOperate && isActiveAction(a, actionCtx);
+  // 「原则上可操作」场景:自由出牌窗口(自己回合+出牌阶段+无阻塞 pending),与
+  // defaultPlayActive 缺省条件集一致。该窗口内 btn 存在但不激活(限一次已用/activeWhen
+  // 不满足)→ 渲染置灰禁用按钮而非被动标签,让玩家能区分「已用/条件不满足」与「技能不存在」;
+  // 其余场景(别人回合等)维持被动标签。
+  const inFreePlayWindow =
+    canOperate &&
+    isFreePlayWindow({
+      isMyTurn: isPerspectiveTurn,
+      phase: view.phase,
+      pending: view.pending,
+    });
   const identityBadgeClass =
     identity === '主公'
       ? styles.lordBadge
@@ -124,6 +139,19 @@ export function PlayerCardLargeImpl({
       </div>
       {/* 文字内容层:浮在立绘上 */}
       <div className={cx(styles.playerCardContent, isChained && styles.playerCardChained)}>
+      {/* 体力变化漂浮数字:伤害「-N」红 / 回血「+N」绿,上浮渐隐(动画状态由 useAnimationState 定时清除) */}
+      {hpChange && (
+        <span
+          key={`hpnum-${hpChange.version}`}
+          className={cx(
+            styles.hpFloatNumber,
+            hpChange.kind === 'heal' ? styles.hpFloatHeal : styles.hpFloatDamage,
+          )}
+          aria-hidden
+        >
+          {hpChange.kind === 'heal' ? `+${hpChange.amount}` : `-${hpChange.amount}`}
+        </span>
+      )}
       {/* 势力色顶部条 */}
       <div
         className={styles.playerCardHeader}
@@ -178,6 +206,19 @@ export function PlayerCardLargeImpl({
                   description={desc}
                   className={cx(styles.skillBtn, skillBtnVariant(btn.style))}
                   onClick={() => onSkillAction(btn)}
+                />
+              );
+            }
+            if (btn && inFreePlayWindow) {
+              return (
+                <SkillTag
+                  key={s}
+                  as="button"
+                  name={display}
+                  description={desc}
+                  className={cx(styles.skillBtn, styles.skillBtnDisabled)}
+                  disabled
+                  title="当前不可发动（已发动或条件不满足）"
                 />
               );
             }
@@ -239,14 +280,24 @@ function playerCardLargePropsEqual(
       next.damageFlashIndices.has(next.perspectiveIdx) &&
     prev.healFlashIndices.has(prev.perspectiveIdx) ===
       next.healFlashIndices.has(next.perspectiveIdx) &&
+    prev.hpChange?.kind === next.hpChange?.kind &&
+    prev.hpChange?.amount === next.hpChange?.amount &&
+    prev.hpChange?.version === next.hpChange?.version &&
     prev.onSkillAction === next.onSkillAction &&
     // skillActions:引用比较(useSkillActions 已 useMemo)
     prev.skillActions === next.skillActions &&
     // 玩家可见字段
     playerVisibleEqual(prevP, nextP) &&
     // 技能可用性依赖 phase + turn vars
-    prev.view.phase === next.view.phase
+    prev.view.phase === next.view.phase &&
+    // 以及阻塞型 pending 的有无(自由出牌窗口开合,驱动按钮↔标签/置灰切换)
+    hasBlockingPending(prev.view.pending) === hasBlockingPending(next.view.pending)
   );
+}
+
+/** view 根 pending 是否为阻塞型(与 isFreePlayWindow/defaultPlayActive 同源的判定)。 */
+function hasBlockingPending(pending: GameView['pending']): boolean {
+  return pending != null && pending.isBlocking !== false;
 }
 
 export const PlayerCardLarge = memo(PlayerCardLargeImpl, playerCardLargePropsEqual);

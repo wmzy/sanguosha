@@ -275,6 +275,8 @@ function DebugGameViewInner({
         overlaySlot={overlayBar}
         currentEvent={conn.currentEvent}
         ingestedEvents={conn.ingestedEvents}
+        pendingCount={conn.pendingCount}
+        onSkipEvents={conn.skipEvents}
       />
       <DebugInfo view={view} perspectiveName={perspectiveName} pending={view.pending} />
       {conn.gameOver && (

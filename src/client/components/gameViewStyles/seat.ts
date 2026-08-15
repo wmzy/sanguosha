@@ -379,6 +379,25 @@ export const seatDamageOverlay = css`
 export const hpHealFlash = css`
   animation: healFlash 0.6s ease-out both;
 `;
+/* 体力变化漂浮数字(大卡):伤害「-N」红 / 回血「+N」绿,上浮渐隐 1s(与 useAnimationState 清除时序对齐) */
+export const hpFloatNumber = css`
+  position: absolute;
+  left: 50%;
+  top: 32%;
+  z-index: 6;
+  font-size: 34px;
+  font-weight: 700;
+  pointer-events: none;
+  animation: hpFloatUp 1s ease-out both;
+`;
+export const hpFloatDamage = css`
+  color: #ff4d4f;
+  text-shadow: 0 0 8px rgba(255, 34, 34, 0.7), 0 1px 3px rgba(0, 0, 0, 0.9);
+`;
+export const hpFloatHeal = css`
+  color: #52c41a;
+  text-shadow: 0 0 8px rgba(82, 196, 26, 0.7), 0 1px 3px rgba(0, 0, 0, 0.9);
+`;
 export const seatHealOverlay = css`
   &::after {
     content: '';

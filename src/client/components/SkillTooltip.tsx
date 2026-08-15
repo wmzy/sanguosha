@@ -20,6 +20,11 @@ export interface SkillTagProps {
   className?: string;
   onClick?: (e: ReactMouseEvent) => void;
   children?: ReactNode;
+  /** as="button" 时的禁用态(置灰按钮,不触发点击);其余元素忽略。
+   *  注意:原生 disabled 元素不触发 mouseenter,自绘 tooltip 失效,原因提示走原生 title。 */
+  disabled?: boolean;
+  /** 透传到元素的原生 title 属性(disabled 元素上原生 tooltip 仍显示)。 */
+  title?: string;
 }
 
 export function SkillTag({

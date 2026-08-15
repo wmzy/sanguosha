@@ -98,6 +98,10 @@ export interface MultiplayerRoom {
   currentEvent: import('./useEventPlayback').QueuedEvent | null;
   /** 刚入队的事件批次:出牌历史条立即消费(不等播放队列) */
   ingestedEvents: import('./useEventPlayback').QueuedEvent[];
+  /** 待播事件队列积压数(>1 时 GameView 横幅显示「+N 排队中」角标) */
+  pendingCount: number;
+  /** 一键清空事件播放积压(横幅角标 ⏭,立即对齐到最新事件) */
+  skipEvents: () => void;
   /** 当前重连尝试次数(0=未在重连) */
   reconnectAttempt: number;
   /** 手动取消重连 */
@@ -239,6 +243,14 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
           }
           return messages;
         });
+      },
+      // 连接身份事件驱动同步(HGC 在 REST 建房/加房响应、room_joined、role_changed 时回调),
+      // 替代原先的 200ms getter 轮询。函数式 setState 避免闭包过期;空值不清空本地状态
+      // (清空由 leaveRoom/player_kicked 显式负责),与原轮询语义一致。
+      onIdentityChange: ({ roomId: newRoomId, playerId: newPlayerId, isSpectator }) => {
+        if (newRoomId) setRoomId((prev) => (prev === newRoomId ? prev : newRoomId));
+        if (newPlayerId) setPlayerId((prev) => (prev === newPlayerId ? prev : newPlayerId));
+        setHgcIsSpectator(isSpectator);
       },
       onMessage: (msg: ServerMessage) => {
         // 再来一局:服务端 resetToLobby 广播 game_reset,清除结算界面回到准备阶段。
@@ -391,19 +403,6 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
       hgcRef.current = null;
     };
   }, [command, serverUrl]);
-
-  // 从 HGC getter 同步 roomId/playerId(收到 room_joined 后更新,无独立回调)
-  useEffect(() => {
-    if (stage !== 'waiting' && stage !== 'playing' && stage !== 'spectating') return;
-    const hgc = hgcRef.current;
-    if (!hgc) return;
-    const id = setInterval(() => {
-      if (hgc.roomId && hgc.roomId !== roomId) setRoomId(hgc.roomId);
-      if (hgc.playerId && hgc.playerId !== playerId) setPlayerId(hgc.playerId);
-      if (hgc.isSpectator !== hgcIsSpectator) setHgcIsSpectator(hgc.isSpectator);
-    }, 200);
-    return () => clearInterval(id);
-  }, [stage, roomId, playerId, hgcIsSpectator]);
 
   const createRoom = useCallback((name: string, maxPlayers: number, config?: RoomConfig, roomType?: 'normal' | 'quick') => {
     setError(null);
@@ -658,5 +657,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     cancelReconnect,
     currentEvent: playback.current,
     ingestedEvents,
+    pendingCount: playback.pendingCount,
+    skipEvents: playback.skipAll,
   };
 }

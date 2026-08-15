@@ -54,6 +54,17 @@ export interface HeadlessCallbacks {
   onReconnectStateChange?: (state: ReconnectState, attempt: number) => void;
   /** 收到聊天消息（单条或历史批量）时调用 */
   onChat?: (messages: ChatMessage[]) => void;
+  /** 连接身份(roomId/playerId/isSpectator)变化时调用。
+   *  触发点:REST 建房/加房/旁观响应返回、SSE room_joined、SSE role_changed。
+   *  可选回调,不传则行为与之前完全一致(getter 轮询方不受影响)。 */
+  onIdentityChange?: (identity: ConnectionIdentity) => void;
+}
+
+/** HGC 连接身份快照(onIdentityChange 回调载荷)。 */
+export interface ConnectionIdentity {
+  roomId: string | null;
+  playerId: string | null;
+  isSpectator: boolean;
 }
 
 /** AI 决策的核心输入：一个可直接执行的操作。 */

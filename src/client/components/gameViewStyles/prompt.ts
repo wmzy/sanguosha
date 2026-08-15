@@ -26,6 +26,20 @@ export const promptTitle = css`
   font-size: 14px;
   margin-bottom: 2px;
 `;
+// 出牌阶段标题行的杀次数徽标(⚔️ 杀 X/Y / 杀 ∞),数据源 view.turnUsage 投影。
+// 视觉沿用 seat 徽章模式(圆角小底色块),配色与 prompt 区橙色主题一致。
+export const slashCountBadge = css`
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(230, 126, 34, 0.6);
+  background: rgba(0, 0, 0, 0.25);
+  color: #f5b041;
+  font-size: 12px;
+  font-weight: normal;
+`;
 export const promptDesc = css`
   font-size: 13px;
   margin-bottom: 4px;

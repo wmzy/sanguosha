@@ -70,6 +70,50 @@ export const revealCardLayer = css`
   justify-content: center;
   pointer-events: none;
 `;
+// ─── 队列积压指示(useEventPlayback 待播 >1 条) ───
+// 顶部中央小胶囊:「+N 排队中」+ ⏭ 一键清空按钮(走 reset 对齐最新事件)。
+// 容器保持 pointer-events:none 不挡游戏交互,仅按钮开启命中。
+// 配色沿用 slashCountBadge 的橙色小徽章模式。
+export const eventBacklogLayer = css`
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 31;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+`;
+// 粘性展示卡在场时下移避让:revealCardLayer 占据 top:8 起约 185px(标签+卡体 160px)
+export const eventBacklogBelowReveal = css`
+  top: 196px;
+`;
+export const eventBacklogBadge = css`
+  padding: 1px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(230, 126, 34, 0.6);
+  background: rgba(0, 0, 0, 0.55);
+  color: #f5b041;
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+`;
+export const eventBacklogSkipBtn = css`
+  pointer-events: auto;
+  padding: 1px 7px;
+  border-radius: 10px;
+  border: 1px solid rgba(230, 126, 34, 0.6);
+  background: rgba(0, 0, 0, 0.55);
+  color: #f5b041;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  white-space: nowrap;
+  &:hover {
+    background: rgba(230, 126, 34, 0.35);
+  }
+`;
 export const revealCard = css`
   display: flex;
   flex-direction: column;

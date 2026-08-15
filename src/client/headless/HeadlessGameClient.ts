@@ -122,6 +122,29 @@ export class HeadlessGameClient {
     }
   }
 
+  /** 统一的身份变更入口:更新 roomId/playerId/isSpectator,任一实际变化时触发
+   *  onIdentityChange 回调(事件驱动,替代宿主轮询 getter)。未传的字段不动。 */
+  private updateIdentity(next: {
+    roomId?: string | null;
+    playerId?: string | null;
+    isSpectator?: boolean;
+  }): void {
+    const changed =
+      (next.roomId !== undefined && next.roomId !== this._roomId) ||
+      (next.playerId !== undefined && next.playerId !== this._playerId) ||
+      (next.isSpectator !== undefined && next.isSpectator !== this._isSpectator);
+    if (next.roomId !== undefined) this._roomId = next.roomId;
+    if (next.playerId !== undefined) this._playerId = next.playerId;
+    if (next.isSpectator !== undefined) this._isSpectator = next.isSpectator;
+    if (changed) {
+      this.callbacks.onIdentityChange?.({
+        roomId: this._roomId,
+        playerId: this._playerId,
+        isSpectator: this._isSpectator,
+      });
+    }
+  }
+
   /** 检查 REST 响应是否成功，失败时抛出带 status 的错误 */
   private async assertOk(resp: Response, fallbackMsg: string): Promise<void> {
     if (resp.ok) return;
@@ -145,9 +168,8 @@ export class HeadlessGameClient {
     });
     await this.assertOk(resp, '创建调试房间失败');
     const data = await resp.json() as { roomId: string; playerId: string; seatIndex: number };
-    this._roomId = data.roomId;
-    this._playerId = data.playerId;
     this._seatIndex = data.seatIndex;
+    this.updateIdentity({ roomId: data.roomId, playerId: data.playerId });
     this.canReconnect = true;
 
     this.openStream();
@@ -158,9 +180,8 @@ export class HeadlessGameClient {
    *  playerId 可选:指定则预先设置本连接身份(透传到 join 请求体),否则复用已有或由服务端生成。 */
   async connect(roomId: string, seatIndex?: number, playerId?: string): Promise<void> {
     this._debugMode = true;
-    this._roomId = roomId;
     this._seatIndex = seatIndex ?? this._seatIndex;
-    if (playerId) this._playerId = playerId;
+    this.updateIdentity({ roomId, playerId: playerId ?? undefined });
     this.intentionalDisconnect = false;
 
     const resp = await fetch(`${this.baseUrl}/api/debug-room/${roomId}/join`, {
@@ -170,9 +191,8 @@ export class HeadlessGameClient {
     });
     await this.assertOk(resp, '加入调试房间失败');
     const data = await resp.json() as { roomId: string; playerId: string; seatIndex: number };
-    this._roomId = data.roomId;
-    this._playerId = data.playerId;
     this._seatIndex = data.seatIndex;
+    this.updateIdentity({ roomId: data.roomId, playerId: data.playerId });
     this.canReconnect = true;
 
     this.openStream();
@@ -191,8 +211,7 @@ export class HeadlessGameClient {
     });
     await this.assertOk(resp, '创建房间失败');
     const data = await resp.json() as { roomId: string; playerId: string };
-    this._roomId = data.roomId;
-    this._playerId = data.playerId;
+    this.updateIdentity({ roomId: data.roomId, playerId: data.playerId });
     this.canReconnect = true;
 
     this.openStream();
@@ -202,7 +221,7 @@ export class HeadlessGameClient {
   /** 加入普通(多人)房间。 */
   async joinRoom(roomId: string, playerId?: string): Promise<void> {
     this._debugMode = false;
-    this._roomId = roomId;
+    this.updateIdentity({ roomId });
     this.intentionalDisconnect = false;
 
     const resp = await fetch(`${this.baseUrl}/api/rooms/${roomId}/join`, {
@@ -212,8 +231,7 @@ export class HeadlessGameClient {
     });
     await this.assertOk(resp, '加入房间失败');
     const data = await resp.json() as { roomId: string; playerId: string };
-    this._roomId = data.roomId;
-    this._playerId = data.playerId;
+    this.updateIdentity({ roomId: data.roomId, playerId: data.playerId });
     this.canReconnect = true;
 
     this.openStream();
@@ -222,7 +240,7 @@ export class HeadlessGameClient {
   /** 以旁观者身份加入房间。不占座次，默认看公开视图。 */
   async joinAsSpectator(roomId: string, playerId?: string): Promise<void> {
     this._debugMode = false;
-    this._roomId = roomId;
+    this.updateIdentity({ roomId });
     this.intentionalDisconnect = false;
 
     const resp = await fetch(`${this.baseUrl}/api/rooms/${roomId}/join-spectator`, {
@@ -232,9 +250,7 @@ export class HeadlessGameClient {
     });
     await this.assertOk(resp, '加入旁观失败');
     const data = await resp.json() as { roomId: string; playerId: string };
-    this._roomId = data.roomId;
-    this._playerId = data.playerId;
-    this._isSpectator = true;
+    this.updateIdentity({ roomId: data.roomId, playerId: data.playerId, isSpectator: true });
     this.canReconnect = true;
 
     this.openStream();
@@ -365,8 +381,9 @@ export class HeadlessGameClient {
       this._gameOverWinner = r.gameOverWinner;
       this.callbacks.onGameOver?.(r.gameOverWinner);
     }
-    if (r.playerId) this._playerId = r.playerId;
-    if (r.roomId) this._roomId = r.roomId;
+    if (r.playerId || r.roomId) {
+      this.updateIdentity({ playerId: r.playerId || undefined, roomId: r.roomId || undefined });
+    }
     if (r.seatIndex !== undefined) this._seatIndex = r.seatIndex;
     // room_joined 表示已成功加入房间,具备重连上下文
     if (msg.type === 'room_joined') {
@@ -411,7 +428,7 @@ export class HeadlessGameClient {
     // 身份切换（player↔spectator）：更新本地 isSpectator 标志。
     // 服务端 switchRole 仅在等待中广播 role_changed；切换后后续消息自动修正座次/视图。
     if (msg.type === 'role_changed' && msg.playerId === this._playerId) {
-      this._isSpectator = msg.newRole === 'spectator';
+      this.updateIdentity({ isSpectator: msg.newRole === 'spectator' });
       if (this._isSpectator) this._seatIndex = -1;
     }
     this.callbacks.onMessage?.(msg);

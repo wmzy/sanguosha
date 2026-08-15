@@ -93,6 +93,11 @@ interface Props {
   currentEvent?: QueuedEvent | null;
   /** 刚入队的事件批次:出牌历史在「使用时」立即入条,不等播放队列延时。 */
   ingestedEvents?: QueuedEvent[];
+  /** 待播事件队列积压数(来自 useEventPlayback;>1 时 EventBanner 显示「+N 排队中」角标)。
+   *  回放等无播放队列的场景不传。 */
+  pendingCount?: number;
+  /** 一键清空事件播放积压(横幅角标上的 ⏭,走 useEventPlayback.skipAll 对齐最新事件)。 */
+  onSkipEvents?: () => void;
   /** 只读模式(回放):禁用选将/身份揭示等阻塞性遮罩,避免遮挡游戏画面。
    *  正式/debug 模式不传(默认 false),保持原有选将流程。 */
   readOnly?: boolean;
@@ -122,6 +127,8 @@ export function GameViewComponentImpl({
   overlaySlot,
   currentEvent,
   ingestedEvents,
+  pendingCount,
+  onSkipEvents,
   readOnly = false,
   chatMessages,
   chatConfig,
@@ -316,6 +323,34 @@ export function GameViewComponentImpl({
   // 隐藏自己的倒计时和「不回应」按钮(广播型 pending 仍在,其他座次照常显示)。
   const broadcastSkipped = pendingTargetIdx < 0 && skippedBroadcast.has(broadcastKey);
 
+  // ─── 手牌可选性判定(渲染循环与数字键快捷键共用)───
+  // 与点击置灰严格同源:自由出牌 canPlay(无 use 入口/未激活的牌置灰)、respond 回应
+  // isAwaiting(cardFilter 排除的牌置灰)、弃牌 canDiscardClick(整手牌可选)。
+  // 数字键 1-9 复用这三个判定,保证「点击置灰的牌数字键也无效果」。
+  const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
+  // canPlay 要求该牌有主动 use 入口,且(若有匹配的 use action)当前激活。
+  // 闪/无懈可击等 timing='生效前' 的纯回应牌无主动 use 入口(hasUseEntry=false),
+  // 在出牌阶段不可选——与 enumeratePlayActions 的 `if (!action) continue` 对齐。
+  // useAction 为 undefined 时(如 useSkillActions 异步注册间隙/视角切换)乐观放行,
+  // 避免手牌全灰闪烁;hasUseEntry 基于 CardEffect 注册表给出稳定判定。
+  const canPlayHandCard = useCallback(
+    (card: Card) => {
+      const useAction = findUseActionForCard(skillActions, card);
+      return (
+        isMyTurn &&
+        canOperate &&
+        hasUseEntry(card) &&
+        (!useAction || isActiveAction(useAction, { view, perspectiveIdx }))
+      );
+    },
+    [isMyTurn, canOperate, skillActions, view, perspectiveIdx],
+  );
+  const isRespondableCard = useCallback(
+    (card: Card) =>
+      !isDistributeActive && isMyAwaiting && !!pendingRespondInfo?.cardFilter?.(card),
+    [isDistributeActive, isMyAwaiting, pendingRespondInfo],
+  );
+
   // ─── stabilized callbacks（引用稳定，避免子组件 memo 失效） ───
   // 身份确认:无依赖,引用永远稳定
   const handleIdentityConfirm = useCallback(() => {
@@ -335,6 +370,8 @@ export function GameViewComponentImpl({
   // 判定翻牌动画(effect.animation='flip', blockUntilDone)期间,延迟询问类 pending 渲染。
   // 否则玩家会在判定结果(八卦阵/乐不思蜀等翻牌)还没看清时就被弹出「是否出闪」打断。
   // useEventPlayback 是非阻塞调度,这里据此实现 blockUntilDone 语义:翻牌动画播放完才显示 pending。
+  // 同源门控倒计时条(底部操作坞 + 座位弧 suppressCountdown):flip 期间倒计时已扣掉动画时长
+  // 但 prompt 还没出现,二者不同步;flip 结束后倒计时与 prompt 同时出现,显示真实剩余时间。
   const isPlayingFlipAnim =
     !!currentEvent &&
     (() => {
@@ -409,15 +446,27 @@ export function GameViewComponentImpl({
           e: () => {
             if (showEndTurn) handleEndTurn();
           },
-          // 1-9:仅自由出牌窗口选第 n 张手牌(与按钮点击同一路径 handleCardClick)
+          // 1-9:选第 n 张手牌,三个窗口与点击走同一 handleCardClick(toggle 逻辑唯一):
+          //   自由出牌(仅出牌阶段无 pending,置灰牌无效)、respond 回应(filter 排除无效)、
+          //   弃牌多选。转化/distribute 模式的候选校验由 handleCardClick 内部分支兜底,
+          //   键盘路径不绕过任何选中校验。输入框焦点过滤由 useHotkeys 统一处理。
           ...Object.fromEntries(
             [1, 2, 3, 4, 5, 6, 7, 8, 9].map(
               (n): [string, () => void] => [
                 String(n),
                 () => {
-                  if (isMyTurn && view.phase === '出牌' && !pending) {
-                    const card = perspectiveHand[n - 1];
-                    if (card) handleCardClick(card);
+                  const card = perspectiveHand[n - 1];
+                  if (!card) return;
+                  const inFreePlay = isMyTurn && view.phase === '出牌' && !pending;
+                  const transformActive = !!transformMode && (isMyTurn || isKillRespondContext);
+                  if (
+                    (inFreePlay && canPlayHandCard(card)) ||
+                    isRespondableCard(card) ||
+                    canDiscardClick ||
+                    transformActive ||
+                    isDistributeActive
+                  ) {
+                    handleCardClick(card);
                   }
                 },
               ],
@@ -496,7 +545,7 @@ export function GameViewComponentImpl({
                     'Esc — 取消转化 / 取消选择\n' +
                     'Space — 不回应\n' +
                     'E — 结束回合\n' +
-                    '1-9 — 选中第 n 张手牌（自由出牌时）'
+                    '1-9 — 选中第 n 张手牌（自由出牌 / 回应 / 弃牌时）'
                   }
                   aria-label="键盘快捷键说明"
                 >
@@ -516,8 +565,14 @@ export function GameViewComponentImpl({
       {/* ─── 主内容:战场区 + 右侧边栏 ─── */}
       <div className={styles.mainContent}>
         <div className={styles.battleField}>
-          {/* ─── 事件横幅(延时展示,非阻塞)+ 粘性展示卡(常驻至操作) ─── */}
-          <EventBanner current={currentEvent ?? null} view={view} reveal={revealEvent} />
+          {/* ─── 事件横幅(延时展示,非阻塞)+ 积压角标/跳过 + 粘性展示卡(常驻至操作) ─── */}
+          <EventBanner
+            current={currentEvent ?? null}
+            view={view}
+            reveal={revealEvent}
+            pendingCount={pendingCount}
+            onSkip={onSkipEvents}
+          />
           {/* ─── 动作浮层+箭头(谁对谁用什么牌) ─── */}
           <ActionOverlay current={currentEvent ?? null} view={view} />
 
@@ -556,8 +611,10 @@ export function GameViewComponentImpl({
                 onSeatDoubleClick={onSeatDoubleClick}
                 damageFlashIndices={anim.damageFlashIndices}
                 healFlashIndices={anim.healFlashIndices}
+                hpChangeNumbers={anim.hpChangeNumbers}
                 turnVersion={anim.turnVersion}
                 disconnectedSeats={disconnectedSeats}
+                suppressCountdown={isPlayingFlipAnim}
                 bottomSlot={
                   <>
                     {isPerspectiveAwaiting &&
@@ -601,9 +658,13 @@ export function GameViewComponentImpl({
                       selectedForDiscard={selectedForDiscard}
                     />
 
+                    {/* 倒计时条与 AwaitingPrompt 同步门控:翻牌动画期间不渲染,
+                        动画结束后与 prompt 同时出现且为真实剩余时间。
+                        不伪造暂停——服务端超时按真实时钟走,deadline 不可改。 */}
                     {(isPerspectiveAwaiting || (isMyTurn && view.phase === '出牌')) &&
                       !broadcastSkipped &&
-                      !readOnly && (
+                      !readOnly &&
+                      !isPlayingFlipAnim && (
                         <CountdownBar
                           deadline={deadline}
                           totalMs={deadlineTotalMs || DEFAULT_COUNTDOWN_TOTAL_MS}
@@ -1020,20 +1081,11 @@ export function GameViewComponentImpl({
               // useCard 类回应:选中牌高亮(仅回应窗口生效,与弃牌/出牌阶段互斥)
               const isRespondSelected =
                 isMyAwaiting && !isDistributeActive && selectedRespondCardId === card.id;
-              const useAction = findUseActionForCard(skillActions, card);
-              // canPlay 要求该牌有主动 use 入口,且(若有匹配的 use action)当前激活。
-              // 闪/无懈可击等 timing='生效前' 的纯回应牌无主动 use 入口(hasUseEntry=false),
-              // 在出牌阶段不可选——与 enumeratePlayActions 的 `if (!action) continue` 对齐。
-              // useAction 为 undefined 时(如 useSkillActions 异步注册间隙/视角切换)乐观放行,
-              // 避免手牌全灰闪烁;hasUseEntry 基于 CardEffect 注册表给出稳定判定。
-              const canPlay =
-                isMyTurn &&
-                canOperate &&
-                hasUseEntry(card) &&
-                (!useAction || isActiveAction(useAction, { view, perspectiveIdx }));
-              const respondFilter = pendingRespondInfo?.cardFilter;
-              const isAwaiting = !isDistributeActive && isMyAwaiting && !!respondFilter?.(card);
-              const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
+              // canPlay / isAwaiting / canDiscardClick 与数字键快捷键共用同一判定
+              // (canPlayHandCard/isRespondableCard/canDiscardClick),保证键盘与点击
+              // 的可选/置灰语义完全一致。
+              const canPlay = canPlayHandCard(card);
+              const isAwaiting = isRespondableCard(card);
               const isTransformCandidate = !!transformMode?.cardFilter(card);
               const isTransformActive =
                 transformMode !== null && canOperate && (isMyTurn || isKillRespondContext);
@@ -1112,6 +1164,7 @@ export function GameViewComponentImpl({
               view={view}
               damageFlashIndices={anim.damageFlashIndices}
               healFlashIndices={anim.healFlashIndices}
+              hpChange={anim.hpChangeNumbers.get(perspectiveIdx)}
               canOperate={canOperate}
               isPerspectiveTurn={isPerspectiveTurn}
               skillActions={skillActions}

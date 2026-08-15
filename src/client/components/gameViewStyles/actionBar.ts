@@ -59,6 +59,17 @@ export const skillBtn = css`
     background: rgba(155, 89, 182, 0.3);
   }
 `;
+// 技能按钮禁用态:自己回合出牌阶段内,技能存在但当前不可发动(限一次已用/activeWhen 不满足)。
+// 降饱和 + 禁用光标,保留按钮形态(不退化为被动标签),让玩家能区分「已用/条件不满足」与「不存在」。
+export const skillBtnDisabled = css`
+  cursor: not-allowed;
+  border-color: #5d4a68;
+  background: rgba(155, 89, 182, 0.05);
+  color: #6f5f78;
+  &:hover {
+    background: rgba(155, 89, 182, 0.05);
+  }
+`;
 // 装备卡片:技能可发动态(橙色发光,可点击发动)
 export const equipSkillActive = css`
   cursor: pointer;
