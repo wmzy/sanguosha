@@ -17,17 +17,19 @@
 // 前端 loadReplay/isReplayFile/useReplay 无需任何改动即可重放。
 
 import { mkdir, readFile, writeFile, rm, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { createLogger } from './logger';
 import { register as registerLifecycle } from './lifecycles';
 import { ReplayRecorder } from '../client/replay/recorder';
 import { eventsForViewer } from '../engine/view/events-for-viewer';
-import type { ReplayFile, ReplayMeta } from '../client/replay/types';
+import type { ReplayFile, ReplayMeta, SeatDelta } from '../client/replay/types';
 import type { GameState, GameView } from '../engine/types';
 
 const log = createLogger('gameHistory');
 
-const HISTORY_DIR = join(process.cwd(), 'data', 'history');
+export const HISTORY_DIR = process.env.SGS_HISTORY_DIR
+  ? resolve(process.env.SGS_HISTORY_DIR)
+  : join(process.cwd(), 'data', 'history');
 
 /** 每房间保留的历史条数上限(含录像文件),防止磁盘无限增长 */
 export const MAX_ENTRIES_PER_ROOM = 20;
@@ -146,14 +148,16 @@ export function buildReplayFile(
 ): ReplayFile | null {
   if (baselineViews.length === 0) return null;
   const rec = new ReplayRecorder();
-  for (let v = 0; v < baselineViews.length; v++) {
+  for (const bv of baselineViews) {
+    // 座次键取视图自身的 viewer(玩家座次 0..N-1;旁观基线为 -1),
+    // 而非数组下标——session 会把旁观基线追加在数组末尾。
     // 首次 record 捕获该座次 initialView(空事件批次仅注册)
-    rec.record(v, baselineViews[v], [], 0);
-    for (const env of eventsForViewer(state, v, baselineSeq)) {
+    rec.record(bv.viewer, bv, [], 0);
+    for (const env of eventsForViewer(state, bv.viewer, baselineSeq)) {
       // notify 事件客户端不录制(viewMaintainer 只把 msg.view 推入 newEvents),保持一致
       if (!env.view) continue;
       // 逐条喂入保留每条事件的相对时间戳(批量 record 会共用同一 time)
-      rec.record(v, null, [env.view], env.timestamp);
+      rec.record(bv.viewer, null, [env.view], env.timestamp);
     }
   }
   if (!rec.hasData()) return null;
@@ -259,6 +263,40 @@ export async function getGameReplay(roomId: string, entryId: string): Promise<Re
   } catch {
     return null;
   }
+}
+
+/** 按请求者过滤录像可看的座次(重放视角限制):
+ *  - 参赛玩家(seat 为其在终局条目中的座次)→ 只保留自己的座次 delta;
+ *  - 其他人(旁观者/未参赛)→ 只保留旁观座次(-1,无私有手牌);
+ *  - 旧录像没有旁观 delta 时,从最小玩家座次合成:剥离私有手牌、身份只保留
+ *    明置主公(事件流沿用该座次的 othersView 投影,与旁观视角公开信息基本一致)。
+ *  完整多座次录像仍可经 ?download=1 导出(导出是显式动作,不做视角裁剪)。 */
+export function filterReplayForViewer(file: ReplayFile, seat: number | null): ReplayFile {
+  if (seat !== null && seat >= 0 && file.seats[seat]) {
+    return { ...file, seats: { [seat]: file.seats[seat] } };
+  }
+  const spectator = file.seats[-1];
+  if (spectator) {
+    return { ...file, seats: { [-1]: spectator } };
+  }
+  const playerSeats = Object.keys(file.seats)
+    .map(Number)
+    .filter((s) => s >= 0)
+    .sort((a, b) => a - b);
+  const src = playerSeats.length > 0 ? file.seats[playerSeats[0]] : null;
+  if (!src) return { ...file, seats: {} };
+  const fallback: SeatDelta = {
+    ...src,
+    viewer: -1,
+    playerName: '旁观',
+    privateHands: [],
+    identityView: src.identityView.map((e) =>
+      e.identityHidden === false
+        ? e
+        : { index: e.index, identity: undefined, identityHidden: true },
+    ),
+  };
+  return { ...file, seats: { [-1]: fallback } };
 }
 
 /** 删除单条历史(含录像文件)。返回条目是否存在。 */

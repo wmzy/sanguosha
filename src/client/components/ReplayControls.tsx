@@ -181,7 +181,7 @@ export function ReplayControls({
         >
           {seats.map((s) => (
             <option key={s} value={s}>
-              座次 {s}
+              {s < 0 ? '旁观视角' : `座次 ${s}`}
             </option>
           ))}
         </select>

@@ -14,8 +14,10 @@ import {
   clearGameHistory,
   sweepOrphanHistory,
   buildHistoryEntry,
+  filterReplayForViewer,
   MAX_ENTRIES_PER_ROOM,
   identityCamp,
+  HISTORY_DIR,
   type GameHistoryEntry,
 } from '../../src/server/gameHistory';
 import { applyRestRoutes } from '../../src/server/rest';
@@ -28,8 +30,6 @@ import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
 import type { ConnectionSink } from '../../src/server/connection';
 import type { ReplayFile } from '../../src/client/replay/types';
-
-const HISTORY_DIR = join(process.cwd(), 'data', 'history');
 
 const ROOM_PREFIX = 'hist-test-';
 
@@ -217,6 +217,58 @@ describe('server/gameHistory 纯构造函数', () => {
     expect(abortEntry.winnerLabel).toBe('中断');
     expect(abortEntry.players[0]!.won).toBeNull();
   });
+
+  it('filterReplayForViewer:参赛者只保留自己座次;其他人拿旁观座次;旧录像合成旁观', () => {
+    const file = makeReplay();
+    file.seats = {
+      [-1]: { viewer: -1, playerName: '旁观', privateHands: [], identityView: [], events: [] },
+      0: {
+        viewer: 0,
+        playerName: '刘备',
+        privateHands: [{ index: 0, hand: [] }],
+        identityView: [{ index: 0, identity: '主公', identityHidden: false }],
+        events: [],
+      },
+      1: {
+        viewer: 1,
+        playerName: '张飞',
+        privateHands: [{ index: 1, hand: [] }],
+        identityView: [{ index: 1, identity: '反贼', identityHidden: false }],
+        events: [],
+      },
+    };
+
+    // 参赛者(座次 1)只拿自己的 delta
+    const p1 = filterReplayForViewer(file, 1);
+    expect(Object.keys(p1.seats)).toEqual(['1']);
+    expect(p1.seats[1]!.playerName).toBe('张飞');
+
+    // 旁观者/未参赛者只拿旁观座次(无私有手牌)
+    const spec = filterReplayForViewer(file, null);
+    expect(Object.keys(spec.seats)).toEqual(['-1']);
+    expect(spec.seats[-1]!.privateHands).toHaveLength(0);
+
+    // 旧录像(无旁观 delta):从最小玩家座次合成,剥离手牌、身份仅保留明置
+    const legacy = makeReplay();
+    legacy.seats = {
+      0: {
+        viewer: 0,
+        playerName: '刘备',
+        privateHands: [{ index: 0, hand: [] }],
+        identityView: [
+          { index: 0, identity: '主公', identityHidden: false },
+          { index: 1, identity: '反贼', identityHidden: true },
+        ],
+        events: [],
+      },
+    };
+    const fallback = filterReplayForViewer(legacy, null);
+    expect(Object.keys(fallback.seats)).toEqual(['-1']);
+    const fd = fallback.seats[-1]!;
+    expect(fd.privateHands).toHaveLength(0);
+    expect(fd.identityView[0]).toMatchObject({ index: 0, identity: '主公', identityHidden: false });
+    expect(fd.identityView[1]).toMatchObject({ index: 1, identityHidden: true });
+  });
 });
 
 describe('server/gameHistory REST 端点', () => {
@@ -260,6 +312,50 @@ describe('server/gameHistory REST 端点', () => {
     );
     const replay = (await plain.json()) as ReplayFile;
     expect(isReplayFile(replay)).toBe(true);
+  });
+
+  it('GET 录像重放拉取按请求者过滤座次(playerId=参赛者只拿自己座次)', async () => {
+    const replay = makeReplay();
+    replay.seats = {
+      [-1]: { viewer: -1, playerName: '旁观', privateHands: [], identityView: [], events: [] },
+      0: {
+        viewer: 0,
+        playerName: '刘备',
+        privateHands: [{ index: 0, hand: [] }],
+        identityView: [],
+        events: [],
+      },
+      1: {
+        viewer: 1,
+        playerName: '张飞',
+        privateHands: [{ index: 1, hand: [] }],
+        identityView: [],
+        events: [],
+      },
+    };
+    await appendGameHistory(roomId, makeEntry(roomId, 1000), replay);
+
+    // 参赛者 p1 → 只有座次 1
+    const asP1 = (await (
+      await app.fetch(
+        new Request(`http://localhost/api/rooms/${roomId}/history/entry-1000?playerId=p1`),
+      )
+    ).json()) as ReplayFile;
+    expect(Object.keys(asP1.seats)).toEqual(['1']);
+
+    // 未参赛/旁观 → 只有旁观座次
+    const asSpectator = (await (
+      await app.fetch(
+        new Request(`http://localhost/api/rooms/${roomId}/history/entry-1000?playerId=stranger`),
+      )
+    ).json()) as ReplayFile;
+    expect(Object.keys(asSpectator.seats)).toEqual(['-1']);
+
+    // 无 playerId → 同旁观
+    const noId = (await (
+      await app.fetch(new Request(`http://localhost/api/rooms/${roomId}/history/entry-1000`))
+    ).json()) as ReplayFile;
+    expect(Object.keys(noId.seats)).toEqual(['-1']);
   });
 
   it('不存在的录像返回 404', async () => {
@@ -409,13 +505,15 @@ describe('server/gameHistory session 集成(真实开局到结束)', () => {
     const replay = await getGameReplay(roomId, entry.id);
     expect(replay).not.toBeNull();
     expect(isReplayFile(replay!)).toBe(true);
+    // 全座次 + 旁观座次(-1):旁观 delta 无私有手牌,供视角受限的重放使用
     const seats = availableSeats(replay!);
-    expect(seats).toHaveLength(2);
+    expect(seats).toEqual([-1, 0, 1]);
+    expect(replay!.seats[-1]!.privateHands).toHaveLength(0);
     // 回放引擎可重建 initialView(step=0):武将名已就绪
-    const v0 = getViewAt(replay!, seats[0]!, 0);
+    const v0 = getViewAt(replay!, 0, 0);
     expect(v0).not.toBeNull();
     expect(v0!.players.every((p) => p.character)).toBe(true);
-    expect(totalSteps(replay!.seats[seats[0]!])).toBeGreaterThan(0);
+    expect(totalSteps(replay!.seats[0])).toBeGreaterThan(0);
 
     await clearGameHistory(roomId);
     await session.destroy();

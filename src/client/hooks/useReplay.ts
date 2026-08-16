@@ -75,7 +75,9 @@ function computeEventDuration(event: ViewEvent): number {
 
 export function useReplay(file: ReplayFile): UseReplayResult {
   const seats = useMemo(() => availableSeats(file), [file]);
-  const [seat, setSeatState] = useState(() => seats[0] ?? 0);
+  // 默认视角取最小非负座次:视角受限的录像(REST 过滤后)可能只有旁观 delta(-1),
+  // 无条件取 seats[0] 会落到旁观座次,参赛者应以自己的座次开局。
+  const [seat, setSeatState] = useState(() => seats.find((s) => s >= 0) ?? seats[0] ?? 0);
   const max = useMemo(() => totalSteps(file.seats[seat]), [file, seat]);
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);

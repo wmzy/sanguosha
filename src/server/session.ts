@@ -369,6 +369,9 @@ export class GameSession {
     for (let v = 0; v < players.length; v++) {
       views.push(JSON.parse(JSON.stringify(buildView(this.state, v))) as GameView);
     }
+    // 旁观基线(viewer=-1,无私有手牌):对局历史重放时,未参赛者/旁观者
+    // 只能以旁观视角观看(buildReplayFile 按 view.viewer 键控,座次为 -1)。
+    views.push(JSON.parse(JSON.stringify(buildView(this.state, -1))) as GameView);
     this.replayBaseline = views;
     this.replayBaselineSeq = this.state.seq;
   }

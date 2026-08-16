@@ -17,9 +17,12 @@ export function totalSteps(delta: SeatDelta | undefined): number {
 function reconstructInitialView(baseline: ReplayBaseline, delta: SeatDelta): GameView {
   const view: GameView = JSON.parse(JSON.stringify(baseline)) as GameView;
   view.viewer = delta.viewer;
-  // 回填私有手牌 + 身份可见性
+  // 回填私有手牌 + 身份可见性。
+  // 手牌必须复制数组本体:viewReducer 会原地 push/splice view.players 的 hand,
+  // 若直接引用 delta.privateHands 的数组,每次 getViewAt(逐步重放/切视角)都会把
+  // 发牌/摸牌事件的牌累积写回录像原始数据,表现为「手牌一直重复」。
   const handMap = new Map<number, Card[]>();
-  for (const { index, hand } of delta.privateHands) handMap.set(index, hand);
+  for (const { index, hand } of delta.privateHands) handMap.set(index, [...hand]);
   const idMap = new Map<number, { identity?: string; identityHidden?: boolean }>();
   for (const { index, identity, identityHidden } of delta.identityView) {
     idMap.set(index, { identity, identityHidden });

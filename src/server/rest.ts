@@ -46,6 +46,7 @@ import type { RoomConfig } from './protocol';
 import {
   listGameHistory,
   getGameReplay,
+  filterReplayForViewer,
   deleteGameHistoryEntry,
   clearGameHistory,
 } from './gameHistory';
@@ -752,6 +753,8 @@ export function applyRestRoutes(app: Hono): void {
   });
 
   // GET /api/rooms/:id/history/:entryId — 单局录像(前端重放拉取;?download=1 触发浏览器下载)
+  // 重放拉取带 playerId 做视角限制:参赛者只拿到自己座次的 delta,其他人只拿旁观座次;
+  // download=1 是显式导出动作,返回完整多座次文件。
   app.get('/api/rooms/:id/history/:entryId', async (c) => {
     const roomId = c.req.param('id');
     const entryId = c.req.param('entryId');
@@ -765,7 +768,13 @@ export function applyRestRoutes(app: Hono): void {
         'Content-Disposition': `attachment; filename="${encodeURIComponent(name)}"`,
       });
     }
-    return c.json(replay);
+    const playerId = c.req.query('playerId') ?? null;
+    const entry = (await listGameHistory(roomId)).find((e) => e.id === entryId) ?? null;
+    const seat =
+      playerId && entry
+        ? (entry.players.find((p) => p.playerId === playerId)?.seat ?? null)
+        : null;
+    return c.json(filterReplayForViewer(replay, seat));
   });
 
   // DELETE /api/rooms/:id/history/:entryId — 房主删除单条历史(含录像文件)

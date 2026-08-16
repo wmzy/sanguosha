@@ -159,7 +159,9 @@ export function RoomHistoryPanel({ roomId, playerId, history, isHost }: RoomHist
       setReplaying(entryId);
       setReplayError(null);
       try {
-        const file = await fetch(`/api/rooms/${roomId}/history/${entryId}`);
+        // 带 playerId 让服务端做视角过滤:参赛者只拿自己座次的录像 delta
+        const q = playerId ? `?playerId=${encodeURIComponent(playerId)}` : '';
+        const file = await fetch(`/api/rooms/${roomId}/history/${entryId}${q}`);
         if (!file.ok) throw new Error(`HTTP ${file.status}`);
         const data = (await file.json()) as ReplayFile;
         navigate('/replay', { state: { file: data } });
@@ -169,7 +171,7 @@ export function RoomHistoryPanel({ roomId, playerId, history, isHost }: RoomHist
         setReplaying(null);
       }
     },
-    [roomId, navigate],
+    [roomId, playerId, navigate],
   );
 
   const handleDownload = useCallback(

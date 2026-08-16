@@ -1,6 +1,18 @@
 import '@testing-library/jest-dom';
 import { afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+// 测试沙箱:对局历史存储重定向到临时目录。必须在任何 src/server 模块导入前设置
+// (setupFiles 先于测试文件的模块导入执行)。否则 gameHistory 测试的
+// sweepOrphanHistory/清空等用例会写/删真实 dev server 的 data/history,
+// 已发生过跑测试清掉线上房间孤儿录像的事故(sweep 只认测试进程内存里的房间表)。
+process.env.SGS_HISTORY_DIR = join(
+  mkdtempSync(join(tmpdir(), 'sanguosha-history-test-')),
+  'history',
+);
 
 // 全局注册 cleanup:每个测试结束后卸载所有通过 render() 挂载的 React 组件。
 // @testing-library/react 默认在模块加载时自动注册 afterEach(cleanup),

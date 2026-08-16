@@ -11,7 +11,7 @@ import type {
   ReplayBaseline,
   ReplayEvent,
 } from '../../src/client/replay/types';
-import type { GameView } from '../../src/engine/types';
+import type { GameView, Card } from '../../src/engine/types';
 
 function makeView(): GameView {
   return {
@@ -186,6 +186,33 @@ describe('getViewAt', () => {
     getViewAt(file, 0, 1);
     // 原始 baseline 不被突变(reconstructInitialView 深拷贝 baseline)
     expect(file.baseline.players[0].health).toBe(4);
+  });
+
+  it('不污染录像 privateHands(多次重建手牌不重复)', () => {
+    // 回归:房间历史重放「手牌一直重复」——reconstructInitialView 曾把
+    // delta.privateHands 的数组引用直接挂到 view.players,viewReducer 的发牌/摸牌
+    // applyView 会原地 push,每次 getViewAt(逐步重放/切视角)都把牌累积写回录像
+    const card = {
+      name: '桃',
+      type: '基本牌',
+      subtype: '桃',
+      suit: '♥',
+      color: '红',
+      rank: '7',
+      description: '',
+      id: '桃-♥7-1',
+    } as unknown as Card;
+    const seat: SeatDelta = {
+      ...makeSeat([{ time: 0, event: { type: '发牌', handSize: 1, cards: [card] } }]),
+      privateHands: [{ index: 0, hand: [] }],
+    };
+    const file = makeReplay({ 0: seat });
+    // 发牌 applyView 会 push 到 view.players[0].hand:若 hand 与 delta 数组共享引用,
+    // 第二次重建叠加成 2 张
+    expect(getViewAt(file, 0, 1)!.players[0].hand).toHaveLength(1);
+    expect(getViewAt(file, 0, 1)!.players[0].hand).toHaveLength(1);
+    // 录像原始数据保持初始值(未被 viewReducer 突变)
+    expect(seat.privateHands[0]!.hand).toHaveLength(0);
   });
 
   it('不同座次独立重建', () => {

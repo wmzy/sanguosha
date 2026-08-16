@@ -119,7 +119,7 @@ export class ReplayRecorder {
       }
       this.seats.set(seat, {
         seatIndex: seat,
-        playerName: view.players[seat]?.name ?? `P${seat}`,
+        playerName: view.players[seat]?.name ?? (seat < 0 ? '旁观' : `P${seat}`),
         initialView: cloneView(view),
         events: [],
       });
@@ -169,8 +169,10 @@ export class ReplayRecorder {
       };
     }
 
-    // 取最小座次的 initialView 作为 baseline 基准
-    const [, base] = entries[0];
+    // 取最小玩家座次的 initialView 作为 baseline 基准(旁观座次 -1 排序最前,
+    // 但公开部分与玩家座次一致;优先真实座次,保持与旧格式文件同构)
+    const playerEntry = entries.find(([seat]) => seat >= 0) ?? entries[0];
+    const [, base] = playerEntry;
     const baseline = extractBaseline(base.initialView);
 
     const seats: Record<number, SeatDelta> = {};
