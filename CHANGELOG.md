@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — 2026-08-16
+
+### Fixed — 朱雀羽扇使用普通杀时增加「是否发动」询问
+
+原先朱雀羽扇只有主动转化路径：必须先点技能栏的【朱雀羽扇】按钮、选普通杀、再选目标（preceding transform + 杀.use 组合 action）。玩家直接点杀使用时无任何提示，与 OL 官方「使用普通杀时询问是否发动」的行为不符。现增加使用时询问主路径：owner 使用普通【杀】时弹 confirm「朱雀羽扇：是否发动，将此【杀】改为火【杀】？」，确认后该牌 damageType 临时改为火焰——检测有效性（藤甲穿透）、伤害属性（火焰+1）、铁索连环传导均经 cardMap.damageType 生效。牌离开处理区（收尾入弃牌堆/被技能回收）或技能卸载（换装/死亡）时还原原属性，防止牌堆真源被永久污染。客户端零改动：confirm 型 pending 由 AwaitingPrompt 通用渲染，skillId 按 requestType `朱雀羽扇/confirm` 首段路由。
+
+#### Changed
+- **新增「使用时」after-hook 询问**（`src/engine/skills/朱雀羽扇.ts`）：仅普通杀触发（火杀/雷杀/transform 影子不询问，避免双重询问）；借刀杀人/激将等 forced 使用照常询问；打出（决斗/南蛮回应）不走 runUseFlow、属性无机制意义，不询问。默认不发动、超时 10s 不回应视为不发动。
+- **respond action + onMount UI 定义**：requestType=`朱雀羽扇/confirm`，与麒麟弓/雌雄双股剑同款 confirm 模式。
+- **onInit 清理改造**：全部注册收集 unloader；卸载时兜底扫描还原所有仍被临时改性的牌。
+- **transform 按钮路径保留**：供「使用前转化」场景（如界疠火+羽扇先转火杀才可多指定一个目标）。
+
+#### 测试
+- **`tests/skill-tests/朱雀羽扇.test.ts` 追加 3 例**（归入现有 describe）：发动→火焰伤害穿透藤甲且+1、结算后属性还原（含 view 层 pending 弹窗断言）；不发动→普通杀被藤甲无效 0 伤害；真实火杀不弹询问。
+
 ## [Unreleased] — 2026-08-07
 
 ### Fixed — 界孙尚香【界结姻】发动交互改为无弹窗单步选牌+选目标

@@ -282,4 +282,177 @@ describe('朱雀羽扇:普通杀可当火杀使用', () => {
     expect(harness.state.cardMap['k1#朱雀羽扇']).toBeUndefined();
     expect(harness.state.players[0].hand).toContain('k1');
   });
+
+  // ─── 7. 使用时询问(主路径):直接用普通杀 → confirm → 发动 → 火杀 ───
+  // 藤甲为判别器:普通杀对藤甲无效(0 伤害);火杀穿透且火焰伤害+1(共 2 点)。
+  // 同时验证:牌入弃牌堆后原属性还原(牌堆真源不被污染)。
+  it('使用时询问:直接用普通杀 → 弹confirm → 发动 → 火焰伤害穿透藤甲+1,结算后属性还原', async () => {
+    const fan = makeFan();
+    const slash = makeCard('k1', '杀', '♠', '7'); // 普通杀
+    const tengjia: Card = {
+      id: 'tj',
+      name: '藤甲',
+      suit: '♠',
+      color: '黑',
+      rank: '2',
+      type: '装备牌',
+      subtype: '防具',
+    };
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: [slash.id],
+          equipment: { 武器: fan.id },
+          skills: ['杀', '装备通用', '朱雀羽扇'],
+          vars: { '距离/出杀范围': 4 },
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          equipment: { 防具: tengjia.id },
+          skills: ['闪', '藤甲'],
+        }),
+      ],
+      cardMap: { [fan.id]: fan, [slash.id]: slash, [tengjia.id]: tengjia },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    const p1HealthBefore = harness.state.players[1].health;
+
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+
+    // 使用时询问已弹出(P0 自己的 confirm 槽)
+    const slot = harness.state.pendingSlots.get(0);
+    expect(slot?.atom.type).toBe('请求回应');
+    expect((slot?.atom as { requestType?: string }).requestType).toBe('朱雀羽扇/confirm');
+    // 视图层:该询问对 P0 可见(confirm 弹窗,前端 AwaitingPrompt 据此渲染"发动/不发动")
+    P0.processEvents();
+    P0.expectView((v) => {
+      expect(v.pending).not.toBeNull();
+      expect(v.pending?.prompt.type).toBe('confirm');
+      expect(String(v.pending?.prompt.title)).toContain('朱雀羽扇');
+    });
+
+    await P0.respond('朱雀羽扇', { choice: true }); // 发动 → 火杀
+
+    // 火杀穿透藤甲(检测有效性不再 cancel)+ 火焰伤害+1 → 共 2 点
+    expect(harness.state.players[1].health).toBe(p1HealthBefore - 2);
+    // 杀进入弃牌堆,且原属性已还原(不再是火焰)
+    expect(harness.state.zones.discardPile).toContain('k1');
+    expect(harness.state.cardMap['k1'].damageType).toBeUndefined();
+    expect(harness.state.pendingSlots.size).toBe(0);
+    // view 级断言
+    P1.processEvents();
+    P1.expectView((v) => {
+      expect(v.players[1].health).toBe(p1HealthBefore - 2);
+      expect(v.pending).toBeNull();
+    });
+  });
+
+  // ─── 8. 使用时询问:不发动 → 保持普通杀(藤甲无效化,0 伤害)───
+  it('使用时询问:confirm 不发动 → 普通杀被藤甲无效,0 伤害,属性不变', async () => {
+    const fan = makeFan();
+    const slash = makeCard('k1', '杀', '♠', '7');
+    const tengjia: Card = {
+      id: 'tj',
+      name: '藤甲',
+      suit: '♠',
+      color: '黑',
+      rank: '2',
+      type: '装备牌',
+      subtype: '防具',
+    };
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: [slash.id],
+          equipment: { 武器: fan.id },
+          skills: ['杀', '装备通用', '朱雀羽扇'],
+          vars: { '距离/出杀范围': 4 },
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          equipment: { 防具: tengjia.id },
+          skills: ['闪', '藤甲'],
+        }),
+      ],
+      cardMap: { [fan.id]: fan, [slash.id]: slash, [tengjia.id]: tengjia },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    const p1HealthBefore = harness.state.players[1].health;
+
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+    await P0.respond('朱雀羽扇', { choice: false }); // 不发动
+
+    // 普通杀对藤甲无效:0 伤害
+    expect(harness.state.players[1].health).toBe(p1HealthBefore);
+    expect(harness.state.cardMap['k1'].damageType).toBeUndefined();
+    expect(harness.state.zones.discardPile).toContain('k1');
+    expect(harness.state.pendingSlots.size).toBe(0);
+  });
+
+  // ─── 9. 使用时询问:真实火杀(非普通杀)不弹询问 ───────────────
+  it('使用时询问:直接用火杀 → 不弹朱雀羽扇confirm(仅藤甲+1 结算)', async () => {
+    const fan = makeFan();
+    const fireSlash = makeCard('k1', '杀', '♠', '7', '基本牌', '火焰');
+    const tengjia: Card = {
+      id: 'tj',
+      name: '藤甲',
+      suit: '♠',
+      color: '黑',
+      rank: '2',
+      type: '装备牌',
+      subtype: '防具',
+    };
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: [fireSlash.id],
+          equipment: { 武器: fan.id },
+          skills: ['杀', '装备通用', '朱雀羽扇'],
+          vars: { '距离/出杀范围': 4 },
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [],
+          equipment: { 防具: tengjia.id },
+          skills: ['闪', '藤甲'],
+        }),
+      ],
+      cardMap: { [fan.id]: fan, [fireSlash.id]: fireSlash, [tengjia.id]: tengjia },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    const p1HealthBefore = harness.state.players[1].health;
+
+    // 无 confirm 询问 → 流程不阻塞,直接结算完成(P1 空手,询问闪自动跳过)
+    await P0.useCardAndTarget('杀', 'k1', [1]);
+
+    expect(harness.state.pendingSlots.size).toBe(0); // 未弹朱雀羽扇询问
+    expect(harness.state.players[1].health).toBe(p1HealthBefore - 2); // 火杀 vs 藤甲 = 2
+  });
 });
