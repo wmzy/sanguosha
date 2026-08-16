@@ -5,16 +5,20 @@
 //   - 响应牌(闪/杀)归到打牌人(等于源使用者或目标,由移动牌事件"from.player"推得)。
 // 本组件只读取 view.zones.processing 的 cardId,从引擎 settleStack 与日志查最近的「打出/获得」
 // 推得归属,避免改引擎:在 viewRef.processingOwner 推导路径上保留 fallback。)
+// 共享数据(view)来自 GameViewCtx;本组件无专属 props。为保留 memo comparator 采用
+// 「context 消费壳 + 内部 memo impl」模式:壳取 view 转发给 memo impl,comparator 原样保留。
 import { memo } from 'react';
 import * as styles from './gameViewStyles';
 import type { GameView } from '../../engine/types';
 import { SUIT_COLOR } from './gameViewConstants';
+import { useGameView } from './GameViewCtx';
 
-export interface ZoneInfoBarProps {
+/** 内部 memo impl 的 props(含从 context 转发下来的共享字段)。 */
+interface ZoneInfoBarImplProps {
   view: GameView;
 }
 
-function ZoneInfoBarImpl(props: ZoneInfoBarProps) {
+function ZoneInfoBarImpl(props: ZoneInfoBarImplProps) {
   const { view } = props;
   const procIds = view.zones?.processing ?? [];
 
@@ -100,7 +104,7 @@ function ZoneInfoBarImpl(props: ZoneInfoBarProps) {
 }
 
 /** memo: 只在牌堆数/弃牌堆/处理区变化时重渲染 */
-function zoneInfoBarPropsEqual(prev: ZoneInfoBarProps, next: ZoneInfoBarProps): boolean {
+function zoneInfoBarPropsEqual(prev: ZoneInfoBarImplProps, next: ZoneInfoBarImplProps): boolean {
   const az = prev.view.zones;
   const bz = next.view.zones;
   // 处理区:比较 cardId 集合 + 对应卡片名(cardMap 查找确定性)
@@ -130,4 +134,10 @@ function zoneInfoBarPropsEqual(prev: ZoneInfoBarProps, next: ZoneInfoBarProps): 
   );
 }
 
-export const ZoneInfoBar = memo(ZoneInfoBarImpl, zoneInfoBarPropsEqual);
+const ZoneInfoBarMemo = memo(ZoneInfoBarImpl, zoneInfoBarPropsEqual);
+
+/** context 消费壳:共享数据 view 来自 GameViewCtx,转发给保持原 comparator 的 memo impl。 */
+export function ZoneInfoBar() {
+  const { view } = useGameView();
+  return <ZoneInfoBarMemo view={view} />;
+}

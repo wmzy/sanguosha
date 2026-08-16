@@ -12,17 +12,19 @@
 //
 // 复用既有组件:GameLog 的渲染抽到 GameLogContent(下方),ChatPanel 的渲染保留但拆出
 // ChatContent 子组件。本组件只做 tab 容器与浮窗外壳。
+// 共享数据(view)来自 GameViewCtx,专属数据(chatMessages/chatConfig/onSendChat/
+// mySeatIndex/embedded)仍走 props。为保留 memo 拦截采用「context 消费壳 + 内部
+// memo impl」模式:壳取 view 转发给 memo impl(默认浅比较),行为不变。
 import { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { css, cx } from '@linaria/core';
 import type { GameView } from '../../engine/types';
 import type { ChatConfig } from '../../server/protocol';
 import type { ChatMessage } from '../headless/types';
+import { useGameView } from './GameViewCtx';
 import { colors } from '../theme';
 import { formatTime as fmtGameTime } from './gameViewConstants';
 
 interface InfoDockProps {
-  /** 当前 GameView —— 用于渲染日志 */
-  view: GameView;
   /** 聊天消息(可选;DebugLobby 不传则只显示日志 tab) */
   chatMessages?: ChatMessage[];
   /** 聊天配置(可选) */
@@ -33,6 +35,12 @@ interface InfoDockProps {
   mySeatIndex?: number;
   /** 嵌入侧边栏模式:true = 不再是 fixed 浮窗,而是 100% 高度貼满右侧边栏。 */
   embedded?: boolean;
+}
+
+/** 内部 memo impl 的 props(含从 context 转发下来的共享字段)。 */
+interface InfoDockImplProps extends InfoDockProps {
+  /** 当前 GameView —— 用于渲染日志 */
+  view: GameView;
 }
 
 type TabKey = 'log' | 'chat';
@@ -389,14 +397,14 @@ function ChatTab({
   );
 }
 
-export const InfoDock = memo(({
+const InfoDockImpl = memo(({
   view,
   chatMessages,
   chatConfig,
   onSendChat,
   mySeatIndex,
   embedded = false,
-}: InfoDockProps) => {
+}: InfoDockImplProps) => {
   const hasChat = !!chatMessages;
   const [tab, setTab] = useState<TabKey>(hasChat ? 'chat' : 'log');
   // 默认折叠:避免初始就遮挡操作区;玩家有新聊天/日志时自动展开。
@@ -494,4 +502,10 @@ export const InfoDock = memo(({
     </div>
   );
 });
+
+/** context 消费壳:共享数据 view 来自 GameViewCtx,转发给 memo impl(默认浅比较)。 */
+export function InfoDock(props: InfoDockProps) {
+  const { view } = useGameView();
+  return <InfoDockImpl {...props} view={view} />;
+}
 

@@ -21,10 +21,11 @@
 //   带目标的事件,不会与 EventBanner 重叠渲染同一类型。
 //
 // 非阻塞:pointer-events:none。
+// 共享数据(view)来自 GameViewCtx,专属数据(current)仍走 props。
 import { useEffect, useRef, useState } from 'react';
 import { css } from '@linaria/core';
-import type { GameView } from '../../engine/types';
 import type { QueuedEvent } from '../hooks/useEventPlayback';
+import { useGameView } from './GameViewCtx';
 import { findSeatEl } from '../utils/gameViewHelpers';
 
 
@@ -110,7 +111,6 @@ function str(v: unknown): string | undefined {
 
 export interface ActionOverlayProps {
   current: QueuedEvent | null;
-  view: GameView;
 }
 
 /** 箭头显示时长(ms) */
@@ -128,7 +128,9 @@ const BROADCAST_TRICKS = new Set([
   '闪电',
 ]);
 
-export function ActionOverlay({ current, view }: ActionOverlayProps) {
+export function ActionOverlay({ current }: ActionOverlayProps) {
+  // 共享数据来自 GameViewCtx(view:群锦囊 pending 命中座次 + 箭头坐标换算)
+  const { view } = useGameView();
   // 用 state 而非每次 render 都计算 DOM:ActionInfo 只在 current 变化时更新。
   const [info, setInfo] = useState<ActionInfo | null>(null);
   const [arrow, setArrow] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(

@@ -1,6 +1,8 @@
 // src/client/components/PlayerCardLarge.tsx
 // 视角玩家角色大卡(势力/身份/体力/技能/装备/判定)。
 // 从 GameView.tsx 抽出的纯展示组件——内部无状态,所有数据/回调由父组件传入。
+// 共享数据(view/perspectiveIdx/canOperate/skillActions)来自 GameViewCtx,专属数据仍走
+// props。为保留 memo comparator 采用「context 消费壳 + 内部 memo impl」模式。
 import { memo } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
@@ -17,30 +19,35 @@ import { SkillTag } from './SkillTooltip';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 import { playerVisibleEqual } from '../utils/memo';
 import { displaySkillName } from '../utils/skillDisplay';
+import { useGameView } from './GameViewCtx';
 
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
 
 export interface PlayerCardLargeProps {
-  /** 视角玩家在 view.players 中的下标 */
-  perspectiveIdx: number;
   /** viewer 座次(用于显示「我」徽章) */
   viewer: number;
-  /** 引擎视图(取 players[perspectiveIdx] / cardMap / phase) */
-  view: GameView;
   /** 动画状态(体力闪烁) */
   damageFlashIndices: Map<number, number>;
   /** 回血动画状态(绿色闪烁) */
   healFlashIndices: Map<number, number>;
   /** 刚发生的体力变化(伤害 -N 红 / 回血 +N 绿 漂浮数字,动画期间存在) */
   hpChange?: HpChangeNumber;
-  /** 是否可操作(debug 模式恒 true) */
-  canOperate: boolean;
   /** 是否当前回合(用于「回合」徽章) */
   isPerspectiveTurn: boolean;
-  /** 已注册的技能前端 actions(技能按钮 + 装备技能按钮) */
-  skillActions: SkillActionDef[];
   /** 点击技能按钮(武将技/装备技统一入口) */
   onSkillAction: (action: SkillActionDef) => void;
+}
+
+/** 内部 memo impl 的 props(含从 context 转发下来的共享字段)。 */
+interface PlayerCardLargeImplProps extends PlayerCardLargeProps {
+  /** 视角玩家在 view.players 中的下标 */
+  perspectiveIdx: number;
+  /** 引擎视图(取 players[perspectiveIdx] / cardMap / phase) */
+  view: GameView;
+  /** 是否可操作(debug 模式恒 true) */
+  canOperate: boolean;
+  /** 已注册的技能前端 actions(技能按钮 + 装备技能按钮) */
+  skillActions: SkillActionDef[];
 }
 
 /** 技能按钮样式变体 → className 后缀 */
@@ -61,7 +68,7 @@ export function PlayerCardLargeImpl({
   isPerspectiveTurn,
   skillActions,
   onSkillAction,
-}: PlayerCardLargeProps) {
+}: PlayerCardLargeImplProps) {
   useSkillDescReady(); // 技能模块加载后重渲染,确保 title 中 getSkillDescription 命中
   const p = view.players[perspectiveIdx];
   if (!p) return null;
@@ -265,8 +272,8 @@ export function PlayerCardLargeImpl({
 
 /** memo: 角色大卡只在玩家可见字段/技能可用性/动画/操作权限变化时重渲染 */
 function playerCardLargePropsEqual(
-  prev: PlayerCardLargeProps,
-  next: PlayerCardLargeProps,
+  prev: PlayerCardLargeImplProps,
+  next: PlayerCardLargeImplProps,
 ): boolean {
   const prevP = prev.view.players[prev.perspectiveIdx];
   const nextP = next.view.players[next.perspectiveIdx];
@@ -300,4 +307,19 @@ function hasBlockingPending(pending: GameView['pending']): boolean {
   return pending != null && pending.isBlocking !== false;
 }
 
-export const PlayerCardLarge = memo(PlayerCardLargeImpl, playerCardLargePropsEqual);
+const PlayerCardLargeMemo = memo(PlayerCardLargeImpl, playerCardLargePropsEqual);
+
+/** context 消费壳:共享数据(view/perspectiveIdx/canOperate/skillActions)来自
+ *  GameViewCtx,转发给保持原 comparator 的 memo impl。 */
+export function PlayerCardLarge(props: PlayerCardLargeProps) {
+  const { view, perspectiveIdx, canOperate, skillActions } = useGameView();
+  return (
+    <PlayerCardLargeMemo
+      {...props}
+      perspectiveIdx={perspectiveIdx}
+      view={view}
+      canOperate={canOperate}
+      skillActions={skillActions}
+    />
+  );
+}

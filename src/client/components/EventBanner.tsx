@@ -15,10 +15,12 @@
 //
 // 队列积压指示:待播事件 >1 条时顶部中央渲染「+N 排队中」角标 + ⏭ 一键清空
 // (调用 useEventPlayback.skipAll,走 reset 按最新 seq 对齐;仅按钮开启命中)。
+// 共享数据(view)来自 GameViewCtx,专属数据(current/reveal/pendingCount/onSkip)仍走 props。
 
 import * as styles from './gameViewStyles';
 import { SUIT_COLOR } from './gameViewConstants';
 import { CardFace } from './CardFace';
+import { useGameView } from './GameViewCtx';
 import type { GameView, Card, ViewEvent } from '../../engine/types';
 import { getAtomDef } from '../../engine/core/atom';
 import type { QueuedEvent } from '../hooks/useEventPlayback';
@@ -29,7 +31,6 @@ type EventEffect = { animation?: string; duration?: number } | undefined;
 export interface EventBannerProps {
   /** 当前播放的事件(null = 空闲,不渲染) */
   current: QueuedEvent | null;
-  view: GameView;
   /** 粘性展示卡(火攻等「展示手牌」):最新展示事件,常驻至玩家操作/新展示。
    *  顶部中央翻入后停住(不淡出),不门控任何交互。 */
   reveal?: ViewEvent | null;
@@ -44,10 +45,11 @@ export interface EventBannerProps {
 export function EventBanner({
   current,
   reveal = null,
-  view,
   pendingCount = 0,
   onSkip,
 }: EventBannerProps) {
+  // 共享数据来自 GameViewCtx(view:粘性展示卡查展示者玩家名)
+  const { view } = useGameView();
   // 粘性展示卡:独立于定时队列渲染(即使队列空闲也常驻,不门控任何交互)
   const revealNode = renderRevealCard(reveal, view);
   return (

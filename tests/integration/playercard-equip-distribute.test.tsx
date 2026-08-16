@@ -13,9 +13,25 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { EquipColumn } from '../../src/client/components/EquipColumn';
+import { GameViewProvider, type GameViewCtxValue } from '../../src/client/components/GameViewCtx';
 import { EQUIP_SLOT_ICON } from '../../src/client/components/gameViewConstants';
 import * as styles from '../../src/client/components/gameViewStyles';
 import type { GameView } from '../../src/engine/types';
+
+/** 构造 GameViewCtx 值:EquipColumn 消费壳从 ctx 取 view/perspectiveIdx/canOperate/skillActions,
+ *  独立渲染时需自建 Provider 包裹(见 GameViewCtx.tsx 的修复指引)。 */
+function makeCtx(view: GameView, skillActions: GameViewCtxValue['skillActions']): GameViewCtxValue {
+  return {
+    view,
+    perspectiveIdx: 0,
+    perspectiveName: view.players[0]?.name ?? 'P0',
+    isSpectating: false,
+    canOperate: true,
+    currentPlayerName: view.players[view.currentPlayerIndex]?.name ?? '',
+    skillActions,
+    send: () => {},
+  };
+}
 
 function makeView(equipment: Record<string, string>): GameView {
   return {
@@ -72,13 +88,9 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
   it('distribute 未激活:装备渲染为不可点的文本', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
-      <EquipColumn
-        perspectiveIdx={0}
-        view={view}
-        canOperate
-        skillActions={[]}
-        onSkillAction={() => {}}
-      />,
+      <GameViewProvider value={makeCtx(view, [])}>
+        <EquipColumn onSkillAction={() => {}} />
+      </GameViewProvider>,
     );
     const node = screen.getByText(/诸葛连弩/);
     // 非候选装备渲染为 equipColumnItem 内的文本 span,不可点击
@@ -89,17 +101,15 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
   it('distribute 激活 + 装备是候选:装备渲染为 button', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
-      <EquipColumn
-        perspectiveIdx={0}
-        view={view}
-        canOperate
-        skillActions={[]}
-        onSkillAction={() => {}}
-        isDistributeActive
-        distCandidateEquipIds={new Set(['wp1'])}
-        distSelectedEquipIds={new Set()}
-        onEquipCardClick={() => {}}
-      />,
+      <GameViewProvider value={makeCtx(view, [])}>
+        <EquipColumn
+          onSkillAction={() => {}}
+          isDistributeActive
+          distCandidateEquipIds={new Set(['wp1'])}
+          distSelectedEquipIds={new Set()}
+          onEquipCardClick={() => {}}
+        />
+      </GameViewProvider>,
     );
     const btn = screen.getByRole('button', { name: /诸葛连弩/ });
     // 候选态:带 equipDistBtn 样式,不带选中样式
@@ -110,17 +120,15 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
   it('装备被选中:带 equipDistSelected 样式', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
-      <EquipColumn
-        perspectiveIdx={0}
-        view={view}
-        canOperate
-        skillActions={[]}
-        onSkillAction={() => {}}
-        isDistributeActive
-        distCandidateEquipIds={new Set(['wp1'])}
-        distSelectedEquipIds={new Set(['wp1'])}
-        onEquipCardClick={() => {}}
-      />,
+      <GameViewProvider value={makeCtx(view, [])}>
+        <EquipColumn
+          onSkillAction={() => {}}
+          isDistributeActive
+          distCandidateEquipIds={new Set(['wp1'])}
+          distSelectedEquipIds={new Set(['wp1'])}
+          onEquipCardClick={() => {}}
+        />
+      </GameViewProvider>,
     );
     const btn = screen.getByRole('button', { name: /诸葛连弩/ });
     expect(btn.className).toContain(styles.equipSelected);
@@ -130,17 +138,15 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     const view = makeView({ 武器: 'wp1' });
     const clicked: string[] = [];
     render(
-      <EquipColumn
-        perspectiveIdx={0}
-        view={view}
-        canOperate
-        skillActions={[]}
-        onSkillAction={() => {}}
-        isDistributeActive
-        distCandidateEquipIds={new Set(['wp1'])}
-        distSelectedEquipIds={new Set()}
-        onEquipCardClick={(id) => clicked.push(id)}
-      />,
+      <GameViewProvider value={makeCtx(view, [])}>
+        <EquipColumn
+          onSkillAction={() => {}}
+          isDistributeActive
+          distCandidateEquipIds={new Set(['wp1'])}
+          distSelectedEquipIds={new Set()}
+          onEquipCardClick={(id) => clicked.push(id)}
+        />
+      </GameViewProvider>,
     );
     fireEvent.click(screen.getByRole('button', { name: /诸葛连弩/ }));
     expect(clicked).toEqual(['wp1']);
@@ -149,17 +155,15 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
   it('distribute 激活但装备非候选:仍渲染为文本(不可点)', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
-      <EquipColumn
-        perspectiveIdx={0}
-        view={view}
-        canOperate
-        skillActions={[]}
-        onSkillAction={() => {}}
-        isDistributeActive
-        distCandidateEquipIds={new Set()} // 候选集为空 → 该装备非候选
-        distSelectedEquipIds={new Set()}
-        onEquipCardClick={() => {}}
-      />,
+      <GameViewProvider value={makeCtx(view, [])}>
+        <EquipColumn
+          onSkillAction={() => {}}
+          isDistributeActive
+          distCandidateEquipIds={new Set()} // 候选集为空 → 该装备非候选
+          distSelectedEquipIds={new Set()}
+          onEquipCardClick={() => {}}
+        />
+      </GameViewProvider>,
     );
     expect(screen.getByText(/诸葛连弩/).closest('[role="button"]')).toBeNull();
   });
@@ -168,13 +172,9 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
   it('完全无装备:5 个槽位均渲染为空占位卡框', () => {
     const view = makeView({});
     render(
-      <EquipColumn
-        perspectiveIdx={0}
-        view={view}
-        canOperate
-        skillActions={[]}
-        onSkillAction={() => {}}
-      />,
+      <GameViewProvider value={makeCtx(view, [])}>
+        <EquipColumn onSkillAction={() => {}} />
+      </GameViewProvider>,
     );
     // 马槽并排(equipHorseRow)用短标签「进攻」「防御」,其余用槽位全名。见 EquipColumn EMPTY_SLOT_LABEL。
     for (const slot of ['武器', '防具', '进攻', '防御', '宝物']) {
@@ -187,13 +187,9 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
   it('部分装备:有装备的槽显示装备名,空槽显示占位', () => {
     const view = makeView({ 武器: 'wp1' });
     render(
-      <EquipColumn
-        perspectiveIdx={0}
-        view={view}
-        canOperate
-        skillActions={[]}
-        onSkillAction={() => {}}
-      />,
+      <GameViewProvider value={makeCtx(view, [])}>
+        <EquipColumn onSkillAction={() => {}} />
+      </GameViewProvider>,
     );
     // 武器槽显示装备名(非占位) → 不显示“武器”占位文本
     expect(screen.queryByText('武器')).toBeNull();
@@ -233,17 +229,15 @@ describe('EquipColumn:装备区 distribute 选牌', () => {
     const skillSpy = vi.fn();
     const equipSpy = vi.fn();
     render(
-      <EquipColumn
-        perspectiveIdx={0}
-        view={iceView}
-        canOperate
-        skillActions={[iceAction]}
-        onSkillAction={skillSpy}
-        isDistributeActive
-        distCandidateEquipIds={new Set(['ice'])}
-        distSelectedEquipIds={new Set()}
-        onEquipCardClick={equipSpy}
-      />,
+      <GameViewProvider value={makeCtx(iceView, [iceAction])}>
+        <EquipColumn
+          onSkillAction={skillSpy}
+          isDistributeActive
+          distCandidateEquipIds={new Set(['ice'])}
+          distSelectedEquipIds={new Set()}
+          onEquipCardClick={equipSpy}
+        />
+      </GameViewProvider>,
     );
     const btn = screen.getByRole('button', { name: /寒冰剑/ });
     fireEvent.click(btn);

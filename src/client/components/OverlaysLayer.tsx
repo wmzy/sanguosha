@@ -1,16 +1,16 @@
 // src/client/components/OverlaysLayer.tsx
 // 选将/身份遮罩层。纯展示组件,不含视角切换逻辑。
+// 共享数据(view/perspectiveIdx)来自 GameViewCtx,专属数据仍走 props。
 // 视角控制 UI 由上层通过 overlaySlot 注入,透传到各遮罩的角落。
 import { type ReactNode } from 'react';
 import { CharSelectOverlay } from './CharSelectOverlay';
 import { CharSelectWaitingOverlay } from './CharSelectWaitingOverlay';
 import { IdentityRevealOverlay } from './IdentityRevealOverlay';
+import { useGameView } from './GameViewCtx';
 import { getCharacterMeta } from '../../engine/data/character-meta';
-import type { GameView, PendingView, Json } from '../../engine/types';
+import type { PendingView, Json } from '../../engine/types';
 
 export interface OverlaysLayerProps {
-  view: GameView;
-  perspectiveIdx: number;
   // 选将状态(由 useCharSelect 派生,父组件传入)
   isCharSelectPending: boolean;
   charSelect: {
@@ -36,9 +36,9 @@ export interface OverlaysLayerProps {
 }
 
 export function OverlaysLayer(props: OverlaysLayerProps) {
+  // 共享数据来自 GameViewCtx(view/perspectiveIdx)
+  const { view, perspectiveIdx } = useGameView();
   const {
-    view,
-    perspectiveIdx,
     isCharSelectPending,
     charSelect,
     charSelectInProgress,

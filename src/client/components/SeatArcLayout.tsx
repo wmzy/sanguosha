@@ -3,6 +3,7 @@
 //
 // 职责:把 orderedPlayers.slice(1) 沿弧形排列,每个渲染一个 <PlayerSeatView>。
 // 纯展示,所有数据和回调由 props 传入。底部可插入操作坞(prompt/倒计时/按钮)。
+// 共享数据(view/perspectiveName)来自 GameViewCtx,专属数据仍走 props。
 
 import type { ReactNode } from 'react';
 import type { GameView } from '../../engine/types';
@@ -10,6 +11,7 @@ import * as styles from './gameViewStyles';
 import { arcLayout } from '../utils/gameViewHelpers';
 import { PlayerSeatView } from './PlayerSeatView';
 import { CountdownBar } from './CountdownBar';
+import { useGameView } from './GameViewCtx';
 import type { HpChangeNumber } from '../hooks/useAnimationState';
 import { DEFAULT_COUNTDOWN_TOTAL_MS } from '../hooks/useCountdown';
 
@@ -28,10 +30,8 @@ function deadlineForSeat(view: GameView, idx: number): number | null {
 }
 
 export interface SeatArcLayoutProps {
-  view: GameView;
   /** 来自 useSeatOrder 的有序玩家列表(不含…… 实际仍含 self,内部 slice(1)) */
   orderedPlayers: GameView['players'];
-  perspectiveName: string;
   currentPlayerName: string;
   /** 目标选择相关(透传给 PlayerSeatView) */
   selectedNeedsTarget: boolean;
@@ -59,10 +59,10 @@ export interface SeatArcLayoutProps {
 }
 
 export function SeatArcLayout(props: SeatArcLayoutProps) {
+  // 共享数据来自 GameViewCtx(view/perspectiveName)
+  const { view, perspectiveName } = useGameView();
   const {
-    view,
     orderedPlayers,
-    perspectiveName,
     currentPlayerName,
     selectedNeedsTarget,
     selectedTargetNames,

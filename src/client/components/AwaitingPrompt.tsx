@@ -2,38 +2,32 @@
 // 等待回应区:渲染 pending prompt 的回应面板(confirm / useCard / choosePlayer 三分支)。
 // distribute 类 pending(遗计分配)不在本组件渲染——由 GameView 统一分配面板处理(选牌在手牌区)。
 // 纯展示,所有数据与回调通过 props 传入。
+// 共享数据(view/perspectiveName/canOperate/send)来自 GameViewCtx,专属数据仍走 props
+// (原 skillActions/onSend props 已删除:前者本就未使用,后者由 ctx.send 取代)。
 // pendingRespondInfo 由 usePendingState memo 后从父组件传入,不再在此重复 resolve。
 import { useState, useEffect } from 'react';
 import * as styles from './gameViewStyles';
-import type { Card, Faction, GameView, Json, PendingView } from '../../engine/types';
+import type { Card, Faction, PendingView } from '../../engine/types';
 import type { PendingRespondInfo } from '../utils/pendingRespond';
-import type { SkillActionDef } from '../skillActionRegistry';
 import type { ProcessingPickState } from '../hooks/useProcessingPicks';
 import type { AutoSkipPrefs } from '../utils/autoSkip';
 import { getPendingRequestType } from '../utils/pendingRespond';
 import { FACTION_BG } from './gameViewConstants';
 import { displaySkillName } from '../utils/skillDisplay';
 import { CardBack } from './CardBack';
+import { useGameView } from './GameViewCtx';
 
 export interface AwaitingPromptProps {
   pending: PendingView;
   pendingTargetIdx: number;
-  perspectiveName: string;
   perspectiveHand: Card[];
   /** 已 resolve 的 respond 信息(由 usePendingState memo 后传入) */
   pendingRespondInfo: PendingRespondInfo | null;
   /** 广播去重 key(由 usePendingState memo 后传入) */
   broadcastKey: string;
-  /** skillActions 仅用于类型兼容旧调用点;respond 信息已在父组件 resolve */
-  skillActions: SkillActionDef[];
   skippedBroadcast: Set<string>;
-  canOperate: boolean;
   /** 五谷丰登选牌展示增强:被选走的牌标注选牌者并禁用 */
   processingPicks?: ProcessingPickState | null;
-  /** 发送动作(无 preceding,本组件不涉及前置 action) */
-  onSend: (skillId: string, actionType: string, params: Record<string, Json>) => void;
-  /** 当前 GameView —— 用于查玩家名/处理区锦囊,补充无懈可击 prompt 文案。 */
-  view?: GameView;
   /** 自动跳过用户偏好(策略跳过开关状态) */
   autoSkipPrefs?: AutoSkipPrefs;
   /** 切换策略跳过开关(requestType) */
@@ -41,19 +35,16 @@ export interface AwaitingPromptProps {
 }
 
 export function AwaitingPrompt(props: AwaitingPromptProps) {
+  // 共享数据来自 GameViewCtx(view/canOperate/perspectiveName/send)
+  const { view, canOperate, perspectiveName, send } = useGameView();
   const {
     pending,
     pendingTargetIdx,
-    perspectiveName,
     perspectiveHand,
     pendingRespondInfo,
     broadcastKey,
-    skillActions: _skillActions,
     skippedBroadcast,
-    canOperate,
     processingPicks,
-    onSend,
-    view,
     autoSkipPrefs,
     onToggleAutoSkip,
   } = props;
@@ -74,7 +65,6 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
   // cancelTarget 来自 atom(广播型 请求回应 requestType='无懈可击');
   // 锦囊名从处理区查 card.name;名取自 view.players[cancelTarget].name。
   const wuxieHint = (() => {
-    if (!view) return undefined;
     const atom = pending.atom as { type?: string; requestType?: string; cancelTarget?: number };
     if (atom.type !== '请求回应' || atom.requestType !== '无懈可击') return undefined;
     const cancelTarget = atom.cancelTarget;
@@ -135,7 +125,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                   <button
                     key={cardId}
                     className={styles.promptBtn}
-                    onClick={() => onSend(skillId, 'respond', { zone: 'equipment', cardId })}
+                    onClick={() => send(skillId, 'respond', { zone: 'equipment', cardId })}
                   >
                     {slot}:{cardName}
                   </button>
@@ -146,7 +136,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                   <button
                     key={cardId}
                     className={styles.promptBtn}
-                    onClick={() => onSend(skillId, 'respond', { zone: 'judge', cardId })}
+                    onClick={() => send(skillId, 'respond', { zone: 'judge', cardId })}
                   >
                     {cardName}
                   </button>
@@ -160,7 +150,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                         <button
                           key={i}
                           className={styles.pickHandCard}
-                          onClick={() => onSend(skillId, 'respond', { zone: 'hand', handIndex: i })}
+                          onClick={() => send(skillId, 'respond', { zone: 'hand', handIndex: i })}
                           title={`第 ${i + 1} 张`}
                         >
                           <CardBack />
@@ -192,7 +182,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                       key={cardId}
                       className={isPicked ? styles.promptBtnDisabled : styles.promptBtn}
                       disabled={isPicked}
-                      onClick={() => !isPicked && onSend(skillId, 'respond', { cardId })}
+                      onClick={() => !isPicked && send(skillId, 'respond', { cardId })}
                     >
                       {cardName} {suit}
                       {rank}
@@ -213,13 +203,13 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                 <button
                   className={confirmDisabled ? styles.promptBtnDisabled : styles.promptBtnPrimary}
                   disabled={confirmDisabled}
-                  onClick={() => !confirmDisabled && onSend(skillId, 'respond', { choice: true })}
+                  onClick={() => !confirmDisabled && send(skillId, 'respond', { choice: true })}
                 >
                   {confirmLabel}
                 </button>
                 <button
                   className={styles.promptBtn}
-                  onClick={() => onSend(skillId, 'respond', { choice: false })}
+                  onClick={() => send(skillId, 'respond', { choice: false })}
                 >
                   {cancelLabel}
                 </button>
@@ -246,7 +236,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                             background: `${factionColor  }20`,
                             borderColor: factionColor,
                           }}
-                          onClick={() => onSend(skillId, 'respond', { option: opt.value })}
+                          onClick={() => send(skillId, 'respond', { option: opt.value })}
                         >
                           <span className={styles.chooseOptionCardName}>
                             {opt.label}
@@ -264,7 +254,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                       <button
                         key={opt.value}
                         className={styles.promptBtnPrimary}
-                        onClick={() => onSend(skillId, 'respond', { option: opt.value })}
+                        onClick={() => send(skillId, 'respond', { option: opt.value })}
                       >
                         {opt.label}
                       </button>
@@ -278,7 +268,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
           if (pending.prompt.type === 'choosePlayer') {
             const p = pending.prompt;
             const candidates = p.candidates ?? [];
-            const names = view?.players ?? [];
+            const names = view.players;
             const max = p.max ?? 1;
             const min = p.min ?? 1;
             if (max <= 1) {
@@ -291,7 +281,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                     <button
                       key={t}
                       className={styles.promptBtn}
-                      onClick={() => onSend(skillId, 'respond', { target: t, targets: [t] })}
+                      onClick={() => send(skillId, 'respond', { target: t, targets: [t] })}
                     >
                       {names[t]?.name ?? `P${t}`}
                     </button>
@@ -299,7 +289,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                   {min === 0 && (
                     <button
                       className={styles.promptBtn}
-                      onClick={() => onSend(skillId, 'respond', { targets: [] })}
+                      onClick={() => send(skillId, 'respond', { targets: [] })}
                     >
                       不选择
                     </button>
@@ -336,14 +326,14 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                 <button
                   className={canConfirm ? styles.promptBtnPrimary : styles.promptBtnDisabled}
                   disabled={!canConfirm}
-                  onClick={() => canConfirm && onSend(skillId, 'respond', { targets: multiSelect })}
+                  onClick={() => canConfirm && send(skillId, 'respond', { targets: multiSelect })}
                 >
                   确认({multiSelect.length}/{max})
                 </button>
                 {min === 0 && (
                   <button
                     className={styles.promptBtn}
-                    onClick={() => onSend(skillId, 'respond', { targets: [] })}
+                    onClick={() => send(skillId, 'respond', { targets: [] })}
                   >
                     不选择
                   </button>

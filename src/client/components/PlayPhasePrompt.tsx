@@ -1,12 +1,16 @@
 // src/client/components/PlayPhasePrompt.tsx
 // 纯展示组件:出牌/distribute/弃牌 5 个并列提示块,逐字迁移自 GameView.tsx 662-746 行。
 // 不持有任何业务状态,所有数据/回调由 props 传入。
+// 共享数据(view/perspectiveName/canOperate)来自 GameViewCtx,专属数据仍走 props。
+// 为保留 memo comparator 采用「context 消费壳 + 内部 memo impl」模式:壳取共享字段
+// 转发给保持原 comparator 的 memo impl(原 perspectiveIdx/perspectiveHand props 已废弃删除)。
 
 import { memo } from 'react';
 import * as styles from './gameViewStyles';
-import type { GameView, Card, PendingView } from '../../engine/types';
+import type { GameView, PendingView } from '../../engine/types';
 import { viewSlashMax, viewSlashUsed } from '../../engine/rules/action-active';
 import { getPendingRequestType } from '../utils/pendingRespond';
+import { useGameView } from './GameViewCtx';
 
 /** 当前回合玩家的杀次数徽标文案(纯函数,渲染与 memo 比较共用)。
  *  数据源:view.players[currentPlayerIndex].turnUsage(「回合用量」atom 实时投影,
@@ -62,16 +66,11 @@ function waitingRespondText(view: GameView): string | null {
 }
 
 export interface PlayPhasePromptProps {
-  view: GameView;
-  perspectiveName: string;
   currentPlayerName: string;
-  perspectiveIdx: number;
-  perspectiveHand: Card[];
   isPerspectiveTurn: boolean;
   isPerspectiveAwaiting: boolean;
   isDiscardPhase: boolean;
   isMyTurn: boolean;
-  canOperate: boolean;
   selectedCardId: string | null;
   selectedTarget: string | null;
   discardMin: number;
@@ -79,13 +78,18 @@ export interface PlayPhasePromptProps {
   selectedForDiscard: string[];
 }
 
-export function PlayPhasePromptImpl(props: PlayPhasePromptProps) {
+/** 内部 memo impl 的 props(含从 context 转发下来的共享字段)。 */
+interface PlayPhasePromptImplProps extends PlayPhasePromptProps {
+  view: GameView;
+  perspectiveName: string;
+  canOperate: boolean;
+}
+
+export function PlayPhasePromptImpl(props: PlayPhasePromptImplProps) {
   const {
     view,
     perspectiveName,
     currentPlayerName,
-    perspectiveIdx: _perspectiveIdx,
-    perspectiveHand: _perspectiveHand,
     isPerspectiveTurn,
     isPerspectiveAwaiting,
     isDiscardPhase,
@@ -168,8 +172,8 @@ export function PlayPhasePromptImpl(props: PlayPhasePromptProps) {
 
 /** memo: 纯展示提示块,只在相关 primitive props / phase 变化时重渲染 */
 function playPhasePromptPropsEqual(
-  prev: PlayPhasePromptProps,
-  next: PlayPhasePromptProps,
+  prev: PlayPhasePromptImplProps,
+  next: PlayPhasePromptImplProps,
 ): boolean {
   return (
     prev.view.phase === next.view.phase &&
@@ -189,4 +193,11 @@ function playPhasePromptPropsEqual(
   );
 }
 
-export const PlayPhasePrompt = memo(PlayPhasePromptImpl, playPhasePromptPropsEqual);
+const PlayPhasePromptMemo = memo(PlayPhasePromptImpl, playPhasePromptPropsEqual);
+
+/** context 消费壳:共享数据(view/perspectiveName/canOperate)来自 GameViewCtx,
+ *  转发给保持原 comparator 的 memo impl。 */
+export function PlayPhasePrompt(props: PlayPhasePromptProps) {
+  const { view, perspectiveName, canOperate } = useGameView();
+  return <PlayPhasePromptMemo {...props} view={view} perspectiveName={perspectiveName} canOperate={canOperate} />;
+}

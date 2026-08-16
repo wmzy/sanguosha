@@ -2,6 +2,8 @@
 // 装备区独立纵向列(布局最左侧)。
 // 布局:武器 → 防具 → [进攻马|防御马] 并排 → 宝物。
 // distribute(制衡/仁德)激活时,候选装备可点击选中,与手牌候选高亮一致。
+// 共享数据(view/perspectiveIdx/canOperate/skillActions)来自 GameViewCtx,专属数据仍走
+// props。为保留 memo comparator 采用「context 消费壳 + 内部 memo impl」模式。
 
 import { memo } from 'react';
 import { cx } from '@linaria/core';
@@ -15,6 +17,7 @@ import { shallowSetEqual } from '../utils/memo';
 import { getSkillDescription } from '../../engine/skills/lifecycle';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { useHoverTooltip } from '../hooks/useHoverTooltip';
+import { useGameView } from './GameViewCtx';
 
 /** 空槽短标签(马槽并排时用短名) */
 const EMPTY_SLOT_LABEL: Record<EquipSlot, string> = {
@@ -26,14 +29,6 @@ const EMPTY_SLOT_LABEL: Record<EquipSlot, string> = {
 };
 
 export interface EquipColumnProps {
-  /** 视角玩家在 view.players 中的下标 */
-  perspectiveIdx: number;
-  /** 引擎视图(取 players[perspectiveIdx].equipment / cardMap) */
-  view: GameView;
-  /** 是否可操作(debug 模式恒 true) */
-  canOperate: boolean;
-  /** 已注册的技能前端 actions(用于装备技能按钮) */
-  skillActions: SkillActionDef[];
   /** 点击装备技能按钮 */
   onSkillAction: (action: SkillActionDef) => void;
   /** distribute(制衡/仁德)激活时可作为候选的装备 cardId 集合 */
@@ -46,6 +41,18 @@ export interface EquipColumnProps {
   onEquipCardClick?: (cardId: string) => void;
 }
 
+/** 内部 memo impl 的 props(含从 context 转发下来的共享字段)。 */
+interface EquipColumnImplProps extends EquipColumnProps {
+  /** 视角玩家在 view.players 中的下标 */
+  perspectiveIdx: number;
+  /** 引擎视图(取 players[perspectiveIdx].equipment / cardMap) */
+  view: GameView;
+  /** 是否可操作(debug 模式恒 true) */
+  canOperate: boolean;
+  /** 已注册的技能前端 actions(用于装备技能按钮) */
+  skillActions: SkillActionDef[];
+}
+
 export function EquipColumnImpl({
   perspectiveIdx,
   view,
@@ -56,7 +63,7 @@ export function EquipColumnImpl({
   distSelectedEquipIds,
   isDistributeActive,
   onEquipCardClick,
-}: EquipColumnProps) {
+}: EquipColumnImplProps) {
   useSkillDescReady();
   const p = view.players[perspectiveIdx];
   if (!p) return null;
@@ -187,7 +194,7 @@ function EquipItem({
 }
 
 /** memo: 装备区只在装备/技能可用性/distribute 状态变化时重渲染 */
-function equipColumnPropsEqual(prev: EquipColumnProps, next: EquipColumnProps): boolean {
+function equipColumnPropsEqual(prev: EquipColumnImplProps, next: EquipColumnImplProps): boolean {
   const prevP = prev.view.players[prev.perspectiveIdx];
   const nextP = next.view.players[next.perspectiveIdx];
   if (!prevP || !nextP) return prevP === nextP;
@@ -214,4 +221,19 @@ function equipColumnPropsEqual(prev: EquipColumnProps, next: EquipColumnProps): 
   );
 }
 
-export const EquipColumn = memo(EquipColumnImpl, equipColumnPropsEqual);
+const EquipColumnMemo = memo(EquipColumnImpl, equipColumnPropsEqual);
+
+/** context 消费壳:共享数据(view/perspectiveIdx/canOperate/skillActions)来自
+ *  GameViewCtx,转发给保持原 comparator 的 memo impl。 */
+export function EquipColumn(props: EquipColumnProps) {
+  const { view, perspectiveIdx, canOperate, skillActions } = useGameView();
+  return (
+    <EquipColumnMemo
+      {...props}
+      perspectiveIdx={perspectiveIdx}
+      view={view}
+      canOperate={canOperate}
+      skillActions={skillActions}
+    />
+  );
+}
