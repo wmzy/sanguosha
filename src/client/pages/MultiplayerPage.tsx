@@ -3,7 +3,7 @@
 // 本页只负责 hooks(useMultiplayerRoom/useRoomHistory/战报事件累计)、URL 同步、
 // 404 分支与 stage 分发;各阶段 JSX 在 ./multiplayer/ 下的 Stage 子组件中,
 // mp 经 MultiplayerRoomCtx 下发,重连横幅与错误 toast 由各 Stage 自行渲染。
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMultiplayerRoom } from '../hooks/useMultiplayerRoom';
 import { useRoomHistory } from '../hooks/useRoomHistory';
@@ -21,6 +21,8 @@ export function MultiplayerPage() {
   const navigate = useNavigate();
   const { roomId: urlRoomId } = useParams<{ roomId?: string }>();
   const mp = useMultiplayerRoom(urlRoomId);
+  // 解构供下方 URL 同步 effect 使用(leaveRoom 是稳定 useCallback,避免整包 mp 进依赖)
+  const { roomId: mpRoomId, leaveRoom } = mp;
   // 对局历史:等待大厅展示;对局结束(gameOver)/回到等待(stage)时刷新
   const history = useRoomHistory(
     mp.roomId,
@@ -37,12 +39,29 @@ export function MultiplayerPage() {
     mp.stage === 'playing' || mp.stage === 'spectating' || mp.stage === 'ended',
   );
 
-  // 房间码进入 URL:建房/加入后同步到 /play/:roomId,便于分享直达
+  // 房间码进入 URL:建房/加入后同步到 /play/:roomId,便于分享直达。
+  // push 而非 replace:保留 /play 历史条目,浏览器后退应回到大厅而非首页。
+  // prevRef 守卫:仅 roomId 实际跃迁(无房→有房)时导航一次,防止 StrictMode
+  // 双执行或导航后 urlRoomId 追平时重复入栈。
+  const prevRoomIdRef = useRef<string | null>(mpRoomId);
   useEffect(() => {
-    if (mp.roomId && mp.roomId !== urlRoomId) {
-      navigate(`/play/${mp.roomId}`, { replace: true });
+    const prev = prevRoomIdRef.current;
+    prevRoomIdRef.current = mpRoomId;
+    if (!mpRoomId || mpRoomId === prev) return;
+    if (mpRoomId !== urlRoomId) navigate(`/play/${mpRoomId}`);
+  }, [mpRoomId, urlRoomId, navigate]);
+
+  // 浏览器后退到 /play(URL 离开房间页)而房间连接仍在:/play 与 /play/:roomId
+  // 渲染同一元素树,React 调和会保留本组件状态——此时主动退出房间对齐状态,
+  // 也避免上面的 URL 同步 effect 把用户再弹回房间页(后退键失灵)。
+  const prevUrlRoomIdRef = useRef<string | undefined>(urlRoomId);
+  useEffect(() => {
+    const prev = prevUrlRoomIdRef.current;
+    prevUrlRoomIdRef.current = urlRoomId;
+    if (prev !== undefined && urlRoomId === undefined && mpRoomId) {
+      leaveRoom();
     }
-  }, [mp.roomId, urlRoomId, navigate]);
+  }, [urlRoomId, mpRoomId, leaveRoom]);
 
   // 房间不存在(URL 直达不存在的 roomId):显示 404 页面
   if (mp.notFound) {
