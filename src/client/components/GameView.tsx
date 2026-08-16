@@ -185,12 +185,18 @@ export function GameViewComponentImpl({
   // ─── 粘性展示卡(火攻/界火计/义绝/蛊惑 等「展示手牌」) ───
   // 展示事件退出 banner 定时队列(useEventPlayback STICKY_REVEAL_TYPES),
   // 从 ingested 立即批次派生:最新一条展示事件常驻显示(翻入后停住不淡出)。
-  // 玩家可同时操作(不门控任何 pending);任何动作提交(send)或新展示到达即消失/替换。
+  // 玩家可同时操作(不门控任何 pending);本地动作提交(send)、展示结束事件或新展示到达即消失/替换。
   const [revealEvent, setRevealEvent] = useState<ViewEvent | null>(null);
   useEffect(() => {
     const reveals = (ingestedEvents ?? []).filter((e) => e.event.type === '展示');
     if (reveals.length > 0) {
       setRevealEvent(reveals[reveals.length - 1].event);
+    }
+    // 展示结束(引擎收尾信号,如火攻弃牌/不弃/超时后):事件驱动收卡。
+    // 必须由事件驱动——旁观/回放/其他座次没有本地 send 动作,且「不弃/超时」
+    // 路径后续再无任何事件可推断展示交互已收尾。本地 send 清除仍保留(双保险)。
+    if ((ingestedEvents ?? []).some((e) => e.event.type === '展示结束')) {
+      setRevealEvent(null);
     }
   }, [ingestedEvents]);
 

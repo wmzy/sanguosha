@@ -52,10 +52,15 @@ async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
   const revealedSuit = revealed.suit;
 
   // ── 2) 请求使用者弃一张同花色手牌 ──
+  // 使用者死亡或无同花色可弃:不询问,直接收尾(广播展示结束收起粘性卡)。
   const fromPlayer = state.players[source];
-  if (!fromPlayer?.alive) return;
-  const hasMatch = fromPlayer.hand.some((id) => state.cardMap[id]?.suit === revealedSuit);
-  if (!hasMatch) return;
+  const hasMatch = fromPlayer?.alive
+    ? fromPlayer.hand.some((id) => state.cardMap[id]?.suit === revealedSuit)
+    : false;
+  if (!hasMatch) {
+    await applyAtom(state, { type: '展示结束', player: target, cardId: revealed.cardId });
+    return;
+  }
 
   delete state.localVars['火攻/弃牌'];
   await applyAtom(state, {
@@ -79,6 +84,10 @@ async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
     await applyAtom(state, { type: '弃置', player: source, cardIds: [discardId], voluntary: true });
     await runDamageFlow(state, source, target, 1, cardId, '火焰');
   }
+  // ── 收尾:广播展示结束,收起前端粘性展示卡 ──
+  // 覆盖剩余出口:已弃牌(伤害结算完)、不弃(无 discardId)、弃牌超时(discardId 空)。
+  // 旁观/回放/其他座次没有本地动作,粘性卡只能靠此事件收起——见 atoms/展示结束.ts。
+  await applyAtom(state, { type: '展示结束', player: target, cardId: revealed.cardId });
 }
 
 /** 火攻牌特有校验：目标有手牌（可对自己使用火攻） */

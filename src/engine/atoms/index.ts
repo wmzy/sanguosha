@@ -31,6 +31,7 @@ import { 回复体力 } from './回复体力';
 import { 声明打出时 } from './声明打出时';
 import { 失去体力 } from './失去体力';
 import { 展示 } from './展示';
+import { 展示结束 } from './展示结束';
 import { 帧参数赋值 } from './帧参数赋值';
 import { 弃置 } from './弃置';
 import { 归还暂存牌 } from './归还暂存牌';
@@ -136,6 +137,7 @@ export const atomMap: Record<AtomName, AtomDefinition<any>> = {
   声明打出时,
   失去体力,
   展示,
+  展示结束,
   帧参数赋值,
   弃置,
   归还暂存牌,

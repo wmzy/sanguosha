@@ -12,7 +12,8 @@
 //     不改变持久 view 状态。buildView 与 processedView 均不变 → 一致。
 //
 // 前端展示方式:展示类操作(火攻看目标手牌等)走「粘性展示卡」——
-// 顶部中央常驻显示被展示牌,玩家可同时操作(不被阻塞),任何动作提交后立即消失。
+// 顶部中央常驻显示被展示牌,玩家可同时操作(不被阻塞);收起时机 = 本地动作提交、
+// 新展示替换、或流程收尾广播「展示结束」(见 atoms/展示结束.ts,覆盖旁观/回放/超时路径)。
 // duration 只控制入场翻转动画时长(翻入后停住,不淡出)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent, Card } from '../types';
 

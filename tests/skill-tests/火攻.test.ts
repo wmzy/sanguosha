@@ -418,4 +418,99 @@ describe('火攻', () => {
     expect(effect?.animation).toBe('flip');
     expect(effect?.duration).toBeGreaterThan(0);
   });
+
+  // ─── 11. 展示结束广播:粘性展示卡的收尾信号(所有出口) ──────────────
+  // 前端粘性展示卡此前只在使用者本地提交动作时消失——旁观/回放/其他座次没有
+  // 本地动作;且「不弃/超时」路径后续无任何事件,无从推断展示交互已收尾。
+  // 修复:火攻收尾在所有出口广播 展示结束(纯控制信号:无声无动画无日志)。
+  // 用例 11a 覆盖「弃同花色→伤害→收尾」,11b 覆盖「不弃(pass)→收尾」,
+  // 11c 覆盖「使用者无同花色→不询问直接收尾」。
+  const findAtoms = (type: string) =>
+    harness.state.atomHistory.filter(
+      (e): e is typeof e & { atom: Record<string, unknown> } =>
+        e.kind === 'atom' && (e.atom as Record<string, unknown>).type === type,
+    );
+
+  it('11a. P2 展示 → P1 弃同花色 → 伤害后广播展示结束(带 player+cardId)', async () => {
+    const hg = makeCard('hg', '火攻', '♥', '2');
+    const match = makeCard('m1', '桃', '♥', '5');
+    const reveal = makeCard('r1', '杀', '♥', '3');
+    const state = buildState({
+      p1Hand: ['hg', 'm1'],
+      p2Hand: ['r1'],
+      extraCards: { hg, m1: match, r1: reveal },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('火攻', 'hg', [1]);
+    await P1.pass(); // 无懈
+    P2.expectPending('请求回应');
+    await P2.respond('火攻', { cardId: 'r1' }); // 展示♥
+    P1.expectPending('请求回应');
+    await P1.respond('火攻', { cardId: 'm1' }); // 弃♥ → 伤害
+
+    // 收尾广播:展示结束带展示者与展示牌
+    const ends = findAtoms('展示结束');
+    expect(ends).toHaveLength(1);
+    expect(ends[0].atom).toMatchObject({ player: 1, cardId: 'r1' });
+    // 顺序:展示 → (弃牌/伤害等) → 展示结束
+    const reveals = findAtoms('展示');
+    expect(reveals).toHaveLength(1);
+    expect(harness.state.atomHistory.indexOf(reveals[0])).toBeLessThan(
+      harness.state.atomHistory.indexOf(ends[0]),
+    );
+  });
+
+  it('11b. P2 展示 → P1 不弃(pass)→ 广播展示结束', async () => {
+    const hg = makeCard('hg', '火攻', '♥', '2');
+    const match = makeCard('m1', '桃', '♥', '5');
+    const reveal = makeCard('r1', '杀', '♥', '3');
+    const state = buildState({
+      p1Hand: ['hg', 'm1'],
+      p2Hand: ['r1'],
+      extraCards: { hg, m1: match, r1: reveal },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('火攻', 'hg', [1]);
+    await P1.pass(); // 无懈
+    P2.expectPending('请求回应');
+    await P2.respond('火攻', { cardId: 'r1' }); // 展示♥
+    P1.expectPending('请求回应');
+    await P1.pass(); // 不弃
+
+    const ends = findAtoms('展示结束');
+    expect(ends).toHaveLength(1);
+    expect(ends[0].atom).toMatchObject({ player: 1, cardId: 'r1' });
+    // 不弃:无伤害
+    expect(harness.state.players[1].health).toBe(4);
+  });
+
+  it('11c. 使用者无同花色可弃 → 不询问直接广播展示结束', async () => {
+    const hg = makeCard('hg', '火攻', '♥', '2');
+    const other = makeCard('o1', '杀', '♠', '5'); // P1 只有黑牌
+    const reveal = makeCard('r1', '杀', '♥', '3'); // 展示♥
+    const state = buildState({
+      p1Hand: ['hg', 'o1'],
+      p2Hand: ['r1'],
+      extraCards: { hg, o1: other, r1: reveal },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    await P1.useCardAndTarget('火攻', 'hg', [1]);
+    await P1.pass(); // 无懈
+    P2.expectPending('请求回应');
+    await P2.respond('火攻', { cardId: 'r1' }); // 展示♥,P1 无♥
+
+    P1.expectNoPending(); // 不询问弃牌
+    const ends = findAtoms('展示结束');
+    expect(ends).toHaveLength(1);
+    expect(ends[0].atom).toMatchObject({ player: 1, cardId: 'r1' });
+  });
 });

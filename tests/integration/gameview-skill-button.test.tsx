@@ -639,4 +639,48 @@ describe('GameView:贯石斧被动 distribute(杀被闪抵消后选 2 张弃置�
     // 询问面板仍在(消失的只是展示卡)
     expect(screen.getAllByText(/是否弃置一张♦牌/).length).toBeGreaterThan(0);
   });
+
+  // 展示结束事件(引擎收尾信号)驱动收卡:火攻使用者弃牌/不弃/超时后引擎广播
+  // 「展示结束」;本地 send 清除只覆盖使用者本人——旁观/回放/其他座次没有本地动作,
+  // 且「不弃/超时」路径后续无任何事件可推断收尾,只能靠此事件收卡。
+  // 引擎侧发射契约见 tests/skill-tests/火攻.test.ts 用例 11。
+  it('展示结束事件到达 → 粘性卡收起(无本地动作,事件驱动)', async () => {
+    const view = makeView();
+    const withPending: GameView = {
+      ...view,
+      viewer: 1, // 其他座次视角:自己无操作,粘性卡只能靠事件收起
+      players: [
+        { ...view.players[0], name: 'P1', skills: ['使用牌', '打出牌'] },
+        { ...view.players[1], name: 'P2', hand: [], handCount: 0 },
+      ],
+      pending: null,
+    };
+    const revealBatch = [
+      {
+        seq: 1,
+        event: {
+          type: '展示',
+          player: 0,
+          cardId: 'r1',
+          card: { name: '杀', suit: '♦', rank: '3' },
+          effect: { sound: 'flip', animation: 'flip', duration: 700 },
+        },
+      },
+    ] as unknown as QueuedEvent[];
+    const { container, rerender } = render(
+      <GameViewComponent view={withPending} onAction={() => {}} ingestedEvents={revealBatch} />,
+    );
+
+    // 1. 粘性卡渲染
+    expect(container.querySelector('[style*="--flip-duration"]')).not.toBeNull();
+
+    // 2. 展示结束事件批次到达(如 P1 弃完牌/超时不弃)→ 粘性卡收起
+    const endBatch = [
+      { seq: 2, event: { type: '展示结束', player: 0, cardId: 'r1' } },
+    ] as unknown as QueuedEvent[];
+    rerender(
+      <GameViewComponent view={withPending} onAction={() => {}} ingestedEvents={endBatch} />,
+    );
+    expect(container.querySelector('[style*="--flip-duration"]')).toBeNull();
+  });
 });

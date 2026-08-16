@@ -302,6 +302,10 @@ export type Atom =
   | { type: '扣牌'; player: number; cardId: string; declaredName: string }
   // 于吉·蛊惑:翻开(展示)已扣置的牌,向所有人公开其真实身份。纯视图事件,不改 state(牌仍在弃牌堆)。
   | { type: '展示'; player: number; cardId: string }
+  // 展示结束:收起前端「粘性展示卡」的纯控制信号(与 展示 对偶)。火攻等流程收尾时广播
+  // (使用者已弃牌/不弃/超时/无同花色可弃)——旁观/回放/其他座次没有本地动作,
+  // 「不弃/超时」路径后续也无事件可推断收尾,只能靠此事件收卡。无 effect/toViewLog(纯控制信号)。
+  | { type: '展示结束'; player: number; cardId: string }
   // 移出至暂存区:把指定玩家的若干牌(手牌/装备)移出游戏,暂存于 target.vars[varsKey]。
   // 通用操作,服务于所有「暂时移出→到时归还」型技能:界谦逊(自身手牌) / 界破军(他人手牌+装备) / 未来的攻心·权计·隐识等。
   // source=操作者(谦逊=自己,破军=徐盛);target=牌主;varsKey=暂存键名(由调用方技能自定义)。

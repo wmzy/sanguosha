@@ -94,7 +94,7 @@ function renderBacklogBadge(
 
 /** 粘性展示卡:火攻/界火计/义绝/蛊惑 等「展示手牌」事件的常驻渲染。
  *  顶部中央翻入(revealCardIn)后停住,不淡出;消失由 React 卸载驱动
- *  (玩家操作 send / 新展示事件替换),展示时长不受定时限制。 */
+ *  (玩家操作 send / 新展示事件替换 / 引擎「展示结束」收尾信号),展示时长不受定时限制。 */
 function renderRevealCard(reveal: ViewEvent | null, view: GameView) {
   if (!reveal) return null;
   const card = reveal.card as Pick<Card, 'name' | 'suit' | 'rank'> | undefined;
