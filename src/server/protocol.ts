@@ -207,6 +207,8 @@ export type ServerMessage =
       roomType?: 'normal' | 'quick';
       seats: (string | null)[];
       pendingSeatSwaps: Record<string, { targetSeat: number; expiresAt: number }>;
+      /** 是否设置了进房密码(只投影布尔) */
+      hasPassword?: boolean;
     }
   | { type: 'player_ready'; playerId: string }
   | { type: 'spectator_joined'; spectatorId: string }
@@ -255,6 +257,8 @@ export interface RoomInfo {
   spectatorCount?: number;
   /** 房间内所有玩家 playerId(用于前端判断当前玩家是否已在房间) */
   playerIds?: string[];
+  /** 是否设置了进房密码(只投影布尔,哈希永不下发) */
+  hasPassword?: boolean;
 }
 
 export function isValidClientMessage(data: unknown): data is ClientMessage {

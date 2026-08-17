@@ -29,10 +29,19 @@ export type ConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'fai
 /** 连接命令:驱动主 effect 建立/重建 HGC 连接。 */
 type Command =
   | { type: 'idle' }
-  | { type: 'autoJoin'; roomId: string }
-  | { type: 'create'; name: string; maxPlayers: number; config?: RoomConfig; roomType?: 'normal' | 'quick' }
-  | { type: 'join'; roomId: string }
-  | { type: 'spectate'; roomId: string };
+  | { type: 'autoJoin'; roomId: string; password?: string }
+  | { type: 'create'; name: string; maxPlayers: number; config?: RoomConfig; roomType?: 'normal' | 'quick'; password?: string }
+  | { type: 'join'; roomId: string; password?: string }
+  | { type: 'spectate'; roomId: string; password?: string }
+
+/** 待输入密码的加入请求(弹窗展示,确认后携带密码重试)。 */
+export interface PasswordPrompt {
+  roomId: string;
+  /** 加入方式:玩家或旁观 */
+  mode: 'join' | 'spectate';
+  /** 重试次数(用于错误提示文案) */
+  error?: string | null;
+};
 
 export interface MultiplayerRoom {
   stage: MultiplayerStage;
@@ -54,9 +63,15 @@ export interface MultiplayerRoom {
   ready: boolean;
   /** 创建房间请求进行中(供创建表单禁用防重复提交) */
   isCreating: boolean;
-  createRoom: (name: string, maxPlayers: number, config?: RoomConfig, roomType?: 'normal' | 'quick') => void;
-  joinRoom: (roomId: string) => void;
-  joinAsSpectator: (roomId: string) => void;
+  createRoom: (name: string, maxPlayers: number, config?: RoomConfig, roomType?: 'normal' | 'quick', password?: string) => void;
+  joinRoom: (roomId: string, password?: string) => void;
+  joinAsSpectator: (roomId: string, password?: string) => void;
+  /** 待输入房间密码的加入请求(非空时 UI 显示密码弹窗) */
+  passwordPrompt: PasswordPrompt | null;
+  /** 密码弹窗确认:携带密码重试加入 */
+  submitRoomPassword: (password: string) => void;
+  /** 密码弹窗取消 */
+  cancelRoomPassword: () => void;
   toggleReady: () => void;
   startGame: () => void;
   /** 游戏结束后再来一局:重置房间回「配置+准备」阶段(复用同一连接)。 */
@@ -161,6 +176,8 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   >(null);
   /** 游戏中已断线的座次(game view player index 集合),供座位卡显示离线标识 */
   const [disconnectedSeats, setDisconnectedSeats] = useState<Set<number>>(new Set());
+  /** 待输入房间密码的加入请求 */
+  const [passwordPrompt, setPasswordPrompt] = useState<PasswordPrompt | null>(null);
 
   // 初始命令:有 initialRoomId 则自动 join(分享链接直达)
   const [command, setCommand] = useState<Command>(() =>
@@ -340,7 +357,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     // playerId 取自本地身份(门禁已确保设置);未设置时 undefined → 服务端自动生成
     const pid = getPlayerId() ?? undefined;
     if (command.type === 'create') {
-      hgc.createRoom(command.name, command.maxPlayers, command.config, pid, command.roomType)
+      hgc.createRoom(command.name, command.maxPlayers, command.config, pid, command.roomType, command.password)
         .catch((err) => {
           if (hgcRef.current !== hgc) return;
           const msg = err instanceof Error ? err.message : String(err);
@@ -356,11 +373,19 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         });
       setStage('waiting');
     } else if (command.type === 'join' || command.type === 'autoJoin') {
-      hgc.joinRoom(command.roomId, pid).catch((err) => {
+      hgc.joinRoom(command.roomId, pid, command.password).catch((err) => {
         if (hgcRef.current !== hgc) return;
         const status = (err as { status?: number })?.status;
         const msg = err instanceof Error ? err.message : String(err);
         log.error('joinRoom failed', { status, error: msg });
+        // 有密码房间且未携带/密码错误 → 弹密码输入框,确认后带密码重试。
+        // autoJoin(URL 直达)与手动 join 都走此路径;仅 403(密码错误)触发,
+        // 其他失败(游戏已开始/房间已满)维持原有降级逻辑。
+        if (status === 403) {
+          setPasswordPrompt({ roomId: command.roomId, mode: 'join', error: command.password ? '密码错误，请重试' : null });
+          setStage('lobby');
+          return;
+        }
         // URL 直达(/play/:roomId)时:
         // 房间不存在(404) → notFound。
         // 其他失败(游戏已开始/房间已满)→ 自动降级为旁观者加入。
@@ -379,11 +404,16 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
       });
       setStage('waiting');
     } else if (command.type === 'spectate') {
-      hgc.joinAsSpectator(command.roomId, pid).catch((err) => {
+      hgc.joinAsSpectator(command.roomId, pid, command.password).catch((err) => {
         if (hgcRef.current !== hgc) return;
         const status = (err as { status?: number })?.status;
         const msg = err instanceof Error ? err.message : String(err);
         log.error('joinAsSpectator failed', { status, error: msg });
+        if (status === 403) {
+          setPasswordPrompt({ roomId: command.roomId, mode: 'spectate', error: command.password ? '密码错误，请重试' : null });
+          setStage('lobby');
+          return;
+        }
         if (isRoomNotFound(err)) setNotFound(true);
         else {
           clearErrorTimer();
@@ -404,11 +434,11 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     };
   }, [command, serverUrl]);
 
-  const createRoom = useCallback((name: string, maxPlayers: number, config?: RoomConfig, roomType?: 'normal' | 'quick') => {
+  const createRoom = useCallback((name: string, maxPlayers: number, config?: RoomConfig, roomType?: 'normal' | 'quick', password?: string) => {
     setError(null);
     setGameOver(null);
     setView(null);
-
+    setPasswordPrompt(null);
     setRoomState(null);
     setHgcIsSpectator(false);
     setIsCreating(true);
@@ -418,18 +448,19 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
       maxPlayers,
       config,
       roomType,
+      password,
     });
     log.info('createRoom', { name, maxPlayers, roomType });
   }, []);
 
-  const joinRoom = useCallback((targetRoomId: string) => {
+  const joinRoom = useCallback((targetRoomId: string, password?: string) => {
     setError(null);
     setGameOver(null);
     setView(null);
-    
+    setPasswordPrompt(null);
     setRoomState(null);
     setHgcIsSpectator(false);
-    setCommand({ type: 'join', roomId: targetRoomId });
+    setCommand({ type: 'join', roomId: targetRoomId, password });
     log.info('joinRoom', { roomId: targetRoomId });
   }, []);
 
@@ -462,6 +493,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setStage('lobby');
     setNotFound(false);
     setIsCreating(false);
+    setPasswordPrompt(null);
     setRoomId(null);
     setRoomState(null);
     setHgcIsSpectator(false);
@@ -506,14 +538,30 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
 
   // ── 旁观者方法 ──
 
-  const joinAsSpectator = useCallback((targetRoomId: string) => {
+  const joinAsSpectator = useCallback((targetRoomId: string, password?: string) => {
     setError(null);
     setGameOver(null);
     setView(null);
-    
+    setPasswordPrompt(null);
     setRoomState(null);
-    setCommand({ type: 'spectate', roomId: targetRoomId });
+    setCommand({ type: 'spectate', roomId: targetRoomId, password });
     log.info('joinAsSpectator', { roomId: targetRoomId });
+  }, []);
+
+  // ── 房间密码弹窗 ──
+
+  /** 密码弹窗确认:按原方式携带密码重试。 */
+  const submitRoomPassword = useCallback((password: string) => {
+    const prompt = passwordPrompt;
+    if (!prompt || !password) return;
+    if (prompt.mode === 'spectate') joinAsSpectator(prompt.roomId, password);
+    else joinRoom(prompt.roomId, password);
+  }, [passwordPrompt, joinRoom, joinAsSpectator]);
+
+  /** 密码弹窗取消:回大厅。 */
+  const cancelRoomPassword = useCallback(() => {
+    setPasswordPrompt(null);
+    setStage('lobby');
   }, []);
 
   const switchRole = useCallback((role: 'player' | 'spectator', seat?: number) => {
@@ -632,6 +680,9 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     createRoom,
     joinRoom,
     joinAsSpectator,
+    passwordPrompt,
+    submitRoomPassword,
+    cancelRoomPassword,
     toggleReady,
     startGame,
     sendRestart,

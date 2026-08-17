@@ -6,6 +6,8 @@ import { loadReplay } from '../replay/replayFile';
 import type { ReplayFile } from '../replay/types';
 import { getPlayerId, setPlayerId } from '../utils/playerIdentity';
 import { PlayerIdForm } from '../components/RequirePlayerId';
+import { AuthPanel } from '../components/AuthPanel';
+import { useAuth } from '../hooks/useAuth';
 
 // ─── 首页视觉:深色牌匾质感 + 金色书法标题 + 卡片式入口 ───
 
@@ -213,6 +215,12 @@ export function HomePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pid, setPid] = useState<string | null>(() => getPlayerId());
   const [editing, setEditing] = useState(false);
+  const auth = useAuth();
+  // GitHub 回调 redirect 回 /?authError=xxx 时提示错误
+  const [oauthError] = useState<string | null>(() => {
+    const m = window.location.search.match(/[?&]authError=([\w-]+)/);
+    return m ? m[1] : null;
+  });
 
   const handleLoadReplay = () => {
     fileInputRef.current?.click();
@@ -235,6 +243,15 @@ export function HomePage() {
     <div className={page}>
       <h1 className={title}>三国杀</h1>
       <p className={subtitle}>数字卡牌游戏</p>
+      {oauthError && (
+        <div className={identityBar} role="alert">
+          <span>登录失败（{oauthError}），请重试</span>
+        </div>
+      )}
+      <div className={identityCard}>
+        <h3 className={identityHeading}>{auth.user ? '账号' : '登录 / 注册'}</h3>
+        <AuthPanel auth={auth} />
+      </div>
       <div className={identityBar}>
         <span>当前身份：</span>
         {pid ? (

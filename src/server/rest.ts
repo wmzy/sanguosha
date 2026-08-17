@@ -33,9 +33,12 @@ import {
   requestSeatSwap,
   respondSeatSwap,
   kickPlayer,
+  checkRoomPassword,
+  notifyRoomChanged,
   type Room,
 } from './room';
 import { destroyRoomCompletely } from './teardown';
+import { hashPassword } from './auth/password';
 import {
   createSnapshot,
   patchSnapshotDescription,
@@ -118,12 +121,18 @@ export function applyRestRoutes(app: Hono): void {
     const config = raw.config ? normalizeRoomConfig(raw.config) : undefined;
     const roomType: 'normal' | 'quick' =
       raw.roomType === 'normal' ? 'normal' : 'quick';
+    // 进房密码:可选,1-32 位;服务端只存 scrypt 哈希
+    const rawPassword = typeof raw.password === 'string' ? raw.password : '';
+    if (rawPassword.length > 32) {
+      return c.json({ error: '房间密码长度不能超过 32 位' }, 400);
+    }
+    const passwordHash = rawPassword ? await hashPassword(rawPassword) : null;
 
     try {
       const playerId = typeof raw.playerId === 'string' && raw.playerId.trim()
         ? raw.playerId.trim()
         : generatePlayerId();
-      const room = createRoom(name, maxPlayers, playerId, nullSink(), config, roomType);
+      const room = createRoom(name, maxPlayers, playerId, nullSink(), config, roomType, passwordHash);
       playerRoomMap.set(playerId, room.id);
       return c.json({ roomId: room.id, playerId });
     } catch (err) {
@@ -157,6 +166,13 @@ export function applyRestRoutes(app: Hono): void {
 
     // 新玩家加入：游戏进行中不允许
     if (room.status !== '等待中') return c.json({ error: '游戏已开始' }, 400);
+
+    // 有密码房间:验证进房密码(成员重连/已在房间已在上方豁免)
+    if (room.passwordHash) {
+      const password = typeof raw.password === 'string' ? raw.password : '';
+      const ok = await checkRoomPassword(room, password);
+      if (!ok) return c.json({ error: '房间密码错误', code: 'ROOM_PASSWORD_REQUIRED' }, 403);
+    }
 
     if (room.players.size >= room.maxPlayers) return c.json({ error: '房间已满' }, 400);
 
@@ -494,6 +510,32 @@ export function applyRestRoutes(app: Hono): void {
     return c.json({ config: updated });
   });
 
+  // PUT /api/rooms/:id/password — 房主设置/修改/清除房间密码(仅等待中)
+  // body: { playerId, password?: string }。password 为空/缺省 = 清除密码。
+  // 修改后已入房成员不受影响,仅约束后续加入者。
+  app.put('/api/rooms/:id/password', async (c) => {
+    const roomId = c.req.param('id');
+    const room = getRoom(roomId);
+    if (!room) return c.json({ error: '房间不存在' }, 404);
+
+    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
+    if (room.hostId !== playerId) return c.json({ error: '只有房主可以修改密码' }, 403);
+    if (room.status !== '等待中') {
+      return c.json({ error: '仅等待中可修改密码' }, 400);
+    }
+
+    const rawPassword = typeof raw.password === 'string' ? raw.password : '';
+    if (rawPassword.length > 32) {
+      return c.json({ error: '房间密码长度不能超过 32 位' }, 400);
+    }
+    room.passwordHash = rawPassword ? await hashPassword(rawPassword) : null;
+    notifyRoomChanged(room, 'update');
+    broadcastRoomState(room);
+    return c.json({ success: true, hasPassword: room.passwordHash !== null });
+  });
+
   // Debug 快照:保存前后端完整游戏状态到 data/snapshots/
   app.post('/api/snapshot', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -540,6 +582,13 @@ export function applyRestRoutes(app: Hono): void {
       typeof raw.playerId === 'string' && raw.playerId.trim()
         ? raw.playerId.trim()
         : generatePlayerId();
+
+    // 有密码房间:旁观同样需要密码;已是本房旁观者(spectators 含该 id,重连/刷新)豁免
+    if (room.passwordHash && !room.spectators.has(spectatorId)) {
+      const password = typeof raw.password === 'string' ? raw.password : '';
+      const ok = await checkRoomPassword(room, password);
+      if (!ok) return c.json({ error: '房间密码错误', code: 'ROOM_PASSWORD_REQUIRED' }, 403);
+    }
 
     // 清理旧房间关联
     const existingRoom = findRoomByPlayerId(spectatorId);

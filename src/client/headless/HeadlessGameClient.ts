@@ -200,14 +200,14 @@ export class HeadlessGameClient {
   }
 
   /** 创建普通(多人)房间:本连接成为房主。roomType: 'normal'=持久化, 'quick'=纯内存(默认)。 */
-  async createRoom(name: string, maxPlayers: number, config?: RoomConfig, playerId?: string, roomType?: 'normal' | 'quick'): Promise<void> {
+  async createRoom(name: string, maxPlayers: number, config?: RoomConfig, playerId?: string, roomType?: 'normal' | 'quick', password?: string): Promise<void> {
     this._debugMode = false;
     this.intentionalDisconnect = false;
 
     const resp = await fetch(`${this.baseUrl}/api/rooms`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, maxPlayers, config, playerId, roomType }),
+      body: JSON.stringify({ name, maxPlayers, config, playerId, roomType, password: password ?? undefined }),
     });
     await this.assertOk(resp, '创建房间失败');
     const data = await resp.json() as { roomId: string; playerId: string };
@@ -218,8 +218,8 @@ export class HeadlessGameClient {
     this.setPhase('lobby');
   }
 
-  /** 加入普通(多人)房间。 */
-  async joinRoom(roomId: string, playerId?: string): Promise<void> {
+  /** 加入普通(多人)房间。password: 有密码房间必填(错误时服务端 403 ROOM_PASSWORD_REQUIRED)。 */
+  async joinRoom(roomId: string, playerId?: string, password?: string): Promise<void> {
     this._debugMode = false;
     this.updateIdentity({ roomId });
     this.intentionalDisconnect = false;
@@ -227,7 +227,7 @@ export class HeadlessGameClient {
     const resp = await fetch(`${this.baseUrl}/api/rooms/${roomId}/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId }),
+      body: JSON.stringify({ playerId, password: password ?? undefined }),
     });
     await this.assertOk(resp, '加入房间失败');
     const data = await resp.json() as { roomId: string; playerId: string };
@@ -238,7 +238,7 @@ export class HeadlessGameClient {
   }
 
   /** 以旁观者身份加入房间。不占座次，默认看公开视图。 */
-  async joinAsSpectator(roomId: string, playerId?: string): Promise<void> {
+  async joinAsSpectator(roomId: string, playerId?: string, password?: string): Promise<void> {
     this._debugMode = false;
     this.updateIdentity({ roomId });
     this.intentionalDisconnect = false;
@@ -246,7 +246,7 @@ export class HeadlessGameClient {
     const resp = await fetch(`${this.baseUrl}/api/rooms/${roomId}/join-spectator`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId }),
+      body: JSON.stringify({ playerId, password: password ?? undefined }),
     });
     await this.assertOk(resp, '加入旁观失败');
     const data = await resp.json() as { roomId: string; playerId: string };

@@ -7,6 +7,7 @@ import { RoomListPanel } from '../../components/RoomListPanel';
 import { apiFetch, ApiError } from '../../api/client';
 import { btnStyle, inputStyle, colors } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
+import { PasswordPromptDialog } from './PasswordPromptDialog';
 import { ErrorToast } from './ErrorToast';
 import {
   title,
@@ -37,6 +38,7 @@ export function LobbyStage() {
   const [createMax, setCreateMax] = useState(2);
   const [createRoomType, setCreateRoomType] = useState<'quick' | 'normal'>('quick');
   const [createGameMode, setCreateGameMode] = useState<GameMode>('身份局');
+  const [createPassword, setCreatePassword] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [spectateCode, setSpectateCode] = useState('');
 
@@ -77,7 +79,8 @@ export function LobbyStage() {
   const handleCreate = () => {
     // 1v1 固定两人;身份局沿用所选人数。config 传部分字段,服务端 normalizeRoomConfig 补全。
     const max = createGameMode === '1v1' ? 2 : createMax;
-    mp.createRoom(createName.trim(), max, { gameMode: createGameMode } as unknown as RoomConfig, createRoomType);
+    const password = createPassword.trim();
+    mp.createRoom(createName.trim(), max, { gameMode: createGameMode } as unknown as RoomConfig, createRoomType, password || undefined);
   };
 
   const handleJoin = () => {
@@ -150,6 +153,15 @@ export function LobbyStage() {
                 />
               </>
             )}
+            <label className={label}>房间密码（可选，留空不设密码）</label>
+            <input
+              className={inputStyle}
+              type="password"
+              value={createPassword}
+              onChange={(e) => setCreatePassword(e.target.value)}
+              placeholder="最多 32 位"
+              maxLength={32}
+            />
             <button
               className={btnStyle}
               style={{ '--btn-bg': colors.accent.orange } as React.CSSProperties}
@@ -218,6 +230,15 @@ export function LobbyStage() {
         </aside>
       </div>
       {mp.error && <ErrorToast message={mp.error} onClose={mp.clearError} />}
+      {mp.passwordPrompt && (
+        <PasswordPromptDialog
+          roomId={mp.passwordPrompt.roomId}
+          mode={mp.passwordPrompt.mode}
+          error={mp.passwordPrompt.error ?? null}
+          onSubmit={mp.submitRoomPassword}
+          onCancel={mp.cancelRoomPassword}
+        />
+      )}
     </div>
   );
 }

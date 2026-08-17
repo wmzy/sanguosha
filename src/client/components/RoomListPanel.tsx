@@ -217,6 +217,7 @@ export const RoomListPanel = memo(
                 <div key={room.id} className={roomItem}>
                   <div className={roomInfo}>
                     <div className={roomName}>
+                      {room.hasPassword && <span title="需要密码" aria-label="密码房间">🔒</span>}
                       {room.name}
                       {isMyRoom && <span className={hostBadge}>我建的</span>}
                     </div>

@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import { cors, requestLogger, errorHandler, rateLimit } from './middleware';
 import { gameSessions } from './registry';
 import { applyRestRoutes } from './rest';
+import { applyAuthRoutes } from './auth/routes';
 import { GameSession } from './session';
 import { createLogger } from './logger';
 import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } from './persistence';
@@ -25,6 +26,7 @@ app.use('*', rateLimit);
 app.onError(errorHandler);
 
 // REST 路由注册到主 app 实例(中间件照常生效)
+applyAuthRoutes(app);
 applyRestRoutes(app);
 
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
@@ -90,6 +92,8 @@ async function restoreNormalRoomsFromDb(): Promise<void> {
       chatHistory: [],
       seats: Array(row.maxPlayers).fill(null),
       pendingSeatSwaps: new Map(),
+      // 密码哈希随房间元数据持久化,重启后密码继续生效
+      passwordHash: row.passwordHash ?? null,
     };
     addRoom(room);
     log.info(`恢复普通房间 ${row.id}（${row.name}，状态: ${row.status}）`);
@@ -188,6 +192,7 @@ async function restorePersistedRooms(): Promise<void> {
         chatHistory: [],
         seats: restoredSeats,
         pendingSeatSwaps: new Map(),
+        passwordHash: null,
       };
       // 复用 existingRoom(normal 房间从 DB 恢复)时,DB schema 不存 seats,
       // existingRoom.seats 是恢复时初始化的全 null 数组。必须用 .json 的 seats 覆盖,

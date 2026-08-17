@@ -5,6 +5,7 @@ import { DEFAULT_ROOM_CONFIG, normalizeRoomConfig } from './protocol';
 import { createRng } from '../engine/util/rng';
 import { register } from './lifecycles';
 import { createLogger } from './logger';
+import { verifyPassword } from './auth/password';
 
 const log = createLogger('room');
 
@@ -32,6 +33,8 @@ export interface Room {
   chatUsage: Map<string, { total: number; timestamps: number[] }>;
   /** 聊天历史（最近 50 条，供重连获取） */
   chatHistory: Array<{ playerId: string; seatIndex: number; text: string; timestamp: number }>;
+  /** 进房密码哈希(scrypt `salt:hash`);null=无密码。永不存明文、永不下发客户端。 */
+  passwordHash: string | null;
   /** 座位表：seats[i] = 座次 i 的 playerId，null=空座。长度始终 = maxPlayers */
   seats: (string | null)[];
   /** 待处理座位交换请求：requesterId → { targetSeat, expiresAt, timer } */
@@ -84,12 +87,23 @@ export function buildRoomState(room: Room): ServerMessage {
         { targetSeat: v.targetSeat, expiresAt: v.expiresAt },
       ]),
     ),
+    hasPassword: room.passwordHash !== null,
   };
 }
 
 /** 获取玩家当前座次下标（-1=不在座位表中）。 */
 export function getPlayerSeat(room: Room, playerId: string): number {
   return room.seats.indexOf(playerId);
+}
+
+/** 校验进房密码。无密码房间恒过;有密码房间需明文匹配(scrypt,timingSafeEqual)。 */
+export async function checkRoomPassword(
+  room: Room,
+  password: string | undefined,
+): Promise<boolean> {
+  if (!room.passwordHash) return true;
+  if (!password) return false;
+  return verifyPassword(password, room.passwordHash);
 }
 
 /** 创建普通房间:需要 host 玩家立刻加入。
@@ -101,6 +115,7 @@ export function createRoom(
   sink: ConnectionSink,
   config?: RoomConfig,
   roomType: 'normal' | 'quick' = 'quick',
+  passwordHash: string | null = null,
 ): Room {
   const id = generateRoomId();
   const seats: (string | null)[] = Array(clampPlayers(maxPlayers)).fill(null);
@@ -122,6 +137,7 @@ export function createRoom(
     chatHistory: [],
     seats,
     pendingSeatSwaps: new Map(),
+    passwordHash,
   };
   roomList.set(id, room);
   roomChangeHandler?.(room, 'create');
@@ -150,6 +166,7 @@ export function createDebugRoom(name: string, maxPlayers: number, config?: RoomC
     chatHistory: [],
     seats: Array(clampPlayers(maxPlayers)).fill(null),
     pendingSeatSwaps: new Map(),
+    passwordHash: null,
   };
   roomList.set(id, room);
   return room;
@@ -453,6 +470,7 @@ export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
       spectatorCount: room.spectators.size,
       // seats 在 SSE 断线后仍保留(仅 leaveRoom 清理),用于判断"玩家是否在房间中"
       playerIds: room.seats.filter((s): s is string => s !== null),
+      hasPassword: room.passwordHash !== null,
     });
   }
   return result;
@@ -518,6 +536,11 @@ export function setRoomChangeHandler(
   fn: ((room: Room, action: 'create' | 'update' | 'delete') => void) | null,
 ): void {
   roomChangeHandler = fn;
+}
+
+/** 外部直接改 Room 字段后(如 rest.ts 改 passwordHash)触发持久化/广播。 */
+export function notifyRoomChanged(room: Room, action: 'create' | 'update' | 'delete'): void {
+  roomChangeHandler?.(room, action);
 }
 
 // ── 座位管理 ──
