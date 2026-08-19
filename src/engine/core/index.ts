@@ -44,6 +44,8 @@ export interface GameConfig {
   timeoutSec?: number;
   /** 游戏模式(规则包)。默认 身份局。restore 时用于从快照恢复模式。 */
   mode?: GameMode;
+  /** 玩家显示名(座次 i → 昵称)。缺省回退 player-{i}。 */
+  playerNames?: string[];
 }
 
 /** 解析 state.config 中持久化的模式,缺省回退 身份局(兼容旧快照)。 */
@@ -64,7 +66,7 @@ export function create(gameConfig: GameConfig): GameState {
   const playerCount = Math.max(2, Math.min(8, gameConfig.playerCount));
   const stubPlayers = Array.from({ length: playerCount }, (_, i) => ({
     index: i,
-    name: `player-${i}`,
+    name: gameConfig.playerNames?.[i]?.trim() || `player-${i}`,
     character: '',
     health: 4,
     maxHealth: 4,

@@ -2,6 +2,7 @@
 // 等待大厅座位图:座次按钮(空位加入/移动、与他人交换确认)、房主踢出、
 // 自己已发出交换请求的等待提示、收到的交换请求同意/拒绝卡。房间数据走 MultiplayerRoomCtx。
 import { btnStyle, colors } from '../../theme';
+import { memberName } from '../../utils/memberNames';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
 
 export function SeatMap() {
@@ -51,7 +52,7 @@ export function SeatMap() {
                     mp.moveSeat(i);
                   } else if (!isMe) {
                     // 请求交换座位
-                    if (window.confirm(`要与 ${seatPlayerId.slice(0, 8)} 交换座位吗？`)) {
+                    if (window.confirm(`要与  交换座位吗？`)) {
                       mp.requestSeatSwap(i);
                     }
                   }
@@ -60,7 +61,7 @@ export function SeatMap() {
               >
                 <div style={{ fontWeight: 'bold' }}>P{i + 1}</div>
                 <div style={{ fontSize: '11px', opacity: 0.8 }}>
-                  {isMe ? '我' : isEmpty ? '空位' : seatPlayerId.slice(0, 6)}
+                  {isMe ? '我' : isEmpty ? '空位' : memberName(seatPlayerId, mp.roomState?.playerNames)}
                 </div>
                 {isPending && !isMe && (
                   <div style={{ fontSize: '10px', marginTop: '2px', color: colors.accent.gold }}>
@@ -92,7 +93,7 @@ export function SeatMap() {
                   } as React.CSSProperties}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (window.confirm(`确定将 ${seatPlayerId.slice(0, 8)} 踢出房间吗？`)) {
+                    if (window.confirm(`确定将  踢出房间吗？`)) {
                       mp.kickPlayer(seatPlayerId);
                     }
                   }}

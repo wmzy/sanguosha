@@ -1,10 +1,9 @@
 // src/client/hooks/useAuth.ts — 登录态管理 hook。
 // 会话由服务端 HttpOnly Cookie 携带,客户端只保存 PublicUser 派生信息。
-// 登录/注册/GitHub 登录/登出/自动恢复(me);GitHub 入口是否可用由 /me 的
-// githubEnabled 随状态返回(服务端未配置凭据时隐藏按钮)。
+// 登录/注册/GitHub 登录/登出/自动恢复(me)/改名/改密。
+// GitHub 入口是否可用由 /me 的 githubEnabled 随状态返回(服务端未配置凭据时隐藏按钮)。
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch } from '../api/client';
-import { setPlayerId, getPlayerId } from '../utils/playerIdentity';
 import { createLogger } from '../utils/logger';
 
 const log = createLogger('useAuth');
@@ -33,6 +32,10 @@ export interface AuthState {
   login: (username: string, password: string) => Promise<boolean>;
   register: (username: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
+  /** 修改昵称(个人页);成功后房间内显示名由服务端实时广播同步 */
+  rename: (displayName: string) => Promise<boolean>;
+  /** 修改密码(个人页);旧密码校验在服务端 */
+  changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>;
 }
 
 export function useAuth(): AuthState {
@@ -45,14 +48,12 @@ export function useAuth(): AuthState {
   // 会被第一个 cleanup 永久禁言)。用 effect 局部 active 标志,随每次 effect 实例独立。
   useEffect(() => {
     let active = true;
-    void (async () => {
+    (async () => {
       try {
-        const me = await apiFetch<MeResponse>('/api/auth/me');
+        const resp = await apiFetch<MeResponse>('/api/auth/me');
         if (!active) return;
-        setUser(me.user);
-        setGithubEnabled(me.githubEnabled);
-        // 登录态恢复时同步昵称(未手动设置过 playerId 的场景)
-        if (me.user && !getPlayerId()) setPlayerId(me.user.displayName);
+        setUser(resp.user);
+        setGithubEnabled(resp.githubEnabled);
       } catch {
         /* 未登录属正常 */
       } finally {
@@ -69,22 +70,19 @@ export function useAuth(): AuthState {
     username: string,
     password: string,
   ): Promise<boolean> => {
-    setError(null);
     setSubmitting(true);
+    setError(null);
     try {
-      const resp = await apiFetch<{ user: AuthUser }>(`/api/auth/${  path}`, {
+      const resp = await apiFetch<{ user: AuthUser }>(`/api/auth/${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-      // 组件卸载后的 setState 在 React 18+ 是无害 no-op,无需 mounted 守卫
       setUser(resp.user);
-      setPlayerId(resp.user.displayName);
       return true;
     } catch (err) {
       const body = (err as { body?: { error?: string } }).body;
-      const msg = body?.error ?? (path === 'login' ? '登录失败' : '注册失败');
-      setError(msg);
+      setError(body?.error ?? '请求失败，请稍后重试');
       return false;
     } finally {
       setSubmitting(false);
@@ -105,11 +103,58 @@ export function useAuth(): AuthState {
     try {
       await apiFetch<void>('/api/auth/logout', { method: 'POST' });
     } catch (err) {
-      log.warn('logout failed', { error: String(err) });
+      log.error('logout failed', { error: String(err) });
     }
     setUser(null);
     setError(null);
   }, []);
 
-  return { user, githubEnabled, loading, submitting, error, login, register, logout };
+  const rename = useCallback(async (displayName: string): Promise<boolean> => {
+    setError(null);
+    try {
+      const resp = await apiFetch<{ user: AuthUser }>('/api/auth/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName }),
+      });
+      setUser(resp.user);
+      return true;
+    } catch (err) {
+      const body = (err as { body?: { error?: string } }).body;
+      setError(body?.error ?? '修改失败，请稍后重试');
+      return false;
+    }
+  }, []);
+
+  const changePassword = useCallback(async (
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<boolean> => {
+    setError(null);
+    try {
+      await apiFetch<{ user: AuthUser }>('/api/auth/password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPassword, newPassword }),
+      });
+      return true;
+    } catch (err) {
+      const body = (err as { body?: { error?: string } }).body;
+      setError(body?.error ?? '修改失败，请稍后重试');
+      return false;
+    }
+  }, []);
+
+  return {
+    user,
+    githubEnabled,
+    loading,
+    submitting,
+    error,
+    login,
+    register,
+    logout,
+    rename,
+    changePassword,
+  };
 }

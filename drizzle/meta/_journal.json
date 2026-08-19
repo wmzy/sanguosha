@@ -15,6 +15,13 @@
       "when": 1786914373584,
       "tag": "0001_milky_tenebrous",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787137573010,
+      "tag": "0002_sweet_morgan_stark",
+      "breakpoints": true
     }
   ]
 }

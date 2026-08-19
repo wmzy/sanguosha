@@ -106,6 +106,16 @@ const userMeta = css`
   font-size: 12px;
 `;
 
+const profileLink = css`
+  color: ${colors.accent.blue};
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+
 const errorText = css`
   color: ${colors.accent.red};
   font-size: 13px;
@@ -127,7 +137,7 @@ const divider = css`
   }
 `;
 
-export const AuthPanel = memo(({ auth }: { auth: AuthState }) => {
+export const AuthPanel = memo(({ auth, compact = false }: { auth: AuthState; compact?: boolean }) => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -152,10 +162,14 @@ export const AuthPanel = memo(({ auth }: { auth: AuthState }) => {
               {auth.user.githubLinked ? ' · GitHub 已绑定' : ''}
             </span>
           </div>
+          <a className={profileLink} href="/profile">
+            个人主页
+          </a>
           <button className={btnStyle} onClick={() => void auth.logout()}>
             退出
           </button>
         </div>
+        {!compact && <div className={errorText}>{auth.error ?? ''}</div>}
       </div>
     );
   }

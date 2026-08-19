@@ -206,6 +206,8 @@ export type ServerMessage =
       pendingViewRequests: Record<string, number>;
       roomType?: 'normal' | 'quick';
       seats: (string | null)[];
+      /** 成员显示名:playerId → 用户昵称(playerId 是稳定 userId,展示用) */
+      playerNames?: Record<string, string>;
       pendingSeatSwaps: Record<string, { targetSeat: number; expiresAt: number }>;
       /** 是否设置了进房密码(只投影布尔) */
       hasPassword?: boolean;
@@ -259,6 +261,8 @@ export interface RoomInfo {
   playerIds?: string[];
   /** 是否设置了进房密码(只投影布尔,哈希永不下发) */
   hasPassword?: boolean;
+  /** 成员显示名:playerId → 用户昵称 */
+  playerNames?: Record<string, string>;
 }
 
 export function isValidClientMessage(data: unknown): data is ClientMessage {

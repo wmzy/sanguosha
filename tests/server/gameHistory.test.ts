@@ -2,7 +2,7 @@
 // 归并说明:覆盖 存储层(gameHistory.ts append/list/get/delete/clear/上限裁剪/孤儿清理)、
 // REST 端点(权限/下载)、真实开局到结束的 session 记录与录像格式(isReplayFile 可校验 +
 // 回放引擎可重建)。无已有同名测试文件,新建。
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hono } from 'hono';
@@ -21,6 +21,9 @@ import {
   type GameHistoryEntry,
 } from '../../src/server/gameHistory';
 import { applyRestRoutes } from '../../src/server/rest';
+import { applyAuthRoutes } from '../../src/server/auth/routes';
+import { initRoomStore, closeRoomStore } from '../../src/server/roomStore';
+import { _resetForTests as resetLifecycles } from '../../src/server/lifecycles';
 import { gameSessions, playerRoomMap } from '../../src/server/registry';
 import { createRoom, getRoom, deleteRoom } from '../../src/server/room';
 import { GameSession } from '../../src/server/session';
@@ -275,10 +278,20 @@ describe('server/gameHistory REST 端点', () => {
   let app: Hono;
   let roomId: string;
 
+  beforeAll(async () => {
+    // DELETE 房主校验走会话,需要 auth 路由 + 内存 DB
+    await initRoomStore(':memory:');
+  });
+  afterAll(async () => {
+    await closeRoomStore();
+    resetLifecycles();
+  });
+
   beforeEach(() => {
     gameSessions.clear();
     playerRoomMap.clear();
     app = new Hono();
+    applyAuthRoutes(app);
     applyRestRoutes(app);
     roomId = `${ROOM_PREFIX}api-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   });
@@ -365,48 +378,80 @@ describe('server/gameHistory REST 端点', () => {
     expect(res.status).toBe(404);
   });
 
-  it('DELETE 单条:房主成功,非房主 403,缺 playerId 400,不存在 404', async () => {
-    const room = createRoom('测试', 2, 'host-user', createCaptureSink([]));
+  it('DELETE 单条:房主成功,非房主 403,缺身份 400,不存在 404', async () => {
+    // 游客模式移除后房主校验走会话:注册 host/guest,room.hostId = host.userId
+    const reg = await app.fetch(
+      new Request('http://localhost/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: `gh-host-${Date.now()}`, password: 'pass123' }),
+      }),
+    );
+    const hostCookie = reg.headers.get('set-cookie')!.split(';')[0];
+    const hostId = ((await reg.json()) as { user: { id: string } }).user.id;
+    const guestReg = await app.fetch(
+      new Request('http://localhost/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: `gh-guest-${Date.now()}`, password: 'pass123' }),
+      }),
+    );
+    const guestCookie = guestReg.headers.get('set-cookie')!.split(';')[0];
+    const room = createRoom('测试', 2, hostId, createCaptureSink([]));
     try {
       await appendGameHistory(room.id, makeEntry(room.id, 1000), null);
 
-      const del = (pid: string | null) =>
+      const del = (cookie: string | null) =>
         app.fetch(
           new Request(`http://localhost/api/rooms/${room.id}/history/entry-1000`, {
             method: 'DELETE',
-            ...(pid
-              ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId: pid }) }
-              : {}),
+            ...(cookie ? { headers: { Cookie: cookie } } : {}),
           }),
         );
 
       expect((await del(null)).status).toBe(400);
-      expect((await del('guest-user')).status).toBe(403);
-      expect((await del('host-user')).status).toBe(200);
+      expect((await del(guestCookie)).status).toBe(403);
+      expect((await del(hostCookie)).status).toBe(200);
       expect(await listGameHistory(room.id)).toHaveLength(0);
-      expect((await del('host-user')).status).toBe(404);
+      expect((await del(hostCookie)).status).toBe(404);
     } finally {
       deleteRoom(room.id);
     }
   });
 
   it('DELETE 清空:仅房主可清空', async () => {
-    const room = createRoom('测试', 2, 'host-user', createCaptureSink([]));
+    const reg = await app.fetch(
+      new Request('http://localhost/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: `gh-host2-${Date.now()}`, password: 'pass123' }),
+      }),
+    );
+    const hostCookie = reg.headers.get('set-cookie')!.split(';')[0];
+    const hostId = ((await reg.json()) as { user: { id: string } }).user.id;
+    const guestReg = await app.fetch(
+      new Request('http://localhost/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: `gh-guest2-${Date.now()}`, password: 'pass123' }),
+      }),
+    );
+    const guestCookie = guestReg.headers.get('set-cookie')!.split(';')[0];
+    const room = createRoom('测试', 2, hostId, createCaptureSink([]));
     try {
       await appendGameHistory(room.id, makeEntry(room.id, 1), null);
       await appendGameHistory(room.id, makeEntry(room.id, 2), null);
 
-      const clear = (pid: string) =>
+      const clear = (cookie: string) =>
         app.fetch(
           new Request(`http://localhost/api/rooms/${room.id}/history`, {
             method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ playerId: pid }),
+            headers: { Cookie: cookie },
           }),
         );
 
-      expect((await clear('guest-user')).status).toBe(403);
-      expect((await clear('host-user')).status).toBe(200);
+      expect((await clear(guestCookie)).status).toBe(403);
+      expect((await clear(hostCookie)).status).toBe(200);
       expect(await listGameHistory(room.id)).toHaveLength(0);
     } finally {
       deleteRoom(room.id);

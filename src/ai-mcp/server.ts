@@ -39,6 +39,26 @@ const SEAT = Number(process.env.SGS_SEAT ?? '0');
 const PLAYER_COUNT = Number(process.env.SGS_PLAYER_COUNT ?? '2');
 const PLAYER_ID = process.env.SGS_PLAYER_ID ?? null;
 
+// 自动账号:MCP 座次需要登录才能进普通房(游客模式已移除)。
+// 默认按进程生成随机账号(注册一次,后续重启复用需显式配置);可用环境变量覆盖。
+//   SGS_MCP_USERNAME / SGS_MCP_PASSWORD: 固定账号(推荐编排脚本显式分配)
+//   SGS_MCP_TOKEN: 已有会话 token(跳过注册/登录)
+const MCP_AUTH = {
+  username: process.env.SGS_MCP_USERNAME,
+  password: process.env.SGS_MCP_PASSWORD,
+  token: process.env.SGS_MCP_TOKEN,
+};
+const autoAccount = (): { username: string; password: string } => ({
+  // username 上限 24 位:pid 最多 7 位数字,预留后缀空间
+  username: `ai-${String(process.pid).slice(-6)}-${Math.random().toString(36).slice(2, 8)}`,
+  password: cryptoRandomHex(12),
+});
+function cryptoRandomHex(n: number): string {
+  const bytes = new Uint8Array(n);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 function logErr(msg: string): void {
   process.stderr.write(`[sanguosha-mcp] ${msg}\n`);
 }
@@ -58,11 +78,18 @@ function buildRoomConfig(opts: { timeoutSec?: number; name?: string }, defaultNa
 }
 
 async function main(): Promise<void> {
+  // auth:显式配置优先;否则每进程生成随机自动账号(注册一次,token 随进程存活)
+  const auth = MCP_AUTH.token
+    ? { token: MCP_AUTH.token }
+    : MCP_AUTH.username && MCP_AUTH.password
+      ? { username: MCP_AUTH.username, password: MCP_AUTH.password }
+      : autoAccount();
   const hgc = new HeadlessGameClient(SERVER_URL, {
     onError: (e) => logErr(`WS error: ${e.message}`),
     onPhaseChange: (p) => logErr(`phase -> ${p}`),
     onGameOver: (w) => logErr(`game over: ${w}`),
-  });
+  }, auth);
+  logErr(`auth account: ${'username' in auth ? auth.username : '(token)'}`);
 
   let startedRole: StartedRole | null = null;
 

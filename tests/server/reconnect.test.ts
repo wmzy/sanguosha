@@ -36,6 +36,13 @@ function makeMultiplayerRoom(playerIds: string[]): { room: Room; sinks: Map<stri
     spectators: new Map(),
     viewGrants: new Map(),
     pendingViewRequests: new Map(),
+    roomType: 'quick',
+    chatUsage: new Map(),
+    chatHistory: [],
+    seats: playerIds.map((pid) => pid),
+    pendingSeatSwaps: new Map(),
+    passwordHash: null,
+    playerNames: new Map(playerIds.map((pid, i) => [pid, `玩家${i + 1}`])),
   } as unknown as Room;
   for (const pid of playerIds) {
     const sink = new FakeSink();

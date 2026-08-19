@@ -14,7 +14,7 @@ import type { ActionMsg } from '../types';
 import type { ChatMessage } from '../headless/types';
 import { createLogger } from '../utils/logger';
 import { apiFetch } from '../api/client';
-import { getPlayerId } from '../utils/playerIdentity';
+import { useAuth } from './useAuth';
 import { isRoomNotFound } from '../utils/roomErrors';
 import { useEventPlayback } from './useEventPlayback';
 import { appendIngestedEvents } from '../utils/appendIngestedEvents';
@@ -126,11 +126,14 @@ export interface MultiplayerRoom {
 export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   const [stage, setStage] = useState<MultiplayerStage>('lobby');
   const [roomId, setRoomId] = useState<string | null>(null);
-  // 门禁已确保身份设置;大厅阶段也需 playerId 供「我的」tab 过滤。
-  const [playerId, setPlayerId] = useState<string | null>(getPlayerId());
+  // 身份来自登录会话(RRequireAuth 门禁保证 user 已就绪):userId 即 playerId。
+  const auth = useAuth();
+  const playerId = auth.user?.id ?? null;
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   /** 从 HGC 同步的旁观者标志(joinAsSpectator 的 REST 响应立即生效,无需等 SSE room_state)。 */
   const [hgcIsSpectator, setHgcIsSpectator] = useState(false);
+  // 命令 effect 内同步旁观标志(闭包直调,避免依赖漂移)
+  const setSpectatorFlag = useCallback(setHgcIsSpectator, []);
   const [view, setView] = useState<GameView | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -264,10 +267,8 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
       // 连接身份事件驱动同步(HGC 在 REST 建房/加房响应、room_joined、role_changed 时回调),
       // 替代原先的 200ms getter 轮询。函数式 setState 避免闭包过期;空值不清空本地状态
       // (清空由 leaveRoom/player_kicked 显式负责),与原轮询语义一致。
-      onIdentityChange: ({ roomId: newRoomId, playerId: newPlayerId, isSpectator }) => {
+      onIdentityChange: ({ roomId: newRoomId }) => {
         if (newRoomId) setRoomId((prev) => (prev === newRoomId ? prev : newRoomId));
-        if (newPlayerId) setPlayerId((prev) => (prev === newPlayerId ? prev : newPlayerId));
-        setHgcIsSpectator(isSpectator);
       },
       onMessage: (msg: ServerMessage) => {
         // 再来一局:服务端 resetToLobby 广播 game_reset,清除结算界面回到准备阶段。
@@ -354,10 +355,9 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     hgcRef.current = hgc;
 
     // 按命令执行(连接命令在 HGC 内部排队,open 后 flush)
-    // playerId 取自本地身份(门禁已确保设置);未设置时 undefined → 服务端自动生成
-    const pid = getPlayerId() ?? undefined;
+    // playerId 不再本地传:服务端从会话(Cookie)解析 userId,body.playerId 已被忽略
     if (command.type === 'create') {
-      hgc.createRoom(command.name, command.maxPlayers, command.config, pid, command.roomType, command.password)
+      hgc.createRoom(command.name, command.maxPlayers, command.config, undefined, command.roomType, command.password)
         .catch((err) => {
           if (hgcRef.current !== hgc) return;
           const msg = err instanceof Error ? err.message : String(err);
@@ -373,7 +373,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         });
       setStage('waiting');
     } else if (command.type === 'join' || command.type === 'autoJoin') {
-      hgc.joinRoom(command.roomId, pid, command.password).catch((err) => {
+      hgc.joinRoom(command.roomId, undefined, command.password).catch((err) => {
         if (hgcRef.current !== hgc) return;
         const status = (err as { status?: number })?.status;
         const msg = err instanceof Error ? err.message : String(err);
@@ -404,7 +404,8 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
       });
       setStage('waiting');
     } else if (command.type === 'spectate') {
-      hgc.joinAsSpectator(command.roomId, pid, command.password).catch((err) => {
+      setSpectatorFlag(true);
+      hgc.joinAsSpectator(command.roomId, undefined, command.password).catch((err) => {
         if (hgcRef.current !== hgc) return;
         const status = (err as { status?: number })?.status;
         const msg = err instanceof Error ? err.message : String(err);
@@ -499,8 +500,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     setHgcIsSpectator(false);
     setView(null);
     setGameOver(null);
-    
-    setPlayerId(null);
+
     setChatMessages([]);
     setIncomingSeatSwap(null);
     playbackRef.current.reset(0);

@@ -1,6 +1,6 @@
 // tests/server/persistence.test.ts
 // 持久化层覆盖率补充:saveRoom/loadRoom 往返、sanitizeState、restoreFromLog、flushPendingWrites
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hono } from 'hono';
@@ -16,7 +16,13 @@ import {
   type PersistedRoom,
 } from '../../src/server/persistence';
 import { applyRestRoutes } from '../../src/server/rest';
+import { applyAuthRoutes } from '../../src/server/auth/routes';
+function applyAuthRoutesForTest(app: Hono): void {
+  applyAuthRoutes(app);
+}
 import { getRoom, createRoom } from '../../src/server/room';
+import { initRoomStore, closeRoomStore } from '../../src/server/roomStore';
+import { _resetForTests as resetLifecycles } from '../../src/server/lifecycles';
 import { gameSessions, playerRoomMap } from '../../src/server/registry';
 import { createGameState } from '../../src/engine/types';
 import type { GameState, PlayerState, Card } from '../../src/engine/types';
@@ -396,60 +402,115 @@ describe('server/persistence', () => {
   });
 
   // join REST: 已在房间中的玩家重新加入（刷新页面）不应被“房间已满”拒绝
+  // 游客模式移除后 join 需登录:注册临时用户带 Cookie 调用(需要内存 DB 支撑 auth)
   describe('POST /api/rooms/:id/join 已在房间中的玩家', () => {
     let app: Hono;
+
+    beforeAll(async () => {
+      await initRoomStore(':memory:');
+    });
+    afterAll(async () => {
+      await closeRoomStore();
+      resetLifecycles();
+    });
 
     beforeEach(() => {
       gameSessions.clear();
       playerRoomMap.clear();
       app = new Hono();
       applyRestRoutes(app);
+      applyAuthRoutesForTest(app);
     });
 
     it('满员时已有玩家重新 join 返回 200 而非 400', async () => {
-      const room = createRoom('测试', 2, 'host1', {
+      // host1 同时是登录用户(直接注册同名,userId 与显式 host 参数无关)
+      const reg = await app.fetch(
+        new Request('http://localhost/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'persistence_host', password: 'pass123' }),
+        }),
+      );
+      const { user } = (await reg.json()) as { user: { id: string } };
+      const cookie = reg.headers.get('set-cookie')!.split(';')[0];
+      const room = createRoom('测试', 2, user.id, {
         send() {},
       } as any);
       // 用 REST 加入第二个玩家使房间满员
+      const guestReg = await app.fetch(
+        new Request('http://localhost/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'persistence_guest', password: 'pass123' }),
+        }),
+      );
+      const guestCookie = guestReg.headers.get('set-cookie')!.split(';')[0];
       const joinRes = await app.fetch(
         new Request(`http://localhost/api/rooms/${room.id}/join`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId: 'guest1' }),
+          headers: { 'Content-Type': 'application/json', Cookie: guestCookie },
+          body: JSON.stringify({}),
         }),
       );
       expect(joinRes.status).toBe(200);
 
-      // host1 刷新页面重新 join → 应成功，不是“房间已满”
+      // 房主刷新页面重新 join → 应成功，不是“房间已满”
       const rejoinRes = await app.fetch(
         new Request(`http://localhost/api/rooms/${room.id}/join`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId: 'host1' }),
+          headers: { 'Content-Type': 'application/json', Cookie: cookie },
+          body: JSON.stringify({}),
         }),
       );
       expect(rejoinRes.status).toBe(200);
       const body = await rejoinRes.json();
-      expect(body.playerId).toBe('host1');
+      expect(body.playerId).toBe(user.id);
     });
 
     it('满员时新玩家 join 仍返回 400 房间已满', async () => {
-      const room = createRoom('测试', 2, 'host1', {
-        send() {},
-      } as any);
-      await app.fetch(
-        new Request(`http://localhost/api/rooms/${room.id}/join`, {
+      const reg = await app.fetch(
+        new Request('http://localhost/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId: 'guest1' }),
+          body: JSON.stringify({ username: 'persistence_host2', password: 'pass123' }),
         }),
       );
-      // 第三个新玩家
+      const cookie = reg.headers.get('set-cookie')!.split(';')[0];
+      const { user } = (await reg.json()) as { user: { id: string } };
+      const room = createRoom('测试', 2, user.id, {
+        send() {},
+      } as any);
+      // host 已占 1 座;guest2 加入占第 2 座 → 满员
+      const guestReg = await app.fetch(
+        new Request('http://localhost/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'persistence_guest2', password: 'pass123' }),
+        }),
+      );
+      const guestCookie = guestReg.headers.get('set-cookie')!.split(';')[0];
+      const joinGuest = await app.fetch(
+        new Request(`http://localhost/api/rooms/${room.id}/join`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: guestCookie },
+          body: JSON.stringify({}),
+        }),
+      );
+      expect(joinGuest.status).toBe(200);
+      // 第三个新玩家 → 房间已满
+      const guest3Reg = await app.fetch(
+        new Request('http://localhost/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: 'persistence_guest3', password: 'pass123' }),
+        }),
+      );
+      const guest3Cookie = guest3Reg.headers.get('set-cookie')!.split(';')[0];
       const res = await app.fetch(
         new Request(`http://localhost/api/rooms/${room.id}/join`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId: 'newbie' }),
+          headers: { 'Content-Type': 'application/json', Cookie: guest3Cookie },
+          body: JSON.stringify({}),
         }),
       );
       expect(res.status).toBe(400);

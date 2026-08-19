@@ -9,6 +9,7 @@ import { OnboardingGuide } from '../../components/OnboardingGuide';
 import { RoomHistoryPanel } from '../../components/RoomHistoryPanel';
 import { ChatConfigSection } from '../../components/ChatConfigSection';
 import { copyToClipboard } from '../../utils/clipboard';
+import { memberName } from '../../utils/memberNames';
 import { btnStyle, colors } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
 import { ErrorToast } from './ErrorToast';
@@ -137,11 +138,11 @@ export function WaitingStage({ history }: WaitingStageProps) {
             </div>
           </div>
           <div className={readyInfo}>
-            当前用户：{mp.playerId ?? '未知'}{mp.isHost ? '（房主）' : ''}
+            当前用户：{memberName(mp.playerId, mp.roomState?.playerNames)}{mp.isHost ? '（房主）' : ''}
           </div>
           {mp.roomState?.hostId && !mp.isHost && (
             <div className={readyInfo} style={{ fontSize: '13px', color: colors.text.muted }}>
-              房主：{mp.roomState.hostId}
+              房主：{memberName(mp.roomState.hostId, mp.roomState?.playerNames)}
             </div>
           )}
           <RoomConfigSection
@@ -178,7 +179,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
                       padding: '2px 4px 2px 10px',
                     }}
                   >
-                    {sid.slice(0, 6)}
+                    {memberName(sid, mp.roomState?.playerNames)}
                     <button
                       className={btnStyle}
                       title="踢出该旁观者"
@@ -196,7 +197,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
                         padding: 0,
                       } as React.CSSProperties}
                       onClick={() => {
-                        if (window.confirm(`确定将旁观者 ${sid.slice(0, 8)} 踢出房间吗？`)) {
+                        if (window.confirm(`确定将旁观者  踢出房间吗？`)) {
                           mp.kickPlayer(sid);
                         }
                       }}
@@ -221,7 +222,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
           {/* 待处理申请提示 */}
           {Object.entries(pendingRequests).map(([sid, seat]) => (
             <div key={sid} style={{ background: colors.bg.input, borderRadius: '8px', padding: '10px', marginBottom: '8px', fontSize: '13px' }}>
-              <span>{sid.slice(0, 8)} 申请查看 P{seat} 视角</span>
+              <span>{memberName(sid, mp.roomState?.playerNames)} 申请查看 P{seat} 视角</span>
               <button
                 className={btnStyle}
                 style={{ '--btn-bg': colors.accent.green, '--btn-padding': '4px 12px', '--btn-font-size': '12px', marginLeft: '8px' } as React.CSSProperties}

@@ -11,6 +11,7 @@ import type { ConnectionSink } from './connection';
 import { getRoom, removeSpectator, leaveRoom } from './room';
 import { broadcastMessage } from './room';
 import { getChatHistory, buildRoomState, ensureSeatOnReconnect } from './room';
+import { getSessionUser, extractSessionToken } from './auth/guard';
 import { gameSessions, playerRoomMap } from './registry';
 import { generatePlayerId } from './utils';
 import { createLogger } from './logger';
@@ -108,7 +109,23 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
     return c.json({ error: '房间不存在' }, 404);
   }
 
-  const playerId: string = queryPlayerId ?? generatePlayerId();
+  // 身份解析:非调试房间必须携带有效会话(Cookie/Bearer/?sgs_token),
+  // playerId 一律取会话 userId;调试房间保持游客模型(queryPlayerId 或自动生成)。
+  let playerId: string;
+  let displayName: string | null = null;
+  if (!room.isDebug) {
+    if (!extractSessionToken(c)) {
+      return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+    }
+    const user = await getSessionUser(c);
+    if (!user) {
+      return c.json({ error: '登录已过期，请重新登录', code: 'AUTH_REQUIRED' }, 401);
+    }
+    playerId = user.id;
+    displayName = user.displayName;
+  } else {
+    playerId = queryPlayerId ?? generatePlayerId();
+  }
 
   return streamSSE(c, async (stream) => {
     try {
@@ -125,6 +142,7 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
       // 旁观者：注册 sink 到 spectators（替换 REST 入口时的 null sink）
       room.spectators.set(playerId, sink);
       playerRoomMap.set(playerId, roomId);
+      if (displayName) room.playerNames.set(playerId, displayName);
 
       log.info('SSE 旁观者连接建立', { roomId, playerId });
 
@@ -170,6 +188,7 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
       // 玩家连接（现有逻辑）
       room.players.set(playerId, sink);
       playerRoomMap.set(playerId, roomId);
+      if (displayName) room.playerNames.set(playerId, displayName);
 
       // 修复 players/seats 一致性:服务器重启后 DB 不恢复 seats,客户端重连只走 SSE 时
       // players.set 却不分配座次,导致 "players 满 / seats 空" 的幽灵连接锁死房间。

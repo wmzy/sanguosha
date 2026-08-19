@@ -120,6 +120,8 @@ function makeRoom(): Room {
     chatHistory: [],
     seats: [null, null, null, null],
     pendingSeatSwaps: new Map(),
+    playerNames: new Map(),
+    passwordHash: null,
   } as unknown as Room;
 }
 function getState(session: GameSession): GameState {

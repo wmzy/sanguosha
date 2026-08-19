@@ -18,6 +18,16 @@ import { decideAutoSkip, DEFAULT_PREFS, type AutoSkipPrefs } from '../utils/auto
 import { getActionsForPlayer, registerSkillActions } from '../skillActionRegistry';
 import type { ClientPhase, HeadlessCallbacks, AvailableAction, RoomState, ReconnectState } from './types';
 
+/** 程序化客户端认证选项。
+ *  - token: 已有会话 token(优先,直接复用)
+ *  - username/password: 自动账号——无 token 时注册(已存在则登录)换取 token。
+ *  浏览器(真实用户)不传 auth:Cookie 会话自动携带。 */
+export interface HeadlessAuthOptions {
+  token?: string;
+  username?: string;
+  password?: string;
+}
+
 export class HeadlessGameClient {
   private eventSource: EventSource | null = null;
   private _view: GameView | null = null;
@@ -57,7 +67,7 @@ export class HeadlessGameClient {
   /** 延迟自动跳过定时器(view 推进到新窗口时清理,避免旧 skip 误作用于新 pending)。 */
   private _autoSkipTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(serverUrl: string, callbacks: HeadlessCallbacks = {}) {
+  constructor(serverUrl: string, callbacks: HeadlessCallbacks = {}, auth?: HeadlessAuthOptions) {
     // 兼容旧 WS URL：ws://→http://, wss://→https://, 去掉 /ws 后缀
     let url = serverUrl;
     if (url.startsWith('ws://')) url = `http://${  url.slice(5)}`;
@@ -65,7 +75,14 @@ export class HeadlessGameClient {
     if (url.endsWith('/ws')) url = url.slice(0, -3);
     this.baseUrl = url;
     this.callbacks = callbacks;
+    this.auth = auth ?? null;
   }
+
+  /** 程序化认证配置(可选;浏览器走 Cookie)。 */
+  private auth: HeadlessAuthOptions | null = null;
+  /** 已解析的会话 token(ensureAuth 后有值)。 */
+  private authToken: string | null = null;
+  private authInitPromise: Promise<void> | null = null;
 
   get phase(): ClientPhase {
     return this._phase;
@@ -155,6 +172,57 @@ export class HeadlessGameClient {
     throw err;
   }
 
+  /** 程序化认证:换取/复用会话 token(幂等,并发安全)。
+   *  无 auth 配置时同步短路(不引入微任务,保持浏览器场景 createRoom 同步发出 fetch)。 */
+  private ensureAuth(): Promise<void> {
+    if (!this.auth || this.authToken) return Promise.resolve();
+    if (!this.authInitPromise) {
+      this.authInitPromise = (async () => {
+        const { username, password, token } = this.auth!;
+        if (token) {
+          this.authToken = token;
+          return;
+        }
+        if (!username || !password) {
+          throw new Error('auth 配置不完整:需要 token 或 username/password');
+        }
+        // 注册(新账号);「用户名已存在」时回退登录
+        const authOnce = async (path: 'register' | 'login'): Promise<void> => {
+          const resp = await fetch(`${this.baseUrl}/api/auth/${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+          });
+          const body = (await resp.json().catch(() => ({}))) as { token?: string; error?: string };
+          if (!resp.ok || !body.token) {
+            throw new Error(body.error ?? `认证失败(${resp.status})`);
+          }
+          this.authToken = body.token;
+        };
+        try {
+          await authOnce('register');
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (!/已存在/.test(msg)) throw err;
+          await authOnce('login');
+        }
+      })().catch((err) => {
+        const e = err instanceof Error ? err : new Error(String(err));
+        this.callbacks.onError?.(e);
+        this.authInitPromise = null;
+        throw e;
+      });
+    }
+    return this.authInitPromise;
+  }
+
+  /** 带 auth 头的 fetch(有 token 时)。 */
+  private authFetch(url: string, init: RequestInit = {}): Promise<Response> {
+    const headers = new Headers(init.headers ?? {});
+    if (this.authToken) headers.set('Authorization', `Bearer ${this.authToken}`);
+    return fetch(url, { ...init, headers });
+  }
+
   /** 创建 debug 房间并自动 join 0 号座。
    *  playerId 可选:指定则用作本座次身份,否则由服务端自动生成。 */
   async createDebugRoom(playerCount: number, config?: RoomConfig, playerId?: string): Promise<void> {
@@ -203,8 +271,9 @@ export class HeadlessGameClient {
   async createRoom(name: string, maxPlayers: number, config?: RoomConfig, playerId?: string, roomType?: 'normal' | 'quick', password?: string): Promise<void> {
     this._debugMode = false;
     this.intentionalDisconnect = false;
+    if (this.auth) await this.ensureAuth();
 
-    const resp = await fetch(`${this.baseUrl}/api/rooms`, {
+    const resp = await this.authFetch(`${this.baseUrl}/api/rooms`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, maxPlayers, config, playerId, roomType, password: password ?? undefined }),
@@ -223,8 +292,9 @@ export class HeadlessGameClient {
     this._debugMode = false;
     this.updateIdentity({ roomId });
     this.intentionalDisconnect = false;
+    if (this.auth) await this.ensureAuth();
 
-    const resp = await fetch(`${this.baseUrl}/api/rooms/${roomId}/join`, {
+    const resp = await this.authFetch(`${this.baseUrl}/api/rooms/${roomId}/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId, password: password ?? undefined }),
@@ -242,8 +312,9 @@ export class HeadlessGameClient {
     this._debugMode = false;
     this.updateIdentity({ roomId });
     this.intentionalDisconnect = false;
+    if (this.auth) await this.ensureAuth();
 
-    const resp = await fetch(`${this.baseUrl}/api/rooms/${roomId}/join-spectator`, {
+    const resp = await this.authFetch(`${this.baseUrl}/api/rooms/${roomId}/join-spectator`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId, password: password ?? undefined }),
@@ -257,12 +328,15 @@ export class HeadlessGameClient {
     this.setPhase('lobby');
   }
 
-  /** 建立 SSE 流接收服务端推送 */
+  /** 建立 SSE 流接收服务端推送。
+   *  程序化客户端(EventSource 无法带自定义头)把会话 token 放 ?sgs_token=;
+   *  浏览器走 Cookie。 */
   private openStream() {
     if (this.intentionalDisconnect) return;
     void this.ensureEventSource().then((EventSourceImpl) => {
       if (this.intentionalDisconnect || !this._roomId || !this._playerId) return;
-      const url = `${this.baseUrl}/api/rooms/${this._roomId}/stream?playerId=${encodeURIComponent(this._playerId)}`;
+      let url = `${this.baseUrl}/api/rooms/${this._roomId}/stream?playerId=${encodeURIComponent(this._playerId)}`;
+      if (this.authToken) url += `&sgs_token=${encodeURIComponent(this.authToken)}`;
       this.eventSource = new EventSourceImpl(url);
       this.attachEventSourceHandlers();
     });

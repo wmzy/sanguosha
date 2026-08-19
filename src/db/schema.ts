@@ -18,6 +18,8 @@ export const rooms = pgTable('rooms', {
   config: jsonb('config').notNull().$type<RoomConfig>(),
   /** 进房密码哈希(scrypt);null=无密码。永不存明文、永不下发客户端。 */
   passwordHash: text('password_hash'),
+  /** 成员显示名:userId → 昵称(重启恢复房间成员名单用) */
+  playerNames: jsonb('player_names').notNull().default({}).$type<Record<string, string>>(),
   createdAt: bigint('created_at', { mode: 'number' }).notNull(),
   updatedAt: bigint('updated_at', { mode: 'number' }).notNull(),
 });

@@ -94,6 +94,8 @@ async function restoreNormalRoomsFromDb(): Promise<void> {
       pendingSeatSwaps: new Map(),
       // 密码哈希随房间元数据持久化,重启后密码继续生效
       passwordHash: row.passwordHash ?? null,
+      // 成员显示名随房间元数据持久化(重启后房间内名字仍可显示)
+      playerNames: new Map(Object.entries(row.playerNames ?? {})),
     };
     addRoom(room);
     log.info(`恢复普通房间 ${row.id}（${row.name}，状态: ${row.status}）`);
@@ -193,6 +195,7 @@ async function restorePersistedRooms(): Promise<void> {
         seats: restoredSeats,
         pendingSeatSwaps: new Map(),
         passwordHash: null,
+        playerNames: new Map(),
       };
       // 复用 existingRoom(normal 房间从 DB 恢复)时,DB schema 不存 seats,
       // existingRoom.seats 是恢复时初始化的全 null 数组。必须用 .json 的 seats 覆盖,

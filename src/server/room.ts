@@ -37,6 +37,9 @@ export interface Room {
   passwordHash: string | null;
   /** 座位表：seats[i] = 座次 i 的 playerId，null=空座。长度始终 = maxPlayers */
   seats: (string | null)[];
+  /** 成员显示名:playerId → 用户昵称(登录用户 displayName;调试房间不维护)。
+   *  playerId 是稳定 userId,展示层一律经此映射取名。 */
+  playerNames: Map<string, string>;
   /** 待处理座位交换请求：requesterId → { targetSeat, expiresAt, timer } */
   pendingSeatSwaps: Map<string, { targetSeat: number; expiresAt: number; timer: ReturnType<typeof setTimeout> }>;
 }
@@ -81,6 +84,7 @@ export function buildRoomState(room: Room): ServerMessage {
     pendingViewRequests: Object.fromEntries(room.pendingViewRequests),
     roomType: room.roomType,
     seats: [...room.seats],
+    playerNames: Object.fromEntries(room.playerNames),
     pendingSeatSwaps: Object.fromEntries(
       [...room.pendingSeatSwaps.entries()].map(([id, v]) => [
         id,
@@ -116,6 +120,7 @@ export function createRoom(
   config?: RoomConfig,
   roomType: 'normal' | 'quick' = 'quick',
   passwordHash: string | null = null,
+  hostName?: string | null,
 ): Room {
   const id = generateRoomId();
   const seats: (string | null)[] = Array(clampPlayers(maxPlayers)).fill(null);
@@ -138,6 +143,7 @@ export function createRoom(
     seats,
     pendingSeatSwaps: new Map(),
     passwordHash,
+    playerNames: hostName ? new Map([[hostId, hostName]]) : new Map(),
   };
   roomList.set(id, room);
   roomChangeHandler?.(room, 'create');
@@ -167,6 +173,7 @@ export function createDebugRoom(name: string, maxPlayers: number, config?: RoomC
     seats: Array(clampPlayers(maxPlayers)).fill(null),
     pendingSeatSwaps: new Map(),
     passwordHash: null,
+    playerNames: new Map(),
   };
   roomList.set(id, room);
   return room;
@@ -189,9 +196,16 @@ function clearSpectatorMembership(room: Room, playerId: string): void {
   room.pendingViewRequests.delete(playerId);
 }
 
-export function joinRoom(roomId: string, playerId: string, sink: ConnectionSink): Room | null {
+export function joinRoom(
+  roomId: string,
+  playerId: string,
+  sink: ConnectionSink,
+  displayName?: string | null,
+): Room | null {
   const room = roomList.get(roomId);
   if (!room) return null;
+  // 显示名在所有路径(复用座位/新入座)统一刷新——重连时若用户已改名则以最新为准
+  if (displayName) room.playerNames.set(playerId, displayName);
   if (room.status !== '等待中') return null;
   if (room.players.has(playerId)) return null;
 
@@ -302,6 +316,8 @@ export function leaveRoom(roomId: string, playerId: string): Room | null {
   if (!room) return null;
 
   removePlayerMembership(room, playerId);
+  // 仍在旁观(如玩家身份被顶替后转旁观)则保留显示名;彻底离开才清除
+  if (!room.spectators.has(playerId)) room.playerNames.delete(playerId);
 
   // 普通房间: 不自动销毁, 不自动换主。仅同步 DB。
   if (room.roomType === 'normal') {
@@ -356,6 +372,7 @@ export function kickPlayer(
     room.viewGrants.delete(targetPlayerId);
     room.pendingViewRequests.delete(targetPlayerId);
   }
+  room.playerNames.delete(targetPlayerId);
 
   roomChangeHandler?.(room, 'update');
   return { room, kickedSink };
@@ -471,6 +488,7 @@ export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
       // seats 在 SSE 断线后仍保留(仅 leaveRoom 清理),用于判断"玩家是否在房间中"
       playerIds: room.seats.filter((s): s is string => s !== null),
       hasPassword: room.passwordHash !== null,
+      playerNames: Object.fromEntries(room.playerNames),
     });
   }
   return result;
@@ -541,6 +559,16 @@ export function setRoomChangeHandler(
 /** 外部直接改 Room 字段后(如 rest.ts 改 passwordHash)触发持久化/广播。 */
 export function notifyRoomChanged(room: Room, action: 'create' | 'update' | 'delete'): void {
   roomChangeHandler?.(room, action);
+}
+
+/** 用户改名后同步所有房间内的显示名并广播 room_state(个人页改名 → 房间内实时生效)。 */
+export function applyDisplayName(userId: string, displayName: string): void {
+  for (const room of roomList.values()) {
+    if (!room.playerNames.has(userId)) continue;
+    room.playerNames.set(userId, displayName);
+    broadcastMessage(room, buildRoomState(room));
+    if (room.roomType === 'normal') roomChangeHandler?.(room, 'update');
+  }
 }
 
 // ── 座位管理 ──
@@ -653,7 +681,12 @@ function expireSeatSwap(roomId: string, requesterId: string): void {
 /** 以旁观者身份加入房间。不占 maxPlayers 名额。
  *  身份互斥：若该 playerId 当前是玩家（占座），先释放座位转为旁观，避免同一个人
  *  同时存在于 players 和 spectators（刷新/autoJoin 降级旁观场景常见）。 */
-export function joinAsSpectator(roomId: string, spectatorId: string, sink: ConnectionSink): Room | null {
+export function joinAsSpectator(
+  roomId: string,
+  spectatorId: string,
+  sink: ConnectionSink,
+  displayName?: string | null,
+): Room | null {
   const room = roomList.get(roomId);
   if (!room) return null;
   // 清理残留的玩家身份：释放座位、移出 players/ready/交换请求
@@ -661,6 +694,7 @@ export function joinAsSpectator(roomId: string, spectatorId: string, sink: Conne
     removePlayerMembership(room, spectatorId);
   }
   room.spectators.set(spectatorId, sink);
+  if (displayName) room.playerNames.set(spectatorId, displayName);
   return room;
 }
 
@@ -671,6 +705,8 @@ export function removeSpectator(roomId: string, spectatorId: string): Room | nul
   room.spectators.delete(spectatorId);
   room.viewGrants.delete(spectatorId);
   room.pendingViewRequests.delete(spectatorId);
+  // 仍在座位上(身份互斥的另一半不存在,防御性判断)则保留;否则彻底清除
+  if (!room.seats.includes(spectatorId)) room.playerNames.delete(spectatorId);
   return room;
 }
 

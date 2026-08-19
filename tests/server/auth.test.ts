@@ -1,6 +1,8 @@
 // tests/server/auth.test.ts — 用户认证模块测试(注册/登录/会话/GitHub upsert)
 // 与房间密码端点测试(建房带密码/加房验证/旁观验证/改密)。
-// 来源:2026-08-17 用户登录认证 + 房间密码需求;后续相关回归用例归并到此文件。
+// 2026-08-17 二次扩展:游客模式移除——房间身份强制登录(playerId=userId)、
+// playerNames 显示名投影、改名传播、profile/password 端点、SSE sgs_token。
+// 来源:用户登录认证 + 房间密码 + 移除游客模式需求;后续相关回归用例归并到此文件。
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Hono } from 'hono';
 import { applyAuthRoutes } from '../../src/server/auth/routes';
@@ -10,9 +12,18 @@ import {
   closeRoomStore,
   loadAllRoomsFromDb,
 } from '../../src/server/roomStore';
-import { getRoom } from '../../src/server/room';
+import { getRoom, buildRoomState, applyDisplayName } from '../../src/server/room';
 import { hashPassword, verifyPassword } from '../../src/server/auth/password';
-import { upsertGithubUser, getUserByToken, createSession, createUser, verifyLogin, deleteSession } from '../../src/server/auth/store';
+import {
+  upsertGithubUser,
+  getUserByToken,
+  createSession,
+  createUser,
+  verifyLogin,
+  deleteSession,
+  updateDisplayName,
+  changePassword,
+} from '../../src/server/auth/store';
 import { _resetRateLimitState } from '../../src/server/middleware/rate-limit';
 import { _resetForTests as resetLifecycles } from '../../src/server/lifecycles';
 
@@ -21,6 +32,23 @@ function makeApp(): Hono {
   applyAuthRoutes(app);
   applyRestRoutes(app);
   return app;
+}
+
+/** 注册一个用户并返回 { cookie, token, userId } — 房间操作的登录上下文。 */
+async function registerUser(
+  app: Hono,
+  username: string,
+): Promise<{ cookie: string; token: string; userId: string; displayName: string }> {
+  const reg = await app.request('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password: 'pass123' }),
+  });
+  expect(reg.status).toBe(200);
+  const setCookie = reg.headers.get('set-cookie')!;
+  const cookie = setCookie.split(';')[0];
+  const body = (await reg.json()) as { token: string; user: { id: string; displayName: string } };
+  return { cookie, token: body.token, userId: body.user.id, displayName: body.user.displayName };
 }
 
 beforeAll(async () => {
@@ -130,12 +158,35 @@ describe('auth/store', () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.user.username).not.toBe('taken_name');
   });
+
+  it('改名:合法更新,非法昵称拒绝', async () => {
+    const u = await createUser('rename_user', 'pass123');
+    expect(u.ok).toBe(true);
+    if (!u.ok) return;
+    const ok = await updateDisplayName(u.user.id, '新昵称');
+    expect(ok?.displayName).toBe('新昵称');
+    expect(await updateDisplayName(u.user.id, '')).toBeNull();
+    expect(await updateDisplayName(u.user.id, '带 空格')).toBeNull();
+    expect(await updateDisplayName(u.user.id, 'x'.repeat(25))).toBeNull();
+  });
+
+  it('改密:旧密码校验,新密码生效', async () => {
+    const u = await createUser('pwchange_user', 'old1234');
+    expect(u.ok).toBe(true);
+    if (!u.ok) return;
+    const bad = await changePassword(u.user.id, 'wrong000', 'new1234');
+    expect(bad.ok === false && bad.error === '旧密码错误').toBe(true);
+    const ok = await changePassword(u.user.id, 'old1234', 'new1234');
+    expect(ok.ok).toBe(true);
+    const relogin = await verifyLogin('pwchange_user', 'new1234');
+    expect(relogin.ok).toBe(true);
+  });
 });
 
 // ── HTTP 路由 ──
 
 describe('auth/routes', () => {
-  it('注册返回 Set-Cookie 且 /me 恢复登录态', async () => {
+  it('注册返回 Set-Cookie + token,且 /me 恢复登录态', async () => {
     const app = makeApp();
     const reg = await app.request('/api/auth/register', {
       method: 'POST',
@@ -146,6 +197,9 @@ describe('auth/routes', () => {
     const cookie = reg.headers.get('set-cookie');
     expect(cookie).toContain('sgs_session=');
     expect(cookie).toContain('HttpOnly');
+    // 程序化通道:token 也在响应体(HGC/MCP 走 Bearer)
+    const body = (await reg.json()) as { token: string };
+    expect(body.token).toMatch(/^[0-9a-f]+$/);
 
     const me = await app.request('/api/auth/me', {
       headers: { Cookie: cookie!.split(';')[0] },
@@ -197,6 +251,154 @@ describe('auth/routes', () => {
     expect(res.status).toBe(503);
     if (prevId) process.env.GITHUB_CLIENT_ID = prevId;
   });
+
+  it('PATCH /profile 改名,Bearer token 可用', async () => {
+    const app = makeApp();
+    const { token } = await registerUser(app, 'profile_user');
+    const res = await app.request('/api/auth/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ displayName: '个人页改名' }),
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { user: { displayName: string } }).user.displayName).toBe('个人页改名');
+  });
+
+  it('PUT /password 改密:旧密码错误 400', async () => {
+    const app = makeApp();
+    const { cookie } = await registerUser(app, 'pwroute_user');
+    const res = await app.request('/api/auth/password', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ oldPassword: 'nope123', newPassword: 'new12345' }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+// ── 房间身份强制(游客模式移除) ──
+
+describe('房间登录强制', () => {
+  it('未登录建房/加入/旁观全部 401', async () => {
+    const app = makeApp();
+    const created = await app.request('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '锁', maxPlayers: 2 }),
+    });
+    expect(created.status).toBe(401);
+    expect(((await created.json()) as { code?: string }).code).toBe('AUTH_REQUIRED');
+
+    // 假装带 playerId 的游客加入也被拒
+    const join = await app.request('/api/rooms/XXXXXX/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: 'guest' }),
+    });
+    expect(join.status).toBe(401);
+
+    const spectate = await app.request('/api/rooms/XXXXXX/join-spectator', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: 'guest' }),
+    });
+    expect(spectate.status).toBe(401);
+  });
+
+  it('建房 playerId = userId,显示名投影 playerNames', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'roomhost1');
+    const created = await app.request('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ name: '身份房', maxPlayers: 4 }),
+    });
+    expect(created.status).toBe(200);
+    const { roomId, playerId, playerName } = (await created.json()) as {
+      roomId: string;
+      playerId: string;
+      playerName: string;
+    };
+    expect(playerId).toBe(host.userId);
+    expect(playerName).toBe(host.displayName);
+
+    // room_state 与列表投影 playerNames
+    const state = buildRoomState(getRoom(roomId)!) as {
+      playerNames?: Record<string, string>;
+    };
+    expect(state.playerNames?.[host.userId]).toBe(host.displayName);
+    const list = (await (
+      await app.request('/api/rooms?type=multiplayer')
+    ).json()) as Array<{ id: string; playerNames?: Record<string, string> }>;
+    const item = list.find((r) => r.id === roomId);
+    expect(item?.playerNames?.[host.userId]).toBe(host.displayName);
+  });
+
+  it('伪造 body.playerId 无效:加入者身份恒为会话用户', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'roomhost2');
+    const guest = await registerUser(app, 'roomguest2');
+    const { roomId } = (await (
+      await app.request('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '防伪造', maxPlayers: 4 }),
+      })
+    ).json()) as { roomId: string };
+
+    // 声称自己是别人,服务端忽略
+    const joined = await app.request(`/api/rooms/${roomId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: guest.cookie },
+      body: JSON.stringify({ playerId: 'someone-else' }),
+    });
+    expect(joined.status).toBe(200);
+    const body = (await joined.json()) as { playerId: string };
+    expect(body.playerId).toBe(guest.userId);
+    const room = getRoom(roomId)!;
+    expect(room.seats.includes(guest.userId)).toBe(true);
+    expect(room.seats.includes('someone-else')).toBe(false);
+    expect(room.playerNames.get(guest.userId)).toBe(guest.displayName);
+  });
+
+  it('Bearer token 与 Cookie 等价(程序化通道)', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'bearerhost');
+    const created = await app.request('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${host.token}` },
+      body: JSON.stringify({ name: 'Bearer 房', maxPlayers: 2 }),
+    });
+    expect(created.status).toBe(200);
+    const { playerId } = (await created.json()) as { playerId: string };
+    expect(playerId).toBe(host.userId);
+  });
+
+  it('改名传播到已加入房间(room_state 广播由调用方断言,此处断言数据面)', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'renamehost');
+    const { roomId } = (await (
+      await app.request('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '改名房', maxPlayers: 2 }),
+      })
+    ).json()) as { roomId: string };
+
+    // 经 REST 改名(会触发 applyDisplayName)
+    const renamed = await app.request('/api/auth/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ displayName: '改名后主机' }),
+    });
+    expect(renamed.status).toBe(200);
+
+    const room = getRoom(roomId)!;
+    expect(room.playerNames.get(host.userId)).toBe('改名后主机');
+    // applyDisplayName 直接调用等价(数据面)
+    applyDisplayName(host.userId, '再次改名');
+    expect(getRoom(roomId)!.playerNames.get(host.userId)).toBe('再次改名');
+  });
 });
 
 // ── 房间密码端点 ──
@@ -204,10 +406,11 @@ describe('auth/routes', () => {
 describe('房间密码', () => {
   it('建房带密码 → 列表投影 hasPassword,哈希不出现在响应', async () => {
     const app = makeApp();
+    const host = await registerUser(app, 'pw_host');
     const created = await app.request('/api/rooms', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: '密码房', maxPlayers: 4, playerId: 'pw-host', password: '1234' }),
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ name: '密码房', maxPlayers: 4, password: '1234' }),
     });
     expect(created.status).toBe(200);
     const { roomId } = (await created.json()) as { roomId: string };
@@ -227,159 +430,174 @@ describe('房间密码', () => {
 
   it('无密码直接加入;有密码缺失/错误 403,正确放行', async () => {
     const app = makeApp();
+    const host = await registerUser(app, 'free_host');
+    const guest = await registerUser(app, 'pw_guest');
 
     // 无密码房
-    const free = await (
+    const free = (await (
       await app.request('/api/rooms', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: '自由房', maxPlayers: 4, playerId: 'free-host' }),
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '自由房', maxPlayers: 4 }),
       })
-    ).json() as { roomId: string };
+    ).json()) as { roomId: string };
     const joinFree = await app.request(`/api/rooms/${free.roomId}/join`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'guest1' }),
+      headers: { 'Content-Type': 'application/json', Cookie: guest.cookie },
+      body: JSON.stringify({}),
     });
     expect(joinFree.status).toBe(200);
 
     // 有密码房
-    const locked = await (
+    const locked = (await (
       await app.request('/api/rooms', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: '锁房', maxPlayers: 4, playerId: 'lock-host', password: '九个密码9' }),
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '锁房', maxPlayers: 4, password: '九个密码9' }),
       })
-    ).json() as { roomId: string };
+    ).json()) as { roomId: string };
 
     const noPw = await app.request(`/api/rooms/${locked.roomId}/join`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'guest2' }),
+      headers: { 'Content-Type': 'application/json', Cookie: guest.cookie },
+      body: JSON.stringify({}),
     });
     expect(noPw.status).toBe(403);
     expect(((await noPw.json()) as { code?: string }).code).toBe('ROOM_PASSWORD_REQUIRED');
 
     const wrongPw = await app.request(`/api/rooms/${locked.roomId}/join`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'guest2', password: 'wrong' }),
+      headers: { 'Content-Type': 'application/json', Cookie: guest.cookie },
+      body: JSON.stringify({ password: 'wrong' }),
     });
     expect(wrongPw.status).toBe(403);
 
     const okPw = await app.request(`/api/rooms/${locked.roomId}/join`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'guest2', password: '九个密码9' }),
+      headers: { 'Content-Type': 'application/json', Cookie: guest.cookie },
+      body: JSON.stringify({ password: '九个密码9' }),
     });
     expect(okPw.status).toBe(200);
 
     // 成员重连免密
     const rejoin = await app.request(`/api/rooms/${locked.roomId}/join`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'guest2' }),
+      headers: { 'Content-Type': 'application/json', Cookie: guest.cookie },
+      body: JSON.stringify({}),
     });
     expect(rejoin.status).toBe(200);
   });
 
   it('旁观同样需要密码,已入房旁观者免密', async () => {
     const app = makeApp();
-    const locked = await (
+    const host = await registerUser(app, 'sp_host');
+    const spec = await registerUser(app, 'sp_guest');
+    const locked = (await (
       await app.request('/api/rooms', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: '旁观锁房', maxPlayers: 4, playerId: 'sp-host', password: 'sp1234' }),
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '旁观锁房', maxPlayers: 4, password: 'sp1234' }),
       })
-    ).json() as { roomId: string };
+    ).json()) as { roomId: string };
 
     const noPw = await app.request(`/api/rooms/${locked.roomId}/join-spectator`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'spec1' }),
+      headers: { 'Content-Type': 'application/json', Cookie: spec.cookie },
+      body: JSON.stringify({}),
     });
     expect(noPw.status).toBe(403);
 
     const okPw = await app.request(`/api/rooms/${locked.roomId}/join-spectator`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'spec1', password: 'sp1234' }),
+      headers: { 'Content-Type': 'application/json', Cookie: spec.cookie },
+      body: JSON.stringify({ password: 'sp1234' }),
     });
     expect(okPw.status).toBe(200);
 
     // 已在 spectators 中(重连)免密
     const rejoin = await app.request(`/api/rooms/${locked.roomId}/join-spectator`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'spec1' }),
+      headers: { 'Content-Type': 'application/json', Cookie: spec.cookie },
+      body: JSON.stringify({}),
     });
     expect(rejoin.status).toBe(200);
   });
 
-  it('房主可改密/清除密码,非房主 403', async () => {
+  it('房主可改密/清除密码,非房主 403(伪造 playerId 无效)', async () => {
     const app = makeApp();
-    const locked = await (
+    const host = await registerUser(app, 'mod_host');
+    const intruder = await registerUser(app, 'mod_intruder');
+    const locked = (await (
       await app.request('/api/rooms', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: '改密房', maxPlayers: 4, playerId: 'mod-host', password: 'old123' }),
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '改密房', maxPlayers: 4, password: 'old123' }),
       })
-    ).json() as { roomId: string };
+    ).json()) as { roomId: string };
 
+    // 他人声称是房主(伪造 body.playerId = host.userId)仍被拒
     const byGuest = await app.request(`/api/rooms/${locked.roomId}/password`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'intruder', password: 'new123' }),
+      headers: { 'Content-Type': 'application/json', Cookie: intruder.cookie },
+      body: JSON.stringify({ playerId: host.userId, password: 'new123' }),
     });
     expect(byGuest.status).toBe(403);
 
     const change = await app.request(`/api/rooms/${locked.roomId}/password`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'mod-host', password: 'new456' }),
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ password: 'new456' }),
     });
     expect(change.status).toBe(200);
 
     // 旧密码失效
     const oldPw = await app.request(`/api/rooms/${locked.roomId}/join`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'guest3', password: 'old123' }),
+      headers: { 'Content-Type': 'application/json', Cookie: intruder.cookie },
+      body: JSON.stringify({ password: 'old123' }),
     });
     expect(oldPw.status).toBe(403);
     const newPw = await app.request(`/api/rooms/${locked.roomId}/join`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'guest3', password: 'new456' }),
+      headers: { 'Content-Type': 'application/json', Cookie: intruder.cookie },
+      body: JSON.stringify({ password: 'new456' }),
     });
     expect(newPw.status).toBe(200);
 
     // 清除密码
     const clear = await app.request(`/api/rooms/${locked.roomId}/password`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'mod-host', password: '' }),
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ password: '' }),
     });
     expect(clear.status).toBe(200);
     expect(((await clear.json()) as { hasPassword: boolean }).hasPassword).toBe(false);
+    const guest4 = await registerUser(app, 'mod_guest4');
     const joinNoPw = await app.request(`/api/rooms/${locked.roomId}/join`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: 'guest4' }),
+      headers: { 'Content-Type': 'application/json', Cookie: guest4.cookie },
+      body: JSON.stringify({}),
     });
     expect(joinNoPw.status).toBe(200);
   });
 
-  it('普通房间密码哈希持久化到 DB 并可恢复', async () => {
+  it('普通房间密码与显示名持久化到 DB 并可恢复', async () => {
     const app = makeApp();
+    const host = await registerUser(app, 'db_host');
     const created = await app.request('/api/rooms', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: '持久密码房', maxPlayers: 4, playerId: 'db-host', password: 'dbpw1', roomType: 'normal' }),
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({
+        name: '持久密码房',
+        maxPlayers: 4,
+        password: 'dbpw1',
+        roomType: 'normal',
+      }),
     });
     const { roomId } = (await created.json()) as { roomId: string };
     const rows = await loadAllRoomsFromDb();
     const row = rows.find((r) => r.id === roomId);
     expect(row?.passwordHash).toMatch(/^[0-9a-f]+:[0-9a-f]+$/);
+    expect(row?.playerNames?.[host.userId]).toBe(host.displayName);
   });
 });

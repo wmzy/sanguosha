@@ -1,0 +1,1 @@
+ALTER TABLE "rooms" ADD COLUMN "player_names" jsonb DEFAULT '{}'::jsonb NOT NULL;

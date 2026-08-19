@@ -16,7 +16,7 @@ import { useEventPlayback } from './useEventPlayback';
 import { useMarkCharSelectSubmitted, useClearSubmittedCharSelects } from './useSubmittedCharSelect';
 import { createLogger } from '../utils/logger';
 import { logWsMessage, logUserAction } from '../utils/debugTelemetry';
-import { getPlayerId } from '../utils/playerIdentity';
+import { useAuth } from './useAuth';
 import { isRoomNotFound } from '../utils/roomErrors';
 import type { GameView } from '../../engine/types';
 import { suitColor, type Suit } from '../../engine/types';
@@ -127,6 +127,9 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   const clearSubmitted = useClearSubmittedCharSelects();
   /** HGC 首次收到 initialView 的座次集合，用于触发 onFirstView（仅 viewer=0 一次） */
   const firstViewFiredRef = useRef(false);
+  /** 登录用户 id:调试座次 playerId 的基础名(RequireAuth 门禁保证非空) */
+  const authUser = useAuth().user;
+  const authUserId = authUser?.id ?? null;
 
   const serverUrl = window.location.origin;
 
@@ -155,8 +158,9 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     // 只通过 onPhaseChange 递增（WS 真正 open 时），不在 effect 体中立即加，避免 StrictMode 翻倍
     let connectionOpenCount = 0;
 
-    // 各座次派生独立 playerId(身份#座次),保证服务端按不同玩家入座
-    const baseId = getPlayerId();
+    // 各座次派生独立 playerId(身份#座次),保证服务端按不同玩家入座。
+    // 调试房保持游客模型:基础名取登录用户 id(RequireAuth 保证已登录),座次加 # 后缀。
+    const baseId = authUserId ?? 'debug';
 
     /* eslint-disable no-loop-func -- 回调安全捕获 effect 作用域的 cancelled/connectionOpenCount 标志,cleanup 后才置 true */
     for (let i = 0; i < playerCount; i++) {
@@ -249,7 +253,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
       clearSubmitted();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, playerCount, serverUrl]);
+  }, [roomId, playerCount, serverUrl, authUserId]);
 
   /** 展示层消息增强：seatPlayerIds/game_reset/判定牌 processing 延迟/event playback。
    *  HGC 已维护 view；这里只做渲染相关的额外处理。 */

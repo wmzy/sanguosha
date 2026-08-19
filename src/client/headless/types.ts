@@ -24,6 +24,8 @@ export interface RoomState {
   seats?: (string | null)[];
   /** 待处理座位交换: requesterId → { targetSeat, expiresAt } */
   pendingSeatSwaps?: Record<string, { targetSeat: number; expiresAt: number }>;
+  /** 成员显示名: playerId(userId) → 昵称 */
+  playerNames?: Record<string, string>;
 }
 
 export type ClientPhase = 'connecting' | 'lobby' | 'playing' | 'ended';

@@ -2,6 +2,7 @@
 // 对局分支(stage=playing 且已有 view):GameViewComponent 全量 props 挂载
 // + 顶栏 headerSlot 的旁观视角申请审批入口 + 错误 toast。房间数据走 MultiplayerRoomCtx。
 import { useNavigate } from 'react-router-dom';
+import { memberName } from '../../utils/memberNames';
 import { GameViewComponent } from '../../components/GameView';
 import { btnStyle, colors } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
@@ -61,7 +62,7 @@ export function PlayingStage() {
                     padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 'bold',
                   }}
                 >
-                  👁 {sid.slice(0, 8)} 申请查看你的视角
+                  👁 {memberName(sid, mp.roomState?.playerNames)} 申请查看你的视角
                   <button
                     className={btnStyle}
                     style={{ '--btn-bg': colors.accent.green, '--btn-padding': '2px 8px', '--btn-font-size': '11px' } as React.CSSProperties}

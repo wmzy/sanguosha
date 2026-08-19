@@ -147,6 +147,7 @@ export function applyServerMessage(
           roomType: msg.roomType,
           seats: msg.seats ?? [],
           pendingSeatSwaps: msg.pendingSeatSwaps ?? {},
+          playerNames: msg.playerNames ?? {},
         },
       };
     case 'room_config':

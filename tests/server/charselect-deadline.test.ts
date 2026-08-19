@@ -36,6 +36,13 @@ function makeRoom(): Room {
     spectators: new Map(),
     viewGrants: new Map(),
     pendingViewRequests: new Map(),
+    seats: [null, null, null, null],
+    playerNames: new Map(),
+    passwordHash: null,
+    roomType: 'quick',
+    chatUsage: new Map(),
+    chatHistory: [],
+    pendingSeatSwaps: new Map(),
   } as unknown as Room;
   trackedRoomIds.push(room.id);
   return room;

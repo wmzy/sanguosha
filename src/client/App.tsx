@@ -1,9 +1,9 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Loading } from './components/Loading';
 import { NarrowScreenHint } from './components/NarrowScreenHint';
-import { RequirePlayerId } from './components/RequirePlayerId';
+import { RequireAuth } from './components/RequireAuth';
 import { globalReset } from './theme';
 import { useAudioUnlock } from './hooks/useAudioUnlock';
 import { useResourcePacks } from './hooks/useResourcePacks';
@@ -15,6 +15,7 @@ const MultiplayerPage = lazy(() =>
   import('./pages/MultiplayerPage').then((m) => ({ default: m.MultiplayerPage })),
 );
 const ReplayPage = lazy(() => import('./pages/ReplayPage').then((m) => ({ default: m.ReplayPage })));
+const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
 
 export function App() {
   // 首次用户交互后解锁 AudioContext(浏览器自动播放策略要求)
@@ -30,11 +31,13 @@ export function App() {
           <Suspense fallback={<Loading />}>
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/play" element={<RequirePlayerId><MultiplayerPage /></RequirePlayerId>} />
-              <Route path="/play/:roomId" element={<RequirePlayerId><MultiplayerPage /></RequirePlayerId>} />
-              <Route path="/debug" element={<RequirePlayerId><DebugPage /></RequirePlayerId>} />
-              <Route path="/debug/:roomId" element={<RequirePlayerId><DebugPage /></RequirePlayerId>} />
+              <Route path="/play" element={<RequireAuth><MultiplayerPage /></RequireAuth>} />
+              <Route path="/play/:roomId" element={<RequireAuth><MultiplayerPage /></RequireAuth>} />
+              <Route path="/debug" element={<RequireAuth><DebugPage /></RequireAuth>} />
+              <Route path="/debug/:roomId" element={<RequireAuth><DebugPage /></RequireAuth>} />
               <Route path="/replay" element={<ReplayPage />} />
+              <Route path="/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
         </BrowserRouter>

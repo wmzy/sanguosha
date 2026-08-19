@@ -1,11 +1,9 @@
 import { css } from '@linaria/core';
 import { Link, useNavigate } from 'react-router-dom';
 import { useRef, useState } from 'react';
-import { colors, btnStyle, pageBgStyle, glassPanelStyle, goldColors, shadows } from '../theme';
+import { colors, pageBgStyle, glassPanelStyle, goldColors, shadows } from '../theme';
 import { loadReplay } from '../replay/replayFile';
 import type { ReplayFile } from '../replay/types';
-import { getPlayerId, setPlayerId } from '../utils/playerIdentity';
-import { PlayerIdForm } from '../components/RequirePlayerId';
 import { AuthPanel } from '../components/AuthPanel';
 import { useAuth } from '../hooks/useAuth';
 
@@ -184,18 +182,6 @@ const identityBar = css`
   color: ${colors.text.secondary};
 `;
 
-const identityName = css`
-  color: ${goldColors.base};
-  font-weight: bold;
-`;
-
-const changeBtn = css`
-  ${btnStyle}
-  --btn-bg: rgba(52, 73, 94, 0.85);
-  --btn-padding: 4px 12px;
-  --btn-font-size: 12px;
-`;
-
 const identityCard = css`
   ${glassPanelStyle}
   padding: 28px;
@@ -213,8 +199,6 @@ const identityHeading = css`
 export function HomePage() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pid, setPid] = useState<string | null>(() => getPlayerId());
-  const [editing, setEditing] = useState(false);
   const auth = useAuth();
   // GitHub 回调 redirect 回 /?authError=xxx 时提示错误
   const [oauthError] = useState<string | null>(() => {
@@ -252,35 +236,6 @@ export function HomePage() {
         <h3 className={identityHeading}>{auth.user ? '账号' : '登录 / 注册'}</h3>
         <AuthPanel auth={auth} />
       </div>
-      <div className={identityBar}>
-        <span>当前身份：</span>
-        {pid ? (
-          <>
-            <span className={identityName}>{pid}</span>
-            <button className={changeBtn} onClick={() => setEditing(true)}>
-            修改
-            </button>
-          </>
-        ) : (
-          <button className={changeBtn} onClick={() => setEditing(true)}>
-          设置身份
-          </button>
-        )}
-      </div>
-      {editing && (
-        <div className={identityCard}>
-          <h3 className={identityHeading}>修改身份</h3>
-          <PlayerIdForm
-            initial={pid ?? ''}
-            submitLabel="保存"
-            onSet={(id) => {
-              setPlayerId(id);
-              setPid(id);
-              setEditing(false);
-            }}
-          />
-        </div>
-      )}
       <div className={actionList}>
         <Link to="/play" className={linkButtonBase}>
           <span className={`${linkIcon} ${linkBlue}`}>⚔</span>

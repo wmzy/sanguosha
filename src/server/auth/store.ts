@@ -220,3 +220,52 @@ export async function linkGithubToUser(
     .returning();
   return updated[0] ? toPublic(updated[0]) : null;
 }
+
+/** 昵称规则:1-24 位,不含空白与控制字符(展示名,允许比 username 宽松的中英混排)。 */
+export function isValidDisplayName(raw: string): boolean {
+  const t = raw.trim();
+  return t.length >= 1 && t.length <= 24 && !/\s/.test(t);
+}
+
+/** 修改昵称(个人页)。返回更新后的公开信息;昵称不合法/用户不存在返回 null。 */
+export async function updateDisplayName(
+  userId: string,
+  displayName: string,
+): Promise<PublicUser | null> {
+  if (!isValidDisplayName(displayName)) return null;
+  const db = getSharedDb();
+  if (!db) return null;
+  const updated = await db.db
+    .update(users)
+    .set({ displayName: displayName.trim(), updatedAt: Date.now() })
+    .where(eq(users.id, userId))
+    .returning();
+  return updated[0] ? toPublic(updated[0]) : null;
+}
+
+/** 修改密码(个人页)。oldPassword 校验失败返回 '旧密码错误'。 */
+export type ChangePasswordResult =
+  | { ok: true; user: PublicUser }
+  | { ok: false; error: '旧密码错误' | '密码不合法' | '无密码可改' | '数据库未初始化' | '用户不存在' };
+
+export async function changePassword(
+  userId: string,
+  oldPassword: string,
+  newPassword: string,
+): Promise<ChangePasswordResult> {
+  const db = getSharedDb();
+  if (!db) return { ok: false, error: '数据库未初始化' };
+  const rows = await db.db.select().from(users).where(eq(users.id, userId)).limit(1);
+  const row = rows[0];
+  if (!row) return { ok: false, error: '用户不存在' };
+  if (!row.passwordHash) return { ok: false, error: '无密码可改' };
+  const oldOk = await verifyPassword(oldPassword, row.passwordHash);
+  if (!oldOk) return { ok: false, error: '旧密码错误' };
+  if (!isValidPassword(newPassword)) return { ok: false, error: '密码不合法' };
+  const updated = await db.db
+    .update(users)
+    .set({ passwordHash: await hashPassword(newPassword), updatedAt: Date.now() })
+    .where(eq(users.id, userId))
+    .returning();
+  return { ok: true, user: toPublic(updated[0]) };
+}

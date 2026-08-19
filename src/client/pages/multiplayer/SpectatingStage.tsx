@@ -2,6 +2,7 @@
 // 旁观对局分支(stage=spectating 且已有 view):旁观控制条(已授权提示/申请查看下拉/退出)
 // + GameViewComponent 只读挂载 + 错误 toast。房间数据走 MultiplayerRoomCtx。
 import { useNavigate } from 'react-router-dom';
+import { memberName } from '../../utils/memberNames';
 import { GameViewComponent } from '../../components/GameView';
 import { btnStyle, inputStyle, colors } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
@@ -55,7 +56,7 @@ export function SpectatingStage() {
               >
                 <option value="" disabled>申请查看视角…</option>
                 {playerIds.map((pid, i) => (
-                  <option key={pid} value={i}>P{i} {pid.slice(0, 6)}</option>
+                  <option key={pid} value={i}>P{i} {memberName(pid, mp.roomState?.playerNames)}</option>
                 ))}
               </select>
             </>

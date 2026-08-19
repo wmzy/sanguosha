@@ -59,6 +59,7 @@ function roomToRow(room: Room, now: number) {
     status: room.status,
     config: room.config,
     passwordHash: room.passwordHash,
+    playerNames: Object.fromEntries(room.playerNames),
     createdAt: now,
     updatedAt: now,
   };
@@ -82,6 +83,7 @@ export async function upsertRoomToDb(room: Room): Promise<void> {
         status: row.status,
         config: row.config,
         passwordHash: row.passwordHash,
+        playerNames: row.playerNames,
         updatedAt: now,
       },
     });

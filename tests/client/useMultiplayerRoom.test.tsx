@@ -93,6 +93,13 @@ describe('useMultiplayerRoom', () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string, opts?: RequestInit) => {
       const body = opts?.body ? JSON.parse(opts.body as string) : {};
       fetchCalls.push({ url, method: opts?.method ?? 'GET', body });
+      // 登录态探测:playerId 现从会话用户派生(游客模式已移除)
+      if (url.includes('/api/auth/me')) {
+        return new Response(
+          JSON.stringify({ user: { id: 'pid-0', username: 'test', displayName: '测试用户', avatarUrl: null, provider: 'local', hasPassword: true, githubLinked: false }, githubEnabled: false }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
       // join 响应:POST /api/rooms/:id/join
       if (url.includes('/api/rooms/') && url.includes('/join')) {
         return new Response(JSON.stringify({ roomId: 'ROOM1', playerId: 'pid-0' }), {
@@ -238,25 +245,25 @@ describe('useMultiplayerRoom', () => {
     expect(create.body.config?.timeoutSec).toBe(2);
   });
 
-  it('createRoom 把本地身份 playerId 透传到请求体', async () => {
-    localStorage.setItem('sgs:playerId', '赵子龙');
+  it('createRoom 不透传 playerId(身份由服务端会话决定)', async () => {
+    // 游客模式移除:playerId = 会话 userId,请求体不再携带本地身份
     const { result } = renderHook(() => useMultiplayerRoom());
     act(() => result.current.createRoom('房', 2));
     await flushConnect();
     const create = fetchCalls.find((c) => c.body && typeof c.body.name === 'string')!;
-    expect(create.body.playerId).toBe('赵子龙');
+    expect(create.body.playerId).toBeUndefined();
   });
 
-  it('joinRoom 把本地身份 playerId 透传到请求体', async () => {
-    localStorage.setItem('sgs:playerId', '孔明');
+  it('joinRoom 不透传 playerId(身份由服务端会话决定)', async () => {
     const { result } = renderHook(() => useMultiplayerRoom());
     act(() => result.current.joinRoom('ROOM-X'));
     await flushConnect();
     const join = fetchCalls.find((c) => c.url.includes('/join') && c.url.includes('ROOM-X'))!;
-    expect(join.body.playerId).toBe('孔明');
+    expect(join.body.playerId ?? join.body).toBeDefined();
+    expect(join.body.playerId).toBeUndefined();
   });
 
-  it('无本地身份时 createRoom 不传 playerId(服务端自动生成)', async () => {
+  it('createRoom 请求发出(未登录时也发起,门禁在路由层)', async () => {
     const { result } = renderHook(() => useMultiplayerRoom());
     act(() => result.current.createRoom('房', 2));
     await flushConnect();
@@ -355,7 +362,8 @@ describe('useMultiplayerRoom', () => {
 
     expect(result.current.stage).toBe('lobby');
     expect(result.current.roomId).toBeNull();
-    expect(result.current.playerId).toBeNull();
+    // playerId 从登录态派生,离开房间不清(用户仍登录)
+    expect(result.current.playerId).toBe('pid-0');
     expect(result.current.roomState).toBeNull();
     expect(result.current.view).toBeNull();
     expect(result.current.ready).toBe(false);
@@ -530,6 +538,8 @@ describe('useMultiplayerRoom', () => {
           headers: { 'Content-Type': 'application/json' },
         }),
       );
+      // fetch/then 链跨多个微任务,多轮刷新确保 finally 执行
+      for (let i = 0; i < 10; i++) await Promise.resolve();
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(result.current.isCreating).toBe(false);

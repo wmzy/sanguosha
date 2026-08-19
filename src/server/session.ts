@@ -132,6 +132,18 @@ export class GameSession {
     return this.gameStartedAt;
   }
 
+  /** 物理座位 i 的玩家显示名(引擎玩家名)。debug 房无 playerNames → 全 fallback。
+   *  fallbackNames: 恢复路径传入旧 state 的玩家名(无房间映射时保留原名)。 */
+  private seatDisplayNames(count: number, fallbackNames?: string[]): string[] {
+    const out: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const pid = this.room.seats[i];
+      const fromRoom = pid !== null ? this.room.playerNames.get(pid) : undefined;
+      out.push(fromRoom ?? fallbackNames?.[i] ?? '');
+    }
+    return out;
+  }
+
   /** 用持久化数据恢复:create(config) → bootstrap → 重放 actionLog,确定性重建完整 state。
    *  config 从 state(rngSeed/playerCount)+ 全局 CHARACTERS 重构。 */
   async restoreState(state: GameState, actionLog: ActionLogEntry[] = []): Promise<void> {
@@ -146,6 +158,8 @@ export class GameSession {
       handSize: this.room.config.handSize,
       timeoutSec: this.room.config.timeoutSec,
       mode: this.room.config.gameMode,
+      // 恢复对局沿用原座位显示名(旧持久化快照无 playerNames 时回退 stub 名,兼容)
+      playerNames: this.seatDisplayNames(state.players.length, state.players.map((p) => p.name)),
     };
     const fresh = create(config);
     // 注入虚拟时钟:重放期间超时按 actionLog 时间戳确定性推导,不依赖真实系统时间。
@@ -197,6 +211,8 @@ export class GameSession {
       handSize: cfg.handSize,
       timeoutSec: cfg.timeoutSec,
       mode: cfg.gameMode,
+      // 物理座位 i 的玩家显示名(seats 序 = startGame 时的入座顺序)
+      playerNames: this.seatDisplayNames(count),
     };
     this.state = create(config);
     // 座次轮转偏移:决定主公(游戏座次 0)对应哪个物理座位。在 bootstrap 之前同步设置,

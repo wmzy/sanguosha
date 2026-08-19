@@ -228,7 +228,9 @@ export const RoomListPanel = memo(
                       {room.spectatorCount ? ` | ${room.spectatorCount} 旁观` : ''}
                     </div>
                     {room.hostId && (
-                      <div className={hostTag}>房主: {room.hostId}</div>
+                      <div className={hostTag}>
+                        房主: {room.playerNames?.[room.hostId] ?? room.hostId}
+                      </div>
                     )}
                   </div>
                   <div className={roomActions}>
