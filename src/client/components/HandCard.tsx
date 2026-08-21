@@ -107,6 +107,15 @@ export function HandCardImpl(props: HandCardProps) {
           !isTransformActive &&
           !isDistributeCandidate &&
           styles.handCardDisabled,
+        // 弃牌阶段:未选中的可选牌紫色呼吸引导;已选中走 discardCardSelected
+        canDiscardClick && !isDiscardSelected && styles.handCardDiscardable,
+        // 出牌阶段:可主动打出的牌轻量提亮(回应/弃牌/转化/distribute 各有专属高亮)
+        canPlay &&
+          !isAwaiting &&
+          !canDiscardClick &&
+          !isTransformActive &&
+          !isDistributeActive &&
+          styles.handCardPlayable,
         isAwaiting && styles.handCardRespondable,
         isDiscardSelected && styles.discardCardSelected,
         isRespondSelected && styles.handCardRespondSelected,

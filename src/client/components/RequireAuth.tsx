@@ -9,8 +9,9 @@ import { colors, pageStyle } from '../theme';
 import { AuthPanel } from './AuthPanel';
 import { useAuth } from '../hooks/useAuth';
 
+// 注意:wyw-in-js 下 css`` 内插值其他 css 类(如 ${pageStyle})不会内联其属性,
+// 必须在使用处做 className 字符串组合,否则 padding/flex 全部丢失(面板贴左上角)。
 const overlay = css`
-  ${pageStyle}
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -51,7 +52,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   if (auth.loading) return null;
   if (auth.user) return <>{children}</>;
   return (
-    <div className={overlay}>
+    <div className={`${pageStyle} ${overlay}`}>
       <div className={card}>
         <h3 className={heading}>请先登录</h3>
         <p className={hint}>进入房间前需要登录账号。没有账号？注册只需用户名和密码。</p>

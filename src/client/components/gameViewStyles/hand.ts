@@ -303,6 +303,30 @@ export const handCardRespondable = css`
   box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
   background: rgba(255, 215, 0, 0.08);
 `;
+// 弃牌阶段:整手牌可选(canDiscardClick)。紫色呼吸光引导——弃牌是义务,
+// 玩家常忽略提示框文案,手牌本身必须传达「这些牌现在可以点」。
+export const handCardDiscardable = css`
+  border-color: #a86fd6;
+  box-shadow: 0 0 8px rgba(168, 111, 214, 0.35);
+  animation: discardPulse 1.8s ease-in-out infinite;
+  & > :first-child {
+    filter: brightness(1.12);
+  }
+  @keyframes discardPulse {
+    0%,
+    100% {
+      box-shadow: 0 0 5px rgba(168, 111, 214, 0.25);
+    }
+    50% {
+      box-shadow: 0 0 14px rgba(168, 111, 214, 0.55);
+    }
+  }
+`;
+// 出牌阶段:有主动 use 入口的牌轻量提亮,与置灰牌形成「能出/不能出」对比
+export const handCardPlayable = css`
+  border-color: #93a3ae;
+  box-shadow: -1px 2px 6px rgba(0, 0, 0, 0.3), 0 0 5px rgba(255, 255, 255, 0.1);
+`;
 // useCard 类回应:已选中牌(待点「打出」出牌)绿色加粗高亮,区别于金色「可回应」
 export const handCardRespondSelected = css`
   border: 3px solid #2ecc71;

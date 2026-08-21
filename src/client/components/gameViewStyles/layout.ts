@@ -170,6 +170,24 @@ export const centerTable = css`
   }
 `;
 
+/** 牌桌中心装饰:低透明度同心圆纹样,营造「桌面」氛围并填补中央空旷感。
+ *  纯装饰层:不拦截任何交互(pointer-events:none),z-index 低于 centerTable。 */
+export const battleFieldDecor = css`
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, 60vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(241, 196, 15, 0.045) 0%, transparent 62%),
+    radial-gradient(circle, transparent 58%, rgba(241, 196, 15, 0.07) 58.5%, rgba(241, 196, 15, 0.07) 59.5%, transparent 60%),
+    radial-gradient(circle, transparent 72%, rgba(241, 196, 15, 0.05) 72.5%, rgba(241, 196, 15, 0.05) 73.2%, transparent 74%);
+  pointer-events: none;
+  z-index: 0;
+`;
+
 /** CenterTable 内的牌堆/处理区信息(非绝对定位) */
 export const centerZoneInfo = css`
   text-align: center;

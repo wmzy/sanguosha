@@ -515,6 +515,8 @@ export function GameViewComponentImpl({
       {/* ─── 主内容:战场区 + 右侧边栏 ─── */}
       <div className={styles.mainContent}>
         <div className={styles.battleField}>
+          {/* 牌桌中心装饰:纯视觉,不拦截交互 */}
+          <div className={styles.battleFieldDecor} />
           {/* ─── 事件横幅(延时展示,非阻塞)+ 积压角标/跳过 + 粘性展示卡(常驻至操作) ─── */}
           <EventBanner
             current={currentEvent ?? null}

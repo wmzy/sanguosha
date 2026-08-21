@@ -141,6 +141,12 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   // ── 建立连接：N 个 HGC 实例 ──
   useEffect(() => {
     if (!roomId || playerCount < 2) return;
+    // auth 未就绪(/me 探测中)不建连:本 hook 内的 useAuth 是独立实例,其 /me 晚于
+    // 组件挂载返回。若此时以 baseId='debug' 建连,authUserId 就绪后 effect 重跑,
+    // 旧连接 SSE 断开会触发服务端 leaveRoom → quick 房「全员离开自动销毁」,
+    // 新一波 join 撞上已删房间 404 → onRoomGone 被踢回大厅(偶现,网络时序决定)。
+    // 等就绪后一次性建连,永远只有一波连接。
+    if (authUserId === null) return;
     clientsRef.current.clear();
     setViews(new Map());
     playbackRef.current.reset(0);

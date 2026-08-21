@@ -5,8 +5,9 @@ import { css } from '@linaria/core';
 import { colors, pageStyle, pageBgStyle, glassPanelStyle, goldHeadingStyle, goldColors } from '../../theme';
 import type { GameMode } from '../../../engine/rules/types';
 
-export const page = css`
-  ${pageBgStyle}
+// wyw-in-js 下 css`` 内插值其他 css 类(如 ${pageBgStyle})不会内联其属性,
+// 统一改为「自身属性类 + 基类字符串拼接」导出,使用处 className 零改动。
+const pageBase = css`
   background-color: #0d1220;
   display: flex;
   flex-direction: column;
@@ -15,27 +16,28 @@ export const page = css`
   padding: 40px 20px;
   color: #eee;
 `;
+export const page = `${pageBase} ${pageBgStyle}`;
 
 /** 页面主标题:金色 + 底部金色下边线 */
-export const title = css`
-  ${goldHeadingStyle}
+const titleBase = css`
   font-size: 36px;
   margin: 0 0 8px;
   letter-spacing: 4px;
   color: ${goldColors.base};
 `;
+export const title = `${titleBase} ${goldHeadingStyle}`;
 
 export const subtitle = css`
   color: ${colors.text.muted};
   margin: 0 0 32px;
 `;
 
-export const card = css`
-  ${glassPanelStyle}
+const cardBase = css`
   padding: 28px;
   width: 100%;
   max-width: 420px;
 `;
+export const card = `${cardBase} ${glassPanelStyle}`;
 
 /** 区块标题:左侧金色竖条 */
 export const sectionTitle = css`
@@ -188,24 +190,24 @@ export const winnerText = css`
   color: ${colors.accent.gold};
 `;
 
-export const gameWrap = css`
+const gameWrapBase = css`
   min-height: 100vh;
-  ${pageBgStyle}
   background-color: ${colors.bg.page};
 `;
+export const gameWrap = `${gameWrapBase} ${pageBgStyle}`;
 
 /**
  * lobby 页容器:顶栏贴顶常驻,主体两栏(左表单/右房间列表)限宽居中。
  * 与 `page` 的居中单列范式分开,避免影响游戏结束等居中分支。
  */
-export const lobbyPage = css`
-  ${pageBgStyle}
+const lobbyPageBase = css`
   background-color: #0d1220;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   color: #eee;
 `;
+export const lobbyPage = `${lobbyPageBase} ${pageBgStyle}`;
 
 /** 顶栏:sticky 常驻页面顶部,左侧返回首页,右侧页面标识 */
 export const topBar = css`
@@ -324,9 +326,7 @@ export const reconnectSpinner = css`
   }
 `;
 
-export const notFoundPage = css`
-  ${pageStyle}
-  ${pageBgStyle}
+const notFoundPageBase = css`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -335,6 +335,7 @@ export const notFoundPage = css`
   text-align: center;
   gap: 12px;
 `;
+export const notFoundPage = `${pageStyle} ${pageBgStyle} ${notFoundPageBase}`;
 
 export const notFoundCode = css`
   font-size: 96px;

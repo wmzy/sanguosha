@@ -11,7 +11,10 @@ export default defineConfig({
       sourceMap: process.env.NODE_ENV !== 'production',
       displayName: process.env.NODE_ENV !== 'production',
       exclude: ['node_modules/**'],
-      evaluate: false,
+      // evaluate 必须为 true(默认):css`` 内插值其他 css 类(如 ${pageStyle})依赖
+      // 求值导出绑定来内联规则;false 时静默跳过,被插值的 padding/flex 等属性全部丢失
+      // (实证:「请先登录」面板贴左上角、404 页不居中)。
+      evaluate: true,
       babelOptions: {
         presets: ['@babel/preset-typescript'],
       },

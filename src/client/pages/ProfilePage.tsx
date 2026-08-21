@@ -9,7 +9,7 @@ import { btnStyle, colors, inputStyle, pageStyle } from '../theme';
 import { useAuth } from '../hooks/useAuth';
 
 const page = css`
-  ${pageStyle}
+  /* 原此处插值 ${pageStyle}:wyw-in-js 不内联跨模块类属性,改为使用处 className 组合 */
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -157,7 +157,7 @@ export function ProfilePage() {
   };
 
   return (
-    <div className={page}>
+    <div className={`${pageStyle} ${page}`}>
       <Link to="/" className={backLink}>
         ← 返回首页
       </Link>

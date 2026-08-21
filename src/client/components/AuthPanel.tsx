@@ -43,7 +43,7 @@ const tabActive = css`
 `;
 
 const githubBtn = css`
-  ${btnStyle}
+  /* 原此处插值 ${btnStyle}:wyw-in-js 不内联跨模块类属性;本类已自带全部所需属性 */
   display: flex;
   align-items: center;
   justify-content: center;
