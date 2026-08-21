@@ -4,27 +4,37 @@ import { css } from '@linaria/core';
 
 // ─── Prompt ───
 export const promptBox = css`
-  border: 2px solid #e67e22;
-  border-radius: 8px;
-  padding: 8px 14px;
-  background: rgba(230, 126, 34, 0.15);
+  border: 1px solid rgba(230, 150, 46, 0.55);
+  border-left: 4px solid #e67e22;
+  border-radius: 10px;
+  padding: 9px 14px;
+  background: linear-gradient(rgba(38, 28, 14, 0.88), rgba(24, 18, 10, 0.88));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 160, 0.07),
+    0 4px 16px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
   width: 100%;
   box-sizing: border-box;
 `;
 export const promptBoxAwaiting = css`
-  border: 2px solid #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.6);
   border-left: 4px solid #e74c3c;
-  border-radius: 8px;
-  padding: 8px 14px;
-  background: rgba(231, 76, 60, 0.1);
+  border-radius: 10px;
+  padding: 9px 14px;
+  background: linear-gradient(rgba(40, 18, 14, 0.88), rgba(26, 12, 10, 0.88));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 190, 170, 0.06),
+    0 4px 16px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
   width: 100%;
   box-sizing: border-box;
 `;
 export const promptTitle = css`
-  color: #e67e22;
+  color: #f0a353;
   font-weight: bold;
   font-size: 14px;
   margin-bottom: 2px;
+  letter-spacing: 0.5px;
 `;
 // 出牌阶段标题行的杀次数徽标(⚔️ 杀 X/Y / 杀 ∞),数据源 view.turnUsage 投影。
 // 视觉沿用 seat 徽章模式(圆角小底色块),配色与 prompt 区橙色主题一致。
@@ -208,8 +218,13 @@ export const autoSkipToggle = css`
 // ─── 辅助状态样式 ───
 /** 自动切换按钮激活态(绿色)。 */
 export const autoSwitchActive = css`
-  background: #27ae60;
-  color: #fff;
+  border-color: rgba(94, 190, 120, 0.6) !important;
+  color: #86e0a0 !important;
+  background: rgba(94, 190, 120, 0.1) !important;
+  &:hover {
+    border-color: rgba(130, 220, 155, 0.8) !important;
+    background: rgba(94, 190, 120, 0.18) !important;
+  }
 `;
 /** 转化模式提示文案色。 */
 export const transformHint = css`

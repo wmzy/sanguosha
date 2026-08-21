@@ -239,7 +239,9 @@ function PlayerSeatViewImpl({
       })()}
       {/* 手牌数 + 基本信息 */}
       <div className={infoRow}>
-        <span>手牌: {player.handCount}</span>
+        <span>
+          手牌: <strong>{player.handCount}</strong>
+        </span>
       </div>
       {/* 装备区 */}
       {Object.keys(player.equipment).length > 0 && (
@@ -344,23 +346,29 @@ export const PlayerSeatView = memo(PlayerSeatViewImpl, playerSeatPropsEqual);
 const seatCard = css`
   position: relative;
   box-sizing: border-box;
-  border: 1px solid #444;
-  border-radius: 10px;
+  border: 1px solid rgba(196, 162, 84, 0.35);
+  border-radius: 12px;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(8, 8, 14, 0.62);
   transition: all 0.25s;
   /* 与底栏 PlayerCardLarge 同尺寸:高度统一为 --hero-card-h,宽度撑满 seatArcSlot(= 卡高 × 15/19) */
   height: var(--hero-card-h);
   width: 100%;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 232, 170, 0.08);
 `;
 // 势力色顶部条:武将名 + 身份
 const seatCardHeader = css`
-  padding: 6px 10px;
+  padding: 6px 10px 5px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: var(--faction-color, transparent);
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.12) 70%, transparent),
+    var(--faction-color, transparent);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 -6px 12px -8px rgba(0, 0, 0, 0.55);
 `;
 const seatCardHeaderTop = css`
   display: flex;
@@ -370,8 +378,11 @@ const seatCardHeaderTop = css`
 const seatCharName = css`
   font-weight: bold;
   font-size: 15px;
-  color: rgba(255, 255, 255, 0.9);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  letter-spacing: 1px;
+  color: rgba(255, 246, 224, 0.96);
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.85),
+    0 0 10px rgba(0, 0, 0, 0.5);
 `;
 // 武将立绘作座位卡背景:绝对定位填满整张卡,文字内容浮在其上
 const seatCharImgWrap = css`
@@ -412,22 +423,29 @@ const seatHpRow = css`
   display: flex;
   gap: 2px;
   padding: 4px 10px;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
 `;
 const hpHeartFull = css`
-  color: #e74c3c;
+  color: #ef4444;
   font-size: 16px;
-  text-shadow: 0 0 4px rgba(231, 76, 60, 0.5);
+  text-shadow:
+    0 0 5px rgba(239, 68, 68, 0.65),
+    0 1px 2px rgba(0, 0, 0, 0.8);
 `;
 const hpHeartEmpty = css`
-  color: #555;
+  color: rgba(120, 96, 96, 0.55);
   font-size: 14px;
+  text-shadow: none;
 `;
 const seatCardActive = css`
+  border-color: rgba(255, 216, 100, 0.85);
+  animation: activeSeatPulse 2s ease-in-out infinite;
   box-shadow:
-    0 0 18px rgba(255, 215, 0, 0.35),
-    inset 0 0 8px rgba(255, 215, 0, 0.1);
+    0 0 22px rgba(255, 210, 60, 0.38),
+    inset 0 0 12px rgba(255, 215, 0, 0.12);
   outline: 2px solid #ffd700;
+  outline-offset: -1px;
 `;
 const seatCardPerspective = css`
   border: 2px solid #3498db;
@@ -568,11 +586,21 @@ const hiddenBadge = css`
 `;
 const equipRow = css`
   font-size: 11px;
-  color: #f39c12;
-  padding: 0 10px 4px;
+  color: #f5b04d;
+  padding: 2px 10px 4px;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  & > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(52, 36, 12, 0.72);
+    border: 1px solid rgba(243, 156, 18, 0.32);
+    border-radius: 999px;
+    padding: 1px 8px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
 `;
 // 判定区(延时锦囊):斜体、紫色边框,亮眼能看清
 const judgeRow = css`
@@ -581,20 +609,23 @@ const judgeRow = css`
   align-items: center;
   gap: 4px;
   margin-top: 2px;
+  padding: 0 10px 4px;
   font-size: 11px;
 `;
 const judgeRowLabel = css`
-  color: #b78bff;
+  color: #c9a2ff;
   font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 `;
 const judgeTag = css`
   display: inline-block;
-  padding: 1px 6px;
-  border-radius: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
   border: 1px solid var(--suit-color, #ccc);
   color: var(--suit-color, #ccc);
-  background: rgba(155, 89, 182, 0.12);
+  background: rgba(30, 18, 40, 0.72);
   font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
 `;
 const skillRow = css`
   margin-bottom: 4px;
@@ -602,20 +633,27 @@ const skillRow = css`
 `;
 const skillTag = css`
   display: inline-block;
-  background: rgba(15, 52, 96, 0.6);
-  border-radius: 3px;
-  padding: 1px 5px;
+  background: linear-gradient(rgba(24, 44, 76, 0.82), rgba(14, 28, 52, 0.82));
+  border: 1px solid rgba(96, 140, 200, 0.35);
+  border-radius: 999px;
+  padding: 1px 8px;
   margin-right: 3px;
   font-size: 10px;
-  color: #8899aa;
+  color: #a8c0dc;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 1px 0 rgba(180, 210, 255, 0.08);
 `;
 const infoRow = css`
   font-size: 11px;
-  color: #999;
+  color: #b9ad8e;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   padding: 2px 10px 4px;
+  & b,
+  & strong {
+    color: #ece1c2;
+  }
 `;
 const markRow = css`
   font-size: 10px;

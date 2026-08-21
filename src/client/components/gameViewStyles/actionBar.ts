@@ -19,23 +19,52 @@ export const actionBar = css`
 `;
 export const playBtn = css`
   border: none;
-  border-radius: 6px;
-  padding: 8px 20px;
+  border-radius: 8px;
+  padding: 8px 22px;
   cursor: pointer;
-  background: #27ae60;
+  background: linear-gradient(rgba(46, 204, 113, 0.95), rgba(30, 150, 85, 0.95));
   color: #fff;
   font-weight: bold;
   font-size: 14px;
+  letter-spacing: 1px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 3px 10px rgba(0, 0, 0, 0.35);
+  transition: all 0.15s;
+  &:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+  &:active {
+    transform: translateY(0);
+    filter: brightness(0.95);
+  }
 `;
 export const endTurnBtn = css`
   border: none;
-  border-radius: 6px;
-  padding: 8px 20px;
+  border-radius: 8px;
+  padding: 8px 22px;
   cursor: pointer;
-  background: #e74c3c;
+  background: linear-gradient(rgba(240, 82, 60, 0.96), rgba(196, 54, 38, 0.96));
   color: #fff;
   font-weight: bold;
   font-size: 14px;
+  letter-spacing: 2px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 3px 12px rgba(196, 54, 38, 0.4),
+    0 0 18px rgba(231, 76, 60, 0.25);
+  transition: all 0.15s;
+  animation: endTurnBreath 2.4s ease-in-out infinite;
+  &:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+  &:active {
+    transform: translateY(0);
+    filter: brightness(0.95);
+    animation: none;
+  }
 `;
 export const targetHint = css`
   font-size: 13px;
@@ -107,10 +136,12 @@ export const equipSkillBadge = css`
 // ─── 装备区纵向列(最左侧) ───
 export const equipColumn = css`
   flex: 0 0 156px;
-  border: 1px solid #444;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.45);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(196, 162, 84, 0.28);
+  border-radius: 12px;
+  background: linear-gradient(rgba(16, 14, 10, 0.78), rgba(10, 9, 6, 0.82));
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 232, 170, 0.05);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -121,11 +152,11 @@ export const equipColumn = css`
 `;
 export const equipColumnTitle = css`
   font-size: 11px;
-  color: #f39c12;
+  color: #e8c47a;
   font-weight: bold;
   padding: 8px 12px 6px;
-  letter-spacing: 1px;
-  border-bottom: 1px solid rgba(243, 156, 18, 0.15);
+  letter-spacing: 2px;
+  border-bottom: 1px solid rgba(196, 162, 84, 0.18);
 `;
 export const equipColumnList = css`
   display: flex;

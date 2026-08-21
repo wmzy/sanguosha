@@ -50,7 +50,11 @@ function ZoneInfoBarImpl(props: ZoneInfoBarImplProps) {
   return (
     <div className={styles.centerZoneInfo}>
       <div className={styles.metaText} data-zone-anchor="deck">
-        牌堆: {view.zones?.deckCount ?? Object.keys(view.cardMap).length} 张
+        <span className={styles.zoneIcon} aria-hidden>
+          🂠
+        </span>
+        牌堆
+        <span className={styles.zoneCount}>{view.zones?.deckCount ?? Object.keys(view.cardMap).length}</span>
       </div>
       {/* 处理区:中间结算的牌(判定牌 / 闪抵消杀 / 杀 / 锦囊) */}
       {(() => {
@@ -92,12 +96,13 @@ function ZoneInfoBarImpl(props: ZoneInfoBarImplProps) {
           </div>
         );
       })()}
-      {/* 弃牌堆:右上角一个小图标 + 数字 */}
+      {/* 弃牌堆:小卡背图标 + 数字 */}
       <div className={styles.discardPileRow} data-zone-anchor="discard">
-        <span className={styles.discardPileIcon} title="弃牌堆">
+        <span className={styles.discardPileIcon} title="弃牌堆" aria-hidden>
           🗂
         </span>
-        <span className={styles.discardPileCount}>弃牌: {view.zones?.discardPileCount ?? 0}</span>
+        弃牌
+        <span className={styles.discardPileCount}>{view.zones?.discardPileCount ?? 0}</span>
       </div>
     </div>
   );

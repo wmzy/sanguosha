@@ -212,15 +212,18 @@ export const selectedCharHpDot = css`
 
 // ─── Debug 快照 ───
 export const snapshotBtn = css`
-  background: #2d4a2d;
-  color: #7ee787;
-  border: 1px solid #4a8a4a;
-  padding: 4px 10px;
-  border-radius: 4px;
+  background: rgba(94, 190, 120, 0.1);
+  color: #86e0a0;
+  border: 1px solid rgba(94, 190, 120, 0.55);
+  padding: 3px 12px;
+  border-radius: 999px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.5;
+  transition: all 0.15s;
   &:hover {
-    background: #3d5a3d;
+    background: rgba(94, 190, 120, 0.18);
+    border-color: rgba(130, 220, 155, 0.8);
   }
   &:disabled {
     opacity: 0.5;

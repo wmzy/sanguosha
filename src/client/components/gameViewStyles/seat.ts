@@ -40,8 +40,40 @@ export const centerMeta = css`
   gap: 4px;
 `;
 export const metaText = css`
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-size: 12px;
-  color: #888;
+  color: #cbbd93;
+  background: linear-gradient(rgba(34, 28, 16, 0.85), rgba(22, 18, 10, 0.85));
+  border: 1px solid rgba(200, 164, 78, 0.32);
+  border-radius: 999px;
+  padding: 4px 14px;
+  letter-spacing: 0.5px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 235, 180, 0.07),
+    0 2px 10px rgba(0, 0, 0, 0.45);
+`;
+/** 牌堆/弃牌堆图标:小卡背 */
+export const zoneIcon = css`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 26px;
+  font-size: 15px;
+  line-height: 1;
+  color: #d8c48a;
+  background: linear-gradient(160deg, #3a2f52, #241d38);
+  border: 1px solid rgba(200, 164, 78, 0.5);
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+`;
+/** 区块计数数字 */
+export const zoneCount = css`
+  color: #f0dfae;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 `;
 
 // ─── Seat card — 竖向信息卡(无立绘):势力色 header + HP + 技能 ───
@@ -304,30 +336,41 @@ export const processingSuit = css`
   font-size: 10px;
   opacity: 0.85;
 `;
-// 弃牌堆:小图标 + 计数
+// 弃牌堆:小卡背图标 + 计数(与牌堆药丸同语言,红色系区分)
 export const discardPileRow = css`
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  justify-content: center;
-  margin-top: 4px;
+  gap: 7px;
+  margin-top: 2px;
   font-size: 12px;
-  color: #aaa;
+  color: #c9a49b;
+  background: linear-gradient(rgba(34, 20, 16, 0.85), rgba(24, 14, 10, 0.85));
+  border: 1px solid rgba(231, 76, 60, 0.35);
+  border-radius: 999px;
+  padding: 3px 12px;
+  letter-spacing: 0.5px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 200, 180, 0.05),
+    0 2px 10px rgba(0, 0, 0, 0.45);
 `;
 export const discardPileIcon = css`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  background: rgba(231, 76, 60, 0.18);
-  border: 1px solid #e74c3c;
-  border-radius: 4px;
-  font-size: 14px;
+  width: 20px;
+  height: 26px;
+  font-size: 13px;
+  line-height: 1;
+  color: #e8a08f;
+  background: linear-gradient(160deg, #4a2622, #301815);
+  border: 1px solid rgba(231, 76, 60, 0.5);
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 `;
 export const discardPileCount = css`
-  color: #e0e0e0;
+  color: #f2c4b8;
   font-weight: bold;
+  font-variant-numeric: tabular-nums;
 `;
 export const skillRow = css`
   margin-bottom: 4px;

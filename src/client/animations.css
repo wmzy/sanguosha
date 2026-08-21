@@ -176,6 +176,32 @@
   }
 }
 
+/* ─── 当前行动座位的金边呼吸(叠加在静态 box-shadow 上,仅动 outline-color) ─── */
+@keyframes activeSeatPulse {
+  0%, 100% {
+    outline-color: rgba(255, 215, 0, 0.95);
+  }
+  50% {
+    outline-color: rgba(255, 215, 0, 0.45);
+  }
+}
+
+/* ─── 结束回合按钮红光呼吸(仅动外发光,不闪按钮本体) ─── */
+@keyframes endTurnBreath {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 3px 12px rgba(196, 54, 38, 0.4),
+      0 0 14px rgba(231, 76, 60, 0.22);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      0 3px 12px rgba(196, 54, 38, 0.5),
+      0 0 26px rgba(231, 76, 60, 0.45);
+  }
+}
+
 /* ─── 淡入(通用) ─── */
 @keyframes fadeIn {
   from { opacity: 0; }
