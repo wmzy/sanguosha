@@ -329,7 +329,10 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   // 服务端座次分配与客户端映射漂移,UI 会停在「正在连接」。此处等价于刷新
   // 页面:teardown 全部连接后按同一 roomId 重新 join(服务端按 playerId 归还
   // 原座次),重建单活流。刷新页面始终能恢复,故此路径语义最稳。
+  // 仅对局开始后生效:配置阶段本就无任何视图,不设防会每 3s 全量重连,
+  // 服务端断连清理会把 readyPlayers 一并清掉(表现:准备按钮点完几秒内全部弹回)。
   useEffect(() => {
+    if (!gameStarted) return;
     if (views.has(perspective)) return;
     // 座次连接尚在建立(joins 未全部完成)时不判定失速,避免自愈与建连互相打断
     if (connectedCount < playerCount) return;
@@ -339,7 +342,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
       setReconnectNonce((n) => n + 1);
     }, 3000);
     return () => clearTimeout(timer);
-  }, [views, perspective, connectedCount, playerCount]);
+  }, [gameStarted, views, perspective, connectedCount, playerCount]);
 
   /** 展示层消息增强：seatPlayerIds/game_reset/判定牌 processing 延迟/event playback。
    *  HGC 已维护 view；这里只做渲染相关的额外处理。 */

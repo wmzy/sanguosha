@@ -23,7 +23,8 @@ export const pageRoot = css`
   font-family: 'Noto Sans SC', 'PingFang SC', sans-serif;
   background-color: ${colors.bg.page};
   color: ${colors.text.primary};
-  height: 100vh;
+  /* 撑满 GameViewScaler 画布(900px 设计高),不再直接用视口单位 */
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -228,7 +229,7 @@ export const battleFieldDecor = css`
   top: 48%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: min(500px, 62vw);
+  width: min(500px, 42%);
   aspect-ratio: 1;
   border-radius: 50%;
   background:
@@ -292,11 +293,6 @@ export const bottomLayout = css`
   background: rgba(0, 0, 0, 0.5);
   position: relative;
   overflow: hidden;
-  @media (max-width: 900px) {
-    height: auto;
-    flex-direction: column;
-    align-items: stretch;
-  }
 `;
 export const handColumn = css`
   flex: 1 1 auto;

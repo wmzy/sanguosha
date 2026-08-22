@@ -10,10 +10,14 @@ export const seatingArea = css`
   display: flex;
   flex-direction: column;
 `;
-// 弧形排列容器:其他玩家沿上半部分弧线分布
+// 弧形排列容器:其他玩家沿上半部分弧线分布。
+// 画布宽流式伸缩(1280~2240),超宽屏时座位环限宽居中,避免弧线过度拉伸走形
+// (座位定位为容器百分比,限宽即限弧);中央装饰/操作坞仍按整个战场区铺开。
 export const seatArcContainer = css`
   position: relative;
   width: 100%;
+  max-width: 1760px;
+  margin: 0 auto;
   height: 100%;
   overflow: visible;
 `;

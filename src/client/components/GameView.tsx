@@ -31,6 +31,7 @@ import { DevProfiler } from './DevProfiler';
 
 // ─── 抽取的子组件 ───
 import { GameHeader } from './GameHeader';
+import { GameViewScaler } from './GameViewScaler';
 import { OverlaysLayer } from './OverlaysLayer';
 import { AwaitingPrompt } from './AwaitingPrompt';
 import { PlayPhasePrompt } from './PlayPhasePrompt';
@@ -79,6 +80,12 @@ import type { ActionMsg } from '../types';
 interface Props {
   view: EngineGameView;
   onAction: (action: ActionMsg) => void;
+  /**
+   * 缩放容器的可用高度来源(透传 GameViewScaler):
+   * - 'viewport'(默认):占满整个视口。
+   * - 'fill':占满 flex 父容器剩余高度(回放页顶部有控制条时用)。
+   */
+  fit?: 'viewport' | 'fill';
   /** 整理手牌:重排顺序(不走 action,直接 mutate 后端 hand) */
   onReorderHand?: (order: string[]) => void;
   /** 双击其他座次卡片(通用 UI 事件;上层决定行为,如切换视角)。 */
@@ -120,6 +127,7 @@ interface Props {
 export function GameViewComponentImpl({
   view,
   onAction,
+  fit,
   onReorderHand,
   onSeatDoubleClick,
   headerSlot,
@@ -487,6 +495,8 @@ export function GameViewComponentImpl({
 
   return (
     <GameViewProvider value={ctxValue}>
+    {/* 等比缩放容器:内部按 900px 设计高度 + 流式画布宽渲染,整体 scale 适配视口 */}
+    <GameViewScaler fit={fit}>
     <div className={styles.pageRoot}>
       <OverlaysLayer
         isCharSelectPending={isCharSelectPending}
@@ -727,6 +737,7 @@ export function GameViewComponentImpl({
       {/* ─── Lottie 特效层(顶层 fixed,不拦截交互)─── */}
       <VfxLayer items={vfxItems} view={view} />
     </div>
+    </GameViewScaler>
     </GameViewProvider>
   );
 }

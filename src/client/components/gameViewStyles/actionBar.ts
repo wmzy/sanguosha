@@ -146,9 +146,6 @@ export const equipColumn = css`
   flex-direction: column;
   overflow: hidden;
   align-self: stretch;
-  @media (max-width: 900px) {
-    flex: 1 1 auto;
-  }
 `;
 export const equipColumnTitle = css`
   font-size: 11px;
@@ -241,9 +238,6 @@ export const playerCardLarge = css`
   display: flex;
   flex-direction: column;
   align-self: stretch;
-  @media (max-width: 900px) {
-    flex: 1 1 auto;
-  }
 `;
 // 自己处于回合时:金色高亮边框(谁的回合一目了然)
 export const playerCardTurn = css`
