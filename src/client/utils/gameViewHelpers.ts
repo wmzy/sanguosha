@@ -306,26 +306,49 @@ export function displayCardName(name: string, damageType?: string): string {
   return name;
 }
 
+// 官方 OL 式预设座次位表(战场区百分比):[leftPct, topPct]。
+// 结构 = 上排横列 + 左右两侧纵列(官方 7 人局:上 3、中左右 2、下左右 2,自己固定右下)。
+// 排列按逆时针环序(与座次行动顺序一致):从自己上家的右侧位开始,沿右缘向上、
+// 横穿顶排、再沿左缘向下。约束:座位块高约 38%(名牌+卡+标签行),同列相邻座
+// top 差需 ≥40% 防重叠;侧列 left ≤4% / ≥92%,避开中央操作坞(x∈[32.5,67.5])。
+const ARC_PRESETS: Record<number, Array<[number, number]>> = {
+  1: [[50, 1]],
+  // 2:顶排左右两角
+  2: [[76, 1], [24, 1]],
+  // 3:顶排三连
+  3: [[85, 1], [50, 0], [15, 1]],
+  // 4:右中 → 顶右 → 顶左 → 左中
+  4: [[92, 22], [80, 1], [20, 1], [6, 24]],
+  // 5:右中 → 顶排三 → 左中
+  5: [[92, 24], [78, 1], [50, 0], [22, 1], [6, 26]],
+  // 6:右中 → 顶右 → 顶中 → 顶左 → 左中 → 左下(自己概念上在右下)
+  6: [[93, 20], [74, 1], [50, 0], [26, 1], [6, 20], [6, 60]],
+  // 7:右纵列两座 → 顶排三 → 左纵列两座
+  7: [[93, 58], [93, 18], [72, 1], [50, 0], [28, 1], [6, 18], [6, 58]],
+};
+
 export function arcLayout(totalOthers: number, i: number): { leftPct: number; topPct: number } {
   if (totalOthers <= 0) return { leftPct: 50, topPct: 1 };
+  const preset = ARC_PRESETS[totalOthers];
+  if (preset && preset[i]) return { leftPct: preset[i][0], topPct: preset[i][1] };
   if (totalOthers === 1) return { leftPct: 50, topPct: 1 };
 
   const t = i / (totalOthers - 1);
-  // 标准极角:0=右, π/2=上, π=左。人数多时用完整上半圆,左右两侧落座。
-  const startAngle = totalOthers <= 3 ? Math.PI * 0.88 : Math.PI;
-  const endAngle = totalOthers <= 3 ? Math.PI * 0.12 : 0;
+  // 超出预设表的更多人数:回退均匀上半弧(极角:0=右, π/2=上, π=左)。
+  const startAngle = Math.PI;
+  const endAngle = 0;
   const angle = startAngle + (endAngle - startAngle) * t;
 
-  const rx = totalOthers <= 3 ? 38 : 44;
+  const rx = 44;
   // ry = cy - 1:最高点(弧顶)恰好贴近顶部(topPct≈1%),整体上移让武将卡尽量靠顶
   const cx = 50;
-  const cy = totalOthers <= 3 ? 14 : 19;
+  const cy = 19;
   const ry = cy - 1;
 
   const leftPct = cx + rx * Math.cos(angle);
   const topPct = cy - ry * Math.sin(angle);
   return {
-    leftPct: Math.min(94, Math.max(6, leftPct)),
-    topPct: Math.min(52, Math.max(0.5, topPct)),
+    leftPct: Math.min(94, Math.max(3, leftPct)),
+    topPct: Math.min(62, Math.max(0.5, topPct)),
   };
 }

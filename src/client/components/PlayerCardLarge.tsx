@@ -1,5 +1,7 @@
 // src/client/components/PlayerCardLarge.tsx
-// 视角玩家角色大卡(势力/身份/体力/技能/装备/判定)。
+// 视角玩家角色大卡(底栏右下,官方 OL 竖版武将卡形态):
+// 立绘填满 + 左缘竖带(身份章/竖排武将名/体力数字)+ 右缘骑边体力珠列 +
+// 底部紧凑技能按钮排(判定/手牌角标随排)。DOM 位置仍在 bottomLayout 内 stretch。
 // 从 GameView.tsx 抽出的纯展示组件——内部无状态,所有数据/回调由父组件传入。
 // 共享数据(view/perspectiveIdx/canOperate/skillActions)来自 GameViewCtx,专属数据仍走
 // props。为保留 memo comparator 采用「context 消费壳 + 内部 memo impl」模式。
@@ -112,20 +114,27 @@ export function PlayerCardLargeImpl({
       phase: view.phase,
       pending: view.pending,
     });
+  // 体力珠缩放:maxHealth ≥ 7 时整列高度会超出卡面,按 6/maxHealth 等比缩小珠体与间距
+  // (与座位卡 PlayerSeatView 同规则);≤ 6 沿用基础尺寸(标准 4 血场景无回归)。
+  const hpScale = p.maxHealth >= 7 ? 6 / p.maxHealth : 1;
+  const beadW = `${10 * hpScale}px`;
+  const beadH = `${14 * hpScale}px`;
+  const hpGap = `${3 * hpScale}px`;
+  // 身份小方章(左缘竖带顶部):主公金/忠臣蓝/反贼红/内奸紫
   const identityBadgeClass =
     identity === '主公'
-      ? styles.lordBadge
+      ? styles.playerCardStampLord
       : identity === '忠臣'
-        ? styles.loyalistBadge
+        ? styles.playerCardStampLoyalist
         : identity === '反贼'
-          ? styles.rebelBadge
+          ? styles.playerCardStampRebel
           : identity === '内奸'
-            ? styles.renegadeBadge
+            ? styles.playerCardStampRenegade
             : '';
 
   return (
     <>
-      {/* 武将立绘作大卡背景:始终渲染一层势力色,无素材/404 时回退势力色背景 */}
+      {/* 武将立绘:填满大卡(自身圆角裁剪);无素材/404 时回退势力色背景 */}
       <div
         className={styles.playerCardPortrait}
         style={{ '--faction-color': factionColor } as React.CSSProperties}
@@ -144,7 +153,17 @@ export function PlayerCardLargeImpl({
           />
         )}
       </div>
-      {/* 文字内容层:浮在立绘上 */}
+      {/* 右缘体力珠列:垂直排列,骑在卡右边框上(满珠绿渐变水滴/空珠透明底) */}
+      <div className={styles.playerCardHpBeadCol} style={{ gap: hpGap }} aria-hidden>
+        {Array.from({ length: p.maxHealth }, (_, i) => (
+          <span
+            key={i}
+            className={i < p.health ? styles.playerCardHpBeadFull : styles.playerCardHpBeadEmpty}
+            style={{ width: beadW, height: beadH }}
+          />
+        ))}
+      </div>
+      {/* 文字内容层:名牌横条(上) + 左缘竖带 + 底部紧凑技能排;中部透出立绘 */}
       <div className={cx(styles.playerCardContent, isChained && styles.playerCardChained)}>
       {/* 体力变化漂浮数字:伤害「-N」红 / 回血「+N」绿,上浮渐隐(动画状态由 useAnimationState 定时清除) */}
       {hpChange && (
@@ -159,7 +178,7 @@ export function PlayerCardLargeImpl({
           {hpChange.kind === 'heal' ? `+${hpChange.amount}` : `-${hpChange.amount}`}
         </span>
       )}
-      {/* 势力色顶部条 */}
+      {/* 名牌横条(卡顶):玩家名 + 徽章组(我/回合/⛓) */}
       <div
         className={styles.playerCardHeader}
         style={{ '--faction-color': factionColor } as React.CSSProperties}
@@ -167,38 +186,44 @@ export function PlayerCardLargeImpl({
       >
         <div className={styles.playerCardHeaderTop}>
           <span className={styles.playerCardName}>{p.name}</span>
-          <div>
-            {perspectiveIdx === viewer && <span className={styles.youBadge}>我</span>}
-            {isPerspectiveTurn && <span className={styles.turnBadge}>回合</span>}
+          <div className={styles.playerCardBadges}>
+            {perspectiveIdx === viewer && <span className={styles.playerCardBadgeYou}>我</span>}
+            {isPerspectiveTurn && <span className={styles.playerCardBadgeTurn}>回合</span>}
             {isChained && (
-              <span className={styles.chainBadge} title="横置·铁索连环">
+              <span className={styles.playerCardBadgeChain} title="横置·铁索连环">
                 ⛓
               </span>
             )}
-            {isDead && <span className={cx(styles.youBadge, styles.deadBadge)}>亡</span>}
-            {identity && <span className={identityBadgeClass}>{identity}</span>}
           </div>
         </div>
-        <div className={styles.playerCardChar}>{p.character || '未知'}</div>
       </div>
-      {/* 体力红心 */}
-      <div className={styles.seatHpRow}>
-        {Array.from({ length: p.maxHealth }, (_, i) => (
-          <span
-            key={i}
-            className={cx(
-              i < p.health ? styles.hpHeartFull : styles.hpHeartEmpty,
-              damageFlashIndices.has(perspectiveIdx) && styles.hpFlash,
-              healFlashIndices.has(perspectiveIdx) && styles.hpHealFlash,
-            )}
-          >
-            ♥
-          </span>
-        ))}
+      {/* 卡内左缘竖带:身份章 + 竖排武将名 + 体力数字 */}
+      <div className={styles.playerCardSideBand}>
+        {identity && (
+          <span className={cx(styles.playerCardStampBase, identityBadgeClass)}>{identity}</span>
+        )}
+        <span className={styles.playerCardChar}>{p.character || '未知'}</span>
+        <span
+          className={cx(
+            styles.playerCardHpNumber,
+            damageFlashIndices.has(perspectiveIdx) && styles.hpFlash,
+            healFlashIndices.has(perspectiveIdx) && styles.hpHealFlash,
+          )}
+        >
+          {p.health}
+        </span>
       </div>
+      {/* 死亡「亡」印章:旋转红字大印(立绘同时 grayscale) */}
+      {isDead && (
+        <span className={styles.playerCardDeadStamp} aria-hidden>
+          亡
+        </span>
+      )}
+      {/* 卡底部紧凑区:技能按钮排 + 判定行 + 手牌角标(官方为暗色小牌叠放) */}
+      <div className={styles.playerCardBottom}>
       {/* 技能区:被动为标签,可主动点击的为按钮 */}
       {visibleSkills.length > 0 && (
-        <div className={cx(styles.skillRow, styles.skillRowPad)}>
+        <div className={styles.playerCardSkillRow}>
           {visibleSkills.map((s) => {
             const btn = triggerableActions.find((a) => a.skillId === s);
             // 描述/资源按原 id(s)查询;展示名去前导"界"
@@ -234,7 +259,7 @@ export function PlayerCardLargeImpl({
                 key={s}
                 name={display}
                 description={desc}
-                className={styles.skillTag}
+                className={styles.playerCardSkillTag}
               />
             );
           })}
@@ -242,15 +267,15 @@ export function PlayerCardLargeImpl({
       )}
       {/* 判定区 */}
       {(p.pendingTricks?.length ?? 0) > 0 && (
-        <div className={cx(styles.judgeRow, styles.judgeRowPad)}>
-          <span className={styles.judgeRowLabel}>判定:</span>
+        <div className={styles.playerCardJudgeRow}>
+          <span className={styles.playerCardJudgeLabel}>判定:</span>
           {(p.pendingTricks ?? []).map((cardId: string) => {
             const card = view.cardMap[cardId];
             const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
             return (
               <span
                 key={cardId}
-                className={styles.judgeTag}
+                className={styles.playerCardJudgeTag}
                 style={{ '--suit-color': suitColor } as React.CSSProperties}
                 title={card?.description ?? card?.name ?? cardId}
               >
@@ -261,9 +286,10 @@ export function PlayerCardLargeImpl({
           })}
         </div>
       )}
-      {/* 手牌数 */}
-      <div className={styles.infoRow}>
-        <span>手牌: {p.handCount}</span>
+      {/* 手牌数角标 */}
+      <span className={styles.playerCardHandChip} title={`手牌: ${p.handCount}`}>
+        🂠 {p.handCount}
+      </span>
       </div>
       </div>
     </>

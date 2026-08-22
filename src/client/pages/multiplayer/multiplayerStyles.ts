@@ -32,6 +32,39 @@ export const subtitle = css`
   margin: 0 0 32px;
 `;
 
+/** 等待大厅页标题:金书风 + 两侧装饰渐变线(同选将面板标题做法,官方 OL 风格)。
+ *  与 `title`(底部下划线式)并存,按页面选用。 */
+export const pageTitle = css`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-size: 34px;
+  font-weight: bold;
+  margin: 0 0 8px;
+  letter-spacing: 6px;
+  color: #e8c47a;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  /* 防止窄容器下文字被逐字换行成竖排 */
+  white-space: nowrap;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 0 1 160px;
+    max-width: 220px;
+    min-width: 24px;
+    height: 7px;
+    background:
+      linear-gradient(#e8c47a, #e8c47a) right center / 5px 5px no-repeat,
+      linear-gradient(90deg, transparent, #8a7448) left center / calc(100% - 9px) 2px no-repeat;
+  }
+
+  &::after {
+    transform: scaleX(-1);
+  }
+`;
+
 const cardBase = css`
   padding: 28px;
   width: 100%;
@@ -78,14 +111,15 @@ export const divider = css`
   margin: 24px 0;
 `;
 
+/** 房间码盒:官方铜牌风(暗皮革底 + 铜边 + 内阴影) */
 export const roomCodeBox = css`
-  background-color: rgba(18, 24, 40, 0.6);
-  border: 2px dashed rgba(241, 196, 15, 0.45);
-  border-radius: 10px;
+  background: linear-gradient(#241d15, #171209);
+  border: 1px solid #8a7448;
+  border-radius: 8px;
   padding: 20px;
   text-align: center;
   margin-bottom: 20px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
 `;
 
 export const roomCodeLabel = css`
@@ -94,11 +128,12 @@ export const roomCodeLabel = css`
   margin-bottom: 6px;
 `;
 
+/** 房间码数字:#ffd700 22px 加粗等宽 */
 export const roomCode = css`
-  font-size: 32px;
+  font-size: 22px;
   font-weight: bold;
   letter-spacing: 6px;
-  color: ${colors.accent.gold};
+  color: #ffd700;
   font-family: monospace;
 `;
 

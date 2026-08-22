@@ -176,6 +176,20 @@
   }
 }
 
+/* ─── 被选为目标:红色边框脉冲(座位卡/大卡目标态,与回合金边/铁索冷光区分) ─── */
+@keyframes seatTargetPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.6),
+      0 0 10px 2px rgba(231, 76, 60, 0.5);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.6),
+      0 0 22px 5px rgba(231, 76, 60, 0.85);
+  }
+}
+
 /* ─── 当前行动座位的金边呼吸(叠加在静态 box-shadow 上,仅动 outline-color) ─── */
 @keyframes activeSeatPulse {
   0%, 100% {
