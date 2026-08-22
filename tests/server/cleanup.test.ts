@@ -298,6 +298,31 @@ describe('cleanupDisconnectedRooms — 无连接快速房间回收', () => {
     expect(getRoom(room.id)).not.toBeNull();
   });
 
+  // 回归:REST join 注册的 nullSink(isAlive=false)占位不算连接。
+  // 原Bug: 脚本/客户端 REST join 后从未开流(或单活流模式下非当前视角座次),
+  // players 里永远留着一个 nullSink 条目,「players 非空」恒真,
+  // 无连接回收永不触发——实测 dev server 积累 12+ 个 1 人僵尸 debug 房。
+  it('仅含 nullSink 占位的房间视为无连接,超 TTL 销毁', () => {
+    const room = makeRoom([]);
+    room.status = '等待中';
+    room.players.set('ghost', { send: () => {}, close: () => {}, isAlive: false });
+
+    // 首次扫描:记录起点
+    expect(cleanupDisconnectedRooms(t0, TTL)).not.toContain(room.id);
+    // 达到 TTL:销毁
+    expect(cleanupDisconnectedRooms(t0 + TTL, TTL)).toContain(room.id);
+    expect(getRoom(room.id)).toBeNull();
+  });
+
+  it('nullSink 与真实连接并存时不销毁(真实连接保命)', () => {
+    const room = makeRoom(['p1']);
+    room.status = '等待中';
+    room.players.set('ghost', { send: () => {}, close: () => {}, isAlive: false });
+
+    expect(cleanupDisconnectedRooms(t0 + TTL * 10, TTL)).not.toContain(room.id);
+    expect(getRoom(room.id)).not.toBeNull();
+  });
+
   it('计时中重连会清零:重新断开后重新计满 TTL 才销毁', () => {
     const room = makeRoom([]);
     room.status = '等待中';
