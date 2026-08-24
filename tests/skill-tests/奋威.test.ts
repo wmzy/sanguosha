@@ -251,13 +251,12 @@ describe('奋威', () => {
     // 奋威多选面板:选择 P3(座次2)令其无效
     await P1.respond('奋威', { targets: [2] });
 
-    // 无懈可击窗口(broadcast,逐目标)→ pass(无人打无懈) → 目标各自选择横置
+    // 无懈可击窗口(broadcast,逐目标)→ pass(无人打无懈) → 目标按当前状态自动切换
     await P1.pass(); // 无懈 target 2(P3)
-    // P3 选择横置(但被奋威令其无效 → 设横置被取消,维持未横置)
-    await harness.player('P3').respond('铁索连环', { option: '横置' });
+    // P3 未横置 → 应自动横置,但被奋威令其无效(设横置被 cancel,维持未横置)
     await P1.pass(); // 无懈 target 3(P4)
-    // P4 选择横置 → 生效
-    await harness.player('P4').respond('铁索连环', { option: '横置' });
+    // P4 未横置 → 自动横置 → 生效
+    await harness.waitForStable();
 
     // 验证:P3(座次2)未被横置(被奋威无效),P4(座次3)被横置
     expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(false);
@@ -302,11 +301,10 @@ describe('奋威', () => {
     await P1.respond('奋威', { choice: true });
     await P1.respond('奋威', { targets: [2, 3] });
 
-    // 无懈窗口(逐目标)→ pass → 目标各自选择(均被奋威无效)
+    // 无懈窗口(逐目标)→ pass → 目标自动切换(P3/P4 均未横置,应横置,但都被奋威无效)
     await P1.pass(); // 无懈 target 2
-    await harness.player('P3').respond('铁索连环', { option: '横置' });
     await P1.pass(); // 无懈 target 3
-    await harness.player('P4').respond('铁索连环', { option: '横置' });
+    await harness.waitForStable();
 
     // P3 和 P4 都未被横置(都被奋威无效)
     expect(harness.state.players[2].marks.some((m) => m.id === 'chained')).toBe(false);

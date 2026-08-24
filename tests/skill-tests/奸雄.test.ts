@@ -1,7 +1,7 @@
 // 奸雄(曹操·被动技)测试
-//   官方效果:当你受到伤害后,你可以获得造成此伤害的牌。
+//   界奸雄效果:当你受到伤害后,你可以获得造成此伤害的牌,并摸一张牌(两项效果,非二选一)。
 //   无来源伤害(闪电等)无牌可获得,技能不发动。
-//   获得伤害牌采用延迟拿取,避免父结算重复入弃牌堆。
+//   获得伤害牌采用延迟拿取,避免父结算重复入弃牌堆;摸一张在成功获得后执行。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import { runDamageFlow } from '../../src/engine/flows/damage';
@@ -55,19 +55,22 @@ describe('奸雄', () => {
     harness = new SkillTestHarness();
   });
 
-  // ─── 获得伤害牌(杀) ─────────────────────────────
-  it('P0 杀 P1(曹操) → P1 不闪 → 奸雄选获得 → 杀牌进 P1 手牌(弃牌堆不重复)', async () => {
+  // ─── 获得伤害牌(杀)并摸一张 ─────────────────────
+  it('P0 杀 P1(曹操) → P1 不闪 → 奸雄发动 → 获得杀牌并摸一张(弃牌堆不重复)', async () => {
     const slash = makeCard('k1', '杀', '♠', '7');
+    const draw = makeCard('d1', '闪', '♦', '3');
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['k1'], skills: ['杀'] }),
         makePlayer({ index: 1, name: 'P1', hand: ['s1'], skills: ['奸雄', '闪'], health: 4 }),
       ],
-      cardMap: { k1: slash, s1: makeCard('s1', '闪', '♥', '2') },
+      cardMap: { k1: slash, s1: makeCard('s1', '闪', '♥', '2'), d1: draw },
       currentPlayerIndex: 0,
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
+    // 摸牌堆放一张:奸雄获得伤害牌后摸一张
+    state.zones = { deck: ['d1'], discardPile: [], processing: [] };
     await harness.setup(state);
     const P0 = harness.player('P0');
     const P1 = harness.player('P1');
@@ -75,12 +78,16 @@ describe('奸雄', () => {
     await P0.useCardAndTarget('杀', 'k1', [1]);
     await P1.pass(); // 不出闪 → 扣血 → 奸雄询问
     P1.expectPending('请求回应');
-    // 选获得伤害牌(choice=true)
+    // 发动奸雄(choice=true)→ 获得伤害牌 + 摸一张
     await P1.respond('奸雄', { choice: true });
     await harness.waitForStable();
 
     // 杀牌进入 P1 手牌
     expect(harness.state.players[1].hand).toContain('k1');
+    // 并摸一张(d1 从牌堆进入手牌)
+    expect(harness.state.players[1].hand).toContain('d1');
+    expect(harness.state.players[1].hand).toHaveLength(3); // s1 + k1 + d1
+    expect(harness.state.zones.deck).toHaveLength(0);
     // 弃牌堆不含杀牌(被奸雄拿走,不重复)
     expect(harness.state.zones.discardPile).not.toContain('k1');
     // P1 受了 1 点伤害

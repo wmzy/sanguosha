@@ -1,4 +1,4 @@
-// 奸雄(曹操·被动技):当你受到伤害后,你可以获得造成此伤害的牌。
+// 奸雄(曹操·被动技):当你受到伤害后,你可以获得造成此伤害的牌,并摸一张牌。
 //   无来源伤害(闪电等)无牌可获得,技能不发动。
 //
 // 时序关键:伤害牌在造成伤害时位于 frame.cards(处理区),父 execute
@@ -20,7 +20,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '奸雄',
-    description: '当你受到伤害后,你可以获得造成此伤害的牌',
+    description: '当你受到伤害后,你可以获得造成此伤害的牌,并摸一张牌',
   };
 }
 
@@ -65,8 +65,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       target: ownerId,
       prompt: {
         type: 'confirm',
-        title: '奸雄:是否获得造成此伤害的牌?',
-        confirmLabel: '获得',
+        title: '奸雄:是否获得造成此伤害的牌,并摸一张牌?',
+        confirmLabel: '发动',
         cancelLabel: '不发动',
       },
       defaultChoice: false,
@@ -75,7 +75,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     const choice = ctx.state.localVars[CHOICE_KEY] === true;
     if (choice) {
-      // 获得伤害牌:延迟到该牌入弃牌堆时拿取(见下方 移动牌 after hook)
+      // 界奸雄:获得伤害牌 + 摸一张牌(两项效果,非二选一)。
+      // 获得采用延迟拿取(见下方 移动牌 after hook),摸一张在成功获得后执行。
       ctx.state.localVars[WANTCARD_KEY] = effectiveId;
     }
     delete ctx.state.localVars[CHOICE_KEY];
@@ -100,6 +101,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       from: { zone: '弃牌堆' },
       to: { zone: '手牌', player: ownerId },
     });
+    // 界奸雄第二段效果:获得伤害牌后摸一张牌(获得失败被拿走则不摸)
+    await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
   });
 
   return () => {};

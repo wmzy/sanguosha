@@ -206,7 +206,9 @@ export function joinRoom(
   if (!room) return null;
   // 显示名在所有路径(复用座位/新入座)统一刷新——重连时若用户已改名则以最新为准
   if (displayName) room.playerNames.set(playerId, displayName);
-  if (room.status !== '等待中') return null;
+  // 「已结束」(上一局打完,等房主再来一局)同样允许加入空座——否则退出房间的玩家
+  // 无法重新加入,只能旁观(游戏结束后 status 停留在 已结束,直到房主重置)。
+  if (room.status !== '等待中' && room.status !== '已结束') return null;
   if (room.players.has(playerId)) return null;
 
   // 如果玩家已在 seats 中（SSE 断开重连时 seats 残留），复用已有座位
@@ -710,7 +712,8 @@ export function removeSpectator(roomId: string, spectatorId: string): Room | nul
   return room;
 }
 
-/** 切换玩家身份（仅等待中允许）。player↔spectator。
+/** 切换玩家身份。player↔spectator。「等待中」与「已结束」(上一局打完等重置)均允许——
+ *  结束后旁观者点击空座位可直接入座,无需等房主点「再来一局」。
  *  身份互斥：切换后确保 playerId 只在一方（players 或 spectators），不留残留。 */
 export function switchRole(
   roomId: string,
@@ -720,7 +723,7 @@ export function switchRole(
 ): { room: Room; success: boolean } {
   const room = roomList.get(roomId);
   if (!room) return { room: null as never, success: false };
-  if (room.status !== '等待中') return { room, success: false };
+  if (room.status !== '等待中' && room.status !== '已结束') return { room, success: false };
 
   if (newRole === 'spectator') {
     // player → spectator

@@ -1,5 +1,5 @@
-// 界狂骨(界魏延·被动可选技):当你对一名角色造成伤害时,若你与其距离不大于 1,
-// 你可以回复 1 点体力或摸一张牌(二选一)。
+// 界狂骨(界魏延·被动可选技):当你对一名角色每造成1点伤害时,若你与其距离不大于 1,
+// 你可以回复 1 点体力或摸一张牌(按伤害点数逐点发动,2点伤害可发动两次)。
 //
 // 实现(被动 after-hook + 两步 respond,同狂骨模式):
 //   造成伤害 after-hook(source===ownerId, amount>0):
@@ -33,7 +33,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '界狂骨',
-    description: '对距离1以内的角色造成伤害时,你可以回复1点体力或摸一张牌',
+    description: '对距离1以内的角色每造成1点伤害时,你可以回复1点体力或摸一张牌',
   };
 }
 
@@ -68,11 +68,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 造成伤害 after hook:狂骨主逻辑 ──
+  // ── 造成伤害 after hook:界狂骨主逻辑 ──
+  // 同狂骨:每造成1点伤害独立发动一次(2点伤害可发动两次),逐点询问。
   registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.source !== ownerId) return;
-    if ((atom.amount ?? 0) <= 0) return;
+    const amount = atom.amount ?? 0;
+    if (amount <= 0) return;
     if (atom.target === undefined) return;
     const target = atom.target;
     if (!ctx.state.players[target]?.alive) return;
@@ -80,51 +82,53 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 距离 1 以内(含自己):effectiveDistance 最小为 1
     if (effectiveDistance(ctx.state, ownerId, target) > 1) return;
 
-    const self = ctx.state.players[ownerId];
-    if (!self?.alive) return;
+    for (let i = 0; i < amount; i++) {
+      const self = ctx.state.players[ownerId];
+      if (!self?.alive) return;
 
-    // 满血时回复体力无效:禁用「回复体力」按钮(confirmDisabled),玩家只能摸牌。
-    const fullHealth = self.health >= self.maxHealth;
+      // 满血时回复体力无效:禁用「回复体力」按钮(confirmDisabled),玩家只能摸牌。
+      const fullHealth = self.health >= self.maxHealth;
 
-    // 1. 询问是否发动界狂骨(可选触发)
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_REQUEST,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动界狂骨?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
-      defaultChoice: false,
-      timeout: 30,
-    });
-    if (ctx.state.localVars[CONFIRMED_KEY] !== true) return; // 不发动 → 无效果
+      // 1. 询问是否发动界狂骨(可选触发)
+      delete ctx.state.localVars[CONFIRMED_KEY];
+      await applyAtom(ctx.state, {
+        type: '请求回应',
+        requestType: CONFIRM_REQUEST,
+        target: ownerId,
+        prompt: {
+          type: 'confirm',
+          title: `是否发动界狂骨?(第 ${i + 1}/${amount} 点伤害)`,
+          confirmLabel: '发动',
+          cancelLabel: '不发动',
+        },
+        defaultChoice: false,
+        timeout: 30,
+      });
+      if (ctx.state.localVars[CONFIRMED_KEY] !== true) continue; // 本点不发动,继续下一点
 
-    // 2. 发动 → 询问二选一(回复 1 点体力 / 摸 1 张牌)
-    delete ctx.state.localVars[CHOICE_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CHOOSE_REQUEST,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '界狂骨:回复1点体力,或摸一张牌?',
-        confirmLabel: '回复1点体力',
-        cancelLabel: '摸一张牌',
-        confirmDisabled: fullHealth ? true : undefined,
-      },
-      defaultChoice: false,
-      timeout: 30,
-    });
-    const choice = ctx.state.localVars[CHOICE_KEY] as string | undefined;
-    if (choice === 'heal') {
-      await applyAtom(ctx.state, { type: '回复体力', target: ownerId, amount: 1 });
-    } else {
-      // 'draw' / 超时缺省 → 摸一张牌(已承诺发动,不浪费机会;同狂骨已发动分支)
-      await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
+      // 2. 发动 → 询问二选一(回复 1 点体力 / 摸 1 张牌)
+      delete ctx.state.localVars[CHOICE_KEY];
+      await applyAtom(ctx.state, {
+        type: '请求回应',
+        requestType: CHOOSE_REQUEST,
+        target: ownerId,
+        prompt: {
+          type: 'confirm',
+          title: '界狂骨:回复1点体力,或摸一张牌?',
+          confirmLabel: '回复1点体力',
+          cancelLabel: '摸一张牌',
+          confirmDisabled: fullHealth ? true : undefined,
+        },
+        defaultChoice: false,
+        timeout: 30,
+      });
+      const choice = ctx.state.localVars[CHOICE_KEY] as string | undefined;
+      if (choice === 'heal') {
+        await applyAtom(ctx.state, { type: '回复体力', target: ownerId, amount: 1 });
+      } else {
+        // 'draw' / 超时缺省 → 摸一张牌(已承诺发动,不浪费机会;同狂骨已发动分支)
+        await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
+      }
     }
   });
 

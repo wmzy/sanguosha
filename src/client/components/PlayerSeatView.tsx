@@ -113,6 +113,12 @@ function PlayerSeatViewImpl({
   const beadW = `${10 * hpScale}px`;
   const beadH = `${14 * hpScale}px`;
   const hpGap = `${3 * hpScale}px`;
+  // 珠列方向:损失的体力(空珠)在上方,剩余体力(满珠)在下方。
+  // 满珠颜色按剩余体力比例分色:>50% 绿 / >25% 黄 / ≤25% 红(濒危警示)。
+  const lostCount = Math.max(0, player.maxHealth - player.health);
+  const hpRatio = player.maxHealth > 0 ? player.health / player.maxHealth : 1;
+  const hpBeadFullCls =
+    hpRatio > 0.5 ? seatHpBeadFull : hpRatio > 0.25 ? seatHpBeadFullMid : seatHpBeadFullLow;
 
   return (
     <div
@@ -225,12 +231,14 @@ function PlayerSeatViewImpl({
             </span>
           )}
         </div>
-        {/* 右缘体力珠列:垂直排列,骑在卡右边框上;满珠绿渐变水滴,空珠透明底 */}
-        <div className={seatHpBeadCol} style={{ gap: hpGap }} aria-hidden>
+        {/* 右缘体力珠列:垂直排列,骑在卡右边框上;空珠(已损失)在上,满珠在下按余量分色 */}
+        <div className={seatHpBeadCol} style={{ gap: hpGap }} aria-hidden data-hp-beads>
           {Array.from({ length: player.maxHealth }, (_, i) => (
             <span
               key={i}
-              className={i < player.health ? seatHpBeadFull : seatHpBeadEmpty}
+              className={i < lostCount ? seatHpBeadEmpty : hpBeadFullCls}
+              data-full={i < lostCount ? undefined : 'true'}
+              data-hue={i < lostCount ? undefined : hpRatio > 0.5 ? 'green' : hpRatio > 0.25 ? 'yellow' : 'red'}
               style={{ width: beadW, height: beadH }}
             />
           ))}
@@ -738,6 +746,7 @@ const seatHpBeadCol = css`
   align-items: center;
   pointer-events: none;
 `;
+// 满珠分色:剩余体力 >50% 绿 / >25% 黄 / ≤25% 红(濒危警示)
 const seatHpBeadFull = css`
   box-sizing: border-box;
   flex-shrink: 0;
@@ -749,6 +758,30 @@ const seatHpBeadFull = css`
     inset 0 2px 2px rgba(255, 255, 255, 0.35),
     inset 0 -1px 2px rgba(0, 0, 0, 0.25),
     0 0 6px rgba(126, 200, 80, 0.45);
+`;
+const seatHpBeadFullMid = css`
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: linear-gradient(135deg, #e8c84a 8%, #b8862a 92%);
+  border: 1px solid rgba(122, 88, 20, 0.9);
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.25),
+    0 0 6px rgba(232, 200, 74, 0.45);
+`;
+const seatHpBeadFullLow = css`
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: linear-gradient(135deg, #e85d4a 8%, #a8281a 92%);
+  border: 1px solid rgba(122, 30, 20, 0.9);
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.25),
+    0 0 6px rgba(232, 93, 74, 0.5);
 `;
 const seatHpBeadEmpty = css`
   box-sizing: border-box;

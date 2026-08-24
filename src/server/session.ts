@@ -381,6 +381,11 @@ export class GameSession {
     if (this.replayBaseline.length > 0) return; // 已捕获本局
     const players = this.state.players;
     if (players.length === 0 || !players.every((p) => p.character)) return;
+    // 选将保密窗口(charSelecting)内不捕获:此时 buildView 对非本人/旁观者
+    // 红化 character,捕到的是残缺基线(旁观座次全空),ReplayRecorder.record
+    // 会因「存在 character 为空的玩家」拒绝初始化 → 录像 hasData=false。
+    // 等开局.ts 清除 charSelecting + 亮将后的 onStateChange 再捕获(完整视图)。
+    if (this.state.charSelecting === true) return;
     const views: GameView[] = [];
     for (let v = 0; v < players.length; v++) {
       views.push(JSON.parse(JSON.stringify(buildView(this.state, v))) as GameView);

@@ -121,3 +121,68 @@ describe('横置(铁索连环)前端展示', () => {
     expect(badges.length).toBeGreaterThanOrEqual(1);
   });
 });
+
+// 体力珠列展示(2026-08-24 对齐官方):损失的体力(空珠)在上方、剩余体力(满珠)在下方,
+// 满珠按剩余体力比例分色(>50% 绿 / >25% 黄 / ≤25% 红)。
+function makeHpView(health: number, maxHealth: number): GameView {
+  return {
+    viewer: 0,
+    currentPlayerIndex: 0,
+    phase: '出牌',
+    turn: { round: 1, phase: '出牌', vars: {} },
+    players: [
+      {
+        index: 0, name: 'P0', character: '刘备', health: 4, maxHealth: 4, alive: true,
+        equipment: {}, skills: [], handCount: 0, marks: [],
+      },
+      {
+        index: 1, name: 'P1', character: '曹操', health, maxHealth, alive: true,
+        equipment: {}, skills: [], handCount: 0, marks: [],
+      },
+    ],
+    cardMap: {},
+    pending: null, deadline: null, deadlineTotalMs: 0, log: [], settlementStack: [],
+  };
+}
+
+describe('体力珠列方向与分色', () => {
+  beforeEach(() => { clearRegistry(); });
+
+  /** 取 P1 座位卡的珠列(每颗珠的 data 属性,自上而下) */
+  function beads(container: HTMLElement): Array<{ full: boolean; hue: string | null }> {
+    const seat = Array.from(container.querySelectorAll('[data-player-name]'))
+      .find((s) => s.getAttribute('data-player-name') === 'P1')!;
+    const col = seat.querySelector('[data-hp-beads]')!;
+    return Array.from(col.children).map((b) => ({
+      full: b.hasAttribute('data-full'),
+      hue: b.getAttribute('data-hue'),
+    }));
+  }
+
+  it('满血:全部满珠(绿色)', () => {
+    const { container } = render(<GameViewComponent view={makeHpView(4, 4)} onAction={() => {}} readOnly />);
+    const bs = beads(container);
+    expect(bs).toHaveLength(4);
+    expect(bs.every((b) => b.full && b.hue === 'green')).toBe(true);
+  });
+
+  it('受伤:空珠在上、满珠在下', () => {
+    const { container } = render(<GameViewComponent view={makeHpView(2, 4)} onAction={() => {}} readOnly />);
+    const bs = beads(container);
+    expect(bs).toHaveLength(4);
+    // 前 2 颗(上方)= 空珠;后 2 颗(下方)= 满珠
+    expect(bs.map((b) => b.full)).toEqual([false, false, true, true]);
+  });
+
+  it('分色:剩余比例递减 → 绿(>50%) → 黄(>25%) → 红(≤25%)', () => {
+    const render4 = (health: number) => {
+      const utils = render(<GameViewComponent view={makeHpView(health, 4)} onAction={() => {}} readOnly />);
+      const hue = beads(utils.container).find((b) => b.full)!.hue;
+      utils.unmount();
+      return hue;
+    };
+    expect(render4(4)).toBe('green'); // 4/4 = 100%
+    expect(render4(2)).toBe('yellow'); // 2/4 = 50%
+    expect(render4(1)).toBe('red'); // 1/4 = 25%
+  });
+});

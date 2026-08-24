@@ -186,8 +186,10 @@ export function applyRestRoutes(app: Hono): void {
       return c.json({ roomId: id, playerId, playerName: user.displayName });
     }
 
-    // 新玩家加入：游戏进行中不允许
-    if (room.status !== '等待中') return c.json({ error: '游戏已开始' }, 400);
+    // 新玩家加入：游戏进行中不允许（「已结束」允许——上一局打完等房主重置,
+    // 此时退出房间的玩家可重新加入空座,旁观者也可入座）
+    if (room.status !== '等待中' && room.status !== '已结束')
+      return c.json({ error: '游戏已开始' }, 400);
 
     // 有密码房间:验证进房密码(成员重连/已在房间已在上方豁免)
     if (room.passwordHash) {
@@ -672,7 +674,7 @@ export function applyRestRoutes(app: Hono): void {
 
     const result = switchRole(roomId, playerId, newRole, seat);
     if (!result.room) return c.json({ error: '房间不存在' }, 404);
-    if (!result.success) return c.json({ error: '切换失败（仅等待中允许，或房间已满）' }, 400);
+    if (!result.success) return c.json({ error: '切换失败（仅等待中/已结束允许，或房间已满）' }, 400);
 
     broadcastMessage(result.room, { type: 'role_changed', playerId, newRole });
     broadcastRoomState(result.room);
