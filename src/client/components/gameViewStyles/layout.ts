@@ -221,6 +221,20 @@ export const centerTable = css`
   }
 `;
 
+/** 左下角区域 HUD:牌堆/弃牌堆计数(官方 p0 弃牌区位置)。
+ *  层级低于一切弹窗(选将 10100 / 结算 10100),不再与武将卡/弹窗争位。 */
+export const zoneCornerHud = css`
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  pointer-events: none;
+`;
+
 /** 牌桌中心装饰:低透明度同心圆纹样,营造「桌面」氛围并填补中央空旷感。
  *  纯装饰层:不拦截任何交互(pointer-events:none),z-index 低于 centerTable。
  *  层次(自上而下):中心微光 → 绸缎放射细纹 → 主金环 + 副细环。 */

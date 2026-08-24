@@ -47,7 +47,7 @@ export function IdentityRevealOverlay({ identity, onConfirm }: IdentityRevealOve
 const overlayRoot = css`
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  z-index: 10100;
   display: flex;
   flex-direction: column;
   align-items: center;

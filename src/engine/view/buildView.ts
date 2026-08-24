@@ -160,16 +160,20 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     currentPlayerIndex: state.currentPlayerIndex,
     phase: state.phase,
     turn: state.turn,
-    players: state.players.map((p, i) => ({
+    players: state.players.map((p, i) => {
+      // 选将保密:选将进行中,非本人视角不投影角色/势力/技能(名字投影昵称);
+      // 选将结束由 亮将 原子统一公开。debug 视角不受限。
+      const hideChar = state.charSelecting === true && !debug && i !== viewer;
+      return {
       index: i,
-      name: p.name,
-      character: p.character,
-      faction: p.faction,
+      name: hideChar ? (p.nickname ?? '') : p.name,
+      character: hideChar ? '' : p.character,
+      faction: hideChar ? undefined : p.faction,
       health: p.health,
       maxHealth: p.maxHealth,
       alive: p.alive,
       equipment: { ...p.equipment },
-      skills: [...p.skills],
+      skills: hideChar ? [] : [...p.skills],
       handCount: p.hand.length,
       hand: (i === viewer || debug) ? p.hand.map((id) => state.cardMap[id]).filter(Boolean) : undefined,
       marks: [...p.marks],
@@ -203,7 +207,8 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
         // 其他玩家:隐藏
         return { identity: undefined, identityHidden: true };
       })(),
-    })),
+      };
+    }),
     cardMap: state.cardMap,
     pending,
     deadline,

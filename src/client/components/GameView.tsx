@@ -36,7 +36,7 @@ import { OverlaysLayer } from './OverlaysLayer';
 import { AwaitingPrompt } from './AwaitingPrompt';
 import { PlayPhasePrompt } from './PlayPhasePrompt';
 import { SeatArcLayout } from './SeatArcLayout';
-import { ZoneInfoBar } from './ZoneInfoBar';
+import { ZoneInfoBar, ZoneCornerCounts } from './ZoneInfoBar';
 import { HeaderToolbar } from './HeaderToolbar';
 import { CenterActionBar } from './CenterActionBar';
 import { HandArea } from './HandArea';
@@ -656,10 +656,15 @@ export function GameViewComponentImpl({
               />
             </DevProfiler>
 
-            {/* 中央:牌堆/处理区 + 出牌历史条 */}
+            {/* 中央:处理区 + 出牌历史条(牌堆/弃牌计数已移至左下角 HUD) */}
             <div className={styles.centerTable}>
               <ZoneInfoBar />
               <PlayHistoryStrip items={playHistoryItems} />
+            </div>
+
+            {/* 左下角:牌堆/弃牌堆计数(官方 p0 左下弃牌区位置;z-index 低于弹窗) */}
+            <div className={styles.zoneCornerHud}>
+              <ZoneCornerCounts />
             </div>
           </div>
         </div>

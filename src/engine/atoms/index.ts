@@ -67,7 +67,7 @@ import { 设横置 } from './设横置';
 import { 询问杀 } from './询问杀';
 import { 询问闪 } from './询问闪';
 import { 请求回应 } from './请求回应';
-import { 抽身份, 初始化洗牌, 发牌, 选将询问, 并行选将 } from './选将';
+import { 抽身份, 初始化洗牌, 发牌, 选将询问, 并行选将, 亮将 } from './选将';
 import { 选择目标时 } from './选择目标时';
 import { 重洗 } from './重洗';
 import { 阶段开始 } from './阶段开始';
@@ -178,6 +178,7 @@ export const atomMap: Record<AtomName, AtomDefinition<any>> = {
   发牌,
   选将询问,
   并行选将,
+  亮将,
   选择目标时,
   重洗,
   阶段开始,

@@ -40,8 +40,8 @@ export function SeatMap() {
           );
           return (
             <div key={i} className={seatCol}>
-              {/* 名牌条(有玩家时):玩家名 + 房主/我标记 */}
-              {!isEmpty && (
+              {/* 名牌条(有玩家时):玩家名 + 房主/我标记;空位渲染等高占位,避免相邻列牌位高低不齐 */}
+              {!isEmpty ? (
                 <div className={seatNameTag}>
                   <span className={seatNameText}>
                     {memberName(seatPlayerId, mp.roomState?.playerNames)}
@@ -49,6 +49,8 @@ export function SeatMap() {
                   {isHostSeat && <span className={seatHostMark}>（房主）</span>}
                   {isMe && <span className={seatMeMark}>（我）</span>}
                 </div>
+              ) : (
+                <div className={seatNameTagPlaceholder} aria-hidden />
               )}
               <div className={seatPlateWrap}>
                 {/* 座次牌:点击加入/移动/请求交换;自座不可点 */}
@@ -177,6 +179,13 @@ const seatNameTag = css`
   border: 1px solid #5a4a30;
   border-radius: 4px;
   padding: 3px 10px;
+`;
+
+/* 空位名牌占位:与名牌条同高(内容高 13px + padding 3px*2 + 边框 1px*2),保持各列牌位顶边对齐 */
+const seatNameTagPlaceholder = css`
+  width: 118px;
+  height: 23px;
+  visibility: hidden;
 `;
 
 const seatNameText = css`
@@ -332,6 +341,9 @@ const seatReadyTrack = css`
   height: 6px;
   border-radius: 3px;
   background: #2a2119;
+  /* 描边让轨道本身可见:未就绪时只显示 30% 暗红填充,无描边会像一截悬空红段 */
+  border: 1px solid #453823;
+  box-sizing: border-box;
   overflow: hidden;
 `;
 

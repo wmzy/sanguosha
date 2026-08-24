@@ -92,7 +92,6 @@ export function OverlaysLayer(props: OverlaysLayerProps) {
               params: { character: characterName },
             });
           }}
-          lordCharacter={view.players.find((p) => p.identity === '主公')?.character}
           overlaySlot={overlaySlot}
         />
       )}

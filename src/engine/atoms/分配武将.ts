@@ -26,6 +26,8 @@ export const 分配武将: AtomDefinition<{ target: number; character: string; s
   apply(state, atom) {
     const p = state.players[atom.target];
     if (!p) throw new Error(`分配武将: target ${atom.target} not found (validate 已通过)`);
+    // 保留原昵称(选将期名牌展示用);name 随后覆写为武将名(对局日志口径)
+    if (!p.nickname) p.nickname = p.name;
     p.character = atom.character;
     p.name = atom.character;
     p.skills = atom.skills;
@@ -57,11 +59,19 @@ export const 分配武将: AtomDefinition<{ target: number; character: string; s
       health: maxHp,
     };
     // 所有玩家都能看到角色分配结果(角色名是公开信息)
+    // 选将保密:选将进行中时,非本人视角只收到「已选将」占位事件(不带角色信息),
+    // 角色统一在选将结束后的 亮将 原子中公开。
+    if (state.charSelecting) {
+      const redacted: ViewEvent = { type: '分配武将', target: atom.target };
+      return { ownerViews: new Map([[atom.target, view]]), othersView: redacted };
+    }
     return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
     const target = event.target as number;
-    const character = event.character as string;
+    const character = event.character as string | undefined;
+    // 选将期红化事件(无 character):仅标记占位,不写任何可见字段
+    if (!character) return;
     const skills = (event.skills ?? []) as string[];
     const pi = view.players.findIndex((p) => p.index === target);
     if (pi < 0) return;

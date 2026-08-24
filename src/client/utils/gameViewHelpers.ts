@@ -313,8 +313,8 @@ export function displayCardName(name: string, damageType?: string): string {
 // top 差需 ≥40% 防重叠;侧列 left ≤4% / ≥92%,避开中央操作坞(x∈[32.5,67.5])。
 const ARC_PRESETS: Record<number, Array<[number, number]>> = {
   1: [[50, 1]],
-  // 2:顶排左右两角
-  2: [[76, 1], [24, 1]],
+  // 2(3人局):两对手分居左右中位(p0),主公概念上在顶中;i=0 为右侧下家
+  2: [[89, 34], [9, 34]],
   // 3:顶排三连
   3: [[85, 1], [50, 0], [15, 1]],
   // 4:右中 → 顶右 → 顶左 → 左中

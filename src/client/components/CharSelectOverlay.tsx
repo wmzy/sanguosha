@@ -57,8 +57,6 @@ interface CharSelectOverlayProps {
    *  通过 prop 注入而非直接 import,便于解耦与单元测试。
    *  找不到时回退 faction='群'、maxHealth=4。 */
   getCharacterMeta: (name: string) => CharacterMeta | undefined;
-  /** 主公已选的武将名(主公选完后,其他玩家查看时展示) */
-  lordCharacter?: string;
   /** 右上角插槽:上层渲染视角控制等 debug UI。 */
   overlaySlot?: ReactNode;
 }
@@ -79,7 +77,6 @@ export function CharSelectOverlay({
   totalMs,
   onSelect,
   getCharacterMeta,
-  lordCharacter,
   overlaySlot,
 }: CharSelectOverlayProps) {
   useSkillDescReady(); // 技能模块加载后重渲染,确保候选武将技能描述 title 命中
@@ -228,10 +225,6 @@ export function CharSelectOverlay({
         )}
         {!isLord && !isSelfSelecting && <div className={subHint}>选将保密</div>}
 
-        {/* 主公已选武将(主公身份公开,选将结果所有人可见) */}
-        {!isLord && lordCharacter && (
-          <div className={lordPickedHint}>主公已选择: {lordCharacter}</div>
-        )}
 
         {/* 自身信息区:身份印章 + 座次印章(横排) */}
         <div className={selfInfoRow}>
@@ -281,8 +274,10 @@ export function CharSelectOverlay({
               />
             </div>
 
-            {/* 候选网格:固定 5 列,多版本组 hover 原地水平展开 */}
-            <div className={candidateGrid}>
+            {/* 候选网格:固定 5 列,多版本组 hover 原地水平展开。
+                网格区内部滚动,标题/筛选/确认按钮固定可见(面板不再整页滚动)。 */}
+            <div className={gridScroll}>
+              <div className={candidateGrid}>
               {visibleGroups.map((versions) => {
                 const baseId = versions[0].baseId ?? versions[0].name;
                 const isMulti = versions.length > 1;
@@ -385,6 +380,7 @@ export function CharSelectOverlay({
                   },
                 );
               })}
+              </div>
             </div>
 
             {/* 筛选/搜索无命中时给出明确提示,而非留白 */}
@@ -429,7 +425,7 @@ export function CharSelectOverlay({
 const overlayRoot = css`
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 10100;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -458,8 +454,11 @@ const panel = css`
   width: 92%;
   max-width: 1150px;
   max-height: 790px;
-  overflow-y: auto;
-  padding: 24px 28px;
+  /* 面板为 flex 列:标题/身份/筛选/按钮固定,仅候选网格区内部滚动 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 16px 24px 14px;
   border: 1px solid #7a6335;
   border-radius: 10px;
   box-shadow:
@@ -476,6 +475,13 @@ const panel = css`
     linear-gradient(#c4a254, #c4a254) right 9px bottom 9px / 16px 2px no-repeat,
     linear-gradient(#c4a254, #c4a254) right 9px bottom 9px / 2px 16px no-repeat,
     linear-gradient(#1a150f, #120d08);
+`;
+
+/* 候选网格滚动容器:占据面板剩余高度,网格超高时仅此区滚动 */
+const gridScroll = css`
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   scrollbar-width: thin;
 `;
 
@@ -485,11 +491,12 @@ const selectTitle = css`
   align-items: center;
   justify-content: center;
   gap: 12px;
-  font-size: 26px;
+  font-size: 22px;
   font-weight: bold;
   color: #e8c47a;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   letter-spacing: 6px;
+  flex-shrink: 0;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
 
   &::before,
@@ -516,19 +523,11 @@ const subHint = css`
   text-align: center;
 `;
 
-const lordPickedHint = css`
-  font-size: 15px;
-  color: #e8c47a;
-  margin-bottom: 8px;
-  font-weight: bold;
-  letter-spacing: 2px;
-  text-align: center;
-`;
-
 const countdownWrap = css`
   width: 340px;
   max-width: 100%;
-  margin: 0 auto 16px;
+  margin: 0 auto 10px;
+  flex-shrink: 0;
 `;
 
 const selfInfoRow = css`
@@ -536,7 +535,8 @@ const selfInfoRow = css`
   align-items: center;
   justify-content: center;
   gap: 12px;
-  margin: 12px 0 14px;
+  margin: 6px 0 8px;
+  flex-shrink: 0;
 `;
 
 /* 身份印章:身份色底 + 金边,竖排两行(标签 + 值) */
@@ -588,9 +588,10 @@ const filterToolbar = css`
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 10px 16px;
-  margin-bottom: 14px;
+  gap: 8px 14px;
+  margin-bottom: 10px;
   width: 100%;
+  flex-shrink: 0;
 `;
 
 const factionChips = css`
@@ -661,8 +662,8 @@ const noMatchHint = css`
 const candidateGrid = css`
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  grid-auto-rows: 300px;
-  gap: 14px;
+  grid-auto-rows: 230px;
+  gap: 12px;
   width: 100%;
 `;
 
@@ -884,13 +885,14 @@ const variantTagActive = css`
 /* 确认按钮:红漆大按钮;未选 = 暗铜禁用;已提交保持红底(文案变「✅ 已选择 X」) */
 const confirmBtn = css`
   display: block;
-  margin: 24px auto 8px;
-  padding: 12px 64px;
-  font-size: 18px;
+  margin: 12px auto 4px;
+  padding: 10px 56px;
+  font-size: 17px;
   font-weight: bold;
   letter-spacing: 6px;
   border-radius: 6px;
   border: 1px solid #d4a048;
+  flex-shrink: 0;
   transition: all 0.2s;
 `;
 

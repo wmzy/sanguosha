@@ -211,10 +211,17 @@ function PlayerSeatViewImpl({
           <span className={seatHandBadge} title={`手牌: ${player.handCount}`}>
             🂠 {player.handCount}
           </span>
-          {/* 死亡「亡」印章:旋转红字大印(立绘同时 grayscale) */}
+          {/* 死亡印章:身份+阵亡 两行红字大印(立绘同时 grayscale),对齐官方「反贼/阵亡」印 */}
           {isDead && (
             <span className={seatDeadStamp} aria-hidden>
-              亡
+              {player.identity ? (
+                <>
+                  <i>{player.identity}</i>
+                  <i>阵亡</i>
+                </>
+              ) : (
+                '亡'
+              )}
             </span>
           )}
         </div>
@@ -688,23 +695,35 @@ const seatHandBadge = css`
   line-height: 1.4;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 `;
-// 死亡「亡」印章:旋转 -12deg 红字大印盖在卡面
+// 死亡印章:旋转红字方印盖在卡面(立绘同时 grayscale)
+// 有身份时两行「身份/阵亡」(对齐官方「反贼/阵亡」印),无身份时单字「亡」
 const seatDeadStamp = css`
   position: absolute;
   top: 42%;
   left: 50%;
   z-index: 3;
-  transform: translate(-50%, -50%) rotate(-12deg);
-  padding: 2px 8px 2px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transform: translate(-50%, -50%) rotate(-10deg);
+  padding: 4px 8px;
   border: 3px solid rgba(200, 40, 34, 0.85);
-  border-radius: 8px;
-  background: rgba(20, 6, 4, 0.35);
-  color: rgba(226, 56, 48, 0.92);
-  font-size: 30px;
+  border-radius: 6px;
+  background: rgba(20, 6, 4, 0.38);
+  color: rgba(226, 56, 48, 0.94);
+  font-size: 21px;
   font-weight: 900;
-  letter-spacing: 6px;
+  line-height: 1.15;
+  letter-spacing: 3px;
+  text-indent: 3px; /* 抵消 letter-spacing 造成的偏移 */
   text-shadow: 0 0 10px rgba(180, 30, 24, 0.6);
   pointer-events: none;
+
+  & > i {
+    font-style: normal;
+    white-space: nowrap;
+  }
 `;
 // 右缘体力珠列:垂直排列,骑在卡右边框上(right: -5px = 半珠宽);
 // 满珠绿渐变水滴(内高光+微光晕),空珠透明底 #444 边。尺寸由内联按 maxHealth 缩放

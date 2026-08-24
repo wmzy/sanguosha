@@ -326,18 +326,13 @@ export const 并行选将: AtomDefinition<{
   toViewEvents(state, atom) {
     const selections = atom.selections;
     const timeoutMs = resolveTimeoutMs(state, 60);
-    // 找主公已选的角色(主公在并行选将之前已完成选将)
-    const lordIdx = state.players.findIndex((p) => p.identity === '主公');
-    const lordCharacter = lordIdx >= 0 ? state.players[lordIdx].character : '';
-    const lordName = lordIdx >= 0 ? state.players[lordIdx].name : '';
-    // ownerViews:每个目标玩家看到自己的候选人 + 主公已选角色
+    // 选将保密:不再向任何视角下发主公已选角色(lordCharacter),角色统一由 亮将 公开。
+    // ownerViews:每个目标玩家看到自己的候选人
     const ownerViews = new Map<number, import('../types').ViewEvent>();
     for (const s of selections) {
       ownerViews.set(s.target, {
         type: '并行选将',
         selections: selections.map((sel) => ({ target: sel.target, candidates: sel.candidates })),
-        lordCharacter,
-        lordName,
         timeoutMs,
         pending: {
           startTime: state.clock.now(),
@@ -351,8 +346,6 @@ export const 并行选将: AtomDefinition<{
       type: '等待选将',
       waitingFor: TARGET_SYSTEM,
       waitingForName: '其他玩家',
-      lordCharacter,
-      lordName,
     };
     return { ownerViews, othersView };
   },
@@ -361,16 +354,6 @@ export const 并行选将: AtomDefinition<{
       target: number;
       candidates: Array<{ name: string; skills: string[] }>;
     }>;
-    const lordCharacter = (event.lordCharacter as string) ?? '';
-    const lordName = (event.lordName as string) ?? '';
-    // 更新主公角色(如果 view 中主公还是空的)
-    if (lordCharacter) {
-      const lordPlayer = view.players.find((p) => p.identity === '主公');
-      if (lordPlayer && !lordPlayer.character) {
-        lordPlayer.character = lordCharacter;
-        lordPlayer.name = lordName || lordCharacter;
-      }
-    }
     // 找当前 viewer 是否在 selections 中
     const mySelection = selections.find((s) => s.target === view.viewer);
     if (mySelection) {
@@ -409,3 +392,56 @@ export const 并行选将: AtomDefinition<{
   effect: { blockUntilDone: true, duration: 200 },
 };
 
+
+// ── 亮将(选将结束,公开全部角色)──────────────────────
+// 选将保密策略的收尾:并行选将全部 resolve 后由 开局.execute 应用。
+// 把所有玩家的 character/faction/skills/体力 一次性广播给所有视角,
+// 同时恢复名牌昵称(name←nickname)。非确定性源:无(纯投影广播)。
+export const 亮将: AtomDefinition<{
+  type: '亮将';
+  assignments: Array<{
+    target: number;
+    character: string;
+    faction?: import('../types').Faction;
+    maxHealth: number;
+    health: number;
+    skills: string[];
+  }>;
+}> = {
+  type: '亮将',
+  validate(state, atom) {
+    if (!Array.isArray(atom.assignments) || atom.assignments.length === 0)
+      return 'assignments required';
+    for (const a of atom.assignments) {
+      if (!state.players[a.target]) return `target ${a.target} not found`;
+      if (!a.character) return 'character required';
+    }
+    return null;
+  },
+  apply(_state) {
+    // 纯广播原子——state 已由 分配武将 写定,apply 不修改
+  },
+  toViewEvents(state, atom): ViewEventSplit {
+    const view: ViewEvent = { type: '亮将', assignments: atom.assignments };
+    return { ownerViews: new Map(), othersView: view };
+  },
+  applyView(view, event) {
+    const assignments = (event.assignments ?? []) as Array<{
+      target: number;
+      character: string;
+      faction?: import('../types').Faction;
+      maxHealth: number;
+      health: number;
+      skills: string[];
+    }>;
+    for (const a of assignments) {
+      const p = view.players.find((q) => q.index === a.target);
+      if (!p) continue;
+      p.character = a.character;
+      p.faction = a.faction;
+      p.skills = a.skills;
+      if (typeof a.maxHealth === 'number') p.maxHealth = a.maxHealth;
+      if (typeof a.health === 'number') p.health = a.health;
+    }
+  },
+};
