@@ -171,6 +171,7 @@ export function CharSelectOverlay({
         )}
         style={{ '--faction-color': FACTION_BG[faction] || '#333' } as React.CSSProperties}
         onClick={onClick}
+        data-char-card
       >
         {charImg && (
           <img
@@ -212,7 +213,7 @@ export function CharSelectOverlay({
   };
 
   return (
-    <div className={overlayRoot}>
+    <div className={overlayRoot} data-char-select-overlay>
       {/* ── 右上角插槽(debug 视角控制等,由上层注入) ── */}
       {overlaySlot && <div className={overlaySlotWrap}>{overlaySlot}</div>}
       {/* 金边双线面板:标题/筛选/网格/按钮都在面板内,面板自身滚动 */}

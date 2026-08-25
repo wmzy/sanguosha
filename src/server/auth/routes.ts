@@ -26,8 +26,7 @@ const log = createLogger('auth-routes');
 
 const COOKIE_NAME = 'sgs_session';
 
-/** 认证端点独立限流:30 req/min/IP(登录/注册是暴力破解入口)。 */
-const authRateLimit = createRateLimit(30);
+/** 认证端点限流:见 applyAuthRoutes 内分级配置。 */
 
 function sanitizeUser(u: PublicUser): PublicUser {
   return u;
@@ -35,7 +34,19 @@ function sanitizeUser(u: PublicUser): PublicUser {
 
 export function applyAuthRoutes(app: Hono): void {
   const auth = new Hono();
-  auth.use('*', authRateLimit);
+  // 分级限流(同为 IP 维度,窗口 60s):
+  //   - login/register/logout/password:暴力破解入口,30 req/min。
+  //   - me/profile:幂等只读/低危写。/me 在每次整页加载时由 useAuth 探测,
+  //     多标签页/频繁刷新即可打满 30/min → 全认证面板瘫痪 60s(可用性缺陷,
+  //     e2e 并行 worker 同 IP 下必现)。放宽到 600/min。
+  const authStrictLimit = createRateLimit(30);
+  const authReadLimit = createRateLimit(600);
+  auth.use('/login', authStrictLimit);
+  auth.use('/register', authStrictLimit);
+  auth.use('/logout', authStrictLimit);
+  auth.use('/password', authStrictLimit);
+  auth.use('/me', authReadLimit);
+  auth.use('/profile', authReadLimit);
 
   const setSessionCookie = (c: Parameters<typeof setCookie>[0], token: string, expiresAt: number) => {
     setCookie(c, COOKIE_NAME, token, {

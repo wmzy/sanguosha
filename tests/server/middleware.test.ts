@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { cors, requestLogger, rateLimit, errorHandler } from '../../src/server/middleware';
-import { createRateLimit, _resetRateLimitState } from '../../src/server/middleware/rate-limit';
+import { createRateLimit } from '../../src/server/middleware/rate-limit';
 
 describe('CORS middleware', () => {
   it('should set Access-Control-Allow-Origin header on normal requests', async () => {
@@ -59,7 +59,6 @@ describe('requestLogger middleware', () => {
 
 describe('rateLimit middleware', () => {
   it('should allow requests under the limit', async () => {
-    _resetRateLimitState();
     const app = new Hono();
     app.use('*', rateLimit);
     app.get('/test', (c) => c.json({ ok: true }));
@@ -71,7 +70,6 @@ describe('rateLimit middleware', () => {
   });
 
   it('should block requests exceeding the limit', async () => {
-    _resetRateLimitState();
     const app = new Hono();
     // 测试用低限制实例
     const testLimit = createRateLimit(5);
@@ -88,7 +86,6 @@ describe('rateLimit middleware', () => {
       results.push(res.status);
     }
     expect(results.filter((s) => s === 429).length).toBeGreaterThan(0);
-    _resetRateLimitState();
   });
 });
 

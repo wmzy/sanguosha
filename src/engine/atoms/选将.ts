@@ -438,6 +438,11 @@ export const 亮将: AtomDefinition<{
       const p = view.players.find((q) => q.index === a.target);
       if (!p) continue;
       p.character = a.character;
+      // name 与 state 口径一致(分配武将 apply 已把 name 覆写为武将名):
+      // 选将期红化事件未更新非本人视角的 name,此处统一补齐,
+      // 否则增量视角的名牌(ActionOverlay/SeatArcLayout/日志解析均读 name)
+      // 与服务端 buildView 全量投影(重连 baseline)分叉。
+      p.name = a.character;
       p.faction = a.faction;
       p.skills = a.skills;
       if (typeof a.maxHealth === 'number') p.maxHealth = a.maxHealth;

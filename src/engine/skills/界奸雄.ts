@@ -1,7 +1,7 @@
-// 界奸雄(界曹操·被动技):每当你受到伤害后,你可以选择一项:
-//   ① 摸一张牌;② 获得造成此伤害的牌。
-//   无来源伤害(闪电等)无牌可获得,只能选①。
-//   与标版区别:标版只能获得造成伤害的牌;界版加入"摸一张牌"选项,二选一。
+// 界奸雄(界曹操·被动技):当你受到伤害后,你可以摸一张牌,并获得造成此伤害的牌。
+//   (官方逐字,OL 官网 hero/311 + docs/research/武将技能/魏国/界曹操.md——两项效果,非二选一。)
+//   无来源伤害(闪电等)无牌可获得:仍可发动,但只摸一张牌(官网 FAQ 2016-11-01)。
+//   与标版区别:标版仅获得造成伤害的牌,无摸牌段。
 //
 // 时序关键(选项②):伤害牌在造成伤害时位于 frame.cards(处理区),父 execute
 // (杀/万箭齐发/南蛮入侵/决斗)收尾会 applyAtom(移动牌, 处理区→弃牌堆)将其入弃牌堆。
@@ -10,7 +10,7 @@
 // 故采用"延迟拿取":造成伤害后记录 wantCard=cardId,挂 移动牌 after hook,
 // 在该伤害牌被移入弃牌堆的瞬间再 移动牌(弃牌堆→手牌)。此时父收尾已完成、无重复。
 //
-// 选项①(摸一张牌)无此问题,直接 摸牌 count=1。
+// 摸一张牌无此问题,在受伤害 hook 内直接 摸牌 count=1(先摸后延迟获得,结果与官方语序一致)。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
@@ -24,7 +24,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '界奸雄',
-    description: '受到伤害后,选择一项:①摸一张牌;②获得造成此伤害的牌',
+    description: '当你受到伤害后,你可以摸一张牌,并获得造成此伤害的牌',
   };
 }
 
@@ -49,7 +49,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // 造成伤害 after:曹操受伤后询问 ①/②
+  // 造成伤害 after:曹操受伤后询问是否发动(两项:摸一张 + 获得伤害牌)
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
@@ -71,30 +71,26 @@ export function onInit(skill: Skill, state: GameState): () => void {
       prompt: {
         type: 'confirm',
         title: hasCard
-          ? '奸雄:获得伤害牌?(确认=获得,取消=摸一张牌)'
-          : '奸雄:摸一张牌?(确认=摸牌,取消=不发动)',
-        confirmLabel: hasCard ? '获得伤害牌' : '摸一张牌',
-        cancelLabel: hasCard ? '摸一张牌' : '不发动',
+          ? '界奸雄:是否发动?(摸一张牌并获得造成此伤害的牌)'
+          : '界奸雄:是否发动?(无伤害牌可获得,仅摸一张牌)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
       },
       defaultChoice: false,
       timeout: 10,
     });
 
     const choice = ctx.state.localVars[CHOICE_KEY] === true;
+    if (!choice) {
+      delete ctx.state.localVars[CHOICE_KEY];
+      return;
+    }
 
+    // 两项效果都执行:先摸一张,获得走延迟拿取(见下方 移动牌 after hook)。
+    // 无来源伤害(闪电等):无牌可获得,仅摸一张(官网 FAQ)。
+    await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
     if (hasCard) {
-      if (choice) {
-        // ② 获得伤害牌:延迟到该牌入弃牌堆时拿取(见下方 移动牌 after hook)
-        ctx.state.localVars[WANTCARD_KEY] = effectiveId;
-      } else {
-        // ① 摸一张牌
-        await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
-      }
-    } else {
-      // 无来源伤害:无牌可获得,仅可摸一张牌
-      if (choice) {
-        await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
-      }
+      ctx.state.localVars[WANTCARD_KEY] = effectiveId;
     }
     delete ctx.state.localVars[CHOICE_KEY];
   });
@@ -125,7 +121,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
   api.defineAction('respond', {
-    label: '奸雄',
+    label: '界奸雄',
     style: 'default',
     prompt: {
       type: 'confirm',

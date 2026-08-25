@@ -641,9 +641,9 @@ export function applyRestRoutes(app: Hono): void {
       if (!ok) return c.json({ error: '房间密码错误', code: 'ROOM_PASSWORD_REQUIRED' }, 403);
     }
 
-    // 清理旧房间关联
+    // 清理旧房间关联(仅限其他房间的残留;同房走下方 switchRole 就地转换)
     const existingRoom = findRoomByPlayerId(spectatorId);
-    if (existingRoom) {
+    if (existingRoom && existingRoom.id !== roomId) {
       if (existingRoom.spectators.has(spectatorId)) {
         removeSpectator(existingRoom.id, spectatorId);
       } else {
@@ -652,8 +652,18 @@ export function applyRestRoutes(app: Hono): void {
       playerRoomMap.delete(spectatorId);
     }
 
-    const joined = joinAsSpectator(roomId, spectatorId, nullSink(), user.displayName);
-    if (!joined) return c.json({ error: '加入失败' }, 400);
+    // 同房玩家(含房主)转旁观:必须就地 switchRole 释放座位并保留房间。
+    // 若走 leave+rejoin,quick 房会在 host leave 时被「全员离开自动销毁」
+    // 直接删掉,随后的旁观加入撞上已删房间 → 永远 400「加入失败」。
+    const isSameRoomPlayer =
+      room.players.has(spectatorId) || room.seats.includes(spectatorId);
+    if (isSameRoomPlayer) {
+      const switched = switchRole(roomId, spectatorId, 'spectator');
+      if (!switched.success) return c.json({ error: '加入失败' }, 400);
+    } else {
+      const joined = joinAsSpectator(roomId, spectatorId, nullSink(), user.displayName);
+      if (!joined) return c.json({ error: '加入失败' }, 400);
+    }
     playerRoomMap.set(spectatorId, roomId);
 
     broadcastMessage(room, { type: 'spectator_joined', spectatorId });

@@ -24,7 +24,6 @@ import {
   updateDisplayName,
   changePassword,
 } from '../../src/server/auth/store';
-import { _resetRateLimitState } from '../../src/server/middleware/rate-limit';
 import { _resetForTests as resetLifecycles } from '../../src/server/lifecycles';
 
 function makeApp(): Hono {
@@ -59,7 +58,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await closeRoomStore();
   resetLifecycles();
-  _resetRateLimitState();
 });
 
 // ── 密码纯函数 ──

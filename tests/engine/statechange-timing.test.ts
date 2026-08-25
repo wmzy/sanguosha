@@ -5,7 +5,7 @@
 //   1. 翻面后:flipFaceDown 发 faceDown=true,flipFaceUp 发 faceDown=false
 //   2. 横置后:setChain(chained=true/false) 在 设横置 后发出
 //   3. 横置后:SetChain 设横置 被 before-hook cancel 时不发出(返回 false)
-//   4. 解围方向修正:翻成背面(flipFaceDown)时触发,翻回正面(flipFaceUp)时不触发
+//   4. 解围方向修正:从背面翻至正面(flipFaceUp)时触发,翻成背面(flipFaceDown)时不触发
 import { describe, it, expect, beforeEach } from 'vitest';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
@@ -144,7 +144,7 @@ describe('模块 E:横置后 atom', () => {
 
 // ─── 4. 解围方向修正(集成) ──────────────────────────────────
 
-describe('模块 E:解围方向修正(翻成背面触发,翻回正面不触发)', () => {
+describe('模块 E:解围方向修正(从背面翻至正面触发,翻成背面不触发)', () => {
   let harness: SkillTestHarness;
 
   function makeCard(
@@ -170,7 +170,7 @@ describe('模块 E:解围方向修正(翻成背面触发,翻回正面不触发)'
     harness = new SkillTestHarness();
   });
 
-  it('翻成背面(flipFaceDown)→ 解围效果②触发(出现 解围/confirm 询问)', async () => {
+  it('翻回正面(flipFaceUp)→ 解围效果②触发(出现 解围/confirm 询问)', async () => {
     const cardMap: Record<string, Card> = {
       hand0: makeCard('hand0', '杀', '♠', '7'),
       equip1: { id: 'equip1', name: '诸葛弩', suit: '♣', color: '黑', rank: 'A', type: '装备牌', subtype: '武器' },
@@ -188,24 +188,26 @@ describe('模块 E:解围方向修正(翻成背面触发,翻回正面不触发)'
       phase: '出牌',
       turn: { round: 1, phase: '出牌', vars: {} },
     });
-    // P1 装备一件装备(满足"场上有可移动的牌")
+    // P0 有手牌可弃置;P1 装备一件装备(满足"场上有可移动的牌")
     state.players[1].equipment = { 武器: 'equip1' };
     await harness.setup(state);
 
-    // 解围效果②的 after-hook 会创建阻塞型 请求回应(解围/confirm),不能直接 await flipFaceDown
+    // 解围效果②的 after-hook 会创建阻塞型 请求回应(解围/confirm),不能直接 await flipFaceUp
     // (会卡在 pending 等待回应)。采用 fire-and-forget:启动后等 pending 出现即断言,再超时收尾。
-    const flipP = flipFaceDown(harness.state, 0, '测试');
+    // 需先翻成背面再翻回正面(官方:「当你从背面翻至正面时」)
+    await flipFaceDown(harness.state, 0, '测试');
+    const flipP = flipFaceUp(harness.state, 0, '测试');
     await waitForStable(harness.state); // pending 创建后返回
 
     // 解围效果②触发:出现 解围/confirm 询问
     expect(hasJieWeiConfirm(harness.state)).toBe(true);
 
-    // 超时解围/confirm(defaultChoice=false)→ 解围提前返回 → flipFaceDown 结束
+    // 超时解围/confirm(defaultChoice=false)→ 解围提前返回 → flipFaceUp 结束
     await fireTimeoutAndWait(harness.state);
     await flipP;
   });
 
-  it('翻回正面(flipFaceUp)→ 解围效果②不触发(无 解围/confirm 询问)', async () => {
+  it('翻成背面(flipFaceDown)→ 解围效果②不触发(无 解围/confirm 询问)', async () => {
     const cardMap: Record<string, Card> = {
       hand0: makeCard('hand0', '杀', '♠', '7'),
     };
@@ -224,8 +226,8 @@ describe('模块 E:解围方向修正(翻成背面触发,翻回正面不触发)'
     });
     await harness.setup(state);
 
-    // 直接翻回正面(faceDown=false)→ 解围 hook 因 faceDown!==true 提前返回
-    await flipFaceUp(harness.state, 0, '测试');
+    // 翻成背面(faceDown=true)→ 解围 hook 因 faceDown!==false 提前返回
+    await flipFaceDown(harness.state, 0, '测试');
     await harness.waitForStable();
 
     expect(hasJieWeiConfirm(harness.state)).toBe(false);

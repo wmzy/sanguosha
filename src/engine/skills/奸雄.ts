@@ -1,5 +1,5 @@
-// 奸雄(曹操·被动技):当你受到伤害后,你可以获得造成此伤害的牌,并摸一张牌。
-//   无来源伤害(闪电等)无牌可获得,技能不发动。
+// 奸雄(曹操·被动技):当你受到伤害后,你可以获得造成此伤害的牌。
+//   无来源伤害(闪电等)无牌可获得,技能不发动。(官方逐字,docs/research/武将技能/魏国/曹操.md)
 //
 // 时序关键:伤害牌在造成伤害时位于 frame.cards(处理区),父 execute
 // (杀/万箭齐发/南蛮入侵/决斗)收尾会 applyAtom(移动牌, 处理区→弃牌堆)将其入弃牌堆。
@@ -20,7 +20,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '奸雄',
-    description: '当你受到伤害后,你可以获得造成此伤害的牌,并摸一张牌',
+    description: '当你受到伤害后,你可以获得造成此伤害的牌',
   };
 }
 
@@ -65,8 +65,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       target: ownerId,
       prompt: {
         type: 'confirm',
-        title: '奸雄:是否获得造成此伤害的牌,并摸一张牌?',
-        confirmLabel: '发动',
+        title: '奸雄:是否获得造成此伤害的牌?',
+        confirmLabel: '获得',
         cancelLabel: '不发动',
       },
       defaultChoice: false,
@@ -75,8 +75,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     const choice = ctx.state.localVars[CHOICE_KEY] === true;
     if (choice) {
-      // 界奸雄:获得伤害牌 + 摸一张牌(两项效果,非二选一)。
-      // 获得采用延迟拿取(见下方 移动牌 after hook),摸一张在成功获得后执行。
+      // 界版才有「获得后再摸一张」;标版奸雄仅获得伤害牌(官方逐字)。
+      // 获得采用延迟拿取(见下方 移动牌 after hook)。
       ctx.state.localVars[WANTCARD_KEY] = effectiveId;
     }
     delete ctx.state.localVars[CHOICE_KEY];
@@ -101,8 +101,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       from: { zone: '弃牌堆' },
       to: { zone: '手牌', player: ownerId },
     });
-    // 界奸雄第二段效果:获得伤害牌后摸一张牌(获得失败被拿走则不摸)
-    await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
+    // 标版奸雄仅获得伤害牌,无摸牌段(摸一张是界奸雄效果,见 界奸雄.ts)
   });
 
   return () => {};
