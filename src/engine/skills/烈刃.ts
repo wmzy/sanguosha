@@ -158,7 +158,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       prompt: {
         type: 'useCard',
         title: '烈刃:请选择一张拼点牌',
-        cardFilter: { min: 1, max: 1 },
+        cardFilter: { filter: () => true, min: 1, max: 1 },
       },
       timeout: 30,
     });
@@ -174,7 +174,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       prompt: {
         type: 'useCard',
         title: `烈刃:与 ${ctx.state.players[ownerId].name} 拼点,请出一张手牌`,
-        cardFilter: { min: 1, max: 1 },
+        cardFilter: { filter: () => true, min: 1, max: 1 },
       },
       timeout: 30,
     });

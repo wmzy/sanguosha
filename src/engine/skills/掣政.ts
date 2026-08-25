@@ -90,10 +90,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!st.players[ownerId]?.alive) return;
 
     const used = (st.turn.vars[USED_KEY] as number | undefined) ?? 0;
-    // 仅保留有牌可供弃置的"这些角色"
-    const targets = outOfRangeChars(st, ownerId).filter((t) => hasAnyCard(st, t));
-    // 用牌数 >= 这些角色数 → 无惩罚;或无可弃牌目标 → 跳过
-    if (used >= targets.length) return;
+    // 触发基数 = 全部"攻击范围内不包含你的角色数"(官方:「小于这些角色数」,
+    // 不因个别角色无牌而缩小);可弃置目标从其中有牌者中选。
+    const outRange = outOfRangeChars(st, ownerId);
+    if (used >= outRange.length) return;
+    const targets = outRange.filter((t) => hasAnyCard(st, t));
+    // 无有牌可弃的目标 → 无从执行惩罚,跳过
     if (targets.length === 0) return;
 
     await pushFrame(st, '掣政', ownerId, {});

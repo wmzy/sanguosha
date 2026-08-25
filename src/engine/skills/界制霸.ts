@@ -152,7 +152,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             prompt: {
               type: 'useCard',
               title: `制霸:与 ${st.players[allyIdx].name} 拼点,请出一张手牌`,
-              cardFilter: { min: 1, max: 1 },
+              cardFilter: { filter: () => true, min: 1, max: 1 },
             },
             timeout: 30,
           });
@@ -244,7 +244,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           prompt: {
             type: 'useCard',
             title: `制霸:${st.players[ownerId].name} 与你拼点,请出一张手牌`,
-            cardFilter: { min: 1, max: 1 },
+            cardFilter: { filter: () => true, min: 1, max: 1 },
           },
           timeout: 30,
         });

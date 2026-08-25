@@ -141,7 +141,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         prompt: {
           type: 'useCard',
           title: `巧说:与 ${st.players[from].name} 拼点,请出一张手牌`,
-          cardFilter: { min: 1, max: 1 },
+          cardFilter: { filter: () => true, min: 1, max: 1 },
         },
         timeout: 30,
       });
@@ -275,7 +275,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     prompt: {
       type: 'useCard',
       title: '巧说:请出一张拼点牌',
-      cardFilter: { min: 1, max: 1 },
+      cardFilter: { filter: () => true, min: 1, max: 1 },
     },
   });
 }

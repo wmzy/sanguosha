@@ -9,8 +9,8 @@
 //   不受自己回合限制(无懈可击任意时机可打)。activeWhen 检测无懈可击广播窗口且有装备。
 //
 // 效果②实现(被动触发,镜像巧变移动):
-//   after hook 挂在「翻面后」(模块 E 状态变更时机):faceDown===true(翻成背面)时触发。
-//   (旧实现挂在「去标签」=翻回正面,方向反——模块 E 修正。)
+//   after hook 挂在「翻面后」(模块 E 状态变更时机):faceDown===false(从背面翻至正面)时触发。
+//   (官方描述:「当你从背面翻至正面时」——即解除翻面状态时才能移牌。)
 //   询问 → 选弃牌(手牌)→ 选源玩家 → 选源牌(pickTargetCard)→ 选目标玩家 →
 //   移动场上牌(获得 atom,与巧变 moveFieldCard 一致)。
 //   触发时机:据守/放逐/悲歌/界仁心/界伏枥/界酒诗 等技能 flipFaceDown 时。
@@ -161,9 +161,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const cardId = params.cardId as string;
       const cardIdOk = typeof cardId === 'string';
       const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      // 只接受装备牌(来自装备区或手牌)
+      // 只接受装备区的牌(官方:「装备区里的牌当【无懈可击】使用」)
       const isEquip = !!card && card.type === '装备牌';
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
       const cardInEquip = cardIdOk && Object.values(self.equipment).some((id) => id === cardId);
       // 必须存在无懈可击窗口
       const hasWindow = hasNullifyWindow(state, ownerId);
@@ -177,7 +176,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         }
         return false;
       })();
-      const ok = isEquip && (cardInHand || cardInEquip) && hasWindow && !blockedByOther;
+      const ok = isEquip && cardInEquip && hasWindow && !blockedByOther;
       return ok ? null : '现在不能使用解围';
     },
     async (state: GameState, params: Record<string, Json>) => {
@@ -318,8 +317,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const atom = ctx.atom;
     if (atom.type !== '翻面后') return;
     if (atom.player !== ownerId) return;
-    // 只在翻成背面(faceDown===true)时触发(旧实现听 去标签=翻回正面,方向反)
-    if (atom.faceDown !== true) return;
+    // 只在翻回正面(faceDown===false)时触发(官方:「当你从背面翻至正面时」)
+    if (atom.faceDown !== false) return;
 
     // 重入保护
     if (ctx.state.localVars[MOVING_FLAG]) return;

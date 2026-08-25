@@ -127,7 +127,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         prompt: {
           type: 'useCardAndTarget',
           title: '从谏:交给一名目标角色一张牌(装备牌摸两张,其他摸一张);不交可放弃',
-          cardFilter: { min: 1, max: 1 },
+          cardFilter: { filter: () => true, min: 1, max: 1 },
           targetFilter: {
             min: 1,
             max: 1,

@@ -85,7 +85,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       prompt: {
         type: 'useCard',
         title: '鬼才:是否打出一张手牌代替判定牌?',
-        cardFilter: { min: 1, max: 1 },
+        cardFilter: { filter: () => true, min: 1, max: 1 },
       },
       defaultChoice: false,
       timeout: 15,
@@ -125,7 +125,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     prompt: {
       type: 'useCard',
       title: '鬼才:选择一张手牌代替判定牌',
-      cardFilter: { min: 1, max: 1 },
+      cardFilter: { filter: () => true, min: 1, max: 1 },
     },
   });
 }
