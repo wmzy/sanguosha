@@ -51,7 +51,7 @@ function makePlayer(opts: {
 }
 
 /** 5 人局:P0=孙亮(掣政);范围外={P2,P3};cards 指定各玩家手牌 */
-function buildState(hands: Record<number, string[]>): GameState {
+function buildState(hands: Record<number, string[]>, rngSeed = 0): GameState {
   const cardMap: Record<string, Card> = {};
   for (const ids of Object.values(hands)) {
     for (const id of ids) cardMap[id] = makeCard(id, '杀', '♠', '7');
@@ -69,6 +69,7 @@ function buildState(hands: Record<number, string[]>): GameState {
     currentPlayerIndex: 0,
     phase: '出牌',
     turn: { round: 1, phase: '出牌', vars: {} },
+    rngSeed,
   });
   // 孙亮挂掣政(setup 前注入 skills 数组即可,harness.setup 会加载实例)
   state.players[0].skills = ['掣政'];
@@ -84,16 +85,33 @@ describe('掣政', () => {
 
   // ─── 修复点回归:基数按全部范围外角色计 ────────────────────
   it('范围外角色中有无牌者时仍触发:基数=2,used=1<2 → 自动弃有牌者(P3)一张', async () => {
-    // P2 无牌(旧实现会把基数缩成 1 导致不触发),P3 两张手牌
-    await harness.setup(buildState({ 2: [], 3: ['p3a', 'p3b'] }));
+    // P2 无牌(旧实现会把基数缩成 1 导致不触发),P3 一张手牌(弃哪张确定)
+    await harness.setup(buildState({ 2: [], 3: ['p3a'] }));
     harness.state.turn.vars['掣政/出牌数'] = 1;
 
     void applyAtom(harness.state, { type: '阶段结束', player: 0, phase: '出牌' });
     await waitForStable(harness.state);
 
-    // 仅 P3 一个有牌目标 → 自动选定并弃其首张
+    // 仅 P3 一个有牌目标 → 自动选定并弃其唯一手牌
     expect(harness.state.zones.discardPile).toContain('p3a');
-    expect(harness.state.players[3].hand).toEqual(['p3b']);
+    expect(harness.state.players[3].hand).toEqual([]);
+  });
+
+  it('目标多张手牌时盲取随机弃一张(seed 变化结果可不同,不固定首张)', async () => {
+    // 回归背景:曾固定取 hand[0],对手可按手牌排列利用;现按 seed RNG 盲取。
+    const discarded = new Set<string>();
+    for (let seed = 1; seed <= 24 && discarded.size < 2; seed++) {
+      const h = new SkillTestHarness();
+      await h.setup(buildState({ 2: [], 3: ['p3a', 'p3b'] }, seed));
+      h.state.turn.vars['掣政/出牌数'] = 1;
+      void applyAtom(h.state, { type: '阶段结束', player: 0, phase: '出牌' });
+      await waitForStable(h.state);
+      const pile = h.state.zones.discardPile;
+      if (pile.includes('p3a')) discarded.add('p3a');
+      if (pile.includes('p3b')) discarded.add('p3b');
+    }
+    // 24 个 seed 下两种结果全不出现的概率 ≈ 2^-23,视为不可能
+    expect(discarded.size).toBe(2);
   });
 
   it('用牌数达到全部范围外角色数则不惩罚', async () => {

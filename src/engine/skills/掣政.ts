@@ -14,13 +14,15 @@
 //   - 防止伤害用 伤害结算开始时 cancel:跳过整段流程(不触发造成/受到伤害后 hook)。
 //   - "使用的牌数":使用时 atom 计数(装备/锦囊/基本牌均算;打出闪/回应不算)。
 //   - 弃牌目标:仅限有牌(手牌或装备)的"这些角色";1 名则自动选定,多名则询问。
-//   - 弃哪张:手牌优先(hand[0]),无手牌则首件装备(描述未指定选牌,引擎自动选定)。
+//   - 弃哪张:手牌非空则 seed RNG 盲取一张(手牌对使用者不可见,固定取首张可被对手
+//     按排列利用);无手牌则首件装备(描述未指定选牌,引擎自动选定)。
 import type { FrontendAPI, GameState, GameView, Json, Skill } from '../types';
 import type { SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { inAttackRange } from '../rules/distance';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { createRng } from '../util/rng';
 
 const CHOOSE_RT = '掣政/选目标';
 const CHOOSE_KEY = '掣政/所选目标';
@@ -130,12 +132,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       chosen = picked;
     }
 
-    // 弃置其一张牌:优先手牌 hand[0],其次首件装备
+    // 弃置其一张牌:手牌对使用者不可见 → seed RNG 盲取(同界除疠"随机替代盲选"注释
+    // 范式);固定取首张可被对手按手牌排列利用。无手牌则首件装备(明牌,保持自动选定)。
     const tp = st.players[chosen];
     if (tp?.alive) {
       let discardId: string | undefined;
       if (tp.hand.length > 0) {
-        discardId = tp.hand[0];
+        const rng = createRng(st.rngSeed);
+        discardId = tp.hand[rng.nextInt(tp.hand.length)];
+        st.rngSeed = rng.getState();
       } else {
         const equipIds = Object.values(tp.equipment).filter(
           (id): id is string => !!id,

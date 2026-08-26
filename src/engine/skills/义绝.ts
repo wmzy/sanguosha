@@ -349,7 +349,9 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     prompt: {
       type: 'useCardAndTarget',
       title: '义绝:弃置一张牌,令一名其他角色展示一张手牌',
-      cardFilter: { min: 1, max: 1 },
+      // filter:()=>true(任意手牌作代价):缺失则 extractCardFilter 返回 null →
+      // findUseActionForCard 恒不匹配,AI/无头客户端枚举不出义绝动作
+      cardFilter: { filter: () => true, min: 1, max: 1 },
       targetFilter: {
         min: 1,
         max: 1,

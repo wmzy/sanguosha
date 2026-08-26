@@ -156,7 +156,9 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     prompt: {
       type: 'useCardAndTarget',
       title: '除疠:弃你和势力各不相同的其他角色各一张牌,被弃黑桃者各摸一张',
-      cardFilter: { min: 1, max: 1 },
+      // filter:()=>true(自身弃牌=任意手牌;装备区由后端 validate 权威处理):
+      // 缺失则 AI/无头客户端枚举不出该动作
+      cardFilter: { filter: () => true, min: 1, max: 1 },
       // 前端只过滤"其他存活角色";势力各不相同由后端 validate 强制(UI 提示无法跨选项目校验)
       targetFilter: {
         min: 1,

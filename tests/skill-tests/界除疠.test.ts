@@ -485,4 +485,44 @@ describe('界除疠', () => {
       params: { cardId: 'c1', targets: [] },
     });
   });
+
+  // ─── defineAction 声明验证 ─────────────────────────
+  it('availableActions:界除疠 use 声明含 filter 且匹配任意手牌(AI 可枚举)', async () => {
+    // 回归背景:cardFilter 缺 filter 时 findUseActionForCard 恒不匹配 →
+    // AI/无头客户端枚举不出主动动作。
+    const c1 = makeCard('c1', '杀', '♥');
+    const oc = makeCard('oc', '闪', '♦');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          character: '神将',
+          faction: '群',
+          hand: ['c1', 'oc'],
+          skills: ['界除疠', '回合管理'],
+        }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操', faction: '魏', hand: ['p1a'] }),
+      ],
+      cardMap: {
+        c1,
+        oc,
+        p1a: makeCard('p1a', '杀', '♠'),
+      },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    const actions = P0.availableActions();
+    const use = actions.find((a) => a.skillId === '界除疠' && a.actionType === 'use');
+    expect(use).toBeDefined();
+    const cf = use!.prompt.type === 'useCardAndTarget' ? use!.prompt.cardFilter : null;
+    expect(cf?.filter).toBeDefined();
+    for (const id of harness.state.players[0].hand) {
+      expect(cf!.filter!(harness.state.cardMap[id])).toBe(true);
+    }
+  });
 });

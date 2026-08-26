@@ -250,7 +250,8 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     prompt: {
       type: 'useCardAndTarget',
       title: '巧说:选择一张拼点牌和一名目标',
-      cardFilter: { min: 1, max: 1 },
+      // filter:()=>true(拼点牌=任意手牌):缺失则 AI/无头客户端枚举不出该动作
+      cardFilter: { filter: () => true, min: 1, max: 1 },
       targetFilter: {
         min: 1,
         max: 1,
