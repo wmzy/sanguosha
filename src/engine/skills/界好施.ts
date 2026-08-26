@@ -132,8 +132,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             const ids = params.cardIds as string[] | undefined;
             if (Array.isArray(ids)) st.localVars[GIVE_KEY] = ids;
           } else if (rt === PASSIVE_GIVE_RT) {
-            const ids = params.cardIds as string[] | undefined;
-            if (Array.isArray(ids) && ids.length > 0) st.localVars[PASSIVE_CARD_KEY] = ids[0];
+            // 客户端契约:useCard 型 pending(min=max=1)只发 {cardId}
+            const raw: unknown = params.cardIds ?? params.cardId;
+            const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
+            if (ids && ids.length > 0) st.localVars[PASSIVE_CARD_KEY] = ids[0];
           }
         },
       ),
@@ -250,6 +252,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             title: `好施:选择 ${giveCount} 张牌交给 ${st.players[target].name}`,
             cardFilter: { filter: () => true, min: giveCount, max: giveCount },
           },
+          // 强制型给牌(「分半给最少者」是效果必要部分):前端走多选弃牌式 UI 提交 {cardIds}
+          mandatory: true,
           timeout: 30,
         });
         const giveCards = st.localVars[GIVE_KEY] as string[] | undefined;

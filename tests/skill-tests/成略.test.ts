@@ -589,4 +589,40 @@ describe('成略', () => {
     expect(harness.state.players[0].vars['成略/态']).toBe('阴');
     expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['h1', 'h2']));
   });
+
+  // 回归(2026-08-26):弃牌询问是技能代价(强制),必须带 mandatory 标记——
+  // 浏览器据 pending.mandatory+useCard 走多选弃牌 UI 提交 {cardIds};缺失标记时
+  // 浏览器按两步式单选只发 {cardId} → validate 拒绝 → 玩家选择被忽略、超时盲弃。
+  it('弃牌询问带 mandatory 标记(浏览器多选弃牌 UI 契约)', async () => {
+    const state = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['h1', 'h2', 'h3'] }),
+        makePlayer({ index: 1, name: 'P2', health: 4, maxHealth: 4, skills: ['闪'] }),
+      ],
+      zones: { deck: ['db1', 'dt1'], discardPile: [], processing: [] },
+      cardMap: {
+        h1: makeCard('h1', '杀', '♠', '7'),
+        h2: makeCard('h2', '杀', '♣', '8'),
+        h3: makeCard('h3', '桃', '♥', '3'),
+        db1: makeCard('db1', '闪', '♦'),
+        dt1: makeCard('dt1', '杀', '♠'),
+      },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('成略', 'use', {});
+    const slot = [...harness.state.pendingSlots.values()][0] as {
+      atom?: { requestType?: string; mandatory?: boolean };
+    };
+    expect(slot?.atom?.requestType).toBe('成略/discard');
+    expect(slot?.atom?.mandatory).toBe(true);
+
+    await P1.respond('成略', { cardIds: ['h1', 'h2'] });
+    await harness.waitForStable();
+    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['h1', 'h2']));
+  });
 });

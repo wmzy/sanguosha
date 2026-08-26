@@ -255,8 +255,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return null;
       }
       if (rt === SELECT_RT) {
-        const cardIds = params.cardIds as string[] | undefined;
-        if (!cardIds || cardIds.length === 0) return '请选择要置于武将牌上的牌';
+        // 客户端契约:useCard 型 pending 只发 {cardId};{}=不置于武将牌上。
+        const raw: unknown = params.cardIds ?? params.cardId;
+        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
+        if (!ids || ids.length === 0) return null; // 放弃 → 消费端按未置牌结束
         return null;
       }
       if (rt === TARGET_RT) {
@@ -275,7 +277,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         st.localVars[CONFIRMED_KEY] =
           params.choice === true || params.confirmed === true;
       } else if (rt === SELECT_RT) {
-        st.localVars[SELECT_KEY] = params.cardIds;
+        const raw: unknown = params.cardIds ?? params.cardId;
+        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
+        if (ids && ids.length > 0) st.localVars[SELECT_KEY] = ids;
       } else if (rt === TARGET_RT) {
         const t = params.target;
         if (typeof t === 'number') st.localVars[TARGET_KEY] = t;

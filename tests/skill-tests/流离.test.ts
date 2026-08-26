@@ -427,4 +427,114 @@ describe('流离:成为杀的目标时转移', () => {
     expect(state.players[1].hand).toContain(dodge.id);
     expect(state.localVars['流离/target']).toBeUndefined();
   });
+
+  // ─────────────────────────────────────────────────────────────
+  // 用例 6(回归 2026-08-26):浏览器两步式 UI 对 useCard 型 pickDiscard 只发
+  // respond{cardId}(单数,无 cardIds)。修复前 validate 只认 cardIds 数组并拒绝
+  // → 确认流离后无法支付代价,卡到超时按未支付处理(转移必败)。
+  //   另:{}(点「不回应」)= 明确不支付 → 立即按未支付收尾,不等超时。
+  // ─────────────────────────────────────────────────────────────
+  it('用例6:pickDiscard 接受浏览器 {cardId} 单数形状完成转移', async () => {
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
+    const discard1: Card = { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '3', type: '基本牌' };
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id], equipment: {}, skills: ['杀'] }),
+        makePlayer({ index: 1, name: 'P1', hand: [discard1.id], equipment: {}, skills: ['流离'], health: 4 }),
+        makePlayer({ index: 2, name: 'P2', hand: [], equipment: {}, skills: [], health: 4 }),
+      ],
+      cardMap: { k1: slash, d1: discard1 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await registerSkillsFromState(state);
+
+    await dispatchAndWait(state, {
+      skillId: '杀',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: slash.id, targets: [1] },
+      baseSeq: state.seq,
+    });
+    await dispatchAndWait(state, {
+      skillId: '流离',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { choice: true },
+      baseSeq: state.seq,
+    });
+    await dispatchAndWait(state, {
+      skillId: '流离',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { target: 2 },
+      baseSeq: state.seq,
+    });
+
+    // 浏览器两步式真实形状:{cardId} 单数
+    await dispatchAndWait(state, {
+      skillId: '流离',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { cardId: discard1.id },
+      baseSeq: state.seq,
+    });
+
+    // 代价已支付:弃 d1、杀帧目标转移到 P2
+    expect(state.players[1].hand).not.toContain(discard1.id);
+    expect(state.zones.discardPile).toContain(discard1.id);
+    expect(state.localVars['流离/target']).toBeUndefined(); // 消费后清除
+  });
+
+  it('用例7:pickDiscard 收到 {}(不回应)立即视为未支付代价', async () => {
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
+    const dodge: Card = { id: 'd2', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id], equipment: {}, skills: ['杀'] }),
+        makePlayer({ index: 1, name: 'P1', hand: [dodge.id], equipment: {}, skills: ['流离'], health: 4 }),
+        makePlayer({ index: 2, name: 'P2', hand: [], equipment: {}, skills: [], health: 4 }),
+      ],
+      cardMap: { k1: slash, d2: dodge },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await registerSkillsFromState(state);
+
+    await dispatchAndWait(state, {
+      skillId: '杀',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: slash.id, targets: [1] },
+      baseSeq: state.seq,
+    });
+    await dispatchAndWait(state, {
+      skillId: '流离',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { choice: true },
+      baseSeq: state.seq,
+    });
+    await dispatchAndWait(state, {
+      skillId: '流离',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { target: 2 },
+      baseSeq: state.seq,
+    });
+    await dispatchAndWait(state, {
+      skillId: '流离',
+      actionType: 'respond',
+      ownerId: 1,
+      params: {},
+      baseSeq: state.seq,
+    });
+
+    // 未支付:手牌保留、无转移;询问已结束(无需等超时)
+    expect(state.players[1].hand).toContain(dodge.id);
+    expect(state.localVars['流离/target']).toBeUndefined();
+    expect([...state.pendingSlots.values()].some((s) => (s.atom as { requestType?: string }).requestType === '流离/pickDiscard')).toBe(false);
+  });
 });

@@ -208,6 +208,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           title: `成略(${stt}):选择 ${discardCount} 张手牌弃置(本阶段同花色牌无距离和次数限制)`,
           cardFilter: { filter: () => true, min: discardCount, max: discardCount },
         },
+        // 强制型弃牌(技能代价):前端隐藏「不回应」+ 走多选弃牌 UI 提交 {cardIds};
+        // headless 不生成 skip。超时由调用方兜底盲弃。
+        mandatory: true,
         timeout: 30,
       });
       delete st.localVars[DISCARD_COUNT_KEY];

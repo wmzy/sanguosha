@@ -113,6 +113,56 @@ describe('界好施', () => {
     expect(harness.state.localVars['界好施/受益者']).toBe(1);
   });
 
+  // 回归(2026-08-26):给牌询问必须带 mandatory 标记(浏览器多选弃牌 UI 契约);
+  // 缺失时浏览器只发 {cardId} → execute 静默忽略,一张不给且被动不激活。
+  it('给牌询问带 mandatory 标记(浏览器多选弃牌 UI 契约)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '鲁肃',
+          hand: ['h1', 'h2', 'h3'],
+          skills: ['界好施', '回合管理'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          hand: [],
+          skills: ['回合管理'],
+        }),
+      ],
+      cardMap: {
+        h1: makeCard('h1', '杀'),
+        h2: makeCard('h2', '闪'),
+        h3: makeCard('h3', '桃', '♦'),
+        d1: makeCard('d1', '杀', '♠'),
+        d2: makeCard('d2', '闪', '♥'),
+        d3: makeCard('d3', '桃', '♦'),
+        d4: makeCard('d4', '酒', '♣'),
+      },
+      zones: { deck: ['d1', 'd2', 'd3', 'd4'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('鲁肃');
+
+    await P0.triggerAction('回合管理', 'start');
+    await P0.respond('界好施', { choice: true });
+
+    const slot = [...harness.state.pendingSlots.values()][0] as {
+      atom?: { requestType?: string; mandatory?: boolean };
+    };
+    expect(slot?.atom?.requestType).toBe('界好施/give');
+    expect(slot?.atom?.mandatory).toBe(true);
+
+    await P0.respond('界好施', { cardIds: ['d1', 'd2', 'd3'] });
+    await harness.waitForStable();
+    expect(harness.state.localVars['界好施/被动激活']).toBe(true);
+  });
+
   // ─── 2. 被动触发:鲁肃被杀指定 → 受益者可交1张 ──────────────
 
   it('被动激活时鲁肃被杀指定 → 受益者P1交给鲁肃1张手牌', async () => {

@@ -49,9 +49,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (!inAttackRange(state, ownerId, t)) return '目标不在你的攻击范围内';
       }
       if (requestType === '流离/pickDiscard') {
-        // 权威校验:必须恰好 1 张且在自己的手牌中(防注入他人手牌 id 复制/丢牌)
-        const cardIds = _params.cardIds;
-        if (!Array.isArray(cardIds) || cardIds.length !== 1) return '请选择弃置的 1 张手牌';
+        // 客户端契约:useCard 型 pending 只发 {cardId};{}=不支付代价(不弃牌不转移)。
+        const raw: unknown = _params.cardIds ?? _params.cardId;
+        const cardIds = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
+        if (!cardIds || cardIds.length === 0) return null; // 放弃支付
+        if (cardIds.length !== 1) return '请选择弃置的 1 张手牌';
         const cid = cardIds[0];
         if (typeof cid !== 'string' || !state.players[ownerId].hand.includes(cid)) {
           return '弃置牌不在你的手牌中';
@@ -66,7 +68,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (requestType === '流离/confirm') {
         state.localVars['流离/confirmed'] = params.choice === true || params.confirmed === true;
       } else if (requestType === '流离/pickDiscard') {
-        state.localVars['流离/discard'] = (params.cardIds as string[])[0];
+        // 兼容 {cardIds:[id]} 与浏览器两步式 {cardId} 两种形状
+        const raw: unknown = params.cardIds ?? params.cardId;
+        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
+        state.localVars['流离/discard'] = ids?.[0];
       } else {
         state.localVars['流离/target'] = params.target;
       }

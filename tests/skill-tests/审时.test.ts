@@ -313,4 +313,52 @@ describe('审时', () => {
     expect(harness.state.players[0].health).toBe(2);
     expect(harness.state.players[0].hand.length).toBe(1); // shan 未给出
   });
+
+  // 回归(2026-08-26):useCard 型 pending 浏览器只发 {cardId};修复前 validate 只认
+  // cardIds 数组并拒绝 → 给牌步必败,超时后按未给牌中止(技能在浏览器不可用)。
+  it('阴:给牌接受浏览器 {cardId} 单数形状', async () => {
+    const state = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P0',
+          hand: ['give1', 'shan'],
+          skills: ['审时', '回合管理'],
+          health: 3,
+          maxHealth: 3,
+          vars: { '审时/态': '阴' },
+        }),
+        makePlayer({ index: 1, name: 'P1', hand: ['s1'], character: '张飞', health: 4, maxHealth: 4, skills: ['回合管理'] }),
+        makePlayer({ index: 2, name: 'P2', hand: ['p'], character: '刘备', health: 4, maxHealth: 4, skills: ['回合管理'] }),
+      ],
+      cardMap: {
+        give1: makeCard('give1', '杀', '♠', '2'),
+        shan: makeCard('shan', '闪', '♥', '2'),
+        s1: makeCard('s1', '杀', '♠', '7'),
+        p: makeCard('p', '闪', '♣', '2'),
+      },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+      zones: { deck: Array.from({ length: 10 }, (_, i) => `dd${i}`), discardPile: [], processing: [] },
+    });
+    for (let i = 0; i < 10; i++) {
+      state.cardMap[`dd${i}`] = makeCard(`dd${i}`, '杀', '♠', '2');
+    }
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P0 = harness.player('P0');
+
+    await P1.useCardAndTarget('杀', 's1', [0]);
+    P0.expectPending('询问闪');
+    await P0.pass();
+    P0.expectPending('请求回应');
+    await P0.respond('审时', { choice: true });
+    P0.expectPending('请求回应'); // 审时/YINgive 选牌
+    await P0.respond('审时', { cardId: 'give1' }); // 浏览器两步式真实形状
+    await harness.waitForStable();
+
+    expect(harness.state.players[1].hand).toContain('give1');
+    expect(getState(harness.state, 0)).toBe('阳'); // 给牌完成 → 翻阳
+  });
 });

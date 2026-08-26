@@ -205,6 +205,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           title: `好施:选择 ${giveCount} 张牌交给 ${ctx.state.players[target].name}`,
           cardFilter: { filter: () => true, min: giveCount, max: giveCount },
         },
+        // 强制型给牌(「分半给最少者」是效果必要部分):前端走多选弃牌式 UI 提交 {cardIds}
+        mandatory: true,
         timeout: 30,
       });
       const giveCards = ctx.state.localVars[GIVE_KEY] as string[] | undefined;

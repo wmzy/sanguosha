@@ -105,6 +105,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             title: `缔盟:弃置 ${actualDiscard} 张牌`,
             cardFilter: { filter: () => true, min: actualDiscard, max: actualDiscard },
           },
+          // 强制型弃牌(交换的代价):前端走多选弃牌 UI 提交 {cardIds};headless 不生成 skip
+          mandatory: true,
           timeout: 30,
         });
         const discardCards = st.localVars[DISCARD_KEY] as string[] | undefined;
