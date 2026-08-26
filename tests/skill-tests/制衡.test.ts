@@ -418,4 +418,34 @@ describe('制衡', () => {
     expect(P1.processedView.players[0].turnUsage?.['制衡/usedThisTurn']).toBe(true);
     expect(P1.view.players[0].turnUsage?.['制衡/usedThisTurn']).toBe(true);
   });
+
+  it('validate:cardIds 含重复 id → 拒绝(防同一张牌被弃两次)', async () => {
+    const c1 = makeCard('c1', '杀', '♠', 'A');
+    const c2 = makeCard('c2', '闪', '♥', '2');
+    const deck = makeCard('d1', '桃', '♥', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['c1', 'c2'], skills: ['制衡'] }),
+        makePlayer({ index: 1, name: 'P2' }),
+      ],
+      cardMap: { c1, c2, d1: deck },
+      zones: { deck: ['d1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // ['c1','c1'] 每张都通过 includes 检查,但重复提交会使同一张牌进弃牌堆两次
+    await P1.expectRejected({
+      skillId: '制衡',
+      actionType: 'use',
+      params: { cardIds: ['c1', 'c1'] },
+    });
+    // 手牌未动、限一次未消耗
+    expect(harness.state.players[0].hand).toEqual(['c1', 'c2']);
+    P1.processEvents();
+    expect(P1.processedView.players[0].turnUsage?.['制衡/usedThisTurn']).toBeUndefined();
+  });
 });

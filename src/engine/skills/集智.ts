@@ -96,7 +96,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       defaultChoice: true,
       timeout: 15,
     });
-    if (!ctx.state.localVars['集智/confirmed']) return;
+    // defaultChoice:true → 超时(undefined=未回应)视为默认确认;仅显式取消(false)放弃摸牌
+    if (ctx.state.localVars['集智/confirmed'] === false) return;
     await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
   });
 

@@ -555,4 +555,38 @@ describe('成略', () => {
     // 态仍为阴(未翻转)
     expect(harness.state.players[0].vars['成略/态']).toBe('阴');
   });
+
+  it('校验:弃牌回应 cardIds 含重复 id → 拒绝', async () => {
+    const state = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['h1', 'h2', 'h3'] }),
+        makePlayer({ index: 1, name: 'P2', health: 4, maxHealth: 4, skills: ['闪'] }),
+      ],
+      zones: { deck: ['db1'], discardPile: [], processing: [] },
+      cardMap: {
+        h1: makeCard('h1', '杀', '♠', '7'),
+        h2: makeCard('h2', '杀', '♣', '8'),
+        h3: makeCard('h3', '桃', '♥', '3'),
+        db1: makeCard('db1', '闪', '♦'),
+      },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('成略', 'use', {});
+    // 阳:摸1弃2。['h1','h1'] 数量=2 但重复 → 去重校验拒绝
+    await P1.expectRejected({
+      skillId: '成略',
+      actionType: 'respond',
+      params: { cardIds: ['h1', 'h1'] },
+    });
+    // 合法选择继续走完(不卡死)
+    await P1.respond('成略', { cardIds: ['h1', 'h2'] });
+    await harness.waitForStable();
+    expect(harness.state.players[0].vars['成略/态']).toBe('阴');
+    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['h1', 'h2']));
+  });
 });

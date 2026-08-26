@@ -151,6 +151,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           for (const id of cardIds) {
             if (typeof id !== 'string' || !tp.hand.includes(id)) return `牌 ${id} 不在手牌中`;
           }
+          // 去重校验:重复 id 会使同一张牌被弃置两次
+          if (new Set(cardIds).size !== cardIds.length) return 'cardIds 含重复牌';
           return null;
         }
         return '当前不是镇骨询问';

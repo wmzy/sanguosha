@@ -631,4 +631,30 @@ describe('飞军 + 兵略', () => {
     expect(harness.state.players[0].hand).toContain('t1');
     expect(harness.state.players[1].hand).not.toContain('t1');
   });
+
+  it('use prompt 投影下发 cardFilter candidates(filter 缺失回归)', async () => {
+    const c1 = makeCard('c1', '杀', '♠', '7');
+    const p1a = makeCard('p1a', '闪', '♥', '2');
+    const p1b = makeCard('p1b', '桃', '♥', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['c1'], skills: ['飞军'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1a', 'p1b'], skills: [] }),
+      ],
+      cardMap: { c1, p1a, p1b },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    const use = P0.availableActions().find((a) => a.label === '飞军' && a.actionType === 'use');
+    expect(use).toBeDefined();
+    // 回归锚点:cardFilter 缺 filter 时前端/无头端拿不到选牌谓词
+    // (use action 的 cardFilter 走 registry 路径,不注入投影 candidates)
+    const cf = (use!.prompt as { cardFilter?: { filter?: unknown } }).cardFilter;
+    expect(typeof cf?.filter).toBe('function');
+    expect(P0.findValidCard('use')).not.toBeNull();
+  });
 });

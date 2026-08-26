@@ -224,7 +224,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     prompt: {
       type: 'useCardAndTarget',
       title: '驱虎:选择一张拼点牌和一名目标',
-      cardFilter: { min: 1, max: 1 },
+      cardFilter: { filter: () => true, min: 1, max: 1 },
       targetFilter: {
         min: 1,
         max: 1,

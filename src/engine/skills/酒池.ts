@@ -46,8 +46,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const card = cardIdOk ? state.cardMap[cardId] : undefined;
       const cardInHand = cardIdOk && self.hand.includes(cardId);
       const isSpade = !!card && card.suit === '♠';
-      const ok = myTurn && free && selfAlive && cardInHand && isSpade;
-      return ok ? null : '现在不能使用酒池';
+      // 濒死求桃窗口:已声明 declareAlternativeResponse('请求回应','桃/求桃'),
+      // 转化出的影子【酒】可经 酒.respond 当桃自救——此时非自己回合且有阻塞 pending,须放行。
+      const slot = state.pendingSlots.get(ownerId);
+      const atomType = (slot?.atom as { type?: string })?.type;
+      const reqType = (slot?.atom as { requestType?: string })?.requestType;
+      const atomTarget = (slot?.atom as { target?: number })?.target;
+      const askedPeach =
+        !!slot &&
+        atomTarget === ownerId &&
+        atomType === '请求回应' &&
+        reqType === '桃/求桃';
+      const ok = (myTurn && free && selfAlive) || (selfAlive && askedPeach);
+      return cardInHand && isSpade && ok ? null : '现在不能使用酒池';
     },
     async (state: GameState, params: Record<string, Json>) => {
       const cardId = params.cardId as string;
@@ -89,10 +100,20 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     },
     transform: (card: Card) => ({ name: '酒', sourceCardId: card.id, fromSkill: skill.id }),
     activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
       const p = ctx.view.players[ctx.perspectiveIdx];
       if (!p) return false;
-      return p.hand?.some((c) => c.suit === '♠') ?? false;
+      const hasSpade = p.hand?.some((c: Card) => c.suit === '♠') ?? false;
+      if (!hasSpade) return false;
+      // 出牌路径(自己回合 + 出牌阶段)
+      if (defaultPlayActive(ctx)) return true;
+      // 濒死自救路径(被询问 桃/求桃):与武圣 askedKill 同构
+      const slot = ctx.view.pending;
+      const reqType = (slot?.atom as { requestType?: string })?.requestType;
+      return (
+        !!slot &&
+        (slot as { target?: number }).target === ctx.perspectiveIdx &&
+        reqType === '桃/求桃'
+      );
     },
   });
   return;

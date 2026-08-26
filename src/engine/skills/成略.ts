@@ -145,6 +145,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return `需弃置 ${expected} 张牌`;
       }
       if (!ids.every((id) => self.hand.includes(id))) return '牌不在手牌中';
+      // 去重校验:重复 id 会使同一张牌被计入多张弃置
+      if (new Set(ids).size !== ids.length) return 'cardIds 含重复牌';
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {

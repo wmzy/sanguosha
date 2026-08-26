@@ -181,6 +181,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const targets = params.targets as number[] | undefined;
         if (!Array.isArray(targets) || targets.length === 0) return '请选择至少一名角色';
         if (targets.length > X) return `至多选择 ${X} 名角色`;
+        // 去重校验:重复座次会使同一角色被重复摸牌/计入体力和
+        if (new Set(targets).size !== targets.length) return 'targets 含重复座次';
         for (const t of targets) {
           if (t === ownerId) return '不能选择自己';
           if (!st.players[t]?.alive) return '目标不合法';
@@ -191,6 +193,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const targets = params.targets as number[] | undefined;
         if (!Array.isArray(targets) || targets.length === 0) return '请选择至少一名角色';
         if (targets.length > X) return `至多选择 ${X} 名角色`;
+        if (new Set(targets).size !== targets.length) return 'targets 含重复座次';
         let sum = 0;
         for (const t of targets) {
           if (t === ownerId) return '不能选择自己';

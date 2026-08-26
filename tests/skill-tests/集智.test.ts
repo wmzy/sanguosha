@@ -219,4 +219,36 @@ describe('集智', () => {
     // 无集智 confirm 窗口
     expect(harness.state.pendingSlots.get(0)).toBeUndefined();
   });
+
+  it('超时不回应(defaultChoice:true)→ 视为确认,摸 1 张', async () => {
+    const wz = makeCard('wz1', '无中生有', '♥', '7');
+    const d1 = makeCard('d1', '杀', '♠', '5', '基本牌');
+    const d2 = makeCard('d2', '闪', '♥', '6', '基本牌');
+    const d3 = makeCard('d3', '杀', '♣', '8', '基本牌');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['wz1'], skills: ['集智', '无中生有'] }),
+        makePlayer({ index: 1, name: 'P2', skills: [] }),
+      ],
+      cardMap: { wz1: wz, d1, d2, d3 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: ['d1', 'd2', 'd3'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.useCardAndTarget('无中生有', 'wz1', [0]);
+    P1.expectPending('请求回应');
+    // 超时(fireTimeout 触发 onTimeout,confirmed 保持 undefined)
+    await P1.pass();
+    // defaultChoice:true 生效:confirmed undefined 视为默认确认,此时已摸 1(deck 3→2)
+    expect(harness.state.zones.deck.length).toBe(2);
+    // 无中生有继续 → 无懈可击窗口 → 无人打出
+    await P1.pass();
+    // 集智摸 1 + 无中生有摸 2 = 3 张(起手 wz1 已打出)
+    expect(harness.state.players[0].hand.length).toBe(3);
+    expect(harness.state.zones.deck).toEqual([]);
+  });
 });

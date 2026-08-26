@@ -158,4 +158,47 @@ describe('酒池', () => {
       params: { cardId: 'c1' },
     });
   });
+
+  // ─── 濒死自救:桃/求桃窗口放行 transform ────────────────
+
+  it('濒死求桃窗口:非自己回合 transform 放行 → 影子酒当桃自救', async () => {
+    const spade = makeCard('c1', '杀', '♠', '7');
+    const attacker = makeCard('a1', '杀', '♣', '8');
+    const state = createGameState({
+      players: [
+        // P0(酒池)1 血无闪:P1 出杀命中 → 濒死
+        makePlayer({ index: 0, name: 'P0', hand: ['c1'], skills: ['酒池'], health: 1, maxHealth: 4 }),
+        makePlayer({ index: 1, name: 'P1', hand: ['a1'], skills: ['杀'], health: 4, maxHealth: 4 }),
+      ],
+      cardMap: { c1: spade, a1: attacker },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+
+    await P1.useCardAndTarget('杀', 'a1', [0]);
+    await P0.pass(); // 不出闪 → HP=0 濒死 → 求桃 pending 问到 P0
+    const slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
+      requestType?: string;
+      target?: number;
+    };
+    expect(slotAtom.requestType).toBe('桃/求桃');
+    expect(slotAtom.target).toBe(0);
+
+    // 回归锚点:修复前 transform validate 要求 myTurn && free,
+    // 濒死窗口(回合外 + 阻塞 pending)下被拒 → 无法自救。
+    // 与真实前端一致:单条消息 preceding=[酒池.transform] + 主 action=酒.respond
+    // (分开 dispatch 会因主动 action 先 resolve 求桃 slot 而走样)
+    await P0.expectAccepted({
+      skillId: '酒',
+      actionType: 'respond',
+      params: { cardId: 'c1#酒池' },
+      preceding: [{ skillId: '酒池', actionType: 'transform', params: { cardId: 'c1' } }],
+    });
+    expect(harness.state.players[0].health).toBe(1);
+    expect(harness.state.zones.discardPile).toContain('c1');
+  });
 });

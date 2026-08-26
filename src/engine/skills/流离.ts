@@ -33,6 +33,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
       ).requestType as string;
       if (requestType !== '流离/confirm' && requestType !== '流离/chooseTarget')
         return '当前不是流离回应';
+      if (requestType === '流离/chooseTarget') {
+        // 服务端兜底:candidates 仅约束前端展示,恶意提交仍须权威校验(与 prompt.filter 同源)。
+        // 杀来源由 hook 存入 localVars(pending atom 本身无 source 字段)
+        const t = _params.target;
+        if (typeof t !== 'number') return '请选择转移目标';
+        if (t === ownerId) return '不能转移给自己';
+        const src = state.localVars['流离/来源'];
+        if (t === src) return '不能转移给杀的来源';
+        if (!state.players[t]?.alive) return '目标不存活';
+        if (!inAttackRange(state, ownerId, t)) return '目标不在你的攻击范围内';
+      }
       return null;
     },
     async (state, params) => {
@@ -60,6 +71,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 询问是否发动流离
     delete ctx.state.localVars['流离/confirmed'];
+    ctx.state.localVars['流离/来源'] = atom.source; // respond 兜底校验用(pending atom 无 source)
     await applyAtom(ctx.state, {
       type: '请求回应',
       requestType: '流离/confirm',
@@ -86,10 +98,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
         title: '流离:选择转移目标',
         min: 1,
         max: 1,
+        // 官方规则:「将此杀转移给你攻击范围内的一名其他角色」——主体是流离使用者(ownerId),
+        // 而非杀来源 atom.source;且不含来源自己(转移后来源不能成为自己这张杀的目标)。
         filter: (view, target) =>
           target !== ownerId &&
+          target !== atom.source &&
           view.players[target]?.alive === true &&
-          inAttackRange(ctx.state, atom.source, target),
+          inAttackRange(ctx.state, ownerId, target),
       },
       timeout: 15,
     });
@@ -108,6 +123,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
     delete ctx.state.localVars['流离/confirmed'];
     delete ctx.state.localVars['流离/target'];
+    delete ctx.state.localVars['流离/来源'];
   });
   return () => {};
 }

@@ -203,6 +203,44 @@ describe('镇骨', () => {
     expect(harness.state.players[0].vars['镇骨/目标']).toBeUndefined();
   });
 
+  it('校验:弃牌回应 cardIds 含重复 id → 拒绝(不卡死)', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: '郝昭', hand: ['h1', 'h2'], skills: ['镇骨', '回合管理'] }),
+          mkPlayer({ index: 1, name: 'P1', hand: ['p1', 'p2', 'p3', 'p4', 'p5'], skills: ['回合管理'] }),
+        ],
+        cardMap: cardMapFor(['h1', 'h2', 'p1', 'p2', 'p3', 'p4', 'p5']),
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const Hao = harness.player('郝昭');
+    const P1 = harness.player('P1');
+
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '回合结束' });
+    await harness.waitForStable();
+    await Hao.respond('镇骨', { targets: [1] });
+    await harness.waitForStable();
+    void applyAtom(harness.state, { type: '回合结束', player: 0 });
+    await harness.waitForStable();
+    expect(hasPending(harness.state, '镇骨/弃牌')).toBe(true);
+
+    // ['p1','p1','p2'] 数量=3 但含重复 → 去重校验拒绝
+    await P1.expectRejected({
+      skillId: '镇骨',
+      actionType: 'respond',
+      params: { cardIds: ['p1', 'p1', 'p2'] },
+    });
+    // 手牌未动
+    expect(harness.state.players[1].hand.length).toBe(5);
+    // 合法选择放行
+    await P1.respond('镇骨', { cardIds: ['p1', 'p2', 'p3'] });
+    await harness.waitForStable();
+    expect(harness.state.players[1].hand.length).toBe(2);
+  });
+
   // ─── 4. 不发动(pass 选目标)→ 无效果 ─────────────────────
   it('结束阶段 pass(不选目标)→ 镇骨不发动,无状态记录', async () => {
     await harness.setup(
