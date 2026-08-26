@@ -319,4 +319,88 @@ describe('武烈', () => {
     expect(harness.state.players[1].marks.filter((m) => m.id === '武烈/烈').length).toBe(0);
     expect(harness.state.players[2].marks.filter((m) => m.id === '武烈/烈').length).toBe(0);
   });
+
+  // ─── HP 选择 chooseOption(prompt 类型修复) ──────────────────
+  // 修复前:HP 询问 prompt 为 confirm,前端只回 {choice},validate 读 hpCount 永远
+  // 得不到数值(点「确认」被 execute 默认 n=1),玩家无法选择失去体力数。
+  // 修复后:prompt 改 chooseOption(选项 1..N),前端提交 {option:'N'}。
+  it('HP 询问接受 chooseOption 格式 option:"2" → 失去2点体力,2名角色各获标记', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界孙坚',
+            character: '界孙坚',
+            skills: ['武烈'],
+            health: 4,
+            maxHealth: 4,
+          }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', skills: [] }),
+          mkPlayer({ index: 2, name: 'P2', character: '反', skills: [] }),
+        ],
+        cardMap: {},
+        zones: { deck: [], discardPile: [], processing: [] },
+        currentPlayerIndex: 0,
+        phase: '回合结束',
+        turn: { round: 1, phase: '回合结束', vars: {} },
+      }),
+    );
+    const SJ = harness.player('界孙坚');
+
+    triggerEndPhase(harness);
+    await harness.waitForStable();
+    SJ.expectPending('请求回应');
+    await SJ.respond('武烈', { choice: true }); // 发动
+    await harness.waitForStable();
+    // 前端 AwaitingPrompt 对 chooseOption 提交 {option: value}(字符串)
+    await SJ.respond('武烈', { option: '2' });
+    await harness.waitForStable();
+    await SJ.respond('武烈', { targets: [1, 2] });
+    await harness.waitForStable();
+
+    expect(harness.state.players[0].health).toBe(2);
+    expect(harness.state.players[0].vars['武烈/used']).toBe(true);
+    expect(harness.state.players[1].marks.filter((m) => m.id === '武烈/烈').length).toBe(1);
+    expect(harness.state.players[2].marks.filter((m) => m.id === '武烈/烈').length).toBe(1);
+  });
+
+  it('HP 询问超时(pass)→ 放弃发动:不失血、不发标记、限定技未消耗', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界孙坚',
+            character: '界孙坚',
+            skills: ['武烈'],
+            health: 4,
+            maxHealth: 4,
+          }),
+          mkPlayer({ index: 1, name: 'P1', character: '反', skills: [] }),
+          mkPlayer({ index: 2, name: 'P2', character: '反', skills: [] }),
+        ],
+        cardMap: {},
+        zones: { deck: [], discardPile: [], processing: [] },
+        currentPlayerIndex: 0,
+        phase: '回合结束',
+        turn: { round: 1, phase: '回合结束', vars: {} },
+      }),
+    );
+    const SJ = harness.player('界孙坚');
+
+    triggerEndPhase(harness);
+    await harness.waitForStable();
+    SJ.expectPending('请求回应');
+    await SJ.respond('武烈', { choice: true }); // 发动
+    await harness.waitForStable();
+    // HP 询问不回应(超时)
+    await SJ.pass();
+    await harness.waitForStable();
+
+    // 放弃:体力不变、无标记;此时 USED_KEY 尚未写入,限定技未消耗
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[0].vars['武烈/used']).toBeUndefined();
+    expect(harness.state.players[1].marks.length).toBe(0);
+  });
 });

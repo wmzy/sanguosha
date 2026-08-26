@@ -201,7 +201,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (requestType === REQUEST_TYPE) {
             // 被挑衅者出杀:目标固定=姜维(ownerId),且须在攻击范围内
             const cardId = params.cardId as string | undefined;
-            const targetIdx = params.target as number | undefined;
+            // 前端 useCardAndTarget 回应发 targets:[idx] 数组;直接 dispatch 兼容单数 target
+            const rawTarget = Array.isArray(params.targets)
+              ? (params.targets as unknown[])[0]
+              : params.target;
+            const targetIdx = typeof rawTarget === 'number' ? rawTarget : undefined;
             if (typeof cardId !== 'string') return '请选择一张杀';
             if (typeof targetIdx !== 'number') return '请选择目标';
             const self = st.players[seat];
@@ -249,9 +253,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
             slot?.atom as { requestType?: string } | undefined
           )?.requestType;
           if (requestType === REQUEST_TYPE) {
+            // 与 validate 同构:前端 targets 数组优先,兼容单数 target
+            const rawTarget = Array.isArray(params.targets)
+              ? (params.targets as unknown[])[0]
+              : params.target;
             st.localVars[CHOICE_VAR] = {
               cardId: params.cardId as string,
-              target: params.target as number,
+              target: rawTarget as number,
             };
           } else if (requestType === PICK_REQUEST_TYPE) {
             st.localVars[PICK_VAR] = {

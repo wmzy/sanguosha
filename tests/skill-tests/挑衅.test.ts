@@ -214,4 +214,23 @@ describe('挑衅', () => {
       params: { target: 0 },
     });
   });
+
+  // ─── 回应参数格式:前端 useCardAndTarget 发 targets 数组 ─────────
+  // 修复前:respond 只读单数 params.target,前端 handleRespond 对 useCardAndTarget
+  // 回应发的是 { cardId, targets:[idx] } → validate 永远返回「请选择目标」,
+  // 被挑衅者从 UI 无法出杀(借刀杀人已兼容两种格式,此处补齐)。
+  it('回应接受前端 useCardAndTarget 格式:cardId + targets 数组', async () => {
+    const kill = mkCard('k1', '杀', '♠', '7');
+    await harness.setup(build({ p1Hand: [kill.id], extraCards: { k1: kill } }));
+    const P0 = harness.player('姜维');
+    const P1 = harness.player('P1');
+
+    await P0.triggerAction('挑衅', 'use', { target: 1 });
+    // 前端格式(targets 数组);修复前此回应被拒,P1 只能被弃牌
+    await P1.respond('挑衅', { cardId: 'k1', targets: [0] });
+    await P0.pass(); // 姜维不出闪
+
+    // P1 出杀成功 → 走完整杀结算,姜维扣 1 点体力
+    expect(harness.state.players[0].health).toBe(3);
+  });
 });

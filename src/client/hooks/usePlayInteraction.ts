@@ -811,7 +811,28 @@ export function usePlayInteraction(
       if (!transformMode) return;
       // 回应路径(被询问杀):转化杀打出,无目标,主 action=杀.respond
       if (isKillRespondContext) {
-        if (transformMode.minCards > 1) return; // 多卡转化不参与杀回应
+        if (transformMode.minCards > 1) {
+          // 多卡转化(丈八蛇矛):2 张手牌当杀打出
+          const ids = transformMode.selectedCardIds;
+          if (ids.length < transformMode.minCards || ids.length > transformMode.maxCards) return;
+          const shadowCardId = `${ids.join('#')}#${transformMode.skillId}`;
+          send(
+            transformMode.wrapperName,
+            'respond',
+            { cardId: shadowCardId },
+            [
+              {
+                skillId: transformMode.skillId,
+                actionType: transformMode.actionType,
+                params: { cardIds: ids },
+              },
+            ],
+          );
+          setTransformMode(null);
+          setSelectedCardId(null);
+          setSelectedTarget(null);
+          return;
+        }
         if (!selectedCardId) return;
         const targetCard = perspectiveHand.find((c) => c.id === selectedCardId);
         if (!targetCard) return;

@@ -15,11 +15,12 @@ import { frameCards } from '../../src/engine/core/frame';
 //   7. color:两张同色(♠+♣) → 影子卡 color=黑,suit=空
 //   8. color:两张异色(♠+♥) → 影子卡 color=无色,suit=空
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import { applyAtom } from '../../src/engine/core/apply';
 
 function makeCard(
   id: string,
@@ -337,5 +338,64 @@ describe('丈八蛇矛', () => {
     expect(shadow.suit).toBe('');
     expect(shadow.color).toBe('无色');
     expect(shadow.shadowOf).toBeUndefined();
+  });
+
+  // ─── 回应(打出)路径:被询问杀时,2 张手牌当杀打出 ──────────────
+  // 修复前:onInit 未声明 declareAlternativeResponse('询问杀') 且 transform
+  // validate 无 askedKill 分支,南蛮入侵/决斗询问出杀时窗口被 skip(无字面杀),
+  // 永远无法用丈八蛇矛把两张手牌当杀打出。修复后与武圣同构。
+  it('回应路径:被询问杀时,2 张手牌当杀回应', async () => {
+    // 直接 applyAtom(询问杀) 不经南蛮/决斗父流程,会触发视图自动对比的
+    // transient 处理区差异,故临时关闭自动对比(与武圣同款处理)。
+    const restoreAutoCompare = disableAutoCompare();
+    try {
+      const c1 = makeCard('c1', '闪', '♠', '2');
+      const c2 = makeCard('c2', '桃', '♣', '3');
+      const state: GameState = createGameState({
+        players: [
+          makePlayer({
+            index: 0,
+            name: 'P1',
+            hand: ['c1', 'c2'],
+            skills: ['丈八蛇矛'],
+            equipment: { 武器: 'zb' },
+          }),
+          makePlayer({ index: 1, name: 'P2', hand: [], skills: [] }),
+        ],
+        cardMap: { zb: ZHANGBA, c1, c2 },
+        currentPlayerIndex: 1, // P2 的回合(模拟南蛮入侵/决斗询问 P1 出杀)
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      });
+      await harness.setup(state);
+      const P1 = harness.player('P1');
+
+      // 模拟南蛮入侵/决斗:询问 P1 出杀(fire-and-forget,等待回应)
+      void applyAtom(harness.state, { type: '询问杀', target: 0, source: 1 });
+      await harness.waitForStable();
+
+      // 修复前:P1 无字面杀 → 询问杀 skip,无 pending,永远无法回应。
+      // 修复后:declareAlternativeResponse 建立回应窗口。
+      expect(harness.state.pendingSlots.has(0)).toBe(true);
+
+      // P1 用丈八蛇矛:c1+c2 → 杀,preceding=[丈八蛇矛.transform] + 主=杀.respond
+      await P1.tryDispatch({
+        skillId: '杀',
+        actionType: 'respond',
+        params: { cardId: 'c1#c2#丈八蛇矛' },
+        preceding: [
+          { skillId: '丈八蛇矛', actionType: 'transform', params: { cardIds: ['c1', 'c2'] } },
+        ],
+      });
+      await harness.waitForStable();
+
+      // 回应成功:询问杀窗口 resolve,P1 两张原卡已随影子转化离开手牌
+      expect(harness.state.pendingSlots.has(0)).toBe(false);
+      expect(harness.state.players[0].hand).toEqual([]);
+      // 影子杀存在(供调用方南蛮/决斗检测)
+      expect(harness.state.cardMap['c1#c2#丈八蛇矛']).toBeDefined();
+    } finally {
+      restoreAutoCompare();
+    }
   });
 });
