@@ -18,13 +18,11 @@ import {
   changePassword,
 } from './store';
 import { getGithubConfig, generateState, exchangeCodeForProfile, isGithubEnabled } from './github';
-import { extractSessionToken } from './guard';
+import { extractSessionToken, SESSION_COOKIE } from './guard';
 import { applyDisplayName } from '../room';
 import type { PublicUser } from './store';
 
 const log = createLogger('auth-routes');
-
-const COOKIE_NAME = 'sgs_session';
 
 /** 认证端点限流:见 applyAuthRoutes 内分级配置。 */
 
@@ -49,7 +47,7 @@ export function applyAuthRoutes(app: Hono): void {
   auth.use('/profile', authReadLimit);
 
   const setSessionCookie = (c: Parameters<typeof setCookie>[0], token: string, expiresAt: number) => {
-    setCookie(c, COOKIE_NAME, token, {
+    setCookie(c, SESSION_COOKIE, token, {
       httpOnly: true,
       sameSite: 'Lax',
       secure: c.req.url.startsWith('https://'),
@@ -87,16 +85,20 @@ export function applyAuthRoutes(app: Hono): void {
   });
 
   // ── 当前用户 ──
+  // 身份解析走 extractSessionToken(Cookie → Bearer → ?sgs_token):register/login
+  // 把 token 放响应体正是供无 Cookie 存储的程序化客户端(HGC/MCP)使用,
+  // 只读 Cookie 会让这类客户端 /me 恒为未登录。
   auth.get('/me', async (c) => {
-    const user = await getUserByToken(getCookie(c, COOKIE_NAME));
+    const user = await getUserByToken(extractSessionToken(c));
     return c.json({ user, githubEnabled: isGithubEnabled() });
   });
 
   // ── 登出 ──
+  // 同 /me:token 来源不限 Cookie,否则 Bearer 客户端登出删不掉服务端会话。
   auth.post('/logout', async (c) => {
-    const token = getCookie(c, COOKIE_NAME);
+    const token = extractSessionToken(c);
     await deleteSession(token);
-    deleteCookie(c, COOKIE_NAME, { path: '/' });
+    deleteCookie(c, SESSION_COOKIE, { path: '/' });
     return c.json({ success: true });
   });
 

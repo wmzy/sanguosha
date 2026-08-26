@@ -548,11 +548,20 @@ export function applyRestRoutes(app: Hono): void {
     return c.json({ success: true, remaining: result.remaining });
   });
 
-  // GET /api/rooms/:id/chat/history — 获取聊天历史（调试用）
-  app.get('/api/rooms/:id/chat/history', (c) => {
+  // GET /api/rooms/:id/chat/history — 获取聊天历史
+  // 聊天记录是房间私有信息(含玩家实时发言):非调试房间与 /log 同款防护——
+  // 必须登录且为本房成员(玩家/旁观者),防止未登录者凭 roomId 拉取全部发言。
+  app.get('/api/rooms/:id/chat/history', async (c) => {
     const roomId = c.req.param('id');
     const room = getRoom(roomId);
     if (!room) return c.json({ error: '房间不存在' }, 404);
+    if (!room.isDebug) {
+      const user = await requireUser(c);
+      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+      if (!room.players.has(user.id) && !room.spectators.has(user.id)) {
+        return c.json({ error: '仅房间成员可查看聊天记录' }, 403);
+      }
+    }
     return c.json(getChatHistory(roomId));
   });
 

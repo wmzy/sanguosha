@@ -275,6 +275,35 @@ describe('auth/routes', () => {
     });
     expect(res.status).toBe(400);
   });
+
+  // ── 2026-08-26 回归:/me 与 /logout 曾只读 Cookie,不走 extractSessionToken——
+  // register/login 特意把 token 放响应体供无 Cookie 存储的程序化客户端走 Bearer,
+  // 这两个端点却对 Bearer 恒返回未登录/删不掉服务端会话。
+
+  it('/me 支持 Bearer token(程序化通道恢复登录态)', async () => {
+    const app = makeApp();
+    const { token } = await registerUser(app, 'me_bearer_user');
+    const me = await app.request('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(me.status).toBe(200);
+    const body = (await me.json()) as { user: { username: string } | null };
+    expect(body.user?.username).toBe('me_bearer_user');
+  });
+
+  it('logout 删除 Bearer 会话:登出后同 token /me 无用户', async () => {
+    const app = makeApp();
+    const { token } = await registerUser(app, 'logout_bearer_user');
+    await app.request('/api/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const me = await app.request('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await me.json()) as { user: unknown };
+    expect(body.user).toBeNull();
+  });
 });
 
 // ── 房间身份强制(游客模式移除) ──
@@ -836,6 +865,60 @@ describe('房间登录强制', () => {
     expect(ok.status).toBe(404);
     expect(((await ok.json()) as { error: string }).error).toBe('无游戏日志');
     gameSessions.delete(roomId);
+  });
+
+  // ── 2026-08-26 回归:chat/history 曾完全无鉴权(连登录都不要),与 /log 防护不一致——
+  // 未登录者凭 roomId 可拉取进行中对局的全部玩家发言。
+
+  it('chat/history:未登录 401、非成员 403、本房成员可读;调试房保持开放', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'auth_chat_host');
+    const outsider = await registerUser(app, 'auth_chat_out');
+    const { roomId } = (await (
+      await app.request('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '聊天鉴权房', maxPlayers: 2 }),
+      })
+    ).json()) as { roomId: string };
+
+    // 聊天仅在「进行中」可发:置状态后由房主产生一条历史
+    setRoomStatus(roomId, '进行中');
+    const sent = await app.request(`/api/rooms/${roomId}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ text: '杀!'}),
+    });
+    expect(sent.status).toBe(200);
+
+    // 未登录 → 401
+    const anon = await app.request(`/api/rooms/${roomId}/chat/history`);
+    expect(anon.status).toBe(401);
+
+    // 登录但不在本房 → 403
+    const forbidden = await app.request(`/api/rooms/${roomId}/chat/history`, {
+      headers: { Cookie: outsider.cookie },
+    });
+    expect(forbidden.status).toBe(403);
+
+    // 本房成员 → 历史含刚才的消息
+    const ok = await app.request(`/api/rooms/${roomId}/chat/history`, {
+      headers: { Cookie: host.cookie },
+    });
+    expect(ok.status).toBe(200);
+    const history = (await ok.json()) as Array<{ playerId: string; text: string }>;
+    expect(history.some((m) => m.playerId === host.userId && m.text === '杀!')).toBe(true);
+
+    // 调试房保持游客模型开放(开发工具)
+    const debugRoomId = (await (
+      await app.request('/api/debug-room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerCount: 2 }),
+      })
+    ).json()) as { roomId: string };
+    const debugRes = await app.request(`/api/rooms/${debugRoomId.roomId}/chat/history`);
+    expect(debugRes.status).toBe(200);
   });
 });
 

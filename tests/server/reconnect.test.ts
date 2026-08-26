@@ -464,4 +464,51 @@ describe('身份分配座次轮转 (multiplayer 非 debug)', () => {
     const lordPhysSeat = (n - offset) % n;
     expect(session.getPlayerName(pids[lordPhysSeat])).toBe(0);
   }, 15000);
+
+  // 回归:seatDisplayNames 曾按 seats 序直接填写引擎玩家名,未跟随 +offset 映射旋转——
+  // offset≠0 时每个玩家在视图里顶着别人的昵称/武将打完整局(战报同样张冠李戴)。
+  it('offset≠0 时引擎座次显示名与 playerId↔座次映射一致(玩家看到自己昵称)', async () => {
+    let covered = false;
+    for (let seed = 1; seed <= 12 && !covered; seed++) {
+      const pids = ['p0', 'p1', 'p2'];
+      const { room } = makeMultiplayerRoom(pids);
+      const session = new GameSession(room, false, seed);
+      await session.startGame();
+      const state = getState(session) as GameState & {
+        players: Array<{ name: string }>;
+      };
+      if ((state.seatRotation ?? 0) === 0) continue; // 该 seed 无偏移,不覆盖目标分支
+      covered = true;
+      for (const pid of pids) {
+        const g = session.getPlayerName(pid)!;
+        expect(state.players[g].name).toBe(room.playerNames.get(pid));
+      }
+    }
+    expect(covered).toBe(true); // 12 个 seed 至少一个 offset≠0,否则偏移机制失效
+  }, 30000);
+
+  // 回归:startGame 映射曾遍历 players.keys()(连接插入序),换座(moveSeat/seat-swap)
+  // 只改 seats 不改 Map 序——换座后开局会让玩家拿到他人座次的私有视图。
+  it('换座后开局:映射与显示名仍按 seats 座位表序对齐', async () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const pids = ['s0', 's1', 's2'];
+      const { room } = makeMultiplayerRoom(pids);
+      // 模拟 s1/s2 换座:seats 变化,players Map 插入序保持原样
+      [room.seats[1], room.seats[2]] = [room.seats[2], room.seats[1]];
+      const session = new GameSession(room, false, seed);
+      await session.startGame();
+      const state = getState(session) as GameState & {
+        players: Array<{ name: string }>;
+      };
+      const n = state.players.length;
+      const offset = state.seatRotation ?? 0;
+      // 映射必须按 seats(权威座位表)而非连接序
+      for (let i = 0; i < n; i++) {
+        const pid = room.seats[i]!;
+        expect(session.getPlayerName(pid)).toBe((i + offset) % n);
+        // 显示名与映射一致
+        expect(state.players[(i + offset) % n].name).toBe(room.playerNames.get(pid));
+      }
+    }
+  }, 60000);
 });
