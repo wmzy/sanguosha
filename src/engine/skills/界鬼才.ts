@@ -75,7 +75,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const reqType = atom.requestType as string;
       if (reqType !== '界鬼才/replace') return '当前不是界鬼才询问';
       // 若选择替换:cardId 必须在手牌或装备区中;若选择不替换:无额外要求
-      if (params.choice === true || params.confirmed === true) {
+      // 浏览器/Headless 客户端对 useCard 型 pending 只发 {cardId}(无 choice),
+      // 故 cardId 出现即视为发动意图;{choice:false}/{} 仍视为不发动。
+      if (params.choice === true || params.confirmed === true || typeof params.cardId === 'string') {
         const cardId = params.cardId as string;
         if (typeof cardId !== 'string') return '请选择一张替换牌';
         if (findCardLocation(st, cardId) === null) return '替换牌不在手牌或装备区中';
@@ -83,7 +85,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const use = params.choice === true || params.confirmed === true;
+      const use =
+        params.choice === true || params.confirmed === true || typeof params.cardId === 'string';
       if (!use) {
         st.localVars['鬼才/replaceCard'] = null;
         return;
