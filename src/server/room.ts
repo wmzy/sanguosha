@@ -644,6 +644,10 @@ export function respondSeatSwap(
 ): { room: Room; swapped: boolean } | null {
   const room = roomList.get(roomId);
   if (!room) return null;
+  // 与 moveSeat/requestSeatSwap 同款守卫:仅等待中可换座。
+  // 缺此检查时,开局瞬间点「接受」会在对局进行中改写 seats,
+  // 破坏断线重连的 ensureSeatOnReconnect 归位与座次显示。
+  if (room.status !== '等待中') return null;
 
   const pending = room.pendingSeatSwaps.get(requesterId);
   if (!pending) return null;

@@ -168,7 +168,19 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
       } else if (rt === DISCARD_RT) {
         const ids = params.cardIds as string[] | undefined;
-        if (Array.isArray(ids)) st.localVars[DISCARD_KEY] = ids;
+        // 校验:恰好 N 张且全部为 owner 手牌(弃置 atom 不校验归属,
+        // 异常客户端提交任意 cardId 会把他人手中的牌复制进弃牌堆)
+        const need = (
+          slot?.atom as { prompt?: { cardFilter?: { min?: number } } } | undefined
+        )?.prompt?.cardFilter?.min;
+        if (
+          Array.isArray(ids) &&
+          typeof need === 'number' &&
+          ids.length === need &&
+          ids.every((id) => st.players[ownerId]?.hand.includes(id))
+        ) {
+          st.localVars[DISCARD_KEY] = ids;
+        }
       }
     },
   );

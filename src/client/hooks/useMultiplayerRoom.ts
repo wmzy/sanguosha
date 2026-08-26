@@ -254,11 +254,11 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         else if (state === 'reconnecting') setConnectionState('reconnecting');
         else if (state === 'failed') setConnectionState('failed');
       },
-      onChat: (messages: ChatMessage[]) => {
+      onChat: (messages: ChatMessage[], source: 'chat' | 'history') => {
         setChatMessages((prev) => {
-          // chat_history 是批量全量替换,chat 是增量追加
-          // 根据消息数量判断：如果收到的是单条,则追加；如果超过1条且第一条时间戳早于已有消息,说明是历史全量
-          if (messages.length === 1) {
+          // chat 是增量追加;chat_history 是全量替换(重连/开局后服务端重发完整历史,
+          // 按来源显式区分,避免「历史恰为 1 条」被当增量追加造成重复)
+          if (source === 'chat') {
             return [...prev, ...messages];
           }
           return messages;

@@ -106,6 +106,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           title: `庸肆:弃置 ${toDiscard} 张牌`,
           cardFilter: { filter: () => true, min: toDiscard, max: toDiscard },
         },
+        // 锁定技:必须弃,前端隐藏"不回应"按钮;超时由下方兜底自动弃
+        mandatory: true,
         timeout: 30,
       });
 

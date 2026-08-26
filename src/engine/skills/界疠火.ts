@@ -206,7 +206,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
         prompt: {
           type: 'useCard',
           title: '疠火:此杀造成伤害。弃置 1 张牌,或放弃(失去 1 体力)',
-          cardFilter: { min: 1, max: 1 },
+          // filter:()=>true 让投影层(resolveCardFilterCandidates)下发全手牌 candidates,
+          // 否则前端拿不到可选牌只能等超时失去体力
+          cardFilter: { filter: () => true, min: 1, max: 1 },
         },
         // 超时默认 false(放弃,失去1体力)
         defaultChoice: false,

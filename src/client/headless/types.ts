@@ -54,8 +54,10 @@ export interface HeadlessCallbacks {
   onMessage?: (msg: ServerMessage) => void;
   /** 重连状态变化时调用。attempt = 当前已尝试次数(0=首次)。 */
   onReconnectStateChange?: (state: ReconnectState, attempt: number) => void;
-  /** 收到聊天消息（单条或历史批量）时调用 */
-  onChat?: (messages: ChatMessage[]) => void;
+  /** 收到聊天消息时调用。source 区分单条增量('chat')与全量历史('history')——
+   *  历史批量必须整体替换本地状态,靠消息数量启发式会在「历史恰为 1 条」时
+   *  被误判为增量,重连场景产生重复消息。 */
+  onChat?: (messages: ChatMessage[], source: 'chat' | 'history') => void;
   /** 连接身份(roomId/playerId/isSpectator)变化时调用。
    *  触发点:REST 建房/加房/旁观响应返回、SSE room_joined、SSE role_changed。
    *  可选回调,不传则行为与之前完全一致(getter 轮询方不受影响)。 */

@@ -504,9 +504,9 @@ export class HeadlessGameClient {
         seatIndex: msg.seatIndex,
         text: msg.text,
         timestamp: msg.timestamp,
-      }]);
+      }], 'chat');
     } else if (msg.type === 'chat_history') {
-      this.callbacks.onChat?.(msg.messages);
+      this.callbacks.onChat?.(msg.messages, 'history');
     }
     // 身份切换（player↔spectator）：更新本地 isSpectator 标志。
     // 服务端 switchRole 仅在等待中广播 role_changed；切换后后续消息自动修正座次/视图。

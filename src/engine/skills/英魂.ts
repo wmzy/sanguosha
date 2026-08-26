@@ -224,7 +224,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
           st.localVars[OPTION_KEY] = params.choice === true ? 'opt1' : 'opt2';
         } else if (rt === DISCARD_RT) {
           const ids = params.cardIds as string[] | undefined;
-          if (Array.isArray(ids)) st.localVars[DISCARD_KEY] = ids;
+          // 校验:恰好 N 张且全部在回应者自己手牌中(弃置 atom 不校验归属,
+          // 非法数组会把他人手中的牌复制进弃牌堆)
+          const need = (
+            slot?.atom as { prompt?: { cardFilter?: { min?: number } } } | undefined
+          )?.prompt?.cardFilter?.min;
+          if (
+            Array.isArray(ids) &&
+            typeof need === 'number' &&
+            ids.length === need &&
+            ids.every((id) => st.players[seatId]?.hand.includes(id))
+          ) {
+            st.localVars[DISCARD_KEY] = ids;
+          }
         }
       },
     );

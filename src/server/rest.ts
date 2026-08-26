@@ -426,20 +426,31 @@ export function applyRestRoutes(app: Hono): void {
   app.post('/api/rooms/:id/chat', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
     const text = typeof raw.text === 'string' ? raw.text : '';
-    if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
 
     const room = getRoom(roomId);
     if (!room) return c.json({ error: '房间不存在' }, 404);
+
+    // 身份解析:非调试房间一律取会话 userId(body.playerId 忽略,防冒充他人发言);
+    // 调试房保持游客模型(query/body.playerId)。
+    let playerId: string;
+    if (!room.isDebug) {
+      const user = await requireUser(c);
+      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+      playerId = user.id;
+    } else {
+      const q = typeof raw.playerId === 'string' ? raw.playerId : '';
+      if (!q) return c.json({ error: '缺少 playerId' }, 400);
+      playerId = q;
+    }
     if (!room.players.has(playerId)) return c.json({ error: '不在房间中' }, 403);
 
     const result = addChatMessage(roomId, playerId, text);
     if (!result.ok) return c.json({ error: result.error }, 400);
 
-    // 广播给房间内所有连接
-    const playerIds = [...room.players.keys()];
-    const seatIndex = playerIds.indexOf(playerId);
+    // 座次必须从 seats 数组反查:players Map 的 key 序是连接建立序,
+    // 断线重连/换座后与真实座次无关,用它当 seatIndex 会把消息挂到错误座位卡上。
+    const seatIndex = room.seats.indexOf(playerId);
     broadcastMessage(room, {
       type: 'chat',
       playerId,
@@ -882,11 +893,21 @@ export function applyRestRoutes(app: Hono): void {
         'Content-Disposition': `attachment; filename="${encodeURIComponent(name)}"`,
       });
     }
-    const playerId = c.req.query('playerId') ?? null;
     const entry = (await listGameHistory(roomId)).find((e) => e.id === entryId) ?? null;
+    // 身份解析:活跃的非调试房间必须携带有效会话,playerId 一律取会话 userId——
+    // 信任 query.playerId 会允许伪造他人身份拉取其座次的私有手牌 delta。
+    // 调试房与已回收房间(历史回看)保持游客模型(query.playerId),后者无法做
+    // 会话↔房间映射,沿用既有查询参数行为。
+    let viewerId: string | null = c.req.query('playerId') ?? null;
+    const liveRoom = getRoom(roomId);
+    if (liveRoom && !liveRoom.isDebug) {
+      const user = await getSessionUser(c);
+      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+      viewerId = user.id;
+    }
     const seat =
-      playerId && entry
-        ? (entry.players.find((p) => p.playerId === playerId)?.seat ?? null)
+      viewerId && entry
+        ? (entry.players.find((p) => p.playerId === viewerId)?.seat ?? null)
         : null;
     return c.json(filterReplayForViewer(replay, seat));
   });
