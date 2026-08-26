@@ -50,6 +50,7 @@ function makePlayer(opts: {
   maxHealth?: number;
   marks?: PlayerState['marks'];
   vars?: Record<string, unknown>;
+  equipment?: Record<string, string>;
 }): PlayerState {
   return {
     index: opts.index,
@@ -59,7 +60,7 @@ function makePlayer(opts: {
     maxHealth: opts.maxHealth ?? 4,
     alive: true,
     hand: opts.hand ?? [],
-    equipment: {},
+    equipment: opts.equipment ?? {},
     skills: opts.skills ?? [],
     vars: (opts.vars as PlayerState['vars']) ?? {},
     marks: opts.marks ?? [],
@@ -342,5 +343,67 @@ describe('鸿举', () => {
     // 已觉醒 → 不再触发:max上限不变(仍3),荣不变(3)
     expect(harness.state.players[0].maxHealth).toBe(3);
     expect(rongCount(harness.state, 0)).toBe(3);
+  });
+
+  // 8. 回归:选目标回应注入候选之外的座次 → 消费端权威校验拒绝
+  // 攻击路径:南蛮入侵(伤害锦囊,触发征荣)目标 [1,2,3],eligible=[1,2](手牌数≥己),
+  // 恶意 respond target=3(手牌数<己、不在 candidates)→ 修复前仅校验存活+有牌,
+  // 可绕过"手牌数不小于你"偷其装备。
+  it('选目标回应注入候选之外的座次 → 不取荣', async () => {
+    const cardMap: Record<string, Card> = {
+      k1: makeCard('k1', '南蛮入侵', '♠', '7', '锦囊牌'),
+      z1: makeCard('z1', '闪', '♥', '8'),
+      d1: makeCard('d1', '杀', '♦', '3'),
+      d2: makeCard('d2', '杀', '♦', '4'),
+      m1: makeCard('m1', '防御马', '♣', '5', '装备牌'),
+    };
+    await harness.setup(
+      createGameState({
+        players: [
+          // P0 出南蛮后仍剩 z1(1 张):合格目标须手牌数≥1
+          makePlayer({ index: 0, name: 'P0', hand: ['k1', 'z1'], skills: ['征荣', '鸿举'] }),
+          makePlayer({ index: 1, name: 'P1', hand: ['d1'] }),
+          makePlayer({ index: 2, name: 'P2', hand: ['d2'] }),
+          // P3 手牌 0 < 1 → 不合格;但装备可取(hasTakeableCard=true)
+          makePlayer({ index: 3, name: 'P3', equipment: { 防御马: 'm1' } }),
+        ],
+        cardMap,
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const P0 = harness.player('P0');
+
+    await P0.useCardAndTarget('南蛮入侵', 'k1', [1, 2, 3]);
+    P0.expectPending('请求回应'); // 征荣 confirm
+    await P0.respond('征荣', { choice: true });
+    P0.expectPending('请求回应'); // 征荣/选目标(candidates=[1,2])
+    await P0.respond('征荣', { target: 3 }); // 注入候选之外的座次
+
+    // 南蛮继续结算:逐目标的 无懈广播(pass 放弃)+ 询问杀(P1/P2 打出手中的杀免伤,
+    // P3 无手牌 skip 直接受伤)
+    for (let i = 0; i < 30; i++) {
+      if (harness.state.pendingSlots.size === 0) break;
+      const entry = [...harness.state.pendingSlots.entries()][0] as [number, { atom?: { type?: string } }];
+      const [owner, slot] = entry;
+      const type = slot?.atom?.type;
+      if (type === '请求回应') {
+        await P0.pass(); // 放弃无懈
+      } else if (type === '询问杀') {
+        const killId = owner === 1 ? 'd1' : 'd2';
+        await harness.player(owner).respond('杀', { cardId: killId });
+      } else {
+        await harness.waitForStable();
+      }
+    }
+    await harness.waitForStable();
+
+    expect(rongCount(harness.state, 0)).toBe(0); // 未取得任何荣
+    expect(harness.state.players[3].equipment['防御马']).toBe('m1'); // P3 装备未被偷走
+    expect(harness.state.players[1].hand.length).toBe(0); // P1 已打出 d1 免伤
+    expect(harness.state.players[1].health).toBe(4);
+    expect(harness.state.players[2].health).toBe(4);
+    expect(harness.state.players[3].health).toBe(3); // P3 无杀受伤
   });
 });

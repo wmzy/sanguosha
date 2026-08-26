@@ -578,4 +578,49 @@ describe('八卦阵', () => {
     await P1.pass();
     expect(harness.state.players[0].health).toBe(3);
   });
+
+  // ─── 回归:判红发动后牌库守恒(ephemeral 虚拟闪销毁而非入弃牌堆) ─────────────
+  // 虚拟闪被 promptCancel 移入弃牌堆时若未销毁,每次发动凭空多一张"闪",
+  // 重洗后可被玩家摸起,永久污染牌库。
+  it('判红发动后:总牌数守恒,弃牌堆/cardMap 无虚拟闪残留,仍视为出闪', async () => {
+    const bagua = makeEquip('b1', '八卦阵', '♣', '防具', 'A');
+    const slash = makeCard('s1', '杀', '♠', 'A');
+    const judgeCard = makeCard('j1', '桃', '♥', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: 'P1',
+          hand: [],
+          skills: ['装备通用', '闪', '八卦阵'],
+          equipment: { 防具: 'b1' },
+        }),
+        makePlayer({ index: 1, name: 'P2', hand: ['s1'], skills: ['杀'] }),
+      ],
+      cardMap: { b1: bagua, s1: slash, j1: judgeCard },
+      zones: { deck: ['j1'], discardPile: [], processing: [] },
+      currentPlayerIndex: 1, // P2 的回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+    const countBefore = Object.keys(harness.state.cardMap).length;
+
+    await P2.useCardAndTarget('杀', 's1', [0]);
+    P1.expectPending('请求回应');
+    await P1.respond('八卦阵', { choice: true }); // 判定红 → 视为出闪
+
+    // 抵消功能不受影响
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.zones.discardPile).toContain('j1'); // 判定牌正常入弃牌堆
+    expect(harness.state.zones.discardPile).toContain('s1'); // 杀正常入弃牌堆
+
+    // 牌数守恒:虚拟闪已销毁,不在弃牌堆、不在 cardMap(修复前两者都会残留)
+    expect(Object.keys(harness.state.cardMap).length).toBe(countBefore);
+    expect(
+      harness.state.zones.discardPile.some((id) => id.startsWith('八卦阵:')),
+    ).toBe(false);
+  });
 });

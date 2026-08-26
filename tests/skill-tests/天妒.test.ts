@@ -159,4 +159,45 @@ describe('天妒', () => {
     const P0 = harness.player('P0');
     await P0.expectRejected({ skillId: '天妒', actionType: 'respond', params: { choice: true } });
   });
+
+  // ─── 回归:runJudgeFlow 返回值契约(判定牌被收走后仍须返回其 id) ─────────────
+  // 场景:郭嘉(天妒)判定区有乐不思蜀 → 判定阶段 resumeDelayedSettlement 的独立帧
+  // 只含判定牌(length===1)→ 天妒把判定牌收进手牌 → runJudgeFlow 收尾搬移为 no-op。
+  // 契约:返回值/localVars['判定/finalJudgeCardId'] 必须仍是该判定牌,
+  // 否则 乐不思蜀/兵粮寸断/闪电 的 resolve 读到 undefined/旧值,判定结果错乱。
+  it('天妒获得判定牌后,runJudgeFlow 仍返回最终判定牌 id', async () => {
+    const restoreCompare = disableAutoCompare();
+    const judge = makeCard('j1', '杀', '♠', '5');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [], skills: ['天妒'] }),
+        makePlayer({ index: 1, name: 'P1', skills: [] }),
+      ],
+      cardMap: { j1: judge },
+      currentPlayerIndex: 0,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    try {
+      let result: string | undefined;
+      const flow = runJudgeFlow(harness.state, 0, '乐不思蜀').then((r) => {
+        result = r;
+      });
+      void flow;
+      await waitForStable(harness.state); // 天妒/choose 询问
+      P0.expectPending('请求回应');
+      await P0.respond('天妒', { choice: true }); // 获得判定牌(收走)
+      await flow;
+
+      // 判定牌被收走后,流程返回值必须仍是它(修复前:undefined → 下游读 stale 旧值)
+      expect(result).toBe('j1');
+      expect(harness.state.players[0].hand).toContain('j1');
+    } finally {
+      restoreCompare();
+    }
+  });
 });

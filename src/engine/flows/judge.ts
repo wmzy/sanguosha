@@ -52,14 +52,26 @@ export async function runJudgeFlow(
   // 消费方读的是结算帧顶牌(改判后),不读此字段。
   const judgeCardId = topFrameCardId(state);
 
+  // 防 stale:清掉上一次判定的残留值。deck 空(翻牌早退)时本流程必须返回 undefined,
+  // 而非上次判定遗留的旧 cardId(旧值会让 乐不思蜀/闪电 读到错误花色)。
+  delete state.localVars[JUDGE_FINAL_CARD_KEY];
+
   // 时机3:判定牌生效前(鬼才/鬼道 改判——afterApply 调 runJudgeModifiers)
   await applyAtom(state, { type: '判定牌生效前', player, judgeType, cardId: judgeCardId });
 
-  // 时机4:判定牌生效后(天妒/洛神/屯田 获得判定牌 / 闪电·乐不思蜀 等消费方读牌)
-  await applyAtom(state, { type: '判定牌生效后', player, judgeType, cardId: judgeCardId });
+  // 改判已完成、消费 hook 尚未运行——此刻帧顶即最终判定牌。
+  // 先行写入 localVars:「判定牌生效后」hook(天妒/屯田/洛神)可能把判定牌收走,
+  // 使收尾搬移变为 no-op;若等收尾才记录,key 会缺失或残留旧值,
+  // 下游(乐不思蜀/兵粮寸断/闪电 resolve)将读到错误的判定结果。
+  const finalCardId = topFrameCardId(state);
+  if (finalCardId !== undefined) state.localVars[JUDGE_FINAL_CARD_KEY] = finalCardId;
 
-  // 收尾:记录最终判定牌(可能被改判替换),再把判定牌从结算帧移入弃牌堆。
-  cleanupJudgeCard(state);
+  // 时机4:判定牌生效后(天妒/洛神/屯田 获得判定牌 / 闪电·乐不思蜀 等消费方读牌)
+  await applyAtom(state, { type: '判定牌生效后', player, judgeType, cardId: finalCardId });
+
+  // 收尾:把判定牌从结算帧移入弃牌堆(按 finalCardId 精确移除;
+  // 天妒/屯田 可能已在 生效后 拿走 → indexOf 为 -1,no-op)。
+  cleanupJudgeCard(state, finalCardId);
 
   return state.localVars[JUDGE_FINAL_CARD_KEY] as string | undefined;
 }
@@ -71,15 +83,16 @@ function topFrameCardId(state: GameState): string | undefined {
   return cards.length > 0 ? cards[cards.length - 1] : undefined;
 }
 
-/** 记录最终判定牌到 localVars,并把判定牌从结算帧移入弃牌堆。
- *  天妒/屯田 可能已在 判定牌生效后 把判定牌拿走(结算帧空)→ splice 为 no-op,但仍记录 cardId。 */
-function cleanupJudgeCard(state: GameState): void {
+/** 把最终判定牌从结算帧移入弃牌堆。
+ *  按 finalCardId 精确定位(不盲取末尾):天妒/屯田 可能已在 判定牌生效后 拿走判定牌
+ *  (结算帧空或已含其他嵌套牌),按 id 找不到即为 no-op,绝不误删帧内其他牌。
+ *  最终判定牌 cardId 已由 runJudgeFlow 在 生效后 hook 之前写入 localVars(此处不再记录)。 */
+function cleanupJudgeCard(state: GameState, finalCardId: string | undefined): void {
+  if (finalCardId === undefined) return;
   const frame = state.settlementStack[state.settlementStack.length - 1];
   const cards = frame ? frame.cards : state.zones.processing;
-  const idx = cards.length - 1;
+  const idx = cards.indexOf(finalCardId);
   if (idx < 0) return;
-  const cardId = cards[idx];
-  state.localVars[JUDGE_FINAL_CARD_KEY] = cardId;
   cards.splice(idx, 1);
-  state.zones.discardPile.push(cardId);
+  state.zones.discardPile.push(finalCardId);
 }
