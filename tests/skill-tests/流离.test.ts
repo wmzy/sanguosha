@@ -283,7 +283,7 @@ describe('流离:成为杀的目标时转移', () => {
     });
     expect(state.localVars['流离/target']).toBeUndefined();
 
-    // 合法目标放行 → 弃 d1、杀帧目标转移
+    // 合法目标放行 → 进入 流离/pickDiscard 选牌询问
     await dispatchAndWait(state, {
       skillId: '流离',
       actionType: 'respond',
@@ -291,6 +291,140 @@ describe('流离:成为杀的目标时转移', () => {
       params: { target: 2 },
       baseSeq: state.seq,
     });
+    const pickSlot = [...state.pendingSlots.values()][0];
+    expect((pickSlot.atom as { requestType?: string }).requestType).toBe('流离/pickDiscard');
+
+    // 选择弃置 d1 → 弃 d1、杀帧目标转移,target 消费后清除
+    await dispatchAndWait(state, {
+      skillId: '流离',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { cardIds: [discard1.id] },
+      baseSeq: state.seq,
+    });
     expect(state.localVars['流离/target']).toBeUndefined(); // 消费后清除
+    expect(state.localVars['流离/discard']).toBeUndefined(); // 弃牌选择消费后清除
+    expect(state.players[1].hand).not.toContain(discard1.id);
+    expect(state.zones.discardPile).toContain(discard1.id);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 用例 5(回归):弃哪张牌由玩家自选,不得固定弃手牌第一张。
+  //   P1 手牌 [桃 d1, 闪 d2]:发动流离选弃闪 d2 → 被弃的是 d2,桃 d1 保留。
+  //   修复前实现固定弃 hand[0](桃),玩家关键牌被强丢。
+  // ─────────────────────────────────────────────────────────────
+  it('用例5:自选弃牌——弃第二张而非固定 hand[0],其余保留', async () => {
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
+    const peach: Card = { id: 'd1', name: '桃', suit: '♥', color: '红', rank: '3', type: '基本牌' };
+    const dodge: Card = { id: 'd2', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id], equipment: {}, skills: ['杀'] }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [peach.id, dodge.id],
+          equipment: {},
+          skills: ['流离'],
+          health: 4,
+        }),
+        makePlayer({ index: 2, name: 'P2', hand: [], equipment: {}, skills: [], health: 4 }),
+      ],
+      cardMap: { k1: slash, d1: peach, d2: dodge },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await registerSkillsFromState(state);
+
+    await dispatchAndWait(state, {
+      skillId: '杀',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: slash.id, targets: [1] },
+      baseSeq: state.seq,
+    });
+    await dispatchAndWait(state, {
+      skillId: '流离',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { choice: true },
+      baseSeq: state.seq,
+    });
+    await dispatchAndWait(state, {
+      skillId: '流离',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { target: 2 },
+      baseSeq: state.seq,
+    });
+
+    // 自选弃闪 d2(非手牌首张的桃)
+    await dispatchAndWait(state, {
+      skillId: '流离',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { cardIds: [dodge.id] },
+      baseSeq: state.seq,
+    });
+    // 弃的是所选的闪;桃保留在手牌(修复前会被固定弃掉)
+    expect(state.players[1].hand).toEqual([peach.id]);
+    expect(state.zones.discardPile).toContain(dodge.id);
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // 用例 6:超时未支付代价 → 不弃牌、不转移(杀仍命中 P1)。
+  //   对齐 界放权「未支付代价不发动」范式。
+  // ─────────────────────────────────────────────────────────────
+  it('用例6:选牌超时 → 未支付代价不转移,杀仍命中 P1', async () => {
+    const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
+    const dodge: Card = { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' };
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: [slash.id], equipment: {}, skills: ['杀'] }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: [dodge.id],
+          equipment: {},
+          skills: ['流离'],
+          health: 4,
+        }),
+        makePlayer({ index: 2, name: 'P2', hand: [], equipment: {}, skills: [], health: 4 }),
+      ],
+      cardMap: { k1: slash, d1: dodge },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await registerSkillsFromState(state);
+
+    await dispatchAndWait(state, {
+      skillId: '杀',
+      actionType: 'use',
+      ownerId: 0,
+      params: { cardId: slash.id, targets: [1] },
+      baseSeq: state.seq,
+    });
+    await dispatchAndWait(state, {
+      skillId: '流离',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { choice: true },
+      baseSeq: state.seq,
+    });
+    await dispatchAndWait(state, {
+      skillId: '流离',
+      actionType: 'respond',
+      ownerId: 1,
+      params: { target: 2 },
+      baseSeq: state.seq,
+    });
+    // 停在 pickDiscard;超时不回应
+    await fireTimeoutAndWait(state);
+
+    // 代价未支付:手牌保留、无转移,P1 成为杀目标(P1 无闪回应则受伤)
+    expect(state.players[1].hand).toContain(dodge.id);
+    expect(state.localVars['流离/target']).toBeUndefined();
   });
 });

@@ -10,6 +10,7 @@ import '../../src/engine/atoms';
 import { GameSession } from '../../src/server/session';
 import { deletePersistedRoom } from '../../src/server/persistence';
 import { createSnapshot, patchSnapshotDescription } from '../../src/server/snapshot';
+import { addRoom, deleteRoom } from '../../src/server/room';
 import { readFile, rm, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Room } from '../../src/server/room';
@@ -165,11 +166,39 @@ describe('debug 快照功能', () => {
 
   it('追加描述:PATCH 后 meta.description 更新', async () => {
     const room = makeRoom(true);
+    // 鉴权要求目标快照属于存活的 debug 房:必须注册进内存房间表
+    addRoom(room);
+    const session = new GameSession(room, true, 42);
+    try {
+      await session.startGame(4);
+      const state = getState(session);
+      for (let i = 0; i < 50 && !state.players.length; i++) await sleep(10);
+      expect(state.players.length).toBeGreaterThan(0);
+
+      const result = await createSnapshot(session, {
+        roomId: room.id,
+        perspective: 0,
+        frontendSeqs: {},
+        frontendViews: {},
+      });
+      const snapshotId = (result as { snapshotId: string }).snapshotId;
+
+      const patchResult = await patchSnapshotDescription(snapshotId, 'P2 出杀后 P0 闪没弹窗');
+      expect(patchResult).toEqual({ success: true });
+
+      const snapshot = (await readSnapshot(snapshotId)) as { meta: { description: string } };
+      expect(snapshot.meta.description).toBe('P2 出杀后 P0 闪没弹窗');
+    } finally {
+      deleteRoom(room.id);
+    }
+  }, 15000);
+
+  it('追加描述:房间已回收(不在内存)→ 快照转只读返回 403', async () => {
+    const room = makeRoom(true);
     const session = new GameSession(room, true, 42);
     await session.startGame(4);
     const state = getState(session);
     for (let i = 0; i < 50 && !state.players.length; i++) await sleep(10);
-    expect(state.players.length).toBeGreaterThan(0);
 
     const result = await createSnapshot(session, {
       roomId: room.id,
@@ -178,12 +207,12 @@ describe('debug 快照功能', () => {
       frontendViews: {},
     });
     const snapshotId = (result as { snapshotId: string }).snapshotId;
+    // 故意不 addRoom:getRoom 返回 null,模拟房间已被回收
+    const patchResult = await patchSnapshotDescription(snapshotId, '越权修改');
+    expect((patchResult as { status?: number }).status).toBe(403);
 
-    const patchResult = await patchSnapshotDescription(snapshotId, 'P2 出杀后 P0 闪没弹窗');
-    expect(patchResult).toEqual({ success: true });
-
-    const snapshot = (await readSnapshot(snapshotId)) as { meta: { description: string } };
-    expect(snapshot.meta.description).toBe('P2 出杀后 P0 闪没弹窗');
+    const snapshot = (await readSnapshot(snapshotId)) as { meta: { description: string | null } };
+    expect(snapshot.meta.description).toBeNull();
   }, 15000);
 
   it('追加描述:不存在的 snapshotId → 返回 404', async () => {
