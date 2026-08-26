@@ -209,8 +209,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         mandatory: true,
         timeout: 30,
       });
-      const giveCards = ctx.state.localVars[GIVE_KEY] as string[] | undefined;
+      let giveCards = ctx.state.localVars[GIVE_KEY] as string[] | undefined;
       delete ctx.state.localVars[GIVE_KEY];
+      // 强制给牌兜底:超时未回应 → 自动从手牌首张起补足(不放弃给牌义务,
+      // 与庸肆/英魂/成略的 mandatory 兜底范式一致)
+      if (!giveCards || giveCards.length === 0) {
+        giveCards = ctx.state.players[ownerId]?.hand.slice(0, giveCount) ?? [];
+      }
       if (giveCards && giveCards.length > 0) {
         for (const cardId of giveCards) {
           await applyAtom(ctx.state, { type: '给予', cardId, from: ownerId, to: target });

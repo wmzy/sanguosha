@@ -98,11 +98,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
               title: '据守:选择一张手牌弃置(装备牌将改为使用)',
               cardFilter: { filter: () => true, min: 1, max: 1 },
             },
-            defaultChoice: self.hand[0],
+            // 强制弃牌(摸四的代价,不可放弃):超时由下方兜底自动弃首张
+            mandatory: true,
             timeout: 20,
           });
-          const chosenId = state.localVars[DISCARD_CHOICE_KEY] as string | undefined;
+          let chosenId = state.localVars[DISCARD_CHOICE_KEY] as string | undefined;
           delete state.localVars[DISCARD_CHOICE_KEY];
+          // 强制弃牌兜底:超时/空响应未选 → 自动弃手牌首张(不放弃弃牌义务)
+          if (!chosenId || !self.hand.includes(chosenId)) {
+            chosenId = self.hand[0];
+          }
           if (chosenId && self.hand.includes(chosenId)) {
             const card = state.cardMap[chosenId];
             const slot = slotOf(card);

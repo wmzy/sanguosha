@@ -383,4 +383,84 @@ describe('据守', () => {
     // 无 据守/skipAll 标志(下一回合阶段 hook 不会 cancel)
     expect(harness.state.localVars['据守/skipAll']).toBeUndefined();
   });
+
+  // ─── 回归(2026-08-26):「摸四弃一」的弃一是强制代价 ────────────────
+  // 此前无 mandatory 且 respond 对空响应放行、超时也无兜底 → 玩家点「不回应」
+  // 或超时即可白摸四张。修复:mandatory:true + 兜底自动弃首张。
+  it('强制弃牌:空响应({})→ 兜底自动弃手牌首张,不可白摸四张', async () => {
+    const base: Card = makeCard('base0', '闪', '♥', '2');
+    const cardMap: Record<string, Card> = { base0: base };
+    const deck = buildDeck(cardMap, 6);
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['base0'], skills: ['据守'] }),
+        makePlayer({ index: 1, name: 'P2', skills: [], character: '曹操' }),
+      ],
+      cardMap,
+      zones: { deck, processing: [], discardPile: [] },
+      currentPlayerIndex: 0,
+      phase: '弃牌',
+      turn: { round: 1, phase: '弃牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('据守', 'use', {});
+    await harness.waitForStable();
+
+    // 弃牌询问带 mandatory 标记(前端隐藏「不回应」+ 走多选 UI 契约)
+    const slot = harness.state.pendingSlots.get(0) as {
+      atom?: { requestType?: string; mandatory?: boolean };
+    };
+    expect(slot?.atom?.requestType).toBe('据守/弃牌');
+    expect(slot?.atom?.mandatory).toBe(true);
+
+    // 空响应(浏览器旧「不回应」形状 {} / 超时 pass 同路径)→ 兜底仍须弃一张
+    await P1.respond('据守', {});
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 初始 1 + 摸 4 - 弃 1 = 4(bug 下为 5)
+    expect(harness.state.players[0].hand.length).toBe(4);
+    // 兜底弃的是手牌首张(base0)
+    expect(harness.state.zones.discardPile).toContain('base0');
+    expect(harness.state.players[0].hand).not.toContain('base0');
+  });
+
+  // 界据守同款回归:摸四后的弃一同样不可被空响应/超时绕过
+  it('界据守:空响应({})→ 兜底自动弃手牌首张', async () => {
+    const base: Card = makeCard('base0', '闪', '♥', '2');
+    const cardMap: Record<string, Card> = { base0: base };
+    const deck = buildDeck(cardMap, 6);
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['base0'], skills: ['界据守'] }),
+        makePlayer({ index: 1, name: 'P2', skills: [], character: '曹操' }),
+      ],
+      cardMap,
+      zones: { deck, processing: [], discardPile: [] },
+      currentPlayerIndex: 0,
+      phase: '弃牌',
+      turn: { round: 1, phase: '弃牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('界据守', 'use', {});
+    await harness.waitForStable();
+
+    const slot = harness.state.pendingSlots.get(0) as {
+      atom?: { requestType?: string; mandatory?: boolean };
+    };
+    expect(slot?.atom?.requestType).toBe('界据守/弃牌');
+    expect(slot?.atom?.mandatory).toBe(true);
+
+    await P1.respond('界据守', {});
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 初始 1 + 摸 4 - 弃 1 = 4(bug 下为 5)
+    expect(harness.state.players[0].hand.length).toBe(4);
+    expect(harness.state.zones.discardPile).toContain('base0');
+  });
 });

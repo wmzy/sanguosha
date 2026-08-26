@@ -248,4 +248,56 @@ describe('好施', () => {
     expect(harness.state.zones.deck.length).toBe(0);
     expect(harness.state.players[0].vars['好施/usedThisTurn']).toBeUndefined();
   });
+
+  // 回归(2026-08-26):mandatory 给牌此前缺超时兜底——超时不回应时 GIVE_KEY 未设,
+  // 「分半给最少者」被静默跳过(锁定效果失灵,鲁肃白留全部手牌)。
+  // 修复:兜底从手牌首张起补足(与庸肆/英魂/成略范式一致)。
+  it('给牌超时(pass)→ 兜底自动从手牌首张起给 3 张', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '鲁肃',
+          hand: ['h1', 'h2', 'h3'],
+          skills: ['好施', '回合管理'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          hand: [],
+          skills: ['回合管理'],
+        }),
+      ],
+      cardMap: {
+        h1: makeCard('h1', '杀'),
+        h2: makeCard('h2', '闪'),
+        h3: makeCard('h3', '桃', '♦'),
+        d1: makeCard('d1', '杀', '♠'),
+        d2: makeCard('d2', '闪', '♥'),
+        d3: makeCard('d3', '桃', '♦'),
+        d4: makeCard('d4', '酒', '♣'),
+      },
+      zones: { deck: ['d1', 'd2', 'd3', 'd4'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('鲁肃');
+
+    await P0.triggerAction('回合管理', 'start');
+    P0.expectPending('请求回应');
+    await P0.respond('好施', { choice: true }); // 发动好施
+
+    // 手牌=3+4=7>5 → 给牌询问出现,超时不回应
+    P0.expectPending('请求回应');
+    await P0.pass();
+    await harness.waitForStable();
+
+    // 兜底:仍须给 floor(7/2)=3 张(手牌首张起的 h1/h2/h3)
+    expect(harness.state.players[0].hand.length).toBe(4);
+    expect(harness.state.players[1].hand).toEqual(expect.arrayContaining(['h1', 'h2', 'h3']));
+    expect(harness.state.players[1].hand.length).toBe(3);
+  });
 });
