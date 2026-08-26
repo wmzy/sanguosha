@@ -996,8 +996,18 @@ export function applyRestRoutes(app: Hono): void {
   }
 
   // GET /api/rooms/:id/history — 对局结果列表(最新在前,不含录像数据)
+  // 对局结果含各成员 userId、身份局身份与胜负:非调试房间仅本房成员可读
+  // (权限模型与 log/chat 一致;此前完全无鉴权,未登录者凭 roomId 可枚举全部条目)。
   app.get('/api/rooms/:id/history', async (c) => {
     const roomId = c.req.param('id');
+    const room = getRoom(roomId);
+    if (room && !room.isDebug) {
+      const user = await requireUser(c);
+      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+      if (!room.players.has(user.id) && !room.spectators.has(user.id)) {
+        return c.json({ error: '仅房间成员可查看历史' }, 403);
+      }
+    }
     const entries = await listGameHistory(roomId);
     return c.json({ entries });
   });
@@ -1010,14 +1020,6 @@ export function applyRestRoutes(app: Hono): void {
     const entryId = c.req.param('entryId');
     const replay = await getGameReplay(roomId, entryId);
     if (!replay) return c.json({ error: '录像不存在' }, 404);
-    if (c.req.query('download') === '1') {
-      const room = getRoom(roomId);
-      const name = `sanguosha-replay-${room?.name ?? roomId}-${entryId}.json`;
-      return c.body(JSON.stringify(replay), 200, {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${encodeURIComponent(name)}"`,
-      });
-    }
     const entry = (await listGameHistory(roomId)).find((e) => e.id === entryId) ?? null;
     // 身份解析:活跃的非调试房间必须携带有效会话,playerId 一律取会话 userId——
     // 信任 query.playerId 会允许伪造他人身份拉取其座次的私有手牌 delta。
@@ -1028,7 +1030,23 @@ export function applyRestRoutes(app: Hono): void {
     if (liveRoom && !liveRoom.isDebug) {
       const user = await getSessionUser(c);
       if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+      // 成员资格:录像含全部座次的私有事件流,仅参赛者/本房旁观者可读
+      // (此前任何登录用户可拉任意对局录像)。
+      if (!liveRoom.players.has(user.id) && !liveRoom.spectators.has(user.id)) {
+        return c.json({ error: '仅房间成员可查看录像' }, 403);
+      }
       viewerId = user.id;
+    }
+    // download 导出必须在身份校验之后:此前该分支位于登录校验之前,
+    // 未登录者凭 roomId+entryId 即可下载完整多座次文件(含每人私有手牌 delta),
+    // 而 entryId 可经无鉴权的列表接口枚举,构成完整越权读取链。
+    if (c.req.query('download') === '1') {
+      const room = getRoom(roomId);
+      const name = `sanguosha-replay-${room?.name ?? roomId}-${entryId}.json`;
+      return c.body(JSON.stringify(replay), 200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(name)}"`,
+      });
     }
     const seat =
       viewerId && entry

@@ -127,6 +127,21 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
     playerId = queryPlayerId ?? generatePlayerId();
   }
 
+  // 非 debug 房:仅房间成员(座位上/成员名单/旁观名单)可建流。正常流程先 POST /join
+  // (密码+容量+状态校验后分配座位)或 /join-spectator 再连 SSE;缺此校验时,
+  // 任何登录用户凭 roomId 直连即可绕过进房密码与容量限制入房,且玩家分支的
+  // ensureSeatOnReconnect 会把非成员补进空座(重启恢复路径的副作用被滥用为越权入口)。
+  // 成员名单 room.playerNames 随房间元数据持久化(DB rooms.player_names),服务器重启
+  // 恢复后仍在 → 合法玩家的纯 SSE 自动重连不受影响。
+  if (
+    !room.isDebug &&
+    !room.seats.includes(playerId) &&
+    !room.playerNames.has(playerId) &&
+    !room.spectators.has(playerId)
+  ) {
+    return c.json({ error: '你不在本房间中', code: 'NOT_MEMBER' }, 403);
+  }
+
   return streamSSE(c, async (stream) => {
     try {
     const sink = new SseSink(stream);
@@ -185,7 +200,7 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
         stream.onAbort(() => resolve());
       });
     } else {
-      // 玩家连接（现有逻辑）
+      // 玩家连接（现有逻辑；成员资格已在 streamSSE 之前统一校验）
       room.players.set(playerId, sink);
       playerRoomMap.set(playerId, roomId);
       if (displayName) room.playerNames.set(playerId, displayName);

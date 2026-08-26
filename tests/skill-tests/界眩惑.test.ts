@@ -365,4 +365,41 @@ describe('界眩惑', () => {
     expect(harness.state.players[0].hand).toContain('xkill');
     expect(harness.state.players[0].hand).toContain('x1');
   });
+
+  // ─── 回归:阶段结束钩子必须 before(UDFJRA slot 覆盖卡死模式) ───
+  // 回合管理先注册(真实引擎 DEFAULT_SKILLS 排前):其「阶段结束(摸牌)」after-hook
+  // 推进 phase 并 fire-and-forget 启动出牌窗口循环(slot key=player)。本技能若用
+  // after-hook,其阻塞型询问会与窗口 slot 同 target 互相覆盖 → 窗口孤立、
+  // 回合循环永不 resolve。修复后(before-hook)询问在窗口创建前完成。
+  it('阶段结束用 before-hook:询问完成后出牌窗口 slot 正常创建不被覆盖', async () => {
+    const c1 = makeCard('c1', '闪', '♠');
+    const c2 = makeCard('c2', '闪', '♣');
+    const state: GameState = createGameState({
+      players: [
+        // 回合管理在前:模拟真实注册顺序(DEFAULT_SKILLS 早于角色技能)
+        makePlayer({ index: 0, name: 'P0', hand: ['c1', 'c2'], skills: ['回合管理', '界眩惑'] }),
+        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['回合管理'] }),
+      ],
+      cardMap: { c1, c2 },
+      currentPlayerIndex: 0,
+      phase: '摸牌',
+      turn: { round: 1, phase: '摸牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    await triggerDrawPhaseEnd(harness);
+
+    // 眩惑询问出现,选择不发动
+    P0.expectPending('请求回应');
+    await P0.respond('界眩惑', { choice: false });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 阶段已推进到出牌;ownerId 的出牌窗口 slot 必须存在(未被阻塞 pending 覆盖)
+    expect(harness.state.phase).toBe('出牌');
+    const slot = harness.state.pendingSlots.get(0);
+    expect(slot).toBeDefined();
+    expect((slot!.atom as { type: string }).type).toBe('出牌窗口');
+  });
 });
