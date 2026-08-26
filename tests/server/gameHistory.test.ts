@@ -458,13 +458,52 @@ describe('server/gameHistory REST 端点', () => {
     }
   });
 
-  it('DELETE /api/rooms/:id 销毁房间时同步清理历史目录', async () => {
-    const room = createRoom('测试', 2, 'host-user', createCaptureSink([]));
+  it('DELETE /api/rooms/:id 销毁房间时同步清理历史目录(仅房主;非房主 403)', async () => {
+    // 注册真实会话:DELETE 房间现在要求房主身份(2026-08-26 鉴权修复)
+    const reg = await app.fetch(
+      new Request('http://localhost/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: `gh-del-${Date.now()}`, password: 'pass123' }),
+      }),
+    );
+    const hostCookie = reg.headers.get('set-cookie')!.split(';')[0];
+    const hostId = ((await reg.json()) as { user: { id: string } }).user.id;
+    const otherReg = await app.fetch(
+      new Request('http://localhost/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: `gh-delo-${Date.now()}`, password: 'pass123' }),
+      }),
+    );
+    const otherCookie = otherReg.headers.get('set-cookie')!.split(';')[0];
+
+    const room = createRoom('测试', 2, hostId, createCaptureSink([]));
     await appendGameHistory(room.id, makeEntry(room.id, 1000), makeReplay());
     expect(existsSync(join(HISTORY_DIR, room.id))).toBe(true);
 
-    const res = await app.fetch(
+    // 未登录 → 401
+    const anon = await app.fetch(
       new Request(`http://localhost/api/rooms/${room.id}`, { method: 'DELETE' }),
+    );
+    expect(anon.status).toBe(401);
+
+    // 非房主 → 403,历史保留
+    const forbidden = await app.fetch(
+      new Request(`http://localhost/api/rooms/${room.id}`, {
+        method: 'DELETE',
+        headers: { Cookie: otherCookie },
+      }),
+    );
+    expect(forbidden.status).toBe(403);
+    expect(existsSync(join(HISTORY_DIR, room.id))).toBe(true);
+
+    // 房主 → 删除成功并同步清理历史目录
+    const res = await app.fetch(
+      new Request(`http://localhost/api/rooms/${room.id}`, {
+        method: 'DELETE',
+        headers: { Cookie: hostCookie },
+      }),
     );
     expect(res.status).toBe(200);
     expect(existsSync(join(HISTORY_DIR, room.id))).toBe(false);

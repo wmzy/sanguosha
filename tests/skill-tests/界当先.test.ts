@@ -11,6 +11,7 @@ import { applyAtom } from '../../src/engine/core/apply';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
+import { createRng } from '../../src/engine/util/rng';
 
 function mkCard(
   id: string,
@@ -353,5 +354,61 @@ describe('界当先', () => {
     // 杀已入手牌(来自弃牌堆)
     expect(harness.state.players[0].hand).toContain('dk3');
     expect(harness.state.zones.discardPile).not.toContain('dk3');
+  });
+
+  // ─── 6. 盲取:seed RNG 随机获得,而非固定第一张(2026-08-26 回归) ───────────
+  // 旧实现按 zones 顺序固定取第一张杀 → 永远获得同一张牌(信息泄露 + 非随机语义)。
+  // 修复后用 createRng(state.rngSeed) 盲取并写回 seed。
+  it('盲取:获得 rng 选中的杀而非固定第一张,且 rngSeed 被推进写回', async () => {
+    const k1 = mkCard('k1', '杀', '♠', '7');
+    const k2 = mkCard('k2', '杀', '♥', '8');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界廖化',
+            faction: '蜀',
+            skills: ['界当先', '杀', '闪', '回合管理'],
+          }),
+          mkPlayer({ index: 1, name: 'P1', faction: '魏', skills: ['回合管理'] }),
+        ],
+        cardMap: { k1, k2 },
+        zones: { deck: ['k1', 'k2'], discardPile: [], processing: [] },
+        currentPlayerIndex: 0,
+        phase: '准备',
+        turn: { round: 1, phase: '准备', vars: {} },
+      }),
+    );
+    const LH = harness.player('界廖化');
+
+    // 在候选 seed 中找一个使 nextInt(2)===1 的:旧实现必取 k1(zones 第一张),
+    // 新实现应盲取到 k2——用例对两种实现有区分度
+    let chosenSeed = -1;
+    for (let s = 1; s < 10_000; s++) {
+      if (createRng(s).nextInt(2) === 1) {
+        chosenSeed = s;
+        break;
+      }
+    }
+    expect(chosenSeed).toBeGreaterThan(0);
+    harness.state.rngSeed = chosenSeed;
+    const seedBefore = harness.state.rngSeed;
+
+    void applyAtom(harness.state, { type: '回合开始', player: 0 });
+    await harness.waitForStable();
+    expect(currentRequestType(harness.state)).toBe('界当先/confirm');
+    await LH.respond('界当先', { choice: true });
+    await harness.waitForStable();
+    expect(currentRequestType(harness.state)).toBe('界当先/source');
+    await LH.respond('界当先', { choice: true }); // 牌堆
+    await harness.waitForStable();
+
+    // 盲取到 k2(rng.nextInt=1),而非 zones 第一张 k1
+    expect(harness.state.players[0].hand).toContain('k2');
+    expect(harness.state.players[0].hand).not.toContain('k1');
+    expect(harness.state.zones.deck).toEqual(['k1']);
+    // seed 被消费并写回(重放确定性前提)
+    expect(harness.state.rngSeed).not.toBe(seedBefore);
   });
 });

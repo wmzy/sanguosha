@@ -41,6 +41,7 @@ import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import { DANGXIAN_NO_RANGE_VIEW_KEY } from '../rules/vars-keys';
+import { createRng } from '../util/rng';
 
 const DISPLAY_NAME = '当先';
 
@@ -204,13 +205,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const zones = source === 'discard'
         ? ctx.state.zones.discardPile
         : ctx.state.zones.deck;
-      // 找第一张杀
+      // 盲取一张杀(seed RNG 推进并写回,保证重放确定性):
+      // 固定取第一张 = 永远获得同一张牌(信息泄露 + 与官方"获得一张杀"的随机语义不符)。
+      const slashIds = zones.filter((cid) => ctx.state.cardMap[cid]?.name === '杀');
       let killCardId: string | undefined;
-      for (const cid of zones) {
-        if (ctx.state.cardMap[cid]?.name === '杀') {
-          killCardId = cid;
-          break;
-        }
+      if (slashIds.length > 0) {
+        const rng = createRng(ctx.state.rngSeed);
+        killCardId = slashIds[rng.nextInt(slashIds.length)];
+        ctx.state.rngSeed = rng.getState();
       }
       if (killCardId) {
         await applyAtom(ctx.state, {

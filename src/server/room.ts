@@ -418,6 +418,10 @@ export function updateConfig(roomId: string, config: unknown, playerId: string, 
 export function setReady(roomId: string, playerId: string): boolean {
   const room = roomList.get(roomId);
   if (room?.status !== '等待中') return false;
+  // 仅占座玩家可准备(seats 是权威座位表;players 是连接层,建房后 SSE 连接前为空)。
+  // 无此守卫时,任意字符串会被塞进 readyPlayers,
+  // 使 allReady 的 size 相等判断永假 → 房间永久无法开局。
+  if (!room.seats.includes(playerId)) return false;
 
   room.readyPlayers.add(playerId);
   return true;
@@ -426,6 +430,8 @@ export function setReady(roomId: string, playerId: string): boolean {
 export function unsetReady(roomId: string, playerId: string): boolean {
   const room = roomList.get(roomId);
   if (room?.status !== '等待中') return false;
+  // 同 setReady:非本房玩家的取消请求直接拒绝
+  if (!room.seats.includes(playerId)) return false;
 
   return room.readyPlayers.delete(playerId);
 }

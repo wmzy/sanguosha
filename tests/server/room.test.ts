@@ -175,6 +175,32 @@ describe('房间管理', () => {
     expect(allReady(room.id)).toBe(false);
   });
 
+  it('非本房玩家的准备请求被拒绝(allReady 不被垃圾 id 破坏)', () => {
+    // 回归:2026-08-26——setReady 原先不校验成员资格,任意字符串被塞进
+    // readyPlayers 后 allReady 的 size 相等判断永假,房间永久无法开局。
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
+    joinRoom(room.id, 'player1', createMockSink());
+
+    expect(setReady(room.id, 'junk-id')).toBe(false);
+    expect(setReady(room.id, 'never-joined')).toBe(false);
+    expect(room.readyPlayers.has('junk-id')).toBe(false);
+
+    setReady(room.id, 'host1');
+    setReady(room.id, 'player1');
+    // 全员(2 人)就绪即可开局,垃圾 id 无法阻断
+    expect(allReady(room.id)).toBe(true);
+  });
+
+  it('旁观者的 id 不能用于准备(未占座)', () => {
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
+    joinAsSpectator(room.id, 'spec1', createMockSink(), '路人');
+
+    expect(setReady(room.id, 'spec1')).toBe(false);
+    expect(room.readyPlayers.has('spec1')).toBe(false);
+  });
+
   it('应该取消准备状态', () => {
     const hostSink = createMockSink();
     const room = createRoom('测试房间', 4, 'host1', hostSink);

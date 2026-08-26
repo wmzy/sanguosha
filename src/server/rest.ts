@@ -114,6 +114,14 @@ export function applyRestRoutes(app: Hono): void {
 
   app.delete('/api/rooms/:id', async (c) => {
     const id = c.req.param('id');
+    // 非调试房间仅房主可删(会话 userId === hostId);调试房保持开放(调试工作流),
+    // 房间已不在内存时保持幂等清理(重启后磁盘/DB 孤儿数据,无权限可泄露)。
+    const room = getRoom(id);
+    if (room && !room.isDebug) {
+      const user = await requireUser(c);
+      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+      if (room.hostId !== user.id) return c.json({ error: '只有房主可以删除房间' }, 403);
+    }
     // 统一走 destroyRoomCompletely:幂等清理 session + room + .json + DB,
     // 无论 room 是否在内存中(如重启后内存丢失但磁盘/DB 还在)。
     await destroyRoomCompletely(id);
@@ -304,11 +312,45 @@ export function applyRestRoutes(app: Hono): void {
   });
 
   // POST /api/rooms/:id/ready — 玩家准备
+  // 非调试房间:身份取会话 userId(body.playerId 忽略)。否则任何人可伪造他人准备,
+  // 或塞入垃圾 id 使 allReady 的 size 相等判断永假 → 房间永远无法开局。
+  const resolveRestPlayerId = async (
+    c: Parameters<typeof getSessionUser>[0],
+    roomId: string,
+    bodyPlayerId: string,
+  ): Promise<{ playerId: string } | { error: string; status: 400 | 401 }> => {
+    const room = getRoom(roomId);
+    if (room && !room.isDebug) {
+      const user = await requireUser(c);
+      if (!user) return { error: '请先登录', status: 401 };
+      return { playerId: user.id };
+    }
+    if (!bodyPlayerId) return { error: '缺少 playerId', status: 400 };
+    return { playerId: bodyPlayerId };
+  };
+
+  /** 审批者(批准/拒绝/撤销旁观者查看申请)必须是本房玩家。
+   *  非调试房间按会话 userId 校验 players 成员资格;调试房保持游客模型。 */
+  const resolveApprover = async (
+    c: Parameters<typeof getSessionUser>[0],
+    roomId: string,
+  ): Promise<{ playerId: string } | { error: string; status: 401 | 403 }> => {
+    const room = getRoom(roomId);
+    if (room && !room.isDebug) {
+      const user = await requireUser(c);
+      if (!user) return { error: '请先登录', status: 401 };
+      if (!room.players.has(user.id)) return { error: '仅房间内玩家可操作', status: 403 };
+      return { playerId: user.id };
+    }
+    return { playerId: '' };
+  };
+
   app.post('/api/rooms/:id/ready', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
-    if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
+    const resolved = await resolveRestPlayerId(c, roomId, typeof raw.playerId === 'string' ? raw.playerId : '');
+    if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
+    const playerId = resolved.playerId;
 
     const ok = setReady(roomId, playerId);
     if (!ok) {
@@ -329,12 +371,13 @@ export function applyRestRoutes(app: Hono): void {
     return c.json({ success: true });
   });
 
-  // POST /api/rooms/:id/cancel-ready — 玩家取消准备
+  // POST /api/rooms/:id/cancel-ready — 玩家取消准备(身份解析同 ready)
   app.post('/api/rooms/:id/cancel-ready', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
-    if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
+    const resolved = await resolveRestPlayerId(c, roomId, typeof raw.playerId === 'string' ? raw.playerId : '');
+    if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
+    const playerId = resolved.playerId;
 
     unsetReady(roomId, playerId);
 
@@ -544,12 +587,16 @@ export function applyRestRoutes(app: Hono): void {
   });
 
   // PUT /api/rooms/:id/config — 更新房间配置
+  // 非调试房间:身份取会话 userId。updateConfig 内部按 hostId 校验,
+  // body.playerId 可伪造房主 id 绕过 → 必须在 REST 层覆盖。
   app.put('/api/rooms/:id/config', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
     const config = raw.config as RoomConfig | undefined;
-    if (!playerId || !config) return c.json({ error: '缺少参数' }, 400);
+    if (!config) return c.json({ error: '缺少 config' }, 400);
+    const resolved = await resolveRestPlayerId(c, roomId, typeof raw.playerId === 'string' ? raw.playerId : '');
+    if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
+    const playerId = resolved.playerId;
 
     const maxPlayers = typeof raw.maxPlayers === 'number' ? raw.maxPlayers : undefined;
     const updated = updateConfig(roomId, config, playerId, maxPlayers);
@@ -687,9 +734,12 @@ export function applyRestRoutes(app: Hono): void {
   app.post('/api/rooms/:id/switch-role', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
     const newRole = raw.role === 'spectator' ? 'spectator' : raw.role === 'player' ? 'player' : '';
-    if (!playerId || !newRole) return c.json({ error: '缺少 playerId 或 role' }, 400);
+    if (!newRole) return c.json({ error: '缺少 role' }, 400);
+    // 非调试房间:身份取会话 userId,防伪造他人换身份/占座
+    const resolved = await resolveRestPlayerId(c, roomId, typeof raw.playerId === 'string' ? raw.playerId : '');
+    if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
+    const playerId = resolved.playerId;
     // 可选座位号：spectator→player 时占据指定空座位
     const seat = typeof raw.seat === 'number' ? raw.seat : undefined;
 
@@ -706,9 +756,12 @@ export function applyRestRoutes(app: Hono): void {
   app.post('/api/rooms/:id/request-view', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const spectatorId = typeof raw.spectatorId === 'string' ? raw.spectatorId : '';
     const targetSeat = typeof raw.targetSeat === 'number' ? raw.targetSeat : -1;
-    if (!spectatorId || targetSeat < 0) return c.json({ error: '缺少参数' }, 400);
+    if (targetSeat < 0) return c.json({ error: '缺少 targetSeat' }, 400);
+    // 非调试房间:spectatorId 取会话 userId,防以他人名义发起申请
+    const resolved = await resolveRestPlayerId(c, roomId, typeof raw.spectatorId === 'string' ? raw.spectatorId : '');
+    if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
+    const spectatorId = resolved.playerId;
 
     const room = requestView(roomId, spectatorId, targetSeat);
     if (!room) return c.json({ error: '申请失败' }, 400);
@@ -721,12 +774,17 @@ export function applyRestRoutes(app: Hono): void {
   });
 
   // POST /api/rooms/:id/approve-view — 玩家审批通过
+  // 非调试房间:审批者必须是本房玩家(会话 userId ∈ players)。
+  // 无校验时任何人都可批准旁观者查看任意座次 → 直接泄露该座次私有视图。
   app.post('/api/rooms/:id/approve-view', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const spectatorId = typeof raw.spectatorId === 'string' ? raw.spectatorId : '';
     const targetSeat = typeof raw.targetSeat === 'number' ? raw.targetSeat : -1;
     if (!spectatorId || targetSeat < 0) return c.json({ error: '缺少参数' }, 400);
+
+    const approver = await resolveApprover(c, roomId);
+    if ('error' in approver) return c.json({ error: approver.error }, approver.status);
 
     const room = approveView(roomId, spectatorId, targetSeat);
     if (!room) return c.json({ error: '审批失败' }, 400);
@@ -748,12 +806,15 @@ export function applyRestRoutes(app: Hono): void {
     return c.json({ success: true });
   });
 
-  // POST /api/rooms/:id/reject-view — 玩家拒绝申请
+  // POST /api/rooms/:id/reject-view — 玩家拒绝申请(审批者校验同 approve-view)
   app.post('/api/rooms/:id/reject-view', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const spectatorId = typeof raw.spectatorId === 'string' ? raw.spectatorId : '';
     if (!spectatorId) return c.json({ error: '缺少 spectatorId' }, 400);
+
+    const approver = await resolveApprover(c, roomId);
+    if ('error' in approver) return c.json({ error: approver.error }, approver.status);
 
     const room = rejectView(roomId, spectatorId);
     if (!room) return c.json({ error: '操作失败' }, 400);
@@ -762,12 +823,15 @@ export function applyRestRoutes(app: Hono): void {
     return c.json({ success: true });
   });
 
-  // POST /api/rooms/:id/revoke-view — 玩家撤销已授权
+  // POST /api/rooms/:id/revoke-view — 玩家撤销已授权(审批者校验同 approve-view)
   app.post('/api/rooms/:id/revoke-view', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const spectatorId = typeof raw.spectatorId === 'string' ? raw.spectatorId : '';
     if (!spectatorId) return c.json({ error: '缺少 spectatorId' }, 400);
+
+    const approver = await resolveApprover(c, roomId);
+    if ('error' in approver) return c.json({ error: approver.error }, approver.status);
 
     const room = revokeView(roomId, spectatorId);
     if (!room) return c.json({ error: '操作失败' }, 400);
@@ -795,9 +859,12 @@ export function applyRestRoutes(app: Hono): void {
   app.post('/api/rooms/:id/seat', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
     const targetSeat = typeof raw.targetSeat === 'number' ? raw.targetSeat : -1;
-    if (!playerId || targetSeat < 0) return c.json({ error: '缺少参数' }, 400);
+    if (targetSeat < 0) return c.json({ error: '缺少 targetSeat' }, 400);
+    // 非调试房间:身份取会话 userId,防伪造他人移座
+    const resolved = await resolveRestPlayerId(c, roomId, typeof raw.playerId === 'string' ? raw.playerId : '');
+    if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
+    const playerId = resolved.playerId;
 
     const room = moveSeat(roomId, playerId, targetSeat);
     if (!room) return c.json({ error: '无法移动到此座位' }, 400);
@@ -810,9 +877,12 @@ export function applyRestRoutes(app: Hono): void {
   app.post('/api/rooms/:id/seat-swap/request', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const requesterId = typeof raw.playerId === 'string' ? raw.playerId : '';
     const targetSeat = typeof raw.targetSeat === 'number' ? raw.targetSeat : -1;
-    if (!requesterId || targetSeat < 0) return c.json({ error: '缺少参数' }, 400);
+    if (targetSeat < 0) return c.json({ error: '缺少 targetSeat' }, 400);
+    // 非调试房间:发起者身份取会话 userId,防以他人名义发起换座请求
+    const resolved = await resolveRestPlayerId(c, roomId, typeof raw.playerId === 'string' ? raw.playerId : '');
+    if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
+    const requesterId = resolved.playerId;
 
     const result = requestSeatSwap(roomId, requesterId, targetSeat);
     if (!result) return c.json({ error: '无法发起交换请求' }, 400);
@@ -833,10 +903,13 @@ export function applyRestRoutes(app: Hono): void {
   app.post('/api/rooms/:id/seat-swap/respond', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const responderId = typeof raw.playerId === 'string' ? raw.playerId : '';
     const requesterId = typeof raw.requesterId === 'string' ? raw.requesterId : '';
+    if (!requesterId) return c.json({ error: '缺少 requesterId' }, 400);
+    // 非调试房间:响应者身份取会话 userId,防代他人接受/拒绝换座
+    const resolved = await resolveRestPlayerId(c, roomId, typeof raw.playerId === 'string' ? raw.playerId : '');
+    if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
+    const responderId = resolved.playerId;
     const accept = raw.accept === true;
-    if (!responderId || !requesterId) return c.json({ error: '缺少参数' }, 400);
 
     const result = respondSeatSwap(roomId, responderId, requesterId, accept);
     if (!result) return c.json({ error: '交换请求无效或已过期' }, 400);
