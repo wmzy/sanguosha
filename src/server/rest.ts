@@ -103,10 +103,20 @@ export function applyRestRoutes(app: Hono): void {
     });
   });
 
-  app.get('/api/rooms/:id/log', (c) => {
+  app.get('/api/rooms/:id/log', async (c) => {
     const id = c.req.param('id');
     const session = gameSessions.get(id);
     if (!session) return c.json({ error: '会话不存在' }, 404);
+    // 动作日志是完整实时战报:非调试房间仅本房成员(玩家/旁观者,登录会话)可读,
+    // 防止未登录者凭 roomId 拉取进行中对局的全部动作细节。
+    const room = getRoom(id);
+    if (room && !room.isDebug) {
+      const user = await requireUser(c);
+      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+      if (!room.players.has(user.id) && !room.spectators.has(user.id)) {
+        return c.json({ error: '仅房间成员可查看日志' }, 403);
+      }
+    }
     const gameLog = session.getGameLog();
     if (!gameLog) return c.json({ error: '无游戏日志' }, 404);
     return c.json(gameLog);
@@ -392,10 +402,18 @@ export function applyRestRoutes(app: Hono): void {
   app.post('/api/rooms/:id/start', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
 
     const room = getRoom(roomId);
     if (!room) return c.json({ error: '房间不存在' }, 404);
+
+    // 非 debug 房间:身份取会话 userId(body.playerId 可伪造 hostId 绕过下方校验,
+    // 强行在未全员准备时开局);调试房间任意座次可触发。
+    let playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    if (!room.isDebug) {
+      const user = await requireUser(c);
+      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+      playerId = user.id;
+    }
 
     // debug 房间任意座次可触发;普通房间仅房主
     if (!room.isDebug && room.hostId !== playerId) {
@@ -421,12 +439,20 @@ export function applyRestRoutes(app: Hono): void {
   });
 
   // POST /api/rooms/:id/restart — 再来一局
+  // 破坏性操作(resetToLobby 清空进行中对局回大厅):非调试房间仅房主,
+  // 否则任何人可对任意 roomId 重置他人正在进行的游戏。
   app.post('/api/rooms/:id/restart', async (c) => {
     const roomId = c.req.param('id');
     const room = getRoom(roomId);
     if (!room) return c.json({ error: '房间不存在' }, 404);
     const session = gameSessions.get(roomId);
     if (!session) return c.json({ error: '游戏会话不存在' }, 404);
+
+    if (!room.isDebug) {
+      const user = await requireUser(c);
+      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+      if (room.hostId !== user.id) return c.json({ error: '只有房主可以再来一局' }, 403);
+    }
 
     session.resetToLobby();
     resetChatUsage(roomId);
@@ -435,31 +461,48 @@ export function applyRestRoutes(app: Hono): void {
   });
 
   // POST /api/rooms/:id/action — 提交玩家操作
+  // 非 debug 房间:playerId 取会话 userId。handleAction 仅校验 ownerId 与
+  // playerNames[playerId] 的座次映射,不校验请求者真实身份——信任 body.playerId
+  // 时,任何知道受害者 userId 者(历史条目公开)可替其出牌/回应。
   app.post('/api/rooms/:id/action', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    let playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
     const action = raw.action;
     if (!playerId || !action) return c.json({ error: '缺少 playerId 或 action' }, 400);
 
     const session = gameSessions.get(roomId);
     if (!session) return c.json({ error: '游戏会话不存在' }, 404);
 
+    const room = getRoom(roomId);
+    if (room && !room.isDebug) {
+      const user = await requireUser(c);
+      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+      playerId = user.id;
+    }
+
     // session.handleAction 内部处理 reject（通过 SSE 推 actionRejected）
     await session.handleAction(playerId, action as never);
     return c.json({ accepted: true });
   });
 
-  // POST /api/rooms/:id/reorder — 重排手牌
+  // POST /api/rooms/:id/reorder — 重排手牌(身份解析同 action)
   app.post('/api/rooms/:id/reorder', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    let playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
     const order = raw.order;
     if (!playerId || !Array.isArray(order)) return c.json({ error: '缺少参数' }, 400);
 
     const session = gameSessions.get(roomId);
     if (!session) return c.json({ error: '游戏会话不存在' }, 404);
+
+    const room = getRoom(roomId);
+    if (room && !room.isDebug) {
+      const user = await requireUser(c);
+      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+      playerId = user.id;
+    }
 
     await session.handleReorderHand(playerId, order as string[]);
     return c.json({ success: true });
