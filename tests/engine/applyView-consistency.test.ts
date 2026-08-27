@@ -854,3 +854,52 @@ describe('亮将 atom: name 同步到所有视角(与 buildView 口径一致)', 
     expect(view.players.find((q) => q.index === 1)!.name).toBe('孙权');
   });
 });
+
+// ── buildView 选将期名牌:未分配玩家的 nickname 尚未写入,回退 p.name ──
+// Bug: 选将保密窗口内(charSelecting=true)非本人视角投影 p.nickname ?? '',
+// 而 nickname 只在 分配武将.apply 时写入(该玩家选将 respond 之前 undefined)——
+// 分配前的窗口里他人/旁观视角名牌为空串,CharSelectWaitingOverlay 拼出
+// 「、、、、正在选将」。修复:回退链 p.nickname ?? p.name。
+// 安全性:分配前 p.name 仍是原昵称(分配武将 apply 才覆写为武将名并留存 nickname),
+// 回退不构成武将名泄漏通道;分配后 nickname 已留存,优先取昵称。
+describe('buildView 选将期名牌:未分配武将的玩家投影原昵称(非空串)', () => {
+  it('charSelecting=true 且目标玩家 nickname undefined 时,他人视角 name === 原 name', () => {
+    const state = makeBareState();
+    state.charSelecting = true;
+    // makeBarePlayer 未设 nickname——模拟 分配武将.apply 之前的窗口
+    expect(state.players[1].nickname).toBeUndefined();
+    const v0 = buildView(state, 0);
+    expect(v0.players[1].name).toBe('P1'); // 原 name,不再是空串
+    // 本人视角不受选将保密影响
+    expect(v0.players[0].name).toBe('P0');
+    // 旁观视角(viewer=-1)同样拿到原昵称
+    const vs = buildView(state, -1);
+    expect(vs.players[1].name).toBe('P1');
+  });
+
+  it('charSelecting=true 且玩家已分配武将(nickname 已留存)时,他人视角投影昵称而非武将名(不泄漏)', async () => {
+    const state = makeBareState();
+    state.charSelecting = true;
+    await applyAtom(state, { type: '分配武将', target: 1, character: '孙权', skills: [] });
+    // 分配后:name=武将名,nickname 留存原昵称
+    expect(state.players[1].name).toBe('孙权');
+    expect(state.players[1].nickname).toBe('P1');
+    const v0 = buildView(state, 0);
+    // 他人视角:名牌是昵称,武将名不泄漏;character/skills 仍红化
+    expect(v0.players[1].name).toBe('P1');
+    expect(v0.players[1].character).toBe('');
+    expect(v0.players[1].skills).toEqual([]);
+    // 本人视角不受红化
+    expect(v0.players[0].name).toBe('P0');
+  });
+
+  it('charSelecting 结束后(亮将口径):所有视角 name = 武将名(回退链不误伤)', async () => {
+    const state = makeBareState();
+    await applyAtom(state, { type: '分配武将', target: 1, character: '孙权', skills: [] });
+    state.charSelecting = false;
+    const v0 = buildView(state, 0);
+    expect(v0.players[1].name).toBe('孙权');
+    const vs = buildView(state, -1);
+    expect(vs.players[1].name).toBe('孙权');
+  });
+});

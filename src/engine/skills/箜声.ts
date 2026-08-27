@@ -118,9 +118,18 @@ async function performKongshengPrepare(
     },
     timeout: 30,
   });
-  const selected = state.localVars[SELECT_KEY] as string[] | undefined;
+  const raw = state.localVars[SELECT_KEY] as string[] | undefined;
   delete state.localVars[SELECT_KEY];
-  if (!selected || selected.length === 0) return;
+  // 校验:全部为自己手牌且无重复(异常 cardIds 会让 移出至暂存区 validate 抛错,
+  // 打断准备阶段 hook;非法视为未选,镜像 明任/审时 的消费端守卫写法)
+  const selected =
+    Array.isArray(raw) &&
+    raw.length > 0 &&
+    raw.every((id) => self.hand.includes(id)) &&
+    new Set(raw).size === raw.length
+      ? raw
+      : [];
+  if (selected.length === 0) return;
 
   // 3) 置于武将牌上(移出游戏)——触发良姻(挂在其 after-hook)
   await applyAtom(state, {

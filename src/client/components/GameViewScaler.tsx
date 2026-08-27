@@ -17,7 +17,7 @@
 // 定位全部由 JS 计算(tx/ty 居中偏移 + scale),避免 CSS transform 百分比在
 // 缩放叠加时的语义歧义。ResizeObserver 驱动,窗口拖拽实时重排。
 
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { css } from '@linaria/core';
 
 /** 设计基准高度(px):GameView 内部定值按此高度下的观感调校 */
@@ -110,11 +110,20 @@ export function GameViewScaler({ children, fit = 'viewport' }: GameViewScalerPro
     >
       <div
         className={scalerInner}
-        style={{
-          width: metrics.canvasW,
-          height: DESIGN_H,
-          transform: `translate(${metrics.tx}px, ${metrics.ty}px) scale(${metrics.scale})`,
-        }}
+        style={
+          {
+            width: metrics.canvasW,
+            height: DESIGN_H,
+            transform: `translate(${metrics.tx}px, ${metrics.ty}px) scale(${metrics.scale})`,
+            // 暴露缩放参数为 CSS 变量(自定义属性随继承链下发):画布内消费
+            // 「视口坐标」的浮层(如 ActionOverlay 箭头)需把 getBoundingClientRect
+            // 的已缩放视口像素差除以 --gv-scale 换算回未缩放画布用户单位;
+            // --gv-tx/--gv-ty 备用(需要视口↔画布全量换算时组合使用)。
+            '--gv-scale': String(metrics.scale),
+            '--gv-tx': `${metrics.tx}px`,
+            '--gv-ty': `${metrics.ty}px`,
+          } as CSSProperties
+        }
       >
         {children}
       </div>

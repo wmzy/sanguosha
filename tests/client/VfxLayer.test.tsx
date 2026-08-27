@@ -35,19 +35,22 @@ function makeView(players: { index: number; name: string }[] = []): GameView {
 afterEach(cleanup);
 
 describe('VfxLayer', () => {
+  // VfxLayer 根已改为 createPortal(document.body) 挂载(脱离 GameViewScaler 的
+  // transform 祖先,fixed+视口坐标天然对齐),渲染产物不在 render() 的 container
+  // 内,统一改查 document.body;cleanup 卸载组件时 portal 子树一并从 body 移除。
   it('items 累积时不重复播放已处理的特效(出杀后吃桃,杀不再次触发)', () => {
     const slash: VfxPlaybackItem = { key: '1-card/slash_red', url: '/slash.apng' };
     const peach: VfxPlaybackItem = { key: '2-card/peach', url: '/peach.apng' };
     const view = makeView();
 
-    const { rerender, container } = render(<VfxLayer items={[slash]} view={view} />);
-    // 首批:1 个特效 → 1 个 APNG <img>
-    expect(container.querySelectorAll('img')).toHaveLength(1);
+    const { rerender } = render(<VfxLayer items={[slash]} view={view} />);
+    // 首批:1 个特效 → 1 个 APNG <img>(挂在 document.body 的 portal 根下)
+    expect(document.body.querySelectorAll('img')).toHaveLength(1);
 
     // 第二批:useVfxPlayback 累积式返回 [slash, peach],仅 peach 是新增。
     // 修复前会把整个数组并入 active,导致杀的特效重复(3 个 img);修复后只新增 peach(2 个 img)。
     rerender(<VfxLayer items={[slash, peach]} view={view} />);
-    expect(container.querySelectorAll('img')).toHaveLength(2);
+    expect(document.body.querySelectorAll('img')).toHaveLength(2);
   });
 
   it('单批次多个特效全部播放', () => {
@@ -55,8 +58,8 @@ describe('VfxLayer', () => {
       { key: '1-card/slash_red', url: '/slash.apng' },
       { key: '2-card/peach', url: '/peach.apng' },
     ];
-    const { container } = render(<VfxLayer items={items} view={makeView()} />);
-    expect(container.querySelectorAll('img')).toHaveLength(2);
+    render(<VfxLayer items={items} view={makeView()} />);
+    expect(document.body.querySelectorAll('img')).toHaveLength(2);
   });
 
   it('有目标的动效定位到对应座次中心(伤害特效落在受伤武将卡上)', () => {
@@ -69,10 +72,10 @@ describe('VfxLayer', () => {
     document.body.appendChild(seat);
 
     const item: VfxPlaybackItem = { key: '1-card/damage', url: '/damage.apng', target: 1 };
-    const { container, unmount } = render(<VfxLayer items={[item]} view={view} />);
+    const { unmount } = render(<VfxLayer items={[item]} view={view} />);
 
     // APNG <img> 的父级是 VfxSlot 定位槽,应落在座次中心(160, 280)。
-    const slot = container.querySelector('img')?.parentElement;
+    const slot = document.body.querySelector('img')?.parentElement;
     expect(slot?.style.position).toBe('absolute');
     expect(slot?.style.left).toBe('160px');
     expect(slot?.style.top).toBe('280px');
@@ -83,8 +86,8 @@ describe('VfxLayer', () => {
 
   it('无目标的动效居中播放(left/top = 50%)', () => {
     const item: VfxPlaybackItem = { key: '1-misc/turn', url: '/turn.apng' };
-    const { container } = render(<VfxLayer items={[item]} view={makeView()} />);
-    const slot = container.querySelector('img')?.parentElement;
+    render(<VfxLayer items={[item]} view={makeView()} />);
+    const slot = document.body.querySelector('img')?.parentElement;
     expect(slot?.style.left).toBe('50%');
     expect(slot?.style.top).toBe('50%');
   });

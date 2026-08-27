@@ -132,17 +132,27 @@ export class GameSession {
     return this.gameStartedAt;
   }
 
-  /** 引擎座次 g 的玩家显示名。物理座位 i 的玩家映射到游戏座次 (i + offset) % n
-   *  (与 playerId↔座次映射一致),故其昵称必须写在 out[(i + offset) % count]——
+  /** 引擎座次 g 的玩家显示名。第 k 个非空座位的玩家映射到游戏座次 (k + offset) % n
+   *  (与 playerId↔座次映射一致),故其昵称必须写在 out[(k + offset) % count]——
    *  直接按 seats 序填写会让 offset≠0 时每个玩家顶着别人的昵称/武将打完整局。
+   *  占位用占座序号 k 而非物理下标 i:座位表可能有空洞(等待中玩家离开只清空座位
+   *  不压缩 seats,room.ts removePlayerMembership),空洞后最高占座下标 ≥ count 时
+   *  (i+offset)%count 会与前面座位对 count 同余 → 两座位写同一 out 槽互相覆盖,
+   *  且 i<count 截断会漏掉空洞之后的所有玩家(引擎玩家名丢失,只剩 stub 兜底)。
    *  debug 房无 playerNames → 全 fallback。
-   *  fallbackNames: 恢复路径传入旧 state 的玩家名(无房间映射时保留原名,按物理座位序)。 */
+   *  fallbackNames: 恢复路径传入旧 state 的玩家名(游戏座次序),按游戏座次 g 取值。 */
   private seatDisplayNames(count: number, offset: number, fallbackNames?: string[]): string[] {
     const out: string[] = new Array(count).fill('');
-    for (let i = 0; i < count && i < this.room.seats.length; i++) {
+    let k = 0; // 占座序号:第 k 个非空座位(空洞不计入)
+    for (let i = 0; i < this.room.seats.length && k < count; i++) {
       const pid = this.room.seats[i];
-      const fromRoom = pid !== null ? this.room.playerNames.get(pid) : undefined;
-      out[(i + offset) % count] = fromRoom ?? fallbackNames?.[i] ?? '';
+      if (pid === null) continue;
+      const g = (k + offset) % count;
+      const fromRoom = this.room.playerNames.get(pid);
+      // fallbackNames 是游戏座次序(state.players.map(p=>p.name)),必须按游戏座次 g
+      // 取值;按物理下标 i 取会在 offset≠0/有空洞时把别人的旧名写到本座次上。
+      out[g] = fromRoom ?? fallbackNames?.[g] ?? '';
+      k++;
     }
     return out;
   }
@@ -184,12 +194,15 @@ export class GameSession {
     // 从 room.seats 恢复 playerId → 座次下标映射,使重启后玩家可重连。
     // startGame 正常路径会在游戏开始时设置 playerNames;恢复路径需手动填充。
     // 应用与 startGame 一致的座次轮转偏移(seatRotation),否则重连后视角错位。
+    // 占座序号映射(与 startGame 同款):座位表有空洞(等待中离开只清空不压缩)时,
+    // 物理下标 i 对 n 同余会碰撞覆盖;用第 k 个非空座位计数,保证映射互不相同。
     const n = this.state.players.length;
+    let k = 0; // 占座序号:第 k 个非空座位(空洞不计入)
     for (let i = 0; i < this.room.seats.length; i++) {
       const pid = this.room.seats[i];
-      if (pid !== null) {
-        this.playerNames.set(pid, (i + offset) % n);
-      }
+      if (pid === null) continue;
+      this.playerNames.set(pid, (k + offset) % n);
+      k++;
     }
     // 恢复局也记录历史:基线取恢复时刻的视图(若选将已完成则立即捕获;否则等
     // onStateChange 在选将完成后捕获)。startedAt 用恢复时刻近似。
@@ -267,17 +280,22 @@ export class GameSession {
         if (seat < state.players.length) this.playerNames.set(playerIds[i], seat);
       }
     } else {
-      // 应用座次轮转偏移(seatRotation):物理座位 i → 游戏座次 (i + offset) % n。
+      // 应用座次轮转偏移(seatRotation):第 k 个非空座位 → 游戏座次 (k + offset) % n。
       // 主公恒在游戏座次 0(引擎不变量),经偏移后落到随机物理座位,房主不再恒为主公。
       // 必须遍历 seats(权威座位表)而非 players.keys():换座(moveSeat/seat-swap)
       // 只改 seats 不改 Map 插入序,按连接序映射会让玩家拿到他人座次的私有视图,
       // 且 ownerId 校验随之错位(与 restoreState 的恢复路径同款遍历)。
+      // 用占座序号 k 而非物理下标 i:座位表可能有空洞(等待中玩家离开只清空座位
+      // 不压缩 seats),空洞后最高占座下标 ≥ n 时 i 与 i-n 对 n 同余 → 两玩家映射
+      // 到同一座次互相覆盖(handleAction 静默丢弃被顶者的操作),另一座次无人控制。
       const n = state.players.length;
       const offset = state.seatRotation ?? 0;
+      let k = 0; // 占座序号:第 k 个非空座位(空洞不计入)
       for (let i = 0; i < this.room.seats.length; i++) {
         const pid = this.room.seats[i];
         if (pid === null) continue;
-        this.playerNames.set(pid, (i + offset) % n);
+        this.playerNames.set(pid, (k + offset) % n);
+        k++;
       }
     }
 

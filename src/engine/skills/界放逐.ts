@@ -5,7 +5,7 @@
 // 作为交换摸 X 张牌。
 //
 // 模式 A(被动触发):after hook 挂在「受到伤害后」。
-//   造成伤害(target=自己) → 选目标 → 该目标翻面 → 摸 X 张(X=已损失体力)。
+//   受到伤害(target=自己) → 询问发动 → 选目标 → 该目标翻面 → 摸 X 张(X=已损失体力)。
 //
 // 关键点:
 //   - X = maxHealth - health(已损失体力值),血越少摸牌越多。
@@ -13,6 +13,9 @@
 //   - 翻面实现(镜像标版 放逐):flipFaceDown 加标签 '放逐/翻面';
 //     阶段开始 before-hook 消费标签(skipAll + cancel),阶段结束 before-hook
 //     主动推进回合(performSkipTurn)。
+//   - 已知简化:对已背面目标再次放逐不实现官方 toggle(翻面两次=翻回正面),
+//     与全引擎翻面模型一致(flipFaceDown 只追加标签,回合管理的 flipFaceUpAll
+//     一次清全部 /翻面 标签,双翻无法对消)。
 import type {
   FrontendAPI,
   GameState,
@@ -74,7 +77,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 造成伤害 after:曹丕受伤后,选目标 + 摸 X 张 + 翻回正面 ──
+  // ── 受到伤害后 after:曹丕受伤后,选目标 → 翻面 → 摸 X 张(官方语序)──
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;

@@ -160,4 +160,95 @@ describe('界鬼才', () => {
       restoreCompare();
     }
   });
+
+  // ─── 回归(2026-08-27):装备牌改判在客户端不可达 ──────────────
+  // 界版核心差异「打出装备牌代替判定牌」后端 validate/execute 正确,但投影层
+  // resolveCardFilterCandidates 只遍历 player.hand 生成 candidates,浏览器/HGC
+  // 把 candidates 当权威 → 装备牌永远选不到。修复:仿界天香,发起询问前计算
+  // hand+equipment 的 id 列表作为显式 candidates 下发。
+  it('装备区牌进入候选列表且可替换判定牌(手牌+装备)', async () => {
+    const lightningCard = makeCard('sd1', '闪电', '♠');
+    const judgeCard = makeCard('j1', '判定牌', '♠', '5'); // ♠5 → 命中(2-9)
+    const weapon: Card = {
+      id: 'w1', name: '诸葛连弩', suit: '♣', color: '黑', rank: '5',
+      type: '装备牌', subtype: '武器', range: 1,
+    };
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: '界司马懿', hand: ['r1'], skills: ['界鬼才', '回合管理'] }),
+        makePlayer({
+          index: 1,
+          name: '闪电主',
+          skills: ['闪电', '回合管理'],
+          pendingTricks: [{ name: '闪电', source: 1, card: lightningCard }],
+        }),
+      ],
+      cardMap: {
+        sd1: lightningCard,
+        j1: judgeCard,
+        w1: weapon,
+        r1: makeCard('r1', '杀', '♣', '5'),
+      },
+      currentPlayerIndex: 1,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    const restoreCompare = disableAutoCompare();
+    try {
+      state.players[0].equipment = { 武器: 'w1' };
+      state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+      await harness.setup(state);
+      const P0 = harness.player('界司马懿');
+
+      void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+      await waitForStable(harness.state); // 无懈窗口
+      await fireTimeoutAndWait(harness.state); // 跳过无懈
+      await waitForStable(harness.state); // 界鬼才询问
+
+      // 权威候选列表含装备区牌(修复前:resolveCardFilterCandidates 只遍历手牌
+      // → candidates=['r1'],浏览器/HGC 把它当权威 → 装备牌永远选不到)
+      const pendingPrompt = P0.view.pending?.prompt as
+        | { cardFilter?: { candidates?: string[] } }
+        | undefined;
+      expect(pendingPrompt?.cardFilter?.candidates).toEqual(expect.arrayContaining(['r1', 'w1']));
+
+      // 打出装备牌替换判定牌:走 卸下 分支(装备区→手牌→顶入判定帧)
+      await P0.respond('界鬼才', { cardId: 'w1' });
+      await waitForStable(harness.state);
+
+      // 装备区已清空,牌不在手牌(顶入判定帧,结算后进弃牌堆);手牌 r1 保留
+      expect(harness.state.players[0].equipment['武器']).toBeUndefined();
+      expect(harness.state.players[0].hand).toEqual(['r1']);
+      expect(harness.state.zones.discardPile).toContain('w1');
+      // ♣5 非黑桃 2-9 → 闪电不命中
+      expect(harness.state.players[1].health).toBe(4);
+    } finally {
+      restoreCompare();
+    }
+  });
+
+  it('回归:respond({})(浏览器「不回应」形状)→ 不替换,判定按原牌结算', async () => {
+    const { state } = lightningScene(['r1']);
+    const restoreCompare = disableAutoCompare();
+    try {
+      state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+      await harness.setup(state);
+      const P0 = harness.player('界司马懿');
+
+      void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+      await waitForStable(harness.state);
+      await fireTimeoutAndWait(harness.state); // 跳过无懈
+      await waitForStable(harness.state); // 界鬼才询问
+
+      // 浏览器「不回应」按钮发送的空参数形状:不发动替换
+      await P0.respond('界鬼才', {});
+      await waitForStable(harness.state);
+
+      // 手牌未动,♠5 原判定生效 → 闪电命中,3 点伤害
+      expect(harness.state.players[0].hand).toContain('r1');
+      expect(harness.state.players[1].health).toBe(1);
+    } finally {
+      restoreCompare();
+    }
+  });
 });

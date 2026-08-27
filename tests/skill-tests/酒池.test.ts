@@ -201,4 +201,62 @@ describe('酒池', () => {
     expect(harness.state.players[0].health).toBe(1);
     expect(harness.state.zones.discardPile).toContain('c1');
   });
+
+  // ─── 回归(2026-08-27):濒死放行未限定「自己濒死」 ────────────
+  // 求桃循环对每个存活玩家发 桃/求桃(target=被问询者),他人濒死轮到董卓时
+  // slot.target===ownerId 也为真;旧 askedPeach 门控无自身濒死条件,组合消息
+  // (酒池.transform ♠牌 + 酒.respond)可救他人,违反「酒仅自救」。
+  // 修复:门控追加 self.health <= 0(runDyingFlow 的 while 保证濒死者整个循环恒成立)。
+  it('他人濒死:求桃轮到董卓,组合消息被拒 → 不可用黑桃牌救他人', async () => {
+    const spade = makeCard('c1', '杀', '♠', '7'); // 董卓的黑桃手牌
+    const attacker = makeCard('a1', '杀', '♣', '8');
+    const state = createGameState({
+      players: [
+        // P0(酒池)血量健康:非自己濒死,不得用酒池救他人
+        makePlayer({ index: 0, name: 'P0', hand: ['c1'], skills: ['酒池'], health: 4, maxHealth: 4 }),
+        // P1 受击者:1 血无闪无桃 → 濒死
+        makePlayer({ index: 1, name: 'P1', hand: [], skills: [], health: 1, maxHealth: 4 }),
+        makePlayer({ index: 2, name: 'P2', hand: ['a1'], skills: ['杀'], health: 4, maxHealth: 4 }),
+      ],
+      cardMap: { c1: spade, a1: attacker },
+      currentPlayerIndex: 2, // P2 的回合
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+
+    // P2 出杀指定 P1:P1 无手牌(无闪)→ 直接受伤 → HP=0 濒死 → 求桃循环
+    await P2.useCardAndTarget('杀', 'a1', [1]);
+    await harness.waitForStable();
+    // 求桃从当前回合角色(P2)逆时针问询:P2/P1 无牌自动跳过,轮到董卓(P0)
+    // (其声明了 桃/求桃 替代回应能力 → 建立真实 pending)
+    const slotAtom = [...harness.state.pendingSlots.values()][0].atom as {
+      requestType?: string;
+      target?: number;
+    };
+    expect(slotAtom.requestType).toBe('桃/求桃');
+    expect(slotAtom.target).toBe(0);
+
+    // 组合消息(与真实前端一致:preceding=[酒池.transform] + 主 action=酒.respond)
+    // 修复前:transform 放行(askedPeach 未查自身濒死)→ 影子酒把 P1 救活(bug)
+    await P0.expectRejected({
+      skillId: '酒',
+      actionType: 'respond',
+      params: { cardId: 'c1#酒池' },
+      preceding: [{ skillId: '酒池', actionType: 'transform', params: { cardId: 'c1' } }],
+    });
+
+    // P1 未被救活:黑桃牌仍在董卓手中
+    expect(harness.state.players[1].health).toBe(0);
+    expect(harness.state.players[0].hand).toContain('c1');
+    expect(harness.state.cardMap['c1#酒池']).toBeUndefined(); // 未建立影子卡
+
+    // 无人救援 → 求桃循环走完 → P1 死亡
+    await P0.pass();
+    await harness.waitForStable();
+    expect(harness.state.players[1].alive).toBe(false);
+  });
 });

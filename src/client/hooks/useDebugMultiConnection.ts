@@ -103,6 +103,13 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   const [reconnectingCount, setReconnectingCount] = useState(0);
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
+  /** gameStarted 的 ref 镜像:connect().then 回调读取实时值。effect 运行时捕获的
+   *  闭包值在「开局瞬间仍有在途 join」场景下是过期的 false,会导致单活流对齐被
+   *  跳过(对齐兜底在 [perspective] effect 的 gameStarted 依赖,但能当场对齐更好)。 */
+  const gameStartedRef = useRef(false);
+  useEffect(() => {
+    gameStartedRef.current = gameStarted;
+  }, [gameStarted]);
   /** 游戏结束结果(winner=胜方座次号字符串,或 '无人')。收到 gameOver 消息后设置。 */
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
   const [seatPlayerIds, setSeatPlayerIds] = useState<Map<number, string>>(new Map());
@@ -251,17 +258,24 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
           // 按服务端分配的真实座次注册(可能与请求序号不同)
           const trueSeat = hgc.seatIndex;
           if (trueSeat >= 0) clientsByViewerRef.current.set(trueSeat, hgc);
-          // 连接完成时的单活流决策:真实座次是当前视角才持流,其余挂起并废弃视图
-          if (trueSeat === perspectiveRef.current) {
-            hgc.resumeStream();
-          } else if (trueSeat >= 0) {
-            hgc.suspendStream();
-            setViews((prev) => {
-              if (!prev.has(trueSeat)) return prev;
-              const next = new Map(prev);
-              next.delete(trueSeat);
-              return next;
-            });
+          // 连接完成时的单活流决策:真实座次是当前视角才持流,其余挂起并废弃视图。
+          // 仅对局中生效(读 ref 实时值,避免 effect 闭包的过期 false):大厅期
+          // (room.status='等待中')非当前视角座次连接时本就 stream:false 无流,
+          // 而挂起当前唯一持流座次会让服务端 SSE onAbort 走 leaveRoom,清掉该座次
+          // 的成员资格与 readyPlayers(表现:配置面板「已准备」静默弹回)。
+          // 开局瞬间仍在途的 join 由 [perspective] effect 的 gameStarted 依赖兜底对齐。
+          if (gameStartedRef.current) {
+            if (trueSeat === perspectiveRef.current) {
+              hgc.resumeStream();
+            } else if (trueSeat >= 0) {
+              hgc.suspendStream();
+              setViews((prev) => {
+                if (!prev.has(trueSeat)) return prev;
+                const next = new Map(prev);
+                next.delete(trueSeat);
+                return next;
+              });
+            }
           }
         })
         .catch((err: unknown) => {
@@ -304,7 +318,14 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   // 切回时 resumeStream() 由服务端按新连接回 initialView 全量快照,视图自动对齐。
   // 挂起座次的缓存视图必须同时废弃:它是过时快照,既不能作为渲染依据(短暂闪现
   // 错误提示/按钮),也会误导 useDebugPerspective 的自动跟随(看见已不存在的 pending)。
+  // 仅对局中生效:大厅期(room.status='等待中')非当前视角座次本来就没有流
+  // (connect 传 stream:false),而挂起唯一持流座次(配置面板依赖它的 room_state
+  // 推送)会触发服务端 SSE onAbort → leaveRoom,清掉该座次的 seats/readyPlayers,
+  // 表现为「已准备」点完几秒内静默弹回。gameStarted 作为依赖:开局广播到达、
+  // phase 翻转为 playing 时本 effect 重跑,补齐「开局→翻转」窗口期切过视角而
+  // 错过的调度;game_reset 回大厅后自动停用(回到大厅期不变式:仅持流座次有流)。
   useEffect(() => {
+    if (!gameStarted) return;
     for (const [seat, hgc] of clientsByViewerRef.current) {
       try {
         if (seat === perspective) {
@@ -322,7 +343,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
         /* 已 disconnect 的实例:忽略 */
       }
     }
-  }, [perspective]);
+  }, [perspective, gameStarted]);
 
   // ── 自愈:当前视角缺视图超过阈值时全量重连 ──
   // 单活流下切视角依赖「挂起旧流→恢复新流→快照重建」。若快照丢失或重连后
@@ -356,10 +377,22 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
             next.set(viewerIndex, msg.playerId);
             return next;
           });
-          // room_joined 可能修正 seatIndex(与服务端分配对齐),按真实座次补登记
+          // room_joined 可能修正 seatIndex(与服务端分配对齐),按真实座次补登记。
+          // 对局中挂起旧流 → 服务端 clearDebugPlayer 删座次映射;恢复时 assignDebugSeat
+          // 按「最小空闲座次」重排,同一 HGC 可能拿到新座号。必须先删它占着的旧键再
+          // 注册新键:否则同一 HGC 在 map 中占双键,而被顶掉座次的键指向失联实例,
+          // 单活流调度/按座次查找全部错位(座次漂移,UI 卡「正在连接」直到 3s 全量
+          // 重连自愈)。被顶掉座次的旧值由本次 set 直接覆盖,该 HGC 下次恢复拿到
+          // 自己的 room_joined 时再补登记。
           const joinedHgc = clientsRef.current.get(viewerIndex);
           if (joinedHgc && joinedHgc.seatIndex >= 0) {
-            clientsByViewerRef.current.set(joinedHgc.seatIndex, joinedHgc);
+            const newSeat = joinedHgc.seatIndex;
+            for (const [seat, hgc] of clientsByViewerRef.current) {
+              if (hgc === joinedHgc && seat !== newSeat) {
+                clientsByViewerRef.current.delete(seat);
+              }
+            }
+            clientsByViewerRef.current.set(newSeat, joinedHgc);
           }
           break;
         }
@@ -374,8 +407,13 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
           break;
         }
         case 'event': {
+          // 以 HGC 的真实座次为权威键:循环下标 ≠ 服务端座次(并发 join 按到达顺序
+          // 入座,对局中挂起/恢复还会重排座号),而 views(onView 按 view.viewer 写入)
+          // 与 perspective(开局后 onFirstView/useDebugPerspective 均为真实座次)都在
+          // 真实座次空间——用循环下标会读错视图键、漏播当前视角的事件。
+          const seat = clientsRef.current.get(viewerIndex)?.seatIndex ?? viewerIndex;
           // event playback / 出牌历史:仅当前视角连接的事件入队,避免 N 座次重复入队
-          if (msg.view && viewerIndex === perspectiveRef.current) {
+          if (msg.view && seat === perspectiveRef.current) {
             playbackRef.current.enqueue([{ seq: msg.seq, event: msg.view }]);
           }
           // 判定牌 processing 延迟展示：判定牌加入 processing 几秒后移除
@@ -386,7 +424,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
               | undefined;
             if (judgeCardId) {
               setViews((prev) => {
-                const v = prev.get(viewerIndex);
+                const v = prev.get(seat);
                 if (!v) return prev;
                 if (!v.cardMap[judgeCardId] && judgeCard) {
                   v.cardMap[judgeCardId] = {
@@ -401,16 +439,16 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
                 if (v.zones && !v.zones.processing.includes(judgeCardId)) {
                   v.zones.processing.push(judgeCardId);
                 }
-                return new Map(prev).set(viewerIndex, v);
+                return new Map(prev).set(seat, v);
               });
               setTimeout(() => {
                 setViews((prev) => {
-                  const v = prev.get(viewerIndex);
+                  const v = prev.get(seat);
                   if (!v?.zones) return prev;
                   const idx = v.zones.processing.indexOf(judgeCardId);
                   if (idx < 0) return prev;
                   v.zones.processing.splice(idx, 1);
-                  return new Map(prev).set(viewerIndex, v);
+                  return new Map(prev).set(seat, v);
                 });
               }, JUDGE_CARD_LINGER_MS);
             }

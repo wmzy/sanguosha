@@ -1,9 +1,10 @@
 // tests/skill-tests/八卦阵.test.ts
 // 八卦阵(防具)技能测试:
-//   onInit:询问闪 before hook → 判定牌堆顶;红色视为出闪(放虚拟闪进处理区);
+//   onInit:询问闪 before hook → 判定(runJudgeFlow);红色视为出闪(放虚拟闪进处理区);
 //          黑色 → 不放虚拟闪,正常询问闪
-//   实现细节:在 询问闪 atom.beforeHook 中 applyAtom(判定) → 判定牌进弃牌堆,
-//            读弃牌堆顶判定牌花色。红色 → 创建虚拟闪(进 processing),
+//   实现细节:在 询问闪 atom.beforeHook 中 runJudgeFlow(判定) → 用其返回值读最终
+//            判定牌花色(判定牌可能被 天妒/屯田 等"判定牌生效后"hook 收走而未入
+//            弃牌堆,不能读弃牌堆顶)。红色 → 创建虚拟闪(进 processing),
 //            杀检查处理区发现闪就视为闪避。
 //
 // 验证:

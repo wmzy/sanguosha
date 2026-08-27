@@ -512,3 +512,102 @@ describe('身份分配座次轮转 (multiplayer 非 debug)', () => {
     }
   }, 60000);
 });
+
+/** 构造带空洞的多人房:seats 含 null(模拟等待中玩家离开——removePlayerMembership
+ *  只清空座位不压缩),players 只含占座玩家。maxPlayers = 物理座位数。 */
+function makeMultiplayerRoomWithSeats(
+  seats: Array<string | null>,
+): { room: Room; sinks: Map<string, FakeSink> } {
+  const playerIds = seats.filter((s): s is string => s !== null);
+  const sinks = new Map<string, FakeSink>();
+  const room: Room = {
+    id: `mp-${Math.random().toString(36).slice(2, 8)}`,
+    name: '空洞座位测试',
+    maxPlayers: seats.length,
+    players: new Map(),
+    status: '等待中',
+    hostId: playerIds[0],
+    readyPlayers: new Set(playerIds),
+    config: { name: '空洞座位测试', timeoutSec: 30, charPool: 'all', handSize: 4 },
+    spectators: new Map(),
+    viewGrants: new Map(),
+    pendingViewRequests: new Map(),
+    roomType: 'quick',
+    chatUsage: new Map(),
+    chatHistory: [],
+    seats: [...seats],
+    pendingSeatSwaps: new Map(),
+    passwordHash: null,
+    playerNames: new Map(playerIds.map((pid, i) => [pid, `玩家${i + 1}`])),
+  } as unknown as Room;
+  for (const pid of playerIds) {
+    const sink = new FakeSink();
+    sinks.set(pid, sink);
+    room.players.set(pid, sink);
+  }
+  addRoom(room);
+  trackedRoomIds.push(room.id);
+  return { room, sinks };
+}
+
+describe('座位表空洞:占座序号映射 (multiplayer 非 debug)', () => {
+  // 回归:等待中玩家离开只清空座位不压缩 seats(room.ts removePlayerMembership),
+  // 座位表出现空洞。旧实现用物理下标 i 做 (i+offset)%n 映射,空洞后最高占座下标 ≥ n
+  // 时下标 i 与 i-n 对 n 同余 → 两玩家映射到同一座次互相覆盖(handleAction 对被顶者
+  // 静默失效),另一引擎座次无人控制;seatDisplayNames 的 i<count 截断还会让空洞后
+  // 的玩家拿不到引擎显示名(只剩 stub 兜底)。修复后按占座序号 k(第 k 个非空座位)
+  // 映射,三处(startGame/restoreState/seatDisplayNames)同源。
+  it('4 座房空洞 seats=[A,null,C,D]:三玩家映射互不相同的座次,显示名与映射一致', async () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const { room } = makeMultiplayerRoomWithSeats(['A', null, 'C', 'D']);
+      const session = new GameSession(room, false, seed);
+      await session.startGame();
+      const state = getState(session) as GameState & {
+        players: Array<{ name: string }>;
+      };
+      const n = state.players.length;
+      expect(n).toBe(3);
+      const offset = state.seatRotation ?? 0;
+      // 占座序号:A=第0个非空座位、C=第1个、D=第2个(物理下标1的空洞不计入)
+      // 旧 bug(offset=1 时):A→(0+1)%3=1,C→(2+1)%3=0,D→(3+1)%3=1 —— A 与 D 碰撞在座次 1
+      const expected: Array<[string, number]> = [
+        ['A', (0 + offset) % n],
+        ['C', (1 + offset) % n],
+        ['D', (2 + offset) % n],
+      ];
+      for (const [pid, seat] of expected) {
+        expect(session.getPlayerName(pid)).toBe(seat);
+      }
+      // 三个玩家映射互不相同(覆盖全部引擎座次,无空洞错位)
+      expect(new Set(expected.map(([, seat]) => seat)).size).toBe(3);
+      // 引擎座次 g 的显示名 = 该座次对应物理玩家的房间昵称(seatDisplayNames 同步修复)
+      for (const [pid, seat] of expected) {
+        expect(state.players[seat].name).toBe(room.playerNames.get(pid));
+      }
+    }
+  }, 60000);
+
+  it('offset=0 空洞场景:占座序号映射仍不冲突(旧实现 D 的物理下标 3%n 回绕碰撞)', async () => {
+    let covered = false;
+    for (let seed = 1; seed <= 24 && !covered; seed++) {
+      const { room } = makeMultiplayerRoomWithSeats(['A', null, 'C', 'D']);
+      const session = new GameSession(room, false, seed);
+      await session.startGame();
+      const state = getState(session) as GameState & {
+        players: Array<{ name: string }>;
+      };
+      if ((state.seatRotation ?? 0) !== 0) continue; // 只覆盖 offset=0 分支
+      covered = true;
+      // offset=0:占座序号即游戏座次 A→0/C→1/D→2。
+      // 旧实现按物理下标:A→0%3=0,C→2%3=2,D→3%3=0 —— A 与 D 碰撞在座次 0,座次 1 无人控制
+      expect(session.getPlayerName('A')).toBe(0);
+      expect(session.getPlayerName('C')).toBe(1);
+      expect(session.getPlayerName('D')).toBe(2);
+      for (const pid of ['A', 'C', 'D']) {
+        const g = session.getPlayerName(pid)!;
+        expect(state.players[g].name).toBe(room.playerNames.get(pid));
+      }
+    }
+    expect(covered).toBe(true); // 24 个 seed 至少一个 offset=0
+  }, 60000);
+});

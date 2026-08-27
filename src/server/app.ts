@@ -92,6 +92,8 @@ async function restoreNormalRoomsFromDb(): Promise<void> {
       chatHistory: [],
       seats: Array(row.maxPlayers).fill(null),
       pendingSeatSwaps: new Map(),
+      // 近期离开宽限表纯内存、不持久化(重启恢复路径由 playerNames 覆盖)
+      recentlyLeft: new Map(),
       // 密码哈希随房间元数据持久化,重启后密码继续生效
       passwordHash: row.passwordHash ?? null,
       // 成员显示名随房间元数据持久化(重启后房间内名字仍可显示)
@@ -194,6 +196,7 @@ async function restorePersistedRooms(): Promise<void> {
         chatHistory: [],
         seats: restoredSeats,
         pendingSeatSwaps: new Map(),
+        recentlyLeft: new Map(),
         passwordHash: null,
         playerNames: new Map(),
       };

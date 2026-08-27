@@ -381,6 +381,15 @@ describe('鸿举', () => {
     P0.expectPending('请求回应'); // 征荣/选目标(candidates=[1,2])
     await P0.respond('征荣', { target: 3 }); // 注入候选之外的座次
 
+    // 回归区分点:eligible 权威校验拦截后,征荣/选牌 面板根本不创建,下一个 pending
+    // 直接回到南蛮结算(无懈广播)。修复前面板照常创建,仅靠后续 pass() 超时兜底
+    // no-op 收场,末尾断言仍全绿(对引擎回滚无区分度)——必须在此处断言面板缺席。
+    await harness.waitForStable();
+    const hasZhengRongPanel = [...harness.state.pendingSlots.values()].some(
+      (s) => ((s.atom as { requestType?: string }).requestType ?? '').startsWith('征荣/'),
+    );
+    expect(hasZhengRongPanel).toBe(false);
+
     // 南蛮继续结算:逐目标的 无懈广播(pass 放弃)+ 询问杀(P1/P2 打出手中的杀免伤,
     // P3 无手牌 skip 直接受伤)
     for (let i = 0; i < 30; i++) {

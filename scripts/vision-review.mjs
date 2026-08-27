@@ -9,7 +9,12 @@ if (!imgPath) {
   process.exit(1);
 }
 
-const apiKey = 'sk-Kz4nS2paFBWnnthBmnwlBchtPgGqDoJr';
+// API Key 从环境变量读取(与 scripts/gen-card.ts 同款约定),缺失时显式报错退出。
+const apiKey = process.env.SENSENOVA_API_KEY;
+if (!apiKey) {
+  console.error('错误:缺少 API Key。请设置 SENSENOVA_API_KEY 环境变量。');
+  process.exit(1);
+}
 const mimeMap = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
 const mime = mimeMap[extname(imgPath).toLowerCase()] ?? 'image/png';
 const b64 = readFileSync(imgPath).toString('base64');

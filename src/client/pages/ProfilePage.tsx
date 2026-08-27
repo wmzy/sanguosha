@@ -52,11 +52,17 @@ const avatar = css`
   object-fit: cover;
 `;
 
+/** 头像加载失败时的首字母回退块(56px 版)。
+ *  原 css`` 内插值同文件 ${avatar}:wyw 不内联类规则,首条非法声明还会吞掉
+ *  display:flex,avatar 的 56px 宽高/圆角/边框全部丢失——故直接内联全部所需属性。 */
 const avatarFallback = css`
-  ${avatar}
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid ${colors.card.borderDefault};
   background: rgba(241, 196, 15, 0.08);
   color: ${colors.accent.gold};
   font-size: 24px;

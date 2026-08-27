@@ -9,7 +9,9 @@ import { useEffect, useState } from 'react';
 import { css } from '@linaria/core';
 import { colors } from '../theme';
 
-/** 与 gameViewStyles(layout/actionBar)的 @media (max-width: 900px) 断点对齐 */
+/** 独立阈值:视口 ≤900px 时画布等比缩放(GameViewScaler)的 scale 偏小、可读性差,
+ *  提示改用桌面浏览器。原 gameViewStyles 的 @media 断点已随缩放容器改造移除,
+ *  此值不再与任何样式断点对齐,仅作提示条件。 */
 const NARROW_QUERY = '(max-width: 900px)';
 
 const bar = css`

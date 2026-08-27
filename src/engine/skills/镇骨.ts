@@ -153,6 +153,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
           }
           // 去重校验:重复 id 会使同一张牌被弃置两次
           if (new Set(cardIds).size !== cardIds.length) return 'cardIds 含重复牌';
+          // 张数必须恰为手牌调整差额(仿进趋;从 pending prompt.cardFilter.min 读取,
+          // 防异常客户端少弃/多弃)
+          const excess = (
+            slot.atom as { prompt?: { cardFilter?: { min?: number } } }
+          ).prompt?.cardFilter?.min;
+          if (typeof excess === 'number' && cardIds.length !== excess) {
+            return `需要恰好弃置 ${excess} 张手牌`;
+          }
           return null;
         }
         return '当前不是镇骨询问';

@@ -106,10 +106,10 @@ function PlayerSeatViewImpl({
   const showIdentity =
     identity && (!hideIdentity || isPerspective || identity === '主公' || !player.alive);
 
-  // 体力珠动态缩放:珠体基础 10×14px + 间距 3px,maxHealth ≥ 7 时整列高度会超出卡面,
-  // 按 6/maxHealth 等比缩小珠体与间距,使任意 maxHealth 的珠列完整排在卡右缘内;
-  // ≤ 6 沿用原值(标准 4 血场景无回归)。
-  const hpScale = player.maxHealth >= 7 ? 6 / player.maxHealth : 1;
+  // 体力珠动态缩放:珠体基础 10×14px + 间距 3px,整列布局高度 = 17N−3(N=maxHealth);
+  // 卡高 200px,仅 N ≥ 12(17×12−3=201>200)才会溢出卡面,此时按 6/maxHealth 等比缩小
+  // 珠体与间距,使珠列完整排在卡右缘内;N ≤ 11 沿用原值(董卓 8 血/主公+1 后 9 血不再无谓缩小)。
+  const hpScale = player.maxHealth >= 12 ? 6 / player.maxHealth : 1;
   const beadW = `${10 * hpScale}px`;
   const beadH = `${14 * hpScale}px`;
   const hpGap = `${3 * hpScale}px`;
@@ -540,9 +540,16 @@ const seatCard = css`
     border-color 0.25s,
     opacity 0.25s;
 `;
-// 当前回合:金绿双层辉光边框(与名牌高亮联动)
+// 当前回合:金绿双层辉光边框 + 金色描边呼吸(与名牌高亮联动)。
+// activeSeatPulse 关键帧只动 outline-color(几何不变),叠加在静态 box-shadow 上;
+// 视角玩家自己的座位不进弧形座位环(SeatArcLayout 只渲染 slice(1)),seatCardPerspective
+// 蓝色 outline 不会与这里的金色 outline 同卡共存。若座位同时被选为目标,
+// seatCardTargeted 的 animation 声明在文件更靠后,优先于此处的呼吸动画。
 const seatCardActive = css`
   border-color: #d4a048;
+  outline: 2px solid rgba(255, 215, 0, 0.95);
+  outline-offset: 2px;
+  animation: activeSeatPulse 2s ease-in-out infinite;
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.6),
     0 0 16px rgba(255, 205, 92, 0.45),

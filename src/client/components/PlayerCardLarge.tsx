@@ -114,12 +114,23 @@ export function PlayerCardLargeImpl({
       phase: view.phase,
       pending: view.pending,
     });
-  // 体力珠缩放:maxHealth ≥ 7 时整列高度会超出卡面,按 6/maxHealth 等比缩小珠体与间距
-  // (与座位卡 PlayerSeatView 同规则);≤ 6 沿用基础尺寸(标准 4 血场景无回归)。
-  const hpScale = p.maxHealth >= 7 ? 6 / p.maxHealth : 1;
+  // 体力珠缩放:整列布局高度 = 17N−3(N=maxHealth),卡高 200px,仅 N ≥ 12(17×12−3=201>200)
+  // 才会溢出卡面,此时按 6/maxHealth 等比缩小珠体与间距(与座位卡 PlayerSeatView 同规则);
+  // N ≤ 11 沿用基础尺寸(标准 4 血场景无回归)。
+  const hpScale = p.maxHealth >= 12 ? 6 / p.maxHealth : 1;
   const beadW = `${10 * hpScale}px`;
   const beadH = `${14 * hpScale}px`;
   const hpGap = `${3 * hpScale}px`;
+  // 珠列方向与分色(与座位卡 PlayerSeatView 同规则):损失的体力(空珠)在上方,
+  // 剩余体力(满珠)在下方;满珠颜色按剩余比例分色:>50% 绿 / >25% 黄 / ≤25% 红(濒危警示)。
+  const lostCount = Math.max(0, p.maxHealth - p.health);
+  const hpRatio = p.maxHealth > 0 ? p.health / p.maxHealth : 1;
+  const hpBeadFullCls =
+    hpRatio > 0.5
+      ? styles.playerCardHpBeadFull
+      : hpRatio > 0.25
+        ? styles.playerCardHpBeadFullMid
+        : styles.playerCardHpBeadFullLow;
   // 身份小方章(左缘竖带顶部):主公金/忠臣蓝/反贼红/内奸紫
   const identityBadgeClass =
     identity === '主公'
@@ -153,12 +164,14 @@ export function PlayerCardLargeImpl({
           />
         )}
       </div>
-      {/* 右缘体力珠列:垂直排列,骑在卡右边框上(满珠绿渐变水滴/空珠透明底) */}
-      <div className={styles.playerCardHpBeadCol} style={{ gap: hpGap }} aria-hidden>
+      {/* 右缘体力珠列:垂直排列,骑在卡右边框上;空珠(已损失)在上,满珠在下按余量分色 */}
+      <div className={styles.playerCardHpBeadCol} style={{ gap: hpGap }} aria-hidden data-hp-beads>
         {Array.from({ length: p.maxHealth }, (_, i) => (
           <span
             key={i}
-            className={i < p.health ? styles.playerCardHpBeadFull : styles.playerCardHpBeadEmpty}
+            className={i < lostCount ? styles.playerCardHpBeadEmpty : hpBeadFullCls}
+            data-full={i < lostCount ? undefined : 'true'}
+            data-hue={i < lostCount ? undefined : hpRatio > 0.5 ? 'green' : hpRatio > 0.25 ? 'yellow' : 'red'}
             style={{ width: beadW, height: beadH }}
           />
         ))}

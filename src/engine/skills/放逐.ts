@@ -1,8 +1,8 @@
 // 放逐(曹丕·被动技):每当你受到一次伤害后,可以令除你以外的任一角色补 X 张牌
 //   (X 为你已损失体力值),然后该角色将其武将牌翻面。
 //
-// 模式 A(被动触发):after hook 挂在「造成伤害」。
-//   造成伤害(target=自己) → 选目标 → 该目标摸 X 张(X=已损失体力) → 翻面。
+// 模式 A(被动触发):after hook 挂在「受到伤害后」。
+//   受到伤害(target=自己) → 询问发动 → 选目标 → 该目标摸 X 张(X=已损失体力) → 翻面。
 //
 // 翻面实现(同据守的手法,但标签名独立,与据守互不干扰):
 //   - 加标签 `放逐/翻面` 到目标(下一回合开始时消费)
@@ -15,6 +15,9 @@
 // 关键点:
 //   - X = maxHealth - health(已损失体力值),血越少摸牌越多
 //   - 目标不能是自己(FAQ)
+//   - 已知简化:对已背面目标再次放逐不实现官方 toggle(翻面两次=翻回正面),
+//     与全引擎翻面模型一致(flipFaceDown 只追加标签,回合管理的 flipFaceUpAll
+//     一次清全部 /翻面 标签,双翻无法对消)
 //   - 翻面 hook 注册在曹丕座次,但 hook 对所有玩家的阶段 atom 触发,callback 内
 //     检查目标 player 是否有翻面标签。曹丕存活期内有效。
 import type {
@@ -78,7 +81,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 造成伤害 after:曹丕受伤后,选目标 + 摸 X 张 + 翻面 ──
+  // ── 受到伤害后 after:曹丕受伤后,选目标 + 摸 X 张 + 翻面 ──
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;

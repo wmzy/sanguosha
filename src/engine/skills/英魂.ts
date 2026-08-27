@@ -224,8 +224,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           st.localVars[OPTION_KEY] = params.choice === true ? 'opt1' : 'opt2';
         } else if (rt === DISCARD_RT) {
           const ids = params.cardIds as string[] | undefined;
-          // 校验:恰好 N 张且全部在回应者自己手牌中(弃置 atom 不校验归属,
-          // 非法数组会把他人手中的牌复制进弃牌堆)
+          // 校验:恰好 N 张、全部在回应者自己手牌中、无重复(弃置 atom 不校验归属/去重,
+          // 非法数组会把他人手中的牌复制进弃牌堆,或把同 id push 进弃牌堆两次)
           const need = (
             slot?.atom as { prompt?: { cardFilter?: { min?: number } } } | undefined
           )?.prompt?.cardFilter?.min;
@@ -233,6 +233,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
             Array.isArray(ids) &&
             typeof need === 'number' &&
             ids.length === need &&
+            new Set(ids).size === ids.length &&
             ids.every((id) => st.players[seatId]?.hand.includes(id))
           ) {
             st.localVars[DISCARD_KEY] = ids;

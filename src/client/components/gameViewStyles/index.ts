@@ -4,7 +4,7 @@
 // 本 barrel 聚合全部导出,保持外部 `import * as styles from './gameViewStyles'` 不变。
 // 通过 `import * as styles` 使用:
 //   className={styles.pageRoot}
-//   className={cx(styles.seatCard, isActive && styles.seatCardActive)}
+//   className={cx(styles.playerCardLarge, isTurn && styles.playerCardTurn)}
 //
 // 动画 keyframes (flyCardMove / damageFlash / damageShake / phaseIn / newTurnGlow / damageOverlay)
 // 定义在 src/client/animations.css,由 main.tsx 全局引入。

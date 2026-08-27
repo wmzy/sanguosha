@@ -165,8 +165,13 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
       // 选将结束由 亮将 原子统一公开。debug 视角不受限。
       const hideChar = state.charSelecting === true && !debug && i !== viewer;
       return {
+      // 名牌回退链 nickname→name:nickname 只在 分配武将.apply 时写入,分配前的
+      // 窗口内 undefined——直接投影空串会让他人/旁观视角名牌全空(CharSelectWaitingOverlay
+      // 拼出「、、、、正在选将」)。回退 p.name 无泄漏:分配前 name 仍是原昵称
+      // (分配武将 apply 才覆写为武将名并留存 nickname);分配后 nickname 已留存,
+      // 优先取昵称,武将名不会经 name 通道泄漏(角色保密由 character/skills 红化控制)。
       index: i,
-      name: hideChar ? (p.nickname ?? '') : p.name,
+      name: hideChar ? (p.nickname ?? p.name) : p.name,
       character: hideChar ? '' : p.character,
       faction: hideChar ? undefined : p.faction,
       health: p.health,

@@ -164,9 +164,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (s: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string | undefined;
-      if (typeof cardId === 'string') {
-        s.localVars[DISCARD_CHOICE_KEY] = cardId;
+      // 客户端契约:mandatory 多选弃牌 UI 与 HeadlessGameClient 提交 {cardIds:[x]},
+      // 旧单发形状为 {cardId}。归一化双形状,且仅接受自己手牌中的牌(防注入他人牌);
+      // 非法形状不写 → use execute 走兜底弃首张。
+      const raw: unknown = Array.isArray(params.cardIds) ? params.cardIds[0] : params.cardId;
+      const self = s.players[ownerId];
+      if (typeof raw === 'string' && self?.hand.includes(raw)) {
+        s.localVars[DISCARD_CHOICE_KEY] = raw;
       }
     },
   );

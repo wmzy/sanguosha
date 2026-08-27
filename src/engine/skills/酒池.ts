@@ -48,6 +48,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const isSpade = !!card && card.suit === '♠';
       // 濒死求桃窗口:已声明 declareAlternativeResponse('请求回应','桃/求桃'),
       // 转化出的影子【酒】可经 酒.respond 当桃自救——此时非自己回合且有阻塞 pending,须放行。
+      // 仅限自己濒死:求桃循环会对每个存活玩家发 桃/求桃(target=被问询者),他人濒死
+      // 轮到董卓时 slot.target 同样等于 ownerId;不加 health<=0 门控,组合消息
+      // (酒池.transform + 酒.respond)即可用黑桃牌救他人,违反「酒仅自救」。
+      // runDyingFlow 的 while 循环保证濒死者整个问询期间 health<=0。
       const slot = state.pendingSlots.get(ownerId);
       const atomType = (slot?.atom as { type?: string })?.type;
       const reqType = (slot?.atom as { requestType?: string })?.requestType;
@@ -56,7 +60,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         !!slot &&
         atomTarget === ownerId &&
         atomType === '请求回应' &&
-        reqType === '桃/求桃';
+        reqType === '桃/求桃' &&
+        self.health <= 0;
       const ok = (myTurn && free && selfAlive) || (selfAlive && askedPeach);
       return cardInHand && isSpade && ok ? null : '现在不能使用酒池';
     },
@@ -106,13 +111,16 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
       if (!hasSpade) return false;
       // 出牌路径(自己回合 + 出牌阶段)
       if (defaultPlayActive(ctx)) return true;
-      // 濒死自救路径(被询问 桃/求桃):与武圣 askedKill 同构
+      // 濒死自救路径(被询问 桃/求桃):与武圣 askedKill 同构。
+      // 仅限自己濒死(酒仅自救):他人濒死轮到董卓被问桃时,pending.target 同样命中
+      // 自己,须再校验视角玩家 health<=0 才亮出转化入口。
       const slot = ctx.view.pending;
       const reqType = (slot?.atom as { requestType?: string })?.requestType;
       return (
         !!slot &&
         (slot as { target?: number }).target === ctx.perspectiveIdx &&
-        reqType === '桃/求桃'
+        reqType === '桃/求桃' &&
+        p.health <= 0
       );
     },
   });

@@ -396,7 +396,8 @@ export const 并行选将: AtomDefinition<{
 // ── 亮将(选将结束,公开全部角色)──────────────────────
 // 选将保密策略的收尾:并行选将全部 resolve 后由 开局.execute 应用。
 // 把所有玩家的 character/faction/skills/体力 一次性广播给所有视角,
-// 同时恢复名牌昵称(name←nickname)。非确定性源:无(纯投影广播)。
+// 同时把名牌 name 统一写为武将名(name←character,与 分配武将 apply 的口径一致
+// ——选将期红化事件未更新非本人视角的 name)。非确定性源:无(纯投影广播)。
 export const 亮将: AtomDefinition<{
   type: '亮将';
   assignments: Array<{

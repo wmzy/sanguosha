@@ -62,7 +62,7 @@ export function OverlaysLayer(props: OverlaysLayerProps) {
 
   return (
     <>
-      {/* 身份揭示弹窗:身份分配后立即显示,盖在选将遮罩之上(zIndex 10000 > 9999)。
+      {/* 身份揭示弹窗:身份分配后立即显示,盖在选将遮罩之上(zIndex 10110 > 10100)。
           玩家点「确认」后 showIdentityReveal 置 false,露出下方的选将界面。
           因此身份揭示发生在选将之前,符合开局先亮身份再选将的流程。 */}
       {showIdentityReveal && view.players[view.viewer]?.identity && (

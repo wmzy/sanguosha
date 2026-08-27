@@ -463,4 +463,113 @@ describe('据守', () => {
     expect(harness.state.players[0].hand.length).toBe(4);
     expect(harness.state.zones.discardPile).toContain('base0');
   });
+
+  // ─── 回归(2026-08-27):mandatory 多选弃牌 UI 的 {cardIds} 形状 ────
+  // 浏览器 usePendingState(强制弃牌 UI)与 HeadlessGameClient 对该 pending 提交
+  // {cardIds:[x]} 数组,respond execute 旧实现只读 params.cardId 单数 → 选择被
+  // 静默忽略、恒走兜底弃首张。修复:归一化双形状 + 归属校验。
+  it('强制弃牌:respond({cardIds:[非首张手牌]}) → 恰弃所选牌(浏览器多选 UI 形状)', async () => {
+    const base: Card = makeCard('base0', '闪', '♥', '2');
+    const extra: Card = makeCard('extra0', '杀', '♠', '3');
+    const cardMap: Record<string, Card> = { base0: base, extra0: extra };
+    const deck = buildDeck(cardMap, 6);
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['base0', 'extra0'], skills: ['据守'] }),
+        makePlayer({ index: 1, name: 'P2', skills: [], character: '曹操' }),
+      ],
+      cardMap,
+      zones: { deck, processing: [], discardPile: [] },
+      currentPlayerIndex: 0,
+      phase: '弃牌',
+      turn: { round: 1, phase: '弃牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('据守', 'use', {});
+    await harness.waitForStable();
+
+    // 摸 4 后手牌 = [base0, extra0, dk0..dk3];用 {cardIds} 形状选非首张 extra0
+    await P1.respond('据守', { cardIds: ['extra0'] });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 恰弃所选的 extra0(修复前:cardIds 被忽略 → 兜底弃首张 base0)
+    expect(harness.state.zones.discardPile).toContain('extra0');
+    expect(harness.state.players[0].hand).not.toContain('extra0');
+    expect(harness.state.players[0].hand).toContain('base0');
+    expect(harness.state.zones.discardPile).not.toContain('base0');
+    // 初始 2 + 摸 4 - 弃 1 = 5
+    expect(harness.state.players[0].hand.length).toBe(5);
+  });
+
+  it('强制弃牌:respond({cardIds:[他人牌]}) → 归属守卫拦截,兜底弃手牌首张', async () => {
+    const mine: Card = makeCard('mine0', '闪', '♥', '2');
+    const others: Card = makeCard('others0', '杀', '♠', '3');
+    const cardMap: Record<string, Card> = { mine0: mine, others0: others };
+    const deck = buildDeck(cardMap, 6);
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['mine0'], skills: ['据守'] }),
+        makePlayer({ index: 1, name: 'P2', hand: ['others0'], skills: [], character: '曹操' }),
+      ],
+      cardMap,
+      zones: { deck, processing: [], discardPile: [] },
+      currentPlayerIndex: 0,
+      phase: '弃牌',
+      turn: { round: 1, phase: '弃牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('据守', 'use', {});
+    await harness.waitForStable();
+
+    // 异常客户端注入他人牌 id → 不得写入选择 → 兜底弃自己手牌首张
+    await P1.respond('据守', { cardIds: ['others0'] });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    expect(harness.state.zones.discardPile).toContain('mine0');
+    expect(harness.state.zones.discardPile).not.toContain('others0');
+    // P2 的牌未被复制/移动
+    expect(harness.state.players[1].hand).toContain('others0');
+  });
+
+  it('界据守:respond({cardIds:[非首张装备牌]}) → 装备所选牌(而非兜底弃首张)', async () => {
+    const keep: Card = makeCard('keep0', '闪', '♥', '2');
+    const weapon = makeWeapon('wp9', '诸葛连弩', '♣', 1);
+    const cardMap: Record<string, Card> = { keep0: keep, wp9: weapon };
+    const deck = buildDeck(cardMap, 6);
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['keep0', 'wp9'], skills: ['界据守'] }),
+        makePlayer({ index: 1, name: 'P2', skills: [], character: '曹操' }),
+      ],
+      cardMap,
+      zones: { deck, processing: [], discardPile: [] },
+      currentPlayerIndex: 0,
+      phase: '弃牌',
+      turn: { round: 1, phase: '弃牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.triggerAction('界据守', 'use', {});
+    await harness.waitForStable();
+
+    // 摸 4 后手牌 = [keep0, wp9, dk0..dk3];{cardIds} 形状选非首张装备牌 wp9
+    await P1.respond('界据守', { cardIds: ['wp9'] });
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 所选装备牌被使用(武器栏),首张 keep0 保留在手(修复前:忽略选择 → 弃首张 keep0)
+    expect(harness.state.players[0].equipment['武器']).toBe('wp9');
+    expect(harness.state.players[0].hand).toContain('keep0');
+    expect(harness.state.zones.discardPile).not.toContain('keep0');
+    expect(harness.state.zones.discardPile).not.toContain('wp9');
+    // 初始 2 + 摸 4 - 装备 1 = 5
+    expect(harness.state.players[0].hand.length).toBe(5);
+  });
 });

@@ -59,13 +59,15 @@ const btn = css`
   }
 `;
 
-const playBtn = css`
-  ${btn};
+/** 播放/暂停主按钮:复用 btn 外观,绿色底色突出(自身属性后声明,覆盖 btn 默认底色/hover)。
+ *  原 css`` 内插值 ${btn} 在 wyw 下不内联规则(非法声明),改为字符串拼接。 */
+const playBtnExtra = css`
   background-color: ${colors.accent.green};
   &:hover {
     background-color: ${colors.accent.greenDark};
   }
 `;
+const playBtn = `${btn} ${playBtnExtra}`;
 
 const progress = css`
   flex: 1;
@@ -92,11 +94,13 @@ const speedBtn = css`
   }
 `;
 
-const speedBtnActive = css`
-  ${speedBtn};
+/** 当前速度档:复用 speedBtn 外观,蓝色底 + 白字高亮(后声明覆盖 speedBtn 默认)。
+ *  原 css`` 内插值 ${speedBtn} 在 wyw 下不内联规则(非法声明),改为字符串拼接。 */
+const speedBtnActiveExtra = css`
   background-color: ${colors.accent.blue};
   color: ${colors.white};
 `;
+const speedBtnActive = `${speedBtn} ${speedBtnActiveExtra}`;
 
 const seatSelect = css`
   padding: 4px 8px;
@@ -107,13 +111,15 @@ const seatSelect = css`
   font-size: 13px;
 `;
 
-const exitBtn = css`
-  ${btn};
+/** 退出按钮:复用 btn 外观,红色底色警示(自身属性后声明,覆盖 btn 默认底色/hover)。
+ *  原 css`` 内插值 ${btn} 在 wyw 下不内联规则(非法声明),改为字符串拼接。 */
+const exitBtnExtra = css`
   background-color: ${colors.accent.red};
   &:hover {
     background-color: ${colors.accent.darkRed};
   }
 `;
+const exitBtn = `${btn} ${exitBtnExtra}`;
 
 const spacer = css`
   flex: 1;

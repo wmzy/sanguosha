@@ -10,7 +10,7 @@ import { serialize } from './protocol';
 import type { ConnectionSink } from './connection';
 import { getRoom, removeSpectator, leaveRoom } from './room';
 import { broadcastMessage } from './room';
-import { getChatHistory, buildRoomState, ensureSeatOnReconnect } from './room';
+import { getChatHistory, buildRoomState, ensureSeatOnReconnect, getRecentLeaveGrace } from './room';
 import { getSessionUser, extractSessionToken } from './auth/guard';
 import { gameSessions, playerRoomMap } from './registry';
 import { generatePlayerId } from './utils';
@@ -131,13 +131,21 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
   // (密码+容量+状态校验后分配座位)或 /join-spectator 再连 SSE;缺此校验时,
   // 任何登录用户凭 roomId 直连即可绕过进房密码与容量限制入房,且玩家分支的
   // ensureSeatOnReconnect 会把非成员补进空座(重启恢复路径的副作用被滥用为越权入口)。
-  // 成员名单 room.playerNames 随房间元数据持久化(DB rooms.player_names),服务器重启
-  // 恢复后仍在 → 合法玩家的纯 SSE 自动重连不受影响。
+  // 例外——近期断线成员宽限:等待中/已结束阶段 SSE 断线(超过心跳检测窗口)会立即
+  // 走 leaveRoom/removeSpectator 清空三名单,而浏览器 EventSource 约 3s 自动重连
+  // 只打本端点、不重走 POST /join,若无宽限会被 403 拒绝且 EventSource 对非 2xx
+  // 永久失败,用户只剩手动「返回大厅」重进。断线路径已把 playerId 记入
+  // room.recentlyLeft,窗口内(RECENT_LEAVE_GRACE_MS)视作成员,重连后由下方
+  // ensureSeatOnReconnect/旁观分支恢复原身份——与正常重连路径一致。进行中状态
+  // 不查宽限表(断线座位宽限期已覆盖,防越权语义不变);主动退出/被踢不记录,
+  // 从未入房者更无条目,仍 403。服务器重启路径由 DB 持久化的 playerNames 覆盖。
+  const graceEntry = room.isDebug ? null : getRecentLeaveGrace(room, playerId);
   if (
     !room.isDebug &&
     !room.seats.includes(playerId) &&
     !room.playerNames.has(playerId) &&
-    !room.spectators.has(playerId)
+    !room.spectators.has(playerId) &&
+    !(graceEntry && room.status !== '进行中')
   ) {
     return c.json({ error: '你不在本房间中', code: 'NOT_MEMBER' }, 403);
   }
@@ -150,14 +158,20 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
     const lastSeq = parseLastEventId(lastEventId, session?.eventEpoch);
     sink.setSeq(lastSeq);
 
-    // 判断连接身份：先查 spectators（旁观者），再查 players（玩家）
-    const isSpectator = room.spectators.has(playerId);
+    // 判断连接身份：先查 spectators（旁观者），再查 players（玩家）。
+    // 宽限窗口内的断线旁观者已被 removeSpectator 清出 spectators，按宽限条目记录的
+    // 角色走旁观分支恢复身份，而非误入玩家分支被 ensureSeatOnReconnect 补成玩家。
+    const isSpectator =
+      room.spectators.has(playerId) ||
+      (graceEntry?.role === 'spectator' && room.status !== '进行中');
 
     if (isSpectator) {
       // 旁观者：注册 sink 到 spectators（替换 REST 入口时的 null sink）
       room.spectators.set(playerId, sink);
       playerRoomMap.set(playerId, roomId);
       if (displayName) room.playerNames.set(playerId, displayName);
+      // 身份已恢复，撤销断线宽限条目(下次断线由 onAbort 重新记录)
+      room.recentlyLeft.delete(playerId);
 
       log.info('SSE 旁观者连接建立', { roomId, playerId });
 
@@ -187,7 +201,7 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
         // 但旧 onAbort 仍触发 removeSpectator 删掉新注册,导致 switchRole(spectator→player)
         // 找不到该玩家而失败("加入游戏失败")。
         if (room.spectators.get(playerId) !== sink) return;
-        removeSpectator(roomId, playerId);
+        removeSpectator(roomId, playerId, 'disconnect');
         playerRoomMap.delete(playerId);
         // 广播 spectator_left
         const r = getRoom(roomId);
@@ -204,6 +218,8 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
       room.players.set(playerId, sink);
       playerRoomMap.set(playerId, roomId);
       if (displayName) room.playerNames.set(playerId, displayName);
+      // 身份已恢复，撤销断线宽限条目(下次断线由下方 onAbort 重新记录)
+      room.recentlyLeft.delete(playerId);
 
       // 修复 players/seats 一致性:服务器重启后 DB 不恢复 seats,客户端重连只走 SSE 时
       // players.set 却不分配座次,导致 "players 满 / seats 空" 的幽灵连接锁死房间。
@@ -271,7 +287,11 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
         // 否则断线玩家的座位永远保留在 seats 中,房间内持续显示其"在线"
         // (幽灵座位),且新玩家无法补位。普通房间保留房间本身(房主可重新进入);
         // 快速房间全员离开时由 leaveRoom 自动销毁(返回 null,无需广播)。
-        const left = leaveRoom(roomId, playerId);
+        // 'disconnect' 使 leaveRoom 把 playerId 记入近期离开宽限表——本连接的
+        // EventSource 自动重连(不重走 POST /join)在窗口内仍被上方门禁放行,
+        // 由 ensureSeatOnReconnect 补座;否则断线超过心跳窗口(约 10s,网络抖动/
+        // 休眠唤醒)的玩家重连即 403 且 EventSource 永久失败,只能手动重进。
+        const left = leaveRoom(roomId, playerId, 'disconnect');
         playerRoomMap.delete(playerId);
         if (left) {
           broadcastMessage(left, buildRoomState(left));

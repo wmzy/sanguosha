@@ -427,6 +427,32 @@ export const playerCardHpBeadFull = css`
     inset 0 -1px 2px rgba(0, 0, 0, 0.25),
     0 0 6px rgba(126, 200, 80, 0.45);
 `;
+// 满珠分色(色值镜像座位卡 seatHpBeadFullMid/FullLow):剩余体力 >50% 绿(上面的默认款)/
+// >25% 黄 / ≤25% 红(濒危警示),由 PlayerCardLarge 按剩余比例选择
+export const playerCardHpBeadFullMid = css`
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: linear-gradient(135deg, #e8c84a 8%, #b8862a 92%);
+  border: 1px solid rgba(122, 88, 20, 0.9);
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.25),
+    0 0 6px rgba(232, 200, 74, 0.45);
+`;
+export const playerCardHpBeadFullLow = css`
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: linear-gradient(135deg, #e85d4a 8%, #a8281a 92%);
+  border: 1px solid rgba(122, 30, 20, 0.9);
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.25),
+    0 0 6px rgba(232, 93, 74, 0.5);
+`;
 export const playerCardHpBeadEmpty = css`
   box-sizing: border-box;
   flex-shrink: 0;

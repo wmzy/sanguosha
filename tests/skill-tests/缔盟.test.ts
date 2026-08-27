@@ -341,4 +341,54 @@ describe('缔盟', () => {
       params: {},
     });
   });
+
+  // ─── 回归(2026-08-27):mandatory 弃牌缺超时兜底 ──────────────
+  // 请求回应.onTimeout 对 '缔盟/discard' 无操作,旧实现超时走「不弃牌不交换整体中止」
+  // 且 markOncePerTurn 已消耗(限一次白烧)。修复:超时/未取得有效 cardIds 时
+  // hand.slice(0, actualDiscard) 兜底弃牌后继续交换流程(与 好施 mandatory 范式一致)。
+  it('弃牌询问超时(pass)→ 兜底弃 actualDiscard 张且两名目标手牌完成交换', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '鲁肃',
+          hand: ['c1', 'c2', 'c3'],
+          skills: ['缔盟'],
+        }),
+        makePlayer({ index: 1, name: 'P1', character: '曹操', hand: ['p1a', 'p1b'], skills: [] }),
+        makePlayer({ index: 2, name: 'P2', character: '刘备', hand: ['p2a'], skills: [] }),
+      ],
+      cardMap: {
+        c1: makeCard('c1', '杀'),
+        c2: makeCard('c2', '闪'),
+        c3: makeCard('c3', '桃', '♦'),
+        p1a: makeCard('p1a', '杀'),
+        p1b: makeCard('p1b', '闪'),
+        p2a: makeCard('p2a', '酒', '♣'),
+      },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('鲁肃');
+
+    await P0.triggerAction('缔盟', 'use');
+    await P0.respond('缔盟', { targets: [1, 2] }); // diff = |2-1| = 1 → 弃牌询问(1 张)
+    P0.expectPending('请求回应');
+
+    // 超时不回应 → 兜底弃手牌首张 c1,且交换照常执行(修复前:整体中止,不弃不换)
+    await P0.pass();
+    await harness.waitForStable();
+    harness.processAllEvents();
+
+    // 鲁肃:3 - 1(兜底弃)= 2,弃牌堆含 c1
+    expect(harness.state.players[0].hand).toEqual(['c2', 'c3']);
+    expect(harness.state.zones.discardPile).toContain('c1');
+    // 交换完成:P1 ↔ P2
+    expect(harness.state.players[1].hand).toEqual(['p2a']);
+    expect(harness.state.players[2].hand).toEqual(['p1a', 'p1b']);
+    // 限一次标记存在(发动本身没有被中止重放)
+    expect(harness.state.players[0].vars['缔盟/usedThisTurn']).toBe(true);
+  });
 });

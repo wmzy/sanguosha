@@ -124,7 +124,8 @@ describe('横置(铁索连环)前端展示', () => {
 
 // 体力珠列展示(2026-08-24 对齐官方):损失的体力(空珠)在上方、剩余体力(满珠)在下方,
 // 满珠按剩余体力比例分色(>50% 绿 / >25% 黄 / ≤25% 红)。
-function makeHpView(health: number, maxHealth: number): GameView {
+// p0Health:视角玩家 P0(底栏大卡)的体力,默认满血(既有座位卡用例只调 P1)。
+function makeHpView(health: number, maxHealth: number, p0Health: number = 4): GameView {
   return {
     viewer: 0,
     currentPlayerIndex: 0,
@@ -132,7 +133,7 @@ function makeHpView(health: number, maxHealth: number): GameView {
     turn: { round: 1, phase: '出牌', vars: {} },
     players: [
       {
-        index: 0, name: 'P0', character: '刘备', health: 4, maxHealth: 4, alive: true,
+        index: 0, name: 'P0', character: '刘备', health: p0Health, maxHealth: 4, alive: true,
         equipment: {}, skills: [], handCount: 0, marks: [],
       },
       {
@@ -184,5 +185,36 @@ describe('体力珠列方向与分色', () => {
     expect(render4(4)).toBe('green'); // 4/4 = 100%
     expect(render4(2)).toBe('yellow'); // 2/4 = 50%
     expect(render4(1)).toBe('red'); // 1/4 = 25%
+  });
+
+  /** 取 P0(视角玩家)底栏大卡的珠列:大卡外层挂 data-seat-index=0
+   *  (弧形座位环只渲染 orderedPlayers.slice(1),视角玩家自己不进环,故该选择器唯一) */
+  function largeCardBeads(container: HTMLElement): Array<{ full: boolean; hue: string | null }> {
+    const card = container.querySelector('[data-seat-index="0"]')!;
+    const col = card.querySelector('[data-hp-beads]')!;
+    return Array.from(col.children).map((b) => ({
+      full: b.hasAttribute('data-full'),
+      hue: b.getAttribute('data-hue'),
+    }));
+  }
+
+  it('大卡(自己)受伤:空珠在上、满珠在下', () => {
+    const { container } = render(<GameViewComponent view={makeHpView(4, 4, 2)} onAction={() => {}} readOnly />);
+    const bs = largeCardBeads(container);
+    expect(bs).toHaveLength(4);
+    // 前 2 颗(上方)= 空珠;后 2 颗(下方)= 满珠 —— 与座位卡同方向
+    expect(bs.map((b) => b.full)).toEqual([false, false, true, true]);
+  });
+
+  it('大卡(自己)分色:剩余比例递减 → 绿 → 黄 → 红(与座位卡同规则)', () => {
+    const renderP0 = (p0Health: number) => {
+      const utils = render(<GameViewComponent view={makeHpView(4, 4, p0Health)} onAction={() => {}} readOnly />);
+      const hue = largeCardBeads(utils.container).find((b) => b.full)!.hue;
+      utils.unmount();
+      return hue;
+    };
+    expect(renderP0(4)).toBe('green'); // 4/4 = 100%
+    expect(renderP0(2)).toBe('yellow'); // 2/4 = 50%
+    expect(renderP0(1)).toBe('red'); // 1/4 = 25%
   });
 });

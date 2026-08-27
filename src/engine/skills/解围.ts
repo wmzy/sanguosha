@@ -13,7 +13,8 @@
 //   (官方描述:「当你从背面翻至正面时」——即解除翻面状态时才能移牌。)
 //   询问 → 选弃牌(手牌)→ 选源玩家 → 选源牌(pickTargetCard)→ 选目标玩家 →
 //   移动场上牌(获得 atom,与巧变 moveFieldCard 一致)。
-//   触发时机:据守/放逐/悲歌/界仁心/界伏枥/界酒诗 等技能 flipFaceDown 时。
+//   触发时机:翻面标签被消费、从背面翻回正面的瞬间——据守/放逐/悲歌 等翻面技能
+//   在目标下回合准备阶段 flipFaceUp,或 回合管理/界落英 调 flipFaceUpAll 清标签。
 import type {
   Card,
   EquipSlot,
@@ -139,7 +140,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     ownerId,
     name: '解围',
     description:
-      '装备区的一张牌当无懈可击使用;武将牌翻面(翻成背面)时可弃置一张牌移动场上的一张牌',
+      '装备区的一张牌当无懈可击使用;武将牌从背面翻至正面时可弃置一张牌移动场上的一张牌',
   };
 }
 

@@ -213,10 +213,12 @@ export const buttonRow = css`
   justify-content: center;
 `;
 
-export const gameOverBox = css`
-  ${card}
+/** 结算回退卡(EndedStage 无 view 时):居中文案 + card 卡片样式。
+ *  原 css`` 内插值 ${card} 在 wyw 下不内联规则(非法声明),改为字符串拼接。 */
+const gameOverBoxBase = css`
   text-align: center;
 `;
+export const gameOverBox = `${gameOverBoxBase} ${card}`;
 
 export const winnerText = css`
   font-size: 28px;
@@ -341,10 +343,13 @@ export const reconnectOverlay = css`
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 `;
 
-export const reconnectFailedOverlay = css`
-  ${reconnectOverlay}
+/** 重连失败横幅:reconnectOverlay 布局 + 红色底覆盖。
+ *  原 css`` 内插值 ${reconnectOverlay} 在 wyw 下不内联规则(非法声明),改为字符串拼接;
+ *  本类声明在其后,background-color 按样式表顺序覆盖琥珀色。 */
+const reconnectFailedBase = css`
   background-color: ${colors.accent.red};
 `;
+export const reconnectFailedOverlay = `${reconnectOverlay} ${reconnectFailedBase}`;
 
 export const reconnectSpinner = css`
   width: 16px;

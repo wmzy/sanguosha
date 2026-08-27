@@ -429,12 +429,12 @@ describe('流离:成为杀的目标时转移', () => {
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 用例 6(回归 2026-08-26):浏览器两步式 UI 对 useCard 型 pickDiscard 只发
+  // 用例 8(回归 2026-08-26):浏览器两步式 UI 对 useCard 型 pickDiscard 只发
   // respond{cardId}(单数,无 cardIds)。修复前 validate 只认 cardIds 数组并拒绝
   // → 确认流离后无法支付代价,卡到超时按未支付处理(转移必败)。
   //   另:{}(点「不回应」)= 明确不支付 → 立即按未支付收尾,不等超时。
   // ─────────────────────────────────────────────────────────────
-  it('用例6:pickDiscard 接受浏览器 {cardId} 单数形状完成转移', async () => {
+  it('用例8:pickDiscard 接受浏览器 {cardId} 单数形状完成转移', async () => {
     const slash: Card = { id: 'k1', name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
     const discard1: Card = { id: 'd1', name: '闪', suit: '♥', color: '红', rank: '3', type: '基本牌' };
     const state: GameState = createGameState({

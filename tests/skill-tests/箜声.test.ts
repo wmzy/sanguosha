@@ -128,4 +128,44 @@ describe('箜声', () => {
 
     expect(kongshengCards(harness.state, 0)).toEqual(['c1', 'c2']);
   });
+
+  // ─── 回归(2026-08-27):SELECT_RT 异常 cardIds 的消费端守卫 ──
+  // 旧消费端裸用 localVars 里的 cardIds,异常提交(含非手牌 id)会让 移出至暂存区
+  // validate 抛错,打断准备阶段 hook。修复:全部在自己手牌 + 去重,非法视为未选
+  // (镜像 明任/审时 的消费端守卫写法)。
+  it('异常 cardIds(含他人牌 id)→ 视为未选,技能不被打断、暂存区为空', async () => {
+    const state = createGameState({
+      players: [
+        mkPlayer({ index: 0, name: 'P0', hand: ['c1', 'c2'], skills: ['箜声'] }),
+        mkPlayer({ index: 1, name: 'P1', character: '曹操', hand: ['x1'] }),
+      ],
+      cardMap: {
+        c1: mkCard('c1', '杀', '♠', '7'),
+        c2: mkCard('c2', '闪', '♣', '4'),
+        x1: mkCard('x1', '杀', '♥', '8'),
+      },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+      zones: { deck: [], discardPile: [], processing: [] },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    void applyAtom(harness.state, { type: '阶段开始', phase: '准备', player: 0 } as unknown as Parameters<typeof applyAtom>[1]);
+    await harness.waitForStable();
+
+    await P0.respond('箜声', { choice: true });
+    P0.expectPending('请求回应');
+    // 异常提交:含 P1 的牌 x1(不在 P0 手中)→ 守卫视为未选(修复前:移出至暂存区 抛错)
+    await P0.respond('箜声', { cardIds: ['c1', 'x1'] });
+    await harness.waitForStable();
+
+    // 技能未被抛错打断:询问正常结束、未置任何牌(暂存区为空)
+    expect(harness.state.pendingSlots.size).toBe(0);
+    expect(kongshengCards(harness.state, 0)).toEqual([]);
+    // 手牌原样
+    expect(harness.state.players[0].hand).toEqual(['c1', 'c2']);
+    expect(harness.state.players[1].hand).toEqual(['x1']);
+  });
 });

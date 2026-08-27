@@ -36,4 +36,31 @@ describe('arcLayout', () => {
     expect(pts[0].leftPct).toBeGreaterThan(80);
     expect(pts[pts.length - 1].leftPct).toBeLessThan(20);
   });
+
+  it('6/7 人局左下座位避让 zoneCornerHud,同列纵排仍保持 ≥40% 错位', () => {
+    // 回归:6 人局末座原为 [6,60]、7 人局末座原为 [6,58],座位块高约 38%
+    // (名牌 26+卡 200+标签 40),块底伸到战场 96%/98% 与左下角 zoneCornerHud
+    // (bottom 10px + 高约 60px ≈ 底部 10%)重叠。修复后左列整体上移为 12/52:
+    for (const n of [6, 7]) {
+      const pts = Array.from({ length: n }, (_, i) => arcLayout(n, i));
+      // 左列座位块底 top+38% ≤ 90%,让出底部 HUD 区域
+      for (const p of pts) {
+        if (p.leftPct <= 10) {
+          expect(p.topPct).toBeLessThanOrEqual(52);
+        }
+      }
+      // 任意同列(left 相同)纵排座位垂直错开 ≥40%,防止卡牌重叠
+      const byCol = new Map<number, number[]>();
+      for (const p of pts) {
+        const tops = byCol.get(p.leftPct) ?? [];
+        tops.push(p.topPct);
+        byCol.set(p.leftPct, tops);
+      }
+      for (const tops of byCol.values()) {
+        if (tops.length >= 2) {
+          expect(Math.max(...tops) - Math.min(...tops)).toBeGreaterThanOrEqual(40);
+        }
+      }
+    }
+  });
 });

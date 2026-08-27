@@ -478,4 +478,63 @@ describe('英魂', () => {
     expect(harness.state.zones.deck.length).toBe(0);
     expect(harness.state.zones.discardPile).toContain('p1a');
   });
+
+  // ─── 回归(2026-08-27):弃牌校验缺去重 ──────────────────────
+  // 旧校验只查「恰好 N 张 + 全在自己手牌」,ids=[a,a] 且 need=2 时通过 →
+  // 弃置 atom 把同 id push 进弃牌堆两次(复制牌)。修复:追加 Set 去重,
+  // 重复提交不写 DISCARD_KEY → 走 mandatory 兜底(手牌首张起补弃),无复制。
+  it('目标弃牌回应重复 id → 拦截并兜底补弃,弃牌堆无复制', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '孙坚',
+          health: 2,
+          maxHealth: 4,
+          hand: [],
+          skills: ['英魂', '回合管理'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          hand: ['p1a', 'p1b'],
+          skills: ['回合管理'],
+          faction: '魏',
+        }),
+      ],
+      cardMap: {
+        p1a: makeCard('p1a', '杀'),
+        p1b: makeCard('p1b', '闪'),
+        d1: makeCard('d1', '桃', '♥'),
+      },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    // X = 4-2 = 2:选项2 摸1弃2 → P1 摸1后 3 张,need=2
+    state.zones = { deck: ['d1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const 孙坚 = harness.player('孙坚');
+    const P1 = harness.player('P1');
+
+    triggerReadyPhase(harness);
+    await waitForStable(harness.state);
+    await 孙坚.respond('英魂', { choice: true });
+    await waitForStable(harness.state);
+    await 孙坚.respond('英魂', { targets: [1] });
+    await waitForStable(harness.state);
+    await 孙坚.respond('英魂', { choice: false }); // 选项2:摸1弃2
+    await waitForStable(harness.state); // 弃牌询问(弃2)
+    P1.expectPending('请求回应');
+
+    // 重复 id:[p1a, p1a] 数量=2 但重复 → 去重校验拦截,不写 DISCARD_KEY
+    await P1.respond('英魂', { cardIds: ['p1a', 'p1a'] });
+    await harness.waitForStable();
+
+    // 兜底从手牌首张起补弃 2 张(p1a, p1b):P1 原2张 +摸1 -弃2 = 1 张(仅剩 d1)
+    expect(harness.state.players[1].hand).toEqual(['d1']);
+    // 弃牌堆无复制:p1a 恰出现一次(修复前:弃置 [p1a,p1a] 把 p1a push 两次)
+    expect(harness.state.zones.discardPile.filter((id) => id === 'p1a').length).toBe(1);
+    expect(harness.state.zones.discardPile).toContain('p1b');
+  });
 });

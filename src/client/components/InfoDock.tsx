@@ -63,13 +63,14 @@ const dockRoot = css`
   top: 56px;
   right: 8px;
 `;
-const dockRootCollapsed = css`
-  ${dockRoot}
+/** 折叠态:复用 dockRoot 外壳,压成右上角小药丸标签,不占底部空间。
+ *  原 css`` 内插值 ${dockRoot} 在 wyw 下不内联规则(非法声明),改为字符串拼接。 */
+const dockRootCollapsedExtra = css`
   width: auto;
   max-height: 36px;
   border-radius: 18px;
-  /* 折叠后只保留一个小药丸标签,貼右上角不占底部空间 */
 `;
+const dockRootCollapsed = `${dockRoot} ${dockRootCollapsedExtra}`;
 // 嵌入侧边栏模式:不用 fixed/阴影,貼满父容器(flex: 1)。
 const dockRootEmbedded = css`
   position: relative;
@@ -217,11 +218,13 @@ const chatMsgRow = css`
   line-height: 1.4;
   word-break: break-word;
 `;
-const chatMsgRowMine = css`
-  ${chatMsgRow}
+/** 我方消息行:复用 chatMsgRow 排版,右对齐 + 绿色高亮。
+ *  原 css`` 内插值 ${chatMsgRow} 在 wyw 下不内联规则(非法声明),改为字符串拼接。 */
+const chatMsgRowMineExtra = css`
   text-align: right;
   color: ${colors.accent.green};
 `;
+const chatMsgRowMine = `${chatMsgRow} ${chatMsgRowMineExtra}`;
 const chatMsgName = css`
   font-weight: bold;
   margin-right: 4px;

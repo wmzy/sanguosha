@@ -130,7 +130,21 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
           } else if (rt === GIVE_RT) {
             const ids = params.cardIds as string[] | undefined;
-            if (Array.isArray(ids)) st.localVars[GIVE_KEY] = ids;
+            // 校验:恰好 N 张、全部为 owner 手牌、无重复(镜像标版好施 GIVE_RT 守卫;
+            // 非法提交不写 GIVE_KEY → 走摸牌 after-hook 的兜底给牌 hand.slice(0, N),
+            // 否则 给予 atom validate 抛错会打断技能结算)
+            const need = (
+              slot?.atom as { prompt?: { cardFilter?: { min?: number } } } | undefined
+            )?.prompt?.cardFilter?.min;
+            if (
+              Array.isArray(ids) &&
+              typeof need === 'number' &&
+              ids.length === need &&
+              new Set(ids).size === ids.length &&
+              ids.every((id) => st.players[seat]?.hand.includes(id))
+            ) {
+              st.localVars[GIVE_KEY] = ids;
+            }
           } else if (rt === PASSIVE_GIVE_RT) {
             // 客户端契约:useCard 型 pending(min=max=1)只发 {cardId}
             const raw: unknown = params.cardIds ?? params.cardId;

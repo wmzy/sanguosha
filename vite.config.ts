@@ -11,9 +11,10 @@ export default defineConfig({
       sourceMap: process.env.NODE_ENV !== 'production',
       displayName: process.env.NODE_ENV !== 'production',
       exclude: ['node_modules/**'],
-      // evaluate 必须为 true(默认):css`` 内插值其他 css 类(如 ${pageStyle})依赖
-      // 求值导出绑定来内联规则;false 时静默跳过,被插值的 padding/flex 等属性全部丢失
-      // (实证:「请先登录」面板贴左上角、404 页不居中)。
+      // evaluate 为 wyw 默认值,保留 true 无害。实测(@wyw-in-js/vite 1.1.0):
+      // css`` 内插值其他 css 类(如 ${pageStyle})无论 evaluate 开关都不会内联其规则,
+      // 只会产出非法声明被浏览器丢弃;colors 等值插值两档都能正常解析。
+      // 跨类组合必须在使用处做 className 字符串拼接(见分支内转换)。
       evaluate: true,
       babelOptions: {
         presets: ['@babel/preset-typescript'],

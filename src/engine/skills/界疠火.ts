@@ -271,7 +271,9 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     prompt: {
       type: 'useCard',
       title: '疠火:请弃置 1 张牌(或放弃失去 1 体力)',
-      cardFilter: { min: 1, max: 1 },
+      // cardFilter 必须有 filter 函数:AI/headless 经 extractCardFilter 枚举可选牌,
+      // 缺 filter 时恒不匹配 → 永远枚举不出该弃牌动作(同 界义绝/界制霸 先例)
+      cardFilter: { filter: () => true, min: 1, max: 1 },
     },
   });
 }

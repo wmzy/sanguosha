@@ -12,6 +12,7 @@
 // 设计与 EventBanner 一致：非阻塞、纯展示、固定层。
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import type { AnimationItem } from 'lottie-web';
 import type { GameView } from '../../engine/types';
 import type { VfxPlaybackItem } from '../hooks/useVfxPlayback';
@@ -61,19 +62,28 @@ export function VfxLayer({ items, view }: VfxLayerProps) {
 
   if (active.length === 0) return null;
 
-  return (
+  // 通过 createPortal 挂到 document.body(与 useHoverTooltip/CardDescTooltip 同范式):
+  // 本组件渲染在 GameViewScaler 的 transform 祖先内——transform 会让 position:fixed
+  // 改以画布为 containing block(而非视口),而 findSeatCenter 返回的是已含缩放的
+  // 视口坐标,scale≠1 时特效会整体偏移。portal 到 body 后脱离 transform 上下文,
+  // fixed + 视口坐标天然对齐。z-index 9000:画布(scalerInner 的 transform)整体
+  // 构成一个层叠上下文,portal 元素位于 body 根上下文必绘于其上;数值上与
+  // 聊天/InfoDock 同档,低于全屏遮罩(9998)/选将·结算(10100)/tooltip(99999)
+  // 的既定层级语义。jsdom 下 document.body 存在,portal 本身安全。
+  return createPortal(
     <div
       style={{
         position: 'fixed',
         inset: 0,
         pointerEvents: 'none',
-        zIndex: 9999,
+        zIndex: 9000,
       }}
     >
       {active.map((v) => (
         <VfxSlot key={v.key} item={v} view={view} />
       ))}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
