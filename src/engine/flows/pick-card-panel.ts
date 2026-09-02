@@ -161,6 +161,10 @@ export async function runPickTargetCardPanel(
 
   if (zone === 'equipment') {
     const cardId = (result?.cardId ?? fallback.cardId) as string;
+    // 校验:必须是被询问时(prompt,含界奇才 before-hook 过滤后)下发的候选之一。
+    // 获得/弃置 atom 均不校验归属,异常客户端注入任意 cardId 会把他人手中的牌
+    // 复制进自己手牌/弃牌堆,且可能绕过装备保护。
+    if (!filteredEquip.some((e) => e.cardId === cardId)) return;
     if (obtain) {
       await applyAtom(state, { type: '获得', player: from, cardId, from: target });
     } else {

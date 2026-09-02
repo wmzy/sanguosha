@@ -99,6 +99,19 @@ describe('房间管理', () => {
     expect(result).toBeNull();
   });
 
+  // 回归(2026-08-24):游戏结束后(已结束,等房主「再来一局」)返回大厅的玩家
+  // 此前无法重新加入房间(只能旁观)。修复:已结束状态允许加入空座。
+  it('可以加入已结束房间的空座', () => {
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
+    room.status = '已结束';
+
+    const result = joinRoom(room.id, 'player1', createMockSink());
+    expect(result).not.toBeNull();
+    expect(result!.players.has('player1')).toBe(true);
+    expect(result!.seats).toContain('player1');
+  });
+
   it('应该离开房间', () => {
     const hostSink = createMockSink();
     const room = createRoom('测试房间', 4, 'host1', hostSink);
@@ -160,6 +173,32 @@ describe('房间管理', () => {
 
     setReady(room.id, 'host1');
     expect(allReady(room.id)).toBe(false);
+  });
+
+  it('非本房玩家的准备请求被拒绝(allReady 不被垃圾 id 破坏)', () => {
+    // 回归:2026-08-26——setReady 原先不校验成员资格,任意字符串被塞进
+    // readyPlayers 后 allReady 的 size 相等判断永假,房间永久无法开局。
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
+    joinRoom(room.id, 'player1', createMockSink());
+
+    expect(setReady(room.id, 'junk-id')).toBe(false);
+    expect(setReady(room.id, 'never-joined')).toBe(false);
+    expect(room.readyPlayers.has('junk-id')).toBe(false);
+
+    setReady(room.id, 'host1');
+    setReady(room.id, 'player1');
+    // 全员(2 人)就绪即可开局,垃圾 id 无法阻断
+    expect(allReady(room.id)).toBe(true);
+  });
+
+  it('旁观者的 id 不能用于准备(未占座)', () => {
+    const hostSink = createMockSink();
+    const room = createRoom('测试房间', 4, 'host1', hostSink);
+    joinAsSpectator(room.id, 'spec1', createMockSink(), '路人');
+
+    expect(setReady(room.id, 'spec1')).toBe(false);
+    expect(room.readyPlayers.has('spec1')).toBe(false);
   });
 
   it('应该取消准备状态', () => {
@@ -504,6 +543,29 @@ describe('旁观者管理', () => {
 
     const result = switchRole(room.id, 'p2', 'spectator');
     expect(result.success).toBe(false);
+  });
+
+  // 回归(2026-08-24):游戏结束后旁观者点击空座位应能直接入座,
+  // 无需等房主点「再来一局」(此前报「切换失败」)。
+  it('switchRole spectator→player 已结束状态允许入空座', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinAsSpectator(room.id, 'spec1', createMockSink());
+    room.status = '已结束';
+
+    const result = switchRole(room.id, 'spec1', 'player');
+    expect(result.success).toBe(true);
+    expect(result.room.players.has('spec1')).toBe(true);
+    expect(result.room.seats).toContain('spec1');
+  });
+
+  it('switchRole player→spectator 已结束状态允许转旁观', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
+    room.status = '已结束';
+
+    const result = switchRole(room.id, 'p2', 'spectator');
+    expect(result.success).toBe(true);
+    expect(result.room.spectators.has('p2')).toBe(true);
   });
 
   it('switchRole spectator→player 房间满时失败', () => {

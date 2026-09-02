@@ -31,11 +31,12 @@ import { DevProfiler } from './DevProfiler';
 
 // ─── 抽取的子组件 ───
 import { GameHeader } from './GameHeader';
+import { GameViewScaler } from './GameViewScaler';
 import { OverlaysLayer } from './OverlaysLayer';
 import { AwaitingPrompt } from './AwaitingPrompt';
 import { PlayPhasePrompt } from './PlayPhasePrompt';
 import { SeatArcLayout } from './SeatArcLayout';
-import { ZoneInfoBar } from './ZoneInfoBar';
+import { ZoneInfoBar, ZoneCornerCounts } from './ZoneInfoBar';
 import { HeaderToolbar } from './HeaderToolbar';
 import { CenterActionBar } from './CenterActionBar';
 import { HandArea } from './HandArea';
@@ -79,6 +80,12 @@ import type { ActionMsg } from '../types';
 interface Props {
   view: EngineGameView;
   onAction: (action: ActionMsg) => void;
+  /**
+   * 缩放容器的可用高度来源(透传 GameViewScaler):
+   * - 'viewport'(默认):占满整个视口。
+   * - 'fill':占满 flex 父容器剩余高度(回放页顶部有控制条时用)。
+   */
+  fit?: 'viewport' | 'fill';
   /** 整理手牌:重排顺序(不走 action,直接 mutate 后端 hand) */
   onReorderHand?: (order: string[]) => void;
   /** 双击其他座次卡片(通用 UI 事件;上层决定行为,如切换视角)。 */
@@ -120,6 +127,7 @@ interface Props {
 export function GameViewComponentImpl({
   view,
   onAction,
+  fit,
   onReorderHand,
   onSeatDoubleClick,
   headerSlot,
@@ -487,6 +495,8 @@ export function GameViewComponentImpl({
 
   return (
     <GameViewProvider value={ctxValue}>
+    {/* 等比缩放容器:内部按 900px 设计高度 + 流式画布宽渲染,整体 scale 适配视口 */}
+    <GameViewScaler fit={fit}>
     <div className={styles.pageRoot}>
       <OverlaysLayer
         isCharSelectPending={isCharSelectPending}
@@ -515,6 +525,8 @@ export function GameViewComponentImpl({
       {/* ─── 主内容:战场区 + 右侧边栏 ─── */}
       <div className={styles.mainContent}>
         <div className={styles.battleField}>
+          {/* 牌桌中心装饰:纯视觉,不拦截交互 */}
+          <div className={styles.battleFieldDecor} />
           {/* ─── 事件横幅(延时展示,非阻塞)+ 积压角标/跳过 + 粘性展示卡(常驻至操作) ─── */}
           <EventBanner
             current={currentEvent ?? null}
@@ -644,10 +656,15 @@ export function GameViewComponentImpl({
               />
             </DevProfiler>
 
-            {/* 中央:牌堆/处理区 + 出牌历史条 */}
+            {/* 中央:处理区 + 出牌历史条(牌堆/弃牌计数已移至左下角 HUD) */}
             <div className={styles.centerTable}>
               <ZoneInfoBar />
               <PlayHistoryStrip items={playHistoryItems} />
+            </div>
+
+            {/* 左下角:牌堆/弃牌堆计数(官方 p0 左下弃牌区位置;z-index 低于弹窗) */}
+            <div className={styles.zoneCornerHud}>
+              <ZoneCornerCounts />
             </div>
           </div>
         </div>
@@ -725,6 +742,7 @@ export function GameViewComponentImpl({
       {/* ─── Lottie 特效层(顶层 fixed,不拦截交互)─── */}
       <VfxLayer items={vfxItems} view={view} />
     </div>
+    </GameViewScaler>
     </GameViewProvider>
   );
 }

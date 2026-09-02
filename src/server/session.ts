@@ -132,14 +132,27 @@ export class GameSession {
     return this.gameStartedAt;
   }
 
-  /** 物理座位 i 的玩家显示名(引擎玩家名)。debug 房无 playerNames → 全 fallback。
-   *  fallbackNames: 恢复路径传入旧 state 的玩家名(无房间映射时保留原名)。 */
-  private seatDisplayNames(count: number, fallbackNames?: string[]): string[] {
-    const out: string[] = [];
-    for (let i = 0; i < count; i++) {
+  /** 引擎座次 g 的玩家显示名。第 k 个非空座位的玩家映射到游戏座次 (k + offset) % n
+   *  (与 playerId↔座次映射一致),故其昵称必须写在 out[(k + offset) % count]——
+   *  直接按 seats 序填写会让 offset≠0 时每个玩家顶着别人的昵称/武将打完整局。
+   *  占位用占座序号 k 而非物理下标 i:座位表可能有空洞(等待中玩家离开只清空座位
+   *  不压缩 seats,room.ts removePlayerMembership),空洞后最高占座下标 ≥ count 时
+   *  (i+offset)%count 会与前面座位对 count 同余 → 两座位写同一 out 槽互相覆盖,
+   *  且 i<count 截断会漏掉空洞之后的所有玩家(引擎玩家名丢失,只剩 stub 兜底)。
+   *  debug 房无 playerNames → 全 fallback。
+   *  fallbackNames: 恢复路径传入旧 state 的玩家名(游戏座次序),按游戏座次 g 取值。 */
+  private seatDisplayNames(count: number, offset: number, fallbackNames?: string[]): string[] {
+    const out: string[] = new Array(count).fill('');
+    let k = 0; // 占座序号:第 k 个非空座位(空洞不计入)
+    for (let i = 0; i < this.room.seats.length && k < count; i++) {
       const pid = this.room.seats[i];
-      const fromRoom = pid !== null ? this.room.playerNames.get(pid) : undefined;
-      out.push(fromRoom ?? fallbackNames?.[i] ?? '');
+      if (pid === null) continue;
+      const g = (k + offset) % count;
+      const fromRoom = this.room.playerNames.get(pid);
+      // fallbackNames 是游戏座次序(state.players.map(p=>p.name)),必须按游戏座次 g
+      // 取值;按物理下标 i 取会在 offset≠0/有空洞时把别人的旧名写到本座次上。
+      out[g] = fromRoom ?? fallbackNames?.[g] ?? '';
+      k++;
     }
     return out;
   }
@@ -150,16 +163,18 @@ export class GameSession {
     this.lastActivityAt = Date.now();
     // config 重构:seed 来自 state,playerCount 从 state.players,characters 用全局表,
     // mode 用房间配置(与开局一致;state.config.mode 由 create 写入快照,二者一致)
+    const playerCount = state.players.length;
+    const offset = computeSeatRotation(state.rngSeed, playerCount);
     const config: GameConfig = {
       characters: resolveCharPool(this.room.config.charPool),
-      playerCount: state.players.length,
+      playerCount,
       seed: state.rngSeed,
       gameId: this.room.id,
       handSize: this.room.config.handSize,
       timeoutSec: this.room.config.timeoutSec,
       mode: this.room.config.gameMode,
       // 恢复对局沿用原座位显示名(旧持久化快照无 playerNames 时回退 stub 名,兼容)
-      playerNames: this.seatDisplayNames(state.players.length, state.players.map((p) => p.name)),
+      playerNames: this.seatDisplayNames(playerCount, offset, state.players.map((p) => p.name)),
     };
     const fresh = create(config);
     // 注入虚拟时钟:重放期间超时按 actionLog 时间戳确定性推导,不依赖真实系统时间。
@@ -179,13 +194,15 @@ export class GameSession {
     // 从 room.seats 恢复 playerId → 座次下标映射,使重启后玩家可重连。
     // startGame 正常路径会在游戏开始时设置 playerNames;恢复路径需手动填充。
     // 应用与 startGame 一致的座次轮转偏移(seatRotation),否则重连后视角错位。
+    // 占座序号映射(与 startGame 同款):座位表有空洞(等待中离开只清空不压缩)时,
+    // 物理下标 i 对 n 同余会碰撞覆盖;用第 k 个非空座位计数,保证映射互不相同。
     const n = this.state.players.length;
-    const offset = this.state.seatRotation ?? 0;
+    let k = 0; // 占座序号:第 k 个非空座位(空洞不计入)
     for (let i = 0; i < this.room.seats.length; i++) {
       const pid = this.room.seats[i];
-      if (pid !== null) {
-        this.playerNames.set(pid, (i + offset) % n);
-      }
+      if (pid === null) continue;
+      this.playerNames.set(pid, (k + offset) % n);
+      k++;
     }
     // 恢复局也记录历史:基线取恢复时刻的视图(若选将已完成则立即捕获;否则等
     // onStateChange 在选将完成后捕获)。startedAt 用恢复时刻近似。
@@ -203,6 +220,9 @@ export class GameSession {
 
     // 从房间配置派生 GameConfig:将池预设 + 手牌数 + 操作倒时秒数 + 游戏模式(规则包)
     const cfg = this.room.config;
+    // 座次轮转偏移:决定主公(游戏座次 0)对应哪个物理座位。随 seed 确定,可复现;
+    // 与下方 state.seatRotation 同源同值(config.seed = sessionSeed)。
+    const seatOffset = computeSeatRotation(this.sessionSeed, count);
     const config: GameConfig = {
       characters: resolveCharPool(cfg.charPool),
       playerCount: count,
@@ -211,8 +231,8 @@ export class GameSession {
       handSize: cfg.handSize,
       timeoutSec: cfg.timeoutSec,
       mode: cfg.gameMode,
-      // 物理座位 i 的玩家显示名(seats 序 = startGame 时的入座顺序)
-      playerNames: this.seatDisplayNames(count),
+      // 引擎玩家 g 的显示名 = 物理座位 (g - offset) 的昵称(与 playerId↔座次映射一致)
+      playerNames: this.seatDisplayNames(count, seatOffset),
     };
     this.state = create(config);
     // 座次轮转偏移:决定主公(游戏座次 0)对应哪个物理座位。在 bootstrap 之前同步设置,
@@ -260,15 +280,22 @@ export class GameSession {
         if (seat < state.players.length) this.playerNames.set(playerIds[i], seat);
       }
     } else {
-      // 应用座次轮转偏移(seatRotation):物理座位 i(房主=0,其余按加入顺序)
-      // → 游戏座次 (i + seatRotation) % n。主公恒在游戏座次 0(引擎不变量),
-      // 经偏移后落到随机物理座位,房主不再恒为主公;玩家环形相对位置保持不变。
-      const playerIds = [...this.room.players.keys()];
+      // 应用座次轮转偏移(seatRotation):第 k 个非空座位 → 游戏座次 (k + offset) % n。
+      // 主公恒在游戏座次 0(引擎不变量),经偏移后落到随机物理座位,房主不再恒为主公。
+      // 必须遍历 seats(权威座位表)而非 players.keys():换座(moveSeat/seat-swap)
+      // 只改 seats 不改 Map 插入序,按连接序映射会让玩家拿到他人座次的私有视图,
+      // 且 ownerId 校验随之错位(与 restoreState 的恢复路径同款遍历)。
+      // 用占座序号 k 而非物理下标 i:座位表可能有空洞(等待中玩家离开只清空座位
+      // 不压缩 seats),空洞后最高占座下标 ≥ n 时 i 与 i-n 对 n 同余 → 两玩家映射
+      // 到同一座次互相覆盖(handleAction 静默丢弃被顶者的操作),另一座次无人控制。
       const n = state.players.length;
       const offset = state.seatRotation ?? 0;
-      for (let i = 0; i < playerIds.length && i < n; i++) {
-        const gameSeat = (i + offset) % n;
-        this.playerNames.set(playerIds[i], state.players[gameSeat].index);
+      let k = 0; // 占座序号:第 k 个非空座位(空洞不计入)
+      for (let i = 0; i < this.room.seats.length; i++) {
+        const pid = this.room.seats[i];
+        if (pid === null) continue;
+        this.playerNames.set(pid, (k + offset) % n);
+        k++;
       }
     }
 
@@ -381,6 +408,11 @@ export class GameSession {
     if (this.replayBaseline.length > 0) return; // 已捕获本局
     const players = this.state.players;
     if (players.length === 0 || !players.every((p) => p.character)) return;
+    // 选将保密窗口(charSelecting)内不捕获:此时 buildView 对非本人/旁观者
+    // 红化 character,捕到的是残缺基线(旁观座次全空),ReplayRecorder.record
+    // 会因「存在 character 为空的玩家」拒绝初始化 → 录像 hasData=false。
+    // 等开局.ts 清除 charSelecting + 亮将后的 onStateChange 再捕获(完整视图)。
+    if (this.state.charSelecting === true) return;
     const views: GameView[] = [];
     for (let v = 0; v < players.length; v++) {
       views.push(JSON.parse(JSON.stringify(buildView(this.state, v))) as GameView);

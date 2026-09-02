@@ -1,5 +1,5 @@
-// 狂骨(魏延·被动可选技):当你对距离1以内的一名角色造成1点伤害后,
-// 你可以回复1点体力或摸一张牌。
+// 狂骨(魏延·被动可选技):当你对距离1以内的一名角色每造成1点伤害后,
+// 你可以回复1点体力或摸一张牌(按伤害点数逐点发动,2点伤害可发动两次)。
 //
 // 实现(被动 after-hook + 两步 respond,同反馈/制霸模式):
 //   造成伤害 after-hook(source===ownerId, amount>0):
@@ -35,7 +35,7 @@ export function createSkill(id: string, ownerId: number): Skill {
     id,
     ownerId,
     name: '狂骨',
-    description: '对距离1以内的角色造成1点伤害后,你可以回复1点体力或摸一张牌',
+    description: '对距离1以内的角色每造成1点伤害后,你可以回复1点体力或摸一张牌',
   };
 }
 
@@ -71,10 +71,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after hook:狂骨主逻辑 ──
+  // 官方(OL):每造成1点伤害,可回复1点体力或摸一张牌——按伤害点数逐点发动,
+  // amount=2(酒杀/裸衣)时可独立发动两次,每次各自询问是否发动+二选一。
   registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.source !== ownerId) return;
-    if ((atom.amount ?? 0) <= 0) return;
+    const amount = atom.amount ?? 0;
+    if (amount <= 0) return;
     if (atom.target === undefined) return;
     const target = atom.target;
     if (!ctx.state.players[target]?.alive) return;
@@ -82,47 +85,50 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 距离1以内(含自己):effectiveDistance 最小为 1
     if (effectiveDistance(ctx.state, ownerId, target) > 1) return;
 
-    const self = ctx.state.players[ownerId];
-    if (!self?.alive) return;
+    // 每点伤害独立发动一次(前一次回复体力/摸牌可能改变存活/体力状态,逐次复查)
+    for (let i = 0; i < amount; i++) {
+      const self = ctx.state.players[ownerId];
+      if (!self?.alive) return;
 
-    // 1. 询问是否发动狂骨(可选触发:官方「你可以」)
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_REQUEST,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动狂骨?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
-      defaultChoice: false,
-      timeout: 30,
-    });
-    if (ctx.state.localVars[CONFIRMED_KEY] !== true) return; // 不发动 → 无效果
+      // 1. 询问是否发动狂骨(可选触发:官方「你可以」)
+      delete ctx.state.localVars[CONFIRMED_KEY];
+      await applyAtom(ctx.state, {
+        type: '请求回应',
+        requestType: CONFIRM_REQUEST,
+        target: ownerId,
+        prompt: {
+          type: 'confirm',
+          title: `是否发动狂骨?(第 ${i + 1}/${amount} 点伤害)`,
+          confirmLabel: '发动',
+          cancelLabel: '不发动',
+        },
+        defaultChoice: false,
+        timeout: 30,
+      });
+      if (ctx.state.localVars[CONFIRMED_KEY] !== true) continue; // 本点不发动,继续下一点
 
-    // 2. 发动 → 询问二选一(回复 1 点体力 / 摸 1 张牌)
-    delete ctx.state.localVars[CHOICE_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CHOOSE_REQUEST,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '狂骨:回复1点体力,或摸一张牌?',
-        confirmLabel: '回复1点体力',
-        cancelLabel: '摸一张牌',
-      },
-      defaultChoice: false,
-      timeout: 30,
-    });
-    const choice = ctx.state.localVars[CHOICE_KEY] as string | undefined;
-    if (choice === 'heal') {
-      await applyAtom(ctx.state, { type: '回复体力', target: ownerId, amount: 1 });
-    } else {
-      // 'draw' 或超时缺省 → 摸一张牌(已承诺发动,不浪费机会)
-      await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
+      // 2. 发动 → 询问二选一(回复 1 点体力 / 摸 1 张牌)
+      delete ctx.state.localVars[CHOICE_KEY];
+      await applyAtom(ctx.state, {
+        type: '请求回应',
+        requestType: CHOOSE_REQUEST,
+        target: ownerId,
+        prompt: {
+          type: 'confirm',
+          title: '狂骨:回复1点体力,或摸一张牌?',
+          confirmLabel: '回复1点体力',
+          cancelLabel: '摸一张牌',
+        },
+        defaultChoice: false,
+        timeout: 30,
+      });
+      const choice = ctx.state.localVars[CHOICE_KEY] as string | undefined;
+      if (choice === 'heal') {
+        await applyAtom(ctx.state, { type: '回复体力', target: ownerId, amount: 1 });
+      } else {
+        // 'draw' 或超时缺省 → 摸一张牌(已承诺发动,不浪费机会)
+        await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
+      }
     }
   });
 

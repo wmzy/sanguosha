@@ -2,9 +2,8 @@
 import type { MiddlewareHandler } from 'hono';
 
 const windowMs = 60_000;
-const clients = new Map<string, { count: number; resetAt: number }>();
 
-function cleanup(): void {
+function cleanup(clients: Map<string, { count: number; resetAt: number }>): void {
   const now = Date.now();
   for (const [key, entry] of clients) {
     if (now > entry.resetAt) {
@@ -13,16 +12,16 @@ function cleanup(): void {
   }
 }
 
-// 每 5 分钟清理过期条目
-const cleanupInterval = setInterval(cleanup, 5 * 60_000);
-cleanupInterval.unref();
-
-/** 重置速率限制状态（测试用） */
-export function _resetRateLimitState(): void {
-  clients.clear();
-}
-
 export function createRateLimit(maxRequests = 6000): MiddlewareHandler {
+  // 计数表必须按实例隔离:若模块级共享,同一 IP 的全部端点累加同一计数,
+  // 高频只读端点(/me)会把严格端点(login/register 30/min)的配额瞬间
+  // 吃光 → 认证整体瘫痪(429→前端拿不到 user→RequireAuth 卡死连锁)。
+  const clients = new Map<string, { count: number; resetAt: number }>();
+
+  // 每 5 分钟清理过期条目
+  const cleanupInterval = setInterval(() => cleanup(clients), 5 * 60_000);
+  cleanupInterval.unref();
+
   return async (c, next) => {
     const ip =
       c.req.header('X-Forwarded-For')?.split(',')[0]?.trim() ??

@@ -31,8 +31,34 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const requestType = (
         state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>
       ).requestType as string;
-      if (requestType !== '流离/confirm' && requestType !== '流离/chooseTarget')
+      if (
+        requestType !== '流离/confirm' &&
+        requestType !== '流离/chooseTarget' &&
+        requestType !== '流离/pickDiscard'
+      )
         return '当前不是流离回应';
+      if (requestType === '流离/chooseTarget') {
+        // 服务端兜底:candidates 仅约束前端展示,恶意提交仍须权威校验(与 prompt.filter 同源)。
+        // 杀来源由 hook 存入 localVars(pending atom 本身无 source 字段)
+        const t = _params.target;
+        if (typeof t !== 'number') return '请选择转移目标';
+        if (t === ownerId) return '不能转移给自己';
+        const src = state.localVars['流离/来源'];
+        if (t === src) return '不能转移给杀的来源';
+        if (!state.players[t]?.alive) return '目标不存活';
+        if (!inAttackRange(state, ownerId, t)) return '目标不在你的攻击范围内';
+      }
+      if (requestType === '流离/pickDiscard') {
+        // 客户端契约:useCard 型 pending 只发 {cardId};{}=不支付代价(不弃牌不转移)。
+        const raw: unknown = _params.cardIds ?? _params.cardId;
+        const cardIds = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
+        if (!cardIds || cardIds.length === 0) return null; // 放弃支付
+        if (cardIds.length !== 1) return '请选择弃置的 1 张手牌';
+        const cid = cardIds[0];
+        if (typeof cid !== 'string' || !state.players[ownerId].hand.includes(cid)) {
+          return '弃置牌不在你的手牌中';
+        }
+      }
       return null;
     },
     async (state, params) => {
@@ -41,6 +67,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       )?.requestType as string;
       if (requestType === '流离/confirm') {
         state.localVars['流离/confirmed'] = params.choice === true || params.confirmed === true;
+      } else if (requestType === '流离/pickDiscard') {
+        // 兼容 {cardIds:[id]} 与浏览器两步式 {cardId} 两种形状
+        const raw: unknown = params.cardIds ?? params.cardId;
+        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
+        state.localVars['流离/discard'] = ids?.[0];
       } else {
         state.localVars['流离/target'] = params.target;
       }
@@ -60,6 +91,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 询问是否发动流离
     delete ctx.state.localVars['流离/confirmed'];
+    ctx.state.localVars['流离/来源'] = atom.source; // respond 兜底校验用(pending atom 无 source)
     await applyAtom(ctx.state, {
       type: '请求回应',
       requestType: '流离/confirm',
@@ -86,18 +118,44 @@ export function onInit(skill: Skill, state: GameState): () => void {
         title: '流离:选择转移目标',
         min: 1,
         max: 1,
+        // 官方规则:「将此杀转移给你攻击范围内的一名其他角色」——主体是流离使用者(ownerId),
+        // 而非杀来源 atom.source;且不含来源自己(转移后来源不能成为自己这张杀的目标)。
         filter: (view, target) =>
           target !== ownerId &&
+          target !== atom.source &&
           view.players[target]?.alive === true &&
-          inAttackRange(ctx.state, atom.source, target),
+          inAttackRange(ctx.state, ownerId, target),
       },
       timeout: 15,
     });
     const newTarget = ctx.state.localVars['流离/target'] as number | undefined;
     if (typeof newTarget !== 'number' || newTarget === ownerId) return;
 
-    // 弃 1 张牌
-    const discardCard = selfPlayer.hand[0];
+    // 询问弃置哪张手牌(官方:玩家自选弃牌;不能固定弃第一张——会强行丢掉桃/无懈等关键牌)。
+    // 对齐 界放权 代价支付范式:超时/不合法 → 未支付代价,不发动(不弃牌不转移)。
+    delete ctx.state.localVars['流离/discard'];
+    await applyAtom(ctx.state, {
+      type: '请求回应',
+      requestType: '流离/pickDiscard',
+      target: ownerId,
+      prompt: {
+        type: 'useCard',
+        title: '流离:弃置 1 张手牌',
+        cardFilter: { filter: () => true, min: 1, max: 1 },
+      },
+      timeout: 15,
+    });
+    const payer = ctx.state.players[ownerId];
+    const picked = ctx.state.localVars['流离/discard'] as string | undefined;
+    delete ctx.state.localVars['流离/discard'];
+    if (typeof picked !== 'string' || !payer.hand.includes(picked)) {
+      // 未支付代价:不弃牌、不转移(杀仍指向原目标)。已写入的中间状态一并清理,
+      // 否则残留的 流离/target 会误导后续回合/hook。
+      delete ctx.state.localVars['流离/target'];
+      delete ctx.state.localVars['流离/来源'];
+      return;
+    }
+    const discardCard = picked;
     await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [discardCard], voluntary: true });
 
     // 修改杀帧 resolvedTargets 中的当前目标为新目标
@@ -108,6 +166,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
     delete ctx.state.localVars['流离/confirmed'];
     delete ctx.state.localVars['流离/target'];
+    delete ctx.state.localVars['流离/来源'];
   });
   return () => {};
 }

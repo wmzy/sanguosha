@@ -3,11 +3,17 @@
 import { css } from '@linaria/core';
 
 // ─── Debug panel ───
+// fixed 悬浮于缩放画布之上(debug 页专用):原先跟流式布局会把页面顶出滚动条,
+// 且遮挡的只是画布下缘,折叠后仅剩 summary 条,不影响游戏区交互。
 export const debugPanel = css`
-  margin-top: 16px;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9400; /* 高于常规游戏 UI,低于全屏遮罩(9998+) */
   border: 1px solid #333;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px 8px 0 0;
+  background: rgba(10, 10, 14, 0.85);
 `;
 export const debugSummary = css`
   padding: 8px 12px;
@@ -212,15 +218,18 @@ export const selectedCharHpDot = css`
 
 // ─── Debug 快照 ───
 export const snapshotBtn = css`
-  background: #2d4a2d;
-  color: #7ee787;
-  border: 1px solid #4a8a4a;
-  padding: 4px 10px;
-  border-radius: 4px;
+  background: rgba(94, 190, 120, 0.1);
+  color: #86e0a0;
+  border: 1px solid rgba(94, 190, 120, 0.55);
+  padding: 3px 12px;
+  border-radius: 999px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.5;
+  transition: all 0.15s;
   &:hover {
-    background: #3d5a3d;
+    background: rgba(94, 190, 120, 0.18);
+    border-color: rgba(130, 220, 155, 0.8);
   }
   &:disabled {
     opacity: 0.5;

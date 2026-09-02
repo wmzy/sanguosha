@@ -130,10 +130,26 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
           } else if (rt === GIVE_RT) {
             const ids = params.cardIds as string[] | undefined;
-            if (Array.isArray(ids)) st.localVars[GIVE_KEY] = ids;
+            // 校验:恰好 N 张、全部为 owner 手牌、无重复(镜像标版好施 GIVE_RT 守卫;
+            // 非法提交不写 GIVE_KEY → 走摸牌 after-hook 的兜底给牌 hand.slice(0, N),
+            // 否则 给予 atom validate 抛错会打断技能结算)
+            const need = (
+              slot?.atom as { prompt?: { cardFilter?: { min?: number } } } | undefined
+            )?.prompt?.cardFilter?.min;
+            if (
+              Array.isArray(ids) &&
+              typeof need === 'number' &&
+              ids.length === need &&
+              new Set(ids).size === ids.length &&
+              ids.every((id) => st.players[seat]?.hand.includes(id))
+            ) {
+              st.localVars[GIVE_KEY] = ids;
+            }
           } else if (rt === PASSIVE_GIVE_RT) {
-            const ids = params.cardIds as string[] | undefined;
-            if (Array.isArray(ids) && ids.length > 0) st.localVars[PASSIVE_CARD_KEY] = ids[0];
+            // 客户端契约:useCard 型 pending(min=max=1)只发 {cardId}
+            const raw: unknown = params.cardIds ?? params.cardId;
+            const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
+            if (ids && ids.length > 0) st.localVars[PASSIVE_CARD_KEY] = ids[0];
           }
         },
       ),
@@ -250,10 +266,17 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             title: `好施:选择 ${giveCount} 张牌交给 ${st.players[target].name}`,
             cardFilter: { filter: () => true, min: giveCount, max: giveCount },
           },
+          // 强制型给牌(「分半给最少者」是效果必要部分):前端走多选弃牌式 UI 提交 {cardIds}
+          mandatory: true,
           timeout: 30,
         });
-        const giveCards = st.localVars[GIVE_KEY] as string[] | undefined;
+        let giveCards = st.localVars[GIVE_KEY] as string[] | undefined;
         delete st.localVars[GIVE_KEY];
+        // 强制给牌兜底:超时未回应 → 自动从手牌首张起补足(不放弃给牌义务,
+        // 与庸肆/英魂/成略的 mandatory 兜底范式一致)
+        if (!giveCards || giveCards.length === 0) {
+          giveCards = st.players[ownerId]?.hand.slice(0, giveCount) ?? [];
+        }
         if (giveCards && giveCards.length > 0) {
           for (const cardId of giveCards) {
             await applyAtom(st, { type: '给予', cardId, from: ownerId, to: target });

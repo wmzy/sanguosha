@@ -9,7 +9,7 @@
 //        a. 请求回应(useCard):owner 选自己的拼点牌
 //        b. 请求回应(useCard):受害者选拼点牌
 //        c. runRankCompareFlow(扣置→亮出→后→弃牌堆,两张牌面朝下同时扣置)
-//     3. 拼点赢(owner 点数 > 受害者)→ 获得 受害者一张牌(优先手牌第一张,其次装备)
+//     3. 拼点赢(owner 点数 > 受害者)→ 获得 受害者一张牌(手牌盲取随机,其次装备)
 //     4. 没赢(输或平)→ 无事发生
 //   限制:无次数限制;拼点需双方都有手牌,任一方无手牌则不发动
 //
@@ -22,6 +22,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { runRankCompareFlow } from '../flows/rank';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { createRng } from '../util/rng';
 
 const CONFIRM_RT = '烈刃/confirm';
 const CONFIRMED_KEY = '烈刃/confirmed';
@@ -158,7 +159,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       prompt: {
         type: 'useCard',
         title: '烈刃:请选择一张拼点牌',
-        cardFilter: { min: 1, max: 1 },
+        cardFilter: { filter: () => true, min: 1, max: 1 },
       },
       timeout: 30,
     });
@@ -174,7 +175,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       prompt: {
         type: 'useCard',
         title: `烈刃:与 ${ctx.state.players[ownerId].name} 拼点,请出一张手牌`,
-        cardFilter: { min: 1, max: 1 },
+        cardFilter: { filter: () => true, min: 1, max: 1 },
       },
       timeout: 30,
     });
@@ -211,12 +212,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     await popFrame(ctx.state);
 
-    // 3. 结算输赢:owner 赢 → 获得 受害者一张牌(优先手牌第一张,其次装备)
+    // 3. 结算输赢:owner 赢 → 获得 受害者一张牌(手牌对使用者不可见,seed RNG 盲取;
+    //    固定取首张 = 可被对手按手牌排列利用的确定性策略,与突袭/界突袭范式不一致)
     if (!win) return;
     const target = ctx.state.players[victim];
     if (!target) return;
     if (target.hand.length > 0) {
-      const cardId = target.hand[0];
+      const rng = createRng(ctx.state.rngSeed);
+      const cardId = target.hand[rng.nextInt(target.hand.length)];
+      ctx.state.rngSeed = rng.getState();
       await applyAtom(ctx.state, { type: '获得', player: ownerId, cardId, from: victim });
     } else {
       const equipSlot = Object.keys(target.equipment)[0] as keyof typeof target.equipment;

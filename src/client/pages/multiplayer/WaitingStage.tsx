@@ -18,7 +18,7 @@ import { RoomConfigSection } from './RoomConfigSection';
 import { SeatMap } from './SeatMap';
 import {
   page,
-  title,
+  pageTitle,
   subtitle,
   card,
   roomCodeBox,
@@ -100,7 +100,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
         }}
       />
       <div className={page}>
-        <h1 className={title}>等待大厅</h1>
+        <h1 className={pageTitle}>等待大厅</h1>
         <p className={subtitle}>{mp.isSpectator ? '👁 旁观中 · 点击空位加入游戏' : '等待玩家加入并准备'}</p>
         <div className={card}>
           <div className={roomCodeBox}>
@@ -241,7 +241,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
             {!mp.isSpectator && !mp.ready && (
               <button
                 className={btnStyle}
-                style={{ '--btn-bg': colors.accent.green } as React.CSSProperties}
+                style={{ '--btn-bg': '#a03028' } as React.CSSProperties}
                 onClick={mp.toggleReady}
               >
                 准备
@@ -261,7 +261,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
                 className={btnStyle}
                 style={
                   {
-                    '--btn-bg': allReady ? colors.accent.orange : colors.disabled,
+                    '--btn-bg': allReady ? '#b8912f' : colors.disabled,
                     '--btn-cursor': allReady ? 'pointer' : 'not-allowed',
                   } as React.CSSProperties
                 }
@@ -298,7 +298,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
             )}
             <button
               className={btnStyle}
-              style={{ '--btn-bg': colors.disabled } as React.CSSProperties}
+              style={{ '--btn-bg': colors.bg.input } as React.CSSProperties}
               onClick={() => {
                 mp.leaveRoom();
                 navigate('/');

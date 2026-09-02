@@ -181,6 +181,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       });
       const picked = ctx.state.localVars[TARGET_KEY];
       if (typeof picked !== 'number') return;
+      // 权威校验:仅合格候选(eligible)可被选。异常客户端注入 candidates 之外的座次
+      // (如手牌数小于己的目标)会绕过"手牌数不小于你"的技能约束偷牌。
+      if (!eligible.includes(picked)) return;
       target = picked;
     }
 

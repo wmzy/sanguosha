@@ -1,48 +1,47 @@
-// 界放逐(界曹丕·被动技):当你受到伤害后,你可以令一名其他角色翻面并摸X张牌
-//   (X为你已损失体力值)。然后若其武将牌已背面朝上,其将武将牌翻回正面。
-//   (即翻面后立即翻回,摸牌但不受翻面惩罚。)
+// 界放逐(界曹丕·被动技):当你受到伤害后,你可以令一名其他角色翻面,
+//   并令其摸X张牌(X为你已损失体力值)。(官方逐字,界曹丕.md)
 //
-// 与标版放逐的区别:
-//   - 标版:目标摸 X 张并翻面(跳过下一回合)。
-//   - 界版:翻面后立即翻回正面,目标只摸牌不受翻面惩罚;且若目标已被其他技能
-//     翻面(背面朝上),界放逐会将其翻回正面(解除翻面状态)。
+// 与标版放逐的区别:仅文案细节;机制同构——目标真实翻面(跳过下一回合),
+// 作为交换摸 X 张牌。
 //
-// 模式 A(被动触发):after hook 挂在「造成伤害」。
-//   造成伤害(target=自己) → 选目标 → 该目标摸 X 张(X=已损失体力) →
-//   清除目标所有 '/翻面' 后缀标签(翻回正面)。
+// 模式 A(被动触发):after hook 挂在「受到伤害后」。
+//   受到伤害(target=自己) → 询问发动 → 选目标 → 该目标翻面 → 摸 X 张(X=已损失体力)。
 //
 // 关键点:
 //   - X = maxHealth - health(已损失体力值),血越少摸牌越多。
 //   - 目标不能是自己(FAQ)。
-//   - 界版不添加翻面标签,因此无需阶段跳过 before-hook(与标版放逐的主要区别)。
-//   - 清除目标已有的 '/翻面' 标签(来自据守/放逐/悲歌/刚烈等),实现"翻回正面"。
+//   - 翻面实现(镜像标版 放逐):flipFaceDown 加标签 '放逐/翻面';
+//     阶段开始 before-hook 消费标签(skipAll + cancel),阶段结束 before-hook
+//     主动推进回合(performSkipTurn)。
+//   - 已知简化:对已背面目标再次放逐不实现官方 toggle(翻面两次=翻回正面),
+//     与全引擎翻面模型一致(flipFaceDown 只追加标签,回合管理的 flipFaceUpAll
+//     一次清全部 /翻面 标签,双翻无法对消)。
 import type {
   FrontendAPI,
   GameState,
+  HookResult,
   Json,
   Skill,
   GameView,
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
+import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 
 const CONFIRM_RT = '界放逐/confirm';
 const TARGET_RT = '界放逐/target';
 const CONFIRMED_KEY = '放逐/confirmed';
 const TARGET_KEY = '放逐/target';
-
-/** 武将牌是否已翻面(存在任意 '/翻面' 后缀标签) */
-function isFlipped(tags: string[]): boolean {
-  return tags.some((t) => t.endsWith('/翻面'));
-}
+const SKIP_TAG = '放逐/翻面';
+const SKIP_FLAG = '放逐/skipAll';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
     id,
     ownerId,
     name: '界放逐',
-    description: '受到伤害后,令一名其他角色摸 X 张牌(X=已损失体力),翻面后立即翻回',
+    description: '受到伤害后,令一名其他角色翻面,并摸 X 张牌(X=已损失体力)',
   };
 }
 
@@ -78,7 +77,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 造成伤害 after:曹丕受伤后,选目标 + 摸 X 张 + 翻回正面 ──
+  // ── 受到伤害后 after:曹丕受伤后,选目标 → 翻面 → 摸 X 张(官方语序)──
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
@@ -104,7 +103,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       target: ownerId,
       prompt: {
         type: 'confirm',
-        title: `是否发动界放逐?(令一名其他角色摸 ${lostHealth} 张牌)`,
+        title: `是否发动界放逐?(令一名其他角色翻面并摸 ${lostHealth} 张牌)`,
         confirmLabel: '发动',
         cancelLabel: '不发动',
       },
@@ -121,7 +120,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       target: ownerId,
       prompt: {
         type: 'choosePlayer',
-        title: '界放逐:选择一名其他角色(摸牌)',
+        title: '界放逐:选择一名其他角色(翻面并摸牌)',
         min: 1,
         max: 1,
         filter: (_view: GameView, t: number) =>
@@ -134,17 +133,43 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (typeof target !== 'number') return;
     if (!ctx.state.players[target]?.alive) return;
 
+    // 翻面(官方语序:「令一名其他角色翻面,并令其摸X张牌」)
+    await flipFaceDown(ctx.state, target, '放逐');
+
     // 摸 X 张牌
     await applyAtom(ctx.state, { type: '摸牌', player: target, count: lostHealth });
+  });
 
-    // 界版:翻面后立即翻回正面 → 清除目标已有的 '/翻面' 标签(若有)
-    const targetPlayer = ctx.state.players[target];
-    if (targetPlayer && isFlipped(targetPlayer.tags)) {
-      const flipTags = targetPlayer.tags.filter((t) => t.endsWith('/翻面'));
-      for (const tag of flipTags) {
-        await applyAtom(ctx.state, { type: '去标签', player: target, tag });
-      }
+  // ── 阶段开始 before hook:检测翻面标签 → 启动跳过(镜像标版 放逐)──
+  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx): Promise<HookResult | void> => {
+    const atom = ctx.atom;
+    if (atom.type !== '阶段开始') return;
+    const player = atom.player;
+    if (player === undefined) return;
+    const p = ctx.state.players[player];
+    if (!p) return;
+
+    if (atom.phase === '准备' && p.tags.includes(SKIP_TAG)) {
+      await flipFaceUp(ctx.state, player, '放逐');
+      ctx.state.localVars[SKIP_FLAG] = player;
+      return { kind: 'cancel' };
     }
+    if (ctx.state.localVars[SKIP_FLAG] === player) {
+      return { kind: 'cancel' };
+    }
+  });
+
+  // ── 阶段结束 before hook:skipAll → 主动推进回合 ──
+  registerBeforeHook(state, skill.id, ownerId, '阶段结束', async (ctx): Promise<HookResult | void> => {
+    const atom = ctx.atom;
+    if (atom.type !== '阶段结束') return;
+    const player = atom.player;
+    if (player === undefined) return;
+    if (ctx.state.localVars[SKIP_FLAG] !== player) return;
+
+    delete ctx.state.localVars[SKIP_FLAG];
+    await performSkipTurn(ctx.state, player);
+    return { kind: 'cancel' };
   });
 
   return () => {};

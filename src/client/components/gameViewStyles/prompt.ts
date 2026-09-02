@@ -1,33 +1,94 @@
 // Prompt 区样式:询问/回应提示框 + 动作按钮变体 + 等待提示 + 辅助状态(转化/distribute 提示、徽章、禁用态)。
+// 面板形态对齐官方 OL 客户端:横向底部横幅(暗皮革底 + 金铜双线描边 + 底部金色底线),
+// 按钮分暗铜石(基础)与红漆(主行动)两种质感。
 
 import { css } from '@linaria/core';
 
 // ─── Prompt ───
+// 官方横幅面板基底:双线描边(1px 金铜边框 + inset 深色内线)、圆角 8px、底部 2px 金色底线
 export const promptBox = css`
-  border: 2px solid #e67e22;
+  position: relative;
+  border: 1px solid #8a7448;
   border-radius: 8px;
-  padding: 8px 14px;
-  background: rgba(230, 126, 34, 0.15);
-  width: 100%;
+  padding: 10px 14px 12px;
+  background: linear-gradient(#241d14f2, #171209f2);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 4px 16px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  width: min(720px, 92%);
+  margin: 0 auto;
   box-sizing: border-box;
+  &::after {
+    content: '';
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 3px;
+    height: 2px;
+    border-radius: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(232, 196, 122, 0.55) 18%,
+      rgba(240, 215, 138, 0.85) 50%,
+      rgba(232, 196, 122, 0.55) 82%,
+      transparent
+    );
+    pointer-events: none;
+  }
 `;
+// 等待回应面板:与 promptBox 同一横幅形态(金铜描边,靠标题/按钮语义区分紧迫感)
 export const promptBoxAwaiting = css`
-  border: 2px solid #e74c3c;
-  border-left: 4px solid #e74c3c;
+  position: relative;
+  border: 1px solid #8a7448;
   border-radius: 8px;
-  padding: 8px 14px;
-  background: rgba(231, 76, 60, 0.1);
-  width: 100%;
+  padding: 10px 14px 12px;
+  background: linear-gradient(#241d14f2, #171209f2);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 4px 16px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  width: min(720px, 92%);
+  margin: 0 auto;
   box-sizing: border-box;
+  &::after {
+    content: '';
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 3px;
+    height: 2px;
+    border-radius: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(232, 196, 122, 0.55) 18%,
+      rgba(240, 215, 138, 0.85) 50%,
+      rgba(232, 196, 122, 0.55) 82%,
+      transparent
+    );
+    pointer-events: none;
+  }
 `;
+// 标题:金色粗体,前置「◆」小菱形装饰,字间距 2px
 export const promptTitle = css`
-  color: #e67e22;
+  color: #f0d78a;
   font-weight: bold;
-  font-size: 14px;
-  margin-bottom: 2px;
+  font-size: 15px;
+  margin-bottom: 4px;
+  letter-spacing: 2px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  &::before {
+    content: '◆';
+    font-size: 10px;
+    margin-right: 6px;
+    color: #c4a254;
+    text-shadow: none;
+  }
 `;
 // 出牌阶段标题行的杀次数徽标(⚔️ 杀 X/Y / 杀 ∞),数据源 view.turnUsage 投影。
-// 视觉沿用 seat 徽章模式(圆角小底色块),配色与 prompt 区橙色主题一致。
+// 视觉沿用 seat 徽章模式(圆角小底色块),配色与 prompt 区金色主题一致。
 export const slashCountBadge = css`
   display: inline-block;
   vertical-align: middle;
@@ -42,39 +103,61 @@ export const slashCountBadge = css`
 `;
 export const promptDesc = css`
   font-size: 13px;
-  margin-bottom: 4px;
+  color: #d8cba8;
+  margin-bottom: 6px;
 `;
+// 动作区:横排,放不下时换行(与标题同向的横向面板)
 export const promptActions = css`
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 `;
-// prompt 动作区变体:装备/判定/手牌盲选等多行内容,换行间距更紧
+// prompt 动作区变体:装备/判定/手牌盲选等多行内容,行间距更紧
 export const promptActionsWrap = css`
   display: flex;
-  gap: 6px;
+  gap: 6px 10px;
   flex-wrap: wrap;
 `;
 // prompt 描述变体:占满整行(分组标题,如「装备区:」)
 export const promptDescFull = css`
-  font-size: 14px;
+  font-size: 12px;
+  color: #cbbd93;
   width: 100%;
   margin-bottom: 0;
 `;
 // prompt 描述变体:单行内联(垂直居中,无下边距)
 export const promptDescInline = css`
-  font-size: 14px;
+  font-size: 13px;
+  color: #d8cba8;
   margin-bottom: 0;
   align-self: center;
 `;
+// 基础按钮(不回应/取消/普通选项):暗铜石质感,hover 亮金边
 export const promptBtn = css`
-  border: 1px solid #888;
-  border-radius: 6px;
-  padding: 6px 14px;
+  border: 1px solid #6a5a3e;
+  border-radius: 4px;
+  padding: 7px 22px;
   cursor: pointer;
-  background: rgba(0, 0, 0, 0.3);
-  color: #e0e0e0;
+  background: linear-gradient(#3a352c, #2a251d);
+  color: #e8d9a8;
   font-size: 13px;
+  line-height: 1.4;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 235, 180, 0.06),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+  transition:
+    border-color 0.15s,
+    filter 0.15s;
+  &:hover {
+    border-color: #d4a048;
+    filter: brightness(1.12);
+  }
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    color: #8a8068;
+    filter: none;
+  }
 `;
 // 选牌面板手牌盲选:牌背卡片行(替代原纯序号数字按钮,视觉对应目标手牌牌背)
 export const pickHandRow = css`
@@ -126,25 +209,43 @@ export const pickHandIndex = css`
   text-align: center;
   pointer-events: none;
 `;
+// 主行动按钮(出牌/确认/选项):红漆质感,金铜描边,hover 提亮
 export const promptBtnPrimary = css`
-  border: 1px solid #27ae60;
-  border-radius: 6px;
-  padding: 6px 14px;
+  border: 1px solid #d4a048;
+  border-radius: 4px;
+  padding: 7px 22px;
   cursor: pointer;
-  background: rgba(39, 174, 96, 0.2);
-  color: #2ecc71;
+  background: linear-gradient(#a03028, #7a2018);
+  color: #f5e6c8;
   font-size: 13px;
   font-weight: bold;
+  letter-spacing: 1px;
+  line-height: 1.4;
+  text-shadow: 0 1px 2px rgba(60, 10, 6, 0.8);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 160, 0.18),
+    0 2px 8px rgba(122, 32, 24, 0.45);
+  transition:
+    filter 0.15s,
+    border-color 0.15s;
+  &:hover {
+    border-color: #f0c060;
+    filter: brightness(1.15);
+  }
+  &:active {
+    filter: brightness(0.95);
+  }
 `;
 // 五谷丰登:被选走的牌(置暗禁用)
 export const promptBtnDisabled = css`
-  border: 1px solid #555;
-  border-radius: 6px;
-  padding: 6px 14px;
+  border: 1px solid #55503f;
+  border-radius: 4px;
+  padding: 7px 22px;
   cursor: not-allowed;
-  background: rgba(40, 40, 40, 0.5);
-  color: #666;
+  background: linear-gradient(#332f28, #26221b);
+  color: #6f6a58;
   font-size: 13px;
+  line-height: 1.4;
   opacity: 0.6;
   display: inline-flex;
   flex-direction: column;
@@ -208,8 +309,13 @@ export const autoSkipToggle = css`
 // ─── 辅助状态样式 ───
 /** 自动切换按钮激活态(绿色)。 */
 export const autoSwitchActive = css`
-  background: #27ae60;
-  color: #fff;
+  border-color: rgba(94, 190, 120, 0.6) !important;
+  color: #86e0a0 !important;
+  background: rgba(94, 190, 120, 0.1) !important;
+  &:hover {
+    border-color: rgba(130, 220, 155, 0.8) !important;
+    background: rgba(94, 190, 120, 0.18) !important;
+  }
 `;
 /** 转化模式提示文案色。 */
 export const transformHint = css`

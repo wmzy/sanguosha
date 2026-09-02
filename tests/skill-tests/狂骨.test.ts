@@ -1,11 +1,13 @@
 // 狂骨(魏延·被动可选技)测试:
-//   官方:你对距离1以内的一名角色造成1点伤害后,你可以回复1点体力或摸一张牌。
+//   官方:你对距离1以内的一名角色每造成1点伤害后,你可以回复1点体力或摸一张牌。
 //   距离1 → 造成伤害后询问 → 回复体力 / 摸牌 / 不发动
 //   距离>1 → 不触发
 //   非魏延造成伤害 → 不触发
 //   满血 → 仍可发动(选摸牌有效,选回复体力被上限截断)
+//   2点伤害 → 逐点独立发动(两次询问,2026-08-24 对齐官方)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
+import { runDamageFlow } from '../../src/engine/flows/damage';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -282,6 +284,86 @@ describe('狂骨', () => {
     expect(harness.state.players[1].hand.length).toBe(1); // 仅持原有闪,未摸牌
     P1.expectNoPending();
   });
+
+  // ─── 2点伤害 → 逐点独立发动 ─────────────────────────────
+  // 官方(OL):每造成1点伤害可发动一次。酒杀/裸衣等 2 点伤害 → 两次独立的
+  // 「是否发动」+「二选一」询问。此处直接 runDamageFlow(amount=2) 验证逐点循环。
+  // 注意:runDamageFlow 不可 await(hook 挂在玩家回应上,await 会死锁),
+  // 与奸雄测试同款 fire-and-forget + waitForStable 模式。
+  it('2点伤害 → 两次独立询问,均发动选回复 → 回复2点', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', skills: ['狂骨'], health: 2 }),
+        makePlayer({ index: 1, name: 'P2', skills: [], health: 4 }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    void runDamageFlow(harness.state, 0, 1, 2);
+    await harness.waitForStable();
+
+    // 第 1 点:发动 → 回复体力
+    P1.expectPending('请求回应');
+    await P1.respond('狂骨', { choice: true }); // 发动
+    await harness.waitForStable();
+    P1.expectPending('请求回应');
+    await P1.respond('狂骨', { choice: true }); // 回复1点体力
+    await harness.waitForStable();
+    // 第 2 点:发动 → 回复体力
+    P1.expectPending('请求回应');
+    await P1.respond('狂骨', { choice: true }); // 发动
+    await harness.waitForStable();
+    P1.expectPending('请求回应');
+    await P1.respond('狂骨', { choice: true }); // 回复1点体力
+    await harness.waitForStable();
+
+    // 魏延 2 → 4(两点各回复1点)
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[0].hand.length).toBe(0);
+    // P2 掉 2 点
+    expect(harness.state.players[1].health).toBe(2);
+    // 询问排空
+    P1.expectNoPending();
+  });
+
+  it('2点伤害 → 第一点发动第二点不发动 → 仅一次效果', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', skills: ['狂骨'], health: 4 }),
+        makePlayer({ index: 1, name: 'P2', skills: [], health: 4 }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    void runDamageFlow(harness.state, 0, 1, 2);
+    await harness.waitForStable();
+
+    // 第 1 点:发动 → 摸牌
+    P1.expectPending('请求回应');
+    await P1.respond('狂骨', { choice: true });
+    await harness.waitForStable();
+    await P1.respond('狂骨', { choice: false }); // 摸一张
+    await harness.waitForStable();
+    // 第 2 点:不发动(无后续询问)
+    P1.expectPending('请求回应');
+    await P1.respond('狂骨', { choice: false });
+    await harness.waitForStable();
+
+    // 仅第 1 点的效果:摸 1 张,体力不变(满血摸牌)
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[0].hand.length).toBe(1);
+    P1.expectNoPending();
+  });
 });
 
 // ════════════════════════════════════════════════════════════════════════
@@ -508,5 +590,53 @@ describe('界狂骨', () => {
 
     expect(harness.state.players[0].health).toBe(3);
     expect(harness.state.players[0].hand.length).toBe(0);
+  });
+
+  // ─── 2点伤害 → 逐点独立发动;第一点回满后第二点 confirmDisabled ────
+  // 官方(OL):每造成1点伤害可发动一次(同狂骨)。界狂骨差异点:满血时二选一
+  // prompt.confirmDisabled=true(回复体力按钮禁用,只能摸牌)。此处验证第 1 点
+  // 回复至满血后,第 2 点的二选一被禁用。
+  // 注意:runDamageFlow 不可 await(hook 挂在玩家回应上,await 会死锁),
+  // 与奸雄测试同款 fire-and-forget + waitForStable 模式。
+  it('2点伤害 → 第一点回复至满血,第二点二选一 confirmDisabled → 只能摸牌', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', skills: ['界狂骨'], health: 3, character: '界魏延' }),
+        makePlayer({ index: 1, name: 'P2', skills: [], health: 4 }),
+      ],
+      cardMap: {},
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    void runDamageFlow(harness.state, 0, 1, 2);
+    await harness.waitForStable();
+
+    // 第 1 点:发动 → 回复体力(3 → 4,未满血时回复可选)
+    P1.expectPending('请求回应');
+    await P1.respond('界狂骨', { choice: true }); // 发动
+    await harness.waitForStable();
+    P1.expectPending('请求回应');
+    expect(pendingPrompt()?.confirmDisabled).toBeUndefined();
+    await P1.respond('界狂骨', { choice: true }); // 回复1点体力
+    await harness.waitForStable();
+
+    // 第 2 点:已回满 → 发动 → 二选一 confirmDisabled=true → 只能摸牌
+    P1.expectPending('请求回应');
+    await P1.respond('界狂骨', { choice: true }); // 发动
+    await harness.waitForStable();
+    P1.expectPending('请求回应');
+    expect(pendingPrompt()?.confirmDisabled).toBe(true);
+    await P1.respond('界狂骨', { choice: false }); // 摸一张牌
+    await harness.waitForStable();
+
+    expect(harness.state.players[0].health).toBe(4);
+    expect(harness.state.players[0].hand.length).toBe(1);
+    // P2 掉 2 点
+    expect(harness.state.players[1].health).toBe(2);
+    P1.expectNoPending();
   });
 });

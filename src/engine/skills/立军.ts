@@ -15,7 +15,8 @@
 //   - "其他吴势力角色":source!==ownerId && faction==='吴'。
 //   - "出牌阶段限一次":turn.vars['立军/used/<ally>'] 标记(回合结束自动清空)。
 //   - 杀卡位置:使用结算结束后已移入弃牌堆(runUseFlow 在发本 atom 前完成牌移动),
-//     移动牌(弃牌堆→手牌);防御性检查卡仍在弃牌堆。
+//     移动牌(弃牌堆→手牌);防御性检查卡仍在弃牌堆。转化杀(武圣等影子卡)入堆时
+//     已被还原为原卡,使用时 hook 把原卡 id 记入帧参数,结算结束后按其获取。
 //   - +1 杀次通过 SlashExtraProvider(slash-quota 通用机制),不自造标签。
 //   - 双询问:先问盟友(给牌 confirm),再问主公(摸牌+杀次 confirm),各自独立。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
@@ -29,6 +30,8 @@ const ALLY_CONFIRM_RT = '立军/盟友确认'; // 问盟友:是否把杀交给�
 const LORD_CONFIRM_RT = '立军/主公确认'; // 问主公:是否令其摸牌+杀次+1
 const ALLY_CONFIRM_KEY = '立军/盟友确认结果';
 const LORD_CONFIRM_KEY = '立军/主公确认结果';
+/** 帧参数 key:使用时记录的实体牌 id(转化牌为还原后的原卡,真实牌即本体)。 */
+const EFFECTIVE_CARD_KEY = '立军/effectiveCardId';
 
 /** turn.vars key:本回合该盟友是否已用过立军(限一次) */
 function usedKey(ally: number): string {
@@ -64,6 +67,21 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     unloads.push(u);
   }
 
+  // ── 使用时 afterHook:记录本次使用的实体牌 id(转化牌兼容) ──
+  //   影子卡(武圣红牌当杀等)入弃牌堆时被引擎还原为原卡并删除影子 cardMap 条目,
+  //   结算结束后按 atom.cardId 反查将落空 → 立军对转化杀静默失灵。
+  //   趁「使用时」影子条目仍在(shadowOf 可读),把实体原卡 id 记入当前结算帧参数,
+  //   「使用结算结束后」从帧参数取回。嵌套结算各有独立帧,天然隔离。
+  unloads.push(
+    registerAfterHook(state, skill.id, ownerId, '使用时', async (ctx) => {
+      const atom = ctx.atom;
+      if (atom.type !== '使用时') return;
+      const card = ctx.state.cardMap[atom.cardId];
+      if (!card) return; // 纯虚拟使用(无实体牌):无牌可交,后续走防御分支
+      ctx.frame.params[EFFECTIVE_CARD_KEY] = card.shadowOf ?? atom.cardId;
+    }),
+  );
+
   // ── 使用结算结束后 afterHook:其他吴角色用杀后触发 ──
   unloads.push(
     registerAfterHook(state, skill.id, ownerId, '使用结算结束后', async (ctx) => {
@@ -71,8 +89,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const st = ctx.state;
       // 主公技:仅孙亮为主公(座次 0)时生效
       if (ownerId !== 0) return;
-      const card = st.cardMap[atom.cardId];
-      if (!card || card.name !== '杀') return;
+      // 判定所用牌名:真实杀读 cardMap;转化杀的影子条目已删,回退看结算帧 skillId
+      // (runUseFlow('杀') 的帧 skillId 即 '杀')。原卡(如红桃桃)的名字不是 杀,不能用它判。
+      const shadowCard = st.cardMap[atom.cardId];
+      const usedName = shadowCard?.name ?? ctx.frame?.skillId;
+      if (usedName !== '杀') return;
+      // 实体牌 id:转化杀为还原后的原卡(已在弃牌堆);真实杀即 atom.cardId
+      const effectiveCardId =
+        (ctx.frame.params[EFFECTIVE_CARD_KEY] as string | undefined) ?? atom.cardId;
       const source = atom.source;
       // 其他角色(非自己)
       if (source === ownerId) return;
@@ -89,7 +113,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 标记本回合已用(触发即消耗一次机会,无论盟友是否交牌)
       st.turn.vars[usedKey(source)] = true;
 
-      await pushFrame(st, '立军', ownerId, { ally: source, cardId: atom.cardId });
+      await pushFrame(st, '立军', ownerId, { ally: source, cardId: effectiveCardId });
 
       // ── 第一步:问盟友是否把此杀交给主公 ──
       delete st.localVars[ALLY_CONFIRM_KEY];
@@ -115,11 +139,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       // 标记已在触发时设(见上方 usedKey 赋值)
 
-      // 移动杀卡:弃牌堆 → 主公手牌(防御性:卡仍在弃牌堆才移动)
-      if (st.zones.discardPile.includes(atom.cardId)) {
+      // 移动杀卡:弃牌堆 → 主公手牌(防御性:卡仍在弃牌堆才移动;
+      // 转化杀用还原后的原卡 id,纯虚拟/已被拿走时跳过)
+      if (st.zones.discardPile.includes(effectiveCardId)) {
         await applyAtom(st, {
           type: '移动牌',
-          cardId: atom.cardId,
+          cardId: effectiveCardId,
           from: { zone: '弃牌堆' },
           to: { zone: '手牌', player: ownerId },
         });

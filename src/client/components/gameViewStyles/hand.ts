@@ -227,28 +227,30 @@ export const handList = css`
   align-items: flex-end;
   gap: 0;
   margin-bottom: 8px;
-  min-height: 120px;
+  min-height: 142px;
   padding: 8px 0 0;
 `;
 export const handCard = css`
   position: relative;
   box-sizing: border-box;
-  border: 2px solid #555;
-  border-radius: 8px;
+  border: 2px solid rgba(126, 104, 66, 0.85);
+  border-radius: 9px;
   padding: 0;
   cursor: pointer;
   background: linear-gradient(180deg, rgba(30, 20, 15, 0.95) 0%, rgba(20, 12, 8, 0.95) 100%);
-  min-width: 80px;
-  width: 80px;
+  min-width: 92px;
+  width: 92px;
   /* 固定高度:文字层绝对定位,不再被插画撑高 */
-  height: 120px;
+  height: 134px;
   text-align: center;
   transition: all 0.2s;
   transform: rotate(var(--fan-angle, 0deg));
   transform-origin: bottom center;
   z-index: var(--card-z, 0);
-  box-shadow: -1px 2px 6px rgba(0, 0, 0, 0.3);
-  margin-left: -16px;
+  box-shadow:
+    -1px 2px 6px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 232, 170, 0.07);
+  margin-left: -18px;
   overflow: hidden;
   &:first-of-type {
     margin-left: 0;
@@ -256,8 +258,10 @@ export const handCard = css`
   &:hover {
     z-index: 100 !important;
     margin-bottom: 8px;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
-    border-color: #888;
+    box-shadow:
+      0 6px 18px rgba(0, 0, 0, 0.55),
+      0 0 14px rgba(217, 180, 92, 0.25);
+    border-color: #d9b45c;
   }
 `;
 // 手牌牌面插画作背景:绝对定位填满卡牌,失败隐藏保留文字回退
@@ -302,6 +306,30 @@ export const handCardRespondable = css`
   border: 2px solid #ffd700;
   box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
   background: rgba(255, 215, 0, 0.08);
+`;
+// 弃牌阶段:整手牌可选(canDiscardClick)。紫色呼吸光引导——弃牌是义务,
+// 玩家常忽略提示框文案,手牌本身必须传达「这些牌现在可以点」。
+export const handCardDiscardable = css`
+  border-color: #a86fd6;
+  box-shadow: 0 0 8px rgba(168, 111, 214, 0.35);
+  animation: discardPulse 1.8s ease-in-out infinite;
+  & > :first-child {
+    filter: brightness(1.12);
+  }
+  @keyframes discardPulse {
+    0%,
+    100% {
+      box-shadow: 0 0 5px rgba(168, 111, 214, 0.25);
+    }
+    50% {
+      box-shadow: 0 0 14px rgba(168, 111, 214, 0.55);
+    }
+  }
+`;
+// 出牌阶段:有主动 use 入口的牌轻量提亮,与置灰牌形成「能出/不能出」对比
+export const handCardPlayable = css`
+  border-color: #93a3ae;
+  box-shadow: -1px 2px 6px rgba(0, 0, 0, 0.3), 0 0 5px rgba(255, 255, 255, 0.1);
 `;
 // useCard 类回应:已选中牌(待点「打出」出牌)绿色加粗高亮,区别于金色「可回应」
 export const handCardRespondSelected = css`

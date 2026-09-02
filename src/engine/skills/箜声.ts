@@ -118,9 +118,18 @@ async function performKongshengPrepare(
     },
     timeout: 30,
   });
-  const selected = state.localVars[SELECT_KEY] as string[] | undefined;
+  const raw = state.localVars[SELECT_KEY] as string[] | undefined;
   delete state.localVars[SELECT_KEY];
-  if (!selected || selected.length === 0) return;
+  // 校验:全部为自己手牌且无重复(异常 cardIds 会让 移出至暂存区 validate 抛错,
+  // 打断准备阶段 hook;非法视为未选,镜像 明任/审时 的消费端守卫写法)
+  const selected =
+    Array.isArray(raw) &&
+    raw.length > 0 &&
+    raw.every((id) => self.hand.includes(id)) &&
+    new Set(raw).size === raw.length
+      ? raw
+      : [];
+  if (selected.length === 0) return;
 
   // 3) 置于武将牌上(移出游戏)——触发良姻(挂在其 after-hook)
   await applyAtom(state, {
@@ -255,8 +264,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return null;
       }
       if (rt === SELECT_RT) {
-        const cardIds = params.cardIds as string[] | undefined;
-        if (!cardIds || cardIds.length === 0) return '请选择要置于武将牌上的牌';
+        // 客户端契约:useCard 型 pending 只发 {cardId};{}=不置于武将牌上。
+        const raw: unknown = params.cardIds ?? params.cardId;
+        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
+        if (!ids || ids.length === 0) return null; // 放弃 → 消费端按未置牌结束
         return null;
       }
       if (rt === TARGET_RT) {
@@ -275,7 +286,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         st.localVars[CONFIRMED_KEY] =
           params.choice === true || params.confirmed === true;
       } else if (rt === SELECT_RT) {
-        st.localVars[SELECT_KEY] = params.cardIds;
+        const raw: unknown = params.cardIds ?? params.cardId;
+        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
+        if (ids && ids.length > 0) st.localVars[SELECT_KEY] = ids;
       } else if (rt === TARGET_RT) {
         const t = params.target;
         if (typeof t === 'number') st.localVars[TARGET_KEY] = t;

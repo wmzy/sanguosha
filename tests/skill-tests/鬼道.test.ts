@@ -318,4 +318,56 @@ describe('鬼道', () => {
       restoreCompare();
     }
   });
+
+  // ─── 回归(2026-08-26 bug 修复会话):客户端真实参数形状 {cardId} 无 choice 也必须替换 ───
+  // 浏览器/Headless 对 useCard 型 pending 只发 respond{cardId};此前只认 choice===true,
+  // 选牌后被静默视为不发动。修复约定:cardId 出现即视为发动意图。
+  it('回归:respond 仅带 {cardId} 无 choice → 同样替换判定牌', async () => {
+    const lightningCard = makeCard('sd1b', '闪电', '♠');
+    const judgeCard = makeCard('j1b', '判定牌', '♠', '5');
+    const replaceCard = makeCard('r1b', '杀', '♣', '5'); // 黑色非黑桃 → 不命中
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '张角',
+          hand: ['r1b'],
+          skills: ['鬼道', '回合管理'],
+          health: 4,
+        }),
+        makePlayer({
+          index: 1,
+          name: '闪电主',
+          skills: ['闪电', '回合管理'],
+          pendingTricks: [{ name: '闪电', source: 1, card: lightningCard }],
+          health: 4,
+        }),
+      ],
+      cardMap: { sd1b: lightningCard, j1b: judgeCard, r1b: replaceCard },
+      currentPlayerIndex: 1,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    const restoreCompare = disableAutoCompare();
+    try {
+      state.zones = { deck: ['j1b'], discardPile: [], processing: [] };
+      await harness.setup(state);
+      const P0 = harness.player('张角');
+
+      void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+      await waitForStable(harness.state); // 无懈窗口
+      await fireTimeoutAndWait(harness.state); // 跳过无懈
+      await waitForStable(harness.state); // 鬼道询问 pending
+
+      // 模拟浏览器/HeadlessGameClient 的真实发送形状:只有 cardId,无 choice
+      await P0.respond('鬼道', { cardId: 'r1b' });
+      await waitForStable(harness.state);
+
+      expect(harness.state.players[0].hand).not.toContain('r1b');
+      expect(harness.state.zones.discardPile).toContain('r1b');
+      expect(harness.state.players[1].health).toBe(4);
+    } finally {
+      restoreCompare();
+    }
+  });
 });

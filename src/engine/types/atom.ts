@@ -237,6 +237,18 @@ export type Atom =
       selections: Array<{ target: number; candidates: Array<{ name: string; skills: string[]; baseId?: string }> }>;
     }
   | { type: '分配武将'; target: number; character: string; skills: string[] }
+  | {
+      type: '亮将';
+      /** 选将结束一次性公开全部角色(选将保密策略的收尾广播) */
+      assignments: Array<{
+        target: number;
+        character: string;
+        faction?: import('./state').Faction;
+        maxHealth: number;
+        health: number;
+        skills: string[];
+      }>;
+    }
   | { type: '初始化洗牌'; seed: number }
   | { type: '发牌'; handSize: number }
   | { type: '判定'; player: number; judgeType: string }

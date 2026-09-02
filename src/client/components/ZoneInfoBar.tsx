@@ -49,10 +49,8 @@ function ZoneInfoBarImpl(props: ZoneInfoBarImplProps) {
 
   return (
     <div className={styles.centerZoneInfo}>
-      <div className={styles.metaText} data-zone-anchor="deck">
-        牌堆: {view.zones?.deckCount ?? Object.keys(view.cardMap).length} 张
-      </div>
-      {/* 处理区:中间结算的牌(判定牌 / 闪抵消杀 / 杀 / 锦囊) */}
+      {/* 处理区:中间结算的牌(判定牌 / 闪抵消杀 / 杀 / 锦囊)。居中展示(官方出牌居中)。
+          牌堆/弃牌计数已移至战场左下角(ZoneCornerCounts),避免与武将卡/弹窗争位。 */}
       {(() => {
         if (procIds.length === 0) return null;
         return (
@@ -92,14 +90,35 @@ function ZoneInfoBarImpl(props: ZoneInfoBarImplProps) {
           </div>
         );
       })()}
-      {/* 弃牌堆:右上角一个小图标 + 数字 */}
+    </div>
+  );
+}
+
+/** 战场左下角 HUD:牌堆/弃牌堆计数(官方 p0 左下角弃牌区位置)。
+ *  纯展示小件,直接读 context;与处理区(居中)分离,避免中央堆栈与
+ *  选将弹窗/武将卡争位争层级。 */
+export function ZoneCornerCounts() {
+  const { view } = useGameView();
+  if (!view) return null;
+  return (
+    <>
+      <div className={styles.metaText} data-zone-anchor="deck">
+        <span className={styles.zoneIcon} aria-hidden>
+          🂠
+        </span>
+        牌堆
+        <span className={styles.zoneCount}>
+          {view.zones?.deckCount ?? Object.keys(view.cardMap).length}
+        </span>
+      </div>
       <div className={styles.discardPileRow} data-zone-anchor="discard">
-        <span className={styles.discardPileIcon} title="弃牌堆">
+        <span className={styles.discardPileIcon} title="弃牌堆" aria-hidden>
           🗂
         </span>
-        <span className={styles.discardPileCount}>弃牌: {view.zones?.discardPileCount ?? 0}</span>
+        弃牌
+        <span className={styles.discardPileCount}>{view.zones?.discardPileCount ?? 0}</span>
       </div>
-    </div>
+    </>
   );
 }
 

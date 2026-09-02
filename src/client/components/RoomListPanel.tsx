@@ -1,7 +1,60 @@
 import { memo, useState } from 'react';
-import { css } from '@linaria/core';
+import { css, cx } from '@linaria/core';
 import type { RoomInfo } from '../../server/protocol';
-import { colors, btnStyle } from '../theme';
+import { colors } from '../theme';
+
+/* ── 房间操作按钮:幽灵药丸体系(与游戏内顶栏同语言)──
+   形状/字号一致,以色相区分语义:中性(刷新)/金(加入=主操作)/蓝(旁观)/红(删除)。 */
+const btnGhost = css`
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 7px 16px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
+  color: #cfcabb;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: nowrap;
+  transition: all 0.15s;
+  &:hover {
+    border-color: rgba(217, 180, 92, 0.65);
+    color: #ecd9a8;
+    background: rgba(217, 180, 92, 0.08);
+  }
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+`;
+const btnGhostGold = css`
+  border-color: rgba(217, 180, 92, 0.55);
+  color: #ecd9a8;
+  background: rgba(217, 180, 92, 0.1);
+  &:hover {
+    border-color: rgba(240, 205, 120, 0.85);
+    background: rgba(217, 180, 92, 0.18);
+  }
+`;
+const btnGhostBlue = css`
+  border-color: rgba(82, 150, 220, 0.55);
+  color: #7db8e8;
+  background: rgba(52, 120, 200, 0.12);
+  &:hover {
+    border-color: rgba(120, 180, 240, 0.8);
+    color: #a5ccf0;
+    background: rgba(52, 120, 200, 0.22);
+  }
+`;
+const btnGhostRed = css`
+  border-color: rgba(231, 76, 60, 0.5);
+  color: #e89a8d;
+  background: rgba(231, 76, 60, 0.1);
+  &:hover {
+    border-color: rgba(240, 120, 100, 0.75);
+    color: #f4b8ad;
+    background: rgba(231, 76, 60, 0.2);
+  }
+`;
 
 interface RoomListPanelProps {
   rooms: RoomInfo[];
@@ -21,11 +74,15 @@ interface RoomListPanelProps {
 }
 
 const panelRoot = css`
-  background-color: ${colors.bg.panel};
+  background: linear-gradient(rgba(22, 20, 30, 0.85), rgba(14, 13, 20, 0.88));
+  border: 1px solid rgba(196, 162, 84, 0.28);
   border-radius: 12px;
   padding: 30px;
   min-width: 300px;
   max-width: 400px;
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 232, 170, 0.05);
 `;
 
 const panelTitle = css`
@@ -48,14 +105,20 @@ const emptyTextStyle = css`
 `;
 
 const roomItem = css`
-  background-color: ${colors.bg.input};
-  border-radius: 8px;
+  background: linear-gradient(rgba(30, 27, 40, 0.75), rgba(22, 20, 30, 0.8));
+  border: 1px solid rgba(196, 162, 84, 0.18);
+  border-radius: 10px;
   padding: 15px;
   margin-bottom: 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  transition: border-color 0.15s, background-color 0.15s;
+  &:hover {
+    border-color: rgba(217, 180, 92, 0.45);
+    background: rgba(38, 34, 48, 0.85);
+  }
 `;
 
 const roomInfo = css`
@@ -187,17 +250,7 @@ export const RoomListPanel = memo(
         )}
 
         <div className={refreshRow}>
-          <button
-            onClick={onRefresh}
-            className={btnStyle}
-            style={
-              {
-                '--btn-bg': colors.accent.blue,
-                '--btn-padding': '8px 16px',
-                '--btn-font-size': '13px',
-              } as React.CSSProperties
-            }
-          >
+          <button onClick={onRefresh} className={btnGhost}>
             刷新列表
           </button>
         </div>
@@ -238,14 +291,7 @@ export const RoomListPanel = memo(
                       <button
                         onClick={() => handleJoinClick(room.id)}
                         disabled={joiningId === room.id}
-                        className={btnStyle}
-                        style={
-                          {
-                            '--btn-bg': colors.accent.green,
-                            '--btn-padding': '8px 16px',
-                            '--btn-font-size': '13px',
-                          } as React.CSSProperties
-                        }
+                        className={cx(btnGhost, btnGhostGold)}
                       >
                         进入
                       </button>
@@ -254,47 +300,19 @@ export const RoomListPanel = memo(
                         <button
                           onClick={() => handleJoinClick(room.id)}
                           disabled={!isJoinable(room) || joiningId === room.id}
-                          className={btnStyle}
-                          style={
-                            {
-                              '--btn-bg': isJoinable(room) ? colors.accent.green : colors.text.dim,
-                              '--btn-padding': '8px 16px',
-                              '--btn-font-size': '13px',
-                              '--btn-cursor': isJoinable(room) ? 'pointer' : 'not-allowed',
-                            } as React.CSSProperties
-                          }
+                          className={cx(btnGhost, btnGhostGold)}
                         >
                           {joiningId === room.id ? '加入中…' : '加入'}
                         </button>
                         {onSpectate && (
-                          <button
-                            onClick={() => onSpectate(room.id)}
-                            className={btnStyle}
-                            style={
-                              {
-                                '--btn-bg': colors.accent.blue,
-                                '--btn-padding': '8px 16px',
-                                '--btn-font-size': '13px',
-                              } as React.CSSProperties
-                            }
-                          >
+                          <button onClick={() => onSpectate(room.id)} className={cx(btnGhost, btnGhostBlue)}>
                             旁观
                           </button>
                         )}
                       </>
                     )}
                     {onDelete && (
-                      <button
-                        onClick={() => onDelete(room.id)}
-                        className={btnStyle}
-                        style={
-                          {
-                            '--btn-bg': colors.accent.red,
-                            '--btn-padding': '8px 16px',
-                            '--btn-font-size': '13px',
-                          } as React.CSSProperties
-                        }
-                      >
+                      <button onClick={() => onDelete(room.id)} className={cx(btnGhost, btnGhostRed)}>
                         删除
                       </button>
                     )}

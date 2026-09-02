@@ -1,6 +1,6 @@
 // src/client/components/NarrowScreenHint.tsx
-// 窄屏提示条:视口宽度 ≤900px(与 gameViewStyles 的 @media 断点一致)时,
-// 在页面顶部显示不阻断的提示「当前窗口较窄,建议桌面浏览器游玩」。
+// 窄屏提示条:视口宽度 ≤900px 时,在页面顶部显示不阻断的提示「当前窗口较窄,建议桌面浏览器游玩」。
+// 游戏画布已改为等比缩放(GameViewScaler),窄窗口下整体缩小仍可玩,但过小屏幕可读性差,故保留提示。
 //   - 不阻断交互:整条 pointer-events: none,点击穿透到下方 UI,仅关闭按钮可点。
 //   - 不参与滚动:position: fixed 固定于视口顶部,滚动不带走。
 //   - 宽屏零影响:matchMedia 驱动条件渲染,宽屏完全不挂载(非 CSS 隐藏)。
@@ -9,7 +9,9 @@ import { useEffect, useState } from 'react';
 import { css } from '@linaria/core';
 import { colors } from '../theme';
 
-/** 与 gameViewStyles(layout/actionBar)的 @media (max-width: 900px) 断点对齐 */
+/** 独立阈值:视口 ≤900px 时画布等比缩放(GameViewScaler)的 scale 偏小、可读性差,
+ *  提示改用桌面浏览器。原 gameViewStyles 的 @media 断点已随缩放容器改造移除,
+ *  此值不再与任何样式断点对齐,仅作提示条件。 */
 const NARROW_QUERY = '(max-width: 900px)';
 
 const bar = css`

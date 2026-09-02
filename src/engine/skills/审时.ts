@@ -121,8 +121,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return null; // confirm:接受 choice/confirmed
       }
       if (rt === YIN_GIVE_RT) {
-        const ids = params.cardIds as string[] | undefined;
-        if (!Array.isArray(ids) || ids.length === 0) return '需要选择一张牌';
+        // 客户端契约:useCard 型 pending 只发 {cardId};{}=不发动(交给其一张牌是可选确认后的动作)。
+        const raw: unknown = params.cardIds ?? params.cardId;
+        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
+        if (!ids || ids.length === 0) return null; // 放弃 → 消费端按未给牌中止
         const self = st.players[ownerId];
         if (!ids.every((id) => self.hand.includes(id))) return '牌不在手牌中';
         return null;
@@ -143,8 +145,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (rt === YIN_CONFIRM_RT) {
         st.localVars[YIN_CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === YIN_GIVE_RT) {
-        const ids = params.cardIds as string[] | undefined;
-        if (Array.isArray(ids)) st.localVars[YIN_GIVE_KEY] = ids;
+        const raw: unknown = params.cardIds ?? params.cardId;
+        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
+        if (ids && ids.length > 0) st.localVars[YIN_GIVE_KEY] = ids;
       } else if (rt === YANG_DEATH_CONFIRM_RT) {
         st.localVars[YANG_DEATH_CONFIRMED_KEY] =
           params.choice === true || params.confirmed === true;

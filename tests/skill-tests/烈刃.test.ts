@@ -332,4 +332,68 @@ describe('烈刃', () => {
     // 祝融仍持有 p1(未拼点)
     expect(harness.state.players[0].hand).toContain('p1');
   });
+
+  it('拼点赢且结算时受害多张手牌 → 盲取随机获得(seed 变化结果可不同,不固定首张)', async () => {
+    // 回归背景:曾固定取 hand[0],对手可按手牌排列利用;现按 seed RNG 盲取
+    // (与突袭/界突袭"从不可见手牌盲取"范式一致)。
+    const gained = new Set<string>();
+    for (let seed = 1; seed <= 24 && gained.size < 2; seed++) {
+      const h = new SkillTestHarness();
+      const slash = mkCard(`s${seed}`, '杀', '♠', '7');
+      const ownerPd = mkCard(`p1_${seed}`, '杀', '♠', 'K'); // K=13 大
+      const victimPd = mkCard(`p2_${seed}`, '闪', '♥', '3'); // 3 小
+      const kp1 = mkCard(`k1_${seed}`, '桃', '♣', '5');
+      const kp2 = mkCard(`k2_${seed}`, '无懈可击', '♦', '6');
+      await h.setup(
+        createGameState({
+          players: [
+            mkPlayer({
+              index: 0,
+              name: '祝融',
+              hand: [slash.id, ownerPd.id],
+              skills: ['杀', '烈刃'],
+            }),
+            mkPlayer({
+              index: 1,
+              name: '受害',
+              hand: [victimPd.id, kp1.id, kp2.id],
+              skills: [],
+            }),
+          ],
+          cardMap: {
+            [slash.id]: slash,
+            [ownerPd.id]: ownerPd,
+            [victimPd.id]: victimPd,
+            [kp1.id]: kp1,
+            [kp2.id]: kp2,
+          },
+          currentPlayerIndex: 0,
+          phase: '出牌',
+          turn: { round: 1, phase: '出牌', vars: {} },
+          rngSeed: seed,
+        }),
+      );
+      const ZR = h.player('祝融');
+      const V = h.player('受害');
+
+      await ZR.useCardAndTarget('杀', slash.id, [1]);
+      await V.pass();
+      await h.waitForStable();
+      ZR.expectPending('请求回应');
+      await ZR.respond('烈刃', { choice: true });
+      await h.waitForStable();
+      await ZR.respond('烈刃', { cardId: ownerPd.id });
+      await h.waitForStable();
+      V.expectPending('请求回应');
+      await V.respond('烈刃', { cardId: victimPd.id });
+      await h.waitForStable();
+
+      // 拼点后受害剩 [kp1,kp2] → 获得其中一张
+      const hand = h.state.players[0].hand;
+      if (hand.includes(kp1.id)) gained.add(kp1.id);
+      if (hand.includes(kp2.id)) gained.add(kp2.id);
+    }
+    // 24 个 seed 下两种结果全不出现的概率 ≈ 2^-23,视为不可能
+    expect(gained.size).toBe(2);
+  });
 });

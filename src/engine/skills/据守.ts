@@ -98,11 +98,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
               title: '据守:选择一张手牌弃置(装备牌将改为使用)',
               cardFilter: { filter: () => true, min: 1, max: 1 },
             },
-            defaultChoice: self.hand[0],
+            // 强制弃牌(摸四的代价,不可放弃):超时由下方兜底自动弃首张
+            mandatory: true,
             timeout: 20,
           });
-          const chosenId = state.localVars[DISCARD_CHOICE_KEY] as string | undefined;
+          let chosenId = state.localVars[DISCARD_CHOICE_KEY] as string | undefined;
           delete state.localVars[DISCARD_CHOICE_KEY];
+          // 强制弃牌兜底:超时/空响应未选 → 自动弃手牌首张(不放弃弃牌义务)
+          if (!chosenId || !self.hand.includes(chosenId)) {
+            chosenId = self.hand[0];
+          }
           if (chosenId && self.hand.includes(chosenId)) {
             const card = state.cardMap[chosenId];
             const slot = slotOf(card);
@@ -161,9 +166,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (s: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string | undefined;
-      if (typeof cardId === 'string') {
-        s.localVars[DISCARD_CHOICE_KEY] = cardId;
+      // 客户端契约:mandatory 多选弃牌 UI 与 HeadlessGameClient 提交 {cardIds:[x]},
+      // 旧单发形状为 {cardId}。归一化双形状,且仅接受自己手牌中的牌(防注入他人牌);
+      // 非法形状不写 → use execute 走兜底弃首张。
+      const raw: unknown = Array.isArray(params.cardIds) ? params.cardIds[0] : params.cardId;
+      const self = s.players[ownerId];
+      if (typeof raw === 'string' && self?.hand.includes(raw)) {
+        s.localVars[DISCARD_CHOICE_KEY] = raw;
       }
     },
   );

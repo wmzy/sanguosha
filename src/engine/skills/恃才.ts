@@ -37,6 +37,8 @@ const USED_TYPES_VAR = '恃才/已用类型';
 const PENDING_VAR = '恃才/待触发';
 /** localVars:恃才发动确认结果。 */
 const CONFIRM_KEY = '恃才/confirmed';
+/** 帧参数 key:使用时记录的实体卡 id(转化牌为原卡,真实牌即本体)。 */
+const EFFECTIVE_ID_KEY = '恃才/effectiveCardId';
 /** 询问 requestType(T1:前缀 = skillId)。 */
 const CONFIRM_RT = '恃才/confirm';
 
@@ -102,6 +104,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const pending = (ctx.state.turn.vars[PENDING_VAR] as string[] | undefined) ?? [];
     pending.push(effectiveIdOf(ctx.state, atom.cardId));
     ctx.state.turn.vars[PENDING_VAR] = pending;
+    // 影子卡(转化牌)入弃牌堆时被引擎还原为原卡并删除影子条目——结算结束后
+    // effectiveIdOf 将无法反查。趁影子仍在,把实体原卡 id 记入当前结算帧参数。
+    ctx.frame.params[EFFECTIVE_ID_KEY] = card.shadowOf ?? atom.cardId;
   });
 
   // ── 使用结算结束后 after-hook:eligible 牌 → 询问置顶摸牌 ──
@@ -111,7 +116,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (atom.source !== ownerId) return;
     if (!ctx.state.players[ownerId]?.alive) return;
 
-    const effectiveId = effectiveIdOf(ctx.state, atom.cardId);
+    // 实体卡 id:优先用 使用时 记入帧参数的原卡 id(转化牌兼容);
+    // 无记录(如纯虚拟使用)回退 cardMap 反查
+    const effectiveId =
+      (ctx.frame.params[EFFECTIVE_ID_KEY] as string | undefined) ??
+      effectiveIdOf(ctx.state, atom.cardId);
     const pending = (ctx.state.turn.vars[PENDING_VAR] as string[] | undefined) ?? [];
     if (!pending.includes(effectiveId)) return; // 非首次使用此类型,不触发
     // 移除 eligible 标记(无论是否发动,本类型本回合不再触发)

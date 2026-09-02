@@ -39,7 +39,7 @@
 // handleTransformPlay 提交 preceding params.cardIds=[id1,id2] + 主 action
 // cardId = ${id1}#${id2}#丈八蛇矛。
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { applyAtom } from '../core/apply';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
@@ -86,8 +86,18 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const weaponId = self.equipment['武器'];
       const weaponCard = weaponId ? state.cardMap[weaponId] : undefined;
       const hasZhangba = weaponCard?.name === '丈八蛇矛';
+      // 回应路径(被询问杀:南蛮入侵/决斗):与武圣同构,preceding 在 杀.respond 前
+      const slot = state.pendingSlots.get(ownerId);
+      const atomType = (slot?.atom as { type?: string })?.type;
+      const reqType = (slot?.atom as { requestType?: string })?.requestType;
+      const atomTarget = (slot?.atom as { target?: number })?.target;
+      const askedKill =
+        !!slot &&
+        atomTarget === ownerId &&
+        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+      const contextOk = (myTurn && inActPhase && free) || askedKill;
       const ok =
-        myTurn && inActPhase && free && selfAlive && cardInHand && cardsExist && hasZhangba;
+        selfAlive && cardInHand && cardsExist && hasZhangba && contextOk;
       return ok ? null : '丈八蛇矛转化条件不满足';
     },
     async (state: GameState, params: Record<string, Json>) => {
@@ -117,7 +127,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
     },
   );
-  return () => {};
+  // 声明替代回应:被询问杀(南蛮入侵/决斗 等)时,可用丈八蛇矛把 2 张手牌当杀打出。
+  // 与武圣同构:声明后 询问杀 的可用性检测不再 skip,建立回应窗口。
+  const unloadAlt = declareAlternativeResponse(state, ownerId, '询问杀');
+  return () => {
+    unloadAlt();
+  };
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): void {
@@ -143,13 +158,23 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     // 多卡选牌 id 由前端在 handleTransformPlay 中拼成 ${id1}#${id2}#丈八蛇矛。
     transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id }),
     activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
       const p = ctx.view.players[ctx.perspectiveIdx];
       if (!p) return false;
       const weaponId = p.equipment['武器'];
       const weapon = weaponId ? ctx.view.cardMap[weaponId] : undefined;
       if (weapon?.name !== '丈八蛇矛') return false;
-      return p.handCount >= 2 && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+      if ((p.handCount ?? 0) < 2) return false;
+      // 出牌路径(自己回合 + 出牌阶段 + 还能出杀)
+      const ownTurnCanSlash = defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+      // 回应路径(被询问杀:南蛮入侵/决斗):与武圣同构
+      const slot = ctx.view.pending;
+      const atomType = (slot?.atom as { type?: string })?.type;
+      const reqType = (slot?.atom as { requestType?: string })?.requestType;
+      const askedKill =
+        !!slot &&
+        slot.target === ctx.perspectiveIdx &&
+        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+      return ownTurnCanSlash || askedKill;
     },
   });
   return;

@@ -31,9 +31,13 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     } else if (atom.to.zone === '牌堆') {
       state.zones.deck.push(atom.cardId);
     } else if (atom.to.zone === '弃牌堆') {
+      // 结算临时牌(八卦阵/八阵虚拟闪):销毁而非入弃牌堆——它是凭空生成的标记,
+      // 入堆会让牌库永久多一张假闪,重洗后可被玩家摸起。
       // 影子卡牌还原:转化牌(武圣红牌当杀)入弃牌堆时,用原卡替换
       const card = state.cardMap[atom.cardId];
-      if (card.shadowOf) {
+      if (card?.ephemeral) {
+        delete state.cardMap[atom.cardId];
+      } else if (card?.shadowOf) {
         state.zones.discardPile.push(card.shadowOf);
         delete state.cardMap[atom.cardId]; // 删除影子,原卡 cardMap[shadowOf] 仍在
       } else {
@@ -109,6 +113,9 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
       from: atom.from,
       to: atom.to,
       player: fromPlayer ?? toPlayer,
+      // 结算临时牌:apply 将销毁而非入弃牌堆。标志随事件下发(增量端 cardMap
+      // 镜像可能没有该虚拟牌条目——hook 直接写 cardMap 不产生事件),applyView 据此同步。
+      ...(state.cardMap[atom.cardId]?.ephemeral ? { ephemeral: true } : {}),
     };
     return { ownerViews: new Map(), othersView: view };
   },
@@ -129,8 +136,13 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
       }
 
       if (to?.zone === '牌堆') view.zones.deckCount += 1;
-      else if (to?.zone === '弃牌堆') view.zones.discardPileCount += 1;
-      else if (to?.zone === '处理区') {
+      else if (to?.zone === '弃牌堆') {
+        // 结算临时牌(ephemeral)在后端被销毁而非入弃牌堆,视图同步:不加计数。
+        // 标志读事件本体(虚拟牌经 hook 直接写 cardMap,增量端镜像未必有该条目)。
+        if ((event as { ephemeral?: unknown }).ephemeral !== true) {
+          view.zones.discardPileCount += 1;
+        }
+      } else if (to?.zone === '处理区') {
         const f = view.settlementStack[view.settlementStack.length - 1];
         if (f) f.cards.push(cardId);
         if (view.zones) view.zones.processing.push(cardId);

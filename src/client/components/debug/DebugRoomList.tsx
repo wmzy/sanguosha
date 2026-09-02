@@ -36,11 +36,15 @@ const rootRow = css`
 `;
 
 const createCard = css`
-  background-color: ${colors.bg.panel};
+  background: linear-gradient(rgba(22, 20, 30, 0.85), rgba(14, 13, 20, 0.88));
+  border: 1px solid rgba(196, 162, 84, 0.28);
   border-radius: 12px;
   padding: 30px;
   min-width: 320px;
   max-width: 400px;
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 232, 170, 0.05);
 `;
 
 const createTitle = css`
@@ -73,8 +77,22 @@ const createBtnBase = css`
 `;
 
 const createBtn = css`
-  background-color: ${colors.accent.orange};
+  background: linear-gradient(rgba(240, 178, 60, 0.96), rgba(206, 138, 30, 0.96));
+  border: 1px solid rgba(255, 214, 130, 0.35);
   cursor: pointer;
+  letter-spacing: 2px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 200, 0.28),
+    0 4px 14px rgba(206, 138, 30, 0.35);
+  transition: all 0.15s;
+  &:hover {
+    filter: brightness(1.07);
+    transform: translateY(-1px);
+  }
+  &:active {
+    transform: translateY(0);
+    filter: brightness(0.96);
+  }
 `;
 
 export function DebugRoomList({

@@ -75,7 +75,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const reqType = atom.requestType as string;
       if (reqType !== '界鬼才/replace') return '当前不是界鬼才询问';
       // 若选择替换:cardId 必须在手牌或装备区中;若选择不替换:无额外要求
-      if (params.choice === true || params.confirmed === true) {
+      // 浏览器/Headless 客户端对 useCard 型 pending 只发 {cardId}(无 choice),
+      // 故 cardId 出现即视为发动意图;{choice:false}/{} 仍视为不发动。
+      if (params.choice === true || params.confirmed === true || typeof params.cardId === 'string') {
         const cardId = params.cardId as string;
         if (typeof cardId !== 'string') return '请选择一张替换牌';
         if (findCardLocation(st, cardId) === null) return '替换牌不在手牌或装备区中';
@@ -83,7 +85,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const use = params.choice === true || params.confirmed === true;
+      const use =
+        params.choice === true || params.confirmed === true || typeof params.cardId === 'string';
       if (!use) {
         st.localVars['鬼才/replaceCard'] = null;
         return;
@@ -107,6 +110,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 询问是否替换
     delete ctx.state.localVars['鬼才/replaceCard'];
+    // 显式 candidates(手牌+装备区,仿界天香):投影层 resolveCardFilterCandidates
+    // 仅遍历 player.hand 生成候选,浏览器/HGC 把 candidates 当权威 → 装备牌永远选不到
+    // (prompt 标题却写「手牌或装备牌」,界版核心差异在客户端不可达)。
+    const equipIds = Object.values(me.equipment).filter(
+      (id): id is string => typeof id === 'string',
+    );
     await applyAtom(ctx.state, {
       type: '请求回应',
       requestType: '界鬼才/replace',
@@ -114,7 +123,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
       prompt: {
         type: 'useCard',
         title: '界鬼才:是否打出一张手牌或装备牌代替判定牌?',
-        cardFilter: { min: 1, max: 1 },
+        cardFilter: {
+          filter: () => true,
+          candidates: [...me.hand, ...equipIds],
+          min: 1,
+          max: 1,
+        },
       },
       defaultChoice: false,
       timeout: 15,
@@ -177,7 +191,10 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     prompt: {
       type: 'useCard',
       title: '界鬼才:选择一张手牌或装备牌代替判定牌',
-      cardFilter: { min: 1, max: 1 },
+      // 注册表兜底声明(静态,无法携带装备区动态 candidates):真实询问的权威候选
+      // 由 onInit 判定改判钩子在发起前以 hand+equipment 显式下发(仿界天香),
+      // 前端/HGC 优先消费 pending 侧 candidates,不依赖此处 cardFilter 的手牌遍历。
+      cardFilter: { filter: () => true, min: 1, max: 1 },
     },
   });
 }

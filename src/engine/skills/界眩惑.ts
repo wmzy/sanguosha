@@ -10,7 +10,12 @@
 //           → 选项 1 去掉"攻击范围内"限制 → 选项 2 多"观看其手牌"
 //
 // 实现:
-//   - 阶段结束(摸牌) after-hook: 自己回合 + 自己摸牌阶段结束 + 存活 + 手牌≥2 + 有其他存活角色
+//   - 阶段结束(摸牌) before-hook(必须 before,非 after——回合管理 的同 atom after-hook
+//     会把 phase 推进到"出牌"并以 fire-and-forget 启动出牌窗口循环(非阻塞 slot,
+//     key=player);本技能的阻塞型询问(请求回应)若在 after-hook 中创建,会与窗口 slot
+//     同 target 互相覆盖,窗口 slot 被孤立后回合循环永不 resolve → 整局卡死
+//     (UDFJRA 实证模式,镜像 截辎/界双雄/界将驰 的 before-hook 手法):
+//     自己回合 + 自己摸牌阶段结束 + 存活 + 手牌≥2 + 有其他存活角色
 //     → 询问是否发动 → 选目标 X (其他存活角色) → 选 2 张手牌交给 X
 //     → X 选择 1 或 2:
 //       · 1: 法正指定 Y(≠X 的存活角色) → X 从手牌出杀对 Y(走完整 杀 结算,无距离限制;
@@ -32,7 +37,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAction, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界眩惑';
@@ -249,8 +254,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     );
   }
 
-  // ── 阶段结束(摸牌) after-hook:法正回合的摸牌阶段结束时发动 ──
-  registerAfterHook(
+  // ── 阶段结束(摸牌) before-hook:法正回合的摸牌阶段结束时发动 ──
+  // before-hook 先于 atom apply 与 回合管理 after-hook:全部阻塞询问在出牌窗口
+  // slot 创建前完成,避免同 target 的 pendingSlots 覆盖卡死(见文件头说明)。
+  registerBeforeHook(
     state,
     skill.id,
     ownerId,

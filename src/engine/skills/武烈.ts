@@ -71,8 +71,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const rt = atom['requestType'] as string;
       if (rt !== CONFIRM_RT && rt !== HP_RT && rt !== CHOOSE_RT) return '当前不是武烈询问';
       if (rt === HP_RT) {
+        // chooseOption 前端提交 { option: 'N' };兼容直接传数字 hpCount 的调用方
+        const raw = typeof params.option === 'string' ? Number(params.option) : params.hpCount;
         const hp = st.players[ownerId]?.health ?? 0;
-        const n = typeof params.hpCount === 'number' ? params.hpCount : NaN;
+        const n = typeof raw === 'number' ? raw : NaN;
         if (!Number.isInteger(n) || n < 1 || n > hp) {
           return `请选择 1-${hp} 之间的整数`;
         }
@@ -92,8 +94,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === HP_RT) {
-        const n = typeof params.hpCount === 'number' ? params.hpCount : 1;
-        st.localVars[HP_KEY] = n;
+        // chooseOption 提交 { option: 'N' };未回应/超时由 onTimeout 兜底,不默认失血
+        const raw = typeof params.option === 'string' ? Number(params.option) : params.hpCount;
+        if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 1) {
+          st.localVars[HP_KEY] = raw;
+        }
       } else if (rt === CHOOSE_RT) {
         const targets = params.targets as number[] | undefined;
         if (Array.isArray(targets)) st.localVars[CHOSEN_KEY] = targets;
@@ -151,11 +156,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         requestType: HP_RT,
         target: ownerId,
         prompt: {
-          type: 'confirm',
+          type: 'chooseOption',
           title: `武烈:失去几点体力?(1-${maxN})`,
-          description: `失去 N 点体力,令 N 名其他角色各获得1个「烈」标记(N 通过 hpCount 参数回复)`,
-          confirmLabel: '确认',
-          cancelLabel: '取消',
+          description: '失去 N 点体力,令 N 名其他角色各获得1个「烈」标记',
+          options: Array.from({ length: maxN }, (_, i) => ({
+            value: String(i + 1),
+            label: `失去 ${i + 1} 点体力`,
+          })),
         },
         defaultChoice: false,
         timeout: 20,

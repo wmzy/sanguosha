@@ -42,6 +42,16 @@ export interface Room {
   playerNames: Map<string, string>;
   /** 待处理座位交换请求：requesterId → { targetSeat, expiresAt, timer } */
   pendingSeatSwaps: Map<string, { targetSeat: number; expiresAt: number; timer: ReturnType<typeof setTimeout> }>;
+  /** 近期离开成员表：playerId → { at: 离开时刻 ms, role: 离开时身份 }。
+   *  等待中/已结束阶段 SSE 断线会立即走 leaveRoom/removeSpectator 清空三名单
+   *  (seats/playerNames/spectators)，而浏览器 EventSource 约 3s 自动重连只打
+   *  stream 端点、不重走 POST /join——若无此表，重连会被 SSE 成员门禁 403 拒绝，
+   *  且 EventSource 对非 2xx 永久失败，用户只能手动重进。此表为「刚被清理但
+   *  马上回来」的合法成员保留短窗口成员资格(见 RECENT_LEAVE_GRACE_MS)。
+   *  仅断线路径写入(主动退出/被踢不记录)；进行中状态不查此表(座位宽限期已
+   *  覆盖，不放宽越权语义)；过期条目由读写两侧懒清理；纯内存不持久化
+   *  (服务器重启路径由 DB 持久化的 playerNames 覆盖)。 */
+  recentlyLeft: Map<string, { at: number; role: 'player' | 'spectator' }>;
 }
 
 const roomList = new Map<string, Room>();
@@ -142,6 +152,7 @@ export function createRoom(
     chatHistory: [],
     seats,
     pendingSeatSwaps: new Map(),
+    recentlyLeft: new Map(),
     passwordHash,
     playerNames: hostName ? new Map([[hostId, hostName]]) : new Map(),
   };
@@ -172,6 +183,7 @@ export function createDebugRoom(name: string, maxPlayers: number, config?: RoomC
     chatHistory: [],
     seats: Array(clampPlayers(maxPlayers)).fill(null),
     pendingSeatSwaps: new Map(),
+    recentlyLeft: new Map(),
     passwordHash: null,
     playerNames: new Map(),
   };
@@ -206,7 +218,9 @@ export function joinRoom(
   if (!room) return null;
   // 显示名在所有路径(复用座位/新入座)统一刷新——重连时若用户已改名则以最新为准
   if (displayName) room.playerNames.set(playerId, displayName);
-  if (room.status !== '等待中') return null;
+  // 「已结束」(上一局打完,等房主再来一局)同样允许加入空座——否则退出房间的玩家
+  // 无法重新加入,只能旁观(游戏结束后 status 停留在 已结束,直到房主重置)。
+  if (room.status !== '等待中' && room.status !== '已结束') return null;
   if (room.players.has(playerId)) return null;
 
   // 如果玩家已在 seats 中（SSE 断开重连时 seats 残留），复用已有座位
@@ -215,6 +229,8 @@ export function joinRoom(
     room.players.set(playerId, sink);
     // 身份互斥：复用座位时清理可能残留的旁观者身份
     clearSpectatorMembership(room, playerId);
+    // 重新入会成为正式成员，撤销可能残留的断线宽限条目
+    room.recentlyLeft.delete(playerId);
     return room;
   }
 
@@ -224,6 +240,8 @@ export function joinRoom(
   room.players.set(playerId, sink);
   // 身份互斥：加入玩家前清理可能残留的旁观者身份（如刷新前是旁观者）
   clearSpectatorMembership(room, playerId);
+  // 重新入会成为正式成员，撤销可能残留的断线宽限条目
+  room.recentlyLeft.delete(playerId);
   // 分配首个空座位
   const emptySeat = room.seats.indexOf(null);
   if (emptySeat >= 0) {
@@ -311,13 +329,24 @@ export function joinDebugRoom(
   return { room, replacedPlayerId };
 }
 
-export function leaveRoom(roomId: string, playerId: string): Room | null {
+export function leaveRoom(
+  roomId: string,
+  playerId: string,
+  /** 'disconnect'=SSE 断线触发(记入近期离开宽限表)；'explicit'=主动退出/换房/清理
+   *  (不记录——客户端已显式关闭连接或被踢，不存在自动重连诉求，被踢者不得借窗口回房)。 */
+  reason: 'disconnect' | 'explicit' = 'explicit',
+): Room | null {
   const room = roomList.get(roomId);
   if (!room) return null;
 
   removePlayerMembership(room, playerId);
   // 仍在旁观(如玩家身份被顶替后转旁观)则保留显示名;彻底离开才清除
-  if (!room.spectators.has(playerId)) room.playerNames.delete(playerId);
+  if (!room.spectators.has(playerId)) {
+    room.playerNames.delete(playerId);
+    // 断线路径记入宽限表：EventSource 自动重连只打 stream 端点、不重走 POST /join，
+    // 若无此记录会被 SSE 成员门禁 403 拒绝且永久失败(见 Room.recentlyLeft 注释)。
+    if (reason === 'disconnect') recordRecentLeave(room, playerId, 'player');
+  }
 
   // 普通房间: 不自动销毁, 不自动换主。仅同步 DB。
   if (room.roomType === 'normal') {
@@ -416,6 +445,10 @@ export function updateConfig(roomId: string, config: unknown, playerId: string, 
 export function setReady(roomId: string, playerId: string): boolean {
   const room = roomList.get(roomId);
   if (room?.status !== '等待中') return false;
+  // 仅占座玩家可准备(seats 是权威座位表;players 是连接层,建房后 SSE 连接前为空)。
+  // 无此守卫时,任意字符串会被塞进 readyPlayers,
+  // 使 allReady 的 size 相等判断永假 → 房间永久无法开局。
+  if (!room.seats.includes(playerId)) return false;
 
   room.readyPlayers.add(playerId);
   return true;
@@ -424,6 +457,8 @@ export function setReady(roomId: string, playerId: string): boolean {
 export function unsetReady(roomId: string, playerId: string): boolean {
   const room = roomList.get(roomId);
   if (room?.status !== '等待中') return false;
+  // 同 setReady:非本房玩家的取消请求直接拒绝
+  if (!room.seats.includes(playerId)) return false;
 
   return room.readyPlayers.delete(playerId);
 }
@@ -513,6 +548,35 @@ export function ensureSeatOnReconnect(room: Room, playerId: string): boolean {
   if (emptySeat < 0) return false;
   room.seats[emptySeat] = playerId;
   return true;
+}
+
+/** 近期离开宽限窗口时长(ms)：等待中/已结束阶段断线的成员，其 EventSource 自动
+ *  重连(不重走 POST /join)在此窗口内仍视作成员。须显著大于心跳间隔(10s)+
+ *  EventSource 重试间隔(约 3s)，覆盖网络抖动/休眠唤醒后的首次自动重连。 */
+export const RECENT_LEAVE_GRACE_MS = 60_000;
+
+/** 记录断线离开成员(带离开时身份，供重连后归位玩家/旁观分支)。
+ *  写入前懒清理过期项，防止表随断线次数无限增长(房间生命周期内条目数 ≤ 成员数)。 */
+function recordRecentLeave(room: Room, playerId: string, role: 'player' | 'spectator'): void {
+  const now = Date.now();
+  for (const [pid, entry] of room.recentlyLeft) {
+    if (now - entry.at >= RECENT_LEAVE_GRACE_MS) room.recentlyLeft.delete(pid);
+  }
+  room.recentlyLeft.set(playerId, { at: now, role });
+}
+
+/** 查询 playerId 的近期离开宽限条目；已过期则顺手懒清理并返回 null。 */
+export function getRecentLeaveGrace(
+  room: Room,
+  playerId: string,
+): { role: 'player' | 'spectator' } | null {
+  const entry = room.recentlyLeft.get(playerId);
+  if (!entry) return null;
+  if (Date.now() - entry.at >= RECENT_LEAVE_GRACE_MS) {
+    room.recentlyLeft.delete(playerId);
+    return null;
+  }
+  return entry;
 }
 
 export function broadcastMessage(room: Room, message: ServerMessage, excludeId?: string): void {
@@ -642,6 +706,10 @@ export function respondSeatSwap(
 ): { room: Room; swapped: boolean } | null {
   const room = roomList.get(roomId);
   if (!room) return null;
+  // 与 moveSeat/requestSeatSwap 同款守卫:仅等待中可换座。
+  // 缺此检查时,开局瞬间点「接受」会在对局进行中改写 seats,
+  // 破坏断线重连的 ensureSeatOnReconnect 归位与座次显示。
+  if (room.status !== '等待中') return null;
 
   const pending = room.pendingSeatSwaps.get(requesterId);
   if (!pending) return null;
@@ -695,22 +763,33 @@ export function joinAsSpectator(
   }
   room.spectators.set(spectatorId, sink);
   if (displayName) room.playerNames.set(spectatorId, displayName);
+  // 重新入房成为正式旁观，撤销可能残留的断线宽限条目
+  room.recentlyLeft.delete(spectatorId);
   return room;
 }
 
-/** 旁观者离开/断线：清理连接、授权和待处理申请。 */
-export function removeSpectator(roomId: string, spectatorId: string): Room | null {
+/** 旁观者离开/断线：清理连接、授权和待处理申请。
+ *  reason 语义同 leaveRoom('disconnect' 记入近期离开宽限表,见 Room.recentlyLeft)。 */
+export function removeSpectator(
+  roomId: string,
+  spectatorId: string,
+  reason: 'disconnect' | 'explicit' = 'explicit',
+): Room | null {
   const room = roomList.get(roomId);
   if (!room) return null;
   room.spectators.delete(spectatorId);
   room.viewGrants.delete(spectatorId);
   room.pendingViewRequests.delete(spectatorId);
   // 仍在座位上(身份互斥的另一半不存在,防御性判断)则保留;否则彻底清除
-  if (!room.seats.includes(spectatorId)) room.playerNames.delete(spectatorId);
+  if (!room.seats.includes(spectatorId)) {
+    room.playerNames.delete(spectatorId);
+    if (reason === 'disconnect') recordRecentLeave(room, spectatorId, 'spectator');
+  }
   return room;
 }
 
-/** 切换玩家身份（仅等待中允许）。player↔spectator。
+/** 切换玩家身份。player↔spectator。「等待中」与「已结束」(上一局打完等重置)均允许——
+ *  结束后旁观者点击空座位可直接入座,无需等房主点「再来一局」。
  *  身份互斥：切换后确保 playerId 只在一方（players 或 spectators），不留残留。 */
 export function switchRole(
   roomId: string,
@@ -720,7 +799,7 @@ export function switchRole(
 ): { room: Room; success: boolean } {
   const room = roomList.get(roomId);
   if (!room) return { room: null as never, success: false };
-  if (room.status !== '等待中') return { room, success: false };
+  if (room.status !== '等待中' && room.status !== '已结束') return { room, success: false };
 
   if (newRole === 'spectator') {
     // player → spectator

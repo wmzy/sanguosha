@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 // ─── 首页视觉:深色牌匾质感 + 金色书法标题 + 卡片式入口 ───
 
 const page = css`
-  ${pageBgStyle}
+  /* 原此处插值 ${pageBgStyle}:wyw-in-js 不内联跨模块类属性,改为使用处 className 组合 */
   background-color: #0d1220;
   min-height: 100vh;
   display: flex;
@@ -183,7 +183,7 @@ const identityBar = css`
 `;
 
 const identityCard = css`
-  ${glassPanelStyle}
+  /* 原此处插值 ${glassPanelStyle}:wyw-in-js 不内联跨模块类属性,改为使用处 className 组合 */
   padding: 28px;
   width: 100%;
   max-width: 360px;
@@ -224,7 +224,7 @@ export function HomePage() {
   };
 
   return (
-    <div className={page}>
+    <div className={`${pageBgStyle} ${page}`}>
       <h1 className={title}>三国杀</h1>
       <p className={subtitle}>数字卡牌游戏</p>
       {oauthError && (
@@ -232,7 +232,7 @@ export function HomePage() {
           <span>登录失败（{oauthError}），请重试</span>
         </div>
       )}
-      <div className={identityCard}>
+      <div className={`${glassPanelStyle} ${identityCard}`}>
         <h3 className={identityHeading}>{auth.user ? '账号' : '登录 / 注册'}</h3>
         <AuthPanel auth={auth} />
       </div>

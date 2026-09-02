@@ -113,6 +113,56 @@ describe('界好施', () => {
     expect(harness.state.localVars['界好施/受益者']).toBe(1);
   });
 
+  // 回归(2026-08-26):给牌询问必须带 mandatory 标记(浏览器多选弃牌 UI 契约);
+  // 缺失时浏览器只发 {cardId} → execute 静默忽略,一张不给且被动不激活。
+  it('给牌询问带 mandatory 标记(浏览器多选弃牌 UI 契约)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '鲁肃',
+          hand: ['h1', 'h2', 'h3'],
+          skills: ['界好施', '回合管理'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          hand: [],
+          skills: ['回合管理'],
+        }),
+      ],
+      cardMap: {
+        h1: makeCard('h1', '杀'),
+        h2: makeCard('h2', '闪'),
+        h3: makeCard('h3', '桃', '♦'),
+        d1: makeCard('d1', '杀', '♠'),
+        d2: makeCard('d2', '闪', '♥'),
+        d3: makeCard('d3', '桃', '♦'),
+        d4: makeCard('d4', '酒', '♣'),
+      },
+      zones: { deck: ['d1', 'd2', 'd3', 'd4'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('鲁肃');
+
+    await P0.triggerAction('回合管理', 'start');
+    await P0.respond('界好施', { choice: true });
+
+    const slot = [...harness.state.pendingSlots.values()][0] as {
+      atom?: { requestType?: string; mandatory?: boolean };
+    };
+    expect(slot?.atom?.requestType).toBe('界好施/give');
+    expect(slot?.atom?.mandatory).toBe(true);
+
+    await P0.respond('界好施', { cardIds: ['d1', 'd2', 'd3'] });
+    await harness.waitForStable();
+    expect(harness.state.localVars['界好施/被动激活']).toBe(true);
+  });
+
   // ─── 2. 被动触发:鲁肃被杀指定 → 受益者可交1张 ──────────────
 
   it('被动激活时鲁肃被杀指定 → 受益者P1交给鲁肃1张手牌', async () => {
@@ -290,5 +340,227 @@ describe('界好施', () => {
     expect(harness.state.localVars['界好施/受益者']).toBeUndefined();
     // 当前已是鲁肃的回合
     expect(harness.state.currentPlayerIndex).toBe(0);
+  });
+
+  // 回归(2026-08-26):mandatory 给牌此前缺超时兜底——超时不回应时 GIVE_KEY 未设,
+  // 「分半给最少者」被静默跳过。修复:兜底从手牌首张起补足(与标版好施一致)。
+  it('给牌超时(pass)→ 兜底自动从手牌首张起给 3 张,被动激活', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '鲁肃',
+          hand: ['h1', 'h2', 'h3'],
+          skills: ['界好施', '回合管理'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          hand: [],
+          skills: ['回合管理'],
+        }),
+      ],
+      cardMap: {
+        h1: makeCard('h1', '杀'),
+        h2: makeCard('h2', '闪'),
+        h3: makeCard('h3', '桃', '♦'),
+        d1: makeCard('d1', '杀', '♠'),
+        d2: makeCard('d2', '闪', '♥'),
+        d3: makeCard('d3', '桃', '♦'),
+        d4: makeCard('d4', '酒', '♣'),
+      },
+      zones: { deck: ['d1', 'd2', 'd3', 'd4'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('鲁肃');
+
+    await P0.triggerAction('回合管理', 'start');
+    P0.expectPending('请求回应');
+    await P0.respond('界好施', { choice: true }); // 发动好施
+
+    // 手牌=3+4=7>5 → 给牌询问出现,超时不回应
+    P0.expectPending('请求回应');
+    await P0.pass();
+    await harness.waitForStable();
+
+    // 兜底:仍须给 floor(7/2)=3 张(手牌首张起的 h1/h2/h3)
+    expect(harness.state.players[0].hand.length).toBe(4);
+    expect(harness.state.players[1].hand).toEqual(expect.arrayContaining(['h1', 'h2', 'h3']));
+    expect(harness.state.players[1].hand.length).toBe(3);
+    // 被动照常激活
+    expect(harness.state.localVars['界好施/被动激活']).toBe(true);
+    expect(harness.state.localVars['界好施/受益者']).toBe(1);
+  });
+
+  // ─── 回归(2026-08-27):GIVE_RT 缺同族校验(镜像标版好施守卫) ──
+  // 旧 execute 裸写 GIVE_KEY,异常 cardIds(他人牌/重复)会让 给予 atom validate 抛错,
+  // 打断技能结算。修复:恰好 N 张 + 全在自己手牌 + 去重,非法不写 → 走兜底给牌。
+  it('给牌回应含他人牌 → 守卫拦截,兜底从手牌首张给 3 张,被动照常激活', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '鲁肃',
+          hand: ['h1', 'h2', 'h3'],
+          skills: ['界好施', '回合管理'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          hand: ['p1a'],
+          skills: ['回合管理'],
+        }),
+      ],
+      cardMap: {
+        h1: makeCard('h1', '杀'),
+        h2: makeCard('h2', '闪'),
+        h3: makeCard('h3', '桃', '♦'),
+        p1a: makeCard('p1a', '杀'),
+        d1: makeCard('d1', '杀', '♠'),
+        d2: makeCard('d2', '闪', '♥'),
+        d3: makeCard('d3', '桃', '♦'),
+        d4: makeCard('d4', '酒', '♣'),
+      },
+      zones: { deck: ['d1', 'd2', 'd3', 'd4'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('鲁肃');
+
+    await P0.triggerAction('回合管理', 'start');
+    await P0.respond('界好施', { choice: true });
+
+    // 手牌=7 > 5 → 给3张;异常提交含 P1 的牌 p1a(不在鲁肃手中)→ 守卫拦截
+    await P0.respond('界好施', { cardIds: ['p1a', 'd1', 'd2'] });
+    await harness.waitForStable();
+
+    // 兜底:手牌首张起的 h1/h2/h3 给 P1;鲁肃剩 d1..d4
+    expect(harness.state.players[1].hand).toEqual(expect.arrayContaining(['h1', 'h2', 'h3']));
+    expect(harness.state.players[1].hand).not.toContain('d1');
+    expect(harness.state.players[0].hand.length).toBe(4);
+    // 他人牌 p1a 未被异常移动(仍恰一张,在 P1 手中)
+    expect(harness.state.players[1].hand.filter((id) => id === 'p1a').length).toBe(1);
+    // 被动照常激活
+    expect(harness.state.localVars['界好施/被动激活']).toBe(true);
+  });
+
+  it('给牌回应重复 id → 守卫拦截,兜底给牌(不中断结算)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '鲁肃',
+          hand: ['h1', 'h2', 'h3'],
+          skills: ['界好施', '回合管理'],
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          hand: [],
+          skills: ['回合管理'],
+        }),
+      ],
+      cardMap: {
+        h1: makeCard('h1', '杀'),
+        h2: makeCard('h2', '闪'),
+        h3: makeCard('h3', '桃', '♦'),
+        d1: makeCard('d1', '杀', '♠'),
+        d2: makeCard('d2', '闪', '♥'),
+        d3: makeCard('d3', '桃', '♦'),
+        d4: makeCard('d4', '酒', '♣'),
+      },
+      zones: { deck: ['d1', 'd2', 'd3', 'd4'], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('鲁肃');
+
+    await P0.triggerAction('回合管理', 'start');
+    await P0.respond('界好施', { choice: true });
+
+    // [d1,d1,d2] 数量=3 但含重复 → 去重守卫拦截(修复前:第二次 给予 d1 抛错中断)
+    await P0.respond('界好施', { cardIds: ['d1', 'd1', 'd2'] });
+    await harness.waitForStable();
+
+    // 兜底给 h1/h2/h3,P1 恰收 3 张且无复制
+    expect(harness.state.players[1].hand).toEqual(['h1', 'h2', 'h3']);
+    expect(harness.state.players[0].hand.length).toBe(4);
+    expect(harness.state.localVars['界好施/被动激活']).toBe(true);
+  });
+
+  // ─── 回归(2026-08-27):PASSIVE_GIVE_RT 浏览器真实形状 ──────
+  // AwaitingPrompt 对 useCard 型 pending(min=max=1)两步式只发 respond{cardId}(单数);
+  // 现有用例只发 {cardIds} 数组,锁不住 execute 的归一化逻辑。补单数形状用例。
+  it('被动给牌:respond({cardId})(浏览器两步式 UI 形状)→ 受益者交 1 张生效', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '鲁肃',
+          character: '界鲁肃',
+          hand: ['l1'],
+          skills: ['界好施'],
+          health: 3,
+        }),
+        makePlayer({
+          index: 1,
+          name: 'P1',
+          character: '曹操',
+          hand: ['p1a', 'p1b'],
+          skills: [],
+        }),
+        makePlayer({
+          index: 2,
+          name: 'P2',
+          character: '张飞',
+          hand: ['kill'],
+          skills: ['杀'],
+        }),
+      ],
+      cardMap: {
+        l1: makeCard('l1', '闪'),
+        p1a: makeCard('p1a', '杀'),
+        p1b: makeCard('p1b', '闪'),
+        kill: makeCard('kill', '杀', '♠'),
+      },
+      zones: { deck: [], discardPile: [], processing: [] },
+      currentPlayerIndex: 2, // P2 的回合
+      phase: '出牌',
+      turn: { round: 2, phase: '出牌', vars: {} },
+    });
+    // 预设被动已激活(模拟好施给牌后的状态)
+    state.localVars['界好施/被动激活'] = true;
+    state.localVars['界好施/受益者'] = 1; // P1
+
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
+    const P0 = harness.player('鲁肃');
+
+    // P2 使用杀指定鲁肃(座次0)→ 被动触发 → P1 被询问交牌
+    await P2.useCardAndTarget('杀', 'kill', [0]);
+    P1.processEvents();
+
+    // 浏览器真实形状:单数 cardId(非 cardIds 数组)
+    await P1.respond('界好施', { cardId: 'p1a' });
+
+    // 鲁肃收到 P1 的牌
+    expect(harness.state.players[0].hand).toContain('p1a');
+    expect(harness.state.players[1].hand.length).toBe(1);
+
+    // 杀的结算继续:鲁肃不出闪 → 受伤害
+    P0.processEvents();
+    await P0.pass();
+    expect(harness.state.players[0].health).toBe(2);
   });
 });

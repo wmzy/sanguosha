@@ -46,7 +46,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const reqType = atom.requestType as string;
       if (reqType !== '鬼才/replace') return '当前不是鬼才询问';
       // 若选择替换:cardId 必须在手牌中;若选择不替换:无额外要求
-      if (params.choice === true || params.confirmed === true) {
+      // 浏览器/Headless 客户端对 useCard 型 pending 只发 {cardId}(无 choice),
+      // 故 cardId 出现即视为发动意图;{choice:false}/{} 仍视为不发动。
+      if (params.choice === true || params.confirmed === true || typeof params.cardId === 'string') {
         const cardId = params.cardId as string;
         if (typeof cardId !== 'string') return '请选择一张替换牌';
         if (!st.players[ownerId].hand.includes(cardId)) return '替换牌不在手牌中';
@@ -54,7 +56,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const use = params.choice === true || params.confirmed === true;
+      const use =
+        params.choice === true || params.confirmed === true || typeof params.cardId === 'string';
       if (!use) {
         st.localVars['鬼才/replaceCard'] = null;
         return;
@@ -85,7 +88,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       prompt: {
         type: 'useCard',
         title: '鬼才:是否打出一张手牌代替判定牌?',
-        cardFilter: { min: 1, max: 1 },
+        cardFilter: { filter: () => true, min: 1, max: 1 },
       },
       defaultChoice: false,
       timeout: 15,
@@ -125,7 +128,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     prompt: {
       type: 'useCard',
       title: '鬼才:选择一张手牌代替判定牌',
-      cardFilter: { min: 1, max: 1 },
+      cardFilter: { filter: () => true, min: 1, max: 1 },
     },
   });
 }

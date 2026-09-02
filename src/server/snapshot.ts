@@ -15,6 +15,7 @@ import type {
 } from '../engine/types';
 import type { GameSession } from './session';
 import { sanitizeState } from './persistence';
+import { getRoom } from './room';
 import { createLogger } from './logger';
 import { ENGINE_VERSION } from './version';
 
@@ -303,6 +304,14 @@ export async function patchSnapshotDescription(
   try {
     const raw = await readFile(path, 'utf-8');
     const snapshot = JSON.parse(raw) as DebugSnapshot;
+    // 鉴权(与 POST /api/snapshot 的权限模型对齐):快照仅 debug 房可创建,
+    // PATCH 也仅当目标快照属于存活的 debug 房时可用。此前本端点完全无鉴权——
+    // 未登录者凭 snapshotId 即可篡改任意快照描述(debug 快照含完整对局状态,
+    // 属调试敏感数据,写入口须与创建口同源校验)。房间已回收 → 快照转只读。
+    const room = getRoom(snapshot.meta.roomId);
+    if (!snapshot.meta.debug || !room?.isDebug) {
+      return { error: '仅存活调试房的快照可修改描述', status: 403 };
+    }
     snapshot.meta.description = description;
     await writeFile(path, JSON.stringify(snapshot, null, 2));
     log.info(`快照描述已更新: ${snapshotId}`);

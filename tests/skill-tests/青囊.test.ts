@@ -323,4 +323,28 @@ describe('青囊', () => {
       params: { cardId: 'dX', targets: [0] },
     });
   });
+
+  it('use prompt 投影下发 cardFilter candidates(filter 缺失回归)', async () => {
+    const c1 = makeCard('c1', '闪', '♥', '2');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['c1'], skills: ['青囊'] }),
+        makePlayer({ index: 1, name: 'P1', health: 2, maxHealth: 4, skills: [] }),
+      ],
+      cardMap: { c1 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    const use = P0.availableActions().find((a) => a.label === '青囊' && a.actionType === 'use');
+    expect(use).toBeDefined();
+    // 回归锚点:cardFilter 缺 filter 时 extractCardFilter 拿不到谓词,前端/无头端无法选牌。
+    // use action 的 cardFilter 走 registry 路径(filter 函数本地可用),不注入投影 candidates。
+    const cf = (use!.prompt as { cardFilter?: { filter?: unknown } }).cardFilter;
+    expect(typeof cf?.filter).toBe('function');
+    expect(P0.findValidCard('use')).not.toBeNull();
+  });
 });

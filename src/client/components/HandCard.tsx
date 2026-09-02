@@ -16,8 +16,12 @@ import type { Card } from '../../engine/types';
 const handCardHoverLift = css`
   &:hover:hover {
     margin-bottom: 0;
-    transform: rotate(var(--fan-angle, 0deg)) translateY(-8px);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.65);
+    transform: rotate(var(--fan-angle, 0deg)) translateY(-10px) scale(1.04);
+    box-shadow:
+      0 12px 26px rgba(0, 0, 0, 0.65),
+      0 0 16px rgba(217, 180, 92, 0.3);
+    border-color: #e6c06a;
+    filter: brightness(1.08);
   }
 `;
 
@@ -107,6 +111,15 @@ export function HandCardImpl(props: HandCardProps) {
           !isTransformActive &&
           !isDistributeCandidate &&
           styles.handCardDisabled,
+        // 弃牌阶段:未选中的可选牌紫色呼吸引导;已选中走 discardCardSelected
+        canDiscardClick && !isDiscardSelected && styles.handCardDiscardable,
+        // 出牌阶段:可主动打出的牌轻量提亮(回应/弃牌/转化/distribute 各有专属高亮)
+        canPlay &&
+          !isAwaiting &&
+          !canDiscardClick &&
+          !isTransformActive &&
+          !isDistributeActive &&
+          styles.handCardPlayable,
         isAwaiting && styles.handCardRespondable,
         isDiscardSelected && styles.discardCardSelected,
         isRespondSelected && styles.handCardRespondSelected,

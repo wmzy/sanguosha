@@ -52,8 +52,8 @@ const dockRoot = css`
   max-height: 60vh;
   display: flex;
   flex-direction: column;
-  background-color: rgba(28, 38, 56, 0.96);
-  border: 1px solid #446;
+  background-color: rgba(13, 15, 24, 0.94);
+  border: 1px solid rgba(196, 162, 84, 0.3);
   border-radius: 10px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
   overflow: hidden;
@@ -63,13 +63,14 @@ const dockRoot = css`
   top: 56px;
   right: 8px;
 `;
-const dockRootCollapsed = css`
-  ${dockRoot}
+/** 折叠态:复用 dockRoot 外壳,压成右上角小药丸标签,不占底部空间。
+ *  原 css`` 内插值 ${dockRoot} 在 wyw 下不内联规则(非法声明),改为字符串拼接。 */
+const dockRootCollapsedExtra = css`
   width: auto;
   max-height: 36px;
   border-radius: 18px;
-  /* 折叠后只保留一个小药丸标签,貼右上角不占底部空间 */
 `;
+const dockRootCollapsed = `${dockRoot} ${dockRootCollapsedExtra}`;
 // 嵌入侧边栏模式:不用 fixed/阴影,貼满父容器(flex: 1)。
 const dockRootEmbedded = css`
   position: relative;
@@ -77,8 +78,9 @@ const dockRootEmbedded = css`
   max-height: none;
   height: 100%;
   flex: 1 1 auto;
-  background-color: rgba(28, 38, 56, 0.96);
+  background: linear-gradient(rgba(13, 15, 24, 0.92), rgba(9, 10, 17, 0.94));
   border: none;
+  border-left: 1px solid rgba(196, 162, 84, 0.3);
   border-radius: 0;
   box-shadow: none;
   overflow: hidden;
@@ -145,17 +147,17 @@ const body = css`
 const logContent = css`
   flex: 1;
   overflow-y: auto;
-  padding: 8px 12px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column-reverse;
-  gap: 4px;
+  gap: 3px;
   max-height: 50vh;
 
   &::-webkit-scrollbar {
     width: 4px;
   }
   &::-webkit-scrollbar-thumb {
-    background-color: #556;
+    background-color: rgba(196, 162, 84, 0.35);
     border-radius: 2px;
   }
 `;
@@ -168,23 +170,28 @@ const logEmpty = css`
 const logEntry = css`
   display: flex;
   gap: 8px;
-  padding: 2px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 2px 4px;
+  border-radius: 4px;
   font-size: 12px;
+  line-height: 1.55;
+  &:hover {
+    background: rgba(255, 232, 170, 0.04);
+  }
 `;
 const logTime = css`
-  color: #666;
+  color: rgba(150, 145, 130, 0.75);
   min-width: 40px;
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 `;
 const logPlayer = css`
-  color: #3498db;
+  color: #6fa8dc;
   font-weight: bold;
   min-width: 40px;
   flex-shrink: 0;
 `;
 const logText = css`
-  color: #ccc;
+  color: #c6c1b2;
   word-break: break-word;
 `;
 
@@ -211,11 +218,13 @@ const chatMsgRow = css`
   line-height: 1.4;
   word-break: break-word;
 `;
-const chatMsgRowMine = css`
-  ${chatMsgRow}
+/** 我方消息行:复用 chatMsgRow 排版,右对齐 + 绿色高亮。
+ *  原 css`` 内插值 ${chatMsgRow} 在 wyw 下不内联规则(非法声明),改为字符串拼接。 */
+const chatMsgRowMineExtra = css`
   text-align: right;
   color: ${colors.accent.green};
 `;
+const chatMsgRowMine = `${chatMsgRow} ${chatMsgRowMineExtra}`;
 const chatMsgName = css`
   font-weight: bold;
   margin-right: 4px;

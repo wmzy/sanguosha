@@ -9,21 +9,20 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import type { ViewEvent } from '../../src/engine/types';
-
-// mock audioEngine:jsdom 无 AudioContext,且要断言 play 调用次数/参数。
-// 同时 mock getDuration 返回固定时长,使串行间隔可预测。
-const { playMock } = vi.hoisted(() => ({
-  playMock: vi.fn(),
-}));
-const { getDurationMock } = vi.hoisted(() => ({
-  getDurationMock: vi.fn(() => 0.3),
-}));
-vi.mock('../../src/client/sounds/audioEngine', () => ({
-  audioEngine: { play: playMock, getDuration: getDurationMock },
-}));
+import { audioEngine } from '../../src/client/sounds/audioEngine';
 
 import { useSoundPlayback } from '../../src/client/hooks/useSoundPlayback';
 import type { QueuedEvent } from '../../src/client/hooks/useEventPlayback';
+
+// audioEngine mock 说明:不用 vi.mock(模块工厂)。isolate:false 下所有测试文件共享
+// worker 模块缓存,若其它 client 测试先真实加载了 audioEngine(经组件链 import),
+// 本文件的模块工厂 mock 对已缓存的 useSoundPlayback(闭包持有真实单例)不再生效
+// → 偶发失败。改为 beforeEach spyOn 单例方法:对象属性修改对所有持有引用者可见,
+// 与模块加载顺序无关。(restoreMocks:true 每个测试前自动还原。)
+// jsdom 无 AudioContext:audioEngine 构造延迟创建 context,import 本身安全;
+// spy 后 play/getDuration 不触达真实 Web Audio 路径。
+let playMock: ReturnType<typeof vi.fn>;
+let getDurationMock: ReturnType<typeof vi.fn>;
 
 /** 构造带 effect.sound 的 ViewEvent(extractSound 优先读 event.effect) */
 function ev(sound: string | undefined, volume?: number): ViewEvent {
@@ -36,9 +35,8 @@ function q(seq: number, event: ViewEvent): QueuedEvent {
 
 describe('useSoundPlayback', () => {
   beforeEach(() => {
-    playMock.mockClear();
-    getDurationMock.mockClear();
-    getDurationMock.mockReturnValue(0.3);
+    playMock = vi.spyOn(audioEngine, 'play').mockImplementation(() => {});
+    getDurationMock = vi.spyOn(audioEngine, 'getDuration').mockReturnValue(0.3);
   });
 
   it('动作音效逐个串行播放:一批事件入队后,间隔基于音频时长逐个响(不叠)', async () => {

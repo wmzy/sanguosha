@@ -3,9 +3,10 @@
 // 表单 state、房间列表拉取/删除、创建/加入/旁观 handler 全部收在本组件;房间数据走 MultiplayerRoomCtx。
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { css, cx } from '@linaria/core';
 import { RoomListPanel } from '../../components/RoomListPanel';
 import { apiFetch, ApiError } from '../../api/client';
-import { btnStyle, inputStyle, colors } from '../../theme';
+import { inputStyle } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
 import { PasswordPromptDialog } from './PasswordPromptDialog';
 import { ErrorToast } from './ErrorToast';
@@ -28,6 +29,47 @@ import {
 } from './multiplayerStyles';
 import type { RoomInfo, RoomConfig } from '../../../server/protocol';
 import type { GameMode } from '../../../engine/rules/types';
+
+/* ── 表单主按钮:与全站幽灵药丸体系同语言 ── */
+const formBtn = css`
+  border: 1px solid rgba(217, 180, 92, 0.55);
+  border-radius: 999px;
+  padding: 10px 18px;
+  cursor: pointer;
+  background: linear-gradient(rgba(240, 178, 60, 0.94), rgba(206, 138, 30, 0.94));
+  color: #2b1c05;
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  width: 100%;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 200, 0.3),
+    0 4px 14px rgba(206, 138, 30, 0.32);
+  transition: all 0.15s;
+  &:hover {
+    filter: brightness(1.07);
+    transform: translateY(-1px);
+  }
+  &:disabled {
+    opacity: 0.55;
+    cursor: wait;
+    transform: none;
+  }
+`;
+const formBtnGhost = css`
+  border-color: rgba(82, 150, 220, 0.55);
+  background: rgba(52, 120, 200, 0.12);
+  color: #7db8e8;
+  font-weight: normal;
+  letter-spacing: 0.5px;
+  box-shadow: none;
+  &:hover {
+    border-color: rgba(120, 180, 240, 0.8);
+    background: rgba(52, 120, 200, 0.22);
+    filter: none;
+    transform: translateY(-1px);
+  }
+`;
 
 export function LobbyStage() {
   const mp = useMultiplayerRoomCtx();
@@ -162,12 +204,7 @@ export function LobbyStage() {
               placeholder="最多 32 位"
               maxLength={32}
             />
-            <button
-              className={btnStyle}
-              style={{ '--btn-bg': colors.accent.orange } as React.CSSProperties}
-              onClick={handleCreate}
-              disabled={mp.isCreating}
-            >
+            <button className={formBtn} onClick={handleCreate} disabled={mp.isCreating}>
               {mp.isCreating ? '创建中…' : '创建房间'}
             </button>
           </div>
@@ -185,11 +222,7 @@ export function LobbyStage() {
                 if (e.key === 'Enter') handleJoin();
               }}
             />
-            <button
-              className={btnStyle}
-              style={{ '--btn-bg': colors.accent.blue } as React.CSSProperties}
-              onClick={handleJoin}
-            >
+            <button className={cx(formBtn, formBtnGhost)} onClick={handleJoin}>
               加入房间
             </button>
           </div>
@@ -207,11 +240,7 @@ export function LobbyStage() {
                 if (e.key === 'Enter') handleSpectate();
               }}
             />
-            <button
-              className={btnStyle}
-              style={{ '--btn-bg': colors.accent.blue } as React.CSSProperties}
-              onClick={handleSpectate}
-            >
+            <button className={cx(formBtn, formBtnGhost)} onClick={handleSpectate}>
               👁 旁观加入
             </button>
           </div>

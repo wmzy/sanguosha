@@ -7,12 +7,24 @@
 
 import { gameSessions } from './registry';
 import { getAllRooms, getRoom } from './room';
+import type { Room } from './room';
 import { destroyRoomCompletely, downgradeRoomToLobby } from './teardown';
 import { register } from './lifecycles';
 import { createLogger } from './logger';
 import type { GameSession } from './session';
 
 const log = createLogger('cleanup');
+
+/** 房间内是否仍有「真实活跃」连接。
+ *  REST join 会先注册 isAlive=false 的 nullSink 占位(rest.ts),真正的 SSE 连接
+ *  (SseSink)才 isAlive=true。仅含 nullSink 的房间必须视为无连接:否则脚本/客户端
+ *  REST join 后从未开流(或单活流模式下非当前视角座次)的座位会让
+ *  「players 非空」永远为真,无连接回收永不触发(实测积累 12+ 个 1 人僵尸 debug 房)。 */
+function hasAliveConnection(room: Room): boolean {
+  for (const sink of room.players.values()) if (sink.isAlive) return true;
+  for (const sink of room.spectators.values()) if (sink.isAlive) return true;
+  return false;
+}
 
 /** 闲置房间存活时间:无玩家连接且超过此时长未活动的会话将被回收。 */
 export const IDLE_ROOM_TTL_MS = 60 * 60 * 1000;
@@ -50,8 +62,10 @@ function classifyRoom(roomId: string, session: GameSession, now: number): Cleanu
   // ── 快速房间 ──
   // 1. zombie session(全员断线 grace 超时后遗留):立即回收
   if (session.isDestroyed()) return { action: 'destroy' };
-  // 2. 有玩家连接:保留(游戏结束后玩家留在房间等「再来一局」)
-  if (room && room.players.size > 0) return { action: 'keep' };
+  // 2. 有玩家连接:保留(游戏结束后玩家留在房间等「再来一局」)。
+  //    按 isAlive 判定:nullSink 占位(join 未开流/单活流非视角座次)不算连接,
+  //    否则此类房间既不满足本条、又因 players 非空躲过无连接回收,成为僵尸。
+  if (room && hasAliveConnection(room)) return { action: 'keep' };
   // 3. 僵尸房间:进行中/已结束但座次全空(重启后 seats 丢失),无人可重连
   if (room && room.status !== '等待中' && room.seats.every((s) => s === null)) {
     return { action: 'destroy' };
@@ -153,7 +167,8 @@ export function cleanupDisconnectedRooms(
     // normal 持久化房间永不自动删(优先于 isDebug 标记);其余(quick/debug)适用本规则
     if (room.roomType === 'normal') continue;
 
-    const hasConnection = room.players.size > 0 || room.spectators.size > 0;
+    // 「有连接」按 isAlive 判定:仅含 nullSink 占位(join 未开流)不算连接
+    const hasConnection = hasAliveConnection(room);
     if (hasConnection) {
       disconnectedSince.delete(room.id);
       continue;

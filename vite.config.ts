@@ -11,7 +11,11 @@ export default defineConfig({
       sourceMap: process.env.NODE_ENV !== 'production',
       displayName: process.env.NODE_ENV !== 'production',
       exclude: ['node_modules/**'],
-      evaluate: false,
+      // evaluate 为 wyw 默认值,保留 true 无害。实测(@wyw-in-js/vite 1.1.0):
+      // css`` 内插值其他 css 类(如 ${pageStyle})无论 evaluate 开关都不会内联其规则,
+      // 只会产出非法声明被浏览器丢弃;colors 等值插值两档都能正常解析。
+      // 跨类组合必须在使用处做 className 字符串拼接(见分支内转换)。
+      evaluate: true,
       babelOptions: {
         presets: ['@babel/preset-typescript'],
       },

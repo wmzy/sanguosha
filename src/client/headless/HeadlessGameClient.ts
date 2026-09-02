@@ -245,8 +245,11 @@ export class HeadlessGameClient {
   }
 
   /** 连接并 join 指定房间。
-   *  playerId 可选:指定则预先设置本连接身份(透传到 join 请求体),否则复用已有或由服务端生成。 */
-  async connect(roomId: string, seatIndex?: number, playerId?: string): Promise<void> {
+   *  playerId 可选:指定则预先设置本连接身份(透传到 join 请求体),否则复用已有或由服务端生成。
+   *  opts.stream 默认 true(join 后立即打开 SSE);debug 单活流模式对非当前视角座次
+   *  传 false——浏览器对同源 HTTP/1.1 有 6 连接上限,N 条长连 SSE 会饿死页面上的
+   *  图片/请求,非当前视角座次只做 REST 驱动,不持有流。 */
+  async connect(roomId: string, seatIndex?: number, playerId?: string, opts?: { stream?: boolean }): Promise<void> {
     this._debugMode = true;
     this._seatIndex = seatIndex ?? this._seatIndex;
     this.updateIdentity({ roomId, playerId: playerId ?? undefined });
@@ -263,7 +266,7 @@ export class HeadlessGameClient {
     this.updateIdentity({ roomId: data.roomId, playerId: data.playerId });
     this.canReconnect = true;
 
-    this.openStream();
+    if (opts?.stream !== false) this.openStream();
     this.setPhase('lobby');
   }
 
@@ -333,7 +336,10 @@ export class HeadlessGameClient {
    *  浏览器走 Cookie。 */
   private openStream() {
     if (this.intentionalDisconnect) return;
+    const generation = ++this.openStreamGeneration;
     void this.ensureEventSource().then((EventSourceImpl) => {
+      // 挂起/断开后迟到的 open 回调:不再创建流(否则挂起的座次"复活"出孤儿连接)
+      if (generation !== this.openStreamGeneration) return;
       if (this.intentionalDisconnect || !this._roomId || !this._playerId) return;
       let url = `${this.baseUrl}/api/rooms/${this._roomId}/stream?playerId=${encodeURIComponent(this._playerId)}`;
       if (this.authToken) url += `&sgs_token=${encodeURIComponent(this.authToken)}`;
@@ -341,6 +347,9 @@ export class HeadlessGameClient {
       this.attachEventSourceHandlers();
     });
   }
+
+  /** 开流代数:每次 open/suspend/disconnect 递增,作废在途的异步创建。 */
+  private openStreamGeneration = 0;
 
   /** 获取 EventSource 构造器：浏览器用全局，Node 动态 import eventsource 包 */
   private async ensureEventSource(): Promise<typeof EventSource> {
@@ -495,9 +504,9 @@ export class HeadlessGameClient {
         seatIndex: msg.seatIndex,
         text: msg.text,
         timestamp: msg.timestamp,
-      }]);
+      }], 'chat');
     } else if (msg.type === 'chat_history') {
-      this.callbacks.onChat?.(msg.messages);
+      this.callbacks.onChat?.(msg.messages, 'history');
     }
     // 身份切换（player↔spectator）：更新本地 isSpectator 标志。
     // 服务端 switchRole 仅在等待中广播 role_changed；切换后后续消息自动修正座次/视图。
@@ -1280,6 +1289,25 @@ export class HeadlessGameClient {
     } catch (err) {
       this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
     }
+  }
+
+  /** 挂起 SSE 流(不离开房间、不清理身份/视图状态):debug 单活流模式用。
+   *  与 disconnect() 的区别:保留 canReconnect/identity/lastSeq,可 resumeStream() 原地恢复。 */
+  suspendStream() {
+    this.stopReconnectStatePolling();
+    // 递增代数:作废在途的 ensureEventSource().then,防止挂起后迟到的新流"复活"
+    this.openStreamGeneration++;
+    this.eventSource?.close();
+    this.eventSource = null;
+    this.sseConnected = false;
+  }
+
+  /** 恢复 SSE 流:新 EventSource 首次请求无 Last-Event-ID,
+   *  服务端按 lastSeq=0 回 initialView 全量快照,视图自动对齐。 */
+  resumeStream() {
+    if (this.intentionalDisconnect || !this._roomId || !this._playerId) return;
+    if (this.eventSource) return;
+    this.openStream();
   }
 
   disconnect() {

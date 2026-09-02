@@ -1,5 +1,8 @@
 // src/client/components/PlayerSeatView.tsx
-// 玩家座位视图(弧形座位上的每张武将卡) — 从 GameView.tsx 抽出
+// 玩家座位视图(弧形座位上的每张武将卡) — 从 GameView.tsx 抽出。
+// 结构对齐官方 OL 客户端:卡上方名牌(身份章+玩家名+徽章组) + 竖版立绘卡本体
+// (卡内左缘竖带:势力章/竖排武将名/体力数字;右缘骑边体力珠列;右下手牌角标;
+// 死亡「亡」印章) + 卡下小标签行(装备/判定/技能/标记)。
 import { memo } from 'react';
 import { css, cx } from '@linaria/core';
 import type { EquipSlot, GameView } from '../../engine/types';
@@ -81,7 +84,7 @@ function PlayerSeatViewImpl({
   useSkillDescReady(); // 技能模块加载后重渲染,确保 title 中 getSkillDescription 命中
   void turnGlowVersion; // 预留:未来用于触发不同强度的回合光环动画
   const isDead = !player.alive;
-  // 横置(铁索连环):marks 含 'chained' —— 座位卡给出铁链光泽 + 连环徽章,代表武将牌横置状态
+  // 横置(铁索连环):marks 含 'chained' —— 卡边框铁链光泽 + 立绘冷色调 + 连环徽章
   const isChained = player.marks.some((m) => m.id === 'chained');
   const isClickable = needsTarget && !isDead && isTargetable;
   // 选目标阶段:不可选的活座位置灰(距离外/不满足槽位条件),与可选座位形成对比
@@ -103,32 +106,27 @@ function PlayerSeatViewImpl({
   const showIdentity =
     identity && (!hideIdentity || isPerspective || identity === '主公' || !player.alive);
 
-  // 体力红心动态缩放:♥ 字形进宽约 1em,座位内容宽度约 136px
-  // (--hero-card-h 200px × 15/19 − 卡边框 − 行 padding 20px)。基础尺寸(满血 16px /
-  // 空血 14px / 间距 2px)下 maxHealth ≥ 7 即 18N−2 会超出该宽度而被截断/溢出。
-  // 故 maxHealth ≥ 7 时按 6/maxHealth 等比缩小满血与空血字号及间距(两者同步缩放保持对齐),
-  // 使任意 maxHealth 的所有心完整排列在座位内;≤ 6 沿用原值(标准 4 血场景无回归)。
-  const hpScale = player.maxHealth >= 7 ? 6 / player.maxHealth : 1;
-  const hpFullSize = `${16 * hpScale}px`;
-  const hpEmptySize = `${14 * hpScale}px`;
-  const hpGap = `${2 * hpScale}px`;
+  // 体力珠动态缩放:珠体基础 10×14px + 间距 3px,整列布局高度 = 17N−3(N=maxHealth);
+  // 卡高 200px,仅 N ≥ 12(17×12−3=201>200)才会溢出卡面,此时按 6/maxHealth 等比缩小
+  // 珠体与间距,使珠列完整排在卡右缘内;N ≤ 11 沿用原值(董卓 8 血/主公+1 后 9 血不再无谓缩小)。
+  const hpScale = player.maxHealth >= 12 ? 6 / player.maxHealth : 1;
+  const beadW = `${10 * hpScale}px`;
+  const beadH = `${14 * hpScale}px`;
+  const hpGap = `${3 * hpScale}px`;
+  // 珠列方向:损失的体力(空珠)在上方,剩余体力(满珠)在下方。
+  // 满珠颜色按剩余体力比例分色:>50% 绿 / >25% 黄 / ≤25% 红(濒危警示)。
+  const lostCount = Math.max(0, player.maxHealth - player.health);
+  const hpRatio = player.maxHealth > 0 ? player.health / player.maxHealth : 1;
+  const hpBeadFullCls =
+    hpRatio > 0.5 ? seatHpBeadFull : hpRatio > 0.25 ? seatHpBeadFullMid : seatHpBeadFullLow;
 
   return (
     <div
       className={cx(
-        seatCard,
-        isCurrentPlayer && seatCardActive,
-        isPerspective && seatCardPerspective,
-        isDead && seatCardDead,
-        isClickable && seatCardClickable,
+        seatRoot,
         isUntargetable && seatCardUntargetable,
-        selectedTargetNames.includes(player.name) && seatCardTargeted,
-        isDamaged && seatShaking,
-        isDamaged && seatDamageOverlay,
-        isHealed && seatHealOverlay,
-        isTurnGlow && turnGlowing,
-        isChained && seatCardChained,
         isDisconnected && seatCardDisconnected,
+        isDamaged && seatShaking,
       )}
       data-player-name={player.name}
       data-seat-index={index}
@@ -137,166 +135,207 @@ function PlayerSeatViewImpl({
       onClick={() => isClickable && onTargetClick(player.name)}
       onDoubleClick={() => onSeatDoubleClick?.(index)}
     >
-      {/* 武将立绘作座位卡背景:始终渲染一层势力色,无素材/404 时回退势力色背景 */}
-      <div className={seatCharImgWrap} aria-hidden>
-        {charImg && (
-          <img
-            className={cx(seatCharImg, isDead && seatCharImgDead)}
-            src={charImg}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            onError={handleImgError}
-          />
+      {/* 卡上方名牌:横向暗条(宽=卡宽)。左:身份小方章 + 座号 + 玩家名,右:徽章组(我/回合/⛓/离线) */}
+      <div className={cx(seatNamePlate, isCurrentPlayer && seatNamePlateActive)}>
+        {showIdentity && identity ? (
+          <span
+            className={cx(
+              seatIdentityStamp,
+              identity === '主公'
+                ? seatIdentityLord
+                : identity === '忠臣'
+                  ? seatIdentityLoyalist
+                  : identity === '反贼'
+                    ? seatIdentityRebel
+                    : identity === '内奸'
+                      ? seatIdentityRenegade
+                      : seatIdentityHidden,
+            )}
+          >
+            {identity}
+          </span>
+        ) : (
+          !showIdentity &&
+          player.identityHidden !== false && <span className={cx(seatIdentityStamp, seatIdentityHidden)}>暗</span>
         )}
+        <span className={seatIndexBadge}>#{index + 1}</span>
+        <span className={seatName}>{player.name.slice(0, 6)}</span>
+        <div className={seatBadgeGroup}>
+          {isPerspective && <span className={youBadge}>我</span>}
+          {isCurrentPlayer && <span className={turnBadge}>回合</span>}
+          {isChained && (
+            <span className={chainBadge} title="横置·铁索连环">
+              ⛓
+            </span>
+          )}
+          {isDisconnected && (
+            <span className={offlineBadge} title="该玩家已断线,等待重连">
+              离线
+            </span>
+          )}
+        </div>
       </div>
-      {/* 体力变化漂浮数字:伤害「-N」红 / 回血「+N」绿,上浮渐隐(动画状态由 useAnimationState 定时清除) */}
-      {hpChange && (
-        <span
-          key={`hpnum-${hpChange.version}`}
-          className={cx(hpFloatNumber, hpChange.kind === 'heal' ? hpFloatHeal : hpFloatDamage)}
-          aria-hidden
+      {/* 卡本体包裹层:relative 锚点,承载骑右边的体力珠列与漂浮数字(不被卡本体 overflow 裁剪) */}
+      <div className={cx(seatCardWrap, isDamaged && seatDamageOverlay, isHealed && seatHealOverlay)}>
+        {/* 卡本体:竖版立绘填满 + 细金铜描边 + 外圈深色,状态类全部挂在此层 */}
+        <div
+          className={cx(
+            seatCard,
+            isCurrentPlayer && seatCardActive,
+            isPerspective && seatCardPerspective,
+            isDead && seatCardDead,
+            isClickable && seatCardClickable,
+            isChained && seatCardChained,
+            selectedTargetNames.includes(player.name) && seatCardTargeted,
+            isTurnGlow && turnGlowing,
+          )}
         >
-          {hpChange.kind === 'heal' ? `+${hpChange.amount}` : `-${hpChange.amount}`}
-        </span>
-      )}
-      {/* 内容层:浮在立绘上,底部渐变蒙版保证文字可读 */}
-      <div className={seatCardContent}>
-      {/* 势力色顶部条:武将名 + 座号 + 身份(--faction-color 由根节点注入) */}
-      <div className={seatCardHeader}>
-        <div className={seatCardHeaderTop}>
-          <span className={seatIndexBadge}>#{index + 1}</span>
-          <span className={seatName}>{player.name.slice(0, 6)}</span>
-          <div>
-            {isPerspective && <span className={youBadge}>我</span>}
-            {isCurrentPlayer && <span className={turnBadge}>回合</span>}
-            {isChained && (
-              <span className={chainBadge} title="横置·铁索连环">
-                ⛓
-              </span>
-            )}
-            {isDisconnected && <span className={offlineBadge} title="该玩家已断线,等待重连">离线</span>}
-            {isDead && <span className={deadBadgeText}>亡</span>}
-            {showIdentity && identity && (
-              <span
-                className={
-                  identity === '主公'
-                    ? lordBadge
-                    : identity === '忠臣'
-                      ? loyalistBadge
-                      : identity === '反贼'
-                        ? rebelBadge
-                        : identity === '内奸'
-                          ? renegadeBadge
-                          : ''
-                }
-              >
-                {identity}
-              </span>
-            )}
-            {!showIdentity && player.identityHidden !== false && (
-              <span className={hiddenBadge}>暗</span>
+          {/* 武将立绘:object-fit cover 填满卡面;无素材/404 时回退势力色背景 */}
+          <div className={cx(seatCharImgWrap, !charImg && seatCharImgWrapEmpty, isChained && seatCharImgChained)} aria-hidden>
+            {charImg && (
+              <img
+                className={cx(seatCharImg, isDead && seatCharImgDead)}
+                src={charImg}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                onError={handleImgError}
+              />
             )}
           </div>
+          {/* 卡内左缘竖带:顶部势力印章 + 中间竖排武将名 + 底部体力数字 */}
+          <div className={seatSideBand}>
+            <span className={seatFactionStamp} style={{ background: factionColor }}>
+              {faction}
+            </span>
+            <span className={seatCharName}>{displayChar || '未知'}</span>
+            <span className={cx(seatHpNumber, isDamaged && hpFlash, isHealed && hpHealFlash)}>
+              {player.health}
+            </span>
+          </div>
+          {/* 手牌数角标:卡内右下角小暗章(title 保留完整手牌信息) */}
+          <span className={seatHandBadge} title={`手牌: ${player.handCount}`}>
+            🂠 {player.handCount}
+          </span>
+          {/* 死亡印章:身份+阵亡 两行红字大印(立绘同时 grayscale),对齐官方「反贼/阵亡」印 */}
+          {isDead && (
+            <span className={seatDeadStamp} aria-hidden>
+              {player.identity ? (
+                <>
+                  <i>{player.identity}</i>
+                  <i>阵亡</i>
+                </>
+              ) : (
+                '亡'
+              )}
+            </span>
+          )}
         </div>
-        <div className={seatCharName}>{displayChar || '未知'}</div>
-      </div>
-      {/* 体力红心 — \uFE0E 强制文本渲染,防止 iOS Safari 将 ♥ 渲染为彩色 emoji 导致空血心也显示红色 */}
-      <div className={seatHpRow} style={{ gap: hpGap }}>
-        {Array.from({ length: player.maxHealth }, (_, i) => {
-          const isFull = i < player.health;
-          return (
+        {/* 右缘体力珠列:垂直排列,骑在卡右边框上;空珠(已损失)在上,满珠在下按余量分色 */}
+        <div className={seatHpBeadCol} style={{ gap: hpGap }} aria-hidden data-hp-beads>
+          {Array.from({ length: player.maxHealth }, (_, i) => (
             <span
               key={i}
-              className={cx(
-                isFull ? hpHeartFull : hpHeartEmpty,
-                isDamaged && hpFlash,
-                isHealed && hpHealFlash,
-              )}
-              style={{ fontSize: isFull ? hpFullSize : hpEmptySize }}
-            >
-              ♥{'\uFE0E'}
-            </span>
-          );
-        })}
-      </div>
-      {/* 技能标签 */}
-      {(() => {
-        const isLordSeat = player.identity === '主公';
-        const seatVisibleSkills = player.skills
-          .filter((s) => !DEFAULT_SKILLS.has(s))
-          .filter((s) => !EQUIPMENT_SKILL_NAMES.has(s))
-          .filter((s) => isLordSeat || !LORD_SKILLS.has(s));
-        if (seatVisibleSkills.length === 0) return null;
-        return (
-          <div className={skillRow}>
-            {seatVisibleSkills.map((s) => (
-              // 描述按原 id(s)查询;展示名去前导"界"
-              <SkillTag key={s} name={displaySkillName(s)} description={getSkillDescription(s)} className={skillTag} />
-            ))}
-          </div>
-        );
-      })()}
-      {/* 手牌数 + 基本信息 */}
-      <div className={infoRow}>
-        <span>手牌: {player.handCount}</span>
-      </div>
-      {/* 装备区 */}
-      {Object.keys(player.equipment).length > 0 && (
-        <div className={equipRow}>
-          {Object.entries(player.equipment).map(([slot, cardId]) => {
-            const card = view.cardMap[cardId];
-            const icon = EQUIP_SLOT_ICON[slot as EquipSlot] ?? '💎';
-            return (
-              <span key={slot} title={card ? `${card.name}(${slot})` : String(cardId)}>
-                {icon}
-                {card?.name ?? cardId}
-              </span>
-            );
-          })}
+              className={i < lostCount ? seatHpBeadEmpty : hpBeadFullCls}
+              data-full={i < lostCount ? undefined : 'true'}
+              data-hue={i < lostCount ? undefined : hpRatio > 0.5 ? 'green' : hpRatio > 0.25 ? 'yellow' : 'red'}
+              style={{ width: beadW, height: beadH }}
+            />
+          ))}
         </div>
-      )}
-      {/* 判定区(延时锦囊) */}
-      {(() => {
-        const ids = player.pendingTricks ?? [];
-        if (ids.length === 0) return null;
-        return (
-          <div className={judgeRow}>
-            <span className={judgeRowLabel}>判定:</span>
-            {ids.map((cardId: string) => {
+        {/* 体力变化漂浮数字:伤害「-N」红 / 回血「+N」绿,上浮渐隐(动画状态由 useAnimationState 定时清除) */}
+        {hpChange && (
+          <span
+            key={`hpnum-${hpChange.version}`}
+            className={cx(hpFloatNumber, hpChange.kind === 'heal' ? hpFloatHeal : hpFloatDamage)}
+            aria-hidden
+          >
+            {hpChange.kind === 'heal' ? `+${hpChange.amount}` : `-${hpChange.amount}`}
+          </span>
+        )}
+      </div>
+      {/* 卡下小标签行:装备 / 判定 / 技能 chips / 标记(每行独立、紧凑) */}
+      <div className={seatLabelCol}>
+        {/* 装备行:暗条 chip + 图标 + 牌名 + 花色点数 */}
+        {Object.keys(player.equipment).length > 0 && (
+          <div className={equipRow}>
+            {Object.entries(player.equipment).map(([slot, cardId]) => {
               const card = view.cardMap[cardId];
+              const icon = EQUIP_SLOT_ICON[slot as EquipSlot] ?? '💎';
               const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
-              const desc = card?.description ?? '';
               return (
-                <span
-                  key={cardId}
-                  className={judgeTag}
-                  style={{ '--suit-color': suitColor } as React.CSSProperties}
-                  title={desc || card?.name || cardId}
-                >
+                <span key={slot} title={card ? `${card.name}(${slot})` : String(cardId)}>
+                  {icon}
                   {card?.name ?? cardId}
-                  {card ? ` ${card.suit}${card.rank}` : ''}
+                  {card && (
+                    <span style={{ color: suitColor }}>
+                      {card.rank}
+                      {card.suit}
+                    </span>
+                  )}
                 </span>
               );
             })}
           </div>
-        );
-      })()}
-      {(() => {
-        // 'chained' 已由座位卡铁链光泽 + ⛓ 徽章代表,这里不重复显示原始标记名
-        const visibleMarks = player.marks.filter((m) => m.id !== 'chained');
-        if (visibleMarks.length === 0) return null;
-        return (
-          <div className={markRow}>
-            {visibleMarks.map((m) => (
-              <span key={m.id} className={markTag}>
-                {m.id}
-                {m.payload ? `(${JSON.stringify(m.payload)})` : ''}
-              </span>
-            ))}
-          </div>
-        );
-      })()}
+        )}
+        {/* 判定区(延时锦囊):紫边 chip */}
+        {(() => {
+          const ids = player.pendingTricks ?? [];
+          if (ids.length === 0) return null;
+          return (
+            <div className={judgeRow}>
+              <span className={judgeRowLabel}>判定:</span>
+              {ids.map((cardId: string) => {
+                const card = view.cardMap[cardId];
+                const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
+                const desc = card?.description ?? '';
+                return (
+                  <span
+                    key={cardId}
+                    className={judgeTag}
+                    style={{ '--suit-color': suitColor } as React.CSSProperties}
+                    title={desc || card?.name || cardId}
+                  >
+                    {card?.name ?? cardId}
+                    {card ? ` ${card.suit}${card.rank}` : ''}
+                  </span>
+                );
+              })}
+            </div>
+          );
+        })()}
+        {/* 技能 chips:暗底金字小圆角 */}
+        {(() => {
+          const isLordSeat = player.identity === '主公';
+          const seatVisibleSkills = player.skills
+            .filter((s) => !DEFAULT_SKILLS.has(s))
+            .filter((s) => !EQUIPMENT_SKILL_NAMES.has(s))
+            .filter((s) => isLordSeat || !LORD_SKILLS.has(s));
+          if (seatVisibleSkills.length === 0) return null;
+          return (
+            <div className={skillRow}>
+              {seatVisibleSkills.map((s) => (
+                // 描述按原 id(s)查询;展示名去前导"界"
+                <SkillTag key={s} name={displaySkillName(s)} description={getSkillDescription(s)} className={skillTag} />
+              ))}
+            </div>
+          );
+        })()}
+        {(() => {
+          // 'chained' 已由卡边框铁链光泽 + ⛓ 徽章代表,这里不重复显示原始标记名
+          const visibleMarks = player.marks.filter((m) => m.id !== 'chained');
+          if (visibleMarks.length === 0) return null;
+          return (
+            <div className={markRow}>
+              {visibleMarks.map((m) => (
+                <span key={m.id} className={markTag}>
+                  {m.id}
+                  {m.payload ? `(${JSON.stringify(m.payload)})` : ''}
+                </span>
+              ))}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -341,45 +380,233 @@ function playerSeatPropsEqual(prev: PlayerSeatProps, next: PlayerSeatProps): boo
 export const PlayerSeatView = memo(PlayerSeatViewImpl, playerSeatPropsEqual);
 
 // ─── Styles ───
+// 座位根:名牌(上) + 武将卡本体(中) + 小标签行(下) 的纵向组合
+const seatRoot = css`
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+// 卡上方名牌:横向暗条,宽=卡宽。左:身份小方章 + 座号 + 玩家名,右:徽章组
+const seatNamePlate = css`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 22px;
+  padding: 2px 6px;
+  background: linear-gradient(rgba(26, 21, 14, 0.95), rgba(15, 12, 8, 0.92));
+  border: 1px solid #3a3226;
+  border-radius: 4px;
+  transition:
+    border-color 0.25s,
+    box-shadow 0.25s;
+`;
+// 当前回合:名牌同步高亮(金边微光,与卡本体金绿辉光呼应)
+const seatNamePlateActive = css`
+  border-color: #b28e4a;
+  box-shadow: 0 0 8px rgba(255, 205, 92, 0.22);
+`;
+// 身份小方章 base:主公金/忠臣蓝/反贼红/内奸紫;未揭示时暗章「暗」
+const seatIdentityStamp = css`
+  flex-shrink: 0;
+  min-width: 22px;
+  text-align: center;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: bold;
+  line-height: 1.5;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+`;
+const seatIdentityLord = css`
+  background: #d4a017;
+  color: #3a2400;
+`;
+const seatIdentityLoyalist = css`
+  background: #3f6fb5;
+  color: #fff;
+`;
+const seatIdentityRebel = css`
+  background: #b03a30;
+  color: #fff;
+`;
+const seatIdentityRenegade = css`
+  background: #8e5aa8;
+  color: #fff;
+`;
+const seatIdentityHidden = css`
+  background: #4a463d;
+  color: #b9b2a0;
+`;
+// 座号小徽章
+const seatIndexBadge = css`
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 9px;
+  font-weight: normal;
+  line-height: 1.5;
+`;
+// 玩家名:白字粗体,超出省略
+const seatName = css`
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+`;
+// 名牌右侧徽章组
+const seatBadgeGroup = css`
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+`;
+const youBadge = css`
+  background: rgba(52, 152, 219, 0.92);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 9px;
+  color: #fff;
+  font-weight: bold;
+  line-height: 1.5;
+`;
+const turnBadge = css`
+  background: #d4a017;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 9px;
+  color: #241a04;
+  font-weight: bold;
+  line-height: 1.5;
+`;
+// 连环徽章:铁灰底 + 铁链图标,标示横置(铁索连环)状态
+const chainBadge = css`
+  display: inline-flex;
+  align-items: center;
+  background: linear-gradient(135deg, #6b8294, #9bb3c4);
+  border: 1px solid #b9cdd9;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 10px;
+  color: #fff;
+  font-weight: bold;
+  line-height: 1.5;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+`;
+// 离线角标:灰底,标示该玩家 SSE 已断开(重连宽限期内)
+const offlineBadge = css`
+  background: #7a7a7a;
+  border: 1px solid #9a9a9a;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 9px;
+  color: #fff;
+  font-weight: bold;
+  line-height: 1.5;
+`;
+// 卡本体包裹层:relative 锚点(体力珠列/漂浮数字挂载点)
+const seatCardWrap = css`
+  position: relative;
+  width: 100%;
+  flex: 0 0 auto;
+`;
+// 卡本体:竖版立绘卡。细金铜描边(1px #8a7448)+ 外圈 1px 深色,圆角 6px;
+// 高度统一 --hero-card-h,宽度撑满 seatArcSlot(= 卡高 × 15/19,与立绘 750×950 同比例)
 const seatCard = css`
   position: relative;
   box-sizing: border-box;
-  border: 1px solid #444;
-  border-radius: 10px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.5);
-  transition: all 0.25s;
-  /* 与底栏 PlayerCardLarge 同尺寸:高度统一为 --hero-card-h,宽度撑满 seatArcSlot(= 卡高 × 15/19) */
   height: var(--hero-card-h);
   width: 100%;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  border: 1px solid #8a7448;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #14110c;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 6px 18px rgba(0, 0, 0, 0.45);
+  transition:
+    box-shadow 0.25s,
+    border-color 0.25s,
+    opacity 0.25s;
 `;
-// 势力色顶部条:武将名 + 身份
-const seatCardHeader = css`
-  padding: 6px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  background: var(--faction-color, transparent);
+// 当前回合:金绿双层辉光边框 + 金色描边呼吸(与名牌高亮联动)。
+// activeSeatPulse 关键帧只动 outline-color(几何不变),叠加在静态 box-shadow 上;
+// 视角玩家自己的座位不进弧形座位环(SeatArcLayout 只渲染 slice(1)),seatCardPerspective
+// 蓝色 outline 不会与这里的金色 outline 同卡共存。若座位同时被选为目标,
+// seatCardTargeted 的 animation 声明在文件更靠后,优先于此处的呼吸动画。
+const seatCardActive = css`
+  border-color: #d4a048;
+  outline: 2px solid rgba(255, 215, 0, 0.95);
+  outline-offset: 2px;
+  animation: activeSeatPulse 2s ease-in-out infinite;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 0 16px rgba(255, 205, 92, 0.45),
+    0 0 32px rgba(110, 190, 100, 0.22),
+    inset 0 0 12px rgba(255, 210, 100, 0.1);
 `;
-const seatCardHeaderTop = css`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+// 视角玩家:蓝色环(outline 与 box-shadow 辉光正交,可叠加)
+const seatCardPerspective = css`
+  outline: 2px solid rgba(52, 152, 219, 0.7);
+  outline-offset: 1px;
 `;
-const seatCharName = css`
-  font-weight: bold;
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.9);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+// 死亡:立绘 grayscale(见 seatCharImgDead)+ 卡面「亡」印章,整体轻降不透明度
+const seatCardDead = css`
+  opacity: 0.72;
 `;
-// 武将立绘作座位卡背景:绝对定位填满整张卡,文字内容浮在其上
+// 可点选目标:hover 红边提示
+const seatCardClickable = css`
+  cursor: pointer;
+  &:hover {
+    border-color: #e05545;
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.6),
+      0 0 14px rgba(231, 76, 60, 0.45);
+  }
+`;
+// 横置(铁索连环):铁灰冷色调边框 + 铁链光泽脉冲(立绘同步降饱和,见 seatCharImgChained)
+const seatCardChained = css`
+  border-color: #8aa6b8;
+  animation: chainPulse 1.8s ease-in-out infinite;
+`;
+// 被选为目标:红色脉冲边框(定义最靠后,目标态优先于回合金边/铁索冷光)
+const seatCardTargeted = css`
+  border-color: #e05545;
+  animation: seatTargetPulse 1.2s ease-in-out infinite;
+`;
+// 武将立绘:绝对定位填满卡面;无素材/404 时回退势力色背景。
+// ::after 暗化蒙版:立绘缺失时避免高饱和势力色平铺刺眼(官方立绘本身带暗调),
+// 有立绘时蒙版同时压暗图底,保证左缘竖带/角标文字可读。
 const seatCharImgWrap = css`
   position: absolute;
   inset: 0;
   z-index: 0;
   overflow: hidden;
   background: var(--faction-color, rgba(0, 0, 0, 0.5));
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 120% 90% at 50% 30%, transparent 40%, rgba(8, 6, 3, 0.5) 100%),
+      linear-gradient(rgba(10, 8, 5, 0.34), rgba(10, 8, 5, 0.18));
+  }
+`;
+// 无立绘素材的武将(回退势力色平铺):整层降饱和压亮,呈暗调势力色牌而非高饱和色块
+const seatCharImgWrapEmpty = css`
+  filter: saturate(0.5) brightness(0.62);
 `;
 const seatCharImg = css`
   position: absolute;
@@ -392,56 +619,262 @@ const seatCharImg = css`
 const seatCharImgDead = css`
   filter: grayscale(1) brightness(0.7);
 `;
-// 座位卡内容层:浮在立绘上,底部渐变蒙版保证文字可读
-const seatCardContent = css`
+// 横置(铁索):立绘铁灰冷色调(降饱和压亮),与边框 chainPulse 呼应
+const seatCharImgChained = css`
+  filter: saturate(0.45) brightness(0.92);
+`;
+// 卡内左缘竖带:自上而下渐变暗带(rgba(0,0,0,.62)→透明),宽约 26px
+const seatSideBand = css`
   position: absolute;
-  inset: 0;
-  z-index: 1;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 26px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 0 9px;
   background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.78) 0%,
-    rgba(0, 0, 0, 0.45) 50%,
-    rgba(0, 0, 0, 0) 100%
+    to bottom,
+    rgba(0, 0, 0, 0.62) 0%,
+    rgba(0, 0, 0, 0.42) 60%,
+    rgba(0, 0, 0, 0.08) 100%
   );
 `;
-// 体力行:红心表示 HP
-const seatHpRow = css`
-  display: flex;
-  gap: 2px;
-  padding: 4px 10px;
-  background: rgba(0, 0, 0, 0.3);
-`;
-const hpHeartFull = css`
-  color: #e74c3c;
-  font-size: 16px;
-  text-shadow: 0 0 4px rgba(231, 76, 60, 0.5);
-`;
-const hpHeartEmpty = css`
-  color: #555;
-  font-size: 14px;
-`;
-const seatCardActive = css`
+// 势力印章:18px 方块,势力色底 + 金字(魏/蜀/吴/群)
+const seatFactionStamp = css`
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  border: 1px solid rgba(240, 215, 138, 0.4);
   box-shadow:
-    0 0 18px rgba(255, 215, 0, 0.35),
-    inset 0 0 8px rgba(255, 215, 0, 0.1);
-  outline: 2px solid #ffd700;
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 1px 3px rgba(0, 0, 0, 0.5);
+  font-size: 10px;
+  font-weight: bold;
+  color: #f0d78a;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.7);
 `;
-const seatCardPerspective = css`
-  border: 2px solid #3498db;
-  box-shadow: 0 0 8px rgba(52, 152, 219, 0.25);
+// 竖排武将名:vertical-rl + upright,金白粗体带深色描边
+const seatCharName = css`
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-weight: bold;
+  font-size: 13px;
+  letter-spacing: 3px;
+  color: #f3e6c2;
+  text-shadow:
+    1px 0 2px rgba(0, 0, 0, 0.9),
+    -1px 0 2px rgba(0, 0, 0, 0.9),
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 -1px 2px rgba(0, 0, 0, 0.9);
 `;
-const seatCardDead = css`
-  opacity: 0.35;
-  filter: grayscale(1);
+// 竖带底部体力数字(当前体力):红色粗体;伤害/回复红/绿闪烁挂在此处
+const seatHpNumber = css`
+  flex-shrink: 0;
+  display: inline-block;
+  line-height: 1;
+  font-size: 16px;
+  font-weight: 900;
+  color: #ff5f52;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.85),
+    0 0 6px rgba(255, 60, 40, 0.45);
 `;
-const seatCardClickable = css`
-  cursor: pointer;
-  &:hover {
-    outline: 2px solid #e74c3c;
+// 手牌数角标:卡内右下角小暗章「🂠 N」
+const seatHandBadge = css`
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(138, 116, 72, 0.5);
+  color: #e8c47a;
+  font-size: 10px;
+  font-weight: bold;
+  line-height: 1.4;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+`;
+// 死亡印章:旋转红字方印盖在卡面(立绘同时 grayscale)
+// 有身份时两行「身份/阵亡」(对齐官方「反贼/阵亡」印),无身份时单字「亡」
+const seatDeadStamp = css`
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transform: translate(-50%, -50%) rotate(-10deg);
+  padding: 4px 8px;
+  border: 3px solid rgba(200, 40, 34, 0.85);
+  border-radius: 6px;
+  background: rgba(20, 6, 4, 0.38);
+  color: rgba(226, 56, 48, 0.94);
+  font-size: 21px;
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: 3px;
+  text-indent: 3px; /* 抵消 letter-spacing 造成的偏移 */
+  text-shadow: 0 0 10px rgba(180, 30, 24, 0.6);
+  pointer-events: none;
+
+  & > i {
+    font-style: normal;
+    white-space: nowrap;
   }
+`;
+// 右缘体力珠列:垂直排列,骑在卡右边框上(right: -5px = 半珠宽);
+// 满珠绿渐变水滴(内高光+微光晕),空珠透明底 #444 边。尺寸由内联按 maxHealth 缩放
+const seatHpBeadCol = css`
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+`;
+// 满珠分色:剩余体力 >50% 绿 / >25% 黄 / ≤25% 红(濒危警示)
+const seatHpBeadFull = css`
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: linear-gradient(135deg, #7ec850 8%, #3e8f2e 92%);
+  border: 1px solid rgba(46, 94, 28, 0.9);
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.25),
+    0 0 6px rgba(126, 200, 80, 0.45);
+`;
+const seatHpBeadFullMid = css`
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: linear-gradient(135deg, #e8c84a 8%, #b8862a 92%);
+  border: 1px solid rgba(122, 88, 20, 0.9);
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.25),
+    0 0 6px rgba(232, 200, 74, 0.45);
+`;
+const seatHpBeadFullLow = css`
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: linear-gradient(135deg, #e85d4a 8%, #a8281a 92%);
+  border: 1px solid rgba(122, 30, 20, 0.9);
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.25),
+    0 0 6px rgba(232, 93, 74, 0.5);
+`;
+const seatHpBeadEmpty = css`
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid #444;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55);
+`;
+// 卡下小标签行容器
+const seatLabelCol = css`
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+`;
+// 装备行:暗条 chip + 图标 + 牌名 + 花色点数(如 ⚔贯石斧5♦)
+const equipRow = css`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  & > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 10px;
+    color: #ecd9a8;
+    background: rgba(12, 10, 7, 0.72);
+    border: 1px solid rgba(138, 116, 72, 0.4);
+    border-radius: 3px;
+    padding: 1px 6px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+`;
+// 判定行(延时锦囊):紫边 chip
+const judgeRow = css`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+`;
+const judgeRowLabel = css`
+  color: #c9a2ff;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+`;
+const judgeTag = css`
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid #8e6cc8;
+  color: var(--suit-color, #ccc);
+  background: rgba(24, 16, 34, 0.78);
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+`;
+// 技能 chips:暗底金字小圆角
+const skillRow = css`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+`;
+const skillTag = css`
+  display: inline-block;
+  background: rgba(10, 8, 6, 0.68);
+  border: 1px solid rgba(138, 116, 72, 0.42);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 10px;
+  color: #e8c47a;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+`;
+// 原始标记行(链式标记已由卡面表达,其余以小灰字展示)
+const markRow = css`
+  font-size: 10px;
+  color: #777;
+  padding: 0 2px;
+`;
+const markTag = css`
+  margin-right: 6px;
 `;
 // 选目标时不可选的座位置灰(距离外/不满足槽位条件),与可选座位形成视觉对比
 const seatCardUntargetable = css`
@@ -449,187 +882,9 @@ const seatCardUntargetable = css`
   filter: grayscale(0.8);
   cursor: not-allowed;
 `;
-const seatCardTargeted = css`
-  outline: 3px solid #e74c3c;
-  box-shadow: 0 0 12px rgba(231, 76, 60, 0.4);
-`;
-// 横置(铁索连环):铁灰光泽脉冲边框,代表武将牌横置状态(与回合金边/选中红边区分)
-const seatCardChained = css`
-  border-color: #8aa6b8;
-  animation: chainPulse 1.8s ease-in-out infinite;
-`;
-const seatName = css`
-  font-weight: bold;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
-`;
-const seatIndexBadge = css`
-  display: inline-block;
-  background: rgba(0, 0, 0, 0.2);
-  color: rgba(255, 255, 255, 0.6);
-  border-radius: 3px;
-  padding: 1px 5px;
-  margin-right: 4px;
-  font-size: 10px;
-  font-weight: normal;
-  vertical-align: middle;
-`;
-const youBadge = css`
-  background: #3498db;
-  border-radius: 3px;
-  padding: 1px 5px;
-  font-size: 9px;
-  color: #fff;
-  margin-left: 4px;
-  font-weight: bold;
-`;
-const turnBadge = css`
-  background: #ffd700;
-  border-radius: 3px;
-  padding: 1px 5px;
-  font-size: 9px;
-  color: #000;
-  margin-left: 4px;
-  font-weight: bold;
-`;
-// 连环徽章:铁灰底 + 铁链图标,标示横置(铁索连环)状态
-const chainBadge = css`
-  display: inline-block;
-  background: linear-gradient(135deg, #6b8294, #9bb3c4);
-  border: 1px solid #b9cdd9;
-  border-radius: 3px;
-  padding: 1px 5px;
-  font-size: 11px;
-  color: #fff;
-  margin-left: 4px;
-  font-weight: bold;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-`;
-// 离线角标:灰底,标示该玩家 SSE 已断开(重连宽限期内)
-const offlineBadge = css`
-  display: inline-block;
-  background: #888;
-  border: 1px solid #aaa;
-  border-radius: 3px;
-  padding: 1px 5px;
-  font-size: 10px;
-  color: #fff;
-  margin-left: 4px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-`;
 // 断线座位置灰(与死亡置灰区分:断线保持立绘可见,仅降透明度)
 const seatCardDisconnected = css`
   opacity: 0.6;
-`;
-const lordBadge = css`
-  background: #ffd700;
-  border-radius: 3px;
-  padding: 1px 6px;
-  font-size: 9px;
-  color: #4a2800;
-  margin-left: 4px;
-  font-weight: bold;
-`;
-const loyalistBadge = css`
-  background: #4a90e2;
-  border-radius: 3px;
-  padding: 1px 6px;
-  font-size: 9px;
-  color: #fff;
-  margin-left: 4px;
-  font-weight: bold;
-`;
-const rebelBadge = css`
-  background: #e74c3c;
-  border-radius: 3px;
-  padding: 1px 6px;
-  font-size: 9px;
-  color: #fff;
-  margin-left: 4px;
-  font-weight: bold;
-`;
-const renegadeBadge = css`
-  background: #9b59b6;
-  border-radius: 3px;
-  padding: 1px 6px;
-  font-size: 9px;
-  color: #fff;
-  margin-left: 4px;
-  font-weight: bold;
-`;
-const hiddenBadge = css`
-  background: #555;
-  border-radius: 3px;
-  padding: 1px 5px;
-  font-size: 10px;
-  color: #bbb;
-  margin-left: 4px;
-  font-weight: bold;
-`;
-const equipRow = css`
-  font-size: 11px;
-  color: #f39c12;
-  padding: 0 10px 4px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-`;
-// 判定区(延时锦囊):斜体、紫色边框,亮眼能看清
-const judgeRow = css`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  margin-top: 2px;
-  font-size: 11px;
-`;
-const judgeRowLabel = css`
-  color: #b78bff;
-  font-weight: bold;
-`;
-const judgeTag = css`
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 4px;
-  border: 1px solid var(--suit-color, #ccc);
-  color: var(--suit-color, #ccc);
-  background: rgba(155, 89, 182, 0.12);
-  font-weight: bold;
-`;
-const skillRow = css`
-  margin-bottom: 4px;
-  padding: 2px 10px;
-`;
-const skillTag = css`
-  display: inline-block;
-  background: rgba(15, 52, 96, 0.6);
-  border-radius: 3px;
-  padding: 1px 5px;
-  margin-right: 3px;
-  font-size: 10px;
-  color: #8899aa;
-`;
-const infoRow = css`
-  font-size: 11px;
-  color: #999;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 2px 10px 4px;
-`;
-const markRow = css`
-  font-size: 10px;
-  color: #666;
-  padding: 0 10px 4px;
-`;
-const markTag = css`
-  margin-right: 6px;
-`;
-// 死亡「亡」小标签
-const deadBadgeText = css`
-  font-size: 10px;
-  color: #fff;
-  margin-left: 2px;
 `;
 
 // ─── 动画状态样式 ───
@@ -644,7 +899,7 @@ const seatDamageOverlay = css`
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: 8px;
+    border-radius: 6px;
     pointer-events: none;
     animation: damageOverlay 0.6s ease-out both;
   }
@@ -681,7 +936,7 @@ const seatHealOverlay = css`
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: 8px;
+    border-radius: 6px;
     pointer-events: none;
     animation: healOverlay 0.6s ease-out both;
   }

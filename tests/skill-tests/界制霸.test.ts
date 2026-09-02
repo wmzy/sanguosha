@@ -373,4 +373,41 @@ describe('界孙策·界制霸', () => {
       params: { cardId: 'lc', target: 1 },
     });
   });
+
+  // ─── defineAction 声明验证 ─────────────────────────
+  it('availableActions:界制霸 use 声明含 filter 且匹配任意手牌(AI 可枚举)', async () => {
+    // 回归背景:cardFilter 缺 filter 时 findUseActionForCard 恒不匹配 →
+    // AI/无头客户端枚举不出主动拼点动作。
+    const lc = mkCard('lc', '2');
+    const oc = mkCard('oc', '9');
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({
+            index: 0,
+            name: '界孙策',
+            faction: '吴',
+            skills: ['界制霸'],
+            hand: ['lc', 'oc'],
+          }),
+          mkPlayer({ index: 1, name: '吴将', faction: '吴', skills: [], hand: ['tc'] }),
+        ],
+        cardMap: { lc, oc, tc: mkCard('tc', 'K') },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+    const SC = harness.player('界孙策');
+
+    const actions = SC.availableActions();
+    const use = actions.find((a) => a.skillId === '界制霸' && a.actionType === 'use');
+    expect(use).toBeDefined();
+    const cf = use!.prompt.type === 'useCardAndTarget' ? use!.prompt.cardFilter : null;
+    expect(cf?.filter).toBeDefined();
+    // 拼点牌=任意一张手牌(不限花色点数)
+    for (const id of harness.state.players[0].hand) {
+      expect(cf!.filter!(harness.state.cardMap[id])).toBe(true);
+    }
+  });
 });

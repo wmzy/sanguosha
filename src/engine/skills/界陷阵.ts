@@ -195,7 +195,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         prompt: {
           type: 'useCard',
           title: `陷阵:与 ${st.players[from].name} 拼点,请出一张手牌`,
-          cardFilter: { min: 1, max: 1 },
+          cardFilter: { filter: () => true, min: 1, max: 1 },
         },
         timeout: 30,
       });
@@ -358,7 +358,9 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     prompt: {
       type: 'useCardAndTarget',
       title: '选择一张手牌与一名其他角色拼点(陷阵)',
-      cardFilter: { min: 1, max: 1 },
+      // filter:()=>true(拼点牌=任意手牌):缺失则 extractCardFilter 返回 null →
+      // findUseActionForCard 恒不匹配,AI/无头客户端枚举不出陷阵动作
+      cardFilter: { filter: () => true, min: 1, max: 1 },
       targetFilter: {
         min: 1,
         max: 1,

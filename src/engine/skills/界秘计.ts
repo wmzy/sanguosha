@@ -95,9 +95,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return null;
       }
       if (rt === GIVE_CARDS_RT) {
-        const cardIds = params.cardIds as Json[] | undefined;
+        // 客户端契约:useCard 型 pending 只发 {cardId},{}(「不回应」)=不选牌(至多语义允许 0 张)。
+        const raw: unknown = params.cardIds ?? params.cardId;
+        const cardIds = Array.isArray(raw)
+          ? raw
+          : typeof raw === 'string'
+            ? [raw]
+            : ([] as Json[]);
         const maxN = (st.localVars[GIVE_MAX_VAR] as number | undefined) ?? 0;
-        if (!Array.isArray(cardIds)) return '需要 cardIds 数组(可为空)';
         if (cardIds.length > maxN) return `至多 ${maxN} 张`;
         const set = new Set(cardIds);
         if (set.size !== cardIds.length) return '不能重复';
@@ -120,10 +125,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       } else if (rt === GIVE_TARGET_RT) {
         st.localVars[GIVE_TARGET_KEY] = params.target;
       } else if (rt === GIVE_CARDS_RT) {
-        const cardIds = params.cardIds as Json[] | undefined;
-        st.localVars[GIVE_CARDS_KEY] = Array.isArray(cardIds)
-          ? (cardIds.filter((id): id is string => typeof id === 'string'))
-          : [];
+        const raw: unknown = params.cardIds ?? params.cardId;
+        const normalized = Array.isArray(raw)
+          ? raw
+          : typeof raw === 'string'
+            ? [raw]
+            : [];
+        st.localVars[GIVE_CARDS_KEY] = normalized.filter(
+          (id): id is string => typeof id === 'string',
+        );
       }
     },
   );

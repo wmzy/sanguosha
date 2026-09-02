@@ -80,8 +80,8 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
     prompt: {
       type: 'useCardAndTarget',
       title: '青囊：弃一张手牌,令一名角色回复 1 点体力',
-      // 弃置任意手牌
-      cardFilter: { min: 1, max: 1 },
+      // 弃置任意手牌(filter 必填:投影层遇 !cf.filter 不下发 candidates,前端无法选牌)
+      cardFilter: { filter: () => true, min: 1, max: 1 },
       // 目标:存活且体力未满的角色(含自己)
       targetFilter: {
         min: 1,

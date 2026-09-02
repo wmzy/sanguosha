@@ -530,4 +530,34 @@ describe('界陷阵', () => {
     expect(harness.state.turn.vars['陷阵/winTarget']).toBeUndefined();
     expect(harness.state.turn.vars['陷阵/lostTarget']).toBeUndefined();
   });
+
+  // ─── defineAction 声明验证 ─────────────────────────
+  it('availableActions:界陷阵 use 声明含 filter 且匹配任意手牌(AI 可枚举)', async () => {
+    // 回归背景(2026-08-26):cardFilter 缺 filter 时 extractCardFilter 返回 null,
+    // findUseActionForCard 恒不匹配 → AI/无头客户端枚举不出陷阵动作(浏览器不受影响)。
+    const pdWin = makeCard('c1', '杀', '♠', 'K');
+    const other = makeCard('c3', '闪', '♦', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['c1', 'c3'], skills: ['界陷阵'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['c2'], skills: [] }),
+      ],
+      cardMap: { c1: pdWin, c2: makeCard('c2', '闪', '♥', '2'), c3: other },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    const actions = P0.availableActions();
+    const use = actions.find((a) => a.skillId === '界陷阵' && a.actionType === 'use');
+    expect(use).toBeDefined();
+    const cf = use!.prompt.type === 'useCardAndTarget' ? use!.prompt.cardFilter : null;
+    expect(cf?.filter).toBeDefined();
+    // 拼点牌=任意一张手牌(不限花色点数)
+    for (const id of harness.state.players[0].hand) {
+      expect(cf!.filter!(harness.state.cardMap[id])).toBe(true);
+    }
+  });
 });

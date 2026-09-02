@@ -67,14 +67,22 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
       if (rt === CONFIRM_RT) return null; // confirm:任意 choice 均可
 
-      // 弃牌:校验 cardIds 均在自己手牌中
+      // 弃牌:校验 cardIds 均在自己手牌中 + 张数恰为 excess + 无重复
       const cardIds = params.cardIds as string[] | undefined;
       if (!Array.isArray(cardIds) || cardIds.length === 0) return '请选择要弃置的牌';
       const self = st.players[ownerId];
       if (!self) return '玩家不存在';
+      const seen = new Set<string>();
       for (const id of cardIds) {
         if (typeof id !== 'string' || !self.hand.includes(id)) return `牌 ${id} 不在手牌中`;
+        if (seen.has(id)) return '存在重复的牌';
+        seen.add(id);
       }
+      // 张数必须恰为弃至 X 张的超出数(防恶意提交多弃/少弃;X=本回合奇制次数)
+      const x = getQizhiCount(st.turn.vars) ?? 0;
+      const excess = self.hand.length - x;
+      if (excess <= 0) return '当前无需弃置';
+      if (cardIds.length !== excess) return `需要恰好弃置 ${excess} 张手牌`;
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {

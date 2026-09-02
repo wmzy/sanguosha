@@ -458,13 +458,106 @@ describe('server/gameHistory REST 端点', () => {
     }
   });
 
-  it('DELETE /api/rooms/:id 销毁房间时同步清理历史目录', async () => {
-    const room = createRoom('测试', 2, 'host-user', createCaptureSink([]));
+  it('GET history 列表/单条/download:非 debug 房仅成员可读(2026-08-26 鉴权修复)', async () => {
+    // 回归背景:列表接口此前完全无鉴权(泄露全员 userId+身份);单条 ?download=1
+    // 位于登录校验之前,未登录者可下载完整多座次文件(含每人私有手牌 delta)。
+    const reg = await app.fetch(
+      new Request('http://localhost/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: `gh-hist-${Date.now()}`, password: 'pass123' }),
+      }),
+    );
+    const hostCookie = reg.headers.get('set-cookie')!.split(';')[0];
+    const hostId = ((await reg.json()) as { user: { id: string } }).user.id;
+    const outReg = await app.fetch(
+      new Request('http://localhost/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: `gh-out-${Date.now()}`, password: 'pass123' }),
+      }),
+    );
+    const outCookie = outReg.headers.get('set-cookie')!.split(';')[0];
+    const room = createRoom('测试', 2, hostId, createCaptureSink([]));
+    try {
+      await appendGameHistory(room.id, makeEntry(room.id, 1000), makeReplay());
+      const base = `http://localhost/api/rooms/${room.id}/history`;
+
+      // 未登录:列表/单条/download 均 401
+      expect((await app.fetch(new Request(`${base}`))).status).toBe(401);
+      expect((await app.fetch(new Request(`${base}/entry-1000`))).status).toBe(401);
+      expect((await app.fetch(new Request(`${base}/entry-1000?download=1`))).status).toBe(401);
+
+      // 已登录非成员:均 403(download 不再绕过鉴权)
+      const auth = { headers: { Cookie: outCookie } };
+      expect((await app.fetch(new Request(`${base}`, auth))).status).toBe(403);
+      expect((await app.fetch(new Request(`${base}/entry-1000`, auth))).status).toBe(403);
+      expect((await app.fetch(new Request(`${base}/entry-1000?download=1`, auth))).status).toBe(403);
+
+      // 成员(房主):列表 200,download 返回完整附件
+      const hostAuth = { headers: { Cookie: hostCookie } };
+      const okList = await app.fetch(new Request(`${base}`, hostAuth));
+      expect(okList.status).toBe(200);
+      const body = (await okList.json()) as { entries: GameHistoryEntry[] };
+      expect(body.entries).toHaveLength(1);
+      const okDl = await app.fetch(new Request(`${base}/entry-1000?download=1`, hostAuth));
+      expect(okDl.status).toBe(200);
+      expect(okDl.headers.get('content-disposition')).toContain('attachment');
+
+      // 成员普通拉取按座次过滤(host 在 entry 中无座位 → 旁观 delta)
+      const okPlain = await app.fetch(new Request(`${base}/entry-1000`, hostAuth));
+      expect(okPlain.status).toBe(200);
+    } finally {
+      deleteRoom(room.id);
+    }
+  });
+
+  it('DELETE /api/rooms/:id 销毁房间时同步清理历史目录(仅房主;非房主 403)', async () => {
+    // 注册真实会话:DELETE 房间现在要求房主身份(2026-08-26 鉴权修复)
+    const reg = await app.fetch(
+      new Request('http://localhost/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: `gh-del-${Date.now()}`, password: 'pass123' }),
+      }),
+    );
+    const hostCookie = reg.headers.get('set-cookie')!.split(';')[0];
+    const hostId = ((await reg.json()) as { user: { id: string } }).user.id;
+    const otherReg = await app.fetch(
+      new Request('http://localhost/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: `gh-delo-${Date.now()}`, password: 'pass123' }),
+      }),
+    );
+    const otherCookie = otherReg.headers.get('set-cookie')!.split(';')[0];
+
+    const room = createRoom('测试', 2, hostId, createCaptureSink([]));
     await appendGameHistory(room.id, makeEntry(room.id, 1000), makeReplay());
     expect(existsSync(join(HISTORY_DIR, room.id))).toBe(true);
 
-    const res = await app.fetch(
+    // 未登录 → 401
+    const anon = await app.fetch(
       new Request(`http://localhost/api/rooms/${room.id}`, { method: 'DELETE' }),
+    );
+    expect(anon.status).toBe(401);
+
+    // 非房主 → 403,历史保留
+    const forbidden = await app.fetch(
+      new Request(`http://localhost/api/rooms/${room.id}`, {
+        method: 'DELETE',
+        headers: { Cookie: otherCookie },
+      }),
+    );
+    expect(forbidden.status).toBe(403);
+    expect(existsSync(join(HISTORY_DIR, room.id))).toBe(true);
+
+    // 房主 → 删除成功并同步清理历史目录
+    const res = await app.fetch(
+      new Request(`http://localhost/api/rooms/${room.id}`, {
+        method: 'DELETE',
+        headers: { Cookie: hostCookie },
+      }),
     );
     expect(res.status).toBe(200);
     expect(existsSync(join(HISTORY_DIR, room.id))).toBe(false);

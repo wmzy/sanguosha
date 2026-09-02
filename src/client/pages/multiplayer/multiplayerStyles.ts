@@ -5,8 +5,9 @@ import { css } from '@linaria/core';
 import { colors, pageStyle, pageBgStyle, glassPanelStyle, goldHeadingStyle, goldColors } from '../../theme';
 import type { GameMode } from '../../../engine/rules/types';
 
-export const page = css`
-  ${pageBgStyle}
+// wyw-in-js 下 css`` 内插值其他 css 类(如 ${pageBgStyle})不会内联其属性,
+// 统一改为「自身属性类 + 基类字符串拼接」导出,使用处 className 零改动。
+const pageBase = css`
   background-color: #0d1220;
   display: flex;
   flex-direction: column;
@@ -15,27 +16,61 @@ export const page = css`
   padding: 40px 20px;
   color: #eee;
 `;
+export const page = `${pageBase} ${pageBgStyle}`;
 
 /** 页面主标题:金色 + 底部金色下边线 */
-export const title = css`
-  ${goldHeadingStyle}
+const titleBase = css`
   font-size: 36px;
   margin: 0 0 8px;
   letter-spacing: 4px;
   color: ${goldColors.base};
 `;
+export const title = `${titleBase} ${goldHeadingStyle}`;
 
 export const subtitle = css`
   color: ${colors.text.muted};
   margin: 0 0 32px;
 `;
 
-export const card = css`
-  ${glassPanelStyle}
+/** 等待大厅页标题:金书风 + 两侧装饰渐变线(同选将面板标题做法,官方 OL 风格)。
+ *  与 `title`(底部下划线式)并存,按页面选用。 */
+export const pageTitle = css`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-size: 34px;
+  font-weight: bold;
+  margin: 0 0 8px;
+  letter-spacing: 6px;
+  color: #e8c47a;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  /* 防止窄容器下文字被逐字换行成竖排 */
+  white-space: nowrap;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 0 1 160px;
+    max-width: 220px;
+    min-width: 24px;
+    height: 7px;
+    background:
+      linear-gradient(#e8c47a, #e8c47a) right center / 5px 5px no-repeat,
+      linear-gradient(90deg, transparent, #8a7448) left center / calc(100% - 9px) 2px no-repeat;
+  }
+
+  &::after {
+    transform: scaleX(-1);
+  }
+`;
+
+const cardBase = css`
   padding: 28px;
   width: 100%;
   max-width: 420px;
 `;
+export const card = `${cardBase} ${glassPanelStyle}`;
 
 /** 区块标题:左侧金色竖条 */
 export const sectionTitle = css`
@@ -76,14 +111,15 @@ export const divider = css`
   margin: 24px 0;
 `;
 
+/** 房间码盒:官方铜牌风(暗皮革底 + 铜边 + 内阴影) */
 export const roomCodeBox = css`
-  background-color: rgba(18, 24, 40, 0.6);
-  border: 2px dashed rgba(241, 196, 15, 0.45);
-  border-radius: 10px;
+  background: linear-gradient(#241d15, #171209);
+  border: 1px solid #8a7448;
+  border-radius: 8px;
   padding: 20px;
   text-align: center;
   margin-bottom: 20px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
 `;
 
 export const roomCodeLabel = css`
@@ -92,11 +128,12 @@ export const roomCodeLabel = css`
   margin-bottom: 6px;
 `;
 
+/** 房间码数字:#ffd700 22px 加粗等宽 */
 export const roomCode = css`
-  font-size: 32px;
+  font-size: 22px;
   font-weight: bold;
   letter-spacing: 6px;
-  color: ${colors.accent.gold};
+  color: #ffd700;
   font-family: monospace;
 `;
 
@@ -176,10 +213,12 @@ export const buttonRow = css`
   justify-content: center;
 `;
 
-export const gameOverBox = css`
-  ${card}
+/** 结算回退卡(EndedStage 无 view 时):居中文案 + card 卡片样式。
+ *  原 css`` 内插值 ${card} 在 wyw 下不内联规则(非法声明),改为字符串拼接。 */
+const gameOverBoxBase = css`
   text-align: center;
 `;
+export const gameOverBox = `${gameOverBoxBase} ${card}`;
 
 export const winnerText = css`
   font-size: 28px;
@@ -188,24 +227,24 @@ export const winnerText = css`
   color: ${colors.accent.gold};
 `;
 
-export const gameWrap = css`
+const gameWrapBase = css`
   min-height: 100vh;
-  ${pageBgStyle}
   background-color: ${colors.bg.page};
 `;
+export const gameWrap = `${gameWrapBase} ${pageBgStyle}`;
 
 /**
  * lobby 页容器:顶栏贴顶常驻,主体两栏(左表单/右房间列表)限宽居中。
  * 与 `page` 的居中单列范式分开,避免影响游戏结束等居中分支。
  */
-export const lobbyPage = css`
-  ${pageBgStyle}
+const lobbyPageBase = css`
   background-color: #0d1220;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   color: #eee;
 `;
+export const lobbyPage = `${lobbyPageBase} ${pageBgStyle}`;
 
 /** 顶栏:sticky 常驻页面顶部,左侧返回首页,右侧页面标识 */
 export const topBar = css`
@@ -304,10 +343,13 @@ export const reconnectOverlay = css`
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 `;
 
-export const reconnectFailedOverlay = css`
-  ${reconnectOverlay}
+/** 重连失败横幅:reconnectOverlay 布局 + 红色底覆盖。
+ *  原 css`` 内插值 ${reconnectOverlay} 在 wyw 下不内联规则(非法声明),改为字符串拼接;
+ *  本类声明在其后,background-color 按样式表顺序覆盖琥珀色。 */
+const reconnectFailedBase = css`
   background-color: ${colors.accent.red};
 `;
+export const reconnectFailedOverlay = `${reconnectOverlay} ${reconnectFailedBase}`;
 
 export const reconnectSpinner = css`
   width: 16px;
@@ -324,9 +366,7 @@ export const reconnectSpinner = css`
   }
 `;
 
-export const notFoundPage = css`
-  ${pageStyle}
-  ${pageBgStyle}
+const notFoundPageBase = css`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -335,6 +375,7 @@ export const notFoundPage = css`
   text-align: center;
   gap: 12px;
 `;
+export const notFoundPage = `${pageStyle} ${pageBgStyle} ${notFoundPageBase}`;
 
 export const notFoundCode = css`
   font-size: 96px;

@@ -33,10 +33,12 @@ const panelRoot = css`
   overflow: hidden;
 `;
 
-const panelRootCollapsed = css`
-  ${panelRoot}
+/** 折叠态:复用 panelRoot 外壳,压成 40px 高横条。
+ *  原 css`` 内插值 ${panelRoot} 在 wyw 下不内联规则(非法声明),改为字符串拼接。 */
+const panelRootCollapsedExtra = css`
   max-height: 40px;
 `;
+const panelRootCollapsed = `${panelRoot} ${panelRootCollapsedExtra}`;
 
 const header = css`
   display: flex;
@@ -85,11 +87,13 @@ const msgRow = css`
   word-break: break-word;
 `;
 
-const msgRowMine = css`
-  ${msgRow}
+/** 我方消息行:复用 msgRow 排版,右对齐 + 绿色高亮。
+ *  原 css`` 内插值 ${msgRow} 在 wyw 下不内联规则(非法声明),改为字符串拼接。 */
+const msgRowMineExtra = css`
   text-align: right;
   color: ${colors.accent.green};
 `;
+const msgRowMine = `${msgRow} ${msgRowMineExtra}`;
 
 const msgName = css`
   font-weight: bold;

@@ -609,4 +609,66 @@ describe('贞良(阴)', () => {
     expect(getState(harness.state, 0)).toBe('阴'); // 未翻转
     expect(harness.state.players[0].health).toBe(3); // 闪抵消杀
   });
+
+  // 回归(2026-08-26):浏览器 AwaitingPrompt 对 useCard 型 pending 是两步式选牌,
+  // 只发 respond{cardId}(无 cardIds);点「不回应」发 respond{}。修复前 validate
+  // 只认 cardIds 数组 → 浏览器玩家永远无法置任/换任(贞良断粮)。
+  it('浏览器形状:仅 {cardId} 单数也能完成置任', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: 'P0', hand: ['c1'], skills: ['明任', '贞良'] }),
+          mkPlayer({ index: 1, name: 'P1', character: '曹操' }),
+        ],
+        cardMap: {
+          c1: mkCard('c1', '杀', '♠', '7'),
+          d1: mkCard('d1', '杀', '♥', '3'),
+          d2: mkCard('d2', '闪', '♣', '4'),
+        },
+        currentPlayerIndex: 0,
+        phase: '准备',
+        turn: { round: 1, phase: '准备', vars: {} },
+        zones: { deck: ['d1', 'd2'], discardPile: [], processing: [] },
+      }),
+    );
+    const P0 = harness.player('P0');
+
+    void applyAtom(harness.state, { type: '回合开始', player: 0 });
+    await harness.waitForStable();
+    await P0.respond('明任', { cardId: 'd1' }); // 两步式 UI 真实形状
+    await harness.waitForStable();
+
+    expect(renCardId(harness.state, 0)).toBe('d1');
+    expect(harness.state.players[0].hand).toEqual(['c1', 'd2']);
+    expect(harness.state.zones.discardPile).toContain('d1');
+  });
+
+  it('浏览器形状:{}(不回应)视为放弃置任,不卡询问', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: 'P0', hand: ['c1'], skills: ['明任', '贞良'] }),
+          mkPlayer({ index: 1, name: 'P1', character: '曹操' }),
+        ],
+        cardMap: {
+          c1: mkCard('c1', '杀', '♠', '7'),
+          d1: mkCard('d1', '杀', '♥', '3'),
+          d2: mkCard('d2', '闪', '♣', '4'),
+        },
+        currentPlayerIndex: 0,
+        phase: '准备',
+        turn: { round: 1, phase: '准备', vars: {} },
+        zones: { deck: ['d1', 'd2'], discardPile: [], processing: [] },
+      }),
+    );
+    const P0 = harness.player('P0');
+
+    void applyAtom(harness.state, { type: '回合开始', player: 0 });
+    await harness.waitForStable();
+    await P0.respond('明任', {});
+    await harness.waitForStable();
+
+    expect(renCardId(harness.state, 0)).toBeUndefined(); // 未置任
+    expect(harness.state.pendingSlots.size).toBe(0); // 询问已结束
+  });
 });

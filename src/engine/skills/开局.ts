@@ -152,7 +152,10 @@ export function onInit(_skill: Skill, state: GameState): () => void {
       //     池不足时:常备不足用非常备补足,总数仍不足则给现有全部。
       //     主公选完后,池中【未被选中】的武将全部进入候选池,供其他身份玩家分配。
       //     仅 lordPickEnabled 模式(身份局);1v1 无主公特权,全员走 2b 并行。
+      //     选将保密:整个选将期间 charSelecting=true,分配武将广播对他人红化,
+      //     视图投影隐藏他人角色;选将结束统一 亮将 公开。
       const used = new Set<string>(); // 追踪 baseId(整组互斥)
+      state.charSelecting = true;
       if (lordPickEnabled && lordIdx >= 0) {
         const lordAvail = pickLordCandidateGroups(charGroups);
         if (lordAvail.length > 0) {
@@ -195,12 +198,24 @@ export function onInit(_skill: Skill, state: GameState): () => void {
         }
         if (selections.length > 0) {
           await applyAtom(state, { type: '并行选将', selections });
-          for (const idx of pickers) {
-            const chosen = state.players[idx]?.character;
-            if (chosen) used.add(getCharacterBaseId(chosen));
-          }
         }
       }
+      // 选将结束:关闭保密标记,一次性公开全部角色(含体力/势力/技能)。
+      // 置于 pickers 条件之外:任何模式(身份局/1v1)选完都必须 亮将。
+      state.charSelecting = false;
+      await applyAtom(state, {
+        type: '亮将',
+        assignments: state.players
+          .filter((p) => p.character)
+          .map((p) => ({
+            target: p.index,
+            character: p.character,
+            faction: p.faction,
+            maxHealth: p.maxHealth,
+            health: p.health,
+            skills: [...p.skills],
+          })),
+      });
 
       // 2.5 注册技能实例(回合管理等默认技能)——必须在阶段推进前注册
       //     选将 已设置 player.skills,但技能实例需要 registerSkillsFromState 实例化

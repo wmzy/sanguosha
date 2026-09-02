@@ -141,7 +141,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         prompt: {
           type: 'useCard',
           title: `巧说:与 ${st.players[from].name} 拼点,请出一张手牌`,
-          cardFilter: { min: 1, max: 1 },
+          cardFilter: { filter: () => true, min: 1, max: 1 },
         },
         timeout: 30,
       });
@@ -250,7 +250,8 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     prompt: {
       type: 'useCardAndTarget',
       title: '巧说:选择一张拼点牌和一名目标',
-      cardFilter: { min: 1, max: 1 },
+      // filter:()=>true(拼点牌=任意手牌):缺失则 AI/无头客户端枚举不出该动作
+      cardFilter: { filter: () => true, min: 1, max: 1 },
       targetFilter: {
         min: 1,
         max: 1,
@@ -275,7 +276,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     prompt: {
       type: 'useCard',
       title: '巧说:请出一张拼点牌',
-      cardFilter: { min: 1, max: 1 },
+      cardFilter: { filter: () => true, min: 1, max: 1 },
     },
   });
 }

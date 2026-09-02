@@ -24,7 +24,9 @@ import {
   updateDisplayName,
   changePassword,
 } from '../../src/server/auth/store';
-import { _resetRateLimitState } from '../../src/server/middleware/rate-limit';
+import { GameSession } from '../../src/server/session';
+import { gameSessions } from '../../src/server/registry';
+import { setRoomStatus } from '../../src/server/room';
 import { _resetForTests as resetLifecycles } from '../../src/server/lifecycles';
 
 function makeApp(): Hono {
@@ -59,7 +61,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await closeRoomStore();
   resetLifecycles();
-  _resetRateLimitState();
 });
 
 // ── 密码纯函数 ──
@@ -274,6 +275,35 @@ describe('auth/routes', () => {
     });
     expect(res.status).toBe(400);
   });
+
+  // ── 2026-08-26 回归:/me 与 /logout 曾只读 Cookie,不走 extractSessionToken——
+  // register/login 特意把 token 放响应体供无 Cookie 存储的程序化客户端走 Bearer,
+  // 这两个端点却对 Bearer 恒返回未登录/删不掉服务端会话。
+
+  it('/me 支持 Bearer token(程序化通道恢复登录态)', async () => {
+    const app = makeApp();
+    const { token } = await registerUser(app, 'me_bearer_user');
+    const me = await app.request('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(me.status).toBe(200);
+    const body = (await me.json()) as { user: { username: string } | null };
+    expect(body.user?.username).toBe('me_bearer_user');
+  });
+
+  it('logout 删除 Bearer 会话:登出后同 token /me 无用户', async () => {
+    const app = makeApp();
+    const { token } = await registerUser(app, 'logout_bearer_user');
+    await app.request('/api/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const me = await app.request('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const body = (await me.json()) as { user: unknown };
+    expect(body.user).toBeNull();
+  });
 });
 
 // ── 房间身份强制(游客模式移除) ──
@@ -398,6 +428,497 @@ describe('房间登录强制', () => {
     // applyDisplayName 直接调用等价(数据面)
     applyDisplayName(host.userId, '再次改名');
     expect(getRoom(roomId)!.playerNames.get(host.userId)).toBe('再次改名');
+  });
+
+  // ── 2026-08-26 回归:REST 操作路由身份伪造族修复 ──
+  // ready/cancel-ready/switch-role/seat/seat-swap/view-*/config/DELETE 房间
+  // 此前信任 body.playerId,可伪造他人身份;非调试房一律以会话 userId 为准。
+
+  it('ready/cancel-ready:未登录 401;登录非成员伪造 playerId 无效;房主正常准备', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'auth_ready_host');
+    const outsider = await registerUser(app, 'auth_ready_out');
+    const { roomId } = (await (
+      await app.request('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '准备鉴权房', maxPlayers: 2 }),
+      })
+    ).json()) as { roomId: string };
+    const room = getRoom(roomId)!;
+
+    // 未登录(无 cookie)→ 401
+    const anon = await app.request(`/api/rooms/${roomId}/ready`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: host.userId }),
+    });
+    expect(anon.status).toBe(401);
+
+    // 登录的非成员冒充房主准备 → 服务端以会话身份校验,outside 不在 seats → 拒绝,
+    // host 的准备状态不受伪造影响
+    const forged = await app.request(`/api/rooms/${roomId}/ready`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: outsider.cookie },
+      body: JSON.stringify({ playerId: host.userId }),
+    });
+    expect(forged.status).toBe(400);
+    expect(room.readyPlayers.has(host.userId)).toBe(false);
+
+    // 垃圾 id 无法经 cancel-ready/ready 污染 readyPlayers(allReady DoS 回归)
+    const junk = await app.request(`/api/rooms/${roomId}/cancel-ready`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: 'junk-id' }),
+    });
+    expect(junk.status).toBe(401);
+
+    // 房主本人正常准备成功
+    const ok = await app.request(`/api/rooms/${roomId}/ready`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ playerId: 'ignored' }),
+    });
+    expect(ok.status).toBe(200);
+    expect(getRoom(roomId)!.readyPlayers.has(host.userId)).toBe(true);
+  });
+
+  it('switch-role:未登录 401;冒充他人转旁观无效', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'auth_role_host');
+    const guest = await registerUser(app, 'auth_role_guest');
+    const { roomId } = (await (
+      await app.request('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '换身份鉴权房', maxPlayers: 4 }),
+      })
+    ).json()) as { roomId: string };
+
+    const forged = await app.request(`/api/rooms/${roomId}/switch-role`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: guest.cookie },
+      body: JSON.stringify({ playerId: host.userId, role: 'spectator' }),
+    });
+    // 服务端忽略伪造的 playerId,以 guest 会话执行(guest 不在房间 → 失败)
+    expect(forged.status).toBe(400);
+    const room = getRoom(roomId)!;
+    expect(room.spectators.has(host.userId)).toBe(false);
+    expect(room.seats[0]).toBe(host.userId);
+
+    // 未登录 → 401
+    const anon = await app.request(`/api/rooms/${roomId}/switch-role`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: host.userId, role: 'spectator' }),
+    });
+    expect(anon.status).toBe(401);
+  });
+
+  it('seat-swap request/respond 与 seat:未登录 401,身份不采信 body', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'auth_seat_host');
+    const guest = await registerUser(app, 'auth_seat_guest');
+    const created = await app.request('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ name: '座位鉴权房', maxPlayers: 3 }),
+    });
+    const { roomId } = (await created.json()) as { roomId: string };
+    // guest 加入占座 1
+    await app.request(`/api/rooms/${roomId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: guest.cookie },
+      body: JSON.stringify({}),
+    });
+    // host 经 SSE 外通道占座:直接 joinRoom 数据面(host 已在 seats[0],players 补连接)
+    // 这里走 REST join 幂等重入即可补 players
+    await app.request(`/api/rooms/${roomId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({}),
+    });
+    const room = getRoom(roomId)!;
+
+    // 未登录发起换座 → 401
+    const anonReq = await app.request(`/api/rooms/${roomId}/seat-swap/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: host.userId, targetSeat: 2 }),
+    });
+    expect(anonReq.status).toBe(401);
+
+    // guest 冒充 host 向 seat 2 发起交换 → 以 guest 会话执行(guest 在座 1,
+    // 目标座 2 为空 → requestSeatSwap 拒绝),host 名下无请求
+    const forged = await app.request(`/api/rooms/${roomId}/seat-swap/request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: guest.cookie },
+      body: JSON.stringify({ playerId: host.userId, targetSeat: 2 }),
+    });
+    expect(forged.status).toBe(400);
+    expect(room.pendingSeatSwaps.size).toBe(0);
+
+    // 移动座位:未登录 → 401
+    const anonSeat = await app.request(`/api/rooms/${roomId}/seat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: guest.userId, targetSeat: 2 }),
+    });
+    expect(anonSeat.status).toBe(401);
+
+    // guest 本人移座(带 cookie,body.playerId 被忽略也无所谓)→ 成功
+    const moved = await app.request(`/api/rooms/${roomId}/seat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: guest.cookie },
+      body: JSON.stringify({ targetSeat: 2 }),
+    });
+    expect(moved.status).toBe(200);
+    expect(getRoom(roomId)!.seats[2]).toBe(guest.userId);
+  });
+
+  it('view 审批链:非本房玩家 approve-view 403;旁观者申请以会话身份为准', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'auth_view_host');
+    const outsider = await registerUser(app, 'auth_view_out');
+    const { roomId } = (await (
+      await app.request('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '审批鉴权房', maxPlayers: 2 }),
+      })
+    ).json()) as { roomId: string };
+
+    // 未登录玩家调 approve-view → 401(requireUser 无凭据短路)
+    const anon = await app.request(`/api/rooms/${roomId}/approve-view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spectatorId: 'spec-x', targetSeat: 0 }),
+    });
+    expect(anon.status).toBe(401);
+
+    // 登录但不在本房 → 403(防任何人批准旁观者查看任意座次泄露私有视图)
+    const forbidden = await app.request(`/api/rooms/${roomId}/approve-view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: outsider.cookie },
+      body: JSON.stringify({ spectatorId: 'spec-x', targetSeat: 0 }),
+    });
+    expect(forbidden.status).toBe(403);
+    expect(getRoom(roomId)!.viewGrants.has('spec-x')).toBe(false);
+
+    // 正向路径:outsider 转旁观并发起申请,房主(join 后为本房玩家)审批成功
+    await app.request(`/api/rooms/${roomId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({}),
+    });
+    await app.request(`/api/rooms/${roomId}/join-spectator`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: outsider.cookie },
+      body: JSON.stringify({}),
+    });
+    // 旁观者申请查看座次 0(spectatorId 以会话身份为准)
+    const req = await app.request(`/api/rooms/${roomId}/request-view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: outsider.cookie },
+      body: JSON.stringify({ spectatorId: 'someone-else', targetSeat: 0 }),
+    });
+    expect(req.status).toBe(200);
+    expect(getRoom(roomId)!.pendingViewRequests.has(outsider.userId)).toBe(true);
+
+    // 非玩家的旁观者不能自己批准自己(403)
+    const selfApprove = await app.request(`/api/rooms/${roomId}/approve-view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: outsider.cookie },
+      body: JSON.stringify({ spectatorId: outsider.userId, targetSeat: 0 }),
+    });
+    expect(selfApprove.status).toBe(403);
+
+    // 本房玩家(host)批准 → 授权生效
+    const approve = await app.request(`/api/rooms/${roomId}/approve-view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ spectatorId: outsider.userId, targetSeat: 0 }),
+    });
+    expect(approve.status).toBe(200);
+    expect(getRoom(roomId)!.viewGrants.get(outsider.userId)).toBe(0);
+  });
+
+  it('config:冒充房主改配置无效;房主本人可改', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'auth_cfg_host');
+    const guest = await registerUser(app, 'auth_cfg_guest');
+    const { roomId } = (await (
+      await app.request('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '配置鉴权房', maxPlayers: 4 }),
+      })
+    ).json()) as { roomId: string };
+
+    // guest 冒充 host 身份改配置 → updateConfig 内部按会话解析出的 hostId 校验拒绝
+    const forged = await app.request(`/api/rooms/${roomId}/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Cookie: guest.cookie },
+      body: JSON.stringify({
+        playerId: host.userId,
+        config: { ...getRoom(roomId)!.config, name: '被篡改' },
+      }),
+    });
+    expect(forged.status).toBe(400);
+    expect(getRoom(roomId)!.name).not.toBe('被篡改');
+
+    // 房主本人改名成功
+    const ok = await app.request(`/api/rooms/${roomId}/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({
+        config: { ...getRoom(roomId)!.config, name: '房主改的名' },
+      }),
+    });
+    expect(ok.status).toBe(200);
+    expect(getRoom(roomId)!.name).toBe('房主改的名');
+  });
+
+  it('DELETE /api/rooms/:id:未登录 401、非房主 403、房主删除成功', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'auth_del_host');
+    const other = await registerUser(app, 'auth_del_other');
+    const { roomId } = (await (
+      await app.request('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '删房鉴权房', maxPlayers: 2 }),
+      })
+    ).json()) as { roomId: string };
+
+    // 未登录 → 401
+    const anon = await app.request(`/api/rooms/${roomId}`, { method: 'DELETE' });
+    expect(anon.status).toBe(401);
+    expect(getRoom(roomId)).not.toBeNull();
+
+    // 已登录非房主 → 403
+    const forbidden = await app.request(`/api/rooms/${roomId}`, {
+      method: 'DELETE',
+      headers: { Cookie: other.cookie },
+    });
+    expect(forbidden.status).toBe(403);
+    expect(getRoom(roomId)).not.toBeNull();
+
+    // 房主 → 删除成功
+    const ok = await app.request(`/api/rooms/${roomId}`, {
+      method: 'DELETE',
+      headers: { Cookie: host.cookie },
+    });
+    expect(ok.status).toBe(200);
+    expect(getRoom(roomId)).toBeNull();
+  });
+
+  // ── 2026-08-26 二批回归:start/restart/action/reorder/log 鉴权漏网 ──
+
+  it('start:未登录 401;非房主伪造 body.playerId=hostId 403;房主通过鉴权进入 allReady 检查', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'auth_start_host');
+    const intruder = await registerUser(app, 'auth_start_in');
+    const { roomId } = (await (
+      await app.request('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '开局鉴权房', maxPlayers: 2 }),
+      })
+    ).json()) as { roomId: string };
+
+    // 未登录(即使声称 playerId = host.userId)→ 401
+    const anon = await app.request(`/api/rooms/${roomId}/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: host.userId }),
+    });
+    expect(anon.status).toBe(401);
+
+    // 已登录的入侵者冒充房主(body.playerId = host.userId)→ 403。
+    // 修复前此处直接通过 hostId 校验(400 还有玩家未准备/或开始游戏)。
+    const forged = await app.request(`/api/rooms/${roomId}/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: intruder.cookie },
+      body: JSON.stringify({ playerId: host.userId }),
+    });
+    expect(forged.status).toBe(403);
+    expect(((await forged.json()) as { error: string }).error).toBe('只有房主可以开始游戏');
+
+    // 房主本人 → 通过身份校验,到达 allReady 检查(单人房间 players<2 → 400 未全员准备)
+    const ok = await app.request(`/api/rooms/${roomId}/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ playerId: host.userId }),
+    });
+    expect(ok.status).toBe(400);
+    expect(((await ok.json()) as { error: string }).error).toBe('还有玩家未准备');
+  });
+
+  it('restart:未登录 401、非房主 403;房主可把进行中状态重置回等待中', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'auth_restart_host');
+    const intruder = await registerUser(app, 'auth_restart_in');
+    const { roomId } = (await (
+      await app.request('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '重置鉴权房', maxPlayers: 2 }),
+      })
+    ).json()) as { roomId: string };
+
+    // 构造存在 session 的房间(占位 session,无 state)
+    gameSessions.set(roomId, new GameSession(getRoom(roomId)!, false));
+    setRoomStatus(roomId, '进行中');
+
+    // 未登录 → 401
+    const anon = await app.request(`/api/rooms/${roomId}/restart`, { method: 'POST' });
+    expect(anon.status).toBe(401);
+    expect(getRoom(roomId)!.status).toBe('进行中');
+
+    // 非房主(伪造 playerId 也无效)→ 403
+    const forbidden = await app.request(`/api/rooms/${roomId}/restart`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: intruder.cookie },
+      body: JSON.stringify({ playerId: host.userId }),
+    });
+    expect(forbidden.status).toBe(403);
+    expect(getRoom(roomId)!.status).toBe('进行中');
+
+    // 房主 → 重置成功,状态回「等待中」
+    const ok = await app.request(`/api/rooms/${roomId}/restart`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({}),
+    });
+    expect(ok.status).toBe(200);
+    expect(getRoom(roomId)!.status).toBe('等待中');
+    gameSessions.delete(roomId);
+  });
+
+  it('action/reorder:未登录 401(修复前匿名可提交 accepted);登录成员正常受理', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'auth_action_host');
+    const { roomId } = (await (
+      await app.request('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '操作鉴权房', maxPlayers: 2 }),
+      })
+    ).json()) as { roomId: string };
+    gameSessions.set(roomId, new GameSession(getRoom(roomId)!, false));
+
+    // 未登录携带他人 playerId 提交 action → 401(修复前返回 accepted:true)
+    const anonAction = await app.request(`/api/rooms/${roomId}/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: host.userId, action: { ownerId: 0 } }),
+    });
+    expect(anonAction.status).toBe(401);
+
+    // 未登录 reorder 同样 401
+    const anonReorder = await app.request(`/api/rooms/${roomId}/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: host.userId, order: [] }),
+    });
+    expect(anonReorder.status).toBe(401);
+
+    // 房主本人(cookie)→ 受理(state 为 null 时 handleAction 内部静默忽略,路由仍 accepted)
+    const ok = await app.request(`/api/rooms/${roomId}/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ playerId: 'forged-but-ignored', action: { ownerId: 0 } }),
+    });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { accepted: boolean }).accepted).toBe(true);
+    gameSessions.delete(roomId);
+  });
+
+  it('log:未登录 401、非成员 403、本房玩家可访问(到达业务层)', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'auth_log_host');
+    const outsider = await registerUser(app, 'auth_log_out');
+    const { roomId } = (await (
+      await app.request('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '日志鉴权房', maxPlayers: 2 }),
+      })
+    ).json()) as { roomId: string };
+    gameSessions.set(roomId, new GameSession(getRoom(roomId)!, false));
+
+    // 未登录 → 401(修复前任何人可拉完整动作日志)
+    const anon = await app.request(`/api/rooms/${roomId}/log`);
+    expect(anon.status).toBe(401);
+
+    // 登录但不在本房 → 403
+    const forbidden = await app.request(`/api/rooms/${roomId}/log`, {
+      headers: { Cookie: outsider.cookie },
+    });
+    expect(forbidden.status).toBe(403);
+
+    // 本房玩家(host 建房即在 players)→ 通过鉴权,业务层因无 state 返回 404 无日志
+    const ok = await app.request(`/api/rooms/${roomId}/log`, {
+      headers: { Cookie: host.cookie },
+    });
+    expect(ok.status).toBe(404);
+    expect(((await ok.json()) as { error: string }).error).toBe('无游戏日志');
+    gameSessions.delete(roomId);
+  });
+
+  // ── 2026-08-26 回归:chat/history 曾完全无鉴权(连登录都不要),与 /log 防护不一致——
+  // 未登录者凭 roomId 可拉取进行中对局的全部玩家发言。
+
+  it('chat/history:未登录 401、非成员 403、本房成员可读;调试房保持开放', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'auth_chat_host');
+    const outsider = await registerUser(app, 'auth_chat_out');
+    const { roomId } = (await (
+      await app.request('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ name: '聊天鉴权房', maxPlayers: 2 }),
+      })
+    ).json()) as { roomId: string };
+
+    // 聊天仅在「进行中」可发:置状态后由房主产生一条历史
+    setRoomStatus(roomId, '进行中');
+    const sent = await app.request(`/api/rooms/${roomId}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ text: '杀!'}),
+    });
+    expect(sent.status).toBe(200);
+
+    // 未登录 → 401
+    const anon = await app.request(`/api/rooms/${roomId}/chat/history`);
+    expect(anon.status).toBe(401);
+
+    // 登录但不在本房 → 403
+    const forbidden = await app.request(`/api/rooms/${roomId}/chat/history`, {
+      headers: { Cookie: outsider.cookie },
+    });
+    expect(forbidden.status).toBe(403);
+
+    // 本房成员 → 历史含刚才的消息
+    const ok = await app.request(`/api/rooms/${roomId}/chat/history`, {
+      headers: { Cookie: host.cookie },
+    });
+    expect(ok.status).toBe(200);
+    const history = (await ok.json()) as Array<{ playerId: string; text: string }>;
+    expect(history.some((m) => m.playerId === host.userId && m.text === '杀!')).toBe(true);
+
+    // 调试房保持游客模型开放(开发工具)
+    const debugRoomId = (await (
+      await app.request('/api/debug-room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerCount: 2 }),
+      })
+    ).json()) as { roomId: string };
+    const debugRes = await app.request(`/api/rooms/${debugRoomId.roomId}/chat/history`);
+    expect(debugRes.status).toBe(200);
   });
 });
 

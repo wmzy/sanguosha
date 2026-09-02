@@ -149,7 +149,7 @@ export function CenterActionBar({
             );
           })()}
         {canOperate &&
-          selectedActive &&
+          (selectedActive || isKillRespondContext) &&
           transformMode &&
           transformMode.minCards > 1 &&
           (() => {
@@ -157,10 +157,10 @@ export function CenterActionBar({
             const enough =
               ids.length >= transformMode.minCards &&
               ids.length <= transformMode.maxCards;
-            // AOE 转化(乱击→万箭齐发)targetFilter.max=0 无需选目标
-            const needsTarget = transformMode.targetFilter
+            // 回应路径(被询问杀):打出无目标,选满牌数即可提交 杀.respond
+            const needsTarget = !isKillRespondContext && (transformMode.targetFilter
               ? transformMode.targetFilter.max >= 1
-              : true;
+              : true);
             const canSubmit = enough && (!needsTarget || !!selectedTarget);
             return (
               <button

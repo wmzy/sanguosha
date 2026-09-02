@@ -12,7 +12,7 @@ import type { BattleStats } from '../utils/battleStats';
 import { css, cx } from '@linaria/core';
 import { IDENTITY_COLORS, FACTION_BG } from './gameViewConstants';
 import { audioEngine } from '../sounds/audioEngine';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export interface GameResultOverlayProps {
   /** 胜方:座次号字符串,或 '无人' */
@@ -92,21 +92,48 @@ export function GameResultOverlay({
     audioEngine.play(iWon ? 'win' : 'lose', 0.6);
   }, [isDraw, iWon]);
 
+  // 官方式「点击空白处关闭」:仅收起结算卡(回到终局桌面),不退出房间。
+  // 收起后右下角保留迷你工具条(重新展开/返回大厅),保证关闭后仍有可达出口;
+  // 不恢复全屏遮罩,终局桌面可自由查看。
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) {
+    return (
+      <div className={miniBar}>
+        <button className={miniBtn} onClick={() => setDismissed(false)}>
+          重新展开结算
+        </button>
+        <button className={miniBtnExit} onClick={onExit}>
+          返回大厅
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className={overlayRoot}>
+    <div
+      className={overlayRoot}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) setDismissed(true);
+      }}
+    >
       <div
         className={cx(resultCard, stats && resultCardWide)}
         style={{ '--camp-color': campColor } as React.CSSProperties}
       >
-        <div className={endLabel}>游戏结束</div>
-        <div className={campName}>{campLabel}</div>
-
-        {/* 本人胜负横幅 */}
+        {/* 胜负大字横幅:金书风「胜利/失败」压红绸带,对齐官方 p9 结算样式。
+            仅本人有胜负时显示(平局 iWon=null、旁观者 me=undefined → iWon=null 不显示,
+            否则旁观路径会误落「胜　利」分支) */}
         {iWon !== null && (
-          <div className={cx(personalBanner, iWon ? personalWin : personalLose)}>
-            {iWon ? '🎉 胜利' : '💀 失败'}
+          <div className={victoryBannerWrap}>
+            <span className={victoryRibbon} aria-hidden />
+            <span className={cx(victoryText, iWon === false && victoryTextLose)}>
+              {iWon === false ? '失　败' : '胜　利'}
+            </span>
           </div>
         )}
+        <div className={campName}>{campLabel}</div>
+
+        {/* 本人胜负已由大字横幅表达,不再重复显示小横幅 */}
 
         <div className={playerList}>
           {/* 表头与数据行共用同一 grid 模板,列宽完全一致 */}
@@ -201,6 +228,8 @@ export function GameResultOverlay({
           </button>
         </div>
       </div>
+      {/* 官方式提示:点击空白处关闭(仅收起结算卡,不退出房间) */}
+      <div className={dismissHint}>点击空白处关闭</div>
     </div>
   );
 }
@@ -210,7 +239,7 @@ export function GameResultOverlay({
 const overlayRoot = css`
   position: fixed;
   inset: 0;
-  z-index: 10001;
+  z-index: 10100;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -239,10 +268,67 @@ const resultCardWide = css`
   max-width: 640px;
 `;
 
-const endLabel = css`
-  font-size: 14px;
-  letter-spacing: 4px;
-  opacity: 0.6;
+/* ── 官方式胜负大字横幅:红绸带压金书大字(p9「胜 利」)── */
+const victoryBannerWrap = css`
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+`;
+
+/** 红绸带:横贯全宽的红色缎带,微透视+两端暗角 */
+const victoryRibbon = css`
+  position: absolute;
+  left: -40px; /* 出血到卡边,模拟横幅贯穿 */
+  right: -40px;
+  top: 50%;
+  height: 34px;
+  transform: translateY(-50%);
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.35), transparent 12%, transparent 88%, rgba(0, 0, 0, 0.35)),
+    linear-gradient(180deg, #c0392b 0%, #8a1f16 55%, #6e150d 100%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+`;
+
+/** 金书大字:粗衬线感金色大字,深色描边浮于绸带上 */
+const victoryText = css`
+  position: relative;
+  z-index: 1;
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: 10px;
+  text-indent: 10px;
+  color: #ffd700;
+  background: linear-gradient(180deg, #ffe9a0 20%, #ffb400 55%, #cc8800 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 1px rgba(60, 20, 0, 0.85)) drop-shadow(0 0 18px rgba(255, 160, 30, 0.45));
+`;
+
+/** 失败态:银灰冷色大字 */
+const victoryTextLose = css`
+  color: #aab4bd;
+  background: linear-gradient(180deg, #dfe6ec 20%, #93a3b0 55%, #5d6b76 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 1px rgba(0, 15, 30, 0.85)) drop-shadow(0 0 18px rgba(120, 160, 200, 0.35));
+`;
+
+/** 「点击空白处关闭」提示:卡片下方弱化小字(官方式) */
+const dismissHint = css`
+  position: absolute;
+  bottom: 26px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: rgba(255, 255, 255, 0.45);
+  pointer-events: none;
 `;
 
 const campName = css`
@@ -250,26 +336,6 @@ const campName = css`
   font-weight: bold;
   color: var(--camp-color);
   text-shadow: 0 2px 12px color-mix(in srgb, var(--camp-color) 53%, transparent);
-`;
-
-const personalBanner = css`
-  padding: 6px 28px;
-  border-radius: 20px;
-  font-size: 18px;
-  font-weight: bold;
-  letter-spacing: 2px;
-`;
-
-const personalWin = css`
-  background: rgba(39, 174, 96, 0.2);
-  border: 1px solid #27ae60;
-  color: #2ecc71;
-`;
-
-const personalLose = css`
-  background: rgba(231, 76, 60, 0.15);
-  border: 1px solid #c0392b;
-  color: #e74c3c;
 `;
 
 const playerList = css`
@@ -466,5 +532,56 @@ const replayBtn = css`
 
   &:hover {
     filter: brightness(1.15);
+  }
+`;
+
+/* ── 关闭结算卡后的迷你工具条:右下角悬浮,不遮挡终局桌面 ── */
+
+/** 工具条容器:固定右下角,半透明深底胶囊,层级同结算遮罩(此时遮罩已收起不冲突) */
+const miniBar = css`
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 10100;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(10, 10, 14, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+`;
+
+/** 迷你按钮(重新展开):金色描边幽灵式,同大厅顶栏按钮语言 */
+const miniBtn = css`
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #e8c47a;
+  background: rgba(241, 196, 15, 0.1);
+  border: 1px solid rgba(241, 196, 15, 0.4);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: rgba(241, 196, 15, 0.22);
+  }
+`;
+
+/** 迷你按钮(返回大厅):灰白幽灵式,同结算卡 exitBtn 语言 */
+const miniBtnExit = css`
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.22);
   }
 `;

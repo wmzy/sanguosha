@@ -31,9 +31,12 @@ export function SpectatingStage() {
           navigate('/');
         }}
       />
-      <div className={gameWrap}>
+      <div
+        className={gameWrap}
+        style={{ display: 'flex', flexDirection: 'column', height: '100vh', minHeight: 0 }}
+      >
         {/* 旁观者控制条 */}
-        <div style={{ padding: '8px 16px', background: colors.bg.panel, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ padding: '8px 16px', background: colors.bg.panel, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
           <span style={{ color: colors.accent.gold, fontWeight: 'bold' }}>👁 旁观中</span>
           <span style={{ color: colors.text.muted, fontSize: '13px' }}>
             {myGrant !== undefined ? `已授权查看 P${myGrant} 视角` : '公开视图'}
@@ -77,6 +80,7 @@ export function SpectatingStage() {
           view={mp.view}
           onAction={() => {}}
           onReorderHand={() => {}}
+          fit="fill"
           currentEvent={mp.currentEvent}
           ingestedEvents={mp.ingestedEvents}
           pendingCount={mp.pendingCount}

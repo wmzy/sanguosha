@@ -16,7 +16,8 @@ interface IdentityRevealOverlayProps {
 /**
  * 身份揭示遮罩。开局时弹出一张身份牌,玩家点击「确认」或遮罩背景任意处后消失。
  * - 点击背景/卡片(冒泡)即确认,避免用户找不到按钮被卡住;
- * - zIndex 高于选将遮罩(10000 vs 9999),先入后出;
+ * - zIndex 高于选将遮罩(10110 vs 10100):两者同时出现时身份揭示绘制在上,
+ *   玩家点「确认」后才露出下方选将界面;仍低于 tooltip(99999);
  * - 翻牌 + 渐入动画在 animations.css 中定义(`identityCardFlip`/`overlayFadeIn`)。
  */
 export function IdentityRevealOverlay({ identity, onConfirm }: IdentityRevealOverlayProps) {
@@ -47,7 +48,9 @@ export function IdentityRevealOverlay({ identity, onConfirm }: IdentityRevealOve
 const overlayRoot = css`
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  /* 10110:高于选将遮罩(10100),低于 tooltip(99999)。
+     开局两者可能同时渲染,若同值则后渲染的选将遮罩盖住身份揭示(不可点)。 */
+  z-index: 10110;
   display: flex;
   flex-direction: column;
   align-items: center;

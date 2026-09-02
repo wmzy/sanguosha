@@ -669,4 +669,66 @@ describe('立军', () => {
     // 孙亮不在主公位(座次 1)→ 立军不触发
     expect(harness.state.pendingSlots.size).toBe(0);
   });
+
+  it('校验:摸牌选项 targets 含重复座次 → 拒绝', async () => {
+    const c1 = mkCard('c1', '杀');
+    const c2 = mkCard('c2', '闪');
+    const state: GameState = createGameState({
+      players: [
+        mkPlayer({ index: 0, name: '孙亮', hand: ['c1', 'c2'], skills: ['溃诛'], health: 1, maxHealth: 3 }),
+        mkPlayer({ index: 1, name: 'P1', hand: [], health: 3, maxHealth: 3 }),
+        mkPlayer({ index: 2, name: 'P2', hand: [], health: 3, maxHealth: 3 }),
+      ],
+      cardMap: { c1, c2 },
+      currentPlayerIndex: 0,
+      phase: '弃牌',
+      turn: { round: 1, phase: '弃牌', vars: {} },
+    });
+    await harness.setup(state);
+    const SL = harness.player('孙亮');
+
+    await simulateDiscardPhase(harness, 0, ['c1', 'c2']);
+    await SL.respond('溃诛', { option: '摸牌' });
+    SL.expectPending('请求回应');
+    // [1,1]:同一角色被重复选择 → 拒绝(否则 P1 被摸 2 张)
+    await SL.expectRejected({
+      skillId: '溃诛',
+      actionType: 'respond',
+      params: { targets: [1, 1] },
+    });
+    expect(harness.state.players[1].hand.length).toBe(0);
+    // 合法目标继续放行,不卡死
+    await SL.respond('溃诛', { targets: [1, 2] });
+    expect(harness.state.players[1].hand.length).toBe(1);
+    expect(harness.state.players[2].hand.length).toBe(1);
+  });
+
+  it('校验:伤害选项 targets 含重复座次 → 拒绝', async () => {
+    const c1 = mkCard('c1', '杀');
+    const c2 = mkCard('c2', '闪');
+    const state: GameState = createGameState({
+      players: [
+        mkPlayer({ index: 0, name: '孙亮', hand: ['c1', 'c2'], skills: ['溃诛'], health: 1, maxHealth: 3 }),
+        mkPlayer({ index: 1, name: 'P1', hand: [], health: 1, maxHealth: 3 }),
+        mkPlayer({ index: 2, name: 'P2', hand: [], health: 3, maxHealth: 3 }),
+      ],
+      cardMap: { c1, c2 },
+      currentPlayerIndex: 0,
+      phase: '弃牌',
+      turn: { round: 1, phase: '弃牌', vars: {} },
+    });
+    await harness.setup(state);
+    const SL = harness.player('孙亮');
+
+    await simulateDiscardPhase(harness, 0, ['c1', 'c2']);
+    await SL.respond('溃诛', { option: '伤害' });
+    // X=2。P1 体力 1 + P2 体力... [1,1] 重复:体力和=2 恰好等于 X,
+    // 若无查重会被接受并使 P1 受两次伤 → 必须拒绝
+    await SL.expectRejected({
+      skillId: '溃诛',
+      actionType: 'respond',
+      params: { targets: [1, 1] },
+    });
+    expect(harness.state.players[1].health).toBe(1);
+  });
 });

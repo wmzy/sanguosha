@@ -18,16 +18,13 @@ import {
   changePassword,
 } from './store';
 import { getGithubConfig, generateState, exchangeCodeForProfile, isGithubEnabled } from './github';
-import { extractSessionToken } from './guard';
+import { extractSessionToken, SESSION_COOKIE } from './guard';
 import { applyDisplayName } from '../room';
 import type { PublicUser } from './store';
 
 const log = createLogger('auth-routes');
 
-const COOKIE_NAME = 'sgs_session';
-
-/** 认证端点独立限流:30 req/min/IP(登录/注册是暴力破解入口)。 */
-const authRateLimit = createRateLimit(30);
+/** 认证端点限流:见 applyAuthRoutes 内分级配置。 */
 
 function sanitizeUser(u: PublicUser): PublicUser {
   return u;
@@ -35,10 +32,22 @@ function sanitizeUser(u: PublicUser): PublicUser {
 
 export function applyAuthRoutes(app: Hono): void {
   const auth = new Hono();
-  auth.use('*', authRateLimit);
+  // 分级限流(同为 IP 维度,窗口 60s):
+  //   - login/register/logout/password:暴力破解入口,30 req/min。
+  //   - me/profile:幂等只读/低危写。/me 在每次整页加载时由 useAuth 探测,
+  //     多标签页/频繁刷新即可打满 30/min → 全认证面板瘫痪 60s(可用性缺陷,
+  //     e2e 并行 worker 同 IP 下必现)。放宽到 600/min。
+  const authStrictLimit = createRateLimit(30);
+  const authReadLimit = createRateLimit(600);
+  auth.use('/login', authStrictLimit);
+  auth.use('/register', authStrictLimit);
+  auth.use('/logout', authStrictLimit);
+  auth.use('/password', authStrictLimit);
+  auth.use('/me', authReadLimit);
+  auth.use('/profile', authReadLimit);
 
   const setSessionCookie = (c: Parameters<typeof setCookie>[0], token: string, expiresAt: number) => {
-    setCookie(c, COOKIE_NAME, token, {
+    setCookie(c, SESSION_COOKIE, token, {
       httpOnly: true,
       sameSite: 'Lax',
       secure: c.req.url.startsWith('https://'),
@@ -76,16 +85,20 @@ export function applyAuthRoutes(app: Hono): void {
   });
 
   // ── 当前用户 ──
+  // 身份解析走 extractSessionToken(Cookie → Bearer → ?sgs_token):register/login
+  // 把 token 放响应体正是供无 Cookie 存储的程序化客户端(HGC/MCP)使用,
+  // 只读 Cookie 会让这类客户端 /me 恒为未登录。
   auth.get('/me', async (c) => {
-    const user = await getUserByToken(getCookie(c, COOKIE_NAME));
+    const user = await getUserByToken(extractSessionToken(c));
     return c.json({ user, githubEnabled: isGithubEnabled() });
   });
 
   // ── 登出 ──
+  // 同 /me:token 来源不限 Cookie,否则 Bearer 客户端登出删不掉服务端会话。
   auth.post('/logout', async (c) => {
-    const token = getCookie(c, COOKIE_NAME);
+    const token = extractSessionToken(c);
     await deleteSession(token);
-    deleteCookie(c, COOKIE_NAME, { path: '/' });
+    deleteCookie(c, SESSION_COOKIE, { path: '/' });
     return c.json({ success: true });
   });
 

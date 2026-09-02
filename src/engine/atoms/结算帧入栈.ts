@@ -5,6 +5,7 @@
 // 与 pushFrame 函数的关系:pushFrame 内部 applyAtom({ type: '结算帧入栈', ... }),
 // 返回被压入的 frame 引用(与旧同步签名行为一致)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { createRng } from '../util/rng';
 
 export const 结算帧入栈: AtomDefinition<{
   skillId: string;
@@ -25,9 +26,11 @@ export const 结算帧入栈: AtomDefinition<{
     };
     state.settlementStack.push(frame);
   },
-  toViewEvents(_state, atom): ViewEventSplit {
+  toViewEvents(state, atom): ViewEventSplit {
     // 技能台词:按 skillId 播报。随机选 1 或 2 号语音(无对应文件时静默跳过)。
-    const variant = Math.random() < 0.5 ? '1' : '2';
+    // 用 state.rngSeed 只读派生(不推进):引擎禁止 Math.random;不写回则不影响
+    // 游戏随机序列(摸牌/重洗/技能盲取),且原局与 dispatch 重放从同一 seed 出发,variant 一致。
+    const variant = createRng(state.rngSeed).next() < 0.5 ? '1' : '2';
     const view: ViewEvent = {
       type: '结算帧入栈',
       skillId: atom.skillId,

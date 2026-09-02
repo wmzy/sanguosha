@@ -28,6 +28,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         (params.cardIds as string[] | undefined) ??
         (typeof params.cardId === 'string' ? [params.cardId] : undefined);
       if (!Array.isArray(cardIds) || cardIds.length === 0) return 'cardIds required (at least 1)';
+      // 去重校验:重复 id 会绕过 includes 检查,使同一张牌被弃置两次(弃牌堆重复)
+      if (new Set(cardIds).size !== cardIds.length) return 'cardIds 含重复牌';
       if (usedThisTurn(state, ownerId, '制衡')) return '本回合已使用过制衡';
       const self = state.players[ownerId];
       if (!self) return 'player not found';

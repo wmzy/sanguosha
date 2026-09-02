@@ -250,7 +250,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       prompt: {
         type: 'useCard',
         title: `献图:选择 ${giveN} 张手牌给予 ${st.players[currentPlayer]?.name}`,
-        cardFilter: { min: giveN, max: giveN },
+        cardFilter: { filter: () => true, min: giveN, max: giveN },
       },
       // 强制给牌:摸牌后必须给等量牌,禁止跳过
       mandatory: true,

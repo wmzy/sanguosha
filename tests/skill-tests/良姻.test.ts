@@ -551,4 +551,61 @@ describe('良姻', () => {
     expect(harness.state.players[1].hand).toEqual(['d1']);
     expect(harness.state.players[1].health).toBe(2); // 未回血
   });
+
+  it('良姻/弃牌:非手牌/数量≠1 均拒绝,合法单张放行', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: '周妃', hand: ['c1', 'c2'], health: 3 }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1'], skills: [], faction: '魏' }),
+      ],
+      cardMap: {
+        c1: makeCard('c1', '杀'),
+        c2: makeCard('c2', '闪'),
+        p1: makeCard('p1', '桃', '♥'),
+      },
+      currentPlayerIndex: 0,
+      phase: '准备',
+      turn: { round: 1, phase: '准备', vars: {} },
+    });
+    state.zones = { deck: [], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const 周妃 = harness.player('周妃');
+    const P1 = harness.player('P1');
+
+    triggerReadyPhase(harness);
+    await waitForStable(harness.state);
+    await 周妃.respond('箜声', { choice: true });
+    await waitForStable(harness.state);
+    await 周妃.respond('箜声', { cardIds: ['c1'] }); // 置 c1(手牌剩 c2)
+    await waitForStable(harness.state);
+    await 周妃.respond('良姻', { choice: true });
+    await waitForStable(harness.state);
+    await 周妃.respond('良姻', { targets: [1] });
+    await waitForStable(harness.state);
+    await 周妃.respond('良姻', { choice: false }); // 各弃一张
+    await waitForStable(harness.state);
+    expect(currentRequestType(harness.state)).toBe('良姻/弃牌');
+
+    // 负面1:提交他人手牌(p1 不在周妃手牌)→ 拒绝
+    await 周妃.expectRejected({
+      skillId: '良姻',
+      actionType: 'respond',
+      params: { cardIds: ['p1'] },
+    });
+    // 负面2:数量≠1(['c2','c2'])→ 拒绝
+    await 周妃.expectRejected({
+      skillId: '良姻',
+      actionType: 'respond',
+      params: { cardIds: ['c2', 'c2'] },
+    });
+    expect(currentRequestType(harness.state)).toBe('良姻/弃牌');
+    // 合法单张放行 → 轮到 P1 弃
+    await 周妃.respond('良姻', { cardIds: ['c2'] });
+    await waitForStable(harness.state);
+    expect(currentRequestType(harness.state)).toBe('良姻/弃牌');
+    await P1.respond('良姻', { cardIds: ['p1'] });
+    await waitForStable(harness.state);
+    expect(harness.state.pendingSlots.size).toBe(0);
+    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['c2', 'p1']));
+  });
 });

@@ -105,17 +105,21 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             title: `缔盟:弃置 ${actualDiscard} 张牌`,
             cardFilter: { filter: () => true, min: actualDiscard, max: actualDiscard },
           },
+          // 强制型弃牌(交换的代价):前端走多选弃牌 UI 提交 {cardIds};headless 不生成 skip
+          mandatory: true,
           timeout: 30,
         });
-        const discardCards = st.localVars[DISCARD_KEY] as string[] | undefined;
+        let discardCards = st.localVars[DISCARD_KEY] as string[] | undefined;
         delete st.localVars[DISCARD_KEY];
-        // 弃牌是交换的代价(「弃置...然后交换」);未完成弃牌(取消/超时)则中止,
-        // 不执行交换——与上方目标未选即中止的处理保持一致。
+        // 强制弃牌兜底:超时/未取得有效 cardIds → 自动从手牌首张起补足后继续交换流程
+        // (与 好施/庸肆/英魂 的 mandatory 兜底范式一致;限一次标记已消耗,整体中止会白烧次数)。
+        // actualDiscard 本由手牌数推出应恒够,防御性 min 兜底。
         if (!discardCards || discardCards.length === 0) {
-          await popFrame(st);
-          return;
+          discardCards = st.players[ownerId]?.hand.slice(0, actualDiscard) ?? [];
         }
-        await applyAtom(st, { type: '弃置', player: ownerId, cardIds: discardCards, voluntary: true });
+        if (discardCards.length > 0) {
+          await applyAtom(st, { type: '弃置', player: ownerId, cardIds: discardCards, voluntary: true });
+        }
       }
 
       // 3) 交换 A、B 手牌:记录原始手牌,逐张移动(移动牌 atom)
@@ -168,7 +172,19 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
       } else if (rt === DISCARD_RT) {
         const ids = params.cardIds as string[] | undefined;
-        if (Array.isArray(ids)) st.localVars[DISCARD_KEY] = ids;
+        // 校验:恰好 N 张且全部为 owner 手牌(弃置 atom 不校验归属,
+        // 异常客户端提交任意 cardId 会把他人手中的牌复制进弃牌堆)
+        const need = (
+          slot?.atom as { prompt?: { cardFilter?: { min?: number } } } | undefined
+        )?.prompt?.cardFilter?.min;
+        if (
+          Array.isArray(ids) &&
+          typeof need === 'number' &&
+          ids.length === need &&
+          ids.every((id) => st.players[ownerId]?.hand.includes(id))
+        ) {
+          st.localVars[DISCARD_KEY] = ids;
+        }
       }
     },
   );

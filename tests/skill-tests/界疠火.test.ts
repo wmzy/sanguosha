@@ -427,4 +427,36 @@ describe('界疠火', () => {
     expect(harness.state.players[0].health).toBe(4); // 不触发代价
     expect(harness.state.players[0].hand).toContain('c0'); // 未弃牌
   });
+
+  // ─── 回归(2026-08-27):onMount respond cardFilter 漏加 filter ──
+  // 同文件 atom 侧的代价询问已修,但 onMount defineAction('respond') 的 cardFilter
+  // 仍是裸 {min,max}。AI/headless 经 extractCardFilter 枚举可选牌,缺 filter 函数
+  // 恒不匹配 → 永远枚举不出该弃牌动作(同 界义绝/界制霸 先例)。补 filter: () => true。
+  it('respond 动作声明的 cardFilter 带 filter 函数(AI/headless 可枚举弃牌)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['c0'], skills: ['界疠火'] }),
+        makePlayer({ index: 1, name: 'P1', hand: [], skills: [] }),
+      ],
+      cardMap: { c0: makeCard('c0', '闪', '♣', '2') },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    // 精确锁定 界疠火 自己的 respond 声明(排除 setup 注入的 使用牌/打出牌 通用动作):
+    // extractCardFilter 只认 prompt.cardFilter.filter 函数,修复前该字段缺失 →
+    // AI/headless 经 availableActions 枚举不出「疠火弃 1 张牌」动作。
+    const respondDef = P0
+      .availableActions()
+      .find((a) => a.actionType === 'respond' && a.skillId === '界疠火');
+    expect(respondDef).toBeDefined();
+    const filter = (respondDef!.prompt as { cardFilter?: { filter?: (c: Card) => boolean } })
+      .cardFilter?.filter;
+    expect(typeof filter).toBe('function');
+    // filter 函数可用:手牌 c0 通过(任意牌可弃)
+    expect(filter!(harness.state.cardMap['c0'])).toBe(true);
+  });
 });

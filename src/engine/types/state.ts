@@ -63,6 +63,9 @@ export type Card = {
    * name/suit/rank 是转化后的视图;原卡仍在 cardMap[shadowOf]。
    * 影子离开结算(入弃牌堆)时,引擎用 shadowOf 还原为原卡。 */
   shadowOf?: string;
+  /** 结算临时牌:凭空生成的标记型牌(如 八卦阵/八阵 的虚拟闪)。移入弃牌堆时
+   *  销毁(cardMap 删除)而非入堆,防止虚拟牌永久膨胀牌库、重洗后可被摸起。 */
+  ephemeral?: boolean;
   /** 武器效果:出杀无次数限制(诸葛连弩) */
   slashUnlimited?: boolean;
   /** 武器效果:最后一张手牌出杀时的额外目标上限(方天画戟) */
@@ -101,6 +104,8 @@ export type Gender = '男' | '女';
 export interface PlayerState {
   index: number;
   name: string;
+  /** 玩家昵称快照:分配武将会把 name 覆写为武将名,此处保留原昵称供选将期展示 */
+  nickname?: string;
   character: string;
   /** 体力（可负）。角色受到过量伤害后体力可小于 0；濒死期间 health ≤ 0。
    *  区别于「体力值」= Math.max(0, health)（封底为 0，用于显示/手牌上限/已损失体力值等）。
@@ -138,6 +143,9 @@ export interface GameState {
   players: PlayerState[];
   currentPlayerIndex: number;
   phase: TurnPhase;
+  /** 选将进行中:为 true 时视图投影隐藏他人 character/faction/skills(选将保密),
+   *  分配武将的广播事件对非本人红化;开局流程选将全部完成后置 false 并广播 亮将。 */
+  charSelecting?: boolean;
   turn: { round: number; phase: TurnPhase; vars: Record<string, Json> };
   zones: {
     deck: string[];

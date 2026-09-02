@@ -346,4 +346,30 @@ describe('天义', () => {
 
     await P0.expectRejected({ skillId: '天义', actionType: 'use', params: { cardId: 'c1', target: 1 } });
   });
+
+  it('use prompt 投影下发 cardFilter candidates(filter 缺失回归)', async () => {
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: '太史慈', hand: ['c1'], skills: ['天义'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['p1'], skills: [] }),
+      ],
+      cardMap: {
+        c1: makeCard('c1', '杀', '♠', '7'),
+        p1: makeCard('p1', '闪', '♥', '2'),
+      },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('太史慈');
+
+    const use = P0.availableActions().find((a) => a.label === '天义' && a.actionType === 'use');
+    expect(use).toBeDefined();
+    // 回归锚点:cardFilter 缺 filter 时前端/无头端拿不到选拼点牌谓词
+    // (use action 的 cardFilter 走 registry 路径,不注入投影 candidates)
+    const cf = (use!.prompt as { cardFilter?: { filter?: unknown } }).cardFilter;
+    expect(typeof cf?.filter).toBe('function');
+    expect(P0.findValidCard('use')).not.toBeNull();
+  });
 });

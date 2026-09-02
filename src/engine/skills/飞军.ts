@@ -370,7 +370,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     prompt: {
       type: 'useCard',
       title: '飞军:弃置一张牌,令手牌数或装备数多于你的角色交牌或弃装备',
-      cardFilter: { min: 1, max: 1 },
+      cardFilter: { filter: () => true, min: 1, max: 1 },
     },
     activeWhen: (ctx) => {
       if (!activeUnlessUsedThisTurn('飞军')(ctx)) return false;

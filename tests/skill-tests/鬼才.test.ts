@@ -18,6 +18,7 @@ import {
   disableAutoCompare,
 } from '../engine-harness';
 import { applyAtom } from '../../src/engine/core/apply';
+import { buildView } from '../../src/engine/index';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -311,6 +312,106 @@ describe('鬼才', () => {
       expect(harness.state.players[1].pendingTricks.some((t) => t.name === '闪电')).toBe(true);
       // 替换牌消耗
       expect(harness.state.players[1].hand).not.toContain('r1');
+    } finally {
+      restoreCompare();
+    }
+  });
+
+  // ─── 投影回归(2026-08-25 cardFilter 修复):pending 必须携带可选牌 candidates ──
+  // 修复前:鬼才/replace 询问的 cardFilter 缺 filter 函数 → 投影层不下发 candidates →
+  // 前端 derive 按卡名猜测匹配 0 张,人类玩家无法选牌发动鬼才。
+  it('鬼才询问的 view.pending 携带 cardFilter.candidates 且含手牌', async () => {
+    const lightningCard = makeCard('sd1', '闪电', '♠');
+    const judgeCard = makeCard('j1', '判定牌', '♠', '5');
+    const replaceCard = makeCard('r1', '杀', '♣', '5'); // ♣5 → 闪电不命中
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: '司马懿', hand: ['r1'], skills: ['鬼才'] }),
+        makePlayer({
+          index: 1,
+          name: '闪电主',
+          skills: ['闪电', '回合管理'],
+          pendingTricks: [{ name: '闪电', source: 1, card: lightningCard }],
+        }),
+      ],
+      cardMap: { r1: replaceCard, j1: judgeCard, sd1: lightningCard },
+      currentPlayerIndex: 1,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+
+    void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+    await waitForStable(harness.state); // 无懈窗口
+    await fireTimeoutAndWait(harness.state); // 跳过无懈
+    await waitForStable(harness.state); // 鬼才询问 pending
+
+    // 司马懿(P0)视角全量视图:cardFilter.candidates 必须由投影层注入
+    const view = buildView(harness.state, 0);
+    const pending = (
+      view as unknown as {
+        pending?: {
+          prompt?: { cardFilter?: { candidates?: string[] } };
+          atom?: { prompt?: { cardFilter?: { candidates?: string[] } } };
+        };
+      }
+    ).pending;
+    const cf =
+      pending?.prompt?.cardFilter ?? pending?.atom?.prompt?.cardFilter;
+    expect(Array.isArray(cf?.candidates)).toBe(true);
+    expect(cf!.candidates!).toContain('r1');
+  });
+
+  // ─── 回归(2026-08-26 bug 修复会话):客户端真实参数形状 {cardId} 无 choice 也必须替换 ───
+  // 浏览器(AwaitingPrompt 两步式「先选牌再点打出」)与 HeadlessGameClient 对 useCard 型
+  // pending 都只发 respond{cardId},不带 choice。此前 respond execute 只认 choice===true,
+  // 玩家选牌确认后被静默视为「不发动」。修复约定:cardId 出现即视为发动意图。
+  it('回归:respond 仅带 {cardId} 无 choice → 同样替换判定牌', async () => {
+    const lightningCard = makeCard('sd1', '闪电', '♠');
+    const judgeCard = makeCard('j1', '判定牌', '♠', '5'); // ♠5 → 闪电命中(2-9)
+    const replaceCard = makeCard('r1', '杀', '♣', '5'); // ♣5 → 非黑桃,不命中
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({
+          index: 0,
+          name: '司马懿',
+          hand: ['r1'],
+          skills: ['鬼才', '回合管理'],
+          health: 4,
+        }),
+        makePlayer({
+          index: 1,
+          name: '闪电主',
+          skills: ['闪电', '回合管理'],
+          pendingTricks: [{ name: '闪电', source: 1, card: lightningCard }],
+          health: 4,
+        }),
+      ],
+      cardMap: { sd1: lightningCard, j1: judgeCard, r1: replaceCard },
+      currentPlayerIndex: 1,
+      phase: '判定',
+      turn: { round: 1, phase: '判定', vars: {} },
+    });
+    const restoreCompare = disableAutoCompare();
+    try {
+      state.zones = { deck: ['j1'], discardPile: [], processing: [] };
+      await harness.setup(state);
+      const P0 = harness.player('司马懿');
+
+      void applyAtom(harness.state, { type: '阶段开始', player: 1, phase: '判定' });
+      await waitForStable(harness.state); // 无懈窗口
+      await fireTimeoutAndWait(harness.state); // 跳过无懈
+      await waitForStable(harness.state); // 鬼才询问 pending
+
+      // 模拟浏览器/HeadlessGameClient 的真实发送形状:只有 cardId,无 choice
+      await P0.respond('鬼才', { cardId: 'r1' });
+      await waitForStable(harness.state);
+
+      // 替换成功:r1 离手进弃牌堆,♣5 不命中
+      expect(harness.state.players[0].hand).not.toContain('r1');
+      expect(harness.state.zones.discardPile).toContain('r1');
+      expect(harness.state.players[1].health).toBe(4);
     } finally {
       restoreCompare();
     }

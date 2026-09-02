@@ -51,9 +51,14 @@ function ReplayView({ file, onExit }: { file: ReplayFile; onExit: () => void }) 
     return <Loading />;
   }
 
-  // 回放模式:传入只读 view,禁用交互
+  // 回放模式:传入只读 view,禁用交互。
+  // 布局:控制条 + 游戏区纵向填满视口;GameView 以 fit='fill' 占剩余高度,
+  // 缩放画布不把控制条顶出首屏(整页无滚动)。
   return (
-    <div className={pageStyle} style={{ padding: 0 }}>
+    <div
+      className={pageStyle}
+      style={{ padding: 0, display: 'flex', flexDirection: 'column', height: '100vh' }}
+    >
       <ReplayControls
         step={r.step}
         total={r.total}
@@ -69,13 +74,16 @@ function ReplayView({ file, onExit }: { file: ReplayFile; onExit: () => void }) 
         onSetSeat={r.setSeat}
         onExit={onExit}
       />
-      <GameViewComponent
-        view={r.view}
-        onAction={noop}
-        readOnly
-        currentEvent={r.currentEvent}
-        ingestedEvents={r.ingestedEvents}
-      />
+      <div style={{ flex: '1 1 auto', minHeight: 0 }}>
+        <GameViewComponent
+          view={r.view}
+          onAction={noop}
+          readOnly
+          fit="fill"
+          currentEvent={r.currentEvent}
+          ingestedEvents={r.ingestedEvents}
+        />
+      </div>
     </div>
   );
 }

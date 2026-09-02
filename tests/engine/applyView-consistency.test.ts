@@ -801,3 +801,105 @@ describe('初始化洗牌 atom: deckCount 未同步到增量视图', () => {
     expect(view.zones!.deckCount).toBe(realDeckCount);
   });
 });
+
+// ── 亮将 atom: name 未同步到增量视图 ──
+// Bug: 选将保密改造后,分配武将的红化事件对非本人视角不写 name(早退),
+// 而 state 侧 apply 已把 p.name 覆写为武将名(昵称留存于 nickname)。
+// 亮将 applyView 恢复了 character/faction/skills/体力 却漏了 name——
+// 增量流客户端的他人名牌(ActionOverlay/SeatArcLayout/日志解析均读 name)
+// 停留在选将前昵称,与 buildView 全量投影(重连 baseline,显示武将名)分叉。
+describe('亮将 atom: name 同步到所有视角(与 buildView 口径一致)', () => {
+  it('applyView 写 name=武将名', () => {
+    const def = getAtomDef('亮将');
+    const view = mockView();
+    def.applyView!(view, {
+      type: '亮将',
+      assignments: [
+        { target: 0, character: '刘备', faction: '蜀', maxHealth: 4, health: 4, skills: ['仁德'] },
+      ],
+    });
+    expect(view.players[0].name).toBe('刘备');
+    expect(view.players[0].character).toBe('刘备');
+  });
+
+  it('端到端:分配武将+亮将后,增量视图与 buildView 投影的 name 一致', async () => {
+    const state = makeBareState();
+    await applyAtom(state, { type: '分配武将', target: 1, character: '孙权', skills: [] });
+    expect(state.players[1].name).toBe('孙权'); // state 口径:name=武将名
+
+    // 模拟非本人视角的增量路径:红化事件(无 character)不改 name,
+    // 随后亮将事件统一公开
+    const view = mockView({ viewer: 0 });
+    const redactDef = getAtomDef('分配武将');
+    const redactSplit = redactDef.toViewEvents!(state, {
+      type: '分配武将',
+      target: 1,
+      character: '孙权',
+      skills: [],
+    });
+    // charSelecting=false 时广播完整事件;此处直接验证亮将兜底同步
+    void redactSplit;
+    const def = getAtomDef('亮将');
+    def.applyView!(view, {
+      type: '亮将',
+      assignments: [
+        { target: 1, character: '孙权', faction: '吴', maxHealth: 4, health: 4, skills: [] },
+      ],
+    });
+
+    // 权威全量投影
+    const built = buildView(state, 0);
+    expect(built.players[1].name).toBe('孙权');
+    // 增量视图必须与权威投影一致
+    expect(view.players.find((q) => q.index === 1)!.name).toBe('孙权');
+  });
+});
+
+// ── buildView 选将期名牌:未分配玩家的 nickname 尚未写入,回退 p.name ──
+// Bug: 选将保密窗口内(charSelecting=true)非本人视角投影 p.nickname ?? '',
+// 而 nickname 只在 分配武将.apply 时写入(该玩家选将 respond 之前 undefined)——
+// 分配前的窗口里他人/旁观视角名牌为空串,CharSelectWaitingOverlay 拼出
+// 「、、、、正在选将」。修复:回退链 p.nickname ?? p.name。
+// 安全性:分配前 p.name 仍是原昵称(分配武将 apply 才覆写为武将名并留存 nickname),
+// 回退不构成武将名泄漏通道;分配后 nickname 已留存,优先取昵称。
+describe('buildView 选将期名牌:未分配武将的玩家投影原昵称(非空串)', () => {
+  it('charSelecting=true 且目标玩家 nickname undefined 时,他人视角 name === 原 name', () => {
+    const state = makeBareState();
+    state.charSelecting = true;
+    // makeBarePlayer 未设 nickname——模拟 分配武将.apply 之前的窗口
+    expect(state.players[1].nickname).toBeUndefined();
+    const v0 = buildView(state, 0);
+    expect(v0.players[1].name).toBe('P1'); // 原 name,不再是空串
+    // 本人视角不受选将保密影响
+    expect(v0.players[0].name).toBe('P0');
+    // 旁观视角(viewer=-1)同样拿到原昵称
+    const vs = buildView(state, -1);
+    expect(vs.players[1].name).toBe('P1');
+  });
+
+  it('charSelecting=true 且玩家已分配武将(nickname 已留存)时,他人视角投影昵称而非武将名(不泄漏)', async () => {
+    const state = makeBareState();
+    state.charSelecting = true;
+    await applyAtom(state, { type: '分配武将', target: 1, character: '孙权', skills: [] });
+    // 分配后:name=武将名,nickname 留存原昵称
+    expect(state.players[1].name).toBe('孙权');
+    expect(state.players[1].nickname).toBe('P1');
+    const v0 = buildView(state, 0);
+    // 他人视角:名牌是昵称,武将名不泄漏;character/skills 仍红化
+    expect(v0.players[1].name).toBe('P1');
+    expect(v0.players[1].character).toBe('');
+    expect(v0.players[1].skills).toEqual([]);
+    // 本人视角不受红化
+    expect(v0.players[0].name).toBe('P0');
+  });
+
+  it('charSelecting 结束后(亮将口径):所有视角 name = 武将名(回退链不误伤)', async () => {
+    const state = makeBareState();
+    await applyAtom(state, { type: '分配武将', target: 1, character: '孙权', skills: [] });
+    state.charSelecting = false;
+    const v0 = buildView(state, 0);
+    expect(v0.players[1].name).toBe('孙权');
+    const vs = buildView(state, -1);
+    expect(vs.players[1].name).toBe('孙权');
+  });
+});

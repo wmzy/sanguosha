@@ -74,18 +74,38 @@ test.describe('多人房间 API', () => {
 
   test('POST /api/rooms/:id/request-view 广播含 pendingViewRequests 的 room_state', async () => {
     const base = 'http://localhost:3930';
+    // 移除游客模式后,创建普通房间必须登录(REST 支持 Authorization: Bearer;
+    // SSE EventSource 无法带自定义头,走 ?sgs_token= 查询参数通道)
+    const regRes = await fetch(`${base}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: `e2erv${Date.now().toString(36)}`, password: 'e2e-pass-123' }),
+    });
+    expect(regRes.status).toBe(200);
+    const reg = (await regRes.json()) as { token: string; user: { id: string } };
+    const token = reg.token;
+    const spectatorId = reg.user.id; // 服务端强制旁观者 id = 登录 userId
+    const authHeaders = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    };
     const post = (path: string, body: unknown) =>
-      fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      fetch(`${base}${path}`, { method: 'POST', headers: authHeaders, body: JSON.stringify(body) });
 
-    const { roomId, playerId: host } = await (await post('/api/rooms', { maxPlayers: 2, roomType: 'quick' })).json() as { roomId: string; playerId: string };
+    const created = await post('/api/rooms', { maxPlayers: 2, roomType: 'quick' });
+    expect(created.status).toBe(200);
+    const { roomId, playerId: host } = (await created.json()) as { roomId: string; playerId: string };
 
     // 连接 host SSE 流(读取 room_state 广播)
-    const sse = await fetch(`${base}/api/rooms/${roomId}/stream?playerId=${host}`);
+    const sse = await fetch(`${base}/api/rooms/${roomId}/stream?playerId=${host}&sgs_token=${token}`);
     const reader = sse.body!.getReader();
     try {
-      // 旁观注册 + 申请查看座次 0
-      await post(`/api/rooms/${roomId}/join-spectator`, { playerId: 'specReqView' });
-      const res = await (await post(`/api/rooms/${roomId}/request-view`, { spectatorId: 'specReqView', targetSeat: 0 })).json() as { success: boolean };
+      // 旁观注册 + 申请查看座次 0(spectatorId 必须等于登录 userId——
+      // join-spectator 服务端强制写入 user.id,request-view 校验其为在册旁观者)
+      expect((await post(`/api/rooms/${roomId}/join-spectator`, {})).status).toBe(200);
+      const res = (await (
+        await post(`/api/rooms/${roomId}/request-view`, { spectatorId, targetSeat: 0 })
+      ).json()) as { success?: boolean };
       expect(res.success).toBe(true);
 
       // 读取 SSE 流,确认收到含 pendingViewRequests 的 room_state
@@ -97,7 +117,7 @@ test.describe('多人房间 API', () => {
         const { value, done } = await reader.read();
         if (done) break;
         buf += new TextDecoder().decode(value, { stream: true });
-        if (buf.includes('pendingViewRequests') && buf.includes('"specReqView":0')) { found = true; break; }
+        if (buf.includes('pendingViewRequests') && buf.includes(`"${spectatorId}":0`)) { found = true; break; }
       }
       expect(found).toBe(true);
     } finally {

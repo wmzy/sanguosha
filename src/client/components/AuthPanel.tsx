@@ -43,7 +43,8 @@ const tabActive = css`
 `;
 
 const githubBtn = css`
-  ${btnStyle}
+  /* 原此处插值 ${btnStyle}:wyw-in-js 不内联跨模块类属性;本类自带全部所需属性
+     (含 btnStyle 的 font-weight: bold) */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -53,6 +54,7 @@ const githubBtn = css`
   border: none;
   padding: 9px 16px;
   font-size: 14px;
+  font-weight: bold;
   cursor: pointer;
   border-radius: 8px;
   &:hover {
@@ -74,11 +76,17 @@ const avatar = css`
   object-fit: cover;
 `;
 
+/** 头像加载失败时的首字母回退块。
+ *  原 css`` 内插值同文件 ${avatar}:wyw 不内联类规则,首条非法声明还会吞掉
+ *  display:flex,avatar 的 40px 宽高/圆角/边框全部丢失——故直接内联全部所需属性。 */
 const avatarFallback = css`
-  ${avatar}
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid ${colors.card.borderDefault};
   background: ${colors.bg.panel};
   color: ${colors.accent.gold};
   font-size: 18px;

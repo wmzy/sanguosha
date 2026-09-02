@@ -630,4 +630,35 @@ describe('义绝', () => {
     expect(harness.state.players[1].tags).not.toContain('义绝/非锁定技失效');
     expect(harness.state.players[1].tags).not.toContain('义绝/红桃杀加伤');
   });
+
+  // ─── defineAction 声明验证 ─────────────────────────
+  it('availableActions:义绝 use 声明含 filter 且匹配任意手牌(AI 可枚举)', async () => {
+    // 回归背景:cardFilter 缺 filter 时 extractCardFilter 返回 null,
+    // findUseActionForCard 恒不匹配 → AI/无头客户端枚举不出义绝动作。
+    const cost = makeCard('cost1', '杀', '♣', '7');
+    const other = makeCard('other1', '闪', '♦', '3');
+    const state = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P1', hand: ['cost1', 'other1'], skills: ['义绝'] }),
+        makePlayer({ index: 1, name: 'P2', hand: ['t1'], skills: [] }),
+      ],
+      cardMap: { cost1: cost, other1: other, t1: makeCard('t1', '桃', '♥', '5') },
+      zones: { deck: [], discardPile: [], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    const actions = P1.availableActions();
+    const use = actions.find((a) => a.skillId === '义绝' && a.actionType === 'use');
+    expect(use).toBeDefined();
+    const cf = use!.prompt.type === 'useCardAndTarget' ? use!.prompt.cardFilter : null;
+    expect(cf?.filter).toBeDefined();
+    // 义绝代价牌=任意一张手牌(不限花色)
+    for (const id of harness.state.players[0].hand) {
+      expect(cf!.filter!(harness.state.cardMap[id])).toBe(true);
+    }
+  });
 });

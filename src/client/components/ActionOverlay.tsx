@@ -128,6 +128,20 @@ const BROADCAST_TRICKS = new Set([
   '闪电',
 ]);
 
+/** 读取 GameViewScaler 注入的画布缩放系数(--gv-scale 写在 scalerInner 上,
+ *  自定义属性经继承链对本层可用)。座位 rect(getBoundingClientRect)返回的是
+ *  已含缩放的视口像素,而箭头 svg 铺在画布内层、用户单位是未缩放画布像素,
+ *  端点差值须除以该系数。取值失败(jsdom 无自定义属性级联/未挂缩放容器)时
+ *  回退 1——等价旧行为,scale=1 时本就无差。 */
+function readCanvasScale(el: HTMLElement | null): number {
+  if (!el || typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') {
+    return 1;
+  }
+  const raw = window.getComputedStyle(el).getPropertyValue('--gv-scale');
+  const v = parseFloat(raw);
+  return Number.isFinite(v) && v > 0 ? v : 1;
+}
+
 export function ActionOverlay({ current }: ActionOverlayProps) {
   // 共享数据来自 GameViewCtx(view:群锦囊 pending 命中座次 + 箭头坐标换算)
   const { view } = useGameView();
@@ -181,11 +195,15 @@ export function ActionOverlay({ current }: ActionOverlayProps) {
         const origin = rootEl.getBoundingClientRect();
         const r1 = srcEl.getBoundingClientRect();
         const r2 = dstEl.getBoundingClientRect();
+        // 视口像素差 → 画布用户单位:rect 差值含 transform 缩放,须除以 scale
+        // (验证:scale=1.2、视口差 (600,300) → 画布差 (500,250)),否则
+        // scale≠1 时箭头端点按缩放比例超射(1.2 时偏出 20%)。
+        const scale = readCanvasScale(rootEl);
         setArrow({
-          x1: r1.left + r1.width / 2 - origin.left,
-          y1: r1.top + r1.height / 2 - origin.top,
-          x2: r2.left + r2.width / 2 - origin.left,
-          y2: r2.top + r2.height / 2 - origin.top,
+          x1: (r1.left + r1.width / 2 - origin.left) / scale,
+          y1: (r1.top + r1.height / 2 - origin.top) / scale,
+          x2: (r2.left + r2.width / 2 - origin.left) / scale,
+          y2: (r2.top + r2.height / 2 - origin.top) / scale,
         });
       } else {
         setArrow(null);

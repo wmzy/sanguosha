@@ -75,13 +75,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       });
       if (!ctx.state.localVars['八卦阵/confirmed']) return;
 
-      // 判定:牌堆顶→处理区→技能 after hooks 读取→afterHooks 清理(处理区→弃牌堆)
-      await runJudgeFlow(ctx.state, ownerId, '八卦阵');
-
-      // 判定完成后判定牌已进弃牌堆,读弃牌堆顶
-      const discardPile = ctx.state.zones.discardPile;
-      if (discardPile.length === 0) return;
-      const judgeCardId = discardPile[discardPile.length - 1];
+      // 判定:用返回值读最终判定牌(勿读弃牌堆顶——判定牌可能被 天妒/屯田 等
+      // 「判定牌生效后」hook 收走而未入弃牌堆,读堆顶会拿到无关旧牌的花色)
+      const judgeCardId = await runJudgeFlow(ctx.state, ownerId, '八卦阵');
+      if (!judgeCardId) return;
       const judgeCard = ctx.state.cardMap[judgeCardId];
       if (!judgeCard) return;
 
@@ -89,6 +86,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 然后 cancel 主 询问闪 atom —— 判定红色即视为出闪,不再询问目标出闪。
       // 杀.execute 检测处理区有闪 → 走"被抵消"分支 → 武器技正常触发。
       // 武器技挂在"被抵消" atom after(非询问闪 after),不受询问闪 cancel 影响。
+      // ephemeral:虚拟闪被 promptCancel 移入弃牌堆时销毁而非入堆(防凭空牌污染牌库)。
       if (judgeCard.suit === '♥' || judgeCard.suit === '♦') {
         const dodgeId = `八卦阵:${ownerId}:${judgeCardId}`;
         const virtualDodge: Card = {
@@ -98,6 +96,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           color: judgeCard.color,
           rank: judgeCard.rank,
           type: '基本牌',
+          ephemeral: true,
         };
         ctx.state.cardMap[dodgeId] = virtualDodge;
         await applyAtom(ctx.state, {

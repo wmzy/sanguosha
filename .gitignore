@@ -31,3 +31,5 @@ docs/card-refs/
 
 # 资源包音效(测试数据,Mogara/QSanguosha CC BY-NC-ND,不入 git)
 public/packs/
+
+tmp/

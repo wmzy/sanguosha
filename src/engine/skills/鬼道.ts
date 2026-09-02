@@ -53,7 +53,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (atom['type'] !== '请求回应') return '当前不需要回应';
       if (atom['requestType'] !== REPLACE_RT) return '当前不是鬼道询问';
       // 选择替换:cardId 必须是黑色手牌;拒绝则无额外要求
-      if (params.choice === true || params.confirmed === true) {
+      // 浏览器/Headless 客户端对 useCard 型 pending 只发 {cardId}(无 choice),
+      // 故 cardId 出现即视为发动意图;{choice:false}/{} 仍视为不发动。
+      if (params.choice === true || params.confirmed === true || typeof params.cardId === 'string') {
         const cardId = params.cardId as string | undefined;
         if (typeof cardId !== 'string') return '请选择一张替换牌';
         if (!st.players[ownerId].hand.includes(cardId)) return '替换牌不在手牌中';
@@ -62,7 +64,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const use = params.choice === true || params.confirmed === true;
+      const use =
+        params.choice === true || params.confirmed === true || typeof params.cardId === 'string';
       if (!use) {
         st.localVars[REPLACE_CARD_KEY] = null;
         return;
