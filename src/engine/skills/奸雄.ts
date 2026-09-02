@@ -49,6 +49,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
+    // 清除上一轮残留的 wantCard:若上次记录的牌被其他 hook(如天妒)截走、
+    // 从未进入弃牌堆,移动牌 hook 不会删除它;此处不清理会在后续该牌入弃牌堆时被误拿。
+    delete ctx.state.localVars[WANTCARD_KEY];
     if ((atom.amount ?? 0) <= 0) return;
 
     const damageCardId = atom.cardId;
@@ -94,7 +97,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 若原卡已被其他技能拿走(不在弃牌堆)→ 跳过,不强行获取避免状态损坏。
     if (!ctx.state.zones.discardPile.includes(wantCard)) return;
     if (!ctx.state.cardMap[wantCard]) return;
-    delete ctx.state.localVars[WANTCARD_KEY];
+    
     await applyAtom(ctx.state, {
       type: '移动牌',
       cardId: wantCard,

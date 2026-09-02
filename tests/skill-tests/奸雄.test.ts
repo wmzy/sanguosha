@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable } from '../engine-harness';
 import { runDamageFlow } from '../../src/engine/flows/damage';
+import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { TARGET_SYSTEM } from '../../src/engine/types';
@@ -169,6 +170,54 @@ describe('奸雄', () => {
     const P0 = harness.player('P0');
     await P0.expectRejected({ skillId: '奸雄', actionType: 'respond', params: { choice: true } });
   });
+
+  // ─── 回归:上一轮 wantCard 残留(伤害牌被截走未入弃牌堆)不得在后续误拿 ───
+  it('上次伤害牌未入弃牌堆 → 下次不发动后该牌再入弃牌堆不被误拿', async () => {
+    const k1 = makeCard('k1', '杀', '♠', '7');
+    const k2 = makeCard('k2', '杀', '♣', '8');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['k1', 'k2'], skills: ['杀'] }),
+        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['奸雄'], health: 4 }),
+      ],
+      cardMap: { k1, k2 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: [], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 第一次伤害:P1 发动奸雄想拿 k1,但 k1 被其他 hook 截走(模拟:始终未入弃牌堆)
+    void runDamageFlow(harness.state, 0, 1, 1, 'k1');
+    await waitForStable(harness.state);
+    P1.expectPending('请求回应');
+    await P1.respond('奸雄', { choice: true });
+    await harness.waitForStable();
+    // k1 从未进入弃牌堆 → wantCard 残留
+    expect(harness.state.zones.discardPile).not.toContain('k1');
+
+    // 第二次伤害:P1 不发动(choice=false)
+    void runDamageFlow(harness.state, 0, 1, 1, 'k2');
+    await waitForStable(harness.state);
+    P1.expectPending('请求回应');
+    await P1.respond('奸雄', { choice: false });
+    await harness.waitForStable();
+
+    // k1 后来被移入弃牌堆 → 修复后不得被误拿
+    await applyAtom(harness.state, {
+      type: '移动牌',
+      cardId: 'k1',
+      from: { zone: '手牌', player: 0 },
+      to: { zone: '弃牌堆' },
+    });
+    await harness.waitForStable();
+
+    expect(harness.state.zones.discardPile).toContain('k1');
+    expect(harness.state.players[1].hand).not.toContain('k1');
+    expect(harness.state.players[1].hand).toHaveLength(0);
+  });
 });
 
 // ─── 界奸雄(界曹操):摸一张牌,并获得造成此伤害的牌(两项,非二选一) ───
@@ -267,5 +316,55 @@ describe('界奸雄', () => {
     // 仅摸一张(d1),无牌可获得
     expect(harness.state.players[0].hand).toEqual(['d1']);
     expect(harness.state.players[0].health).toBe(3);
+  });
+
+  // ─── 回归:上一轮 wantCard 残留(伤害牌被截走未入弃牌堆)不得在后续误拿 ───
+  it('上次伤害牌未入弃牌堆 → 下次不发动后该牌再入弃牌堆不被误拿', async () => {
+    const k1 = makeCard('k1', '杀', '♠', '7');
+    const k2 = makeCard('k2', '杀', '♣', '8');
+    const d1 = makeCard('d1', '闪', '♦', '3');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['k1', 'k2'], skills: ['杀'] }),
+        makePlayer({ index: 1, name: 'P1', hand: [], skills: ['界奸雄'], health: 4 }),
+      ],
+      cardMap: { k1, k2, d1 },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.zones = { deck: ['d1'], discardPile: [], processing: [] };
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    // 第一次伤害:P1 发动界奸雄(摸一张 + 想拿 k1),但 k1 被截走(模拟:始终未入弃牌堆)
+    void runDamageFlow(harness.state, 0, 1, 1, 'k1');
+    await waitForStable(harness.state);
+    P1.expectPending('请求回应');
+    await P1.respond('界奸雄', { choice: true });
+    await harness.waitForStable();
+    // 摸了 d1;k1 从未进入弃牌堆 → wantCard 残留
+    expect(harness.state.players[1].hand).toContain('d1');
+    expect(harness.state.zones.discardPile).not.toContain('k1');
+
+    // 第二次伤害:P1 不发动(choice=false)
+    void runDamageFlow(harness.state, 0, 1, 1, 'k2');
+    await waitForStable(harness.state);
+    P1.expectPending('请求回应');
+    await P1.respond('界奸雄', { choice: false });
+    await harness.waitForStable();
+
+    // k1 后来被移入弃牌堆 → 修复后不得被误拿
+    await applyAtom(harness.state, {
+      type: '移动牌',
+      cardId: 'k1',
+      from: { zone: '手牌', player: 0 },
+      to: { zone: '弃牌堆' },
+    });
+    await harness.waitForStable();
+
+    expect(harness.state.zones.discardPile).toContain('k1');
+    expect(harness.state.players[1].hand).not.toContain('k1');
+    expect(harness.state.players[1].hand).toEqual(['d1']);
   });
 });
