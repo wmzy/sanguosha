@@ -19,7 +19,7 @@ import { applyAtom } from '../../src/engine/core/apply'
 import { frameCards, pushFrame, popFrame } from '../../src/engine/core/frame';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import type { CardEffect } from '../../src/engine/types';
-import { getCardEffect, hasCardEffect, requireCardEffect, cardEffectMap } from '../../src/engine/skills/cards';
+import { cardEffectMap } from '../../src/engine/skills/cards';
 
 import {
   isLegalTarget,

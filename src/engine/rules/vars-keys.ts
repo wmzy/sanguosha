@@ -150,10 +150,10 @@ function asBoolean(v: Json | undefined): boolean | undefined {
   return typeof v === 'boolean' ? v : undefined;
 }
 function asStringArray(v: Json | undefined): string[] | undefined {
-  return Array.isArray(v) && v.every((x) => typeof x === 'string') ? (v as string[]) : undefined;
+  return Array.isArray(v) && v.every((x) => typeof x === 'string') ? (v) : undefined;
 }
 function asNumberArray(v: Json | undefined): number[] | undefined {
-  return Array.isArray(v) && v.every((x) => typeof x === 'number') ? (v as number[]) : undefined;
+  return Array.isArray(v) && v.every((x) => typeof x === 'number') ? (v) : undefined;
 }
 
 // 距离修正(player.vars,number)

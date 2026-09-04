@@ -128,7 +128,7 @@ describe.skipIf(!serverUp)('HeadlessGameClient 集成', () => {
     const tag = `enc${Date.now()}`;
 
     const seats: number[] = [];
-    const joiners = [1, 2].map((i) =>
+    const joiners = [1, 2].map(() =>
       new HeadlessGameClient(SERVER, {
         onMessage: (msg) => {
           if (msg.type === 'room_joined') seats.push((msg as { seatIndex: number }).seatIndex);

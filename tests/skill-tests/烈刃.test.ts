@@ -376,7 +376,7 @@ describe('烈刃', () => {
       const ZR = h.player('祝融');
       const V = h.player('受害');
 
-      await ZR.useCardAndTarget('杀', slash.id, [1]);
+      await ZR.useCardAndTarget('杀', slash.id, [1]); // eslint-disable-line react-hooks/rules-of-hooks -- 测试 harness 方法非 React Hook,循环逐 seed 重放
       await V.pass();
       await h.waitForStable();
       ZR.expectPending('请求回应');

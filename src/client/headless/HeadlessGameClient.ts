@@ -176,43 +176,41 @@ export class HeadlessGameClient {
    *  无 auth 配置时同步短路(不引入微任务,保持浏览器场景 createRoom 同步发出 fetch)。 */
   private ensureAuth(): Promise<void> {
     if (!this.auth || this.authToken) return Promise.resolve();
-    if (!this.authInitPromise) {
-      this.authInitPromise = (async () => {
-        const { username, password, token } = this.auth!;
-        if (token) {
-          this.authToken = token;
-          return;
+    this.authInitPromise ??= (async () => {
+      const { username, password, token } = this.auth!;
+      if (token) {
+        this.authToken = token;
+        return;
+      }
+      if (!username || !password) {
+        throw new Error('auth 配置不完整:需要 token 或 username/password');
+      }
+      // 注册(新账号);「用户名已存在」时回退登录
+      const authOnce = async (path: 'register' | 'login'): Promise<void> => {
+        const resp = await fetch(`${this.baseUrl}/api/auth/${path}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const body = (await resp.json().catch(() => ({}))) as { token?: string; error?: string };
+        if (!resp.ok || !body.token) {
+          throw new Error(body.error ?? `认证失败(${resp.status})`);
         }
-        if (!username || !password) {
-          throw new Error('auth 配置不完整:需要 token 或 username/password');
-        }
-        // 注册(新账号);「用户名已存在」时回退登录
-        const authOnce = async (path: 'register' | 'login'): Promise<void> => {
-          const resp = await fetch(`${this.baseUrl}/api/auth/${path}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password }),
-          });
-          const body = (await resp.json().catch(() => ({}))) as { token?: string; error?: string };
-          if (!resp.ok || !body.token) {
-            throw new Error(body.error ?? `认证失败(${resp.status})`);
-          }
-          this.authToken = body.token;
-        };
-        try {
-          await authOnce('register');
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          if (!/已存在/.test(msg)) throw err;
-          await authOnce('login');
-        }
-      })().catch((err) => {
-        const e = err instanceof Error ? err : new Error(String(err));
-        this.callbacks.onError?.(e);
-        this.authInitPromise = null;
-        throw e;
-      });
-    }
+        this.authToken = body.token;
+      };
+      try {
+        await authOnce('register');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!/已存在/.test(msg)) throw err;
+        await authOnce('login');
+      }
+    })().catch((err) => {
+      const e = err instanceof Error ? err : new Error(String(err));
+      this.callbacks.onError?.(e);
+      this.authInitPromise = null;
+      throw e;
+    });
     return this.authInitPromise;
   }
 
@@ -465,7 +463,7 @@ export class HeadlessGameClient {
       this.callbacks.onGameOver?.(r.gameOverWinner);
     }
     if (r.playerId || r.roomId) {
-      this.updateIdentity({ playerId: r.playerId || undefined, roomId: r.roomId || undefined });
+      this.updateIdentity({ playerId: r.playerId ?? undefined, roomId: r.roomId ?? undefined });
     }
     if (r.seatIndex !== undefined) this._seatIndex = r.seatIndex;
     // room_joined 表示已成功加入房间,具备重连上下文

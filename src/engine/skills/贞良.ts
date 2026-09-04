@@ -32,7 +32,7 @@ import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
 import { viewCanAttack } from '../rules/viewDistance';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
-import { REN_MARK_ID, getRenCardId, getRenColor } from './明任';
+import { REN_MARK_ID, getRenColor } from './明任';
 
 const SKILL_ID = '贞良';
 /** 转换态 state key(跨回合持久,无 /usedThisTurn 后缀)。 */
@@ -154,7 +154,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (typeof cardId !== 'string') return '需要选择一张牌';
       if (!self.hand.includes(cardId)) return '牌不在手牌中';
       const card = st.cardMap[cardId];
-      if (!card || card.color !== renColor) return '必须弃置一张与"任"颜色相同的牌';
+      if (card?.color !== renColor) return '必须弃置一张与"任"颜色相同的牌';
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {

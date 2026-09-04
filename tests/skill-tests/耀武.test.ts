@@ -18,10 +18,9 @@ import * as 耀武Module from '../../src/engine/skills/耀武';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
-import type { SkillModule } from '../../src/engine/types';
 
 // 本地注册 耀武 技能模块(主 agent 统一在 skills/index.ts 注册;测试本地兜底)
-setSkillModuleOverride('耀武', async () => 耀武Module as unknown as SkillModule);
+setSkillModuleOverride('耀武', async () => 耀武Module);
 
 function makePlayer(opts: {
   index: number;

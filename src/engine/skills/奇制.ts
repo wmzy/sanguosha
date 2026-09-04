@@ -144,7 +144,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!self?.alive) return;
     // 非装备牌(装备牌无目标,不会到此;此处显式排除以精确对齐官方"非装备牌"语义)
     const card = atom.cardId !== undefined ? ctx.state.cardMap[atom.cardId] : undefined;
-    if (card && card.type === '装备牌') return;
+    if (card?.type === '装备牌') return;
     // 须有可弃目标(其他存活且有牌的角色)
     if (!hasValidTargets(ctx.state, ownerId)) return;
 

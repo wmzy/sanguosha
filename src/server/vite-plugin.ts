@@ -26,15 +26,13 @@ export function honoApiPlugin(): Plugin {
 
   const loadServer = (server: ViteDevServer): Promise<ServerModule> => {
     if (serverModule) return Promise.resolve(serverModule);
-    if (!serverReady) {
-      serverReady = server.ssrLoadModule('/src/server/app.ts').then((m) => {
-        serverModule = m as unknown as ServerModule;
-        // 启动服务器生命周期(闲置清理 + 持久化恢复)。
-        // 仅 dev 模式(本插件 configureServer 只在 vite dev 调用)。
-        serverModule.startServerLifecycle();
-        return serverModule;
-      });
-    }
+    serverReady ??= server.ssrLoadModule('/src/server/app.ts').then((m) => {
+      serverModule = m as unknown as ServerModule;
+      // 启动服务器生命周期(闲置清理 + 持久化恢复)。
+      // 仅 dev 模式(本插件 configureServer 只在 vite dev 调用)。
+      serverModule.startServerLifecycle();
+      return serverModule;
+    });
     return serverReady;
   };
 

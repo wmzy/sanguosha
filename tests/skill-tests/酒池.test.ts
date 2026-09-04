@@ -225,7 +225,6 @@ describe('酒池', () => {
     });
     await harness.setup(state);
     const P0 = harness.player('P0');
-    const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
     // P2 出杀指定 P1:P1 无手牌(无闪)→ 直接受伤 → HP=0 濒死 → 求桃循环

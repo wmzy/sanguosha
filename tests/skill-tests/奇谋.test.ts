@@ -18,7 +18,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
-import { createGameState, suitColor } from '../../src/engine/types';
+import { createGameState } from '../../src/engine/types';
 import type { GameState, PlayerState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import { slashMax } from '../../src/engine/rules/slash-quota';
@@ -77,7 +77,7 @@ function makeState(opts: {
     cardMap: {},
     currentPlayerIndex: opts.currentPlayerIndex ?? 0,
     phase: opts.phase ?? '出牌',
-    turn: { round: 1, phase: (opts.phase ?? '出牌') as GameState['turn']['phase'], vars: {} },
+    turn: { round: 1, phase: (opts.phase ?? '出牌'), vars: {} },
   });
 }
 

@@ -122,12 +122,12 @@ export function GameResultOverlay({
       >
         {/* 胜负大字横幅:金书风「胜利/失败」压红绸带,对齐官方 p9 结算样式。
             仅本人有胜负时显示(平局 iWon=null、旁观者 me=undefined → iWon=null 不显示,
-            否则旁观路径会误落「胜　利」分支) */}
+            否则旁观路径会误落「胜利」分支) */}
         {iWon !== null && (
           <div className={victoryBannerWrap}>
             <span className={victoryRibbon} aria-hidden />
             <span className={cx(victoryText, iWon === false && victoryTextLose)}>
-              {iWon === false ? '失　败' : '胜　利'}
+              {iWon === false ? '失败' : '胜利'}
             </span>
           </div>
         )}

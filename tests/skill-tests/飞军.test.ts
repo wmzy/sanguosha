@@ -22,14 +22,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
-import type { SkillModule } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, EquipSlot, GameState, PlayerState } from '../../src/engine/types';
 
 // 注册飞军/兵略(测试注入,见 lifecycle.setSkillModuleOverride)
-setSkillModuleOverride('飞军', async () => (await import('../../src/engine/skills/飞军')) as unknown as SkillModule);
-setSkillModuleOverride('兵略', async () => (await import('../../src/engine/skills/兵略')) as unknown as SkillModule);
+setSkillModuleOverride('飞军', async () => await import('../../src/engine/skills/飞军'));
+setSkillModuleOverride('兵略', async () => await import('../../src/engine/skills/兵略'));
 
 function makeCard(
   id: string,

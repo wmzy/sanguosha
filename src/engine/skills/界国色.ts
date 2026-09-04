@@ -204,7 +204,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         // 用 ?? (nullish) 而非 truthy 判断:target===0 是合法座次,
         // truthy 写法会错误地 fall-through 到 targets[0](与上方 validate 不一致)
         st.localVars[TARGET_KEY] =
-          (params.target as number | undefined) ??
+          (params.target) ??
           (params.targets as number[] | undefined)?.[0] ??
           null;
       } else if (rt === REMOVE_CARD_RT) {

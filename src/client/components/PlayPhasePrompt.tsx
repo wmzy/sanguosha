@@ -20,7 +20,7 @@ import { useGameView } from './GameViewCtx';
 function slashCountBadgeText(view: GameView): string | null {
   const idx = view.currentPlayerIndex;
   const p = view.players[idx];
-  if (!p || !p.turnUsage) return null;
+  if (!p?.turnUsage) return null;
   const max = viewSlashMax(view, idx);
   if (max === Infinity) return '杀 ∞';
   return `杀 ${viewSlashUsed(view, idx)}/${max}`;

@@ -77,9 +77,9 @@ export function appendEventJournal(
   if (!path) return;
   // 同步序列化:不能让落盘链读取已被 splice/mutate 的源数组
   const payload =
-    serializeAtomHistory(entries)
+    `${serializeAtomHistory(entries)
       .map((entry) => JSON.stringify({ epoch, ...entry }))
-      .join('\n') + '\n';
+      .join('\n')  }\n`;
   void enqueue(roomId, async () => {
     const dir = dirname(path);
     if (!ensuredDirs.has(dir)) {

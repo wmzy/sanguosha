@@ -22,7 +22,6 @@ import type { QueuedEvent } from '../../src/client/hooks/useEventPlayback';
 // jsdom 无 AudioContext:audioEngine 构造延迟创建 context,import 本身安全;
 // spy 后 play/getDuration 不触达真实 Web Audio 路径。
 let playMock: ReturnType<typeof vi.fn>;
-let getDurationMock: ReturnType<typeof vi.fn>;
 
 /** 构造带 effect.sound 的 ViewEvent(extractSound 优先读 event.effect) */
 function ev(sound: string | undefined, volume?: number): ViewEvent {
@@ -36,7 +35,7 @@ function q(seq: number, event: ViewEvent): QueuedEvent {
 describe('useSoundPlayback', () => {
   beforeEach(() => {
     playMock = vi.spyOn(audioEngine, 'play').mockImplementation(() => {});
-    getDurationMock = vi.spyOn(audioEngine, 'getDuration').mockReturnValue(0.3);
+    vi.spyOn(audioEngine, 'getDuration').mockReturnValue(0.3);
   });
 
   it('动作音效逐个串行播放:一批事件入队后,间隔基于音频时长逐个响(不叠)', async () => {

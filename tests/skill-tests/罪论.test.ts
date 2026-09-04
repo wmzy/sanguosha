@@ -438,7 +438,7 @@ describe('父荫', () => {
         currentPlayerIndex: 0,
         phase: '出牌',
         turn: { round: 1, phase: '出牌', vars: {} },
-      }) as GameState,
+      }),
     );
     const P0 = harness.player('诸葛瞻');
 

@@ -30,7 +30,7 @@ export function checkIdentityGameOver(state: GameState): GameOverResult {
     return { gameOver: true, winner: anyRebel?.index };
   }
   // 主公存活:所有反贼和内奸均已死亡 → 主公方(主忠)获胜
-  if (lord && lord.alive) {
+  if (lord?.alive) {
     const aliveEnemy = state.players.find(
       (p) => p.alive && (p.identity === '反贼' || p.identity === '内奸'),
     );

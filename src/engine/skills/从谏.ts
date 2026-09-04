@@ -87,7 +87,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         st.localVars[CHOICE_LV] = null;
         return;
       }
-      st.localVars[CHOICE_LV] = { cardId, target } as unknown as Json;
+      st.localVars[CHOICE_LV] = { cardId, target };
     },
   );
 
@@ -105,7 +105,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!self?.alive) return;
       // 牌须为锦囊牌
       const card = atom.cardId ? st.cardMap[atom.cardId] : undefined;
-      if (!card || card.type !== '锦囊牌') return;
+      if (card?.type !== '锦囊牌') return;
       // 本牌目标数 > 1(读结算帧 resolvedTargets)
       const resolved = (ctx.params.resolvedTargets as number[] | undefined) ??
         (ctx.params.targets as number[] | undefined) ??

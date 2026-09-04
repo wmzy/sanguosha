@@ -24,6 +24,7 @@ export class RealClock implements Clock {
   now(): number {
     return Date.now();
   }
+
   schedule(delayMs: number, fn: () => void | Promise<void>): () => void {
     const timer = setTimeout(fn, delayMs);
     return () => clearTimeout(timer);

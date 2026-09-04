@@ -475,7 +475,6 @@ describe('server/persistence', () => {
           body: JSON.stringify({ username: 'persistence_host2', password: 'pass123' }),
         }),
       );
-      const cookie = reg.headers.get('set-cookie')!.split(';')[0];
       const { user } = (await reg.json()) as { user: { id: string } };
       const room = createRoom('测试', 2, user.id, {
         send() {},

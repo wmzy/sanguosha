@@ -16,7 +16,7 @@ import { SkillTestHarness, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
-import type { Card, Faction, GameState, PlayerState } from '../../src/engine/types';
+import type { Card, Faction, PlayerState } from '../../src/engine/types';
 
 function makeCard(
   id: string,

@@ -212,7 +212,7 @@ describe('getViewAt', () => {
     expect(getViewAt(file, 0, 1)!.players[0].hand).toHaveLength(1);
     expect(getViewAt(file, 0, 1)!.players[0].hand).toHaveLength(1);
     // 录像原始数据保持初始值(未被 viewReducer 突变)
-    expect(seat.privateHands[0]!.hand).toHaveLength(0);
+    expect(seat.privateHands[0].hand).toHaveLength(0);
   });
 
   it('不同座次独立重建', () => {

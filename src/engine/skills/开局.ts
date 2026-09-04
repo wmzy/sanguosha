@@ -9,7 +9,6 @@ import { instantiateSkill } from './lifecycle';
 import { getCharacterBaseId, isLord } from '../data/character-meta';
 import { loadRuleset } from '../rules/registry';
 import { resolveGameMode } from '../core';
-import type { SkillModule } from '../types';
 
 /**
  * system 命名空间占位 ownerId(座次下标 -1,不对应任何玩家槽位)。

@@ -27,7 +27,7 @@ export const 分配武将: AtomDefinition<{ target: number; character: string; s
     const p = state.players[atom.target];
     if (!p) throw new Error(`分配武将: target ${atom.target} not found (validate 已通过)`);
     // 保留原昵称(选将期名牌展示用);name 随后覆写为武将名(对局日志口径)
-    if (!p.nickname) p.nickname = p.name;
+    p.nickname ??= p.name;
     p.character = atom.character;
     p.name = atom.character;
     p.skills = atom.skills;

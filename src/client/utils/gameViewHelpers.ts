@@ -334,7 +334,7 @@ const ARC_PRESETS: Record<number, Array<[number, number]>> = {
 export function arcLayout(totalOthers: number, i: number): { leftPct: number; topPct: number } {
   if (totalOthers <= 0) return { leftPct: 50, topPct: 1 };
   const preset = ARC_PRESETS[totalOthers];
-  if (preset && preset[i]) return { leftPct: preset[i][0], topPct: preset[i][1] };
+  if (preset?.[i]) return { leftPct: preset[i][0], topPct: preset[i][1] };
   if (totalOthers === 1) return { leftPct: 50, topPct: 1 };
 
   const t = i / (totalOthers - 1);

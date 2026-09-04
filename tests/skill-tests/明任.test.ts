@@ -456,7 +456,6 @@ describe('贞良(阴)', () => {
     );
     const P1 = harness.player('P1');
     const P0 = harness.player('P0');
-    const P2 = harness.player('P2');
 
     expect(getState(harness.state, 0)).toBe('阴');
 

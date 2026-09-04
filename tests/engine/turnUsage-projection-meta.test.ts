@@ -133,7 +133,7 @@ describe('turnUsage 投影 key 静态契约', () => {
     const re = /type:\s*'回合用量'[\s\S]{0,300}?key:\s*([A-Za-z_$][\w$]*\([^)]*\)|`[^`]*`|'[^']*'|[A-Za-z_$][\w$]*)/g;
     for (const f of files) {
       const src = readFileSync(f, 'utf8');
-      for (const m of src.matchAll(re)) hits.push({ file: f.replace(ENGINE_ROOT + '/', ''), expr: m[1] });
+      for (const m of src.matchAll(re)) hits.push({ file: f.replace(`${ENGINE_ROOT  }/`, ''), expr: m[1] });
     }
     return hits;
   }

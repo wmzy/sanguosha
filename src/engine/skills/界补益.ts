@@ -204,12 +204,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // 超时未选(玩家确认发动后未在选牌窗口回应)→ 回退 defaultChoice(装备优先,否则手牌[0])。
     // 与 runPickTargetCardPanel/固政 一致;请求回应.onTimeout 对非弃牌型询问无操作,
     // defaultChoice 仅由技能自身在此兜底,引擎不会自动提交。
-    if (!result) {
-      result =
-        equipmentAfter.length > 0
-          ? { zone: 'equipment', cardId: equipmentAfter[0].cardId, handIndex: null }
-          : { zone: 'hand', cardId: null, handIndex: 0 };
-    }
+    result ??=
+      equipmentAfter.length > 0
+        ? { zone: 'equipment', cardId: equipmentAfter[0].cardId, handIndex: null }
+        : { zone: 'hand', cardId: null, handIndex: 0 };
 
     // 解析选择 → 拿到具体 cardId
     let pickedCardId: string | undefined;

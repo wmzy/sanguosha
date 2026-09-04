@@ -2,7 +2,7 @@
 // 归并说明:覆盖 存储层(gameHistory.ts append/list/get/delete/clear/上限裁剪/孤儿清理)、
 // REST 端点(权限/下载)、真实开局到结束的 session 记录与录像格式(isReplayFile 可校验 +
 // 回放引擎可重建)。无已有同名测试文件,新建。
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hono } from 'hono';
@@ -102,8 +102,8 @@ describe('server/gameHistory 存储层', () => {
 
     const entries = await listGameHistory(roomId);
     expect(entries).toHaveLength(2);
-    expect(entries[0]!.endedAt).toBe(2000);
-    expect(entries[1]!.endedAt).toBe(1000);
+    expect(entries[0].endedAt).toBe(2000);
+    expect(entries[1].endedAt).toBe(1000);
   });
 
   it('append 带 replay:录像文件可读回且格式校验通过', async () => {
@@ -130,8 +130,8 @@ describe('server/gameHistory 存储层', () => {
     const entries = await listGameHistory(roomId);
     expect(entries).toHaveLength(MAX_ENTRIES_PER_ROOM);
     // 最新的两条仍在,最旧两条(0/1)被裁剪
-    expect(entries[0]!.endedAt).toBe(MAX_ENTRIES_PER_ROOM + 1);
-    expect(entries[entries.length - 1]!.endedAt).toBe(2);
+    expect(entries[0].endedAt).toBe(MAX_ENTRIES_PER_ROOM + 1);
+    expect(entries[entries.length - 1].endedAt).toBe(2);
     // 被裁剪的录像文件已删除,保留的录像文件还在
     expect(existsSync(join(HISTORY_DIR, roomId, 'entry-0.json'))).toBe(false);
     expect(existsSync(join(HISTORY_DIR, roomId, 'entry-2.json'))).toBe(true);
@@ -206,7 +206,7 @@ describe('server/gameHistory 纯构造函数', () => {
       reason: '正常',
     });
     expect(drawEntry.winnerLabel).toBe('平局');
-    expect(drawEntry.players[0]!.won).toBeNull();
+    expect(drawEntry.players[0].won).toBeNull();
 
     const abortEntry = buildHistoryEntry(state, [], {
       roomId: 'r1',
@@ -218,7 +218,7 @@ describe('server/gameHistory 纯构造函数', () => {
       reason: '中断',
     });
     expect(abortEntry.winnerLabel).toBe('中断');
-    expect(abortEntry.players[0]!.won).toBeNull();
+    expect(abortEntry.players[0].won).toBeNull();
   });
 
   it('filterReplayForViewer:参赛者只保留自己座次;其他人拿旁观座次;旧录像合成旁观', () => {
@@ -244,12 +244,12 @@ describe('server/gameHistory 纯构造函数', () => {
     // 参赛者(座次 1)只拿自己的 delta
     const p1 = filterReplayForViewer(file, 1);
     expect(Object.keys(p1.seats)).toEqual(['1']);
-    expect(p1.seats[1]!.playerName).toBe('张飞');
+    expect(p1.seats[1].playerName).toBe('张飞');
 
     // 旁观者/未参赛者只拿旁观座次(无私有手牌)
     const spec = filterReplayForViewer(file, null);
     expect(Object.keys(spec.seats)).toEqual(['-1']);
-    expect(spec.seats[-1]!.privateHands).toHaveLength(0);
+    expect(spec.seats[-1].privateHands).toHaveLength(0);
 
     // 旧录像(无旁观 delta):从最小玩家座次合成,剥离手牌、身份仅保留明置
     const legacy = makeReplay();
@@ -267,7 +267,7 @@ describe('server/gameHistory 纯构造函数', () => {
     };
     const fallback = filterReplayForViewer(legacy, null);
     expect(Object.keys(fallback.seats)).toEqual(['-1']);
-    const fd = fallback.seats[-1]!;
+    const fd = fallback.seats[-1];
     expect(fd.privateHands).toHaveLength(0);
     expect(fd.identityView[0]).toMatchObject({ index: 0, identity: '主公', identityHidden: false });
     expect(fd.identityView[1]).toMatchObject({ index: 1, identityHidden: true });
@@ -308,7 +308,7 @@ describe('server/gameHistory REST 端点', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { entries: GameHistoryEntry[] };
     expect(body.entries).toHaveLength(1);
-    expect(body.entries[0]!.winnerLabel).toBe('主公方');
+    expect(body.entries[0].winnerLabel).toBe('主公方');
   });
 
   it('GET 录像 + download=1 带 Content-Disposition', async () => {
@@ -585,7 +585,7 @@ describe('server/gameHistory session 集成(真实开局到结束)', () => {
     expect(state.pendingSlots.size).toBeGreaterThan(0);
     // 逐个选将 slot respond 第一个候选武将;遇非选将 slot(如选将完成后的出牌窗口)即停
     while (state.pendingSlots.size > 0) {
-      const target = [...state.pendingSlots.keys()][0]!;
+      const target = [...state.pendingSlots.keys()][0];
       const slot = state.pendingSlots.get(target)!;
       const atom = slot.atom as { type?: string; target: number; candidates?: Array<{ name: string }> };
       if (atom.type !== '选将询问' || !atom.candidates) break;
@@ -597,9 +597,9 @@ describe('server/gameHistory session 集成(真实开局到结束)', () => {
         skillId: '系统规则',
         actionType: '选将',
         ownerId: target,
-        params: { character: atom.candidates[0]!.name },
+        params: { character: atom.candidates[0].name },
         baseSeq: state.seq,
-      } as never);
+      });
       await sleep(50);
     }
     // 等开局 execute resume 完成发牌/回合启动 + 录像基线捕获
@@ -631,7 +631,7 @@ describe('server/gameHistory session 集成(真实开局到结束)', () => {
 
     const entries = await listGameHistory(roomId);
     expect(entries).toHaveLength(1);
-    const entry = entries[0]!;
+    const entry = entries[0];
     expect(entry.roomName).toBe('历史测试房');
     expect(entry.winnerLabel).toBe('反贼');
     expect(entry.hasReplay).toBe(true);
@@ -646,7 +646,7 @@ describe('server/gameHistory session 集成(真实开局到结束)', () => {
     // 全座次 + 旁观座次(-1):旁观 delta 无私有手牌,供视角受限的重放使用
     const seats = availableSeats(replay!);
     expect(seats).toEqual([-1, 0, 1]);
-    expect(replay!.seats[-1]!.privateHands).toHaveLength(0);
+    expect(replay!.seats[-1].privateHands).toHaveLength(0);
     // 回放引擎可重建 initialView(step=0):武将名已就绪
     const v0 = getViewAt(replay!, 0, 0);
     expect(v0).not.toBeNull();
@@ -683,9 +683,9 @@ describe('server/gameHistory session 集成(真实开局到结束)', () => {
 
     const entries = await listGameHistory(roomId);
     expect(entries).toHaveLength(1);
-    expect(entries[0]!.endedReason).toBe('中断');
-    expect(entries[0]!.winnerLabel).toBe('中断');
-    expect(entries[0]!.players.every((p) => p.won === null)).toBe(true);
+    expect(entries[0].endedReason).toBe('中断');
+    expect(entries[0].winnerLabel).toBe('中断');
+    expect(entries[0].players.every((p) => p.won === null)).toBe(true);
 
     await clearGameHistory(roomId);
     gameSessions.delete(room.id);

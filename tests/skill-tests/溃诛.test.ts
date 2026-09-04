@@ -14,12 +14,12 @@ import { applyAtom } from '../../src/engine/core/apply';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import { slashMax } from '../../src/engine/rules/slash-quota';
 import { createGameState, suitColor } from '../../src/engine/types';
-import type { Card, GameState, PlayerState, SkillModule } from '../../src/engine/types';
+import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 // 本地注册技能模块(主 agent 统一在 skills/index.ts 注册;测试本地兜底)
-setSkillModuleOverride('溃诛', async () => 溃诛Module as unknown as SkillModule);
-setSkillModuleOverride('掣政', async () => 掣政Module as unknown as SkillModule);
-setSkillModuleOverride('立军', async () => 立军Module as unknown as SkillModule);
+setSkillModuleOverride('溃诛', async () => 溃诛Module);
+setSkillModuleOverride('掣政', async () => 掣政Module);
+setSkillModuleOverride('立军', async () => 立军Module);
 
 function mkCard(
   id: string,

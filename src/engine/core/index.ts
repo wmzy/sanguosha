@@ -11,7 +11,7 @@ import type {
   PendingSlot,
   Card,
 } from '../types';
-import { createGameState, TARGET_SYSTEM } from '../types';
+import { createGameState } from '../types';
 import { VirtualClock } from './clock';
 import { buildView as buildViewImpl } from '../view/buildView';
 import {
@@ -66,7 +66,7 @@ export function create(gameConfig: GameConfig): GameState {
   const playerCount = Math.max(2, Math.min(8, gameConfig.playerCount));
   const stubPlayers = Array.from({ length: playerCount }, (_, i) => ({
     index: i,
-    name: gameConfig.playerNames?.[i]?.trim() || `player-${i}`,
+    name: gameConfig.playerNames?.[i]?.trim() ?? `player-${i}`,
     character: '',
     health: 4,
     maxHealth: 4,

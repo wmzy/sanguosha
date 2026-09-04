@@ -211,9 +211,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (atom.requestType === OPTION_RT) {
         st.localVars[OPTION_KEY] = params.option;
       } else if (atom.requestType === DRAW_RT) {
-        st.localVars[DRAW_KEY] = params.targets as number[];
+        st.localVars[DRAW_KEY] = params.targets;
       } else if (atom.requestType === DAMAGE_RT) {
-        st.localVars[DAMAGE_KEY] = params.targets as number[];
+        st.localVars[DAMAGE_KEY] = params.targets;
       }
     },
   );
