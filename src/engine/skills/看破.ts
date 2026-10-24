@@ -43,56 +43,52 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // transform action:把黑色手牌转化为影子"无懈可击"。
   // 作为 preceding 在 无懈可击.respond 之前执行。
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      // 看破不受自己回合限制(无懈可击任意时机可打),但需有无懈窗口且无其他阻塞
-      const self = state.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const isBlack = !!card && card.color === '黑';
-      // 必须存在无懈可击窗口(否则转化出的无懈无处使用)
-      const hasWindow = hasNullifyWindow(state, ownerId);
-      // 无其他阻塞型 pending(转化不应打断正在进行的结算);无懈窗口本身是当前响应目标,允许
-      const blockedByOther = (() => {
-        for (const slot of state.pendingSlots.values()) {
-          const atom = slot.atom as { type?: string; requestType?: string };
-          if (!slot.isBlocking) continue;
-          if (atom.type === '请求回应' && atom.requestType === '无懈可击') continue;
-          return true;
-        }
-        return false;
-      })();
-      const ok = cardInHand && isBlack && hasWindow && !blockedByOther;
-      return ok ? null : '现在不能使用看破';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '无懈可击',
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const sId = shadowIdOf(cardId);
-      delete state.cardMap[sId];
-      const self = state.players[ownerId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) self.hand[idx] = cardId;
-    },
-  );
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    // 看破不受自己回合限制(无懈可击任意时机可打),但需有无懈窗口且无其他阻塞
+    const self = state.players[ownerId];
+    if (!self?.alive) return '玩家不存在或已死亡';
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const isBlack = !!card && card.color === '黑';
+    // 必须存在无懈可击窗口(否则转化出的无懈无处使用)
+    const hasWindow = hasNullifyWindow(state, ownerId);
+    // 无其他阻塞型 pending(转化不应打断正在进行的结算);无懈窗口本身是当前响应目标,允许
+    const blockedByOther = (() => {
+      for (const slot of state.pendingSlots.values()) {
+        const atom = slot.atom as { type?: string; requestType?: string };
+        if (!slot.isBlocking) continue;
+        if (atom.type === '请求回应' && atom.requestType === '无懈可击') continue;
+        return true;
+      }
+      return false;
+    })();
+    const ok = cardInHand && isBlack && hasWindow && !blockedByOther;
+    return ok ? null : '现在不能使用看破';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '无懈可击',
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
+  (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const sId = shadowIdOf(cardId);
+    delete state.cardMap[sId];
+    const self = state.players[ownerId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) self.hand[idx] = cardId;
+  },);
   return () => {};
 }
 

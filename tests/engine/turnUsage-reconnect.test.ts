@@ -9,6 +9,10 @@ import { describe, it, expect } from 'vitest';
 import { buildView } from '../../src/engine/index';
 import { applyAtom } from '../../src/engine/core/apply';
 import { createGameState } from '../../src/engine/types';
+import { markOncePerTurn, usedThisTurn } from '../../src/engine/rules/once-per-turn';
+import { incSlashUsed, slashUsed } from '../../src/engine/rules/slash-quota';
+import { getAtomDef } from '../../src/engine/core/atom';
+import { registerBeforeHook } from '../../src/engine/core/skill';
 import type { GameState, Json, PlayerState } from '../../src/engine/types';
 import {
   SHUANGXIONG_COLOR_VIEW_KEY,
@@ -49,6 +53,54 @@ function mkState(): GameState {
     turn: { round: 1, phase: '出牌', vars: {} },
   });
 }
+
+describe('回合用量统一写入', () => {
+  it('限一次标记在首个 await 前阻止重入,并立即可重建', async () => {
+    const state = mkState();
+    const incremental = buildView(state, 0);
+    let release!: () => void;
+    registerBeforeHook(state, '延迟用量', 0, '回合用量', async () => {
+      await new Promise<void>((resolve) => { release = resolve; });
+      return { kind: 'pass' };
+    });
+
+    const pending = markOncePerTurn(state, 1, '制霸');
+    expect(usedThisTurn(state, 1, '制霸')).toBe(true);
+    expect(usedThisTurn(state, 0, '制霸')).toBe(false);
+    expect(buildView(state, 0).players[1].turnUsage?.['制霸/usedThisTurn']).toBe(true);
+    release();
+    await pending;
+    for (const event of state.atomHistory) {
+      if (event.kind !== 'atom') continue;
+      const viewEvent = event.viewEvents?.othersView;
+      if (viewEvent) getAtomDef(event.atom.type).applyView?.(incremental, viewEvent);
+    }
+    expect(incremental.players.map((p) => p.turnUsage)).toEqual(buildView(state, 0).players.map((p) => p.turnUsage));
+
+    await applyAtom(state, { type: '回合结束', player: 0 });
+    expect(usedThisTurn(state, 1, '制霸')).toBe(false);
+    expect(buildView(state, 0).players[1].turnUsage).toEqual({});
+  });
+
+  it('出杀计数只有一个入口,不串到当前回合玩家且回合结束清空', async () => {
+    const state = mkState();
+    const first = incSlashUsed(state, 1);
+    expect(slashUsed(state, 1)).toBe(1);
+    expect(slashUsed(state, 0)).toBe(0);
+    expect(buildView(state, 0).players[1].turnUsage?.['杀/usedCount']).toBe(1);
+    await first;
+    await incSlashUsed(state, 1);
+    await incSlashUsed(state, 0);
+    expect(slashUsed(state, 1)).toBe(2);
+    expect(slashUsed(state, 0)).toBe(1);
+    expect(buildView(state, 0).players.map((p) => p.turnUsage?.['杀/usedCount'])).toEqual([1, 2]);
+
+    await applyAtom(state, { type: '回合结束', player: 0 });
+    expect(slashUsed(state, 1)).toBe(0);
+    expect(slashUsed(state, 0)).toBe(0);
+    expect(buildView(state, 0).players.map((p) => p.turnUsage)).toEqual([{}, {}]);
+  });
+});
 
 describe('回合内 view 键重连重建(双雄/界双雄/审时/成略/界当先)', () => {
   const cases: ReadonlyArray<{ key: string; value: Json; desc: string }> = [

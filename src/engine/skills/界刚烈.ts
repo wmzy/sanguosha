@@ -19,8 +19,7 @@
 //   - judgeType='界刚烈' 与标版 '刚烈' 区分(日志/调试用,不影响机制)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
-import { frameCards } from '../core/frame';
-import { runJudgeFlow } from '../flows/judge';
+import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
@@ -93,12 +92,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const atom = ctx.atom;
     if (atom.judgeType !== '界刚烈') return;
     if (atom.player !== ownerId) return;
-    const processing = frameCards(ctx.state);
-    if (processing.length === 0) return;
-    const judgeCardId = processing[processing.length - 1];
-    const judgeCard = ctx.state.cardMap[judgeCardId];
+    const judgeCardId = currentJudgeCardId(ctx.state);
+    const judgeCard = judgeCardId ? ctx.state.cardMap[judgeCardId] : undefined;
     if (!judgeCard) return;
-    ctx.state.localVars[JUDGE_COLOR_KEY] = judgeCard.color;
   });
 
   // ── 受到伤害后 after hook:界刚烈主逻辑 ──
@@ -133,10 +129,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     });
     if (!ctx.state.localVars['界刚烈/confirmed']) return; // 不发动
 
-    delete ctx.state.localVars[JUDGE_COLOR_KEY];
-    await runJudgeFlow(ctx.state, ownerId, '界刚烈');
-    const color = ctx.state.localVars[JUDGE_COLOR_KEY] as string | undefined;
-    delete ctx.state.localVars[JUDGE_COLOR_KEY];
+    const judgeCardId = await runJudgeFlow(ctx.state, ownerId, '界刚烈');
+    const color = judgeCardId ? ctx.state.cardMap[judgeCardId]?.color : undefined;
     if (color === undefined) return; // 判定未产出牌
 
     if (color === '红') {

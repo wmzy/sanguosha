@@ -37,7 +37,7 @@ import {
   extractCardFilter,
 } from '../utils/gameViewHelpers';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
-import { viewSlashTargetMax } from '../../engine/rules/action-active';
+import { targetCandidates, targetSelectionBounds, toggleTargetSelection, validateTargetSelection } from '../../engine/rules/target-selection';
 
 /**
  * 有序选择 + FIFO 淘汰:点击一张牌 toggle 其选中状态。
@@ -181,6 +181,7 @@ export interface PlayInteractionResult {
   selectedRespondCardId: string | null;
   /** useCardAndTarget 类回应(借刀杀人/出杀)选中的目标座次 name;非此模式为 null */
   respondTargetName: string | null;
+  respondTargets: number[];
   /** 当前回应是否需要选目标(useCardAndTarget 且非 selfTarget) */
   respondNeedsTarget: boolean;
   /** respond 目标是否已满足(选了牌 + 选了目标) */
@@ -308,7 +309,8 @@ export function usePlayInteraction(
   const [selectedRespondCardId, setSelectedRespondCardId] = useState<string | null>(null);
   // useCardAndTarget 类回应(借刀杀人/出杀):选中杀牌后再选目标座次 name,满足后「打出」可提交。
   // respond 模式独立于出牌阶段的 selectedTarget,避免与出牌选牌状态互相干扰。
-  const [respondTargetName, setRespondTargetName] = useState<string | null>(null);
+  const [respondTargets, setRespondTargets] = useState<number[]>([]);
+  const respondTargetName = respondTargets.map((index) => view.players[index]?.name).filter(Boolean).join('、') || null;
   const [transformMode, setTransformMode] = useState<TransformMode | null>(null);
   const [distributeMode, setDistributeMode] = useState<{
     skillId: string;
@@ -381,7 +383,7 @@ export function usePlayInteraction(
   // 询问窗口切换/打出后/不回应后:pending 变化驱动清空回应选牌,与 selectedForDiscard 同源。
   useEffect(() => {
     setSelectedRespondCardId(null);
-    setRespondTargetName(null);
+    setRespondTargets([]);
   }, [pending]);
   const distKey = activeDistribute
     ? `${activeDistribute.skillId}:${activeDistribute.actionType}:${activeDistribute.prompt.mode ?? 'allocate'}`
@@ -553,6 +555,11 @@ export function usePlayInteraction(
           ? ' (请选目标)'
           : '';
     }
+    if (rules.targetFilter && !rules.selfTarget) {
+      const names = rules.hasSlots || rules.multiTarget ? selectedMultiTargets : selectedTarget ? [selectedTarget] : [];
+      canPlay = validateTargetSelection(view, perspectiveIdx, rules.targetFilter,
+        names.map((name) => view.players.findIndex((player) => player.name === name)), card);
+    }
     return { canPlay, targetLabel };
   })();
 
@@ -566,10 +573,9 @@ export function usePlayInteraction(
       : null;
   const respondNeedsTarget =
     isMyAwaiting && pending?.prompt?.type === 'useCardAndTarget' && !pending.prompt.selfTarget;
-  // respond 目标是否已满足:min<=1 时选了一个即可;max>1 时至少选 min 个。
-  // 当前仅支持单目标路径(借刀杀人 targetFilter.max<=3 但默认选 1 即可);多目标累加
-  // 复用 selectedMultiTargets 的场景极少(无现有 useCardAndTarget respond 需多选),暂不支持。
-  const respondTargetReady = respondNeedsTarget ? !!respondTargetName : true;
+  const respondCard = perspectiveHand.find((card) => card.id === selectedRespondCardId);
+  const respondTargetReady = !respondNeedsTarget || (!!respondTargetFilter &&
+    validateTargetSelection(view, perspectiveIdx, respondTargetFilter, respondTargets, respondCard));
 
   // ─── handlers ───
   const nameToIndex = useCallback(
@@ -649,55 +655,29 @@ export function usePlayInteraction(
           return false;
         return view.players[i]?.alive === true;
       }
-      const tf = selectedTargetFilter;
-      // respond 模式 useCardAndTarget(借刀杀人/出杀):座位可选性由 respondTargetFilter 决定。
-      // 不依赖 selectedUseAction(respond 时 selectedCardId=null,selectedUseAction=undefined)。
-      if (isMyAwaiting && respondTargetFilter) {
-        const tf2 = respondTargetFilter;
-        // 不能选自己(借刀杀人/出杀的目标是其他角色;selfTarget 的 useCardAndTarget respond 不走此分支)
-        if (i === perspectiveIdx) return false;
-        if (!view.players[i]?.alive) return false;
-        const filter = tf2.filter;
-        if (!filter) return true;
-        return filter(view, i);
-      }
-      // 多槽位目标(借刀杀人 A+B):按当前选择进度取对应槽位 filter 判断可选性。
-      // 槽位自身决定可选性（含是否允许自己作为 killTarget），不应用 self 排除。
-      if (tf?.slots && tf.slots.length > 1) {
-        const slotIdx = selectedTarget ? 1 : 0;
-        // 后续槽位不能重复选已选座次
-        if (slotIdx === 1 && view.players[i]?.name === selectedTarget) return false;
-        const slot = tf.slots[slotIdx];
-        const ctxSelected =
-          slotIdx === 1 ? [view.players.findIndex((p) => p.name === selectedTarget)] : [];
-        return slot?.filter ? slot.filter(view, i, { selected: ctxSelected }) : true;
-      }
-      // 多目标(铁索连环 max>=2):点击累加为集合。已选目标仍可点(用于取消);
-      // 未达上限且通过 filter(含 allowSelf)才可选。与 playRules.multiTarget 对齐。
-      if (playRules?.multiTarget && tf) {
-        const name = view.players[i]?.name;
-        if (name && selectedMultiTargets.includes(name)) return true;
-        // 出杀时目标数上限受方天画戟/天义/疠火动态约束(与后端 slashTargetMax 同源);
-        // 其他多目标牌(铁索连环)用 prompt 静态 max。
-        const isSelectedSlash = selectedCard?.name === '杀';
-        const effMax = isSelectedSlash
-          ? viewSlashTargetMax(view, perspectiveIdx, selectedCard ?? undefined)
-          : tf.max;
-        if (selectedMultiTargets.length >= effMax) return false;
-        if (i === perspectiveIdx && !tf.allowSelf) return false;
-        return tf.filter ? tf.filter(view, i) : true;
-      }
-      // 单目标路径：自己仅当卡牌允许时可选（selfTarget=桃/酒自动目标；
-      // allowSelf=铁索连环/火攻含自己）。避免决斗等无 filter 卡误选自己。
-      if (i === perspectiveIdx) {
-        const allowSelf =
-          selectedUseAction?.prompt.type === 'useCardAndTarget' &&
-          (!!selectedUseAction.prompt.selfTarget || !!tf?.allowSelf);
-        if (!allowSelf) return false;
-      }
-      const filter = tf?.filter;
-      if (!filter) return true;
-      return filter(view, i);
+      const tf = isMyAwaiting && respondTargetFilter ? respondTargetFilter : selectedTargetFilter;
+      if (!tf) return !!view.players[i]?.alive;
+      const names = playRules?.hasSlots || playRules?.multiTarget
+        ? selectedMultiTargets.length ? selectedMultiTargets : [selectedTarget, selectedKillTarget].filter((name): name is string => name !== null)
+        : selectedTarget ? [selectedTarget] : [];
+      const selected = isMyAwaiting && respondTargetFilter ? respondTargets : names.map((name) => view.players.findIndex((player) => player.name === name));
+      if (selected.includes(i)) return true;
+      // 目标约束的 card 参数只在「这张牌就是正在使用的牌」时有意义:
+      //   · 回应窗口(出闪/出杀)用的是正在打出的牌;
+      //   · 主动出牌 useCard 型(杀本体)/ 有转化产出牌名时同理;
+      //   · useCardAndTarget 但无产出名(离间 弃一张牌 + 选两名男性)里的选中牌是代价牌,
+      //     不能按杀的动态目标上限解释(否则上限塌成 1,永远提交不出合法目标数)。
+      const usingSelected = !selectedTargetFilter
+        || !!transformWrapperName
+        || selectedCard?.name === '杀';
+      const card = isMyAwaiting && respondTargetFilter
+        ? respondCard
+        : selectedCard && usingSelected
+          ? { ...selectedCard, name: transformWrapperName ?? selectedCard.name }
+          : undefined;
+      const { max } = targetSelectionBounds(view, perspectiveIdx, tf, card);
+      const prefix = !tf.slots?.length && max === 1 ? [] : selected;
+      return prefix.length < max && targetCandidates(view, perspectiveIdx, tf, prefix, card).includes(i);
     },
     [
       isDistributeActive,
@@ -712,6 +692,10 @@ export function usePlayInteraction(
       selectedCard,
       isMyAwaiting,
       respondTargetFilter,
+      respondTargets,
+      respondCard,
+      selectedKillTarget,
+      transformWrapperName,
       pendingSkillAction,
     ],
   );
@@ -734,6 +718,7 @@ export function usePlayInteraction(
       selectedTarget,
       selectedKillTarget,
       selectedMultiTargets,
+      view,
     );
     if (params === null) return;
     // 出牌飞行动画:在 card 消失前捕获位置
@@ -808,42 +793,17 @@ export function usePlayInteraction(
       // respond 模式 useCardAndTarget(借刀杀人/出杀):点目标 toggle 选中,与出牌阶段 selectedTarget 独立。
       // 不依赖 selectedCardId/selectedUseAction(respond 时两者均空),直接操作 respondTargetName。
       if (isMyAwaiting && respondTargetFilter) {
-        if (!isTargetable(idx)) return;
-        setSelectedRespondCardId((prev) => prev); // 保持选中牌高亮
-        setRespondTargetName(respondTargetName === name ? null : name);
+        setRespondTargets((previous) => toggleTargetSelection(view, perspectiveIdx, respondTargetFilter, previous, idx, respondCard));
         return;
       }
-      // 转化模式(丈八蛇矛/武圣):永远只提交单目标(handleTransformPlay 取 targets:[idx]),
-      // 不走多目标累加——否则杀的 targetFilter.max=3 会让 multiTarget=true,
-      // 点击目标写入 selectedMultiTargets 而按钮只认 selectedTarget → 按钮卡住 disabled。
-      if (transformMode) {
-        setSelectedTarget(selectedTarget === name ? null : name);
-        return;
-      }
-      // 多槽位目标(借刀杀人):首次点选 A(slot 0),再点选 B(slot 1)
-      if (playRules?.hasSlots) {
-        const slotIdx = selectedTarget ? 1 : 0;
-        if (slotIdx === 0) {
-          if (selectedTarget === name) {
-            setSelectedTarget(null);
-            setSelectedKillTarget(null);
-          } else {
-            setSelectedTarget(name);
-            setSelectedKillTarget(null);
-          }
-        } else {
-          setSelectedKillTarget(selectedKillTarget === name ? null : name);
-        }
-        return;
-      }
-      // 多目标(铁索连环 max>=2):点击目标 toggle 进/出集合
-      if (playRules?.multiTarget) {
-        setSelectedMultiTargets((prev) => {
-          if (prev.includes(name)) return prev.filter((n) => n !== name);
-          const max = playRules.targetFilter?.max ?? prev.length;
-          if (prev.length >= max) return prev;
-          return [...prev, name];
-        });
+      if (playRules?.targetFilter && (playRules.hasSlots || playRules.multiTarget)) {
+        const current = selectedMultiTargets.map((target) => view.players.findIndex((player) => player.name === target));
+        const card = selectedCard ? { ...selectedCard, name: transformWrapperName ?? selectedCard.name } : undefined;
+        const next = toggleTargetSelection(view, perspectiveIdx, playRules.targetFilter, current, idx, card);
+        const names = next.map((target) => view.players[target].name);
+        setSelectedMultiTargets(names);
+        setSelectedTarget(names[0] ?? null);
+        setSelectedKillTarget(playRules.hasSlots ? names[1] ?? null : null);
         return;
       }
       setSelectedTarget(selectedTarget === name ? null : name);
@@ -862,7 +822,11 @@ export function usePlayInteraction(
       transformMode,
       isMyAwaiting,
       respondTargetFilter,
-      respondTargetName,
+      respondCard,
+      selectedCard,
+      selectedMultiTargets,
+      transformWrapperName,
+      view,
       pendingSkillAction,
       submitSkillTarget,
     ],
@@ -1155,13 +1119,10 @@ export function usePlayInteraction(
         if (info.cardFilter && !info.cardFilter(card)) return;
         // 求桃:按救援牌路由到对应技能(桃/酒/急救);其他回应用默认 skillId
         const rescueSkill = info.rescueSkillForCard?.(card);
-        // useCardAndTarget 类回应(借刀杀人/出杀):附带 targets,必含发起者指定的 killTarget。
-        // respondTargetName 为前端选中的单目标;无 targetFilter 的 useCardAndTarget(不应出现)回退仅 cardId。
-        if (respondNeedsTarget) {
-          if (!respondTargetName) return;
-          const tIdx = view.players.findIndex((pl) => pl.name === respondTargetName);
-          if (tIdx < 0) return;
-          send(rescueSkill ?? info.skillId, 'respond', { cardId, targets: [tIdx] });
+        // useCardAndTarget 类回应：目标数组经共享约束解释器校验并原样提交。
+        if (respondNeedsTarget && respondTargetFilter) {
+          if (!validateTargetSelection(view, perspectiveIdx, respondTargetFilter, respondTargets, card)) return;
+          send(rescueSkill ?? info.skillId, 'respond', { cardId, targets: respondTargets });
         } else {
           send(rescueSkill ?? info.skillId, 'respond', { cardId });
         }
@@ -1186,8 +1147,10 @@ export function usePlayInteraction(
       markBroadcastSkipped,
       broadcastKey,
       respondNeedsTarget,
-      respondTargetName,
-      view.players,
+      respondTargets,
+      respondTargetFilter,
+      perspectiveIdx,
+      view,
     ],
   );
 
@@ -1200,16 +1163,16 @@ export function usePlayInteraction(
   // useCardAndTarget(借刀杀人/出杀)还需已选目标(respondTargetReady)。
   const handlePlayRespond = useCallback(() => {
     if (!selectedRespondCardId) return;
-    if (respondNeedsTarget && !respondTargetName) return;
+    if (!respondTargetReady) return;
     const cardId = selectedRespondCardId;
     setSelectedRespondCardId(null);
-    setRespondTargetName(null);
+    setRespondTargets([]);
     handleRespond(cardId);
-  }, [selectedRespondCardId, respondNeedsTarget, respondTargetName, handleRespond]);
+  }, [selectedRespondCardId, respondTargetReady, handleRespond]);
 
   const clearRespondSelection = useCallback(() => {
     setSelectedRespondCardId(null);
-    setRespondTargetName(null);
+    setRespondTargets([]);
   }, []);
 
   // 双击手牌(快速提交);误触风险由「仅无目标牌即时提交」约束兜底:
@@ -1605,6 +1568,7 @@ export function usePlayInteraction(
     isRespondTransformContext,
     selectedRespondCardId,
     respondTargetName,
+    respondTargets,
     respondNeedsTarget,
     respondTargetReady,
     altActions,

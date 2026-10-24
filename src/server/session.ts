@@ -642,6 +642,7 @@ export class GameSession {
         timestamp: env.timestamp,
         ...(env.view ? { view: env.view } : {}),
         ...(env.notify ? { notify: env.notify } : {}),
+        ...(env.pending !== undefined ? { pending: env.pending } : {}),
         ...(attachDeadline ? { deadline: dl } : {}),
       });
     }

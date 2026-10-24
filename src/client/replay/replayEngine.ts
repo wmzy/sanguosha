@@ -36,6 +36,11 @@ function reconstructInitialView(baseline: ReplayBaseline, delta: SeatDelta): Gam
       identityHidden: id?.identityHidden,
     };
   });
+  view.pending = delta.pending === undefined ? view.pending : delta.pending;
+  if (view.pending) {
+    view.deadline = view.pending.deadline ?? null;
+    view.deadlineTotalMs = view.pending.totalMs ?? 0;
+  }
   return view;
 }
 
@@ -51,6 +56,16 @@ export function getViewAt(file: ReplayFile, seat: number, step: number): GameVie
     // notify 事件(pendingResolved 等):实时前端把 notify 和 atom ViewEvent 分开处理
     // (msg.notify 字段 vs msg.view 字段),viewReducer 只处理 atom ViewEvent。
     // 录像中若混入 notify(测试 harness 场景),回放时单独处理 pending 清除。
+    // pending 快照事件(与实时 applyServerMessage / harness 同构):
+    // 增量订阅端把 pending 作为独立事件应用,录像回放也必须照做,
+    // 否则回放末步视图缺少 pending 且会落到 getAtomDef('pendingChanged') 抛错。
+    if (type === 'pendingChanged') {
+      const pending = (event as unknown as { pending: GameView['pending'] }).pending ?? null;
+      view.pending = pending;
+      view.deadline = pending?.deadline ?? null;
+      view.deadlineTotalMs = pending?.totalMs ?? 0;
+      continue;
+    }
     if (type === 'notify') {
       if ((event.eventType as string) === 'pendingResolved') {
         const target = (event.data as { target?: number } | undefined)?.target;

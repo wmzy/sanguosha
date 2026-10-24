@@ -83,56 +83,52 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── transform action(preceding,主 action=杀.use 之前执行):普通杀 → 火杀影子 ──
   unloaders.push(
-    registerAction(
-      state,
-      skill.id,
-      ownerId,
-      'transform',
-      (state: GameState, params: Record<string, Json>) => {
-        // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活
-        const myTurn = state.currentPlayerIndex === ownerId;
-        const inActPhase = state.phase === '出牌';
-        const free = !hasBlockingPending(state);
-        const self = state.players[ownerId];
-        const selfAlive = self?.alive === true;
-        const cardId = params.cardId as string;
-        const cardIdOk = typeof cardId === 'string';
-        const card = cardIdOk ? state.cardMap[cardId] : undefined;
-        const cardInHand = cardIdOk && !!self && self.hand.includes(cardId);
-        // 仅普通杀可转化(非火杀、非雷杀)
-        const ok =
-          myTurn &&
-          inActPhase &&
-          free &&
-          selfAlive &&
-          cardInHand &&
-          isNormalSlash(card);
-        return ok ? null : '现在不能使用朱雀羽扇';
-      },
-      async (state: GameState, params: Record<string, Json>) => {
-        const cardId = params.cardId as string;
-        const shadowId = shadowIdOf(cardId);
-        // 通过 当作 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-        // outputDamageType='火焰' 是朱雀羽扇核心:普通杀转化为火杀
-        await applyAtom(state, {
-          type: '当作',
-          player: ownerId,
-          cardIds: [cardId],
-          shadowId,
-          outputName: '杀',
-          outputDamageType: '火焰',
-        });
-      },
-      // rollback:主 action validate 失败时撤销转化(删影子、还原手牌)
-      (state: GameState, params: Record<string, Json>) => {
-        const cardId = params.cardId as string;
-        const shadowId = shadowIdOf(cardId);
-        delete state.cardMap[shadowId];
-        state.players[ownerId].hand = state.players[ownerId].hand.map((id) =>
-          id === shadowId ? cardId : id,
-        );
-      },
-    ),
+    registerAction(state,
+    skill.id,
+    ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+      // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活
+      const myTurn = state.currentPlayerIndex === ownerId;
+      const inActPhase = state.phase === '出牌';
+      const free = !hasBlockingPending(state);
+      const self = state.players[ownerId];
+      const selfAlive = self?.alive === true;
+      const cardId = params.cardId as string;
+      const cardIdOk = typeof cardId === 'string';
+      const card = cardIdOk ? state.cardMap[cardId] : undefined;
+      const cardInHand = cardIdOk && !!self && self.hand.includes(cardId);
+      // 仅普通杀可转化(非火杀、非雷杀)
+      const ok =
+        myTurn &&
+        inActPhase &&
+        free &&
+        selfAlive &&
+        cardInHand &&
+        isNormalSlash(card);
+      return ok ? null : '现在不能使用朱雀羽扇';
+    },
+    async (state: GameState, params: Record<string, Json>) => {
+      const cardId = params.cardId as string;
+      const shadowId = shadowIdOf(cardId);
+      // 通过 当作 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+      // outputDamageType='火焰' 是朱雀羽扇核心:普通杀转化为火杀
+      await applyAtom(state, {
+        type: '当作',
+        player: ownerId,
+        cardIds: [cardId],
+        shadowId,
+        outputName: '杀',
+        outputDamageType: '火焰',
+      });
+    },
+    // rollback:主 action validate 失败时撤销转化(删影子、还原手牌)
+    (state: GameState, params: Record<string, Json>) => {
+      const cardId = params.cardId as string;
+      const shadowId = shadowIdOf(cardId);
+      delete state.cardMap[shadowId];
+      state.players[ownerId].hand = state.players[ownerId].hand.map((id) =>
+        id === shadowId ? cardId : id,
+      );
+    },),
   );
 
   // ── respond action:owner 回应「使用普通杀时是否发动」的 confirm 询问 ──

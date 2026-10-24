@@ -6,7 +6,9 @@ import { describe, it, expect } from 'vitest';
 import '../../src/engine/atoms';
 import { viewReducer } from '../../src/client/view/reducer';
 import { getAtomDef } from '../../src/engine/core/atom';
+import { projectVisiblePending } from '../../src/engine/view/pending';
 import { applyAtom } from '../../src/engine/core/apply';
+import { waitForStable } from '../engine-harness';
 import { buildView } from '../../src/engine/view/buildView';
 import { createGameState } from '../../src/engine/types';
 import type { GameView, ViewEvent, Card, GameState, PlayerState } from '../../src/engine/types';
@@ -601,92 +603,92 @@ describe('展示型 ViewEvent 注册', () => {
   });
 });
 
-// ── 请求回应 atom: applyView 的 deadline/totalMs 必须与后端真实超时口径一致 ──
-// 后端 createAndAwaitSlot 走 resolveTimeoutMs(state, base)。
-// toViewEvents 计算出 timeoutMs(已应用 timeoutSec)并透传给 applyView。
-// applyView 必须从 event.timeoutMs 读取,而非硬编码 30s,
-// 否则前端倒计时(applyView 增量路径)与后端真实超时不一致。
-describe('请求回应 atom: deadline/totalMs 口径一致性', () => {
+// ── pending 投影:deadline/totalMs 与后端真实超时口径一致,观察者不泄露 prompt ──
+// pending 不再由 applyView 增量构造(那会让增量视图与 buildView 各写一套),
+// 统一由 view/pending.ts 的 projectVisiblePending 从 pendingSlots 权威投影,
+// 经 events(ServerMessage.pending) 下发。以下直接验证该投影与 slot 的真实超时口径。
+/** 最小可用 GameState(两张手牌,无技能)。pending 投影只依赖 pendingSlots/players/config。 */
+function makeState(): GameState {
+  return createGameState({
+    players: [0, 1].map((index) => ({
+      index, name: `P${index + 1}`, character: '', health: 4, maxHealth: 4, alive: true,
+      hand: [], equipment: {}, pendingTricks: [], skills: [], vars: {}, marks: [], tags: [],
+    })),
+    cardMap: {},
+  });
+}
+
+describe('pending 投影: deadline/totalMs 口径一致性', () => {
   const TIMEOUT_MS = 10_000; // 无懈可击 atom.timeout=10(秒) → timeoutMs=10000
 
-  it('广播型(无懈可击): applyView 的 totalMs = event.timeoutMs', () => {
-    const def = getAtomDef('请求回应');
-    const view = mockView();
-    // 模拟 toViewEvents 生成的 event(广播型,带 timeoutMs)
-    const event = {
-      type: '请求回应',
-      requestType: '无懈可击',
-      target: -2, // TARGET_BROADCAST
-      prompt: { type: 'useCard', title: '是否打出无瓣可击?' },
-      timeoutMs: 10_000,
-    } as unknown as ViewEvent;
-    def.applyView!(view, event);
-    expect(view.pending).not.toBeNull();
-    expect(view.pending!.totalMs).toBe(TIMEOUT_MS);
-    // deadline ≈ now + 10s(允许 100ms 漂移)
-    expect(view.pending!.deadline).toBeGreaterThan(Date.now() + TIMEOUT_MS - 200);
-    expect(view.pending!.deadline).toBeLessThan(Date.now() + TIMEOUT_MS + 200);
+  async function project(
+    state: GameState,
+    atom: Record<string, unknown>,
+    viewer: number,
+  ): Promise<GameView['pending']> {
+    const waiting = applyAtom(state, atom as unknown as Parameters<typeof applyAtom>[1]);
+    await waitForStable(state);
+    try {
+      return projectVisiblePending(state, viewer);
+    } finally {
+      for (const slot of state.pendingSlots.values()) slot.resolve();
+      state.pendingSlots.clear();
+      await waiting;
+    }
+  }
+
+  it('广播型(无懈可击): totalMs = atom 超时,deadline ≈ 现在 + totalMs', async () => {
+    const state = makeState();
+    const pending = await project(state, {
+      type: '请求回应', requestType: '无懈可击', target: -2, timeout: 10,
+      prompt: { type: 'useCard', title: '是否打出无懈可击?', cardFilter: { min: 1, max: 1 } },
+    }, 0);
+    expect(pending).not.toBeNull();
+    expect(pending!.totalMs).toBe(TIMEOUT_MS);
+    expect(pending!.deadline).toBeGreaterThan(Date.now() + TIMEOUT_MS - 200);
+    expect(pending!.deadline).toBeLessThan(Date.now() + TIMEOUT_MS + 200);
   });
 
-  it('target viewer: applyView 的 totalMs = event.timeoutMs', () => {
-    const def = getAtomDef('请求回应');
-    const view = mockView({ viewer: 1 });
-    const event = {
-      type: '请求回应',
-      requestType: '询问杀',
-      target: 1,
-      prompt: { type: 'useCard', title: '请出杀' },
-      timeoutMs: 15_000,
-    } as unknown as ViewEvent;
-    def.applyView!(view, event);
-    expect(view.pending).not.toBeNull();
-    expect(view.pending!.totalMs).toBe(15_000);
+  it('target viewer: totalMs 取 slot 实际生效值(含房间 timeoutSec)', async () => {
+    const state = makeState();
+    state.config = { timeoutSec: 15 };
+    const pending = await project(state, {
+      type: '请求回应', requestType: '询问杀', target: 1,
+      prompt: { type: 'useCard', title: '请出杀', cardFilter: { min: 1, max: 1 } },
+    }, 1);
+    expect(pending).not.toBeNull();
+    expect(pending!.totalMs).toBe(15_000);
   });
 
-  it('未传 timeout 时 fallback 到 pending.timeout(30s)', () => {
-    const def = getAtomDef('请求回应');
-    const view = mockView();
-    const event = {
-      type: '请求回应',
-      requestType: '询问杀',
-      target: -2,
-      prompt: { type: 'useCard', title: '请出杀' },
-      // 不带 timeout → fallback
-    } as unknown as ViewEvent;
-    def.applyView!(view, event);
-    expect(view.pending).not.toBeNull();
-    expect(view.pending!.totalMs).toBe(30_000);
+  it('未传 timeout 时 fallback 到 pending.timeout(30s)', async () => {
+    const state = makeState();
+    const pending = await project(state, {
+      type: '请求回应', requestType: '询问杀', target: -2,
+      prompt: { type: 'useCard', title: '请出杀', cardFilter: { min: 1, max: 1 } },
+    }, 0);
+    expect(pending).not.toBeNull();
+    expect(pending!.totalMs).toBe(30_000);
   });
 
-  it('非 target viewer: applyView 设置观察型 pending(不可操作)', () => {
-    const def = getAtomDef('请求回应');
-    const view = mockView({ viewer: 2 }); // viewer 2 ≠ target 0
-    const event = {
-      type: '请求回应',
-      requestType: '询问杀',
-      target: 0,
-      prompt: { type: 'useCard', title: '请出杀' },
-      timeoutMs: 30_000,
-    } as unknown as ViewEvent;
-    def.applyView!(view, event);
-    expect(view.pending).not.toBeNull();
-    // 观察型:prompt 被替换为 "等待回应"
-    const prompt = view.pending!.prompt as { title: string };
+  it('非 target viewer: 观察型 pending(prompt 为「等待回应」,不含候选)', async () => {
+    const state = makeState();
+    const pending = await project(state, {
+      type: '请求回应', requestType: '询问杀', target: 0, timeout: 30,
+      prompt: { type: 'useCard', title: '请出杀', cardFilter: { min: 1, max: 1 } },
+    }, 1);
+    expect(pending).not.toBeNull();
+    const prompt = pending!.prompt as { title: string };
     expect(prompt.title).toBe('等待回应');
+    expect(JSON.stringify(pending)).not.toContain('请出杀');
   });
 
-  it('target viewer 但无 prompt 字段: applyView 不设置 pending', () => {
-    const def = getAtomDef('请求回应');
-    const view = mockView({ viewer: 0 });
-    const event = {
-      type: '请求回应',
-      requestType: '询问杀',
-      target: 0,
-      // 无 prompt 字段
-      timeoutMs: 30_000,
-    } as unknown as ViewEvent;
-    def.applyView!(view, event);
-    expect(view.pending).toBeNull();
+  it('无 prompt 字段: target viewer 拿到 atom 定义的默认 prompt', async () => {
+    const state = makeState();
+    const pending = await project(state, {
+      type: '请求回应', requestType: '询问杀', target: 0, timeout: 30,
+    }, 0);
+    expect(pending).not.toBeNull();
+    expect((pending!.prompt as { title: string }).title).toBe('请回应');
   });
 });
 

@@ -62,76 +62,72 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ─── transform action:黑色牌(手牌或装备)→ 影子无懈 ─────────────
   // 作为 preceding 在 无懈可击.respond(本座次被覆盖)之前执行。
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      // 界看破不受自己回合限制(无懈可击任意时机可打),但需有无懈窗口且无其他阻塞
-      const self = state.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const cardInEquip =
-        cardIdOk && Object.values(self.equipment).some((id) => id === cardId);
-      const isBlack = !!card && card.color === '黑';
-      // 必须存在无懈可击窗口(否则转化出的无懈无处使用)
-      const hasWindow = hasNullifyWindow(state, ownerId);
-      // 无其他阻塞型 pending(转化不应打断正在进行的结算);无懈窗口本身是当前响应目标,允许
-      const blockedByOther = (() => {
-        for (const slot of state.pendingSlots.values()) {
-          const atom = slot.atom as { type?: string; requestType?: string };
-          if (!slot.isBlocking) continue;
-          if (atom.type === '请求回应' && atom.requestType === '无懈可击') continue;
-          return true;
-        }
-        return false;
-      })();
-      const ok = (cardInHand || cardInEquip) && isBlack && hasWindow && !blockedByOther;
-      return ok ? null : '现在不能使用界看破';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      const self = state.players[ownerId];
-      // 装备区黑色牌:先卸下到手牌(产生 ViewEvent,清除装备 vars),再走当作。
-      const equipSlotEntry = Object.entries(self.equipment).find(([, id]) => id === cardId);
-      if (equipSlotEntry) {
-        const slot = equipSlotEntry[0] as EquipSlot;
-        params['_origSlot'] = slot;
-        await applyAtom(state, { type: '卸下', player: ownerId, slot });
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    // 界看破不受自己回合限制(无懈可击任意时机可打),但需有无懈窗口且无其他阻塞
+    const self = state.players[ownerId];
+    if (!self?.alive) return '玩家不存在或已死亡';
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const cardInEquip =
+      cardIdOk && Object.values(self.equipment).some((id) => id === cardId);
+    const isBlack = !!card && card.color === '黑';
+    // 必须存在无懈可击窗口(否则转化出的无懈无处使用)
+    const hasWindow = hasNullifyWindow(state, ownerId);
+    // 无其他阻塞型 pending(转化不应打断正在进行的结算);无懈窗口本身是当前响应目标,允许
+    const blockedByOther = (() => {
+      for (const slot of state.pendingSlots.values()) {
+        const atom = slot.atom as { type?: string; requestType?: string };
+        if (!slot.isBlocking) continue;
+        if (atom.type === '请求回应' && atom.requestType === '无懈可击') continue;
+        return true;
       }
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '无懈可击',
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子,牌还原,清标记)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const sId = shadowIdOf(cardId);
-      const self = state.players[ownerId];
-      const origSlot = params['_origSlot'] as EquipSlot | undefined;
-      delete state.cardMap[sId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) {
-        if (origSlot) {
-          // 原是装备牌:从手牌移除影子,还原装备槽位
-          self.hand.splice(idx, 1);
-          self.equipment[origSlot] = cardId;
-        } else {
-          // 原是手牌:影子替换回原卡
-          self.hand[idx] = cardId;
-        }
+      return false;
+    })();
+    const ok = (cardInHand || cardInEquip) && isBlack && hasWindow && !blockedByOther;
+    return ok ? null : '现在不能使用界看破';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    const self = state.players[ownerId];
+    // 装备区黑色牌:先卸下到手牌(产生 ViewEvent,清除装备 vars),再走当作。
+    const equipSlotEntry = Object.entries(self.equipment).find(([, id]) => id === cardId);
+    if (equipSlotEntry) {
+      const slot = equipSlotEntry[0] as EquipSlot;
+      params['_origSlot'] = slot;
+      await applyAtom(state, { type: '卸下', player: ownerId, slot });
+    }
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '无懈可击',
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子,牌还原,清标记)
+  (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const sId = shadowIdOf(cardId);
+    const self = state.players[ownerId];
+    const origSlot = params['_origSlot'] as EquipSlot | undefined;
+    delete state.cardMap[sId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) {
+      if (origSlot) {
+        // 原是装备牌:从手牌移除影子,还原装备槽位
+        self.hand.splice(idx, 1);
+        self.equipment[origSlot] = cardId;
+      } else {
+        // 原是手牌:影子替换回原卡
+        self.hand[idx] = cardId;
       }
-    },
-  );
+    }
+  },);
 
   // ─── respond override:覆盖标版无懈可击.respond,本座次走界版规则 ──
   // 界看破转化的无懈:不可被响应（runUseFlow + skipCancelQuery=true）。

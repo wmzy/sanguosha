@@ -27,6 +27,7 @@
 //     防御:多牌场景下跳过获取(让判定牌正常入弃牌堆),避免状态损坏。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply'
+import { currentJudgeCardId } from '../flows/judge';
 import { frameCards } from '../core/frame';
 import { flipFaceUpAll } from '../flows/face-down';
 import {
@@ -223,11 +224,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const atom = ctx.atom;
     if (atom.player === ownerId) return; // 自己的判定不触发
 
-    const processing = frameCards(ctx.state);
-    if (processing.length === 0) return;
-    // 安全检查:只在 frame.cards 末尾就是判定牌且无其他干扰时获取
+    const judgeCardId = currentJudgeCardId(ctx.state);
+    if (!judgeCardId) return;
+    const processing = ctx.state.settlementStack.at(-1)?.cards ?? [];
     if (processing.length > 1) return;
-    const judgeCardId = processing[processing.length - 1];
     if (!isClubCard(ctx.state, judgeCardId)) return;
 
     const gained = await askAndGain(ctx.state, ownerId, [judgeCardId], '处理区');

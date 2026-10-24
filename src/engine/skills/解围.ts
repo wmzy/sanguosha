@@ -150,101 +150,97 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ════════════════════════════════════════════════════════════
   // 效果①:transform action — 装备区牌 → 影子无懈可击
   // ════════════════════════════════════════════════════════════
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      // 解围不受自己回合限制(无懈可击任意时机可打)
-      const self = state.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      // 只接受装备区的牌(官方:「装备区里的牌当【无懈可击】使用」)
-      const isEquip = !!card && card.type === '装备牌';
-      const cardInEquip = cardIdOk && Object.values(self.equipment).some((id) => id === cardId);
-      // 必须存在无懈可击窗口
-      const hasWindow = hasNullifyWindow(state, ownerId);
-      // 无其他阻塞型 pending(无懈窗口本身允许)
-      const blockedByOther = (() => {
-        for (const slot of state.pendingSlots.values()) {
-          const atom = slot.atom as { type?: string; requestType?: string };
-          if (!slot.isBlocking) continue;
-          if (atom.type === '请求回应' && atom.requestType === '无懈可击') continue;
-          return true;
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    // 解围不受自己回合限制(无懈可击任意时机可打)
+    const self = state.players[ownerId];
+    if (!self?.alive) return '玩家不存在或已死亡';
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    // 只接受装备区的牌(官方:「装备区里的牌当【无懈可击】使用」)
+    const isEquip = !!card && card.type === '装备牌';
+    const cardInEquip = cardIdOk && Object.values(self.equipment).some((id) => id === cardId);
+    // 必须存在无懈可击窗口
+    const hasWindow = hasNullifyWindow(state, ownerId);
+    // 无其他阻塞型 pending(无懈窗口本身允许)
+    const blockedByOther = (() => {
+      for (const slot of state.pendingSlots.values()) {
+        const atom = slot.atom as { type?: string; requestType?: string };
+        if (!slot.isBlocking) continue;
+        if (atom.type === '请求回应' && atom.requestType === '无懈可击') continue;
+        return true;
+      }
+      return false;
+    })();
+    const ok = isEquip && cardInEquip && hasWindow && !blockedByOther;
+    return ok ? null : '现在不能使用解围';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    const self = state.players[ownerId];
+  
+    // 装备区的装备牌:先移除装备技能(若有),再卸下到手牌(产生 ViewEvent),
+    // 再走「当作」(当作要求牌在手牌)。
+    const equipSlotEntry = Object.entries(self.equipment).find(([, id]) => id === cardId);
+    if (equipSlotEntry) {
+      const slot = equipSlotEntry[0] as EquipSlot;
+      params['_origSlot'] = slot;
+      // 移除装备自带技能(与 装备通用 一致,卸下 atom 不自动移除技能)
+      const card = state.cardMap[cardId];
+      if (card?.name && hasSkillModule(card.name)) {
+        await applyAtom(state, { type: '移除技能', player: ownerId, skillId: card.name });
+      }
+      await applyAtom(state, { type: '卸下', player: ownerId, slot });
+    }
+  
+    // 通过「当作」atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '无懈可击',
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子,牌还原,重新挂载装备技能)
+  async (state: GameState, params: Record<string, Json>): Promise<void> => {
+    const cardId = params.cardId as string;
+    const sId = shadowIdOf(cardId);
+    const self = state.players[ownerId];
+    const origSlot = params['_origSlot'] as EquipSlot | undefined;
+  
+    // 删除影子卡
+    delete state.cardMap[sId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) {
+      if (origSlot) {
+        // 原是装备牌:从手牌移除影子,还原装备槽位
+        self.hand.splice(idx, 1);
+        self.equipment[origSlot] = cardId;
+        // 卸下武器时清除了 vars[DISTANCE_ATTACK_RANGE_KEY](该 var 仅由 装备 atom 在装备时设值,不会重算),
+        // 回滚必须还原,否则武器已归位但攻击范围退化为徒手(1)。镜像 奇袭 的回滚逻辑。
+        if (origSlot === '武器') {
+          const card = state.cardMap[cardId];
+          self.vars[DISTANCE_ATTACK_RANGE_KEY] = card?.range ?? 1;
         }
-        return false;
-      })();
-      const ok = isEquip && cardInEquip && hasWindow && !blockedByOther;
-      return ok ? null : '现在不能使用解围';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      const self = state.players[ownerId];
-
-      // 装备区的装备牌:先移除装备技能(若有),再卸下到手牌(产生 ViewEvent),
-      // 再走「当作」(当作要求牌在手牌)。
-      const equipSlotEntry = Object.entries(self.equipment).find(([, id]) => id === cardId);
-      if (equipSlotEntry) {
-        const slot = equipSlotEntry[0] as EquipSlot;
-        params['_origSlot'] = slot;
-        // 移除装备自带技能(与 装备通用 一致,卸下 atom 不自动移除技能)
+        // 重新挂载装备技能(transform execute 用 applyAtom(移除技能) 卸载了实例)。
+        // rollback 现在是 async,可以 await instantiateSkill。同时还原 player.skills。
         const card = state.cardMap[cardId];
         if (card?.name && hasSkillModule(card.name)) {
-          await applyAtom(state, { type: '移除技能', player: ownerId, skillId: card.name });
-        }
-        await applyAtom(state, { type: '卸下', player: ownerId, slot });
-      }
-
-      // 通过「当作」atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '无懈可击',
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子,牌还原,重新挂载装备技能)
-    async (state: GameState, params: Record<string, Json>): Promise<void> => {
-      const cardId = params.cardId as string;
-      const sId = shadowIdOf(cardId);
-      const self = state.players[ownerId];
-      const origSlot = params['_origSlot'] as EquipSlot | undefined;
-
-      // 删除影子卡
-      delete state.cardMap[sId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) {
-        if (origSlot) {
-          // 原是装备牌:从手牌移除影子,还原装备槽位
-          self.hand.splice(idx, 1);
-          self.equipment[origSlot] = cardId;
-          // 卸下武器时清除了 vars[DISTANCE_ATTACK_RANGE_KEY](该 var 仅由 装备 atom 在装备时设值,不会重算),
-          // 回滚必须还原,否则武器已归位但攻击范围退化为徒手(1)。镜像 奇袭 的回滚逻辑。
-          if (origSlot === '武器') {
-            const card = state.cardMap[cardId];
-            self.vars[DISTANCE_ATTACK_RANGE_KEY] = card?.range ?? 1;
+          if (!self.skills.includes(card.name)) {
+            self.skills.push(card.name);
           }
-          // 重新挂载装备技能(transform execute 用 applyAtom(移除技能) 卸载了实例)。
-          // rollback 现在是 async,可以 await instantiateSkill。同时还原 player.skills。
-          const card = state.cardMap[cardId];
-          if (card?.name && hasSkillModule(card.name)) {
-            if (!self.skills.includes(card.name)) {
-              self.skills.push(card.name);
-            }
-            await instantiateSkill(state, card.name, ownerId);
-          }
-        } else {
-          // 原是手牌:影子替换回原卡
-          self.hand[idx] = cardId;
+          await instantiateSkill(state, card.name, ownerId);
         }
+      } else {
+        // 原是手牌:影子替换回原卡
+        self.hand[idx] = cardId;
       }
-    },
-  );
+    }
+  },);
 
   // ════════════════════════════════════════════════════════════
   // 效果②:respond — 翻回正面后多步交互的回应处理

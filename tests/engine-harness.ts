@@ -207,6 +207,10 @@ export class PlayerSession {
         const viewEvent = e.viewEvents?.othersView;
         if (viewEvent) result.push(viewEvent);
       } else if (e.kind === 'notify') {
+        const pending = e.pendingViews?.[String(this.playerIndex)];
+        if (pending !== undefined) {
+          result.push({ type: 'pendingChanged', pending } as unknown as ViewEvent);
+        }
         const data = e.views ? (e.views.get(String(this.playerIndex)) ?? null) : e.data;
         if (data !== null) {
           result.push({ type: 'notify', skillId: e.skillId, eventType: e.eventType, data });
@@ -233,6 +237,13 @@ export class PlayerSession {
           : typeof raw.type === 'string'
             ? raw.type
             : '';
+      if (type === 'pendingChanged') {
+        const pending = raw.pending as GameView['pending'] | null;
+        this.processedView.pending = pending;
+        this.processedView.deadline = pending?.deadline ?? null;
+        this.processedView.deadlineTotalMs = pending?.totalMs ?? 0;
+        continue;
+      }
       // notify 事件(pendingResolved 等):单独处理
       if (type === 'notify') {
         const eventType = raw.eventType as string | undefined;
@@ -820,17 +831,42 @@ function normalizePrompt(prompt: ActionPrompt | undefined): unknown {
   if (!prompt) return null;
   const base: Record<string, unknown> = { type: prompt.type };
   if ('title' in prompt && prompt.title) base.title = prompt.title;
-  // cardFilter:只比 min/max,filter 是函数不可比
+  // cardFilter:只比可序列化的约束(min/max/candidates),filter/comboFilter 是函数不可比。
+  // (candidatesByCard/maxByCard 声明在 TargetFilter 上,卡面 CardFilter 没有。)
   if ('cardFilter' in prompt && prompt.cardFilter) {
-    base.cardFilter = { min: prompt.cardFilter.min, max: prompt.cardFilter.max };
+    base.cardFilter = {
+      min: prompt.cardFilter.min,
+      max: prompt.cardFilter.max,
+      ...(prompt.cardFilter.candidates ? { candidates: [...prompt.cardFilter.candidates] } : {}),
+    };
   }
   // targetFilter: 只 SelectTargetPrompt / UseCardAndTargetPrompt 有 TargetFilter(含 min/max);
-  // DistributePrompt.targetFilter 是函数不可比。按 type 收窄。
+  // DistributePrompt.targetFilter 是函数不可比。按 type 收窄。可序列化的候选约束
+  // (candidates/required/candidatesByCard/maxByCard/slots)是「可操作」信息,必须参与对比。
   if (
     (prompt.type === 'selectTarget' || prompt.type === 'useCardAndTarget') &&
     prompt.targetFilter
   ) {
-    base.targetFilter = { min: prompt.targetFilter.min, max: prompt.targetFilter.max };
+    const { min, max, candidates, required, candidatesByCard, maxByCard, slots } =
+      prompt.targetFilter;
+    base.targetFilter = {
+      min,
+      max,
+      ...(candidates ? { candidates: [...candidates] } : {}),
+      ...(required ? { required: [...required] } : {}),
+      ...(candidatesByCard ? { candidatesByCard: { ...candidatesByCard } } : {}),
+      ...(maxByCard ? { maxByCard: { ...maxByCard } } : {}),
+      ...(slots
+        ? { slots: slots.map((slot) => ({ label: slot.label, candidates: slot.candidates ? [...slot.candidates] : undefined })) }
+        : {}),
+    };
+  }
+  // choosePlayer/chooseCharacter:候选列表是权威可操作数据(跨进程传递),必须参与对比。
+  if (prompt.type === 'choosePlayer' && prompt.candidates) {
+    base.candidates = [...prompt.candidates];
+  }
+  if (prompt.type === 'chooseCharacter') {
+    base.candidates = prompt.candidates.map((entry) => entry.name);
   }
   return base;
 }
@@ -841,21 +877,30 @@ function normalizePrompt(prompt: ActionPrompt | undefined): unknown {
  *  属预期差异,不纳入对比。丢弃 deadline/totalMs(Date.now() 近似值)。 */
 function normalizePending(pending: GameView['pending'], viewer: number): unknown {
   if (!pending) return null;
-  const isOwner = pending.target === viewer;
+  const isOwner = pending.target === viewer ||
+    (pending.target < 0 && viewer >= 0);
   return {
     type: pending.type,
     target: pending.target,
     atomType: pending.atom?.type,
     // 仅 target viewer 比可操作 prompt;observer 的 prompt 跳过
-    ...(isOwner ? { prompt: normalizePrompt(pending.prompt) } : {}),
+    ...(isOwner ? {
+      prompt: normalizePrompt(pending.prompt),
+      mandatory: pending.mandatory === true,
+      responseMode: pending.responseMode ?? null,
+    } : {}),
   };
 }
 
 /** 默认比较所有视图字段;只排除来源不同的日志、实时截止时间和规范化后的 pending。 */
 function normalizeViewForCompare(view: GameView): unknown {
-  const { log: _log, deadline: _deadline, deadlineTotalMs: _deadlineTotalMs, pending, ...comparable } = view;
+  const { log: _log, deadline: _deadline, deadlineTotalMs: _deadlineTotalMs, pending, turn, ...comparable } = view;
   return {
     ...comparable,
+    // turn.vars 是已知架构差异(与 replay/replay-consistency 同约定):
+    // buildView 直接投影 state.turn(含引擎内部用量键/__view 镜像),applyView 只同步
+    // turnUsage,不同步 turn.vars。公开用量由 turnUsage 字段单独对比。
+    turn: { round: turn.round, phase: turn.phase },
     pending: normalizePending(pending, view.viewer),
     // log: buildView 用 actionLog,processedView 用 toViewLog,由专门检查覆盖。
     // deadline/deadlineTotalMs: 两条路径读取实时时钟,不要求数值完全一致。

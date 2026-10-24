@@ -12,7 +12,7 @@ import type {
   ViewEvent,
   ViewEventSplit,
 } from './atom';
-import type { GameView } from './view';
+import type { GameView, PendingView } from './view';
 import type { ActionActiveWhen, ActionPrompt } from './prompt';
 
 // ==================== Skill ====================
@@ -132,22 +132,10 @@ export interface ActionEntry {
   skillId: string;
   ownerId: number;
   actionType: string;
-  /**
-   * 验证消息合法性:返回 null 表示通过,返回字符串为错误信息。
-   * ownerId 已在 entry.ownerId 上,无需重复传入。
-   */
+  /** 验证消息合法性:返回 null 表示通过,返回字符串为错误信息。 */
   validate: (state: GameState, params: Record<string, Json>) => string | null;
-  /**
-   * 技能 execute:顶层函数式 API。
-   * ownerId 已在 entry.ownerId 上,无需重复传入。
-   */
+  /** 技能 execute:顶层函数式 API。 */
   execute: (state: GameState, params: Record<string, Json>) => Promise<void>;
-  /**
-   * 可选:回滚 execute 的副作用。仅"可组合 action"(用于 preceding)需要实现。
-   * dispatch 执行 preceding 序列时,若主 action 或后续 preceding 的 validate 失败,
-   * 对已执行的 preceding 按逆序调用 rollback,恢复 state。
-   * 普通非组合 action 不实现(undefined)。
-   */
   rollback?: (state: GameState, params: Record<string, Json>) => void | Promise<void>;
 }
 
@@ -211,11 +199,12 @@ export type GameEvent =
       eventType: string;
       data: Json;
       views?: ReadonlyMap<string, Json>;
+      pendingViews?: Readonly<Record<string, import('./view').PendingView | null>>;
     };
 
 /** 引擎唯一权威事件源条目。apply 时写入，不可变。
  *  替代旧的模块级 event-stream 单例。 */
-export type AppliedAtomEntry =
+export type AppliedAtomEntry = (
   | { kind: 'atom'; seq: number; timestamp: number; atom: Atom; viewEvents: ViewEventSplit }
   | {
       kind: 'notify';
@@ -225,7 +214,8 @@ export type AppliedAtomEntry =
       eventType: string;
       data: Json;
       views?: ReadonlyMap<string, Json>;
-    };
+    }
+) & { pendingViews?: Readonly<Record<string, PendingView | null>> };
 
 /** 事件 envelope(per-viewer 已分叉)。session 广播用。
  *  从 engine/types 导出避免 engine→server 循环依赖。 */
@@ -237,4 +227,6 @@ export interface GameEventEnvelope {
   view?: ViewEvent;
   /** 通知事件(per-viewer 分叉后的 data) */
   notify?: { skillId: string; eventType: string; data: Json };
+  /** This viewer's authoritative pending change at this sequence. */
+  pending?: PendingView | null;
 }

@@ -27,46 +27,42 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // transform action:把黑色手牌转化为影子"闪"(新建 Card 实体,shadowOf 指向原卡)。
   // 作为 preceding 在 闪.respond 之前执行。闪.validate 读 cardMap[影子id] 看到"闪"。
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:存活 + 手牌 + 黑牌。
-      // 不限定回合/阶段:倾国用于"需要打出闪时"(被杀目标时),不是自己回合主动出。
-      const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const isBlack = !!card && card.color === '黑';
-      const ok = selfAlive && cardInHand && isBlack;
-      return ok ? null : '现在不能使用倾国';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '闪',
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const sId = shadowIdOf(cardId);
-      delete state.cardMap[sId];
-      const self = state.players[ownerId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) self.hand[idx] = cardId;
-    },
-  );
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    // 通用合法条件:存活 + 手牌 + 黑牌。
+    // 不限定回合/阶段:倾国用于"需要打出闪时"(被杀目标时),不是自己回合主动出。
+    const self = state.players[ownerId];
+    const selfAlive = self.alive === true;
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const isBlack = !!card && card.color === '黑';
+    const ok = selfAlive && cardInHand && isBlack;
+    return ok ? null : '现在不能使用倾国';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '闪',
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
+  (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const sId = shadowIdOf(cardId);
+    delete state.cardMap[sId];
+    const self = state.players[ownerId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) self.hand[idx] = cardId;
+  },);
   const unloadDecl = declareAlternativeResponse(state, ownerId, '询问闪');
   return () => { unloadDecl(); };
 }

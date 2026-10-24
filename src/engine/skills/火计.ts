@@ -27,48 +27,44 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // transform action:把红色手牌转化为影子"火攻"。
   // 作为 preceding 在 火攻.use 之前执行。火攻.validate 读 cardMap[影子id] 看到"火攻"。
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活 + 手牌 + 红牌
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
-      const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const isRed = !!card && card.color === '红';
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && isRed;
-      return ok ? null : '现在不能使用火计';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '火攻',
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const sId = shadowIdOf(cardId);
-      delete state.cardMap[sId];
-      const self = state.players[ownerId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) self.hand[idx] = cardId;
-    },
-  );
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活 + 手牌 + 红牌
+    const myTurn = state.currentPlayerIndex === ownerId;
+    const inActPhase = state.phase === '出牌';
+    const free = !hasBlockingPending(state);
+    const self = state.players[ownerId];
+    const selfAlive = self.alive === true;
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const isRed = !!card && card.color === '红';
+    const ok = myTurn && inActPhase && free && selfAlive && cardInHand && isRed;
+    return ok ? null : '现在不能使用火计';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '火攻',
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
+  (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const sId = shadowIdOf(cardId);
+    delete state.cardMap[sId];
+    const self = state.players[ownerId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) self.hand[idx] = cardId;
+  },);
   return () => {};
 }
 

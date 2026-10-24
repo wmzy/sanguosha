@@ -59,95 +59,91 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ─── transform action:田 → 影子顺手牵羊(作为 preceding) ───
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (st: GameState, params: Record<string, Json>): string | null => {
-      // 自己回合 + 出牌阶段 + 无阻塞 pending
-      if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (st.phase !== '出牌') return '只能在出牌阶段发动';
-      const self = st.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
-
-      // 选定的田 markId
-      const markId = params.markId as string;
-      if (typeof markId !== 'string') return '需要选择一张田';
-
-      // 该 mark 存在且是田
-      const mark = self.marks.find((m) => m.id === markId);
-      if (!mark?.id.startsWith(TIAN_PREFIX)) return '指定的田不存在';
-      const payload = mark.payload as { cardId?: string } | undefined;
-      if (!payload?.cardId) return '田缺少卡牌信息';
-
-      return null;
-    },
-    async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const markId = params.markId as string;
-      const self = st.players[ownerId];
-      const mark = self.marks.find((m) => m.id === markId);
-      if (!mark) return;
-
-      const payload = mark.payload as { cardId?: string } | undefined;
-      const tianCardId = payload?.cardId;
-      const origCard = tianCardId ? st.cardMap[tianCardId] : undefined;
-      const shadowId = shadowIdOf(markId);
-
-      // 1. 去标记:移除田(走 atom 管线,产生 ViewEvent)+ 同步距离修正 view
-      //    田减少 → 进攻修正 -1;必须经 distanceVars 通道同步 view(与屯田加田、
-      //    界义从去标记对称)。否则 view.distanceVars.attackMod 停在旧值,前端距离
-      //    显示/目标过滤(viewCanAttack)与后端 effectiveDistance 不一致。
-      const newCount = tianCount(st, ownerId) - 1;
-      await applyAtom(st, {
-        type: '去标记',
-        player: ownerId,
-        markId,
-        distanceVars: { attackMod: newCount > 0 ? newCount : undefined },
-      });
-
-      // 2. 创建影子卡(直接 mutate:田不在手牌,不能用「当作」atom)
-      const shadow: Card = {
-        id: shadowId,
-        name: '顺手牵羊',
-        suit: origCard?.suit ?? '',
-        color: origCard?.color ?? '无色',
-        rank: origCard?.rank ?? 'A',
-        type: '锦囊牌',
-        trickSubtype: '普通锦囊',
-        shadowOf: tianCardId,
-      };
-      st.cardMap[shadowId] = shadow;
-      self.hand.push(shadowId);
-
-      // 3. 更新距离修正(田减少)
-      syncDistanceMod(st, ownerId);
-    },
-    // rollback:主 action validate 失败时,撤销转化
-    (st: GameState, params: Record<string, Json>): void => {
-      const markId = params.markId as string;
-      const shadowId = shadowIdOf(markId);
-      const self = st.players[ownerId];
-
-      // 先从影子卡获取原始 cardId(删除前)
-      const shadow = st.cardMap[shadowId];
-      const tianCardId = shadow?.shadowOf;
-
-      // 删影子卡 + 手牌还原
-      delete st.cardMap[shadowId];
-      self.hand = self.hand.filter((id) => id !== shadowId);
-
-      // 恢复田标记(直接加回 marks,不走 atom)
-      self.marks.push({
-        id: markId,
-        scope: ownerId,
-        payload: { cardId: tianCardId ?? '' },
-      });
-
-      // 更新距离修正(田恢复)
-      syncDistanceMod(st, ownerId);
-    },
-  );
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (st: GameState, params: Record<string, Json>): string | null => {
+    // 自己回合 + 出牌阶段 + 无阻塞 pending
+    if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
+    if (st.phase !== '出牌') return '只能在出牌阶段发动';
+    const self = st.players[ownerId];
+    if (!self?.alive) return '玩家不存在或已死亡';
+  
+    // 选定的田 markId
+    const markId = params.markId as string;
+    if (typeof markId !== 'string') return '需要选择一张田';
+  
+    // 该 mark 存在且是田
+    const mark = self.marks.find((m) => m.id === markId);
+    if (!mark?.id.startsWith(TIAN_PREFIX)) return '指定的田不存在';
+    const payload = mark.payload as { cardId?: string } | undefined;
+    if (!payload?.cardId) return '田缺少卡牌信息';
+  
+    return null;
+  },
+  async (st: GameState, params: Record<string, Json>): Promise<void> => {
+    const markId = params.markId as string;
+    const self = st.players[ownerId];
+    const mark = self.marks.find((m) => m.id === markId);
+    if (!mark) return;
+  
+    const payload = mark.payload as { cardId?: string } | undefined;
+    const tianCardId = payload?.cardId;
+    const origCard = tianCardId ? st.cardMap[tianCardId] : undefined;
+    const shadowId = shadowIdOf(markId);
+  
+    // 1. 去标记:移除田(走 atom 管线,产生 ViewEvent)+ 同步距离修正 view
+    //    田减少 → 进攻修正 -1;必须经 distanceVars 通道同步 view(与屯田加田、
+    //    界义从去标记对称)。否则 view.distanceVars.attackMod 停在旧值,前端距离
+    //    显示/目标过滤(viewCanAttack)与后端 effectiveDistance 不一致。
+    const newCount = tianCount(st, ownerId) - 1;
+    await applyAtom(st, {
+      type: '去标记',
+      player: ownerId,
+      markId,
+      distanceVars: { attackMod: newCount > 0 ? newCount : undefined },
+    });
+  
+    // 2. 创建影子卡(直接 mutate:田不在手牌,不能用「当作」atom)
+    const shadow: Card = {
+      id: shadowId,
+      name: '顺手牵羊',
+      suit: origCard?.suit ?? '',
+      color: origCard?.color ?? '无色',
+      rank: origCard?.rank ?? 'A',
+      type: '锦囊牌',
+      trickSubtype: '普通锦囊',
+      shadowOf: tianCardId,
+    };
+    st.cardMap[shadowId] = shadow;
+    self.hand.push(shadowId);
+  
+    // 3. 更新距离修正(田减少)
+    syncDistanceMod(st, ownerId);
+  },
+  // rollback:主 action validate 失败时,撤销转化
+  (st: GameState, params: Record<string, Json>): void => {
+    const markId = params.markId as string;
+    const shadowId = shadowIdOf(markId);
+    const self = st.players[ownerId];
+  
+    // 先从影子卡获取原始 cardId(删除前)
+    const shadow = st.cardMap[shadowId];
+    const tianCardId = shadow?.shadowOf;
+  
+    // 删影子卡 + 手牌还原
+    delete st.cardMap[shadowId];
+    self.hand = self.hand.filter((id) => id !== shadowId);
+  
+    // 恢复田标记(直接加回 marks,不走 atom)
+    self.marks.push({
+      id: markId,
+      scope: ownerId,
+      payload: { cardId: tianCardId ?? '' },
+    });
+  
+    // 更新距离修正(田恢复)
+    syncDistanceMod(st, ownerId);
+  },);
 
   return () => {};
 }

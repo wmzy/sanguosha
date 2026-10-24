@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — 2026-10-25
+
+### Changed — 执行生命周期、目标约束与 pending 投影的统一
+
+- **执行生命周期显式化**：新增 `core/run-tracker.ts`（active/suspended run 记账、
+  `createSlotGroup`、`runDetached`、`whenIdle/whenIdleSince`）。`dispatch` 的 `settle`
+  改为「本 execute 完成或挂起后的稳定点」；`restore` 去掉 1000 次 `setTimeout(0)` 轮询，
+  改为 `await whenIdle` + 触发阻塞型超时。出牌窗口循环等脱离父链的 fire-and-forget 执行
+  必须经 `runDetached` 记账，否则会释放别人的挂起计数、导致 settle 提前。
+- **组合动作（preceding）事务边界收敛**：只有自带 `rollback` 的 action 才能作为 preceding
+  （`ActionEntry.composable` 字段移除）；回滚按快照**原位**还原玩家字段/三区/cardMap/
+  cardWrappers/turn/座次/阶段/RNG/marks，并截断 atomHistory/actionLog、只清理本次新建的
+  pending。移除了会抛 `DataCloneError` 且破坏对象引用的整对象 `structuredClone` 还原。
+- **目标约束统一解释**：新增 `rules/target-selection.ts`（`resolveTargetSelection` /
+  `validateTargetSelection` / `targetCandidates` / `toggleTargetSelection`）。浏览器
+  `usePlayInteraction`、无头 `availableActions` 与 `HeadlessGameClient` 共用同一判据，
+  `AvailableAction` 增加 `targetSelection` 契约（min/max/required/candidates/slots）。
+  修正「技能代价牌被当作杀」导致 `min=max=2` 类技能（离间）上限塌成 1、客户端永远提交不出
+  合法目标数的问题。
+- **pending 投影统一**：新增 `view/pending.ts` 的 `projectVisiblePending`，全量 `buildView`
+  与增量视图、回放共用同一条权威投影；pending 快照作为独立事件随 `ServerMessage.event.pending`
+  下发（`undefined`=未变，`null`=清除），旁观者只得到「等待回应」提示。
+- **临时状态作用域收敛**：判定结果改为绑定本次判定 atom 的私有 WeakMap（不再写
+  `localVars['判定/finalJudgeCardId']`）；`rules/turn-usage.ts` 成为回合用量的唯一写入口，
+  同步写权威值+重连镜像，并由「回合用量」atom 投影在线视图。
+- `移动牌` 的 `处理区 → 弃牌堆` 改为就地 `splice`：判定流程持有牌区引用，重建数组会让
+  改判后的收尾找不到最终判定牌（鬼道/鬼才 等替换牌滞留处理区）。
+
+### Fixed — 由此暴露的既有缺陷
+
+- 删除永不生效的 `core/state-context.ts`（facade 从未绑定，`canonicalGameState`/
+  `assertRegistrationAllowed` 恒等/恒通过）。
+- 自动回合在牌堆+弃牌堆为空时不再让摸牌 atom 抛错（异常会从 fire-and-forget 的超时链
+  冒成 unhandled rejection，并让出牌窗口循环在测试结束后继续空转）。
+- 测试 harness 的视图对比补上 pending 的 `mandatory`/`responseMode`/候选约束与
+  `targetFilter` 的 `required/candidatesByCard/maxByCard/slots`；按回放既有约定排除
+  `turn.vars`（buildView 投影 state.turn 的已知差异）。
+- 回放引擎处理 pending 快照事件，不再落到 `getAtomDef('pendingChanged')` 抛错。
+
 ## [Unreleased] — 2026-10-24
 
 ### Fixed — 状态完整性、权限隔离与客户端契约

@@ -89,45 +89,41 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── transform:梅花手牌 → 影子"铁索连环"(作为 preceding,主 action=铁索连环.use) ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const isClub = !!card && card.suit === '♣';
-      if (!selfAlive) return '你已死亡';
-      if (!cardIdOk || !cardInHand) return '牌不在手牌中';
-      if (!isClub) return '只能将梅花牌当铁索连环';
-      return null;
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '铁索连环',
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const sId = shadowIdOf(cardId);
-      delete state.cardMap[sId];
-      const self = state.players[ownerId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) self.hand[idx] = cardId;
-    },
-  );
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    const self = state.players[ownerId];
+    const selfAlive = self?.alive === true;
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const isClub = !!card && card.suit === '♣';
+    if (!selfAlive) return '你已死亡';
+    if (!cardIdOk || !cardInHand) return '牌不在手牌中';
+    if (!isClub) return '只能将梅花牌当铁索连环';
+    return null;
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '铁索连环',
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
+  (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const sId = shadowIdOf(cardId);
+    delete state.cardMap[sId];
+    const self = state.players[ownerId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) self.hand[idx] = cardId;
+  },);
 
   // ─── use action:覆盖标版铁索连环.use,本座次走界版结算(目标上限 3) ───
   // 铁索连环在 DEFAULT_SKILLS 中先实例化标版铁索连环.use;此处 registerAction 覆盖之(同 key 覆盖)。

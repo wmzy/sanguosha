@@ -1,13 +1,7 @@
 // src/engine/atoms/询问闪.ts
 // 询问闪:等待型 atom — 等待 target 出闪
-import type { ActionPrompt, AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { resolveTimeoutMs } from '../core/timeout';
-import {
-  SHORT_DELAY_MS,
-  SILENT_RESPONSE_PROMPT,
-  cardResponsePreResolveForTarget,
-  evaluateCardResponseModeForTarget,
-} from '../core/card-response-availability';
+import type { ActionPrompt, AtomDefinition, ViewEventSplit } from '../types';
+import { cardResponsePreResolveForTarget } from '../core/card-response-availability';
 
 const TIMEOUT_SEC = 15;
 const PROMPT: ActionPrompt = {
@@ -36,70 +30,11 @@ export const 询问闪: AtomDefinition<{ target: number; source: number }> = {
       cardResponsePreResolveForTarget(state, '询问闪', atom.target, (c) => c.name === '闪'),
   },
   effect: { blockUntilDone: true, duration: 200 },
-  toViewEvents(state, atom): ViewEventSplit {
-    const mode = evaluateCardResponseModeForTarget(state, '询问闪', atom.target, (c) => c.name === '闪');
-    // silent 用固定短延时(不走 timeoutSec);normal 用缩放后的正常超时;
-    // skip 不设 pending(timeoutMs 不参与)。
-    const timeoutMs =
-      mode === 'silent' ? SHORT_DELAY_MS : resolveTimeoutMs(state, TIMEOUT_SEC);
-    const base: ViewEvent = {
-      type: '询问闪',
-      target: atom.target,
-      source: atom.source,
-      timeoutMs,
-      responseMode: mode,
-    };
+  // Interactive state is published from the actual slot, never reconstructed by the client clock.
+  toViewEvents(_state, atom): ViewEventSplit {
     return {
-      ownerViews: new Map([[atom.target, base]]),
-      othersView: base,
+      ownerViews: new Map(),
+      othersView: { type: '询问闪', target: atom.target, source: atom.source },
     };
-  },
-  applyView(view, event) {
-    const target = event.target as number;
-    const mode = (event.responseMode as 'normal' | 'silent' | 'skip' | undefined) ?? 'normal';
-    // skip:target 手牌为 0(本就公开),瞬间结束,不展示任何 pending。
-    if (mode === 'skip') return;
-    const timeoutMs = (event.timeoutMs as number | undefined) ?? TIMEOUT_SEC * 1000;
-    const atomObj = {
-      type: '询问闪',
-      target,
-      source: event.source,
-    } as unknown as import('../types').Atom;
-    if (mode === 'silent') {
-      // silent:target 也不被询问——给观察型 pending(与"其他人看到的"一致),仅展示短倒计时。
-      view.pending = {
-        type: 'awaits',
-        atom: atomObj,
-        prompt: SILENT_RESPONSE_PROMPT,
-        target,
-        responseMode: 'silent',
-        deadline: Date.now() + timeoutMs,
-        totalMs: timeoutMs,
-      };
-      return;
-    }
-    // normal:维持现状
-    if (view.viewer === target) {
-      view.pending = {
-        type: 'awaits',
-        atom: atomObj,
-        prompt: PROMPT,
-        target,
-        responseMode: 'normal',
-        deadline: Date.now() + timeoutMs,
-        totalMs: timeoutMs,
-      };
-    } else {
-      // 其他 viewer:观察型 pending（不可操作,但 target 供视角自动跟随）
-      view.pending = {
-        type: 'awaits',
-        atom: atomObj,
-        prompt: { type: 'confirm', title: `等待出闪`, cancelLabel: '' },
-        target,
-        deadline: Date.now() + timeoutMs,
-        totalMs: timeoutMs,
-      };
-    }
   },
 };
-

@@ -41,8 +41,12 @@ describe('pending-scoped 版本控制', () => {
     await new Promise((r) => setTimeout(r, 50));
     const slot = state.pendingSlots.get(0);
     expect(slot).toBeDefined();
-    // createdSeq 应等于 applyAtom push atomHistory 时递增后的 state.seq
-    expect(slot!.createdSeq).toBe(state.seq);
+    // createdSeq = 创建该 slot 的 atom 的 seq。pending 快照会作为独立序号的
+    // notify 事件追加(见 view/pending.ts),故 state.seq 可能再前进一格;
+    // 断言 createdSeq 不晚于当前水位,且等于最近一个非 pending 事件的 seq。
+    const atomSeqs = state.atomHistory.filter((e) => e.kind === 'atom').map((e) => e.seq);
+    expect(slot!.createdSeq).toBe(atomSeqs[atomSeqs.length - 1]);
+    expect(slot!.createdSeq).toBeLessThanOrEqual(state.seq);
     slot!.resolve();
     await p;
   });

@@ -153,7 +153,9 @@ describe('turnUsage 投影 key 静态契约', () => {
     const violations: string[] = [];
     for (const { file, expr } of writers) {
       // atom/类型声明文件自身的 key: atom.key / key: string 形态,非技能写入点
-      if (file === 'atoms/回合用量.ts' || file === 'types/atom.ts') continue;
+      // rules/turn-usage.ts 是「回合用量」的通用发射器:它的 key 是 string 形参,
+      // 真实 key 由调用方以注册表工厂/技能名模板给出(下方调用点仍逐条校验)。
+      if (file === 'atoms/回合用量.ts' || file === 'types/atom.ts' || file === 'rules/turn-usage.ts') continue;
       // 1) 工厂调用:slashXxxKey(...) / usedThisTurnKey(...)
       const call = expr.match(/^(\w+)\(/);
       if (call) {

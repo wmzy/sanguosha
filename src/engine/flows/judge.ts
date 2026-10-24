@@ -1,135 +1,100 @@
-// src/engine/judge-flow.ts
-// 判定结算编排函数(对齐 出牌流程重设计.md 模块 H / judge.md)。
-//
-// 将判定流程拆为「判定时 → 翻牌(判定 atom)→ 生效前 → 生效后」时机标记 atom,
-// 与 runUseFlow / runDamageFlow / runDeathFlow / runMoveCardFlow 一致的
-// 「编排函数 + 时机标记 atom」模式。
-//
-// 模块 H 已完成接入:
-//   - 判定时:咒缚 before-hook 可替换判定牌来源。
-//   - 判定牌生效前:鬼才/鬼道 改判(本 atom afterApply 调 runJudgeModifiers)。
-//   - 判定牌生效后:天妒/洛神/屯田 获得判定牌 / 闪电·乐不思蜀 等消费方 after-hook 读牌。
-//   - 判定 atom 已瘦身为纯翻牌(apply),改判/消费/清理逻辑均迁出至本编排函数。
-//
-// 判定结果回传:收尾步骤把最终判定牌 cardId 写入
-// state.localVars['判定/finalJudgeCardId'],调用方据此读取判定结果。runJudgeFlow 返回该 cardId。
-import type { GameState } from '../types';
+// 判定编排:结果绑定本次调用,不写公共 params/localVars。
+import type { Atom, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { frameCards } from '../core/frame';
 
-/** runJudgeFlow 收尾回写最终判定牌 cardId 的 localVars 键(与 cleanupJudgeCard 一致)。 */
-const JUDGE_FINAL_CARD_KEY = '判定/finalJudgeCardId';
+interface JudgeResult {
+  cardId?: string;
+  cards?: string[];
+}
 
-/** 判定结算编排函数——对齐 judge.md / 出牌流程重设计.md 模块 H 四时机。
- *
- *  时机1 判定时:咒缚 before-hook 可替换判定牌来源。
- *  时机2 判定(翻牌):底层操作,牌堆顶→结算帧牌区。
- *  时机3 判定牌生效前:鬼才/鬼道 改判(afterApply 调 runJudgeModifiers,逆时针从目标起,
- *    经 replaceJudgeCard 以两步「移动牌」atom 替换结算帧顶牌)。
- *  时机4 判定牌生效后:天妒/洛神/屯田 获得判定牌 / 闪电·乐不思蜀 等消费方 after-hook 读牌。
- *  收尾:记录最终判定牌 cardId 到 localVars,再把判定牌从结算帧移入弃牌堆
- *    (天妒/屯田 可能已在 生效后 拿走 → splice 为 no-op,但仍记录 cardId)。
- *
- *  返回最终判定牌 cardId(可能被改判替换),供调用方读取判定结果。
- *  牌堆为空(判定 atom apply 早退,未翻牌)时返回 undefined。
- *
- *  @param state     游戏状态
- *  @param player    判定目标(座次下标)
- *  @param judgeType 判定类型(乐不思蜀/闪电/八卦阵/铁骑 等)
- *  @returns 最终判定牌 cardId(牌堆空时为 undefined) */
+// 仅存在于流程执行期间；atomHistory/settlementStack 不携带私有结果。
+const results = new WeakMap<object, JudgeResult>();
+
+/** 翻牌 atom 在真正 apply 时绑定结果,不能在 await 后猜测全局帧顶。 */
+export function bindJudgeCard(atom: object, cardId: string, cards: string[]): void {
+  const result = results.get(atom);
+  if (result) {
+    result.cardId = cardId;
+    result.cards = cards;
+  }
+}
+
+function activeJudgeResult(state: GameState): JudgeResult | undefined {
+  for (let i = state.atomStack.length - 1; i >= 0; i--) {
+    const result = results.get(state.atomStack[i]);
+    if (result) return result;
+  }
+  return undefined;
+}
+
+/** 当前判定流程在 hook 内的稳定结果。仅供判定相关 hook 读取，不写入 public frame/params。 */
+export function currentJudgeCardId(state: GameState): string | undefined {
+  return activeJudgeResult(state)?.cardId;
+}
+/** 四时机:判定时 → 翻牌 → 生效前(改判) → 生效后(消费)。
+ * 返回本次最终判定牌；消费 hook 收走它或触发嵌套判定均不改变返回值。
+ * 没有翻牌时返回 undefined,绝不借用帧中先前的牌。 */
 export async function runJudgeFlow(
   state: GameState,
   player: number,
   judgeType: string,
 ): Promise<string | undefined> {
-  // 时机1:判定时(咒缚可替换判定牌来源)
-  await applyAtom(state, { type: '判定时', player, judgeType });
-
-  // 时机2:翻牌(判定 atom 仅翻牌:牌堆顶→结算帧牌区,无改判/消费/清理)
-  await applyAtom(state, { type: '判定', player, judgeType });
-
-  // 读当前判定牌 cardId(结算帧牌区顶;牌堆空时判定.apply 早退,可能无牌)。
-  // 注意:此刻改判尚未发生(生效前 在其后);atom.cardId 字段仅供 validate/视图,
-  // 消费方读的是结算帧顶牌(改判后),不读此字段。
-  const judgeCardId = topFrameCardId(state);
-
-  // 防 stale:清掉上一次判定的残留值。deck 空(翻牌早退)时本流程必须返回 undefined,
-  // 而非上次判定遗留的旧 cardId(旧值会让 乐不思蜀/闪电 读到错误花色)。
-  delete state.localVars[JUDGE_FINAL_CARD_KEY];
-
-  // 时机3:判定牌生效前(鬼才/鬼道 改判——afterApply 调 runJudgeModifiers)
-  await applyAtom(state, { type: '判定牌生效前', player, judgeType, cardId: judgeCardId });
-
-  // 改判已完成、消费 hook 尚未运行——此刻帧顶即最终判定牌。
-  // 先行写入 localVars:「判定牌生效后」hook(天妒/屯田/洛神)可能把判定牌收走,
-  // 使收尾搬移变为 no-op;若等收尾才记录,key 会缺失或残留旧值,
-  // 下游(乐不思蜀/兵粮寸断/闪电 resolve)将读到错误的判定结果。
-  const finalCardId = topFrameCardId(state);
-  if (finalCardId !== undefined) state.localVars[JUDGE_FINAL_CARD_KEY] = finalCardId;
-
-  // 时机4:判定牌生效后(天妒/洛神/屯田 获得判定牌 / 闪电·乐不思蜀 等消费方读牌)
-  await applyAtom(state, { type: '判定牌生效后', player, judgeType, cardId: finalCardId });
-
-  // 收尾:把判定牌从结算帧移入弃牌堆(按 finalCardId 精确移除;
-  // 天妒/屯田 可能已在 生效后 拿走 → 找不到,no-op)。
-  await cleanupJudgeCard(state, finalCardId);
-
-  return state.localVars[JUDGE_FINAL_CARD_KEY] as string | undefined;
+  const result: JudgeResult = {};
+  const flip: Atom = { type: '判定', player, judgeType };
+  const before: Atom = { type: '判定牌生效前', player, judgeType };
+  const after: Atom = { type: '判定牌生效后', player, judgeType };
+  results.set(flip, result);
+  results.set(before, result);
+  results.set(after, result);
+  try {
+    await applyAtom(state, { type: '判定时', player, judgeType });
+    await applyAtom(state, flip);
+    before.cardId = result.cardId;
+    await applyAtom(state, before);
+    after.cardId = result.cardId;
+    await applyAtom(state, after);
+    const finalCardId = result.cardId;
+    await cleanupJudgeCard(state, result);
+    return finalCardId;
+  } finally {
+    results.delete(flip);
+    results.delete(before);
+    results.delete(after);
+  }
 }
 
-/** 结算帧牌区顶的牌 id(frame 优先,否则 processing);空则 undefined。 */
-function topFrameCardId(state: GameState): string | undefined {
-  const frame = state.settlementStack[state.settlementStack.length - 1];
-  const cards = frame ? frame.cards : state.zones.processing;
-  return cards.length > 0 ? cards[cards.length - 1] : undefined;
-}
-
-/** 改判:把当前判定牌移入弃牌堆,再把替换牌从 owner 手牌打出到处理区(成为新判定牌)。
- *
- *  两步都走「移动牌」atom(而非直接 mutate frameCards):判定牌的进出必须经 view 通道投影,
- *  否则增量视图(processedView / 前端 viewReducer)与权威 buildView 漂移——
- *  直接 mutate 会漏掉「替换牌离手(handCount)」与「原判定牌入弃牌堆(discardPileCount)」
- *  两项公开信息,客户端一直显示张角/司马懿手里还有那张牌。
- *
- *  先移除原判定牌再压入替换牌,保证帧顶(消费方读的判定牌)= 替换牌。
- *  调用方需已保证替换牌在 owner 手牌中。 */
+/** 改判的两次移动均走 atom,同步手牌数/处理区/弃牌堆。 */
 export async function replaceJudgeCard(
   state: GameState,
   ownerId: number,
   replaceCardId: string,
 ): Promise<void> {
-  const cur = frameCards(state);
-  const originalJudgeId = cur[cur.length - 1];
-  if (originalJudgeId === undefined) return;
-  // 1) 原判定牌:处理区 → 弃牌堆(替换下来的牌进入弃牌堆)
+  const result = activeJudgeResult(state);
+  const cur = result?.cards ?? frameCards(state);
+  const originalJudgeId = result ? result.cardId : cur[cur.length - 1];
+  if (originalJudgeId === undefined || !cur.includes(originalJudgeId)) return;
   await applyAtom(state, {
     type: '移动牌',
     cardId: originalJudgeId,
     from: { zone: '处理区' },
     to: { zone: '弃牌堆' },
   });
-  // 2) 替换牌:手牌 → 处理区(帧顶 = 新判定牌)
   await applyAtom(state, {
     type: '移动牌',
     cardId: replaceCardId,
     from: { zone: '手牌', player: ownerId },
     to: { zone: '处理区' },
   });
+  if (result) result.cardId = replaceCardId;
 }
 
-/** 把最终判定牌从结算帧移入弃牌堆。
- *  按 finalCardId 精确定位(不盲取末尾):天妒/屯田 可能已在 判定牌生效后 拿走判定牌
- *  (结算帧空或已含其他嵌套牌),按 id 找不到即为 no-op,绝不误删帧内其他牌。
- *  走「移动牌」atom 而非直接 mutate:弃牌堆 +1 与处理区 -1 都必须投影到增量视图。
- *  最终判定牌 cardId 已由 runJudgeFlow 在 生效后 hook 之前写入 localVars(此处不再记录)。 */
-async function cleanupJudgeCard(state: GameState, finalCardId: string | undefined): Promise<void> {
-  if (finalCardId === undefined) return;
-  const frame = state.settlementStack[state.settlementStack.length - 1];
-  const cards = frame ? frame.cards : state.zones.processing;
-  if (!cards.includes(finalCardId)) return;
+/** 按本次判定的稳定牌区引用和 cardId 清理,收走后为 no-op。 */
+async function cleanupJudgeCard(state: GameState, result: JudgeResult): Promise<void> {
+  if (result.cardId === undefined || !result.cards?.includes(result.cardId)) return;
   await applyAtom(state, {
     type: '移动牌',
-    cardId: finalCardId,
+    cardId: result.cardId,
     from: { zone: '处理区' },
     to: { zone: '弃牌堆' },
   });

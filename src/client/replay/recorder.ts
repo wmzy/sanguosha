@@ -10,7 +10,7 @@
 //   2. 为每座次计算私有 delta(viewer 手牌 + 身份可见性 + 事件流[去冗余 seq])
 // 这样录制逻辑零改动,去重归并集中在 finalize 一步。
 
-import type { GameView, ViewEvent } from '../../engine/types';
+import type { GameView, PendingView, ViewEvent } from '../../engine/types';
 import type {
   ReplayBaseline,
   ReplayEvent,
@@ -29,6 +29,7 @@ interface InternalSeat {
   seatIndex: number;
   playerName: string;
   initialView: GameView;
+  pending?: PendingView | null;
   events: Array<{ seq: number; time: number; event: ViewEvent }>;
 }
 
@@ -87,6 +88,7 @@ function extractDelta(rec: InternalSeat): SeatDelta {
     playerName: rec.playerName,
     privateHands,
     identityView,
+    pending: rec.pending,
     events,
   };
 }
@@ -106,7 +108,7 @@ export class ReplayRecorder {
    * @param view 该座次当前 GameView(用于首次捕获 initialView)
    * @param events 本次新事件
    */
-  record(seat: number, view: GameView | null, events: ViewEvent[], now: number = Date.now()): void {
+  record(seat: number, view: GameView | null, events: ViewEvent[], now: number = Date.now(), pending?: PendingView | null): void {
     // 首次产生「选将已完成」的 view 时才捕获 initialView。
     // 选将阶段(存在 character 为空的玩家)的 view 不捕获、事件也不记录——
     // 否则 initialView 会捕获于抽身份/选将询问阶段(所有 character 为空),
@@ -129,6 +131,7 @@ export class ReplayRecorder {
 
     const rec = this.seats.get(seat);
     if (!rec) return; // 座次未初始化(还没有 view),丢弃事件
+    if (pending !== undefined) rec.pending = pending === null ? null : JSON.parse(JSON.stringify(pending)) as PendingView;
 
     let seq = this.seqCounters.get(seat) ?? 0;
     for (const event of events) {

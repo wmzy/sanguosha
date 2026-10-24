@@ -1,13 +1,14 @@
 // 判定:从牌堆顶翻一张到结算帧牌区(亮出判定牌)。纯翻牌操作,无改判/消费/清理逻辑。
 // 改判(鬼才/鬼道)→ 判定牌生效前.afterApply(runJudgeModifiers);
 // 消费(天妒/洛神/屯田/闪电/乐不思蜀 等)→ 判定牌生效后 after-hook;
-// 清理(判定牌入弃牌堆 + 记 finalJudgeCardId)→ runJudgeFlow 末尾。
+// 清理(判定牌入弃牌堆)及结果回传 → runJudgeFlow 末尾。
 // 上述时机由 judge-flow.ts 的 runJudgeFlow 编排,本 atom 仅做翻牌。
 //
 // 前端展示:判定牌是公开信息,toViewEvents 携带 card+cardId。
 // applyView 与 apply 对称:deckCount -1 + 判定牌进 processing/帧牌区;
 // 判定牌离开处理区由后续 atom 投影(移动牌 / 收取判定牌),本 atom 不预支弃牌堆计数。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { bindJudgeCard } from '../flows/judge';
 
 export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
   type: '判定',
@@ -15,14 +16,15 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
     if (!state.players[atom.player]) return `player ${atom.player} not found`;
     return null;
   },
-  apply(state) {
+  apply(state, atom) {
     // 牌堆顶翻一张到栈顶结算帧的牌区(亮出判定牌)
     // 方向约定:牌堆顶 = deck 末尾(与 摸牌/置创牌/整理牌堆 一致,见 引擎架构.md)。
     if (state.zones.deck.length === 0) return;
     const topCardId = state.zones.deck.pop()!;
     const frame = state.settlementStack[state.settlementStack.length - 1];
-    if (frame) frame.cards.push(topCardId);
-    else state.zones.processing.push(topCardId);
+    const cards = frame ? frame.cards : state.zones.processing;
+    cards.push(topCardId);
+    bindJudgeCard(atom, topCardId, cards);
   },
   toViewEvents(state, atom): ViewEventSplit {
     // 判定牌是公开信息:所有玩家都能看到花色点数+牌名

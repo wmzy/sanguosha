@@ -71,9 +71,7 @@ async function onLightningCancelled(state: GameState, target: number, cardId: st
 /** 闪电的生效后效果：判定 → 命中则伤害+移除，否则传递下家 */
 async function resolveLightning(ctx: ResolveCtx): Promise<void> {
   const { state, target, cardId } = ctx;
-  await runJudgeFlow(state, target, TRICK_NAME);
-  const judgeCardId = state.localVars['判定/finalJudgeCardId'] as string | undefined;
-  delete state.localVars['判定/finalJudgeCardId'];
+  const judgeCardId = await runJudgeFlow(state, target, TRICK_NAME);
   const judgeCard = judgeCardId ? state.cardMap[judgeCardId] : undefined;
 
   // 保留原 trick 条目引用（实体卡）——传递时复用同一张卡，不丢失实体

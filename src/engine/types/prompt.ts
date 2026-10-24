@@ -53,6 +53,13 @@ export interface TargetFilter {
   min: number;
   max: number;
   filter?: (view: GameView, target: number) => boolean;
+  /** 权威的可序列化候选，优先于本地 filter；只包含公开座次。 */
+  candidates?: number[];
+  /** 每次使用必须包含的目标（例如借刀杀人指定的被杀角色）。 */
+  required?: number[];
+  /** 选中牌关联的权威约束；仅发送给能看到该牌的回应者。 */
+  candidatesByCard?: Record<string, number[]>;
+  maxByCard?: Record<string, number>;
   /** 是否允许以自己为目标（铁索连环：一至两名角色含自己）。
    *  无 filter 的目标选择默认排除自己；设此 flag 后前端/无头枚举将自己纳入可选目标。 */
   allowSelf?: boolean;
@@ -62,6 +69,7 @@ export interface TargetFilter {
    *  filter 仅为前端 UI 提示(高亮/禁用),不参与后端 validate。 */
   slots?: Array<{
     label: string;
+    candidates?: number[];
     filter?: (view: GameView, target: number, ctx: { selected: number[] }) => boolean;
   }>;
 }

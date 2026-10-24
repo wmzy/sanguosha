@@ -34,10 +34,8 @@ function canUseIndulgence(
 /** 乐不思蜀的生效后效果：判定 → 非♥加跳过标签 → 移除延时锦囊 */
 async function resolveIndulgence(ctx: ResolveCtx): Promise<void> {
   const { state, target } = ctx;
-  // 判定结算：翻牌堆顶 → 改判 → 判定牌进弃牌堆（最终判定牌 ID 记录在 localVars）
-  await runJudgeFlow(state, target, '乐不思蜀');
-  const judgeCardId = state.localVars['判定/finalJudgeCardId'] as string | undefined;
-  delete state.localVars['判定/finalJudgeCardId'];
+  // 判定结果属于本次调用,不受嵌套判定或天妒收牌影响。
+  const judgeCardId = await runJudgeFlow(state, target, '乐不思蜀');
   const judgeCard = judgeCardId ? state.cardMap[judgeCardId] : undefined;
   if (judgeCard && judgeCard.suit !== '♥') {
     // 非♥：加跳过出牌阶段标签

@@ -180,6 +180,8 @@ export type ServerMessage =
       timestamp: number;
       view?: ViewEvent;
       notify?: { skillId: string; eventType: string; data: Json };
+      /** Visible pending snapshot at this seq; omitted = unchanged, null = explicitly cleared. */
+      pending?: GameView['pending'];
       deadline?: DeadlineInfo | null;
     }
   | { type: 'error'; message: string }

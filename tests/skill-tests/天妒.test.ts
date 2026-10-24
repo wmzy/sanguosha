@@ -157,7 +157,7 @@ describe('天妒', () => {
   // ─── 回归:runJudgeFlow 返回值契约(判定牌被收走后仍须返回其 id) ─────────────
   // 场景:郭嘉(天妒)判定区有乐不思蜀 → 判定阶段 resumeDelayedSettlement 的独立帧
   // 只含判定牌(length===1)→ 天妒把判定牌收进手牌 → runJudgeFlow 收尾搬移为 no-op。
-  // 契约:返回值/localVars['判定/finalJudgeCardId'] 必须仍是该判定牌,
+  // 契约:返回值必须仍是该判定牌,
   // 否则 乐不思蜀/兵粮寸断/闪电 的 resolve 读到 undefined/旧值,判定结果错乱。
   it('天妒获得判定牌后,runJudgeFlow 仍返回最终判定牌 id', async () => {
     const judge = makeCard('j1', '杀', '♠', '5');

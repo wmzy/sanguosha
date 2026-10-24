@@ -11,6 +11,50 @@ import { defaultPlayActive } from '@engine/rules/action-active';
 import type { SkillActionDef } from '@/skillActionRegistry';
 import type { Card, DistributePrompt, GameView, Json, PendingView } from '@engine/types';
 
+describe('usePlayInteraction · 跨 JSON 目标约束', () => {
+  it('强制出杀只提交指定目标并支持牌关联多目标上限', () => {
+    const send = vi.fn();
+    const view = makePlayView();
+    view.players.push({ ...view.players[1], index: 2, name: 'P2' });
+    const pending: PendingView = {
+      type: 'awaits', target: 0, isBlocking: true,
+      atom: { type: '请求回应', requestType: '借刀杀人/出杀', target: 0 } as PendingView['atom'],
+      prompt: {
+        type: 'useCardAndTarget', title: '借刀杀人',
+        cardFilter: { candidates: [KILL_CARD.id], min: 1, max: 1 },
+        targetFilter: { min: 1, max: 3, candidates: [1, 2], required: [2], maxByCard: { [KILL_CARD.id]: 1 } },
+      },
+    };
+    const { result } = renderPlay(makePlayParams({
+      view, pending, perspectiveHand: [KILL_CARD], isPerspectiveAwaiting: true,
+      skillActions: [],
+      pendingRespondInfo: { skillId: '借刀杀人', cardFilter: (card) => card.name === '杀' }, send,
+    }));
+    act(() => result.current.handleCardClick(KILL_CARD));
+    act(() => result.current.handleTargetClick('P1'));
+    expect(result.current.respondTargetReady).toBe(false);
+    act(() => result.current.handlePlayRespond());
+    expect(send).not.toHaveBeenCalled();
+    act(() => result.current.handleTargetClick('P2'));
+    expect(result.current.respondTargetReady).toBe(true);
+    act(() => result.current.handlePlayRespond());
+    expect(send).toHaveBeenCalledWith('借刀杀人', 'respond', { cardId: KILL_CARD.id, targets: [2] });
+  });
+
+  it('完整有序槽位用 targets 数组提交且重新选择前槽清除后槽', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(makePlayParams({
+      view: makePlayView({ p1Weapon: 'weapon' }), skillActions: [borrowSwordAction()],
+      perspectiveHand: [BORROW_CARD], send,
+    }));
+    act(() => result.current.handleCardClick(BORROW_CARD));
+    act(() => result.current.handleTargetClick('P1'));
+    act(() => result.current.handleTargetClick('P0'));
+    act(() => result.current.handlePlayCard());
+    expect(send).toHaveBeenCalledWith('借刀杀人', 'use', { cardId: BORROW_CARD.id, targets: [1, 0] });
+  });
+});
+
 // ─── 测试夹具 ───
 
 /** 制衡 action(与 engine/skills/制衡.ts onMount 声明同源):
@@ -777,7 +821,7 @@ describe('usePlayInteraction · handlePlayCard(出牌参数构造)', () => {
     ]);
   });
 
-  it('借刀杀人(多槽位)选 A+B 后发送 {cardId, target, killTarget}', () => {
+  it('借刀杀人(多槽位)选 A+B 后发送 {cardId, targets:[A,B]}', () => {
     const send = vi.fn();
     const { result } = renderPlay(
       makePlayParams({
@@ -795,7 +839,7 @@ describe('usePlayInteraction · handlePlayCard(出牌参数构造)', () => {
       {
         skillId: '借刀杀人',
         actionType: 'use',
-        params: { cardId: 'c-borrow', target: 1, killTarget: 0 },
+        params: { cardId: 'c-borrow', targets: [1, 0] },
       },
     ]);
   });

@@ -20,8 +20,12 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
       state.zones.discardPile = state.zones.discardPile.filter((id) => id !== atom.cardId);
     } else if (atom.from.zone === '处理区') {
       const frame = state.settlementStack[state.settlementStack.length - 1];
-      if (frame) frame.cards = frame.cards.filter((id) => id !== atom.cardId);
-      else state.zones.processing = state.zones.processing.filter((id) => id !== atom.cardId);
+      // 就地 splice 而非重建数组:判定流程用 bindJudgeCard 持有牌区**引用**
+      // (取代旧的「await 后再读帧顶」的猜测),重建数组会让该引用失效——
+      // 改判(鬼道/鬼才)后收尾找不到最终判定牌,替换牌滞留在处理区/视图里。
+      const cards = frame ? frame.cards : state.zones.processing;
+      const index = cards.indexOf(atom.cardId);
+      if (index >= 0) cards.splice(index, 1);
     }
 
     // to

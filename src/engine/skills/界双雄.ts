@@ -263,54 +263,50 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // ── transform action:把一张与弃置牌颜色不同的手牌转化为影子"决斗" ──
   // 作为 preceding 在 决斗.use 之前执行。决斗.use validate 读 cardMap[影子id] 看到"决斗"通过。
   // 决斗技能零感知双雄——它看到的永远是 cardMap 里的一张"决斗"。
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (s: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活
-      const myTurn = s.currentPlayerIndex === ownerId;
-      const inActPhase = s.phase === '出牌';
-      const free = !hasBlockingPending(s);
-      const self = s.players[ownerId];
-      const selfAlive = self.alive === true;
-      // 本回合必须已发动过双雄(弃置牌颜色已记)
-      const discardColor = s.turn.vars[COLOR_KEY] as string | undefined;
-      const colorSet = typeof discardColor === 'string' && discardColor !== '';
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const card = cardIdOk ? s.cardMap[cardId] : undefined;
-      const cardExists = !!card;
-      // 核心:手牌颜色与弃置牌颜色不同(红 vs 黑)
-      const colorDiff = !!card && !!discardColor && card.color !== discardColor;
-      const ok =
-        myTurn && inActPhase && free && selfAlive && colorSet && cardInHand && cardExists && colorDiff;
-      return ok ? null : '双雄:需要一张与本回合弃置牌颜色不同的手牌';
-    },
-    async (s: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      // 通过「当作」atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(s, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '决斗',
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-    (s: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const sId = shadowIdOf(cardId);
-      delete s.cardMap[sId];
-      const self = s.players[ownerId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) self.hand[idx] = cardId;
-    },
-  );
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (s: GameState, params: Record<string, Json>) => {
+    // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活
+    const myTurn = s.currentPlayerIndex === ownerId;
+    const inActPhase = s.phase === '出牌';
+    const free = !hasBlockingPending(s);
+    const self = s.players[ownerId];
+    const selfAlive = self.alive === true;
+    // 本回合必须已发动过双雄(弃置牌颜色已记)
+    const discardColor = s.turn.vars[COLOR_KEY] as string | undefined;
+    const colorSet = typeof discardColor === 'string' && discardColor !== '';
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const card = cardIdOk ? s.cardMap[cardId] : undefined;
+    const cardExists = !!card;
+    // 核心:手牌颜色与弃置牌颜色不同(红 vs 黑)
+    const colorDiff = !!card && !!discardColor && card.color !== discardColor;
+    const ok =
+      myTurn && inActPhase && free && selfAlive && colorSet && cardInHand && cardExists && colorDiff;
+    return ok ? null : '双雄:需要一张与本回合弃置牌颜色不同的手牌';
+  },
+  async (s: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    // 通过「当作」atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+    await applyAtom(s, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '决斗',
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
+  (s: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const sId = shadowIdOf(cardId);
+    delete s.cardMap[sId];
+    const self = s.players[ownerId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) self.hand[idx] = cardId;
+  },);
 
   return () => {};
 }

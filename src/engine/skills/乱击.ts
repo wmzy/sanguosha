@@ -42,59 +42,55 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // transform action:把 2 张同花色手牌转化为影子"万箭齐发"(新建 Card 实体,shadowOf 留空)。
   // 作为 preceding 在 万箭齐发.use 之前执行。万箭齐发.validate 读 cardMap[影子id] 看到"万箭齐发"。
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活
+    const myTurn = state.currentPlayerIndex === ownerId;
+    const inActPhase = state.phase === '出牌';
+    const free = !hasBlockingPending(state);
+    const self = state.players[ownerId];
+    const selfAlive = self.alive === true;
+    const cardIds = params.cardIds;
+    if (!Array.isArray(cardIds) || cardIds.length !== 2) return '需要选择 2 张手牌';
+    const [id1, id2] = cardIds as string[];
+    if (typeof id1 !== 'string' || typeof id2 !== 'string') return 'cardIds 必须为字符串';
+    if (id1 === id2) return '不能选择同一张牌';
+    const cardInHand = !!self && self.hand.includes(id1) && self.hand.includes(id2);
+    const c1 = state.cardMap[id1];
+    const c2 = state.cardMap[id2];
+    const cardsExist = !!c1 && !!c2;
+    // 乱击核心条件:两张牌花色相同(同花色)
+    const sameSuit = !!c1 && !!c2 && c1.suit !== '' && c1.suit === c2.suit;
+    const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardsExist && sameSuit;
+    return ok ? null : '乱击需要两张同花色的手牌';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardIds = params.cardIds as string[];
+    const [id1, id2] = cardIds;
+    const shadowId = shadowIdOf(id1, id2);
+    // 通过「当作」atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds,
+      shadowId,
+      outputName: '万箭齐发',
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子 + 还原两张原卡到手牌)
+  (state: GameState, params: Record<string, Json>) => {
+    const cardIds = params.cardIds;
+    const [id1, id2] = Array.isArray(cardIds) ? (cardIds as string[]) : [];
+    const sId = id1 && id2 ? shadowIdOf(id1, id2) : undefined;
+    if (sId) {
+      delete state.cardMap[sId];
       const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
-      const cardIds = params.cardIds;
-      if (!Array.isArray(cardIds) || cardIds.length !== 2) return '需要选择 2 张手牌';
-      const [id1, id2] = cardIds as string[];
-      if (typeof id1 !== 'string' || typeof id2 !== 'string') return 'cardIds 必须为字符串';
-      if (id1 === id2) return '不能选择同一张牌';
-      const cardInHand = !!self && self.hand.includes(id1) && self.hand.includes(id2);
-      const c1 = state.cardMap[id1];
-      const c2 = state.cardMap[id2];
-      const cardsExist = !!c1 && !!c2;
-      // 乱击核心条件:两张牌花色相同(同花色)
-      const sameSuit = !!c1 && !!c2 && c1.suit !== '' && c1.suit === c2.suit;
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && cardsExist && sameSuit;
-      return ok ? null : '乱击需要两张同花色的手牌';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardIds = params.cardIds as string[];
-      const [id1, id2] = cardIds;
-      const shadowId = shadowIdOf(id1, id2);
-      // 通过「当作」atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds,
-        shadowId,
-        outputName: '万箭齐发',
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子 + 还原两张原卡到手牌)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardIds = params.cardIds;
-      const [id1, id2] = Array.isArray(cardIds) ? (cardIds as string[]) : [];
-      const sId = id1 && id2 ? shadowIdOf(id1, id2) : undefined;
-      if (sId) {
-        delete state.cardMap[sId];
-        const self = state.players[ownerId];
-        const idx = self.hand.indexOf(sId);
-        if (idx >= 0) self.hand.splice(idx, 1);
-        self.hand.push(id1, id2);
-      }
-    },
-  );
+      const idx = self.hand.indexOf(sId);
+      if (idx >= 0) self.hand.splice(idx, 1);
+      self.hand.push(id1, id2);
+    }
+  },);
   return () => {};
 }
 

@@ -94,159 +94,151 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── A. 父魂 转化(主动 preceding) ──
-  const unregTransform = registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
-      const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
-      const cardIds = params.cardIds;
-      if (!Array.isArray(cardIds) || cardIds.length !== 2) return '需要选择 2 张牌';
-      const [id1, id2] = cardIds as string[];
-      if (typeof id1 !== 'string' || typeof id2 !== 'string') return 'cardIds 必须为字符串';
-      if (id1 === id2) return '不能选择同一张牌';
-      const cardsOwned = !!self && cardInOwnZone(self, id1) && cardInOwnZone(self, id2);
-      const c1 = state.cardMap[id1];
-      const c2 = state.cardMap[id2];
-      const cardsExist = !!c1 && !!c2;
-      // 时机由两条路径之一满足:
-      //   1. 出杀路径(自己回合 + 出牌阶段 + 无阻塞 pending):preceding 在 杀.use 前
-      //   2. 回应路径(被询问杀:南蛮入侵/决斗):preceding 在 杀.respond 前
-      const slot = state.pendingSlots.get(ownerId);
-      const atomType = (slot?.atom as { type?: string })?.type;
-      const reqType = (slot?.atom as { requestType?: string })?.requestType;
-      const atomTarget = (slot?.atom as { target?: number })?.target;
-      const askedKill =
-        !!slot &&
-        atomTarget === ownerId &&
-        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
-      const contextOk = (myTurn && inActPhase && free) || askedKill;
-      const ok = contextOk && selfAlive && cardsOwned && cardsExist;
-      return ok ? null : '父魂转化条件不满足';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardIds = params.cardIds as string[];
-      const [id1, id2] = cardIds;
-      const self = state.players[ownerId];
-      // 装备区牌:先卸下到手牌(当作要求牌在手牌)。记录原槽位供 rollback。
-      // 同 界武圣.ts / 奇袭.ts 的装备转化模式。
-      const equipsToUnequip: Array<{ slot: EquipSlot; cardId: string }> = [];
-      for (const cid of cardIds) {
-        const entry = Object.entries(self.equipment).find(([, id]) => id === cid);
-        if (entry) equipsToUnequip.push({ slot: entry[0] as EquipSlot, cardId: cid });
+  const unregTransform = registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    const myTurn = state.currentPlayerIndex === ownerId;
+    const inActPhase = state.phase === '出牌';
+    const free = !hasBlockingPending(state);
+    const self = state.players[ownerId];
+    const selfAlive = self.alive === true;
+    const cardIds = params.cardIds;
+    if (!Array.isArray(cardIds) || cardIds.length !== 2) return '需要选择 2 张牌';
+    const [id1, id2] = cardIds as string[];
+    if (typeof id1 !== 'string' || typeof id2 !== 'string') return 'cardIds 必须为字符串';
+    if (id1 === id2) return '不能选择同一张牌';
+    const cardsOwned = !!self && cardInOwnZone(self, id1) && cardInOwnZone(self, id2);
+    const c1 = state.cardMap[id1];
+    const c2 = state.cardMap[id2];
+    const cardsExist = !!c1 && !!c2;
+    // 时机由两条路径之一满足:
+    //   1. 出杀路径(自己回合 + 出牌阶段 + 无阻塞 pending):preceding 在 杀.use 前
+    //   2. 回应路径(被询问杀:南蛮入侵/决斗):preceding 在 杀.respond 前
+    const slot = state.pendingSlots.get(ownerId);
+    const atomType = (slot?.atom as { type?: string })?.type;
+    const reqType = (slot?.atom as { requestType?: string })?.requestType;
+    const atomTarget = (slot?.atom as { target?: number })?.target;
+    const askedKill =
+      !!slot &&
+      atomTarget === ownerId &&
+      (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+    const contextOk = (myTurn && inActPhase && free) || askedKill;
+    const ok = contextOk && selfAlive && cardsOwned && cardsExist;
+    return ok ? null : '父魂转化条件不满足';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardIds = params.cardIds as string[];
+    const [id1, id2] = cardIds;
+    const self = state.players[ownerId];
+    // 装备区牌:先卸下到手牌(当作要求牌在手牌)。记录原槽位供 rollback。
+    // 同 界武圣.ts / 奇袭.ts 的装备转化模式。
+    const equipsToUnequip: Array<{ slot: EquipSlot; cardId: string }> = [];
+    for (const cid of cardIds) {
+      const entry = Object.entries(self.equipment).find(([, id]) => id === cid);
+      if (entry) equipsToUnequip.push({ slot: entry[0] as EquipSlot, cardId: cid });
+    }
+    if (equipsToUnequip.length > 0) {
+      params['_unequipped'] = equipsToUnequip;
+      for (const { slot } of equipsToUnequip) {
+        await applyAtom(state, { type: '卸下', player: ownerId, slot });
       }
-      if (equipsToUnequip.length > 0) {
-        params['_unequipped'] = equipsToUnequip;
-        for (const { slot } of equipsToUnequip) {
-          await applyAtom(state, { type: '卸下', player: ownerId, slot });
+    }
+    const shadowId = shadowIdOf(id1, id2);
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds,
+      shadowId,
+      outputName: '杀',
+    });
+  },
+  // rollback:主 action validate 失败时撤销转化(删影子 + 还原牌)
+  (state: GameState, params: Record<string, Json>) => {
+    const cardIds = params.cardIds;
+    const [id1, id2] = Array.isArray(cardIds) ? (cardIds as string[]) : [];
+    const sId = id1 && id2 ? shadowIdOf(id1, id2) : undefined;
+    if (!sId) return;
+    delete state.cardMap[sId];
+    const self = state.players[ownerId];
+    // 影子从手牌移除
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) self.hand.splice(idx, 1);
+    // 还原:装备区牌回装备槽;手牌回手牌
+    const unequipped = params['_unequipped'] as
+      | Array<{ slot: EquipSlot; cardId: string }>
+      | undefined;
+    if (unequipped) {
+      for (const { slot, cardId } of unequipped) {
+        // 若已被其他流程占用槽位,退回手牌兜底
+        if (self.equipment[slot] === undefined) {
+          self.equipment[slot] = cardId;
+          // 卸下武器时清除了 vars[DISTANCE_ATTACK_RANGE_KEY](由 卸下 atom 设值,不会重算),
+          // 回滚必须还原,否则武器已归位但攻击范围退化为徒手(1)。镜像 界武圣 回滚。
+        if (slot === '武器') {
+          const card = state.cardMap[cardId];
+          self.vars[DISTANCE_ATTACK_RANGE_KEY] = card?.range ?? 1;
+        }
+        } else {
+          self.hand.push(cardId);
         }
       }
-      const shadowId = shadowIdOf(id1, id2);
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds,
-        shadowId,
-        outputName: '杀',
-      });
-    },
-    // rollback:主 action validate 失败时撤销转化(删影子 + 还原牌)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardIds = params.cardIds;
-      const [id1, id2] = Array.isArray(cardIds) ? (cardIds as string[]) : [];
-      const sId = id1 && id2 ? shadowIdOf(id1, id2) : undefined;
-      if (!sId) return;
-      delete state.cardMap[sId];
-      const self = state.players[ownerId];
-      // 影子从手牌移除
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) self.hand.splice(idx, 1);
-      // 还原:装备区牌回装备槽;手牌回手牌
-      const unequipped = params['_unequipped'] as
-        | Array<{ slot: EquipSlot; cardId: string }>
-        | undefined;
-      if (unequipped) {
-        for (const { slot, cardId } of unequipped) {
-          // 若已被其他流程占用槽位,退回手牌兜底
-          if (self.equipment[slot] === undefined) {
-            self.equipment[slot] = cardId;
-            // 卸下武器时清除了 vars[DISTANCE_ATTACK_RANGE_KEY](由 卸下 atom 设值,不会重算),
-            // 回滚必须还原,否则武器已归位但攻击范围退化为徒手(1)。镜像 界武圣 回滚。
-          if (slot === '武器') {
-            const card = state.cardMap[cardId];
-            self.vars[DISTANCE_ATTACK_RANGE_KEY] = card?.range ?? 1;
-          }
-          } else {
-            self.hand.push(cardId);
-          }
-        }
+    }
+    // 手牌原卡还原(当作把手牌过滤掉了)
+    for (const cid of cardIds as string[]) {
+      if (!self.hand.includes(cid) && !unequipped?.some((u) => u.cardId === cid)) {
+        self.hand.push(cid);
       }
-      // 手牌原卡还原(当作把手牌过滤掉了)
-      for (const cid of cardIds as string[]) {
-        if (!self.hand.includes(cid) && !unequipped?.some((u) => u.cardId === cid)) {
-          self.hand.push(cid);
-        }
-      }
-    },
-  );
+    }
+  },);
 
   // ── B'. granted 武圣 转化(主动 preceding,granted 时生效) ──
   // 标准"武圣":将一张红色手牌当【杀】使用或打出。
-  const unregWusheng = registerAction(
-    state,
-    skill.id,
-    ownerId,
-    '武圣transform',
-    (state: GameState, params: Record<string, Json>) => {
-      if (!isGranted(state, ownerId)) return '本回合未获得武圣';
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
-      const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const isRed = !!card && card.color === '红';
-      // 时机:出杀路径(自己回合 + 出牌阶段 + 无阻塞)或回应路径(决斗中被询问杀)
-      const slot = state.pendingSlots.get(ownerId);
-      const atomType = (slot?.atom as { type?: string })?.type;
-      const reqType = (slot?.atom as { requestType?: string })?.requestType;
-      const atomTarget = (slot?.atom as { target?: number })?.target;
-      const askedKill =
-        !!slot &&
-        atomTarget === ownerId &&
-        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
-      const contextOk = (myTurn && inActPhase && free) || askedKill;
-      const ok = contextOk && selfAlive && cardInHand && isRed;
-      return ok ? null : '现在不能使用武圣';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = grantedShadowIdOf(cardId);
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '杀',
-      });
-    },
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const sId = grantedShadowIdOf(cardId);
-      delete state.cardMap[sId];
-      const self = state.players[ownerId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) self.hand[idx] = cardId;
-    },
-  );
+  const unregWusheng = registerAction(state,
+  skill.id,
+  ownerId, '武圣transform', (state: GameState, params: Record<string, Json>) => {
+    if (!isGranted(state, ownerId)) return '本回合未获得武圣';
+    const myTurn = state.currentPlayerIndex === ownerId;
+    const inActPhase = state.phase === '出牌';
+    const free = !hasBlockingPending(state);
+    const self = state.players[ownerId];
+    const selfAlive = self.alive === true;
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const isRed = !!card && card.color === '红';
+    // 时机:出杀路径(自己回合 + 出牌阶段 + 无阻塞)或回应路径(决斗中被询问杀)
+    const slot = state.pendingSlots.get(ownerId);
+    const atomType = (slot?.atom as { type?: string })?.type;
+    const reqType = (slot?.atom as { requestType?: string })?.requestType;
+    const atomTarget = (slot?.atom as { target?: number })?.target;
+    const askedKill =
+      !!slot &&
+      atomTarget === ownerId &&
+      (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+    const contextOk = (myTurn && inActPhase && free) || askedKill;
+    const ok = contextOk && selfAlive && cardInHand && isRed;
+    return ok ? null : '现在不能使用武圣';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = grantedShadowIdOf(cardId);
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '杀',
+    });
+  },
+  (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const sId = grantedShadowIdOf(cardId);
+    delete state.cardMap[sId];
+    const self = state.players[ownerId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) self.hand[idx] = cardId;
+  },);
 
   // ── C. granted 咆哮:无限出杀提供者读 turn.vars,granted 时 true → slashMax=∞ ──
   const unregMax = registerSlashUnlimitedProvider(state, ownerId, (s, p) =>

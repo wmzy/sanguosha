@@ -24,14 +24,12 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply'
-import { frameCards } from '../core/frame';
-import { runJudgeFlow } from '../flows/judge';
+import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 
 const DISCARD_RT = '悲歌/discard';
 const DISCARD_CARD_KEY = '悲歌/discardCard';
-const JUDGE_SUIT_KEY = '悲歌/judgeSuit';
 const SKIP_TAG = '悲歌/翻面';
 const SKIP_FLAG = '悲歌/skipAll';
 
@@ -72,12 +70,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.judgeType !== '悲歌') return;
-    const processing = frameCards(ctx.state);
-    if (processing.length === 0) return;
-    const judgeCardId = processing[processing.length - 1];
-    const judgeCard = ctx.state.cardMap[judgeCardId];
+    const judgeCardId = currentJudgeCardId(ctx.state);
+    const judgeCard = judgeCardId ? ctx.state.cardMap[judgeCardId] : undefined;
     if (!judgeCard) return;
-    ctx.state.localVars[JUDGE_SUIT_KEY] = judgeCard.suit;
   });
 
   // ── 造成伤害 after hook:悲歌主逻辑 ──
@@ -121,10 +116,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 判定(受伤角色);牌堆空则无法判定,悲歌效果不触发
     if (ctx.state.zones.deck.length === 0) return;
-    delete ctx.state.localVars[JUDGE_SUIT_KEY];
-    await runJudgeFlow(ctx.state, targetIdx, '悲歌');
-    const suit = ctx.state.localVars[JUDGE_SUIT_KEY] as string | undefined;
-    delete ctx.state.localVars[JUDGE_SUIT_KEY];
+    const judgeCardId = await runJudgeFlow(ctx.state, targetIdx, '悲歌');
+    const suit = judgeCardId ? ctx.state.cardMap[judgeCardId]?.suit : undefined;
     if (suit === undefined) return;
 
     const sourceIdx = atom.source;

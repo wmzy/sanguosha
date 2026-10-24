@@ -2,6 +2,7 @@
 // 被 apply.ts(applyAtom 管线)和 core/index.ts(dispatch)共用。
 import type { Atom, ClientMessage, GameState, NotifyEvent, PendingSlot } from '../types';
 import { TARGET_SYSTEM } from '../types';
+import { publishPendingChanges } from '../view/pending';
 
 /**
  * system 命名空间占位座次。引擎只认座次下标,玩家真实 ID 由 session 层映射。
@@ -23,6 +24,7 @@ export function extractPendingTarget(atom: Atom): number {
 /** 通知 session:state 已变更(每次 applyAtom 结束后触发)。 */
 export function notifyStateChange(state: GameState): void {
   if (state.viewBuffering) return; // preceding 缓冲期:吞掉广播,由 dispatch 统一 flush
+  publishPendingChanges(state);
   state.onStateChange?.();
 }
 

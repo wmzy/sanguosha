@@ -16,6 +16,7 @@ import type {
 import { getCardEffect } from '../../engine/skills/cards';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { defaultPlayActive } from '../../engine/rules/action-active';
+import { validateTargetSelection } from '../../engine/rules/target-selection';
 
 // ─── use action 查找(filter-based) ───
 // 设计原则:action 声明即真相——技能 onMount 调 defineAction('use') 时通过
@@ -137,7 +138,7 @@ export function derivePlayRules(
   selfTarget?: boolean,
 ): PlayRules {
   const slots = targetFilter?.slots;
-  const hasSlots = !!slots && slots.length > 1;
+  const hasSlots = !!slots?.length;
   const slotCount = slots?.length ?? 0;
   const isSelf = !!selfTarget;
   const needsTarget = isSelf ? false : hasSlots || (targetFilter ? targetFilter.max >= 1 : false);
@@ -156,7 +157,7 @@ export function derivePlayRules(
 
 /**
  * 构造出牌 action 的 params。
- * 由出牌规则(PlayRules,从 use action prompt 派生)决定 target/targets/killTarget 字段。
+ * 由出牌规则(PlayRules,从 prompt 派生)决定 target/targets 字段；有序槽位统一 targets=[A,B]。
  * @param players            全部玩家(nameToIndex 用)
  * @param perspectiveIdx     当前视角座次(取自己 name)
  * @param card               要出的牌
@@ -174,15 +175,18 @@ export function buildPlayParams(
   selectedKillTarget: string | null,
   /** 多目标(铁索连环等)已选目标 name 集合;单/槽位路径忽略 */
   selectedMultiTargets: string[] = [],
+  view?: GameView,
 ): Record<string, Json> | null {
+  const chosen = rules.hasSlots
+    ? selectedMultiTargets.length ? selectedMultiTargets : [selectedTarget, selectedKillTarget].filter((name): name is string => name !== null)
+    : rules.multiTarget ? selectedMultiTargets : selectedTarget ? [selectedTarget] : [];
+  const indices = chosen.map((name) => players.findIndex((player) => player.name === name));
+  if (rules.targetFilter && !rules.selfTarget && view &&
+    !validateTargetSelection(view, perspectiveIdx, rules.targetFilter, indices, card)) return null;
   const selfName = players[perspectiveIdx]?.name ?? '';
   if (rules.hasSlots) {
-    // 借刀杀人:需 A + B 两个目标
-    if (!selectedTarget || !selectedKillTarget) return null;
-    const aIdx = players.findIndex((p) => p.name === selectedTarget);
-    const bIdx = players.findIndex((p) => p.name === selectedKillTarget);
-    if (aIdx < 0 || bIdx < 0) return null;
-    return { cardId: card.id, target: aIdx, killTarget: bIdx };
+    if (indices.length !== rules.slotCount || indices.some((index) => index < 0)) return null;
+    return { cardId: card.id, targets: indices };
   }
   if (rules.selfTarget) {
     // 桃/酒:自动以自己为目标

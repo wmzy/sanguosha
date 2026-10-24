@@ -114,7 +114,8 @@ describe('借刀杀人', () => {
   // ────────────────────────────────────────────────────────────
   it('P1 对 P2(有武器)借刀杀人,killTarget=P3 → expectPending(请求回应)无懈 → pass → expectPending(请求回应)借刀杀人/出杀 → P2 pass → P1 获得武器', async () => {
     const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
-    const p2shan = makeCard('p2s', '闪', '♥', '4', '基本牌');
+    // A 手里必须真有【杀】:借刀杀人/出杀 窗口只把 A 手牌的杀列为候选(maxByCard 按牌算)。
+    const p2shan = makeCard('p2s', '杀', '♥', '4', '基本牌');
     const state = buildState({
       p2Hand: ['p2s'],
       p2Equipment: { 武器: 'wp1' },
@@ -127,8 +128,6 @@ describe('借刀杀人', () => {
 
     await P1.triggerAction('借刀杀人', 'use', { cardId: 'jd1', target: 1, killTarget: 2 });
 
-    // 窗口 1:无懈可击(broadcast)
-    P1.expectPending('请求回应');
     const info1 = P2.respondInfo();
     expect(info1?.skillId).toBe('无懈可击');
     expect(info1?.cardFilter).toBeDefined();
@@ -143,8 +142,15 @@ describe('借刀杀人', () => {
     expect(info2?.skillId).toBe('借刀杀人');
     // 直接从 slot.atom 拿 prompt.cardFilter 验证“仅接受 杀”委托关系
     const slot2 = harness.state.pendingSlots.get(1)!;
-    const prompt2 = (slot2.atom as { prompt: { cardFilter?: { filter?: (c: Card) => boolean } } })
-      .prompt;
+    const promptAtom = slot2.atom as unknown as { prompt: {
+      targetFilter: { required?: number[]; candidatesByCard?: Record<string, number[]>; maxByCard?: Record<string, number> };
+      cardFilter?: { filter?: (c: Card) => boolean };
+    } };
+    expect(promptAtom.prompt.targetFilter.required).toEqual([2]);
+    expect(promptAtom.prompt.targetFilter.candidatesByCard).toBeDefined();
+    expect(promptAtom.prompt.targetFilter.maxByCard?.p2s).toBe(1);
+    const prompt2 = promptAtom.prompt;
+
     expect(prompt2.cardFilter?.filter?.(makeCard('x', '杀', '♠', 'A', '基本牌'))).toBe(true);
     expect(prompt2.cardFilter?.filter?.(makeCard('y', '闪', '♥', '5', '基本牌'))).toBe(false);
 
@@ -714,7 +720,17 @@ describe('借刀杀人', () => {
     expect(harness.state.zones.processing).toEqual([]);
   });
 
-  // ─── 回归:f7536790 把借刀杀人从 DEFAULT_SKILLS 移除后,真实选将路径
+  it('canonical targets=[借刀目标,杀目标] is accepted', async () => {
+    const weapon = makeCard('wp1', '诸葛连弩', '♣', '1', '装备牌');
+    const state = buildState({ p2Equipment: { 武器: 'wp1' }, extraCards: { wp1: weapon } });
+    await harness.setup(state);
+    await harness.player('P1').expectAccepted({
+      skillId: '借刀杀人', actionType: 'use',
+      params: { cardId: 'jd1', targets: [1, 2] },
+    });
+  });
+
+
   //     (skills=DEFAULT_SKILLS,不手动注入 '借刀杀人') 不再实例化借刀杀人技能 →
   //     「借刀杀人/出杀」respond action 未注册 → 被借刀者无法回应。
   //     此用例不手动注入,仅靠 DEFAULT_SKILLS。

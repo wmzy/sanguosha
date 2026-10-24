@@ -21,6 +21,7 @@ import {
   extractPendingTarget,
 } from './notify';
 import { topFrame, emptyFrame } from './frame';
+import { beginRun, createSlotGroup, type SlotGroup } from './run-tracker';
 
 // 非锁定技失效扩展点(skill-suppression.ts)提供,引擎核心不感知具体技能/标签。
 // 提供者由各技能自行注册(义绝/界铁骑/界完杀 等),predicate 内部读自己的 tag/vars。
@@ -109,6 +110,14 @@ export async function runJudgeModifiers(state: GameState): Promise<void> {
  */
 export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> {
   state.atomStack.push(atom);
+  let stackClosed = false;
+  const closeStack = () => {
+    if (stackClosed) return;
+    stackClosed = true;
+    const index = state.atomStack.lastIndexOf(atom);
+    if (index >= 0) state.atomStack.splice(index, 1);
+  };
+  try {
 
   // before 阶段:折叠(folding)语义。hooks 按多角色结算顺序(逆时针,系统级排最后)依次跑,
   // 每个 hook 可 pass/modify/cancel。modify 叠加(藤甲-1 后白银狮子看到减过的值);
@@ -138,8 +147,8 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
     } // 后续 hook + validate + apply 用新值
   }
 
-  if (cancelled) {
-    state.atomStack.pop();
+    if (cancelled) {
+    closeStack();
     // cancel 非静默:推 notify 事件让前端感知(技能可据此显示"伤害被取消"/"目标无效")
     pushNotify(state, { skillId: '', eventType: 'atomCancelled', data: { atomType: atom.type } });
     notifyStateChange(state);
@@ -149,7 +158,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
   const def = getAtomDef(current.type);
   const error = def.validate(state, current);
   if (error !== null) {
-    state.atomStack.pop();
+    closeStack();
     throw new Error(`applyAtom validate 失败: ${current.type} → ${error}`);
   }
 
@@ -203,15 +212,19 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
       notifyStateChange(state);
     } else {
       const slotPromises: Promise<void>[] = [];
+      // 并行 slot 共用一个挂起组:全部创建后当前执行链转入 suspended,
+      // 最后一个 slot resolve 时同步恢复 active(见 run-tracker.ts)。
+      const group = createSlotGroup(state, slotAtoms.length);
       for (let i = 0; i < slotAtoms.length; i++) {
         const slotAtom = slotAtoms[i];
         const slotTarget = targets[i];
         // 每个 slot 用自己 atom type 对应的 def(并行选将→选将询问)
         const slotDef = slotAtom.type !== current.type ? getAtomDef(slotAtom.type) : def;
         slotPromises.push(
-          createAndAwaitSlot(state, slotAtom, slotDef, slotTarget, silentDelayMs),
+          createAndAwaitSlot(state, slotAtom, slotDef, slotTarget, group, silentDelayMs),
         );
       }
+      group.suspend();
       await Promise.all(slotPromises);
     }
 
@@ -224,7 +237,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
       def.afterHooks(state, current);
     }
 
-    state.atomStack.pop();
+    closeStack();
     // 正常完成路径(等待型 atom):受 state.assertInvariants 开关保护,护栏牌重复 bug。
     // cancel/validate 失败路径不检查(状态已回滚)。
     if (state.assertInvariants) assertCardInvariants(state);
@@ -248,11 +261,13 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
     def.afterHooks(state, current);
   }
 
-  state.atomStack.pop();
-  // 正常完成路径(非等待型 atom):受 state.assertInvariants 开关保护,护栏牌重复 bug。
-  // cancel/validate 失败路径不检查(状态已回滚)。
+  closeStack();
+  // 正常完成路径(非等待型 atom):受 state.assertInvariants 开关保护,护栏「同一张牌出现在多个区」的重复 bug。
   if (state.assertInvariants) assertCardInvariants(state);
   return true;
+  } finally {
+    closeStack();
+  }
 }
 
 /** 为单个 target 创建 PendingSlot 并 await 到它 resolve。
@@ -263,6 +278,7 @@ function createAndAwaitSlot(
   atom: Atom,
   def: AtomDefinition,
   target: number,
+  group: SlotGroup,
   silentDelayMs?: number,
 ): Promise<void> {
   return new Promise<void>((resolve) => {
@@ -283,6 +299,9 @@ function createAndAwaitSlot(
       if (resolveCalled) return;
       resolveCalled = true;
       cancelTimer();
+      // 先同步恢复挂起链的 active 计数,再让 promise 续体入队:
+      // 回应 execute 结束(-1)与父 execute 恢复(+1)之间 active 不会假归零。
+      group.slotResolved();
       resolve();
     };
     const slot: PendingSlot = {
@@ -322,6 +341,9 @@ function createAndAwaitSlot(
       if (paused || claimed || timedOut || resolveCalled) return;
       timedOut = true;
       cancelTimer();
+      // 超时编排本身是一个 run:onTimeout 里的 applyAtom 可能再挂新 slot,
+      // 在 safeResolve 恢复父链之后才结束,期间 active 不归零。
+      const endRun = beginRun(state);
       try {
         // 超时行为:调用 atom 定义的 onTimeout 编排函数。
         // 内部可自由编排 applyAtom(支持多步操作),每个 applyAtom 走完整 pipeline(hooks 正常触发)。
@@ -339,6 +361,7 @@ function createAndAwaitSlot(
         }
         if (deleted) notifyPendingResolved(state, slot);
         safeResolve();
+        endRun();
       }
     };
     slot._fireTimeoutNow = fireTimeoutNow;
@@ -347,8 +370,5 @@ function createAndAwaitSlot(
     // 存入 pendingSlots Map(按 target 索引)。不同 target 的 slot 共存,各自独立 resolve。
     state.pendingSlots.set(target, slot);
     notifyStateChange(state);
-    // 通知所有并发 dispatch:execute 已到达挂起点(slot 创建)。
-    // 每个 dispatch 都拥有独立 listener，避免后来的请求覆盖前一个 settle。
-    for (const listener of state.onExecuteSettleListeners ?? []) listener(slot);
   });
 }

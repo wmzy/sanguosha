@@ -36,87 +36,83 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // transform action:把红色牌(手牌或装备区)转化为影子"杀"(新建 Card 实体,shadowOf 指向原卡)。
   // 作为 preceding 在 杀.use 之前执行。杀.validate 读 cardMap[影子id] 看到"杀"。
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:存活 + 红牌(手牌或装备区)。时机由两条路径之一满足:
-      //   1. 出杀路径(自己回合 + 无阻塞 pending):preceding 在 杀.use 前
-      //   2. 回应路径(被询问杀:南蛮入侵/决斗):preceding 在 杀.respond 前
-      const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      // 界关羽武圣:红色牌包括手牌和装备区
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const cardInEquip = cardIdOk && Object.values(self.equipment).some((id) => id === cardId);
-      const isRed = !!card && card.color === '红';
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const free = !hasBlockingPending(state);
-      const slot = state.pendingSlots.get(ownerId);
-      const atomType = (slot?.atom as { type?: string })?.type;
-      const reqType = (slot?.atom as { requestType?: string })?.requestType;
-      const atomTarget = (slot?.atom as { target?: number })?.target;
-      // 与 杀.respond 的 pending 判定同构:询问杀 或 请求回应(杀/respondKill,激将/挑衅)
-      const askedKill =
-        !!slot &&
-        atomTarget === ownerId &&
-        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
-      const contextOk = (myTurn && free) || askedKill;
-      const ok = selfAlive && (cardInHand || cardInEquip) && isRed && contextOk;
-      return ok ? null : '现在不能使用武圣';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      const self = state.players[ownerId];
-      // 装备区的红色牌:先卸下到手牌(产生 ViewEvent,清除武器距离 vars),
-      // 再走「当作」(当作要求牌在手牌)。镜像奇袭.ts 的装备转化模式。
-      const equipSlotEntry = Object.entries(self.equipment).find(([, id]) => id === cardId);
-      if (equipSlotEntry) {
-        const slot = equipSlotEntry[0] as EquipSlot;
-        params['_origSlot'] = slot;
-        await applyAtom(state, { type: '卸下', player: ownerId, slot });
-      }
-      // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '杀',
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子,牌还原)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const sId = shadowIdOf(cardId);
-      const self = state.players[ownerId];
-      const origSlot = params['_origSlot'] as EquipSlot | undefined;
-      // 删除影子卡
-      delete state.cardMap[sId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) {
-        if (origSlot) {
-          // 原是装备牌:从手牌移除影子,还原装备槽位
-          self.hand.splice(idx, 1);
-          self.equipment[origSlot] = cardId;
-          // 卸下武器时清除了 vars[DISTANCE_ATTACK_RANGE_KEY](该 var 仅由 装备 atom 在装备时设值,不会重算),
-          // 回滚必须还原,否则武器已归位但攻击范围退化为徒手(1)。镜像 装备 atom 的设值逻辑。
-          if (origSlot === '武器') {
-            const card = state.cardMap[cardId];
-            self.vars[DISTANCE_ATTACK_RANGE_KEY] = card?.range ?? 1;
-          }
-        } else {
-          // 原是手牌:影子替换回原卡
-          self.hand[idx] = cardId;
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    // 通用合法条件:存活 + 红牌(手牌或装备区)。时机由两条路径之一满足:
+    //   1. 出杀路径(自己回合 + 无阻塞 pending):preceding 在 杀.use 前
+    //   2. 回应路径(被询问杀:南蛮入侵/决斗):preceding 在 杀.respond 前
+    const self = state.players[ownerId];
+    const selfAlive = self.alive === true;
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    // 界关羽武圣:红色牌包括手牌和装备区
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const cardInEquip = cardIdOk && Object.values(self.equipment).some((id) => id === cardId);
+    const isRed = !!card && card.color === '红';
+    const myTurn = state.currentPlayerIndex === ownerId;
+    const free = !hasBlockingPending(state);
+    const slot = state.pendingSlots.get(ownerId);
+    const atomType = (slot?.atom as { type?: string })?.type;
+    const reqType = (slot?.atom as { requestType?: string })?.requestType;
+    const atomTarget = (slot?.atom as { target?: number })?.target;
+    // 与 杀.respond 的 pending 判定同构:询问杀 或 请求回应(杀/respondKill,激将/挑衅)
+    const askedKill =
+      !!slot &&
+      atomTarget === ownerId &&
+      (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+    const contextOk = (myTurn && free) || askedKill;
+    const ok = selfAlive && (cardInHand || cardInEquip) && isRed && contextOk;
+    return ok ? null : '现在不能使用武圣';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    const self = state.players[ownerId];
+    // 装备区的红色牌:先卸下到手牌(产生 ViewEvent,清除武器距离 vars),
+    // 再走「当作」(当作要求牌在手牌)。镜像奇袭.ts 的装备转化模式。
+    const equipSlotEntry = Object.entries(self.equipment).find(([, id]) => id === cardId);
+    if (equipSlotEntry) {
+      const slot = equipSlotEntry[0] as EquipSlot;
+      params['_origSlot'] = slot;
+      await applyAtom(state, { type: '卸下', player: ownerId, slot });
+    }
+    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '杀',
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子,牌还原)
+  (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const sId = shadowIdOf(cardId);
+    const self = state.players[ownerId];
+    const origSlot = params['_origSlot'] as EquipSlot | undefined;
+    // 删除影子卡
+    delete state.cardMap[sId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) {
+      if (origSlot) {
+        // 原是装备牌:从手牌移除影子,还原装备槽位
+        self.hand.splice(idx, 1);
+        self.equipment[origSlot] = cardId;
+        // 卸下武器时清除了 vars[DISTANCE_ATTACK_RANGE_KEY](该 var 仅由 装备 atom 在装备时设值,不会重算),
+        // 回滚必须还原,否则武器已归位但攻击范围退化为徒手(1)。镜像 装备 atom 的设值逻辑。
+        if (origSlot === '武器') {
+          const card = state.cardMap[cardId];
+          self.vars[DISTANCE_ATTACK_RANGE_KEY] = card?.range ?? 1;
         }
+      } else {
+        // 原是手牌:影子替换回原卡
+        self.hand[idx] = cardId;
       }
-    },
-  );
+    }
+  },);
 
   // 声明替代回应:被询问杀(南蛮入侵/决斗 等)时,可用武圣把红色牌(手牌或装备区)当杀打出。
   // 与标版武圣/龙胆/倾国同构:声明后 询问杀 的可用性检测不再 skip,建立回应窗口。

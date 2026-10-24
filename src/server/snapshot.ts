@@ -48,6 +48,7 @@ interface SnapshotBackend {
     data?: Json;
     viewEvents?: { ownerViews: Array<[number, Json | null]>; othersView: Json | null };
     views?: Array<[string, Json]>;
+    pendingViews?: Record<string, Json | null>;
   }>;
   sessionSeed: number;
   lastActivityAt: number;
@@ -123,6 +124,7 @@ export function serializeAtomHistory(history: AppliedAtomEntry[]): SnapshotBacke
         timestamp: entry.timestamp,
         atom: entry.atom as unknown as Json,
         viewEvents: serializeViewEventSplit(entry.viewEvents),
+        pendingViews: entry.pendingViews as Record<string, Json | null> | undefined,
       };
     }
     return {
@@ -133,6 +135,7 @@ export function serializeAtomHistory(history: AppliedAtomEntry[]): SnapshotBacke
       eventType: entry.eventType,
       data: entry.data,
       views: entry.views ? [...entry.views.entries()] : undefined,
+      pendingViews: entry.pendingViews as Record<string, Json | null> | undefined,
     };
   });
 }

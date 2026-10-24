@@ -62,9 +62,9 @@ import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
-import { canSlash, incSlashUsed, slashUsed } from '../rules/slash-quota';
+import { canSlash, incSlashUsed } from '../rules/slash-quota';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
-import { SLASH_USED_COUNT_KEY, usedThisTurnKey } from '../rules/vars-keys';
+import { usedThisTurnKey } from '../rules/vars-keys';
 import { viewCanAttack } from '../rules/viewDistance';
 import { viewCanSlash } from '../rules/action-active';
 
@@ -159,8 +159,7 @@ async function resolveGuSlash(
     if (card && origName !== undefined && origName !== '杀') card.name = origName;
   }
   // 蛊惑-杀 成功计入出杀次数(标准 FAQ:真牌/无人质疑=正常使用)
-  incSlashUsed(state, source);
-  await applyAtom(state, { type: '回合用量', player: source, key: SLASH_USED_COUNT_KEY, value: slashUsed(state, source) });
+  await incSlashUsed(state, source);
 }
 
 /** 将扣牌(在弃牌堆)经 弃牌堆→手牌→当作(影子 outputName)→手牌→处理区 提供到当前结算帧。

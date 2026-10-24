@@ -296,6 +296,10 @@ describe('dispatch preceding transaction and pending ownership', () => {
 
     expect([r0.accepted, r1.accepted].filter(Boolean)).toHaveLength(1);
     expect([s.players[0].hand.length, s.players[1].hand.length]).toContain(1);
+    // settle 是「execute 到达稳定点」的显式信号:slot 清理在同一段异步链里完成,
+    // 不 await settle 就断言会与清理竞争(dispatch 返回是 fire-and-forget 语义)。
+    const accepted = r0.accepted ? r0 : r1;
+    await accepted.settle;
     expect(s.pendingSlots.size).toBe(0);
   });
 });

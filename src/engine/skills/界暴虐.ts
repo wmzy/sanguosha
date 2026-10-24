@@ -111,16 +111,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     if (!ctx.state.localVars[CONFIRMED_KEY]) return;
 
-    // 记录判定前 discardPile 长度,以便定位判定牌(判定 atom 完成后 push 到末尾)
-    const discardLenBefore = ctx.state.zones.discardPile.length;
-
-    // 进行判定(await 完成后,判定牌已入 discardPile 末尾,视图一致)
-    await runJudgeFlow(ctx.state, ownerId, '暴虐');
-
-    // 读判定结果:判定 atom 的 def.afterHooks 把判定牌 push 到 discardPile 末尾
-    const discard = ctx.state.zones.discardPile;
-    if (discard.length <= discardLenBefore) return; // 判定未发生(牌堆空)
-    const judgeCardId = discard[discard.length - 1];
+    const judgeCardId = await runJudgeFlow(ctx.state, ownerId, '暴虐');
+    if (!judgeCardId) return;
     const judgeCard = ctx.state.cardMap[judgeCardId];
     if (!judgeCard) return;
 

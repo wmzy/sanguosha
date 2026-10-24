@@ -13,6 +13,7 @@ import type { ServerMessage, RoomConfig } from '../../server/protocol';
 import { applyServerMessage, mergeRoomConfig } from './viewMaintainer';
 import { enumerateAvailableActions } from './availableActions';
 import { resolvePendingRespond, getPendingRequestType } from '../utils/pendingRespond';
+import { resolveTargetSelection } from '../../engine/rules/target-selection';
 import { resolveDistributeCardIds } from '../utils/gameViewHelpers';
 import { decideAutoSkip, DEFAULT_PREFS, type AutoSkipPrefs } from '../utils/autoSkip';
 import { getActionsForPlayer, registerSkillActions } from '../skillActionRegistry';
@@ -974,28 +975,26 @@ export class HeadlessGameClient {
         } else {
           candidates = me?.hand ?? [];
         }
-        // 合法目标:默认排除自己;allowSelf/selfTarget(铁索连环)时纳入自己
-        const allowSelf = !!prompt.targetFilter?.allowSelf || !!prompt.selfTarget;
-        const tFilter = prompt.targetFilter?.filter;
-        const validTargets: number[] = [];
-        for (const p of view.players) {
-          if (!p.alive) continue;
-          if (p.index === ownerId && !allowSelf) continue;
-          if (tFilter && !tFilter(view, p.index)) continue;
-          validTargets.push(p.index);
-        }
         for (const card of candidates) {
+          const resolved = resolveTargetSelection(view, ownerId, prompt.targetFilter, card);
+          const targetParams: Record<string, Json> = resolved.targets
+            ? { targets: resolved.targets }
+            : {};
+          if (prompt.targetFilter.min > 0 && !resolved.targets) continue;
           out.push({
             description: `回应【${info.skillId}】(${card.suit}${card.rank})`,
             message: {
               skillId: info.skillId,
               actionType: 'respond',
               ownerId,
-              params: { cardId: card.id },
+              params: { cardId: card.id, ...targetParams },
               baseSeq: 0,
             },
-            validTargets,
+            validTargets: resolved.contract.candidates,
+            targetSelection: resolved.contract,
             category: 'respond',
+            ...(resolved.contract.min > 1 ? { minTarget: resolved.contract.min } : {}),
+            maxTarget: resolved.contract.max,
           });
         }
         if (pending.target >= 0) {

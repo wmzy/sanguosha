@@ -28,7 +28,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界禁酒'(避开标版潜在冲突);
 //   内部 Skill.name = '禁酒'(OL 官方技能名,玩家可见)。
-import type { Card, FrontendAPI, GameView, GameState, Json, Skill } from '../types';
+import type { Card, FrontendAPI, GameState, GameView, Json, Skill, SkillModule } from '../types';
 import {
   registerAction,
   registerAfterHook,
@@ -40,7 +40,6 @@ import type { ActionEntry } from '../types';
 import { applyAtom } from '../core/apply';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
 import { viewCanAttack } from '../rules/viewDistance';
-import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界禁酒';
 const DISPLAY_NAME = '禁酒';
@@ -83,52 +82,48 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ─── transform action:把【酒】手牌转化为影子"杀"(点数 K)──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (st: GameState, params: Record<string, Json>): string | null => {
-      // 锁定技常驻(任意回合);转化需在自己回合 + 无 pending + 存活 + 手牌 + 酒
-      const myTurn = st.currentPlayerIndex === ownerId;
-      const free = !hasBlockingPending(st);
-      const self = st.players[ownerId];
-      const selfAlive = self.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? st.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const isWine = !!card && card.name === '酒';
-      const ok = myTurn && free && selfAlive && cardInHand && isWine;
-      return ok ? null : '现在不能使用禁酒';
-    },
-    async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(st, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '杀',
-      });
-      // 强制覆盖点数为 K(当作 atom 默认继承首张原卡 rank,界禁酒需固定 K)
-      const shadow = st.cardMap[shadowId];
-      if (shadow) {
-        shadow.rank = SHADOW_RANK;
-      }
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-    (st: GameState, params: Record<string, Json>): void => {
-      const cardId = params.cardId as string;
-      const sId = shadowIdOf(cardId);
-      delete st.cardMap[sId];
-      const self = st.players[ownerId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) self.hand[idx] = cardId;
-    },
-  );
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (st: GameState, params: Record<string, Json>): string | null => {
+    // 锁定技常驻(任意回合);转化需在自己回合 + 无 pending + 存活 + 手牌 + 酒
+    const myTurn = st.currentPlayerIndex === ownerId;
+    const free = !hasBlockingPending(st);
+    const self = st.players[ownerId];
+    const selfAlive = self.alive === true;
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? st.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const isWine = !!card && card.name === '酒';
+    const ok = myTurn && free && selfAlive && cardInHand && isWine;
+    return ok ? null : '现在不能使用禁酒';
+  },
+  async (st: GameState, params: Record<string, Json>): Promise<void> => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+    await applyAtom(st, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '杀',
+    });
+    // 强制覆盖点数为 K(当作 atom 默认继承首张原卡 rank,界禁酒需固定 K)
+    const shadow = st.cardMap[shadowId];
+    if (shadow) {
+      shadow.rank = SHADOW_RANK;
+    }
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
+  (st: GameState, params: Record<string, Json>): void => {
+    const cardId = params.cardId as string;
+    const sId = shadowIdOf(cardId);
+    delete st.cardMap[sId];
+    const self = st.players[ownerId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) self.hand[idx] = cardId;
+  },);
 
   // ─── wrap 其他玩家的 酒.respond:owner 回合内禁止他人用酒 ──
   //   酒.respond 由 使用牌 skill 按座次逐个实例化时注册。registerSkillsFromState

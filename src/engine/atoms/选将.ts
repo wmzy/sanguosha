@@ -16,7 +16,6 @@ import { TARGET_SYSTEM } from '../types';
 import { createRng } from '../util/rng';
 import { createStandardDeck, shuffle } from '../core/deck';
 import { applyAtom } from '../core/apply'
-import { resolveTimeoutMs } from '../core/timeout';
 
 /** 默认通用技能列表 */
 export const DEFAULT_SKILLS = [
@@ -222,52 +221,11 @@ export const 选将询问: AtomDefinition<{
   apply(_state) {
     // 等待型 atom——apply 不修改 state
   },
-  toViewEvents(state, atom) {
-    const target = atom.target;
-    const candidates = atom.candidates;
-    const timeoutMs = resolveTimeoutMs(state, 60);
-    // 主公(被问询者)看到候选人列表
-    const ownerView: import('../types').ViewEvent = {
-      type: '选将询问',
-      target,
-      candidates,
-      timeoutMs,
-      pending: {
-        startTime: state.clock.now(),
-        deadline: state.clock.now() + timeoutMs,
-        prompt: { type: 'chooseCharacter', title: '请选择武将', candidates },
-      },
-    };
-    // 其他人看到"等待主公选将"
-    const othersView: import('../types').ViewEvent = {
-      type: '等待选将',
-      waitingFor: target,
-      waitingForName: '主公',
-    };
+  toViewEvents(_state, atom): ViewEventSplit {
     return {
-      ownerViews: new Map([[target, ownerView]]),
-      othersView,
+      ownerViews: new Map([[atom.target, { type: '选将询问', target: atom.target }]]),
+      othersView: { type: '等待选将', waitingFor: atom.target, waitingForName: '主公' },
     };
-  },
-  applyView(view, event) {
-    const target = event.target as number;
-    const candidates = (event.candidates ?? []) as Array<{ name: string; skills: string[] }>;
-    const timeoutMs = (event.timeoutMs as number | undefined) ?? 60000;
-    // 只有被问询的玩家才设置 pending
-    if (view.viewer === target) {
-      view.pending = {
-        type: 'awaits',
-        atom: { type: '选将询问', target, candidates } as unknown as import('../types').Atom,
-        prompt: {
-          type: 'chooseCharacter',
-          title: '请选择武将',
-          candidates,
-        } as import('../types').ActionPrompt,
-        target,
-        deadline: Date.now() + timeoutMs,
-        totalMs: timeoutMs,
-      };
-    }
   },
   pending: {
     // 选将超时:从候选人中随机分配一个未被选走的武将(确定性:用 state.seq 做种子)。
@@ -323,58 +281,11 @@ export const 并行选将: AtomDefinition<{
   apply(_state) {
     // 等待型 atom——apply 不修改 state
   },
-  toViewEvents(state, atom) {
-    const selections = atom.selections;
-    const timeoutMs = resolveTimeoutMs(state, 60);
-    // 选将保密:不再向任何视角下发主公已选角色(lordCharacter),角色统一由 亮将 公开。
-    // ownerViews:每个目标玩家看到自己的候选人
-    const ownerViews = new Map<number, import('../types').ViewEvent>();
-    for (const s of selections) {
-      ownerViews.set(s.target, {
-        type: '并行选将',
-        selections: selections.map((sel) => ({ target: sel.target, candidates: sel.candidates })),
-        timeoutMs,
-        pending: {
-          startTime: state.clock.now(),
-          deadline: state.clock.now() + timeoutMs,
-          prompt: { type: 'chooseCharacter', title: '请选择武将', candidates: s.candidates },
-        },
-      });
-    }
-    // othersView:已选完的玩家(如主公)看到"等待其他玩家选将"
-    const othersView: import('../types').ViewEvent = {
-      type: '等待选将',
-      waitingFor: TARGET_SYSTEM,
-      waitingForName: '其他玩家',
+  toViewEvents(_state, atom): ViewEventSplit {
+    return {
+      ownerViews: new Map(atom.selections.map(({ target }) => [target, { type: '并行选将', target }])),
+      othersView: { type: '等待选将', waitingFor: TARGET_SYSTEM, waitingForName: '其他玩家' },
     };
-    return { ownerViews, othersView };
-  },
-  applyView(view, event) {
-    const selections = (event.selections ?? []) as Array<{
-      target: number;
-      candidates: Array<{ name: string; skills: string[] }>;
-    }>;
-    // 找当前 viewer 是否在 selections 中
-    const mySelection = selections.find((s) => s.target === view.viewer);
-    if (mySelection) {
-      const timeoutMs = (event.timeoutMs as number | undefined) ?? 60000;
-      view.pending = {
-        type: 'awaits',
-        atom: {
-          type: '选将询问',
-          target: mySelection.target,
-          candidates: mySelection.candidates,
-        } as unknown as import('../types').Atom,
-        prompt: {
-          type: 'chooseCharacter',
-          title: '请选择武将',
-          candidates: mySelection.candidates,
-        } as import('../types').ActionPrompt,
-        target: mySelection.target,
-        deadline: Date.now() + timeoutMs,
-        totalMs: timeoutMs,
-      };
-    }
   },
   pending: {
     // 超时:无操作。并行选将拆成多个单-target 选将询问 slot,各 slot 用选将询问的 onTimeout

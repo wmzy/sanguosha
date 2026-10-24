@@ -18,6 +18,7 @@ import { findActionEntry, findPendingSlot, setSkillInstanceUnload } from './skil
 // unloadSkillInstance 已迁至 skills/lifecycle.ts（可直接访问 skillLoaders/cardEffectMap）
 import { unloadSkillInstance } from '../skills/lifecycle';
 import { createStandardDeck } from './deck';
+import { beginRun, currentIdleCount, whenIdle, whenIdleSince } from './run-tracker';
 import { SYSTEM_OWNER } from './notify';
 import {
   notifyStateChange,
@@ -181,6 +182,9 @@ export async function restore(
     // 先推进虚拟时钟到该命令的时间戳:触发所有到期超时。
     // 超时 resolve 上一条 execute 的 slot → 其 resume 到下一个挂起点或完成。
     await clock.advanceTo(entry.timestamp);
+    // 到期超时 resolve 的父 execute 可能还在跨真实异步边界(动态 import)恢复:
+    // 等到稳定点再 dispatch,避免命令在父流程创建下一个 slot 前被 validate 拒绝。
+    await whenIdle(state);
     // 「设置手牌顺序」是盲选流程(pick-card-panel.spliceHandOrderEntry)splice 进
     // actionLog 的服务端内部快照,原对局从不走 dispatch(同 session.handleReorderHand
     // 的纯 mutate)。若当普通 action dispatch,findPendingSlot(ownerId) 会误命中该
@@ -217,8 +221,8 @@ export async function restore(
   // 阻塞型 pending(如界放权询问)在原对局中被超时处理(fireTimeout 副作用不在 actionLog),
   // 触发其超时让 execute 继续;非阻塞 pending(出牌窗口)不触发——restore 停在正常游戏状态。
   for (let guard = 0; guard < 200; guard++) {
-    // 排空微任务队列:让挂起的 execute resume 链推进到下一个 await 挂起点或完成。
-    await new Promise((r) => setTimeout(r, 0));
+    // 等稳定点:挂起的 execute resume 链推进到下一个 slot 或完成。
+    await whenIdle(state);
     const blocking = [...state.pendingSlots.values()].filter((s) => s.isBlocking);
     if (blocking.length === 0) break;
     for (const slot of blocking) {
@@ -352,22 +356,15 @@ export async function dispatch(
   }
   const message = normalizeMessageTargetShape(rawMessage);
   // settle 信号:execute 是 fire-and-forget,restore 需要知道它何时「挂起或完成」。
-  // 挂起点由 createAndAwaitSlot 在 slot 入 pendingSlots 后调 state.onExecuteSettle 通知;
-  // 执行完成由下方 .finally(settleAfterDrain) 通知。两处竞争,settled 防重入只 resolve 一次。
-  // settle 携带 execute 错误(若有):挂起点(onExecuteSettle)与 validate 拒绝(reject)
-  // 都是无错误路径,resolve(undefined);只有 execute 自身抛错才 resolve(error)。
+  // 见下方 execute 启动处:settle 在引擎到达稳定点(无 active run)时 resolve。
   let settleResolve!: (error?: Error) => void;
   const settle = new Promise<Error | undefined>((r) => {
     settleResolve = r;
   });
   let settled = false;
-  const settleListeners =
-    state.onExecuteSettleListeners ?? (state.onExecuteSettleListeners = new Set());
-  let onExecuteSettle: (slot: PendingSlot) => void = () => {};
   const signalSettle = (error?: Error) => {
     if (settled) return;
     settled = true;
-    settleListeners.delete(onExecuteSettle);
     settleResolve(error);
   };
   let ownsPreparation = false;
@@ -376,26 +373,15 @@ export async function dispatch(
     preparingStates.delete(state);
     ownsPreparation = false;
   };
+  let rollbackFailure: Error | undefined;
   const reject = (error?: Error): DispatchResult => {
+    error ??= rollbackFailure;
     releasePreparation();
     signalSettle(error);
     if (error) state.onError?.(error);
     return { accepted: false, settle };
   };
   const accept = (): DispatchResult => ({ accepted: true, settle });
-  // 排空微任务直到 settle(execute resume 后创建 slot 触发 onExecuteSettle)或预算耗尽。
-  // skip 触发超时的路径需要:fireTimeoutNow resolve 广播/阻塞 slot → 父 execute 跨微任务
-  // resume 到下一挂起点;若不等它,restore 的下一条 action 会在 resume 创建的新 slot
-  // 出现前被 validate 拒绝(与下方 respond 路径的 settleAfterDrain 同理)。
-  // 预算取宽(1000 次 macrotask ≈ ≥1s):父 resume 链可能含技能模块的首次动态 import,
-  // vitest 下按需转换可达数百毫秒,预算不足会让 restore 抢跑(后续条目被静默拒绝)。
-  // 排空只影响 settle 信号时机,不触碰任何游戏状态,不破坏重放确定性。
-  const drainUntilSettled = async (): Promise<void> => {
-    for (let i = 0; i < 1000 && !settled; i++) {
-      await new Promise((r) => setTimeout(r, 0));
-    }
-  };
-
   const rollbacks: Array<{ entry: ActionEntry; params: Record<string, Json> }> = [];
   // ── view 缓冲:preceding 的 ViewEvent 缓冲,主 validate 失败时截断 atomHistory,不广播 ──
   const hasPreceding = !!message.preceding?.length;
@@ -408,6 +394,8 @@ export async function dispatch(
   //    (UI 排列 + pickTargetCard 盲选的 handIndex 按位置取值),被拒动作不得改动它 ——
   //    否则在线客户端(增量视图看不到被回滚的 preceding 事件)与权威 buildView 顺序不一致,
   //    玩家按位置选到的牌与点击的不是同一张。回滚后按快照整体还原(内容 + 顺序)。
+  // 玩家逐字段快照(不整对象替换:在线 execute 可能持有 player/zone 引用,
+  // 替换引用会让正在恢复的父流程读写到孤儿对象)。
   const orderedSnapshot = hasPreceding
     ? state.players.map((p) => ({
         hand: [...p.hand],
@@ -415,13 +403,33 @@ export async function dispatch(
         vars: structuredClone(p.vars),
         equipment: { ...p.equipment },
         tags: [...p.tags],
+        pendingTricks: structuredClone(p.pendingTricks),
+        judgeZone: p.judgeZone ? [...p.judgeZone] : undefined,
+        skills: [...p.skills],
+        health: p.health,
+        maxHealth: p.maxHealth,
+        alive: p.alive,
+        character: p.character,
       }))
     : null;
   const cardMapSnapshot = hasPreceding ? { ...state.cardMap } : null;
+  const cardWrappersSnapshot = hasPreceding ? structuredClone(state.cardWrappers) : null;
   const localVarsSnapshot = hasPreceding ? structuredClone(state.localVars) : null;
-  const turnVarsSnapshot = hasPreceding ? structuredClone(state.turn.vars) : null;
+  const turnSnapshot = hasPreceding ? structuredClone(state.turn) : null;
   const atomStackSnapshot = hasPreceding ? [...state.atomStack] : null;
   const settlementSnapshot = hasPreceding ? [...state.settlementStack] : null;
+  const zonesSnapshot = hasPreceding
+    ? {
+        deck: [...state.zones.deck],
+        discardPile: [...state.zones.discardPile],
+        processing: [...state.zones.processing],
+      }
+    : null;
+  const currentPlayerIndexSnapshot = state.currentPlayerIndex;
+  const phaseSnapshot = state.phase;
+  const rngSeedSnapshot = state.rngSeed;
+  const marksSnapshot = hasPreceding ? structuredClone(state.marks) : null;
+  const actionLogLength = state.actionLog.length;
   const seqSnapshot = state.seq;
   // 回滚 preceding(逆序调用 rollback)+ 截断缓冲的 atomHistory + 恢复 viewBuffering
   // + 还原有序数组快照(hand/marks:技能回调各自恢复顺序不可靠)
@@ -431,18 +439,38 @@ export async function dispatch(
         try {
           await rollbacks[i].entry.rollback?.(state, rollbacks[i].params);
         } catch (error) {
-          state.onError?.(error instanceof Error ? error : new Error(String(error)));
+          rollbackFailure ??= error instanceof Error ? error : new Error(String(error));
+          state.onError?.(rollbackFailure);
         }
       }
     } finally {
+      if (hasPreceding) {
+        // 牌面先还原:下面重建装备依赖 vars 时要读到原武器的 range。
+        if (cardMapSnapshot) {
+          for (const id of Object.keys(state.cardMap)) {
+            if (!(id in cardMapSnapshot)) delete state.cardMap[id];
+          }
+          Object.assign(state.cardMap, cardMapSnapshot);
+        }
+      }
       if (orderedSnapshot) {
         for (let i = 0; i < orderedSnapshot.length; i++) {
           const p = state.players[i];
           if (!p) continue;
-          p.hand = [...orderedSnapshot[i].hand];
-          p.marks = structuredClone(orderedSnapshot[i].marks);
-          p.vars = structuredClone(orderedSnapshot[i].vars);
-          p.equipment = { ...orderedSnapshot[i].equipment };
+          const was = orderedSnapshot[i];
+          p.hand = [...was.hand];
+          p.marks = structuredClone(was.marks);
+          p.vars = structuredClone(was.vars);
+          p.equipment = { ...was.equipment };
+          p.tags = [...was.tags];
+          p.pendingTricks = structuredClone(was.pendingTricks);
+          if (was.judgeZone) p.judgeZone = [...was.judgeZone];
+          else delete p.judgeZone;
+          p.skills = [...was.skills];
+          p.health = was.health;
+          p.maxHealth = was.maxHealth;
+          p.alive = was.alive;
+          p.character = was.character;
           // rollback 回调可恢复装备槽位；用装备牌面重建依赖 vars，避免快照中的旧
           // 直接构造状态没有通过「装备」atom而缺少距离变量。
           const weaponId = p.equipment['武器'];
@@ -450,18 +478,19 @@ export async function dispatch(
             const weapon = state.cardMap[weaponId];
             if (weapon?.range !== undefined) p.vars['距离/出杀范围'] = weapon.range;
           }
-          p.tags = [...orderedSnapshot[i].tags];
         }
       }
       if (hasPreceding) {
-        if (cardMapSnapshot) {
-          for (const id of Object.keys(state.cardMap)) {
-            if (!(id in cardMapSnapshot)) delete state.cardMap[id];
-          }
-          Object.assign(state.cardMap, cardMapSnapshot);
-        }
+        state.zones.deck = [...zonesSnapshot!.deck];
+        state.zones.discardPile = [...zonesSnapshot!.discardPile];
+        state.zones.processing = [...zonesSnapshot!.processing];
+        state.cardWrappers = structuredClone(cardWrappersSnapshot!);
         state.localVars = localVarsSnapshot!;
-        state.turn.vars = turnVarsSnapshot!;
+        state.turn = structuredClone(turnSnapshot!);
+        state.currentPlayerIndex = currentPlayerIndexSnapshot;
+        state.phase = phaseSnapshot;
+        state.rngSeed = rngSeedSnapshot;
+        state.marks = structuredClone(marksSnapshot!);
         state.atomStack = atomStackSnapshot!;
         state.settlementStack = settlementSnapshot!;
         for (const [key, slot] of state.pendingSlots) {
@@ -471,22 +500,17 @@ export async function dispatch(
           const previous = pendingEntriesSnapshot.get(key);
           if (previous) state.pendingSlots.set(key, previous);
         }
+        state.actionLog.length = actionLogLength;
         state.atomHistory.length = bufferSnapshot;
         state.seq = seqSnapshot;
         state.viewBuffering = bufferWasActive;
       }
+      if (rollbackFailure) state.onError?.(rollbackFailure);
     }
   };
   const pendingEntriesSnapshot = new Map(state.pendingSlots);
   const pendingSnapshot = new Set(state.pendingSlots.values());
   const createdPending = new Set<PendingSlot>();
-  onExecuteSettle = (slot: PendingSlot) => {
-    if (!pendingSnapshot.has(slot)) {
-      createdPending.add(slot);
-      signalSettle();
-    }
-  };
-  if (!hasPreceding) settleListeners.add(onExecuteSettle);
   const trackNewPending = () => {
     for (const slot of state.pendingSlots.values()) {
       if (!pendingSnapshot.has(slot)) createdPending.add(slot);
@@ -506,9 +530,17 @@ export async function dispatch(
     ownsPreparation = true;
     for (const p of message.preceding) {
       const pEntry = findActionEntry(state, p.skillId, message.ownerId, p.actionType);
+      // preceding 必须自带 rollback:主 action 校验失败/抛错时能逆向撤销已生效的部分效果。
+      // 没有 rollback 的动作(如 制衡)一律不允许作为 preceding —— 否则会出现
+      // 「牌已弃置进弃牌堆、主 action 被拒、牌仍在手牌」的重复归属。
+      if (!pEntry?.rollback) {
+        await rollbackPreceding();
+        cleanupResidualPending();
+        return reject();
+      }
       let pError: unknown;
       try {
-        pError = !pEntry ? new Error('preceding action not found') : pEntry.validate(state, p.params);
+        pError = pEntry.validate(state, p.params);
       } catch (error) {
         pError = error;
       }
@@ -517,9 +549,9 @@ export async function dispatch(
         cleanupResidualPending();
         return reject();
       }
-      rollbacks.push({ entry: pEntry!, params: p.params });
+      rollbacks.push({ entry: pEntry, params: p.params });
       try {
-        await pEntry!.execute(state, p.params);
+        await pEntry.execute(state, p.params);
       } catch {
         trackNewPending();
         await rollbackPreceding();
@@ -560,8 +592,8 @@ export async function dispatch(
       const alivePlayers = state.players.filter((p) => p.alive).map((p) => p.index);
       if (alivePlayers.every((idx) => slot.skippedPlayers!.has(idx))) {
         await slot._fireTimeoutNow?.();
-        await drainUntilSettled();
       }
+      await whenIdle(state);
       signalSettle();
       return accept();
     }
@@ -569,7 +601,7 @@ export async function dispatch(
     if (slot.isBlocking) {
       logAction(state, message);
       await slot._fireTimeoutNow?.();
-      await drainUntilSettled();
+      await whenIdle(state);
       signalSettle();
       return accept();
     }
@@ -629,7 +661,6 @@ export async function dispatch(
   }
 
   releasePreparation();
-  settleListeners.add(onExecuteSettle);
   // ── 全部校验通过:flush 缓冲的 ViewEvent(一次性广播所有积压 event) ──
   if (hasPreceding) {
     state.viewBuffering = bufferWasActive;
@@ -666,18 +697,16 @@ export async function dispatch(
   // 如果 dispatch 返回该 promise,session/harness 的 await 会死锁。
   // dispatch 返回 { accepted, settle }。execute 抛错由链首 .catch 捕获:同步 onError 上报,
   // 并记到 executeError;不 rethrow(避免无人 await 的 unhandled rejection)。
-  // settle 在「execute 完成/挂起且排空父 execute 的异步 resume」后 resolve:
-  //   respond execute 的 cleanupSlot resolve 旧 slot,触发父 execute(如开局)的异步 resume 链。
-  //   若直接 signalSettle,restore 的下一条 respond 会在父 resume 创建的新 slot 出现前被拒。
-  //   故先排空微任务让 resume 推进到下一个挂起点(slot 创建触发 onExecuteSettle)或完成。
-  //   settleAfterDrain 把 executeError 传给 signalSettle,使 await settle 方能感知 execute 错误。
+  // settle = 稳定点(core/run-tracker.ts):所有 active run(本 execute、被它 resolve 而
+  //   恢复的父 execute 链、超时编排)都已完成或重新挂到 PendingSlot 上。
+  //   respond execute 的 cleanupSlot resolve 旧 slot 时,safeResolve 同步把父链记回 active,
+  //   先于本 run 结束,所以父链跨动态 import 等真实异步边界恢复期间 settle 不会提前。
+  //   不轮询、不依赖宏任务;execute 抛错经 settle 返回。
   let executeError: Error | undefined;
-  const settleAfterDrain = async (): Promise<void> => {
-    await drainUntilSettled();
-    signalSettle(executeError);
-  };
-  entry
-    .execute(state, message.params)
+  // 归零序号取样在 beginRun 之前:此刻本 run 还没产生任何归零,之后的那次归零才满足。
+  const idleMark = currentIdleCount(state);
+  const endRun = beginRun(state);
+  void new Promise<void>((resolve) => resolve(entry.execute(state, message.params)))
     .catch((err: unknown) => {
       const e = err instanceof Error ? err : new Error(String(err));
       state.onError?.(e);
@@ -685,8 +714,24 @@ export async function dispatch(
     })
     .then(cleanupSlot)
     .finally(cleanupSlot)
-    .finally(settleAfterDrain);
+    .then(endRun);
+  // settle = 本 execute 的稳定点(core/run-tracker.ts):它已完成或已挂到 PendingSlot 上,
+  // 且被它唤醒的父 execute 链也已重新挂起/结束。归零序号在 beginRun 之前取样,
+  // 只有「本 run 之后的那次归零」满足,不会被调用瞬间的历史归零误命中。
+  // 稳定点后再让出一个微任务:slot 清理 / 旧 slot resolve 的收尾链(notifyPendingResolved、
+  // 视图广播)是同一批微任务,先让它们跑完,await settle 的调用方读到的才是完整状态。
+  void whenIdleSince(state, idleMark)
+    .then(() => Promise.resolve())
+    .then(() => signalSettle(executeError));
   return accept();
+}
+
+/**
+ * 稳定点(测试/AI 等待用):等价于旧的「等到 execute 挂起或跑完」,但不轮询。
+ * 所有 active run 都已完成或重新挂到 PendingSlot 上时 resolve。
+ */
+export function whenEngineIdle(state: GameState): Promise<void> {
+  return whenIdle(state);
 }
 
 /**

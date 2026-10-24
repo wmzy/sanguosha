@@ -38,57 +38,53 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // 无头 availableActions 构造的 preceding 都只带 cardId——方向由 transform(card).name 决定,
   // 不放进 params;引擎硬性要求 to 会让所有真实客户端的龙胆转化恒被拒)。
   // 作为 preceding 在 闪.respond / 杀.use / 杀.respond 之前执行。
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      if (!selfAlive) return '你已死亡';
-      if (!cardIdOk || !cardInHand) return '牌不在手牌中';
-      // 推导/校验 to:to 缺省时按原卡名推导;给定时须与原卡名的映射一致
-      const expectedTo = card ? TRANSFORM_MAP[card.name] : undefined;
-      const to = (params.to as string | undefined) ?? expectedTo;
-      if (!expectedTo) return '只能将杀当闪或将闪当杀';
-      if (to !== expectedTo) {
-        if (to === '闪') return '只能将杀当闪';
-        if (to === '杀') return '只能将闪当杀';
-        return '无效的转化方向';
-      }
-      return null;
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const card = state.cardMap[cardId];
-      // validate 已保证原卡可转化(TRANSFORM_MAP 命中);to 缺省时按原卡名推导
-      const to = (params.to as string | undefined) ?? (card ? TRANSFORM_MAP[card.name] : undefined);
-      if (!to) return; // validate 已拦截,防御性兜底
-      const shadowId = shadowIdOf(cardId);
-      // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: to,
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const sId = shadowIdOf(cardId);
-      delete state.cardMap[sId];
-      const self = state.players[ownerId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) self.hand[idx] = cardId;
-    },
-  );
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    const self = state.players[ownerId];
+    const selfAlive = self?.alive === true;
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    if (!selfAlive) return '你已死亡';
+    if (!cardIdOk || !cardInHand) return '牌不在手牌中';
+    // 推导/校验 to:to 缺省时按原卡名推导;给定时须与原卡名的映射一致
+    const expectedTo = card ? TRANSFORM_MAP[card.name] : undefined;
+    const to = (params.to as string | undefined) ?? expectedTo;
+    if (!expectedTo) return '只能将杀当闪或将闪当杀';
+    if (to !== expectedTo) {
+      if (to === '闪') return '只能将杀当闪';
+      if (to === '杀') return '只能将闪当杀';
+      return '无效的转化方向';
+    }
+    return null;
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const card = state.cardMap[cardId];
+    // validate 已保证原卡可转化(TRANSFORM_MAP 命中);to 缺省时按原卡名推导
+    const to = (params.to as string | undefined) ?? (card ? TRANSFORM_MAP[card.name] : undefined);
+    if (!to) return; // validate 已拦截,防御性兜底
+    const shadowId = shadowIdOf(cardId);
+    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: to,
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
+  (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const sId = shadowIdOf(cardId);
+    delete state.cardMap[sId];
+    const self = state.players[ownerId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) self.hand[idx] = cardId;
+  },);
   const unloadDodge = declareAlternativeResponse(state, ownerId, '询问闪');
   const unloadSlash = declareAlternativeResponse(state, ownerId, '询问杀');
   return () => {

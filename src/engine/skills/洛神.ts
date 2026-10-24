@@ -64,14 +64,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.judgeType !== '洛神') return;
 
     const processing = frameCards(ctx.state);
-    if (processing.length === 0) {
-      ctx.state.localVars['洛神/lastResult'] = 'red';
-      return;
-    }
-    const judgeCardId = processing[processing.length - 1];
+    const judgeCardId = (ctx.atom as { cardId?: string }).cardId ?? processing[processing.length - 1];
+    if (!judgeCardId) return;
     const judgeCard = ctx.state.cardMap[judgeCardId];
-    ctx.state.localVars['洛神/lastJudgeCardId'] = judgeCardId;
-    ctx.state.localVars['洛神/lastResult'] = isBlack(judgeCard) ? 'black' : 'red';
+    if (!judgeCard) return;
   });
 
   // 阶段开始(准备) after-hook:洛神主循环
@@ -106,12 +102,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (ctx.state.zones.deck.length === 0) break;
       // 判定:判定 atom 把判定牌移入处理区,after-hook 读花色存 localVars,
       // def.afterHooks 把判定牌移入弃牌堆。
-      await runJudgeFlow(ctx.state, ownerId, '洛神');
-
-      const result = ctx.state.localVars['洛神/lastResult'];
-      const judgeCardId = ctx.state.localVars['洛神/lastJudgeCardId'] as string | undefined;
-      delete ctx.state.localVars['洛神/lastResult'];
-      delete ctx.state.localVars['洛神/lastJudgeCardId'];
+      const judgeCardId = await runJudgeFlow(ctx.state, ownerId, '洛神');
+      const result = judgeCardId && ctx.state.cardMap[judgeCardId] && isBlack(ctx.state.cardMap[judgeCardId]) ? 'black' : 'red';
 
       if (result !== 'black' || !judgeCardId) break; // 红色或异常:退出
 

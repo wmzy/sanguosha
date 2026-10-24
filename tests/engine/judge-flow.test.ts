@@ -16,6 +16,7 @@ import type { Atom, Card, GameState, PlayerState } from '../../src/engine/types'
 import { runJudgeFlow } from '../../src/engine/flows/judge';
 import { applyAtom } from '../../src/engine/core/apply';
 import { suitColor } from '../../src/engine/types';
+import { registerAfterHook } from '../../src/engine/core/skill';
 
 function makePlayer(opts: {
   index: number;
@@ -110,8 +111,33 @@ describe('模块 H:判定编排函数 runJudgeFlow', () => {
     expect(state.zones.deck).toEqual([]);
     // 判定牌进弃牌堆
     expect(state.zones.discardPile).toEqual(['j1']);
-    // localVars 回写(与原 判定 atom 行为一致)
-    expect(state.localVars['判定/finalJudgeCardId']).toBe('j1');
+    expect(state.localVars).toEqual({});
+  });
+
+  it('生效后嵌套判定保留外层返回值,不留下共享结果', async () => {
+    state = makeState({ deckCards: [makeCard('inner', '判定牌', '♣'), makeCard('outer', '判定牌', '♥')] });
+    let innerResult: string | undefined;
+    registerAfterHook(state, '嵌套判定', 0, '判定牌生效后', async ({ atom }) => {
+      if (atom.judgeType === '外层') innerResult = await runJudgeFlow(state, 1, '内层');
+    });
+
+    expect(await runJudgeFlow(state, 0, '外层')).toBe('outer');
+    expect(innerResult).toBe('inner');
+    expect(state.zones.processing).toEqual([]);
+    expect(state.zones.discardPile).toEqual(['inner', 'outer']);
+    expect(state.localVars).toEqual({});
+  });
+
+  it('空牌堆嵌套判定不把外层处理区牌当作自己的结果', async () => {
+    let innerResult: string | undefined = '未运行';
+    registerAfterHook(state, '空嵌套判定', 0, '判定牌生效后', async ({ atom }) => {
+      if (atom.judgeType === '外层') innerResult = await runJudgeFlow(state, 1, '内层');
+    });
+
+    expect(await runJudgeFlow(state, 0, '外层')).toBe('j1');
+    expect(innerResult).toBeUndefined();
+    expect(state.zones.discardPile).toEqual(['j1']);
+    expect(state.localVars).toEqual({});
   });
 
   // ── 牌堆空早退 ─────────────────────────────────────────────

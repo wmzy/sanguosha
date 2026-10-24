@@ -97,12 +97,10 @@ async function run雷击Flow(state: GameState, ownerId: number, triggerDesc: str
   if (judgeChoice !== true) return; // 放弃发动
 
   // ── 步骤 2:判定自己(界鬼道可在判定改判阶段替换判定牌) ──
-  await runJudgeFlow(state, ownerId, DISPLAY_NAME);
+  const judgeCardId = await runJudgeFlow(state, ownerId, DISPLAY_NAME);
 
-  // ── 步骤 3:读判定结果(弃牌堆顶=最终判定牌,经界鬼道替换即为替换牌) ──
-  const dp = state.zones.discardPile;
-  if (dp.length === 0) return;
-  const judgeCardId = dp[dp.length - 1];
+  // ── 步骤 3:读取本次判定结果(可已被消费 hook 收走) ──
+  if (!judgeCardId) return;
   const judgeCard = state.cardMap[judgeCardId];
   if (!judgeCard) return;
 

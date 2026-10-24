@@ -6,6 +6,7 @@ import type {
   ClientMessage as EngineClientMessage,
   Card,
 } from '../../engine/types';
+import type { TargetSelection } from '../../engine/rules/target-selection';
 import type { RoomConfig, ServerMessage } from '../../server/protocol';
 
 /** 配置阶段房间准备状态（由 room_state 消息驱动）。 */
@@ -75,8 +76,10 @@ export interface ConnectionIdentity {
 export interface AvailableAction {
   /** 人类可读描述，如 "使用【杀】(♠5) 攻击 P2" / "出【闪】响应杀" / "进入弃牌阶段(选 X 张)" */
   description: string;
-  /** 预填的 ClientMessage 模板；目标类操作 targets 需 agent 补全 */
+  /** 完整的最小合法消息；可直接提交。改变目标时必须遵守 targetSelection。 */
   message: EngineClientMessage;
+  /** 可序列化的目标约束；有序槽位候选只适用于各自 after 前缀。 */
+  targetSelection?: TargetSelection;
   /** 合法目标座次列表（无目标操作为空）；cardFilter/targetFilter 已跑过 */
   validTargets: number[];
   /** 目标数下限：prompt.targetFilter.min 的投影(如 离间「两名男性角色」min=2)。

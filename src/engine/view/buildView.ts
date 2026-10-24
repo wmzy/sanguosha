@@ -1,10 +1,7 @@
 // src/engine/view/buildView.ts
 // src/engine/view/buildView.ts
-import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage, Json } from '../types';
-import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
-import { resolveChoosePlayerCandidates } from './choosePlayerCandidates';
-import { resolveCardFilterCandidates } from './cardFilterCandidates';
-import { getCardResponseMode, SILENT_RESPONSE_PROMPT } from '../core/card-response-availability';
+import type { GameState, GameView, ActionLogEntry, ClientMessage, Json } from '../types';
+import { projectVisiblePending } from './pending';
 import { getDistanceAttackMod, getDistanceDefenseMod, getDistanceAttackRange } from '../rules/vars-keys';
 
 /** 从 ClientMessage 生成可读日志文本(不含玩家名——player 字段单独携带,由展示层映射) */
@@ -33,122 +30,12 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     text: formatLogEntry(e.message),
   }));
 
-  // 从 GameState.pendingSlots 构建 pending view。
-  // 多 target 并行(拼点/选将)时,每个 viewer 只看到自己的 slot;
-  // 单 target 场景 Map 只有1个 slot。
-  let pending: GameView['pending'] = null;
-  // 优先匹配 viewer 专属 slot,其次广播型 slot(target === TARGET_BROADCAST)。
-  // 不使用 findPendingSlot 的 size===1 fallback —— 那会让主公选将期间(单 slot)
-  // 的其他 viewer 错误匹配到主公 slot,导致"共用倒计时":其他角色看到主公的
-  // 选将 atom/deadline/target,前端据此渲染主公的选将界面和倒计时。
-  // 死亡玩家不参与任何询问:广播型 slot(无懈可击等)对死亡 viewer 不可操作。
-  const viewerAlive = viewer >= 0 && state.players[viewer]?.alive === true;
-  const broadcastSlot = viewerAlive
-    ? [...state.pendingSlots.values()].find(
-        (s) =>
-          (s.atom as { target?: number }).target === TARGET_BROADCAST && !s.isPaused,
-      )
-    : undefined;
-  const ownSlot = viewer >= 0 ? state.pendingSlots.get(viewer) : undefined;
-  // viewer 专属 slot 若已 pause(respond execute 内部创建了新 pending),不应再返回它。
-  // 但必须继续回退到广播型 slot:该 slot 对 viewer 是可回应的(增量视图同样为所有存活
-  // viewer 投影广播询问),否则「自己动作触发无懈可击询问」期间重连/初始视图看不到
-  // 询问、无法回应(在线客户端能看到)。无广播 slot 时才交给 observer 逻辑接管。
-  const ownOrBroadcastSlot = ownSlot && !ownSlot.isPaused ? ownSlot : broadcastSlot;
-  if (ownOrBroadcastSlot) {
-    const slot = ownOrBroadcastSlot;
-    const def = slot.definition;
-    const rawPrompt =
-      (slot.atom as { prompt?: ActionPrompt }).prompt ??
-      def.pending?.prompt ??
-      (slot.atom.type === '询问闪'
-        ? { type: 'useCard' as const, title: '请出闪', cardFilter: { min: 1, max: 1 } }
-        : slot.atom.type === '询问杀'
-          ? { type: 'useCard' as const, title: '请出杀', cardFilter: { min: 1, max: 1 } }
-          : { type: 'confirm' as const, title: '请回应' });
-    // choosePlayer/cardFilter 注入可序列化 candidates(filter 无法跨进程序列化)
-    const targetForResolve =
-      'target' in slot.atom && typeof slot.atom.target === 'number'
-        ? slot.atom.target
-        : 'player' in slot.atom && typeof slot.atom.player === 'number'
-          ? (slot.atom as { player: number }).player
-          : TARGET_SYSTEM;
-    // target 提取:'target' 字段优先;出牌窗口 用 'player';都无则 TARGET_SYSTEM
-    const target = targetForResolve;
-    // 卡牌回应型 silent 模式:target 也不被询问——给观察型 prompt(与 applyView 一致)。
-    // 非卡牌回应型/广播/有匹配牌 → normal(用原始可操作 prompt)。
-    const isSilent = getCardResponseMode(state, slot.atom) === 'silent';
-    const prompt = isSilent
-      ? SILENT_RESPONSE_PROMPT
-      : resolveCardFilterCandidates(
-          resolveChoosePlayerCandidates(rawPrompt, state),
-          state,
-          targetForResolve,
-        );
-    pending = {
-      type: 'awaits',
-      atom: slot.atom,
-      prompt,
-      target,
-      isBlocking: slot.isBlocking,
-      // silent 模式标记:前端/headless 不当作可操作询问
-      ...(isSilent ? { responseMode: 'silent' as const } : {}),
-      // slot.deadline 是相对开局时间 (Date.now() - state.startedAt + timeoutMs),
-      // 前端用 (deadline - Date.now()) / 1000 算剩余秒数,需要绝对时间戳。
-      deadline: state.startedAt + slot.deadline,
-      // totalMs = slot 实际生效超时(silent=SHORT_DELAY_MS);回退到 def.pending.timeout。
-      totalMs:
-        slot.resolvedTimeoutMs ??
-        ((slot.atom as { timeout?: number }).timeout ?? def.pending?.timeout ?? 30) * 1000,
-    };
-  } else {
-    // 观察型 pending:当前 viewer 既无自己的 slot 也无广播 slot,但场上存在其他
-    // 玩家的 pending slot(真实玩家 target>=0)。与事件流 applyView(询问闪/询问杀/
-    // 请求回应 对非 target viewer 设观察型 pending)对齐:让初始视图/重连视图也能
-    // 看到"某人在被询问",供视角自动跟随。
-    // 不渲染可操作 prompt(仅给 target 供跟随),避免"共用倒计时"误导。
-    // 仅限游戏进行中的问询类 atom —— 选将询问/选将 等开局 atom 的 pending 是
-    // 隔离的(只有被问询者见),不应观察型投影(charselect-pending-isolation 契约)。
-    // viewer<0(旁观者)也需 observer pending 以获知"当前在等谁操作"。
-    const OBSERVER_PENDING_TYPES = new Set([
-      '询问闪', '询问杀', '请求回应', '出牌窗口',
-      ...(debug ? ['选将询问', '选将'] : []),
-    ]);
-    const observerSlot = [...state.pendingSlots.values()].find((s) => {
-      // target 字段优先;出牌窗口用 player
-      const t =
-        (s.atom as { target?: number; player?: number }).target ??
-        (s.atom as { player?: number }).player;
-      return (
-        typeof t === 'number' && t >= 0 && t !== viewer && OBSERVER_PENDING_TYPES.has(s.atom.type)
-      );
-    });
-    if (observerSlot) {
-      const slot = observerSlot;
-      const target =
-        (slot.atom as { target?: number; player?: number }).target ??
-        (slot.atom as { player: number }).player;
-      pending = {
-        type: 'awaits',
-        atom: slot.atom,
-        prompt: { type: 'confirm', title: '等待回应', cancelLabel: '' },
-        target,
-        isBlocking: slot.isBlocking,
-        deadline: state.startedAt + slot.deadline,
-        totalMs:
-          slot.resolvedTimeoutMs ??
-          ((slot.atom as { timeout?: number }).timeout ?? slot.definition.pending?.timeout ?? 30) *
-          1000,
-      };
-    }
-  }
+  const pending = projectVisiblePending(state, viewer);
 
   // deadline 来自 pending slot 的超时(出牌阶段的 __出牌 询问、询问闪/弃牌等)。
   // 无 pending 时为 null(没有倒计时)。
   const deadline = pending?.deadline ?? null;
   const deadlineTotalMs = pending?.totalMs ?? 0;
-
-  // debug 参数已在 hand 可见性和 OBSERVER_PENDING_TYPES 中使用
 
   return {
     viewer,
@@ -246,25 +133,8 @@ export function getPendingDeadline(
   state: GameState,
   viewer: number,
 ): { target: number; deadline: number; totalMs: number } | null {
-  const slot =
-    viewer >= 0
-      ? (state.pendingSlots.get(viewer) ??
-        [...state.pendingSlots.values()].find(
-          (s) => (s.atom as { target?: number }).target === TARGET_BROADCAST,
-        ))
-      : undefined;
-  if (!slot) return null;
-  const def = slot.definition;
-  const target =
-    'target' in slot.atom && typeof slot.atom.target === 'number'
-      ? slot.atom.target
-      : 'player' in slot.atom && typeof slot.atom.player === 'number'
-        ? (slot.atom as { player: number }).player
-        : TARGET_SYSTEM;
-  const timeoutSec = (slot.atom as { timeout?: number }).timeout ?? def.pending?.timeout ?? 30;
-  return {
-    target,
-    deadline: state.startedAt + slot.deadline,
-    totalMs: timeoutSec * 1000,
-  };
+  const pending = projectVisiblePending(state, viewer);
+  return pending?.deadline !== undefined && pending.totalMs !== undefined
+    ? { target: pending.target, deadline: pending.deadline, totalMs: pending.totalMs }
+    : null;
 }

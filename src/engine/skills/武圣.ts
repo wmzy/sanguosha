@@ -29,59 +29,55 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // transform action:把红色手牌转化为影子"杀"(新建 Card 实体,shadowOf 指向原卡)。
   // 作为 preceding 在 杀.use(出牌阶段)/ 杀.respond(被询问杀)之前执行。
-  const unloadTransform = registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:存活 + 手牌 + 红牌。时机由两条路径之一满足:
-      //   1. 出杀路径(自己回合 + 无阻塞 pending):preceding 在 杀.use 前
-      //   2. 回应路径(被询问杀:南蛮入侵/决斗):preceding 在 杀.respond 前
-      const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const isRed = !!card && card.color === '红';
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const free = !hasBlockingPending(state);
-      const slot = state.pendingSlots.get(ownerId);
-      const atomType = (slot?.atom as { type?: string })?.type;
-      const reqType = (slot?.atom as { requestType?: string })?.requestType;
-      const atomTarget = (slot?.atom as { target?: number })?.target;
-      // 与 杀.respond 的 pending 判定同构:询问杀 或 请求回应(杀/respondKill,激将/挑衅)
-      const askedKill =
-        !!slot &&
-        atomTarget === ownerId &&
-        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
-      const contextOk = (myTurn && free) || askedKill;
-      const ok = selfAlive && cardInHand && isRed && contextOk;
-      return ok ? null : '现在不能使用武圣';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '杀',
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const sId = shadowIdOf(cardId);
-      delete state.cardMap[sId];
-      const self = state.players[ownerId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) self.hand[idx] = cardId;
-    },
-  );
+  const unloadTransform = registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    // 通用合法条件:存活 + 手牌 + 红牌。时机由两条路径之一满足:
+    //   1. 出杀路径(自己回合 + 无阻塞 pending):preceding 在 杀.use 前
+    //   2. 回应路径(被询问杀:南蛮入侵/决斗):preceding 在 杀.respond 前
+    const self = state.players[ownerId];
+    const selfAlive = self.alive === true;
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const isRed = !!card && card.color === '红';
+    const myTurn = state.currentPlayerIndex === ownerId;
+    const free = !hasBlockingPending(state);
+    const slot = state.pendingSlots.get(ownerId);
+    const atomType = (slot?.atom as { type?: string })?.type;
+    const reqType = (slot?.atom as { requestType?: string })?.requestType;
+    const atomTarget = (slot?.atom as { target?: number })?.target;
+    // 与 杀.respond 的 pending 判定同构:询问杀 或 请求回应(杀/respondKill,激将/挑衅)
+    const askedKill =
+      !!slot &&
+      atomTarget === ownerId &&
+      (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+    const contextOk = (myTurn && free) || askedKill;
+    const ok = selfAlive && cardInHand && isRed && contextOk;
+    return ok ? null : '现在不能使用武圣';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '杀',
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
+  (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const sId = shadowIdOf(cardId);
+    delete state.cardMap[sId];
+    const self = state.players[ownerId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) self.hand[idx] = cardId;
+  },);
   // 声明替代回应:被询问杀(南蛮入侵/决斗 等)时,可用武圣把红色手牌当杀打出。
   // 与龙胆/倾国同构:声明后 询问杀 的可用性检测不再 skip,建立回应窗口。
   const unloadAlt = declareAlternativeResponse(state, ownerId, '询问杀');

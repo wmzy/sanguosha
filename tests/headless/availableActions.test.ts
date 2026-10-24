@@ -10,6 +10,36 @@ import { createGameState } from '../../src/engine/types';
 import { defaultPlayActive } from '../../src/engine/rules/action-active';
 import type { GameView, Card } from '../../src/engine/types';
 import type { SkillActionDef } from '../../src/client/skillActionRegistry';
+import { getCardEffect } from '../../src/engine/skills/cards';
+import { resolveTargetSelection, validateTargetSelection } from '../../src/engine/rules/target-selection';
+
+ describe('共享目标约束', () => {
+  it('借刀杀人保留有序槽位并生成可直接提交的完整消息', () => {
+    const card: Card = { ...killCard, id: 'borrow', name: '借刀杀人', type: '锦囊牌' };
+    const view = makeView3(0, '出牌', [card]);
+    view.players[1].equipment['武器'] = 'weapon';
+    const effect = getCardEffect('借刀杀人')!;
+    const action = enumerateAvailableActions(view, 0, [{
+      skillId: '借刀杀人', ownerId: 0, actionType: 'use', label: '借刀杀人', prompt: effect.prompt,
+    }]).find((candidate) => candidate.message.skillId === '借刀杀人')!;
+    expect(action).toBeDefined();
+    expect(action.message.params.targets).toEqual([1, 0]);
+    expect(action.targetSelection?.slots?.map((slot) => slot.candidates)).toEqual([[1], [0, 2]]);
+    expect(action.targetSelection?.slots?.[1].after).toEqual([1]);
+  });
+
+  it('强制目标、牌关联上限和跨 JSON 候选共同约束选择', () => {
+    const view = makeView3(0, '出牌', [killCard]);
+    const filter = { min: 1, max: 3, required: [2], candidates: [1, 2], maxByCard: { c1: 1 } };
+    const selection = resolveTargetSelection(view, 0, filter, killCard);
+    expect(selection.targets).toEqual([2]);
+    expect(selection.contract.max).toBe(1);
+    expect(validateTargetSelection(view, 0, filter, [1], killCard)).toBe(false);
+    expect(validateTargetSelection(view, 0, filter, [2, 2], killCard)).toBe(false);
+    expect(validateTargetSelection(view, 0, filter, [1, 2], killCard)).toBe(false);
+    expect(validateTargetSelection(view, 0, filter, [2], killCard)).toBe(true);
+  });
+});
 
 function makeView(
   seat: number,
@@ -1525,7 +1555,7 @@ describe('enumerateAvailableActions:非 useCard 型主动技', () => {
     expect(picked.map((a) => a.message.params.target)).toEqual([1, 2]);
     // 反间读 params.targets、激将读 params.target → 两者都带上
     expect(picked[0].message.params.targets).toEqual([1]);
-    expect(picked[0].validTargets).toEqual([1]);
+    expect(picked[0].validTargets).toEqual([1, 2]);
   });
 
   it('selectTarget + paramVariants(强袭代价) → 变体×目标,params 含 cost', () => {
@@ -1554,7 +1584,7 @@ describe('enumerateAvailableActions:非 useCard 型主动技', () => {
     const picked = actions.filter((a) => a.message.skillId === '双选');
     expect(picked).toHaveLength(1);
     const a = picked[0];
-    expect(a.message.params).toEqual({ targets: [] }); // targets 由 agent 从 validTargets 选
+    expect(a.message.params).toEqual({ targets: [1, 2] }); // concrete minimal legal default
     expect(a.validTargets).toEqual([1, 2]);
     expect(a.minTarget).toBe(2);
     expect(a.maxTarget).toBe(2);
@@ -1583,9 +1613,9 @@ describe('enumerateAvailableActions:非 useCard 型主动技', () => {
     const byCost = Object.fromEntries(
       picked.map((a) => [a.message.params.cost as string, a]),
     ) as Record<string, (typeof picked)[number]>;
-    expect(byCost.hp.message.params).toEqual({ targets: [], cost: 'hp' });
+    expect(byCost.hp.message.params).toEqual({ targets: [1, 2], cost: 'hp' });
     expect(byCost.discard.message.params).toEqual({
-      targets: [],
+      targets: [1, 2],
       cost: 'discard',
       cardId: 'w1',
     });

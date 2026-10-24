@@ -154,10 +154,9 @@ export function buildReplayFile(
     // 首次 record 捕获该座次 initialView(空事件批次仅注册)
     rec.record(bv.viewer, bv, [], 0);
     for (const env of eventsForViewer(state, bv.viewer, baselineSeq)) {
-      // notify 事件客户端不录制(viewMaintainer 只把 msg.view 推入 newEvents),保持一致
-      if (!env.view) continue;
-      // 逐条喂入保留每条事件的相对时间戳(批量 record 会共用同一 time)
-      rec.record(bv.viewer, null, [env.view], env.timestamp);
+      if (env.view || env.pending !== undefined) {
+        rec.record(bv.viewer, null, env.view ? [env.view] : [], env.timestamp, env.pending);
+      }
     }
   }
   if (!rec.hasData()) return null;

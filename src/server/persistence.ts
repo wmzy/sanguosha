@@ -163,7 +163,6 @@ export function sanitizeState(state: GameState): GameState {
     // pendingSlots 含 resolve/pause/定时器等函数引用,持久化时清空。
     // restore 路径走 bootstrap 重放 actionLog,会重建 pending。
     pendingSlots: new Map(),
-    onExecuteSettleListeners: undefined,
     // atomHistory 不持久化:恢复路径(restoreFromLog → restoreState → create+bootstrap+restore)
     // 从不读取快照里的 atomHistory,重放后由 fresh state 重建——持久化它是死重
     // (每局数百条含 viewEvents 分叉,体积可观)。完整事件流由服务端 eventJournal

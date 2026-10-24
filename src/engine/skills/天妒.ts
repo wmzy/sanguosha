@@ -6,7 +6,7 @@
 //   拿走后 frame 空,runJudgeFlow 收尾 splice 末尾为 no-op。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply'
-import { frameCards } from '../core/frame';
+import { currentJudgeCardId } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
 
 const CHOOSE_RT = '天妒/choose';
@@ -47,14 +47,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const atom = ctx.atom;
     if (atom.player !== ownerId) return;
 
-    // 判定牌生效后,判定牌仍在 frameCards 末尾(尚未入弃牌堆)
-    const processing = frameCards(ctx.state);
-    if (processing.length === 0) return;
-    // 安全前提:frame.cards 仅含判定牌(典型场景:判定阶段/独立判定)。若 frame 还含
-    // 其他牌(如杀结算中八卦阵判定),拿走判定牌会使 runJudgeFlow 收尾 splice 误删
-    // 其他牌(判定牌的清理盲取末尾)→ 状态损坏。多牌场景跳过获取,与 界落英 一致。
+    const judgeCardId = currentJudgeCardId(ctx.state);
+    if (!judgeCardId) return;
+    // 安全前提:本次判定私有处理区仅含判定牌,多牌父帧跳过获取。
+    const processing = ctx.state.settlementStack.at(-1)?.cards ?? [];
     if (processing.length > 1) return;
-    const judgeCardId = processing[processing.length - 1];
     if (!ctx.state.cardMap[judgeCardId]) return;
 
     // 询问是否获得

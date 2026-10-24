@@ -7,6 +7,13 @@ import type { ActionPrompt } from './prompt';
 import type { GameView } from './view';
 import type { SettlementFrame } from './skill';
 
+/** 回合用量的权威写入位置。省略 key/value 时复用公开投影键值。 */
+export interface TurnUsageAuthority {
+  scope: 'player' | 'turn';
+  key?: string;
+  value?: Json;
+}
+
 /** Atom 等待配置(pending)。有此字段 = 等待型 atom。apply 流程走完后进 pending 区。
  等待型 atom 不可被取消——必走完(响应/超时)之一(没有 drop 机制)。
  `timeout` 与 `onTimeout` 都是必填,无合理默认值。 */
@@ -306,8 +313,8 @@ export type Atom =
   | { type: '设置帧抵消'; frameIndex: number; cancelled: boolean }
   // 结算帧 params 变更(走 atom,保证前端同步);省略 frameIndex 时操作栈顶。
   | { type: '帧参数赋值'; frameIndex?: number; key: string; value: Json }
-  // 回合用量(view 同步):出杀计数/限一次标记同步到前端 turnUsage
-  | { type: '回合用量'; player: number; key: string; value: Json }
+  // 回合用量:权威用量与公开投影同时提交,authority 不进入 ViewEvent。
+  | { type: '回合用量'; player: number; key: string; value: Json; authority?: TurnUsageAuthority | readonly TurnUsageAuthority[] }
   // 翻牌判定(通用):牌堆顶一张牌置于 player.vars[varsKey] 列表;点数与已有牌重复则移去(进弃牌堆)。
   // 重复判定结果写入 localVars[resultKey]。服务于「翻一张牌作标记,点数去重」型技能(周泰不屈/界不屈)。
   // varsKey=创牌列表的 player.vars 键名(由调用方技能指定,如 '不屈/创牌');

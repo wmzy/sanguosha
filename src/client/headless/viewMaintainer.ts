@@ -63,8 +63,8 @@ export function applyServerMessage(
       if (msg.notify) {
         if (msg.notify.eventType === 'pendingResolved') {
           const target = (msg.notify.data as { target?: number }).target;
-          if (target !== undefined && (target === view.viewer || target < 0) && view.pending) {
-            view = { ...view, pending: null };
+          if (target !== undefined && (target < 0 || view.pending?.target === target)) {
+            view = { ...view, pending: null, deadline: null, deadlineTotalMs: 0 };
           }
         }
       }
@@ -117,6 +117,14 @@ export function applyServerMessage(
           ...view,
           deadline: msg.deadline !== null ? msg.deadline.deadline : null,
           deadlineTotalMs: msg.deadline !== null ? msg.deadline.totalMs : 0,
+        };
+      }
+      if (msg.pending !== undefined) {
+        view = {
+          ...view,
+          pending: msg.pending,
+          deadline: msg.pending?.deadline ?? null,
+          deadlineTotalMs: msg.pending?.totalMs ?? 0,
         };
       }
       return { ...base, view, lastSeq: msg.seq, newEvents };

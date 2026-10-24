@@ -23,6 +23,7 @@
 // 无模块级全局状态泄漏(与 skill.ts 的 registries 同构)。
 
 import type { GameState } from '../types';
+import { setTurnUsage } from './turn-usage';
 import { getSlashQuotaUsed, getSlashExtraUsed, slashQuotaUsedKey, slashExtraUsedKey, SLASH_QUOTA_USED_KEY as QUOTA_USED_VAR, SLASH_EXTRA_USED_KEY as EXTRA_USED_VAR, SLASH_USED_COUNT_KEY } from './vars-keys';
 
 /**
@@ -319,20 +320,20 @@ export function canSlash(
  *  无限出杀(诸葛连弩/咆哮)时始终计入 quotaUsed(不计入 extraUsed),
  *  即使超过 quotaMax 也不动 extraUsed——文档规定无限出杀的杀只计入额定次数。
  *  否则优先扣额定,额定满后扣额外。在杀 use 的 execute 末尾调用。 */
-export function incSlashUsed(state: GameState, player = state.currentPlayerIndex): void {
-  const writeQuota = (value: number) => {
-    state.turn.vars[slashQuotaUsedKey(player)] = value;
-    if (player === state.currentPlayerIndex) state.turn.vars[QUOTA_USED_VAR] = value;
-  };
-  const writeExtra = (value: number) => {
-    state.turn.vars[slashExtraUsedKey(player)] = value;
-    if (player === state.currentPlayerIndex) state.turn.vars[EXTRA_USED_VAR] = value;
-  };
-  if (isSlashUnlimited(state, player)) {
-    writeQuota(slashQuotaUsed(state, player) + 1);
-  } else if (slashQuotaUsed(state, player) < slashQuotaMax(state, player)) {
-    writeQuota(slashQuotaUsed(state, player) + 1);
+export async function incSlashUsed(state: GameState, player = state.currentPlayerIndex): Promise<void> {
+  const quota = slashQuotaUsed(state, player);
+  const extra = slashExtraUsed(state, player);
+  if (isSlashUnlimited(state, player) || quota < slashQuotaMax(state, player)) {
+    const value = quota + 1;
+    await setTurnUsage(state, player, SLASH_USED_COUNT_KEY, value + extra, [
+      { scope: 'turn', key: slashQuotaUsedKey(player), value },
+      ...(player === state.currentPlayerIndex ? [{ scope: 'turn' as const, key: QUOTA_USED_VAR, value }] : []),
+    ]);
   } else {
-    writeExtra(slashExtraUsed(state, player) + 1);
+    const value = extra + 1;
+    await setTurnUsage(state, player, SLASH_USED_COUNT_KEY, quota + value, [
+      { scope: 'turn', key: slashExtraUsedKey(player), value },
+      ...(player === state.currentPlayerIndex ? [{ scope: 'turn' as const, key: EXTRA_USED_VAR, value }] : []),
+    ]);
   }
 }

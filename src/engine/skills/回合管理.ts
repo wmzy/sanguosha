@@ -6,6 +6,7 @@
 //   4) 主动 start action:仅主公位首次开局触发
 import type { GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
+import { runDetached } from '../core/run-tracker';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { handLimit } from '../rules/hand-limit';
 import { isFaceDown, flipFaceUpAll } from '../flows/face-down';
@@ -92,8 +93,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 不再执行其自动动作(摸牌/弃牌检查/自动结束),否则会让本应跳过的阶段仍摸牌。
     if (ctx.state.phase !== next) return;
 
-    // 摸牌阶段自动摸 2 张(摸牌 atom 内部处理牌堆不足时的洗牌补充)
-    if (next === '摸牌') {
+    // 摸牌阶段自动摸 2 张(摸牌 atom 内部处理牌堆不足时的洗牌补充)。
+    // 牌堆+弃牌堆都空 = 牌局已无法推进(测试夹具常见);此时跳过摸牌而不是让
+    // 摸牌 atom 抛错——异常会从 fire-and-forget 的超时/回合链里冒成 unhandled
+    // rejection,并让出牌窗口循环在测试结束后继续空转。
+    if (next === '摸牌' && ctx.state.zones.deck.length + ctx.state.zones.discardPile.length >= 2) {
       await applyAtom(ctx.state, { type: '摸牌', player, count: 2 });
     }
 
@@ -126,7 +130,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     //   2) currentPlayerIndex 不再是本玩家(本回合结束,轮到下家)
     // 条件 2 防止旧 IIFE 在下家出牌阶段因 phase 相同而持续为旧玩家创建出牌窗口。
     if (next === '出牌') {
-      void (async () => {
+      // 独立 run:该循环脱离当前 execute 链,由 run-tracker 记账(suspend/resume 平衡)。
+      runDetached(ctx.state, async () => {
         while (ctx.state.phase === '出牌' && ctx.state.currentPlayerIndex === player) {
           await applyAtom(ctx.state, {
             type: '出牌窗口',
@@ -134,7 +139,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
             timeout: 50,
           });
         }
-      })();
+      });
       return;
     }
 

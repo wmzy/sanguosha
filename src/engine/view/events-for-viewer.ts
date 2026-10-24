@@ -1,37 +1,25 @@
-// 从 state.atomHistory 派生某 viewer 可见的事件序列(供 session 广播/重连差量)。
-//
-// 投影规则(§8.2.2):
-// - atom.viewEvents.ownerViews.get(viewer) 非 null → 用 ownerView(专属)
-// - ownerViews.get(viewer) === null → 跳过(隐藏)
-// - ownerViews 无此 viewer 且 othersView 非 null → 用 othersView(通用)
-// - notify 事件按 views 字典分叉;无 views 则全量可见
+// Per-viewer event projection, including private, separately sequenced pending metadata.
 import type { GameState, GameEventEnvelope } from '../types';
 
-export function eventsForViewer(
-  state: GameState,
-  viewer: number,
-  sinceSeq = 0,
-): GameEventEnvelope[] {
+export function eventsForViewer(state: GameState, viewer: number, sinceSeq = 0): GameEventEnvelope[] {
   const out: GameEventEnvelope[] = [];
-  for (const e of state.atomHistory) {
-    if (e.seq <= sinceSeq) continue;
-    if (e.kind === 'atom') {
-      const owner = e.viewEvents.ownerViews.get(viewer);
-      if (owner === null) continue;
-      const viewEvent = owner ?? e.viewEvents.othersView;
-      if (!viewEvent) continue;
-      out.push({ seq: e.seq, timestamp: e.timestamp, view: viewEvent });
+  for (const entry of state.atomHistory) {
+    if (entry.seq <= sinceSeq) continue;
+    const envelope: GameEventEnvelope = { seq: entry.seq, timestamp: entry.timestamp };
+    if (entry.kind === 'atom') {
+      const owner = entry.viewEvents.ownerViews.get(viewer);
+      const event = owner === null ? null : owner ?? entry.viewEvents.othersView;
+      if (event) envelope.view = event;
     } else {
-      // kind === 'notify'
-      const data = e.views ? (e.views.get(String(viewer)) ?? null) : e.data;
-      if (data !== null) {
-        out.push({
-          seq: e.seq,
-          timestamp: e.timestamp,
-          notify: { skillId: e.skillId, eventType: e.eventType, data },
-        });
-      }
+      const data = entry.views ? entry.views.get(String(viewer)) ?? null : entry.data;
+      if (data !== null) envelope.notify = { skillId: entry.skillId, eventType: entry.eventType, data };
     }
+    const pendingKey = String(viewer);
+    if (entry.pendingViews && Object.prototype.hasOwnProperty.call(entry.pendingViews, pendingKey)) {
+      envelope.pending = entry.pendingViews[pendingKey];
+    }
+    // Hidden atom/notify does not hide a separately visible pending delta, and never exposes another viewer's snapshot.
+    if (envelope.view || envelope.notify || envelope.pending !== undefined) out.push(envelope);
   }
   return out;
 }

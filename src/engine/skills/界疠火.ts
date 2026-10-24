@@ -92,56 +92,52 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ─── transform action:把非火杀转化为火杀影子(preceding,杀.use 之前) ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
-      const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      // 非火杀:name === '杀' 且 damageType !== '火焰'(含普通杀与雷杀)
-      const isNonFireSlash = !!card && card.name === '杀' && card.damageType !== '火焰';
-      const ok =
-        myTurn && inActPhase && free && selfAlive && cardInHand && isNonFireSlash;
-      return ok ? null : '现在不能使用疠火';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      // outputDamageType='火焰' 是疠火核心:非火杀转化为火杀
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '杀',
-        outputDamageType: '火焰',
-      });
-      // 标记此影子为疠火转化,供后续 hook 识别
-      state.localVars[convertedKey(shadowId)] = true;
-    },
-    // rollback:主 action validate 失败时撤销转化
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      delete state.cardMap[shadowId];
-      delete state.localVars[convertedKey(shadowId)];
-      delete state.localVars[damagedKey(shadowId)];
-      state.players[ownerId].hand = state.players[ownerId].hand.map((id) =>
-        id === shadowId ? cardId : id,
-      );
-    },
-  );
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活
+    const myTurn = state.currentPlayerIndex === ownerId;
+    const inActPhase = state.phase === '出牌';
+    const free = !hasBlockingPending(state);
+    const self = state.players[ownerId];
+    const selfAlive = self.alive === true;
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    // 非火杀:name === '杀' 且 damageType !== '火焰'(含普通杀与雷杀)
+    const isNonFireSlash = !!card && card.name === '杀' && card.damageType !== '火焰';
+    const ok =
+      myTurn && inActPhase && free && selfAlive && cardInHand && isNonFireSlash;
+    return ok ? null : '现在不能使用疠火';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+    // outputDamageType='火焰' 是疠火核心:非火杀转化为火杀
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '杀',
+      outputDamageType: '火焰',
+    });
+    // 标记此影子为疠火转化,供后续 hook 识别
+    state.localVars[convertedKey(shadowId)] = true;
+  },
+  // rollback:主 action validate 失败时撤销转化
+  (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    delete state.cardMap[shadowId];
+    delete state.localVars[convertedKey(shadowId)];
+    delete state.localVars[damagedKey(shadowId)];
+    state.players[ownerId].hand = state.players[ownerId].hand.map((id) =>
+      id === shadowId ? cardId : id,
+    );
+  },);
 
   // ─── respond:玩家在「疠火/cost」询问下选弃哪张牌;超时 = 失去1体力 ──
   registerAction(

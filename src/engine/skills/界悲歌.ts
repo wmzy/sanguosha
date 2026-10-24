@@ -35,8 +35,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply'
-import { frameCards } from '../core/frame';
-import { runJudgeFlow } from '../flows/judge';
+import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
 import { flipFaceDown, flipFaceUp } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 
@@ -44,9 +43,6 @@ const START_RT = '界悲歌/chooseStart';
 const DISCARD_RT = '界悲歌/chooseDiscard';
 const START_KEY = '界悲歌/start';
 const DISCARD_CARD_KEY = '界悲歌/discardCard';
-const JUDGE_SUIT_KEY = '界悲歌/judgeSuit';
-const JUDGE_RANK_KEY = '界悲歌/judgeRank';
-const JUDGE_CARD_KEY = '界悲歌/judgeCardId';
 const SKIP_TAG = '界悲歌/翻面';
 const SKIP_FLAG = '界悲歌/skipAll';
 
@@ -100,14 +96,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.judgeType !== '界悲歌') return;
-    const processing = frameCards(ctx.state);
-    if (processing.length === 0) return;
-    const judgeCardId = processing[processing.length - 1];
-    const judgeCard = ctx.state.cardMap[judgeCardId];
+    const judgeCardId = currentJudgeCardId(ctx.state);
+    const judgeCard = judgeCardId ? ctx.state.cardMap[judgeCardId] : undefined;
     if (!judgeCard) return;
-    ctx.state.localVars[JUDGE_SUIT_KEY] = judgeCard.suit;
-    ctx.state.localVars[JUDGE_RANK_KEY] = judgeCard.rank;
-    ctx.state.localVars[JUDGE_CARD_KEY] = judgeCardId;
   });
 
   // ── 造成伤害 after hook:界悲歌主逻辑 ──
@@ -150,16 +141,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 判定(受伤角色);牌堆空则无法判定,界悲歌效果不触发
     if (ctx.state.zones.deck.length === 0) return;
-    delete ctx.state.localVars[JUDGE_SUIT_KEY];
-    delete ctx.state.localVars[JUDGE_RANK_KEY];
-    delete ctx.state.localVars[JUDGE_CARD_KEY];
-    await runJudgeFlow(ctx.state, targetIdx, '界悲歌');
-    const suit = ctx.state.localVars[JUDGE_SUIT_KEY] as string | undefined;
-    const _rank = ctx.state.localVars[JUDGE_RANK_KEY] as string | undefined;
-    const judgeCardId = ctx.state.localVars[JUDGE_CARD_KEY] as string | undefined;
-    delete ctx.state.localVars[JUDGE_SUIT_KEY];
-    delete ctx.state.localVars[JUDGE_RANK_KEY];
-    delete ctx.state.localVars[JUDGE_CARD_KEY];
+    const judgeCardId = await runJudgeFlow(ctx.state, targetIdx, '界悲歌');
+    const judgeCard = judgeCardId ? ctx.state.cardMap[judgeCardId] : undefined;
+    const suit = judgeCard?.suit;
+    const _rank = judgeCard?.rank;
     if (suit === undefined) return;
 
     const sourceIdx = atom.source;

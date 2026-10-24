@@ -130,7 +130,9 @@ describe('询问闪事件流(applyView 增量路径)', () => {
     expect(P2.processedView.players[1].health).toBe(3);
   });
 
-  it('target viewer 的 pending.prompt 必须有 cardFilter(前端据此高亮可出的牌)', async () => {
+  it('target viewer 的 pending.prompt 必须带可序列化的 cardFilter.candidates(前端据此高亮可出的牌)', async () => {
+    // 投影层契约:pending 由 view/pending.ts 权威投影并经 JSON 下发,filter 函数不可跨进程,
+    // 故可操作性必须由 cardFilter.candidates(权威手牌 id 列表)表达。
     await harness.setup(buildState({ p2Hand: ['c3'] }));
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
@@ -139,16 +141,13 @@ describe('询问闪事件流(applyView 增量路径)', () => {
 
     const prompt = P2.processedView.pending!.prompt as {
       type: string;
-      cardFilter?: { filter?: (c: Card) => boolean };
+      cardFilter?: { candidates?: string[] };
     };
     expect(prompt.type).toBe('useCard');
     expect(prompt.cardFilter).toBeDefined();
-    expect(prompt.cardFilter!.filter).toBeDefined();
-    // cardFilter 应该匹配闪牌
-    const dodgeCard = harness.state.cardMap['c3'];
-    expect(prompt.cardFilter!.filter!(dodgeCard)).toBe(true);
-    // 不匹配杀牌
-    const slashCard = harness.state.cardMap['c1'];
-    expect(prompt.cardFilter!.filter!(slashCard)).toBe(false);
+    expect(prompt.cardFilter!.candidates).toEqual(['c3']);
+    // P1 视角是非操作观察者:candidates 不得泄露对手手牌
+    const observerPrompt = P1.processedView.pending!.prompt as { cardFilter?: { candidates?: string[] } };
+    expect(JSON.stringify(observerPrompt)).not.toContain('c3');
   });
 });

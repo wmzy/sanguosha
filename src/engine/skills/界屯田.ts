@@ -32,15 +32,12 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply'
-import { frameCards } from '../core/frame';
-import { runJudgeFlow } from '../flows/judge';
+import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { DISTANCE_ATTACK_MOD_KEY } from '../rules/vars-keys';
 
 const CONFIRM_RT = '界屯田/confirm';
 const CONFIRMED_KEY = '屯田/confirmed';
-const JUDGE_SUIT_KEY = '屯田/judgeSuit';
-const JUDGE_CARD_KEY = '屯田/judgeCardId';
 const TIAN_PREFIX = '屯田/田:';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -99,16 +96,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 必须由 maybeTriggerTunTian 预设 CONFIRMED_KEY(玩家已选择发动)
     if (!ctx.state.localVars[CONFIRMED_KEY]) return;
 
-    const processing = frameCards(ctx.state);
-    if (processing.length === 0) return;
-    const judgeCardId = processing[processing.length - 1];
+    const judgeCardId = currentJudgeCardId(ctx.state);
+    if (!judgeCardId) return;
     const judgeCard = ctx.state.cardMap[judgeCardId];
     if (!judgeCard) return;
 
-    // 记录花色(供测试/调试观察)
-    ctx.state.localVars[JUDGE_SUIT_KEY] = judgeCard.suit;
-    ctx.state.localVars[JUDGE_CARD_KEY] = judgeCardId;
-
+    // 判定牌仅保留于私有本次判定 scope,不写 localVars。
     // 红桃:不拿(让 runJudgeFlow 收尾的 cleanupJudgeCard 把判定牌正常移入弃牌堆)
     if (judgeCard.suit === '♥') return;
 
@@ -162,11 +155,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!ctx.state.localVars[CONFIRMED_KEY]) return;
 
     // 判定(判定 after hook 会读取 CONFIRMED_KEY 并完成拿牌/加田)
-    delete ctx.state.localVars[JUDGE_SUIT_KEY];
-    delete ctx.state.localVars[JUDGE_CARD_KEY];
     await runJudgeFlow(ctx.state, ownerId, '屯田');
-    delete ctx.state.localVars[JUDGE_SUIT_KEY];
-    delete ctx.state.localVars[JUDGE_CARD_KEY];
   }
 
   /** 回合外触发(标版行为):currentPlayerIndex !== ownerId */

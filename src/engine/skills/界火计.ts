@@ -64,70 +64,66 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ─── transform action:红色牌(手牌或装备)→ 影子火攻 ──────────────
   // 作为 preceding 在 火攻.use(本座次被覆盖为界版)之前执行。
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活 + 红牌(手牌或装备)
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
-      const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const cardInEquip =
-        cardIdOk && Object.values(self.equipment).some((id) => id === cardId);
-      const isRed = !!card && card.color === '红';
-      const ok =
-        myTurn && inActPhase && free && selfAlive && (cardInHand || cardInEquip) && isRed;
-      return ok ? null : '现在不能使用界火计';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      const self = state.players[ownerId];
-      // 装备区红色牌:先卸下到手牌(产生 ViewEvent,清除装备 vars),再走当作。
-      // 镜像界武圣.ts / 奇袭.ts 的装备转化模式。
-      const equipSlotEntry = Object.entries(self.equipment).find(([, id]) => id === cardId);
-      if (equipSlotEntry) {
-        const slot = equipSlotEntry[0] as EquipSlot;
-        params['_origSlot'] = slot;
-        await applyAtom(state, { type: '卸下', player: ownerId, slot });
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活 + 红牌(手牌或装备)
+    const myTurn = state.currentPlayerIndex === ownerId;
+    const inActPhase = state.phase === '出牌';
+    const free = !hasBlockingPending(state);
+    const self = state.players[ownerId];
+    const selfAlive = self.alive === true;
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const cardInEquip =
+      cardIdOk && Object.values(self.equipment).some((id) => id === cardId);
+    const isRed = !!card && card.color === '红';
+    const ok =
+      myTurn && inActPhase && free && selfAlive && (cardInHand || cardInEquip) && isRed;
+    return ok ? null : '现在不能使用界火计';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    const self = state.players[ownerId];
+    // 装备区红色牌:先卸下到手牌(产生 ViewEvent,清除装备 vars),再走当作。
+    // 镜像界武圣.ts / 奇袭.ts 的装备转化模式。
+    const equipSlotEntry = Object.entries(self.equipment).find(([, id]) => id === cardId);
+    if (equipSlotEntry) {
+      const slot = equipSlotEntry[0] as EquipSlot;
+      params['_origSlot'] = slot;
+      await applyAtom(state, { type: '卸下', player: ownerId, slot });
+    }
+    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '火攻',
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子,牌还原)
+  (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const sId = shadowIdOf(cardId);
+    const self = state.players[ownerId];
+    const origSlot = params['_origSlot'] as EquipSlot | undefined;
+    delete state.cardMap[sId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) {
+      if (origSlot) {
+        // 原是装备牌:从手牌移除影子,还原装备槽位
+        self.hand.splice(idx, 1);
+        self.equipment[origSlot] = cardId;
+      } else {
+        // 原是手牌:影子替换回原卡
+        self.hand[idx] = cardId;
       }
-      // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '火攻',
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子,牌还原)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const sId = shadowIdOf(cardId);
-      const self = state.players[ownerId];
-      const origSlot = params['_origSlot'] as EquipSlot | undefined;
-      delete state.cardMap[sId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) {
-        if (origSlot) {
-          // 原是装备牌:从手牌移除影子,还原装备槽位
-          self.hand.splice(idx, 1);
-          self.equipment[origSlot] = cardId;
-        } else {
-          // 原是手牌:影子替换回原卡
-          self.hand[idx] = cardId;
-        }
-      }
-    },
-  );
+    }
+  },);
 
   // ─── use action:覆盖标版火攻.use,本座次走界版结算 ─────────────────
   // 火攻在 DEFAULT_SKILLS 中先实例化标版火攻.use;此处 registerAction 覆盖之(同 key 覆盖)。

@@ -41,6 +41,16 @@ async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
   const killTargetName = state.players[killTarget]?.name ?? '?';
 
   // 请求 A 选择：出杀(含 B/方天画戟多目标) 或 交出武器
+  const responseCardIds = state.players[target]?.hand.filter((cardId) => state.cardMap[cardId]?.name === '杀') ?? [];
+  const candidatesByCard: Record<string, number[]> = {};
+  const maxByCard: Record<string, number> = {};
+  for (const cardId of responseCardIds) {
+    candidatesByCard[cardId] = state.players
+      .filter((player) => player.alive && player.index !== target && inAttackRange(state, target, player.index, cardId))
+      .map((player) => player.index);
+    maxByCard[cardId] = slashTargetMax(state, target, cardId);
+  }
+  const responseCandidates = [...new Set(Object.values(candidatesByCard).flat())];
   await applyAtom(state, {
     type: '请求回应',
     requestType: REQUEST_TYPE,
@@ -49,8 +59,15 @@ async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
       type: 'useCardAndTarget',
       title: `借刀杀人:对 ${killTargetName} 使用一张杀,或交出武器`,
       cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
-      // 方天画戟等允许多目标;距离/必含 B 由后端 canUse + mandatedTargets 校验
-      targetFilter: { min: 1, max: 3, filter: () => true },
+      targetFilter: {
+        min: 1,
+        max: 3,
+        candidates: responseCandidates,
+        required: [killTarget],
+        candidatesByCard,
+        maxByCard,
+        filter: () => true,
+      },
     },
     timeout: 20,
   });
@@ -83,13 +100,13 @@ function canUseBorrowedSword(
   if (
     Array.isArray(params.targets) &&
     (params.targets as unknown[]).length >= 2 &&
-    typeof (params.targets as unknown[])[0] === 'number' &&
-    typeof (params.targets as unknown[])[1] === 'number'
+    (params.targets as unknown[]).every((value) => typeof value === 'number')
   ) {
     const arr = params.targets as number[];
     targetIdx = arr[0];
     killTargetIdx = arr[1];
   } else {
+    // Legacy wire shape is accepted only at this engine boundary during migration.
     targetIdx = params.target as number | undefined;
     killTargetIdx = params.killTarget as number | undefined;
   }
@@ -119,8 +136,7 @@ export const borrowedSwordEffect: CardEffect = {
     if (
       Array.isArray(params.targets) &&
       (params.targets as unknown[]).length >= 2 &&
-      typeof (params.targets as unknown[])[0] === 'number' &&
-      typeof (params.targets as unknown[])[1] === 'number'
+      (params.targets as unknown[]).every((value) => typeof value === 'number')
     ) {
       const arr = params.targets as number[];
       targetIdx = arr[0];

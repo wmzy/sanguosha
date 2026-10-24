@@ -1,13 +1,7 @@
 // src/engine/atoms/询问杀.ts
 // 询问杀:等待型 atom — 等待 target 出杀
-import type { ActionPrompt, AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { resolveTimeoutMs } from '../core/timeout';
-import {
-  SHORT_DELAY_MS,
-  SILENT_RESPONSE_PROMPT,
-  cardResponsePreResolveForTarget,
-  evaluateCardResponseModeForTarget,
-} from '../core/card-response-availability';
+import type { ActionPrompt, AtomDefinition, ViewEventSplit } from '../types';
+import { cardResponsePreResolveForTarget } from '../core/card-response-availability';
 
 const TIMEOUT_SEC = 15;
 const PROMPT: ActionPrompt = {
@@ -36,64 +30,11 @@ export const 询问杀: AtomDefinition<{ target: number; source: number }> = {
       cardResponsePreResolveForTarget(state, '询问杀', atom.target, (c) => c.name === '杀'),
   },
   effect: { blockUntilDone: true, duration: 200 },
-  toViewEvents(state, atom): ViewEventSplit {
-    const mode = evaluateCardResponseModeForTarget(state, '询问杀', atom.target, (c) => c.name === '杀');
-    const timeoutMs =
-      mode === 'silent' ? SHORT_DELAY_MS : resolveTimeoutMs(state, TIMEOUT_SEC);
-    const base: ViewEvent = {
-      type: '询问杀',
-      target: atom.target,
-      source: atom.source,
-      timeoutMs,
-      responseMode: mode,
-    };
+  // Interactive state is published from the actual slot, never reconstructed by the client clock.
+  toViewEvents(_state, atom): ViewEventSplit {
     return {
-      ownerViews: new Map([[atom.target, base]]),
-      othersView: base,
+      ownerViews: new Map(),
+      othersView: { type: '询问杀', target: atom.target, source: atom.source },
     };
-  },
-  applyView(view, event) {
-    const target = event.target as number;
-    const mode = (event.responseMode as 'normal' | 'silent' | 'skip' | undefined) ?? 'normal';
-    if (mode === 'skip') return;
-    const timeoutMs = (event.timeoutMs as number | undefined) ?? TIMEOUT_SEC * 1000;
-    const atomObj = {
-      type: '询问杀',
-      target,
-      source: event.source,
-    } as unknown as import('../types').Atom;
-    if (mode === 'silent') {
-      view.pending = {
-        type: 'awaits',
-        atom: atomObj,
-        prompt: SILENT_RESPONSE_PROMPT,
-        target,
-        responseMode: 'silent',
-        deadline: Date.now() + timeoutMs,
-        totalMs: timeoutMs,
-      };
-      return;
-    }
-    if (view.viewer === target) {
-      view.pending = {
-        type: 'awaits',
-        atom: atomObj,
-        prompt: PROMPT,
-        target,
-        responseMode: 'normal',
-        deadline: Date.now() + timeoutMs,
-        totalMs: timeoutMs,
-      };
-    } else {
-      view.pending = {
-        type: 'awaits',
-        atom: atomObj,
-        prompt: { type: 'confirm', title: `等待出杀`, cancelLabel: '' },
-        target,
-        deadline: Date.now() + timeoutMs,
-        totalMs: timeoutMs,
-      };
-    }
   },
 };
-

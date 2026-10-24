@@ -23,6 +23,7 @@ import {
 } from '../utils/gameViewHelpers';
 import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../../engine/data/card-defs';
 import { viewSlashTargetMax } from '../../engine/rules/action-active';
+import { resolveTargetSelection, validateTargetSelection } from '../../engine/rules/target-selection';
 
 /** 产出牌的真实 CardDef(type/subtype),供转化动作查找同源 use action。
  * 不能沿用原料牌的 type：装备原料(青釭剑)+普通牌在丈八组合中若沿用
@@ -61,19 +62,10 @@ function computeValidTargets(
   targetFilter: TargetFilter | null,
   rules: PlayRules,
 ): number[] {
-  const validTargets: number[] = [];
-  if (rules.needsTarget && !rules.hasSlots && !rules.selfTarget) {
-    const allowSelf = !!targetFilter?.allowSelf;
-    for (const p of view.players) {
-      if (!p.alive) continue;
-      if (p.index === seatIndex && !allowSelf) continue;
-      if (targetFilter?.filter && !targetFilter.filter(view, p.index)) continue;
-      validTargets.push(p.index);
-    }
-  } else if (rules.selfTarget) {
-    validTargets.push(seatIndex);
-  }
-  return validTargets;
+  if (rules.selfTarget) return [seatIndex];
+  if (!rules.needsTarget || !targetFilter) return [];
+  const selection = resolveTargetSelection(view, seatIndex, targetFilter);
+  return selection.targets ? selection.contract.candidates : [];
 }
 
 /** 目标数上下界(prompt.targetFilter 的投影)。
@@ -759,5 +751,50 @@ export function enumerateAvailableActions(
       category: 'play',
     });
   }
-  return actions;
+  return actions.flatMap((action) => {
+    const message = action.message;
+    const definition = skillActions.find((entry) =>
+      entry.skillId === message.skillId && entry.actionType === message.actionType) ??
+      (message.actionType === 'use' ? skillActions.find((entry) =>
+        entry.skillId === message.preceding?.[0]?.skillId && entry.actionType === message.preceding?.[0]?.actionType) : undefined);
+    const prompt = definition?.prompt;
+    if (!prompt || (prompt.type !== 'useCardAndTarget' && prompt.type !== 'selectTarget' && prompt.type !== 'choosePlayer'))
+      return [action];
+    if (prompt.type === 'useCardAndTarget' && prompt.selfTarget) return [action];
+    const filter: TargetFilter = prompt.type === 'choosePlayer'
+      ? { min: prompt.min, max: prompt.max, allowSelf: true, candidates: prompt.candidates, filter: prompt.filter }
+      : prompt.targetFilter;
+    if (!filter.slots?.length && filter.max === 0) return [action];
+    const id = message.params.cardId;
+    const material = message.preceding?.[0]?.params;
+    const materialId = material?.cardId ?? (Array.isArray(material?.cardIds) ? material.cardIds[0] : undefined);
+    const source = typeof id === 'string' ? view.cardMap[id] : undefined;
+    const ingredient = typeof materialId === 'string' ? view.cardMap[materialId] : undefined;
+    // 有 preceding 时原牌是转化原料、产出牌名 = 技能名,原牌名不足为凭(武圣 红牌当杀)。
+    // 没有 preceding 时,同名的 useCardAndTarget 出牌(杀本体)里选中的牌就是正在使用的牌;
+    // 而技能自带 cardFilter 的代价牌(离间 弃一张牌 + 选两名男性)动作名是技能名,
+    // 那张牌不是被使用的牌——按杀解释会让 min=max=2 塌成 1,引擎随即拒
+    // 「需要选择两名男性角色」。故用「动作名 === 牌名」判定是否同一张牌。
+    const slashScaled = !!message.preceding?.length || source?.name === message.skillId;
+    const card = source
+      ? { ...source, countsAsSlash: slashScaled }
+      : ingredient
+        ? { ...ingredient, name: message.skillId, countsAsSlash: slashScaled }
+        : undefined;
+    const resolved = resolveTargetSelection(view, seatIndex, filter, card);
+    if (!resolved.targets) return [];
+    const current = Array.isArray(message.params.targets) ? message.params.targets as number[] : [];
+    const targets = validateTargetSelection(view, seatIndex, filter, current, card)
+      ? current : resolved.targets;
+    const params = { ...message.params, targets };
+    if ('target' in params) params.target = targets[0];
+    return [{
+      ...action,
+      message: { ...message, params },
+      validTargets: resolved.contract.candidates,
+      targetSelection: resolved.contract,
+      ...(resolved.contract.min !== 1 ? { minTarget: resolved.contract.min } : {}),
+      maxTarget: resolved.contract.max,
+    }];
+  });
 }

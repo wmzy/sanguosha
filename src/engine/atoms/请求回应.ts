@@ -2,19 +2,11 @@
 // 请求回应:通用等待型 atom — 等待 target 玩家回应
 // src/engine/atoms/请求回应.ts
 // 请求回应:通用等待型 atom — 等待 target 玩家回应
-import type { ActionPrompt, AtomDefinition, Card, Json, ViewEventSplit, ViewEvent } from '../types';
+import type { ActionPrompt, AtomDefinition, Card, Json, ViewEventSplit } from '../types';
 
-import { applyAtom } from '../core/apply'
-import { resolveTimeoutMs } from '../core/timeout';
+import { applyAtom } from '../core/apply';
 import { handLimit } from '../rules/hand-limit';
-import { resolveChoosePlayerCandidates } from '../view/choosePlayerCandidates';
-import { resolveCardFilterCandidates } from '../view/cardFilterCandidates';
-import {
-  SHORT_DELAY_MS,
-  SILENT_RESPONSE_PROMPT,
-  cardResponsePreResolveForTarget,
-  evaluateCardResponseModeForTarget,
-} from '../core/card-response-availability';
+import { cardResponsePreResolveForTarget } from '../core/card-response-availability';
 
 /** 请求回应 的卡牌回应 filter:仅 useCard+cardFilter.filter 的非 mandatory 回应。
  *  其他(confirm / choosePlayer / distribute / pickTargetCard / mandatory 等)返回 null → 正常询问。
@@ -24,7 +16,8 @@ function responseCardFilter(atom: {
   prompt: ActionPrompt;
 }): ((card: Card) => boolean) | null {
   if (atom.mandatory === true) return null;
-  if (atom.prompt.type !== 'useCard') return null;
+  // prompt 在类型上可缺省(旧构造路径):无 prompt = 无卡牌过滤,按 normal 询问。
+  if (!atom.prompt || atom.prompt.type !== 'useCard') return null;
   const filter = atom.prompt.cardFilter?.filter;
   return typeof filter === 'function' ? filter : null;
 }
@@ -93,138 +86,11 @@ export const 请求回应: AtomDefinition<{
     },
   },
   effect: { blockUntilDone: true, duration: 200 },
-  toViewEvents(state, atom): ViewEventSplit {
-    // 应用房间 timeoutSec:优先 atom 自带 timeout,回退到 pending.timeout。
-    // 透传 timeoutMs 给 applyView,使其 deadline/totalMs 与后端真实定时器口径一致
-    // (createAndAwaitSlot 同样走 resolveTimeoutMs)。
-    // 卡牌回应型(useCard+cardFilter.filter,silent 模式)用固定短延时(不走 timeoutSec)。
-    const timeoutSec = atom.timeout ?? 请求回应.pending!.timeout;
-    const isBroadcast = atom.target < 0;
-    const cardFilter = responseCardFilter(atom);
-    const mode =
-      cardFilter && atom.target >= 0
-        ? evaluateCardResponseModeForTarget(state, '请求回应', atom.target, cardFilter, atom.requestType)
-        : 'normal';
-    const timeoutMs =
-      mode === 'silent' ? SHORT_DELAY_MS : resolveTimeoutMs(state, timeoutSec, isBroadcast);
-    // target 看到带 prompt 的请求(choosePlayer/cardFilter 注入可序列化 candidates)
-    const resolvedPrompt = resolveCardFilterCandidates(
-      resolveChoosePlayerCandidates(atom.prompt, state),
-      state,
-      atom.target,
-    );
-    const targetView: ViewEvent = {
-      type: '请求回应',
-      requestType: atom.requestType,
-      target: atom.target,
-      prompt: resolvedPrompt,
-      timeoutMs,
-      mandatory: atom.mandatory === true ? true : undefined,
-      responseMode: mode,
-    };
-    // 广播型(target=TARGET_BROADCAST,如无懈可击):所有存活玩家都可回应,
-    // 故 ownerViews 无人命中(Map key=target<0 不匹配真实 viewer),
-    // 将 othersView 设为带 prompt 的完整视图,让所有人都能看到回应提示。
-    if (atom.target < 0) {
-      return { ownerViews: new Map([[atom.target, targetView]]), othersView: targetView };
-    }
-    // 其他人只看到"某人被请求回应"
-    const othersView: ViewEvent = {
-      type: '请求回应',
-      requestType: atom.requestType,
-      target: atom.target,
-      timeoutMs,
-      mandatory: atom.mandatory === true ? true : undefined,
-      responseMode: mode,
-    };
+  toViewEvents(_state, atom): ViewEventSplit {
+    // Prompts/candidates belong only to the per-viewer authoritative pending envelope.
     return {
-      ownerViews: new Map([[atom.target, targetView]]),
-      othersView,
+      ownerViews: new Map(),
+      othersView: { type: '请求回应', requestType: atom.requestType, target: atom.target },
     };
-  },
-  applyView(view, event) {
-    const target = event.target as number;
-    const requestType = event.requestType as string | undefined;
-    const prompt = event.prompt as ActionPrompt | undefined;
-    // 超时:优先 event.timeoutMs(由 toViewEvents 经 resolveTimeoutMs 计算并透传),
-    // 回退到默认 30s。与后端 createAndAwaitSlot 口径一致。
-    const timeoutMs = (event.timeoutMs as number | undefined) ?? 30 * 1000;
-    const mandatory = event.mandatory === true;
-    const mode = (event.responseMode as 'normal' | 'silent' | 'skip' | undefined) ?? 'normal';
-    // 广播型(target=TARGET_BROADCAST,如无懈可击):存活玩家设置可操作 pending;
-    // 死亡玩家不参与任何询问(1EyezD:死亡玩家收到无懈询问但只能 skip)。
-    if (target < 0) {
-      if (!prompt) return;
-      // view.viewer 对应玩家已死亡 → 不设可操作 pending(死亡玩家不参与结算询问)。
-      // 增量视图累积的 players[].alive 在此时已是最终值(死亡由更早的 系统处理牌 atom 设置)。
-      if (view.viewer >= 0 && view.players[view.viewer]?.alive === false) return;
-      view.pending = {
-        type: 'awaits',
-        atom: {
-          type: '请求回应',
-          requestType,
-          target,
-          prompt,
-        } as unknown as import('../types').Atom,
-        prompt,
-        target,
-        deadline: Date.now() + timeoutMs,
-        totalMs: timeoutMs,
-        mandatory,
-      };
-      return;
-    }
-    // skip:卡牌回应型 target 手牌为 0,瞬间结束,不展示任何 pending。
-    if (mode === 'skip') return;
-    // target viewer
-    if (view.viewer === target) {
-      // silent:target 也不被询问——给观察型 pending(与其他人一致),仅展示短倒计时。
-      if (mode === 'silent') {
-        view.pending = {
-          type: 'awaits',
-          atom: {
-            type: '请求回应',
-            requestType,
-            target,
-          } as unknown as import('../types').Atom,
-          prompt: SILENT_RESPONSE_PROMPT,
-          target,
-          responseMode: 'silent',
-          deadline: Date.now() + timeoutMs,
-          totalMs: timeoutMs,
-          mandatory,
-        };
-        return;
-      }
-      // normal:完整 pending（可操作）
-      if (!prompt) return;
-      view.pending = {
-        type: 'awaits',
-        atom: {
-          type: '请求回应',
-          requestType,
-          target,
-          prompt,
-        } as unknown as import('../types').Atom,
-        prompt,
-        target,
-        responseMode: 'normal',
-        deadline: Date.now() + timeoutMs,
-        totalMs: timeoutMs,
-        mandatory,
-      };
-    } else {
-      // 其他 viewer:观察型 pending（不可操作,但 target 供视角自动跟随）
-      view.pending = {
-        type: 'awaits',
-        atom: { type: '请求回应', requestType, target } as unknown as import('../types').Atom,
-        prompt: { type: 'confirm', title: '等待回应', cancelLabel: '' },
-        target,
-        deadline: Date.now() + timeoutMs,
-        totalMs: timeoutMs,
-        mandatory,
-      };
-    }
   },
 };
-

@@ -30,63 +30,59 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // transform action:把黑桃手牌转化为影子"酒"(新建 Card 实体,shadowOf 指向原卡)。
   // 作为 preceding 在 酒.use 之前执行。酒.validate 读 cardMap[影子id] 看到"酒"。
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 无 pending + 存活 + 手牌 + 黑桃
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const free = !hasBlockingPending(state);
-      const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const isSpade = !!card && card.suit === '♠';
-      // 濒死求桃窗口:已声明 declareAlternativeResponse('请求回应','桃/求桃'),
-      // 转化出的影子【酒】可经 酒.respond 当桃自救——此时非自己回合且有阻塞 pending,须放行。
-      // 仅限自己濒死:求桃循环会对每个存活玩家发 桃/求桃(target=被问询者),他人濒死
-      // 轮到董卓时 slot.target 同样等于 ownerId;不加 health<=0 门控,组合消息
-      // (酒池.transform + 酒.respond)即可用黑桃牌救他人,违反「酒仅自救」。
-      // runDyingFlow 的 while 循环保证濒死者整个问询期间 health<=0。
-      const slot = state.pendingSlots.get(ownerId);
-      const atomType = (slot?.atom as { type?: string })?.type;
-      const reqType = (slot?.atom as { requestType?: string })?.requestType;
-      const atomTarget = (slot?.atom as { target?: number })?.target;
-      const askedPeach =
-        !!slot &&
-        atomTarget === ownerId &&
-        atomType === '请求回应' &&
-        reqType === '桃/求桃' &&
-        self.health <= 0;
-      const ok = (myTurn && free && selfAlive) || (selfAlive && askedPeach);
-      return cardInHand && isSpade && ok ? null : '现在不能使用酒池';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '酒',
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const sId = shadowIdOf(cardId);
-      delete state.cardMap[sId];
-      const self = state.players[ownerId];
-      const idx = self.hand.indexOf(sId);
-      if (idx >= 0) self.hand[idx] = cardId;
-    },
-  );
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    // 通用合法条件:自己回合 + 无 pending + 存活 + 手牌 + 黑桃
+    const myTurn = state.currentPlayerIndex === ownerId;
+    const free = !hasBlockingPending(state);
+    const self = state.players[ownerId];
+    const selfAlive = self.alive === true;
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const isSpade = !!card && card.suit === '♠';
+    // 濒死求桃窗口:已声明 declareAlternativeResponse('请求回应','桃/求桃'),
+    // 转化出的影子【酒】可经 酒.respond 当桃自救——此时非自己回合且有阻塞 pending,须放行。
+    // 仅限自己濒死:求桃循环会对每个存活玩家发 桃/求桃(target=被问询者),他人濒死
+    // 轮到董卓时 slot.target 同样等于 ownerId;不加 health<=0 门控,组合消息
+    // (酒池.transform + 酒.respond)即可用黑桃牌救他人,违反「酒仅自救」。
+    // runDyingFlow 的 while 循环保证濒死者整个问询期间 health<=0。
+    const slot = state.pendingSlots.get(ownerId);
+    const atomType = (slot?.atom as { type?: string })?.type;
+    const reqType = (slot?.atom as { requestType?: string })?.requestType;
+    const atomTarget = (slot?.atom as { target?: number })?.target;
+    const askedPeach =
+      !!slot &&
+      atomTarget === ownerId &&
+      atomType === '请求回应' &&
+      reqType === '桃/求桃' &&
+      self.health <= 0;
+    const ok = (myTurn && free && selfAlive) || (selfAlive && askedPeach);
+    return cardInHand && isSpade && ok ? null : '现在不能使用酒池';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const shadowId = shadowIdOf(cardId);
+    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds: [cardId],
+      shadowId,
+      outputName: '酒',
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
+  (state: GameState, params: Record<string, Json>) => {
+    const cardId = params.cardId as string;
+    const sId = shadowIdOf(cardId);
+    delete state.cardMap[sId];
+    const self = state.players[ownerId];
+    const idx = self.hand.indexOf(sId);
+    if (idx >= 0) self.hand[idx] = cardId;
+  },);
   const unloadDecl = declareAlternativeResponse(state, ownerId, '请求回应', '桃/求桃');
   return () => { unloadDecl(); };
 }

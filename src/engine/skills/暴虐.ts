@@ -12,8 +12,7 @@
 //   - 判定牌在 frame.cards 末尾(判定牌生效后时仍在结算帧牌区顶,runJudgeFlow 收尾后才入弃牌堆)
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
-import { frameCards } from '../core/frame';
-import { runJudgeFlow } from '../flows/judge';
+import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
 
 const CONFIRM_RT = '暴虐/confirm';
@@ -101,9 +100,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.player !== ownerId) return;
 
     // 读判定牌(判定牌生效后,仍在结算帧牌区顶,runJudgeFlow 收尾才入弃牌堆)
-    const processing = frameCards(ctx.state);
-    if (processing.length === 0) return;
-    const judgeCardId = processing[processing.length - 1];
+    const judgeCardId = currentJudgeCardId(ctx.state);
+    if (!judgeCardId) return;
     const judgeCard = ctx.state.cardMap[judgeCardId];
     if (!judgeCard) return;
 

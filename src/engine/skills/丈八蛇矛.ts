@@ -62,71 +62,67 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // transform action:把 2 张手牌转化为影子"杀"(新建 Card 实体,shadowOf 留空)。
   // 作为 preceding 在 杀.use 之前执行。杀.validate 读 cardMap[影子id] 看到"杀"。
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'transform',
-    (state: GameState, params: Record<string, Json>) => {
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
+  registerAction(state,
+  skill.id,
+  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+    const myTurn = state.currentPlayerIndex === ownerId;
+    const inActPhase = state.phase === '出牌';
+    const free = !hasBlockingPending(state);
+    const self = state.players[ownerId];
+    const selfAlive = self.alive === true;
+    const cardIds = params.cardIds;
+    if (!Array.isArray(cardIds) || cardIds.length !== 2) return '需要选择 2 张手牌';
+    const [id1, id2] = cardIds as string[];
+    if (typeof id1 !== 'string' || typeof id2 !== 'string') return 'cardIds 必须为字符串';
+    if (id1 === id2) return '不能选择同一张牌';
+    const cardInHand = !!self && self.hand.includes(id1) && self.hand.includes(id2);
+    const c1 = state.cardMap[id1];
+    const c2 = state.cardMap[id2];
+    const cardsExist = !!c1 && !!c2;
+    // 武器校核:必须装备丈八蛇矛(动态检查,允许同帧内换下后不再触发)
+    const weaponId = self.equipment['武器'];
+    const weaponCard = weaponId ? state.cardMap[weaponId] : undefined;
+    const hasZhangba = weaponCard?.name === '丈八蛇矛';
+    // 回应路径(被询问杀:南蛮入侵/决斗):与武圣同构,preceding 在 杀.respond 前
+    const slot = state.pendingSlots.get(ownerId);
+    const atomType = (slot?.atom as { type?: string })?.type;
+    const reqType = (slot?.atom as { requestType?: string })?.requestType;
+    const atomTarget = (slot?.atom as { target?: number })?.target;
+    const askedKill =
+      !!slot &&
+      atomTarget === ownerId &&
+      (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
+    const contextOk = (myTurn && inActPhase && free) || askedKill;
+    const ok =
+      selfAlive && cardInHand && cardsExist && hasZhangba && contextOk;
+    return ok ? null : '丈八蛇矛转化条件不满足';
+  },
+  async (state: GameState, params: Record<string, Json>) => {
+    const cardIds = params.cardIds as string[];
+    const [id1, id2] = cardIds;
+    const shadowId = shadowIdOf(id1, id2);
+    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
+    await applyAtom(state, {
+      type: '当作',
+      player: ownerId,
+      cardIds,
+      shadowId,
+      outputName: '杀',
+    });
+  },
+  // rollback:主 action validate 失败时,撤销转化(删影子 + 还原卡)
+  (state: GameState, params: Record<string, Json>) => {
+    const cardIds = params.cardIds;
+    const [id1, id2] = Array.isArray(cardIds) ? (cardIds as string[]) : [];
+    const sId = id1 && id2 ? shadowIdOf(id1, id2) : undefined;
+    if (sId) {
+      delete state.cardMap[sId];
       const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
-      const cardIds = params.cardIds;
-      if (!Array.isArray(cardIds) || cardIds.length !== 2) return '需要选择 2 张手牌';
-      const [id1, id2] = cardIds as string[];
-      if (typeof id1 !== 'string' || typeof id2 !== 'string') return 'cardIds 必须为字符串';
-      if (id1 === id2) return '不能选择同一张牌';
-      const cardInHand = !!self && self.hand.includes(id1) && self.hand.includes(id2);
-      const c1 = state.cardMap[id1];
-      const c2 = state.cardMap[id2];
-      const cardsExist = !!c1 && !!c2;
-      // 武器校核:必须装备丈八蛇矛(动态检查,允许同帧内换下后不再触发)
-      const weaponId = self.equipment['武器'];
-      const weaponCard = weaponId ? state.cardMap[weaponId] : undefined;
-      const hasZhangba = weaponCard?.name === '丈八蛇矛';
-      // 回应路径(被询问杀:南蛮入侵/决斗):与武圣同构,preceding 在 杀.respond 前
-      const slot = state.pendingSlots.get(ownerId);
-      const atomType = (slot?.atom as { type?: string })?.type;
-      const reqType = (slot?.atom as { requestType?: string })?.requestType;
-      const atomTarget = (slot?.atom as { target?: number })?.target;
-      const askedKill =
-        !!slot &&
-        atomTarget === ownerId &&
-        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
-      const contextOk = (myTurn && inActPhase && free) || askedKill;
-      const ok =
-        selfAlive && cardInHand && cardsExist && hasZhangba && contextOk;
-      return ok ? null : '丈八蛇矛转化条件不满足';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardIds = params.cardIds as string[];
-      const [id1, id2] = cardIds;
-      const shadowId = shadowIdOf(id1, id2);
-      // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds,
-        shadowId,
-        outputName: '杀',
-      });
-    },
-    // rollback:主 action validate 失败时,撤销转化(删影子 + 还原卡)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardIds = params.cardIds;
-      const [id1, id2] = Array.isArray(cardIds) ? (cardIds as string[]) : [];
-      const sId = id1 && id2 ? shadowIdOf(id1, id2) : undefined;
-      if (sId) {
-        delete state.cardMap[sId];
-        const self = state.players[ownerId];
-        const idx = self.hand.indexOf(sId);
-        if (idx >= 0) self.hand.splice(idx, 1);
-        self.hand.push(id1, id2);
-      }
-    },
-  );
+      const idx = self.hand.indexOf(sId);
+      if (idx >= 0) self.hand.splice(idx, 1);
+      self.hand.push(id1, id2);
+    }
+  },);
   // 声明替代回应:被询问杀(南蛮入侵/决斗 等)时,可用丈八蛇矛把 2 张手牌当杀打出。
   // 与武圣同构:声明后 询问杀 的可用性检测不再 skip,建立回应窗口。
   const unloadAlt = declareAlternativeResponse(state, ownerId, '询问杀');

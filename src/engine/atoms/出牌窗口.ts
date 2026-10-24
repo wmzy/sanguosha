@@ -3,9 +3,8 @@
 // 与请求回应的区别:出牌窗口不要求玩家做任何特定动作。玩家可自由出牌/用技/结束回合,
 // 每次操作都 resolve 当前窗口(回合管理的 IIFE 循环重建它)。超时则结束回合。
 // isBlocking=false 让 hasBlockingPending / 前端 isPerspectiveAwaiting 跳过它。
-import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { applyAtom } from '../core/apply'
-import { resolveTimeoutMs } from '../core/timeout';
+import type { AtomDefinition, ViewEventSplit } from '../types';
+import { applyAtom } from '../core/apply';
 
 const DEFAULT_TIMEOUT_SEC = 50;
 
@@ -30,49 +29,7 @@ export const 出牌窗口: AtomDefinition<{ player: number; timeout?: number }> 
     isBlocking: false,
   },
   effect: { blockUntilDone: true, duration: 200 },
-  toViewEvents(state, atom): ViewEventSplit {
-    const timeoutMs = resolveTimeoutMs(state, DEFAULT_TIMEOUT_SEC);
-    const playerView: ViewEvent = {
-      type: '出牌窗口',
-      player: atom.player,
-      timeoutMs,
-    };
-    const othersView: ViewEvent = {
-      type: '出牌窗口',
-      player: atom.player,
-      timeoutMs,
-    };
-    return {
-      ownerViews: new Map([[atom.player, playerView]]),
-      othersView,
-    };
-  },
-  applyView(view, event) {
-    const player = event.player as number;
-    const timeoutMs = (event.timeoutMs as number | undefined) ?? DEFAULT_TIMEOUT_SEC * 1000;
-    // player viewer: 出牌阶段 pending(非阻塞,前端据此渲染出牌 UI 而非回应面板)
-    if (view.viewer === player) {
-      view.pending = {
-        type: 'awaits',
-        atom: { type: '出牌窗口', player } as unknown as import('../types').Atom,
-        prompt: { type: 'confirm', title: '出牌阶段', cancelLabel: '结束回合' },
-        target: player,
-        isBlocking: false,
-        deadline: Date.now() + timeoutMs,
-        totalMs: timeoutMs,
-      };
-    } else {
-      // 其他 viewer:观察型 pending(不可操作)
-      view.pending = {
-        type: 'awaits',
-        atom: { type: '出牌窗口', player } as unknown as import('../types').Atom,
-        prompt: { type: 'confirm', title: '等待出牌', cancelLabel: '' },
-        target: player,
-        isBlocking: false,
-        deadline: Date.now() + timeoutMs,
-        totalMs: timeoutMs,
-      };
-    }
+  toViewEvents(_state, atom): ViewEventSplit {
+    return { ownerViews: new Map(), othersView: { type: '出牌窗口', player: atom.player } };
   },
 };
-

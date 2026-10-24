@@ -12,7 +12,7 @@
 // 录制器(ReplayRecorder)内部仍逐座次收集完整 initialView,在 finalize 时
 // 提取公共 baseline + 计算每座次 delta,录制逻辑零改动。
 
-import type { Card, GameView, ViewEvent } from '../../engine/types';
+import type { Card, GameView, PendingView, ViewEvent } from '../../engine/types';
 
 export const REPLAY_FORMAT = 'sanguosha-replay' as const;
 export const REPLAY_VERSION = 2;
@@ -60,7 +60,8 @@ export interface SeatDelta {
   /** 该 viewer 视角下各玩家的身份可见性。
    *  baseline 不含身份(主公身份公开规则由各座次视角决定),每座次独立存。 */
   identityView: Array<{ index: number; identity?: string; identityHidden?: boolean }>;
-  /** 该座次收到的 ViewEvent 序列(数组下标即 seq) */
+  /** pending-only metadata snapshots; does not enter animation event playback. */
+  pending?: PendingView | null;
   events: ReplayEvent[];
 }
 

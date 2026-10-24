@@ -37,9 +37,7 @@ function canUseSupplyShortage(
 /** 兵粮寸断的生效后效果：判定 → 非♣加跳过标签 → 移除延时锦囊 */
 async function resolveSupplyShortage(ctx: ResolveCtx): Promise<void> {
   const { state, target } = ctx;
-  await runJudgeFlow(state, target, '兵粮寸断');
-  const judgeCardId = state.localVars['判定/finalJudgeCardId'] as string | undefined;
-  delete state.localVars['判定/finalJudgeCardId'];
+  const judgeCardId = await runJudgeFlow(state, target, '兵粮寸断');
   const judgeCard = judgeCardId ? state.cardMap[judgeCardId] : undefined;
   if (judgeCard && judgeCard.suit !== '♣') {
     // 非♣：加跳过摸牌阶段标签

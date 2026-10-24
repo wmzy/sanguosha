@@ -12,7 +12,6 @@
 //   - 来源手牌不足两张时只能选择受到伤害(规则 FAQ)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
-import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
@@ -70,19 +69,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     unloaders.push(u);
   }
 
-  // ── 判定牌生效后 after hook:捕获判定牌花色(仍在结算帧牌区顶,尚未入弃牌堆)──
-  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.judgeType !== '刚烈') return;
-    if (atom.player !== ownerId) return;
-    const processing = frameCards(ctx.state);
-    if (processing.length === 0) return;
-    const judgeCardId = processing[processing.length - 1];
-    const judgeCard = ctx.state.cardMap[judgeCardId];
-    if (!judgeCard) return;
-    ctx.state.localVars['刚烈/judgeSuit'] = judgeCard.suit;
-  });
-
+  // 判定结果由 runJudgeFlow 直接返回；不再通过全局临时变量捕获。
   // ── 造成伤害 after hook:刚烈主逻辑 ──
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
@@ -113,9 +100,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     });
     if (!ctx.state.localVars['刚烈/confirmed']) return; // 不发动
 
-    delete ctx.state.localVars['刚烈/judgeSuit'];
-    await runJudgeFlow(ctx.state, ownerId, '刚烈');
-    const suit = ctx.state.localVars['刚烈/judgeSuit'] as string | undefined;
+    const judgeCardId = await runJudgeFlow(ctx.state, ownerId, '刚烈');
+    const suit = judgeCardId ? ctx.state.cardMap[judgeCardId]?.suit : undefined;
     if (suit === undefined) return; // 判定未产出牌
     if (suit === '♥') return; // 红桃:无事发生
 
