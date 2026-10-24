@@ -6,7 +6,7 @@
 import type { GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
-import { isCancelled, clearCancelled } from '../core/frame';
+import { isCancelled, setFrameCancelled } from '../core/frame';
 import { getGender } from '../data/character-meta';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -64,7 +64,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 第一次闪:清除 cancelled + 追加第二次询问
     // 闪牌已由 runUseFlow 自动移入弃牌堆,无需手动 drain
-    clearCancelled(ctx.state, killCardId, target);
+    await setFrameCancelled(ctx.state, ctx.frame, false);
     ctx.state.localVars[countKey] = count + 1;
 
     await applyAtom(ctx.state, { type: '询问闪', target, source: atom.source });

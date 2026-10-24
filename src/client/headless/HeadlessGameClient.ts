@@ -48,6 +48,20 @@ export class HeadlessGameClient {
   // ── 重连机制 ──
   /** 主动断开标记:disconnect() 设为 true,不触发重连 */
   private intentionalDisconnect = false;
+  /** 作废旧建房/加入请求及其后续回调，避免离开或换房后迟到响应复活连接。 */
+  private connectionGeneration = 0;
+
+  private isCurrentConnection(generation: number): boolean {
+    return generation === this.connectionGeneration && !this.intentionalDisconnect;
+  }
+
+  private beginConnection(debugMode: boolean): number {
+    this.disconnect();
+    this.intentionalDisconnect = false;
+    this._debugMode = debugMode;
+    return this.connectionGeneration;
+  }
+
   /** 当前重连状态 */
   private _reconnectState: ReconnectState = 'idle';
   /** 是否为 debug 模式(影响连接方式) */
@@ -164,12 +178,7 @@ export class HeadlessGameClient {
 
   /** 检查 REST 响应是否成功，失败时抛出带 status 的错误 */
   private async assertOk(resp: Response, fallbackMsg: string): Promise<void> {
-    if (resp.ok) return;
-    const body = await resp.json().catch(() => ({}));
-    const message = (body as { error?: string }).error ?? fallbackMsg;
-    const err = new Error(message) as Error & { status: number };
-    err.status = resp.status;
-    throw err;
+    if (!resp.ok) throw await this.requestError(resp, fallbackMsg);
   }
 
   /** 程序化认证:换取/复用会话 token(幂等,并发安全)。
@@ -206,36 +215,81 @@ export class HeadlessGameClient {
         await authOnce('login');
       }
     })().catch((err) => {
-      const e = err instanceof Error ? err : new Error(String(err));
-      this.callbacks.onError?.(e);
       this.authInitPromise = null;
-      throw e;
+      // 建房/加入的 Promise 是认证错误的唯一通道，避免宿主 catch 与 onError 重复提示。
+      throw err instanceof Error ? err : new Error(String(err));
     });
     return this.authInitPromise;
   }
 
-  /** 带 auth 头的 fetch(有 token 时)。 */
+  /** 带 auth 头的 fetch(有 token 时)。浏览器无 token 时保留 Cookie 行为。 */
   private authFetch(url: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers ?? {});
     if (this.authToken) headers.set('Authorization', `Bearer ${this.authToken}`);
     return fetch(url, { ...init, headers });
   }
 
+  /** 读取 HTTP 错误并构造可观测错误。 */
+  private async requestError(resp: Response, fallbackMsg: string): Promise<Error & { status: number }> {
+    const body = await resp.json().catch(() => ({}));
+    const message = (body as { error?: string }).error ?? fallbackMsg;
+    const err = new Error(message) as Error & { status: number };
+    err.status = resp.status;
+    return err;
+  }
+
+  /** 上报 REST 错误；action 还要标记 rejected，供 runPlay 不再等待 SSE。 */
+  private reportRequestError(err: Error, rejected = false): void {
+    if (rejected) {
+      this._lastActionRejected = true;
+      this.callbacks.onActionRejected?.();
+    }
+    this.callbacks.onError?.(err);
+  }
+
+  /** 房间命令只在当前连接上生效；HTTP/网络错误统一上报一次。 */
+  private async requestRoom(
+    op: string,
+    fallbackMsg: string,
+    body: Record<string, unknown> = {},
+    method = 'POST',
+    rejected = false,
+  ): Promise<Response | null> {
+    if (!this._roomId || !this._playerId || this.intentionalDisconnect) return null;
+    const generation = this.connectionGeneration;
+    try {
+      const resp = await this.authFetch(`${this.baseUrl}/api/rooms/${this._roomId}/${op}`, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: this._playerId, ...body }),
+      });
+      if (!this.isCurrentConnection(generation)) return null;
+      await this.assertOk(resp, fallbackMsg);
+      return this.isCurrentConnection(generation) ? resp : null;
+    } catch (err) {
+      if (this.isCurrentConnection(generation)) {
+        this.reportRequestError(err instanceof Error ? err : new Error(String(err)), rejected);
+      }
+      return null;
+    }
+  }
+
   /** 创建 debug 房间并自动 join 0 号座。
    *  playerId 可选:指定则用作本座次身份,否则由服务端自动生成。 */
   async createDebugRoom(playerCount: number, config?: RoomConfig, playerId?: string): Promise<void> {
-    this._debugMode = true;
-    this.intentionalDisconnect = false;
+    const generation = this.beginConnection(true);
 
     const resp = await fetch(`${this.baseUrl}/api/debug-room`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerCount, config, autoJoin: true, playerId }),
     });
+    if (!this.isCurrentConnection(generation)) return;
     await this.assertOk(resp, '创建调试房间失败');
     const data = await resp.json() as { roomId: string; playerId: string; seatIndex: number };
+    if (!this.isCurrentConnection(generation)) return;
     this._seatIndex = data.seatIndex;
-    this.updateIdentity({ roomId: data.roomId, playerId: data.playerId });
+    this.updateIdentity({ roomId: data.roomId, playerId: data.playerId, isSpectator: false });
     this.canReconnect = true;
 
     this.openStream();
@@ -248,18 +302,19 @@ export class HeadlessGameClient {
    *  传 false——浏览器对同源 HTTP/1.1 有 6 连接上限,N 条长连 SSE 会饿死页面上的
    *  图片/请求,非当前视角座次只做 REST 驱动,不持有流。 */
   async connect(roomId: string, seatIndex?: number, playerId?: string, opts?: { stream?: boolean }): Promise<void> {
-    this._debugMode = true;
+    const generation = this.beginConnection(true);
     this._seatIndex = seatIndex ?? this._seatIndex;
-    this.updateIdentity({ roomId, playerId: playerId ?? undefined });
-    this.intentionalDisconnect = false;
+    this.updateIdentity({ roomId, playerId: playerId ?? undefined, isSpectator: false });
 
     const resp = await fetch(`${this.baseUrl}/api/debug-room/${roomId}/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId: this._playerId ?? undefined, lastSeq: this._lastSeq }),
     });
+    if (!this.isCurrentConnection(generation)) return;
     await this.assertOk(resp, '加入调试房间失败');
     const data = await resp.json() as { roomId: string; playerId: string; seatIndex: number };
+    if (!this.isCurrentConnection(generation)) return;
     this._seatIndex = data.seatIndex;
     this.updateIdentity({ roomId: data.roomId, playerId: data.playerId });
     this.canReconnect = true;
@@ -270,18 +325,20 @@ export class HeadlessGameClient {
 
   /** 创建普通(多人)房间:本连接成为房主。roomType: 'normal'=持久化, 'quick'=纯内存(默认)。 */
   async createRoom(name: string, maxPlayers: number, config?: RoomConfig, playerId?: string, roomType?: 'normal' | 'quick', password?: string): Promise<void> {
-    this._debugMode = false;
-    this.intentionalDisconnect = false;
+    const generation = this.beginConnection(false);
     if (this.auth) await this.ensureAuth();
+    if (!this.isCurrentConnection(generation)) return;
 
     const resp = await this.authFetch(`${this.baseUrl}/api/rooms`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, maxPlayers, config, playerId, roomType, password: password ?? undefined }),
     });
+    if (!this.isCurrentConnection(generation)) return;
     await this.assertOk(resp, '创建房间失败');
     const data = await resp.json() as { roomId: string; playerId: string };
-    this.updateIdentity({ roomId: data.roomId, playerId: data.playerId });
+    if (!this.isCurrentConnection(generation)) return;
+    this.updateIdentity({ roomId: data.roomId, playerId: data.playerId, isSpectator: false });
     this.canReconnect = true;
 
     this.openStream();
@@ -290,19 +347,21 @@ export class HeadlessGameClient {
 
   /** 加入普通(多人)房间。password: 有密码房间必填(错误时服务端 403 ROOM_PASSWORD_REQUIRED)。 */
   async joinRoom(roomId: string, playerId?: string, password?: string): Promise<void> {
-    this._debugMode = false;
-    this.updateIdentity({ roomId });
-    this.intentionalDisconnect = false;
+    const generation = this.beginConnection(false);
+    this.updateIdentity({ roomId, isSpectator: false });
     if (this.auth) await this.ensureAuth();
+    if (!this.isCurrentConnection(generation)) return;
 
     const resp = await this.authFetch(`${this.baseUrl}/api/rooms/${roomId}/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId, password: password ?? undefined }),
     });
+    if (!this.isCurrentConnection(generation)) return;
     await this.assertOk(resp, '加入房间失败');
     const data = await resp.json() as { roomId: string; playerId: string };
-    this.updateIdentity({ roomId: data.roomId, playerId: data.playerId });
+    if (!this.isCurrentConnection(generation)) return;
+    this.updateIdentity({ roomId: data.roomId, playerId: data.playerId, isSpectator: false });
     this.canReconnect = true;
 
     this.openStream();
@@ -310,18 +369,20 @@ export class HeadlessGameClient {
 
   /** 以旁观者身份加入房间。不占座次，默认看公开视图。 */
   async joinAsSpectator(roomId: string, playerId?: string, password?: string): Promise<void> {
-    this._debugMode = false;
+    const generation = this.beginConnection(false);
     this.updateIdentity({ roomId });
-    this.intentionalDisconnect = false;
     if (this.auth) await this.ensureAuth();
+    if (!this.isCurrentConnection(generation)) return;
 
     const resp = await this.authFetch(`${this.baseUrl}/api/rooms/${roomId}/join-spectator`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ playerId, password: password ?? undefined }),
     });
+    if (!this.isCurrentConnection(generation)) return;
     await this.assertOk(resp, '加入旁观失败');
     const data = await resp.json() as { roomId: string; playerId: string };
+    if (!this.isCurrentConnection(generation)) return;
     this.updateIdentity({ roomId: data.roomId, playerId: data.playerId, isSpectator: true });
     this.canReconnect = true;
 
@@ -360,25 +421,25 @@ export class HeadlessGameClient {
   }
 
   private attachEventSourceHandlers(): void {
-    if (!this.eventSource) return;
+    const source = this.eventSource;
+    if (!source) return;
+    const isCurrent = () => this.eventSource === source && !this.intentionalDisconnect;
     this.sseConnected = false;
 
-    this.eventSource.onopen = () => {
+    source.onopen = () => {
+      if (!isCurrent()) return;
       this.sseConnected = true;
-      if (this.intentionalDisconnect) {
-        this.eventSource?.close();
-        return;
-      }
       this.setReconnectState('idle');
     };
 
-    this.eventSource.onmessage = (ev) => {
+    source.onmessage = (ev) => {
+      if (!isCurrent()) return;
       this.handleRaw(ev.data);
     };
 
-    this.eventSource.onerror = () => {
+    source.onerror = () => {
+      if (!isCurrent()) return;
       this.sseConnected = false;
-      if (this.intentionalDisconnect) return;
       // EventSource 自动重连——映射为 reconnecting 状态
       if (this.canReconnect) {
         this.setReconnectState('reconnecting');
@@ -1050,16 +1111,7 @@ export class HeadlessGameClient {
 
   /** POST action 到服务端 */
   private async postAction(action: EngineClientMessage): Promise<void> {
-    if (!this._roomId || !this._playerId) return;
-    try {
-      await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/action`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: this._playerId, action }),
-      });
-    } catch (err) {
-      this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
-    }
+    await this.requestRoom('action', '操作失败', { action }, 'POST', true);
   }
 
   /** 返回并清除最近一次 action 是否被服务端拒（供 runPlay 轮询，已拒则报告 rejected）。 */
@@ -1071,16 +1123,7 @@ export class HeadlessGameClient {
 
   /** 重排手牌 */
   async reorderHand(order: string[]): Promise<void> {
-    if (!this._roomId || !this._playerId) return;
-    try {
-      await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/reorder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: this._playerId, order }),
-      });
-    } catch (err) {
-      this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
-    }
+    await this.requestRoom('reorder', '重排手牌失败', { order });
   }
 
   useCardAndTarget(skillId: string, cardId: string, targets: number[]): void {
@@ -1234,63 +1277,20 @@ export class HeadlessGameClient {
 
   /** 发送聊天消息 */
   async sendChat(text: string): Promise<{ remaining?: number | null } | null> {
-    if (!this._roomId || !this._playerId) return null;
-    try {
-      const resp = await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: this._playerId, text }),
-      });
-      if (!resp.ok) {
-        const body = await resp.json().catch(() => ({}));
-        this.callbacks.onError?.(new Error(body.error ?? '发送失败'));
-        return null;
-      }
-      const data = await resp.json().catch(() => ({}));
-      return { remaining: data.remaining };
-    } catch (err) {
-      this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
-      return null;
-    }
+    const generation = this.connectionGeneration;
+    const resp = await this.requestRoom('chat', '发送失败', { text });
+    if (!resp) return null;
+    const data = await resp.json().catch(() => ({})) as { remaining?: number | null };
+    return this.isCurrentConnection(generation) ? { remaining: data.remaining } : null;
   }
 
   async sendUpdateConfig(config: RoomConfig, maxPlayers?: number): Promise<void> {
-    if (!this._roomId || !this._playerId) return;
-    try {
-      const body: Record<string, unknown> = { playerId: this._playerId, config };
-      if (maxPlayers !== undefined) body.maxPlayers = maxPlayers;
-      const resp = await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/config`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!resp.ok) {
-        const body = (await resp.json().catch(() => ({}))) as { error?: string };
-        this.callbacks.onError?.(new Error(body.error ?? '更新配置失败'));
-      }
-    } catch (err) {
-      this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
-    }
+    await this.requestRoom('config', '更新配置失败', { config, maxPlayers }, 'PUT');
   }
 
   /** POST 通用房间操作（ready/start/restart） */
   private async postRoomOp(op: string): Promise<void> {
-    if (!this._roomId || !this._playerId) return;
-    try {
-      const resp = await fetch(`${this.baseUrl}/api/rooms/${this._roomId}/${op}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: this._playerId }),
-      });
-      // 服务端 4xx/5xx（如房间已开局、非房主、未全员准备）必须上报,
-      // 否则前端静默吞掉表现为「点击无响应」。
-      if (!resp.ok) {
-        const body = (await resp.json().catch(() => ({}))) as { error?: string };
-        this.callbacks.onError?.(new Error(body.error ?? `${op} 失败(${resp.status})`));
-      }
-    } catch (err) {
-      this.callbacks.onError?.(err instanceof Error ? err : new Error(String(err)));
-    }
+    await this.requestRoom(op, `${op} 失败`);
   }
 
   /** 挂起 SSE 流(不离开房间、不清理身份/视图状态):debug 单活流模式用。
@@ -1314,8 +1314,14 @@ export class HeadlessGameClient {
 
   disconnect() {
     this.intentionalDisconnect = true;
+    this.connectionGeneration++;
+    this.openStreamGeneration++;
     this.stopReconnectStatePolling();
     this.canReconnect = false;
+    if (this._autoSkipTimer) {
+      clearTimeout(this._autoSkipTimer);
+      this._autoSkipTimer = null;
+    }
     this.eventSource?.close();
     this.eventSource = null;
   }

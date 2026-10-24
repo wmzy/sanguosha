@@ -16,6 +16,7 @@
 
 import type { Card, GameState, Json } from '../../types';
 import type { CardEffect } from '../../types';
+import { setFrameCancelled } from '../../core/frame';
 import type { Color } from '../../../engine/types';
 
 const COLOR_LIMIT_VAR = '闪/色限制';
@@ -30,7 +31,7 @@ export const dodgeEffect: CardEffect = {
     // 闪帧（stack[length-1]）是本帧，resolve 时它正在生效。
     const { state } = ctx;
     const targetFrame = state.settlementStack[state.settlementStack.length - 2];
-    if (targetFrame) targetFrame.cancelled = true;
+    await setFrameCancelled(state, targetFrame, true);
   },
   respond: {
     validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {

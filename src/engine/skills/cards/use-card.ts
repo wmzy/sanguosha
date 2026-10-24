@@ -6,7 +6,7 @@
 
 import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../../types';
 import { applyAtom } from '../../core/apply'
-import { frameCards, popFrame, pushFrame, topFrame } from '../../core/frame';
+import { frameCards, popFrame, pushFrame, setFrameCancelled, topFrame } from '../../core/frame';
 import { registerAction, registerBeforeHook, registerAfterHook } from '../../core/skill';
 import { promptCancel } from '../../flows/cancel';
 import { validateCardUse, computeAutoTargets } from '../../skills/cards/validate';
@@ -53,7 +53,7 @@ async function runSettlementPhase(
 
   // 重置栈顶帧的抵消状态（多目标锦囊每个目标独立结算）
   const settleFrame = topFrame(state);
-  if (settleFrame) settleFrame.cancelled = false;
+  await setFrameCancelled(state, settleFrame, false);
 
   // (2) 生效前：发出时机 atom（before/after hook 可介入）
   await applyAtom(state, { type: '生效前', source, target, cardId });
@@ -131,13 +131,12 @@ export async function runUseFlow(
 
   // ── 使用结算前（声明阶段）──
   // skippedTargets：声明阶段「成为目标」被 cancel（空城/帷幕）的目标集合。
-  // 浅拷贝保留数组引用，后续循环 push/includes 即可读写。结算阶段据此跳过被取消的目标。
-  const skippedTargets: number[] = [];
+  // 后续变更必须经帧参数赋值同步,不能依赖入栈事件共享数组引用。
   const frame = await pushFrame(state, cardName, source, {
     cardId,
     targets: [...targets], // 保持与旧 pushFrame({ ...params }) 的兼容性（界谦逊等读 frame.params.targets）
     resolvedTargets: [...targets],
-    skippedTargets,
+    skippedTargets: [],
   });
 
   try {
@@ -219,7 +218,12 @@ export async function runUseFlow(
         cardId,
       });
       if (!becameTarget) {
-        (frame.params.skippedTargets as number[]).push(target);
+        await applyAtom(state, {
+          type: '帧参数赋值',
+          frameIndex: state.settlementStack.indexOf(frame),
+          key: 'skippedTargets',
+          value: [...(frame.params.skippedTargets as number[]), target],
+        });
       }
     }
 

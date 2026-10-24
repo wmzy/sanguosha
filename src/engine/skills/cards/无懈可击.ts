@@ -11,6 +11,7 @@
 
 import type { Card, GameState, Json } from '../../types';
 import { findPendingSlot } from '../../core/skill';
+import { setFrameCancelled } from '../../core/frame';
 import type { CardEffect } from '../../types';
 
 const CARD_NAME = '无懈可击';
@@ -22,7 +23,7 @@ export const nullificationEffect: CardEffect = {
   resolve: async (ctx) => {
     const { state } = ctx;
     const targetFrame = state.settlementStack[state.settlementStack.length - 2];
-    if (targetFrame) targetFrame.cancelled = true;
+    await setFrameCancelled(state, targetFrame, true);
   },
   respond: {
     validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {

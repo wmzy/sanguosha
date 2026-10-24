@@ -4,20 +4,16 @@ on:
   workflow_dispatch: # 支持手动触发——构建修复后补发被阻塞的版本时使用
   push:
     branches: [main]
-    paths:
-      - "src/ai-mcp/**"
-      - "plugin/**"
-      - "vite.mcp.config.ts"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - ".github/workflows/release-agent-plugin.yml"
-      - ".releaserc.json"
 
 permissions:
   contents: read
 
 jobs:
+  check:
+    uses: ./.github/workflows/ci.yml
+
   release:
+    needs: check
     name: Release sanguosha-agent-plugin
     runs-on: ubuntu-latest
     permissions:
@@ -57,6 +53,9 @@ jobs:
         run: pnpm build:plugin
         env:
           SGS_PUBLIC_URL: ${{ secrets.SGS_PUBLIC_URL }}
+
+      - name: Validate release artifact
+        run: pnpm validate:plugin
 
       - name: Release
         env:

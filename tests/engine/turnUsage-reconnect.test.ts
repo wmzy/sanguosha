@@ -4,10 +4,7 @@
 // 该键 —— 否则重连后 双雄/界双雄 转化按钮消失、界当先 额外阶段无法主动结束、
 // 审时/成略/拒战 的「阴」态门控丢失(前端 activeWhen 读不到 turnUsage)。
 //
-// 机制:「回合用量」atom 的 apply 把镜像值写进 turn.vars['__view/<key>'](仅当 key
-// 命中 TURN_SCOPED_VIEW_KEYS 或 杀/ 前缀);buildView 把 __view/* 镜像投影给
-// 当前回合玩家的 turnUsage。键漏注册进 TURN_SCOPED_VIEW_KEYS 时镜像不落
-// turn.vars → 在线视图有、重连视图没有,静默 desync,只能在重连路径上断言拦截。
+// 机制:「回合用量」atom 的 apply 把镜像值写进 turn.vars['__view/<player>/<key>']；buildView按玩家归属重建。
 import { describe, it, expect } from 'vitest';
 import { buildView } from '../../src/engine/index';
 import { applyAtom } from '../../src/engine/core/apply';
@@ -20,7 +17,7 @@ import {
   CHENGLUE_STATE_VIEW_KEY,
   DANGXIAN_EXTRA_PHASE_VIEW_KEY,
   JUZHAN_STATE_VIEW_KEY,
-  VIEW_MIRROR_PREFIX,
+  viewMirrorKey,
 } from '../../src/engine/rules/vars-keys';
 import '../../src/engine/atoms';
 
@@ -69,7 +66,7 @@ describe('回合内 view 键重连重建(双雄/界双雄/审时/成略/界当�
       await applyAtom(state, { type: '回合用量', player: 0, key, value });
 
       // 镜像已落 turn.vars(缺失 = 键未注册进 TURN_SCOPED_VIEW_KEYS,重连必丢)
-      expect(state.turn.vars[VIEW_MIRROR_PREFIX + key]).toBe(value);
+      expect(state.turn.vars[viewMirrorKey(0, key)]).toBe(value);
 
       // 当前回合玩家:重连/初始视图重建该键(前端 activeWhen 据此恢复按钮/门控)
       const view = buildView(state, 0);

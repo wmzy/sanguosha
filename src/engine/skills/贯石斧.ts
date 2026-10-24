@@ -8,7 +8,7 @@
 import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { isCancelled, clearCancelled } from '../core/frame';
+import { isCancelled, setFrameCancelled } from '../core/frame';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -100,7 +100,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: selectedIds, voluntary: true });
 
     // 清除已抵消标记:杀不再被抵消,将正常造成伤害(runSettlementPhase 检测标记被清除后继续 resolve)
-    clearCancelled(ctx.state, atom.cardId, atom.target);
+    await setFrameCancelled(ctx.state, ctx.frame, false);
   });
 
   return () => {};

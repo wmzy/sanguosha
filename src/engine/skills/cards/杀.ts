@@ -60,12 +60,12 @@ async function onSettleSlash(
   cardId: string,
 ): Promise<void> {
   if (!isSlashExempted(state, source, cardId)) {
-    incSlashUsed(state);
+    incSlashUsed(state, source);
     await applyAtom(state, {
       type: '回合用量',
       player: source,
       key: SLASH_USED_COUNT_KEY,
-      value: slashUsed(state),
+      value: slashUsed(state, source),
     });
   }
 }

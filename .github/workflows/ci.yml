@@ -1,8 +1,10 @@
 name: CI
 
 on:
+  workflow_call:
   push:
-    branches: [main, master, develop, 'feat/**']
+    # main 的检查由发布工作流调用,避免同一提交重复执行两套 CI。
+    branches: [master, develop, 'feat/**']
   pull_request:
     branches: [main, master, develop]
 
@@ -30,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Inspect runner resources
+        run: free -h && nproc
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -40,7 +45,13 @@ jobs:
         run: pnpm build
 
       - name: Test with coverage
-        run: pnpm test:coverage
+        run: pnpm test:coverage --maxWorkers=2
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Authenticated room smoke
+        run: pnpm exec playwright test tests/e2e/room-api.spec.ts --project chromium --workers=1
 
       - name: Build plugin MCP
         run: pnpm build:plugin

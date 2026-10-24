@@ -2,6 +2,7 @@
 // PGLite 是进程内单实例数据库;roomStore(房间元数据)与 auth(用户/会话)共用同一连接。
 // 本模块拥有唯一的 DB 生命周期:init(幂等,含迁移)/get/close,并注册 lifecycles 清理。
 import { join } from 'node:path';
+import { mkdir } from 'node:fs/promises';
 import { createDB, migrateDB, type DB } from '../db';
 import { register as registerLifecycle } from './lifecycles';
 import { createLogger } from './logger';
@@ -25,8 +26,16 @@ registerLifecycle('dbHandle', { dbHandle }, () => {
 export async function initSharedDb(dataDir?: string): Promise<void> {
   if (initPromise) return initPromise;
   initPromise = (async () => {
-    dbHandle = await createDB({ driver: 'pglite', dataDir: dataDir ?? DATA_DIR });
-    await migrateDB(dbHandle);
+    const directory = dataDir ?? DATA_DIR;
+    if (directory !== ':memory:') await mkdir(directory, { recursive: true });
+    const handle = await createDB({ driver: 'pglite', dataDir: directory });
+    try {
+      await migrateDB(handle);
+      dbHandle = handle;
+    } catch (error) {
+      await handle.close();
+      throw error;
+    }
     log.info('shared db initialized');
   })();
   return initPromise;

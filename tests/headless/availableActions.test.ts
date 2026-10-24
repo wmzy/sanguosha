@@ -438,18 +438,70 @@ describe('enumerateAvailableActions', () => {
     const view = makeView(0, '出牌', [redCard, redCard2]);
     const actions = enumerateAvailableActions(view, 0, [zhangbaTransformAction]);
     const tf = actions.filter((x) => x.category === 'transform');
-    expect(tf).toHaveLength(1); // 2 张手牌 → 1 对
+    expect(tf).toHaveLength(1);
     const a = tf[0];
     expect(a.message.skillId).toBe('杀');
-    // 影子 cardId = 两张原卡 id 拼接
     expect(a.message.params.cardId).toBe('c2#c3#丈八蛇矛');
-    // preceding transform 携带 cardIds(顺序与影子 id 一致)
     expect(a.message.preceding).toEqual([
       { skillId: '丈八蛇矛', actionType: 'transform', params: { cardIds: ['c2', 'c3'] } },
     ]);
-    // 攻击范围内的其他角色作为合法目标(非空)
     expect(a.validTargets).toEqual([1]);
     expect(a.description).toContain('丈八蛇矛');
+  });
+
+  it('丈八蛇矛多卡转化不受装备原料在手牌中的位置影响（真实 DEFAULT_SKILLS）', async () => {
+    const { DEFAULT_SKILLS } = await import('../../src/engine/atoms/选将');
+    const { registerSkillActions, getActionsForPlayer } = await import('../../src/client/skillActionRegistry');
+    clearRegistry();
+    await registerSkillActions(0, [...DEFAULT_SKILLS, '丈八蛇矛']);
+    const weapon: Card = {
+      id: 'weapon',
+      name: '青釭剑',
+      suit: '♠',
+      color: '黑',
+      rank: '6',
+      type: '装备牌',
+      subtype: '武器',
+      range: 2,
+    };
+    for (const hand of [
+      [weapon, redCard],
+      [redCard, weapon],
+    ]) {
+      const view = makeView(0, '出牌', hand);
+      view.players[0].equipment = { 武器: 'zhangba' };
+      view.cardMap.zhangba = { ...weapon, id: 'zhangba', name: '丈八蛇矛', range: 3 };
+      const actions = enumerateAvailableActions(view, 0, getActionsForPlayer(0));
+      const transformed = actions.filter((action) => action.category === 'transform');
+      expect(transformed).toHaveLength(1);
+      expect(transformed[0].message.skillId).toBe('杀');
+      expect(transformed[0].message.params.cardId).toBe(`${hand[0].id}#${hand[1].id}#丈八蛇矛`);
+      expect(transformed[0].validTargets).toEqual([1]);
+      const state = createGameState({
+        players: [
+          { ...makePlayerForEnum({ index: 0, name: 'P0', skills: [...DEFAULT_SKILLS, '丈八蛇矛'] }),
+            hand: hand.map((card) => card.id), equipment: { 武器: 'zhangba' } },
+          makePlayerForEnum({ index: 1, name: 'P1', skills: [...DEFAULT_SKILLS] }),
+        ],
+        cardMap: view.cardMap,
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+        config: { timeoutSec: 0 },
+      });
+      const { registerSkillsFromState, dispatch } = await import('../../src/engine/index');
+      await registerSkillsFromState(state);
+      const result = await dispatch(state, {
+        ...transformed[0].message,
+        params: { ...transformed[0].message.params, targets: [1] },
+        baseSeq: state.seq,
+      });
+      expect(result.accepted).toBe(true);
+      expect(await result.settle).toBeUndefined();
+      expect(state.players[1].health).toBe(3);
+      expect(state.players[0].hand).toEqual([]);
+    }
+    clearRegistry();
   });
 
   it('丈八蛇矛转化（多卡）：3 张手牌生成 C(3,2)=3 个 transform action', () => {
@@ -1591,12 +1643,11 @@ describe('主动技枚举 → 引擎执行', () => {
     const actions = enumerateAvailableActions(
       view,
       0,
-      harness.player(0).availableActions() as unknown as SkillActionDef[],
+      harness.player(0).availableActions(),
     );
     const kurou = actions.find((a) => a.message.skillId === '苦肉');
-    expect(kurou).toBeDefined();
-
-    await dispatchAndWait(state, { ...kurou!.message, baseSeq: state.seq });
+    if (!kurou) throw new Error('苦肉 action missing');
+    await dispatchAndWait(state, { ...kurou.message, baseSeq: state.seq });
     expect(state.players[0].health).toBe(3); // 失去 1 点体力
     expect(state.players[0].hand).toEqual(expect.arrayContaining(['d1', 'd2'])); // 摸两张
   });

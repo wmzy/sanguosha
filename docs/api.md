@@ -1,6 +1,6 @@
 # 三国杀 API 文档
 
-后端基于 Hono：REST（C→S 命令）+ SSE（S→C 事件流）+ WebSocket（兼容 fallback）。前端通过 `pnpm dev`（端口 3930）连接。
+后端基于 Hono：REST（C→S 命令）+ SSE（S→C 事件流）。前端通过 `pnpm dev`（端口 3930）连接。当前服务不提供 `/ws` 升级路由；无头客户端只为旧配置保留 URL 转换，不代表存在 WebSocket fallback。
 
 ## 传输架构
 
@@ -8,7 +8,6 @@
 |------|------|------|
 | C→S | REST POST | 房间操作 + 游戏命令（fire-and-forget） |
 | S→C | SSE | 事件流推送（自动重连 + Last-Event-ID 断点续传） |
-| C→S ↔ S→C | WebSocket | 兼容 fallback（旧客户端） |
 
 客户端主要走 REST + SSE：`fetch(POST)` 发命令，`EventSource` 接收推送。
 
@@ -37,6 +36,19 @@ GET /api/rooms/:id
 **响应 200** — 同上单个对象。
 **响应 404** — `{ "error": "房间不存在" }`
 
+### 游戏日志
+
+```
+GET /api/rooms/:id/log
+```
+
+普通房间需要登录且仅房间成员可访问。返回的是按查看者脱敏后的公开战报，**不是**内部重放日志；隐藏手牌顺序、盲选候选牌、preceding 原始参数等私有信息不会通过该接口返回。完整重放数据由服务端内部恢复链路使用。
+
+### 认证
+
+普通房间的创建、加入、准备、开始、重置、出牌、重排、聊天和配置操作均需要登录。REST 请求使用 `Authorization: Bearer <token>`；浏览器同源请求使用会话 Cookie。SSE 客户端不能设置自定义请求头时，可使用短期会话 token 的 `sgs_token` 查询参数。
+
+
 ### 创建房间（HTTP 入口）
 
 ```
@@ -51,7 +63,7 @@ Content-Type: application/json
 **响应 200** — `{ "roomId": "ABC123", "playerId": "pid-xxx" }`
 **响应 400** — `{ "error": "最大玩家数须在2-8之间" }`
 
-可选 `playerId` 参数：给定则采用该 playerId，否则服务端自动生成。
+普通房间的 `playerId` 固定取已登录会话的 `user.id`，请求体不能指定或冒用其他身份。
 
 > REST 入口直接创建房间并分配 playerId，客户端随后建立 SSE 连接接收推送。
 
@@ -133,7 +145,7 @@ POST /api/rooms/:id/kick      { "playerId": "pid-xxx(房主)", "targetPlayerId":
 PUT  /api/rooms/:id/config    { "playerId": "pid-xxx", "config": RoomConfig }
 ```
 
-所有端点返回 `{ "success": true }` 或错误 JSON。
+所有端点成功时返回 `{ "success": true }` 或端点专属 JSON；校验、鉴权或状态冲突时返回错误 JSON 和对应 HTTP 状态码。无效手牌重排（重复、缺失、未知牌或错误类型）返回 400，且不会改变权威手牌顺序。
 
 ### 踢出玩家
 
@@ -153,36 +165,23 @@ Content-Type: application/json
 **响应 200** — `{ "success": true }`
 **响应 400** — `{ "error": "无法踢出该玩家（仅房主可操作，或目标不在房间中）" }`（非房主 / 目标不存在 / 踢自己 / 游戏进行中 / 调试房间）
 
-## WebSocket 协议（兼容 fallback）
+## 游戏动作与事件
 
-> 新客户端建议使用 REST + SSE。WS 端点保留用于兼容旧客户端和渐进迁移。
-
-连接 URL：`ws://<host>:3930/ws`
-
-服务器连接成功后为每个连接分配 `playerId`（32 字节十六进制随机串）。客户端需在 `reconnect` 消息中传入之前收到的 `playerId` 以恢复会话。
-
-### 客户端 → 服务器（ClientMessage）
+动作通过 `POST /api/rooms/:id/action` 提交，结构来源为 `src/engine/types/skill.ts` 的 `ClientMessage`：
 
 ```typescript
-type EventSeq = number;  // 服务端 GameSession 维护的全局递增序号
-
-type ClientMessage =
-  | { type: 'action'; action: GameAction; baseSeq: EventSeq }
-  | { type: 'reorder_hand'; order: string[] }
-  | { type: 'ready' }
-  | { type: 'join_room'; roomId: string }
-  | { type: 'create_room'; name: string; maxPlayers: number; config?: RoomConfig }
-  | { type: 'create_debug_room'; config?: RoomConfig; playerCount?: number }
-  | { type: 'join_debug_room'; roomId: string; lastSeq?: EventSeq }
-  | { type: 'start_game' }
-  | { type: 'update_room_config'; config: RoomConfig }
-  | { type: 'leave_room' }
-  | { type: 'reconnect'; playerId: string; lastSeq?: EventSeq };
+{
+  skillId: string;
+  actionType: string;
+  ownerId: number;
+  params: Record<string, Json>;
+  baseSeq: number;
+  pendingSeq?: number;
+  preceding?: Array<{ skillId: string; actionType: string; params: Record<string, Json> }>;
+}
 ```
 
-**baseSeq 语义**: 客户端发出该操作时，其本地状态对应的最新事件序号。服务端做 CAS 校验：`baseSeq !== 服务端当前 nextSeq` 时静默丢弃（不发 error）。客户端会通过后续 `events` 推送自动看到最新状态。
-
-旧版 `response` 消息带 `promptId` 做版本关联，新版用 `baseSeq` 取代——`baseSeq` 隐含了"全局状态是否推进过"，比 promptId 语义更强（详见 ADR 0009）。
+`baseSeq` 表示客户端已处理的最新事件版本；`pendingSeq` 用于回应窗口的新旧校验。动作必须通过权威引擎验证，同一个窗口只允许一个执行者占有回应权。被拒动作通过 SSE `actionRejected` 通知；HTTP 4xx/5xx 则由客户端错误通道报告，不能等待一个不会到达的 SSE。
 
 ### 服务器 → 客户端（ServerMessage）
 
@@ -207,34 +206,31 @@ type ServerMessage =
 
 ### 流程
 
-1. 客户端 `create_room`/`create_debug_room` 或 `join_room`/`join_debug_room` → 服务器返回 `room_joined`（含 `playerId`、`seatIndex`）
-2. 房主(调试房间任意玩家)用 `update_room_config` 修改配置;广播 `room_config` + `room_state`
-3. 玩家 `ready` → 广播 `player_ready` + `room_state`;所有人 ready 后 `start_game` → 广播 `game_started` 并发送 `initialView`
-4. 轮到自己回合时,服务器通过 `event` 推送事件(部分 `event` 携带 `pending` 字段)
-5. 客户端读取 `pending`,用 `action` + `baseSeq` + `pendingSeq` 提交回应
-6. 任何时候可用 `action` + `baseSeq` 提交玩家操作
+1. 客户端通过 REST 创建或加入房间，随后建立 SSE，接收 `room_joined` 和配置/视图。
+2. 房主通过 `PUT config` 修改配置；玩家通过 `POST ready` 准备，房主通过 `POST start` 开局。
+3. 服务端发送 `initialView` 基线，随后通过 `event` 推送该查看者可见的增量事件。
+4. 客户端用 `POST action` 提交动作，携带 `baseSeq`；回应阻塞窗口时同时携带 `pendingSeq`。
 
-**baseSeq 来源**: 客户端从最近一次 `events` / `initialView` / `debugGameState` 消息中拿到 `lastSeq`/`fromSeq` 作为本地 `lastAppliedSeq`，发操作时填入 `baseSeq`。
+**baseSeq 来源**：客户端维护最近一次 `initialView.lastSeq` 或 `event.seq`。
 
 ### 重连
 
-- 客户端断线后 30s 内可用 `reconnect` 携带原 `playerId` 重新加入
-- 超时则游戏结束
+SSE 使用 `Last-Event-ID`（`epoch:seq`）请求断点续传。同一局且历史仍在缓存窗口内时补发增量；跨局或缺口过大时返回新的 `initialView`。普通房间重连仍需有效登录会话，`playerId` 不能替代凭据。
 
 ### 调试模式(Debug Room)
 
 **定义**: debug 房间相当于在一个页面同时创建了多个客户端实例。进来的用户可以自由切换到任一实例（玩家视角）进行操作，不需要身份认证。切换到某一客户端实例后，看到的视图与真实房间完全一致（身份按规则隐藏：自己/主公/死亡可见，其他隐藏）。
 
 **核心行为**:
-- 单个 WS 连接控制所有 N 个角色
+- 每个座次对应一个 HGC 实例；浏览器仅当前视角保持活跃 SSE，其他座次通过 REST 驱动
 - 用户可随时切换视角(perspectiveIdx),切换后看到的就是该角色的真实视图
 - 身份可见性与真实游戏一致:只能看到自己、主公、死亡玩家的身份
 - 自动视角切换:有玩家被问询(pending)时自动切换到该玩家视角,方便操作。可通过 UI 开关关闭(用于多 agent 协作测试)
-- `create_debug_room` 创建 N 人调试房间
-- `delete_room` 手动删除(HTTP 端点 `DELETE /api/rooms/:id` 等价)
+- `POST /api/debug-room` 创建 N 人调试房间
+- `DELETE /api/rooms/:id` 手动删除
 
-**多人协作**: 多个 agent 可各自 WS 连接进入同一 debug 房间,默认看到各自座次视角。每个连接分配递增座次(player[0], player[1], ...)。各 agent 只看自己视角,不偷看他人,模拟真实游戏。
+**多人协作**：多个 agent 可各自通过 REST 加入同一 debug 房间并建立 SSE，每个连接分配座次；各 agent 只看自己视角。
 
 ## 类型来源
 
-`src/src/shared/types.ts`、`src/src/engine/types.ts`、`src/src/engine/view/types.ts`、`src/src/server/protocol.ts` 均为单一类型来源（TS 编译期校验）。
+`src/engine/types/skill.ts`（动作）、`src/engine/types/view.ts`（视图）、`src/server/protocol.ts`（SSE 消息和房间配置）为类型来源。

@@ -190,6 +190,7 @@ describe('酒', () => {
     const { applyAtom } = await import('../../src/engine/core/apply');
     await applyAtom(harness.state, { type: '回合结束', player: 0 });
     await harness.waitForStable();
+    harness.processAllEvents();
     expect(harness.state.players[0].vars['酒/usedThisTurn']).toBeUndefined();
 
     // 下回合可再次使用方法Ⅰ:成功

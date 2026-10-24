@@ -1,36 +1,33 @@
-// src/engine/atoms/帧参数赋值.ts
-// 结算帧 params 字段赋值(走 atom,保证前端同步)。
-//
-// frame.params 的 mutate 不产生 ViewEvent,前端看不到。
-// 需要前端感知的 params 变更(如五谷丰登的 revealedIds/pickedBy)
-// 必须通过此 atom 同步。
-//
-// 操作栈顶帧:set params[key] = value。
-import type { AtomDefinition, ViewEventSplit, ViewEvent, Json } from '../types';
+// 结算帧 params 字段赋值。默认操作栈顶,也可定位仍在栈中的父帧。
+import type { AtomDefinition, Json } from '../types';
 
-export const 帧参数赋值: AtomDefinition<{ key: string; value: Json }> = {
+export const 帧参数赋值: AtomDefinition<{ frameIndex?: number; key: string; value: Json }> = {
   type: '帧参数赋值',
-  validate(state) {
-    if (state.settlementStack.length === 0) return 'settlementStack 为空,无栈顶帧可赋值';
+  validate(state, atom) {
+    const frameIndex = atom.frameIndex ?? state.settlementStack.length - 1;
+    if (!Number.isInteger(frameIndex) || !state.settlementStack[frameIndex]) {
+      return `结算帧 ${frameIndex} 不存在`;
+    }
     return null;
   },
   apply(state, atom) {
-    const frame = state.settlementStack[state.settlementStack.length - 1];
-    frame.params[atom.key] = atom.value;
+    const frame = state.settlementStack[atom.frameIndex ?? state.settlementStack.length - 1];
+    frame.params[atom.key] = structuredClone(atom.value);
   },
-  toViewEvents(_state, atom): ViewEventSplit {
-    const view: ViewEvent = {
-      type: '帧参数赋值',
-      key: atom.key,
-      value: atom.value,
+  toViewEvents(state, atom) {
+    return {
+      ownerViews: new Map(),
+      othersView: {
+        type: '帧参数赋值',
+        frameIndex: atom.frameIndex ?? state.settlementStack.length - 1,
+        key: atom.key,
+        value: structuredClone(atom.value),
+      },
     };
-    return { ownerViews: new Map(), othersView: view };
   },
   applyView(view, event) {
-    const frame = view.settlementStack[view.settlementStack.length - 1];
-    if (frame) {
-      frame.params[event.key as string] = event.value as Json;
-    }
+    const frameIndex = (event.frameIndex as number | undefined) ?? view.settlementStack.length - 1;
+    const frame = view.settlementStack[frameIndex];
+    if (frame) frame.params[event.key as string] = structuredClone(event.value as Json);
   },
 };
-

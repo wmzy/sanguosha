@@ -38,34 +38,27 @@ const DISCONNECTED_ROOM_SCAN_MS = 30 * 1000;
  *  必须由运行时入口(index.ts 独立运行 / vite-plugin configureServer dev 模式)显式调用。
  *  不能放在模块级: vite build 时加载 vite.config → import app 也会触发副作用,
  *  导致 build 进程意外启动游戏 session 并反复写持久化文件。 */
-export function startServerLifecycle(): void {
+export async function startServerLifecycle(): Promise<void> {
   setInterval(cleanupIdleRooms, CLEANUP_INTERVAL_MS).unref();
   // 无连接快速/debug 房间回收(30s 扫描):unref 保证不阻止进程退出,
   // ssrLoadModule 环境下随 vite dev server 生命周期存续,无需显式 teardown。
   setInterval(() => {
     cleanupDisconnectedRooms();
   }, DISCONNECTED_ROOM_SCAN_MS).unref();
-  void (async () => {
-    await initRoomStore();
-    await restoreNormalRoomsFromDb();
-    await restorePersistedRooms().catch((err) => {
-      const e = err instanceof Error ? err : new Error(String(err));
-      log.error('restorePersistedRooms failed', { error: e.stack ?? String(e) });
-    });
-    // 普通房间“进行中”但无 session(无 .json 持久化可恢复)时降级为“等待中”,
-    // 让房主可在房间列表看到房间并重新开局;否则 getRoomList 的 hasSession 过滤
-    // 会让它从列表中永久消失,房主无法管理。
-    downgradeStaleNormalRooms();
-    // 恢复后立即清理僵尸房间(无 seats 的进行中房间),避免它们出现在房间列表。
-    cleanupIdleRooms();
-    // 基线扫描:为恢复出的无连接房间记录计时起点(60s 后仍未重连则回收)。
-    cleanupDisconnectedRooms();
-    // 清理孤儿对局历史:快速房重启后不恢复,其历史目录已无主。
-    void sweepOrphanHistory(getAllRooms().map((r) => r.id)).catch((err) => {
-      const e = err instanceof Error ? err : new Error(String(err));
-      log.error('sweepOrphanHistory failed', { error: e.stack ?? String(e) });
-    });
-  })();
+  await initRoomStore();
+  await restoreNormalRoomsFromDb();
+  await restorePersistedRooms().catch((err) => {
+    const e = err instanceof Error ? err : new Error(String(err));
+    log.error('restorePersistedRooms failed', { error: e.stack ?? String(e) });
+  });
+  // 普通房间元数据存在但无可恢复对局时退回等待大厅。
+  await downgradeStaleNormalRooms();
+  cleanupIdleRooms();
+  cleanupDisconnectedRooms();
+  void sweepOrphanHistory(getAllRooms().map((r) => r.id)).catch((err) => {
+    const e = err instanceof Error ? err : new Error(String(err));
+    log.error('sweepOrphanHistory failed', { error: e.stack ?? String(e) });
+  });
 }
 
 /** 从 DB 恢复普通房间元数据。快闪房间不入库,无需恢复。

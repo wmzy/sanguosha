@@ -278,6 +278,7 @@ function createAndAwaitSlot(
     let resolveCalled = false;
     let timedOut = false;
     let paused = false;
+    let claimed = false;
     const safeResolve = () => {
       if (resolveCalled) return;
       resolveCalled = true;
@@ -304,10 +305,21 @@ function createAndAwaitSlot(
         paused = true;
         cancelTimer();
       },
+      get isClaimed() {
+        return claimed;
+      },
+      claim() {
+        if (resolveCalled || timedOut || paused || claimed) return false;
+        claimed = true;
+        return true;
+      },
+      releaseClaim() {
+        if (!resolveCalled && !timedOut && !paused) claimed = false;
+      },
     };
     const fireTimeoutNow = async (): Promise<void> => {
       if (state.pendingSlots.get(target) !== slot) return;
-      if (paused) return;
+      if (paused || claimed || timedOut || resolveCalled) return;
       timedOut = true;
       cancelTimer();
       try {
@@ -335,8 +347,8 @@ function createAndAwaitSlot(
     // 存入 pendingSlots Map(按 target 索引)。不同 target 的 slot 共存,各自独立 resolve。
     state.pendingSlots.set(target, slot);
     notifyStateChange(state);
-    // 通知 dispatch:execute 已到达挂起点(slot 创建)。restore 用其替代轮询等待。
-    state.onExecuteSettle?.();
-    state.onExecuteSettle = null;
+    // 通知所有并发 dispatch:execute 已到达挂起点(slot 创建)。
+    // 每个 dispatch 都拥有独立 listener，避免后来的请求覆盖前一个 settle。
+    for (const listener of state.onExecuteSettleListeners ?? []) listener(slot);
   });
 }

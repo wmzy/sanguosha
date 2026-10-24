@@ -177,10 +177,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
             self.equipment[slot] = cardId;
             // 卸下武器时清除了 vars[DISTANCE_ATTACK_RANGE_KEY](由 卸下 atom 设值,不会重算),
             // 回滚必须还原,否则武器已归位但攻击范围退化为徒手(1)。镜像 界武圣 回滚。
-            if (slot === '武器') {
-              const card = state.cardMap[cardId];
-              self.vars[DISTANCE_ATTACK_RANGE_KEY] = card?.range ?? 1;
-            }
+          if (slot === '武器') {
+            const card = state.cardMap[cardId];
+            self.vars[DISTANCE_ATTACK_RANGE_KEY] = card?.range ?? 1;
+          }
           } else {
             self.hand.push(cardId);
           }

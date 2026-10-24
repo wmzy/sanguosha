@@ -58,6 +58,7 @@ import { 移除延时锦囊 } from './移除延时锦囊';
 import { 移除技能 } from './移除技能';
 import { 结算帧入栈 } from './结算帧入栈';
 import { 结算帧出栈 } from './结算帧出栈';
+import { 设置帧抵消 } from './设置帧抵消';
 import { 给予 } from './给予';
 import { 置创牌 } from './置创牌';
 import { 获得 } from './获得';
@@ -165,6 +166,7 @@ export const atomMap: Record<AtomName, AtomDefinition<any>> = {
   移除技能,
   结算帧入栈,
   结算帧出栈,
+  设置帧抵消,
   给予,
   置创牌,
   获得,

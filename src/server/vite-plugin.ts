@@ -16,8 +16,10 @@ import type { IncomingMessage, ServerResponse } from 'http';
 
 /** 从 SSR 世界取到的形状(app 默认导出 + 生命周期函数)。 */
 interface ServerModule {
-  default: { fetch: (req: Request) => Promise<Response> };
-  startServerLifecycle(): void;
+  default: {
+    fetch: (req: Request, env: { incoming: IncomingMessage; outgoing: ServerResponse }) => Response | Promise<Response>;
+  };
+  startServerLifecycle(): Promise<void>;
 }
 
 export function honoApiPlugin(): Plugin {
@@ -26,12 +28,11 @@ export function honoApiPlugin(): Plugin {
 
   const loadServer = (server: ViteDevServer): Promise<ServerModule> => {
     if (serverModule) return Promise.resolve(serverModule);
-    serverReady ??= server.ssrLoadModule('/src/server/app.ts').then((m) => {
-      serverModule = m as unknown as ServerModule;
-      // 启动服务器生命周期(闲置清理 + 持久化恢复)。
-      // 仅 dev 模式(本插件 configureServer 只在 vite dev 调用)。
-      serverModule.startServerLifecycle();
-      return serverModule;
+    serverReady ??= server.ssrLoadModule('/src/server/app.ts').then(async (m) => {
+      const loaded = m as unknown as ServerModule;
+      await loaded.startServerLifecycle();
+      serverModule = loaded;
+      return loaded;
     });
     return serverReady;
   };
@@ -112,7 +113,9 @@ export function honoApiPlugin(): Plugin {
             body,
           });
 
-          const response = await app.default.fetch(request);
+          const response = await app.default.fetch(request, {
+            incoming: req, outgoing: res,
+          });
           res.statusCode = response.status;
           response.headers.forEach((value: string, key: string) => {
             res.setHeader(key, value);

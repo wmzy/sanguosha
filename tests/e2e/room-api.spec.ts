@@ -1,4 +1,101 @@
 import { test, expect, request } from '@playwright/test';
+import { HeadlessGameClient } from '../../src/client/headless/HeadlessGameClient';
+import { DEFAULT_ROOM_CONFIG } from '../../src/server/protocol';
+
+const baseURL = 'http://localhost:3930';
+
+async function registerAccount(label: string) {
+  const context = await request.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+  const response = await context.post('/api/auth/register', {
+    data: { username: `e2e-${label}-${crypto.randomUUID().slice(0, 8)}`, password: 'e2e-pass-123' },
+  });
+  expect(response.status()).toBe(200);
+  const account = await response.json() as { token: string; user: { id: string } };
+  return { context, ...account };
+}
+
+test('Bearer 无头客户端完成普通房间准备、配置、聊天、开局和选将', async () => {
+  test.setTimeout(60_000);
+  const hostAccount = await registerAccount('host');
+  const guestAccount = await registerAccount('guest');
+  const errors: string[] = [];
+  const chat: string[] = [];
+  const host = new HeadlessGameClient(baseURL, {
+    onError: (error) => errors.push(error.message),
+  }, { token: hostAccount.token });
+  const guest = new HeadlessGameClient(baseURL, {
+    onError: (error) => errors.push(error.message),
+    onChat: (messages) => chat.push(...messages.map((message) => message.text)),
+  }, { token: guestAccount.token });
+  let roomId: string | null = null;
+  try {
+    await host.createRoom('认证契约', 2, { ...DEFAULT_ROOM_CONFIG, timeoutSec: 0, charPool: 'standard' });
+    roomId = host.roomId;
+    expect(roomId).toBeTruthy();
+    await guest.joinRoom(roomId!);
+    await expect.poll(() => host.roomState?.playerIds.length).toBe(2);
+    await expect.poll(() => guest.roomState?.playerIds.length).toBe(2);
+    await host.sendUpdateConfig({ ...DEFAULT_ROOM_CONFIG, name: '认证房间', timeoutSec: 0, charPool: 'standard' });
+    await expect.poll(() => guest.roomState?.config.name).toBe('认证房间');
+    await host.sendReady();
+    await guest.sendReady();
+    await expect.poll(() => host.roomState?.readyPlayers.slice().sort()).toEqual(
+      [hostAccount.user.id, guestAccount.user.id].sort(),
+    );
+    await host.sendStartGame();
+    const clients = [host, guest];
+    for (let selection = 0; selection < clients.length; selection++) {
+      await expect.poll(() => clients.some((client) =>
+        client.getAvailableActions().some((action) => action.category === 'selectChar'),
+      ), { timeout: 15_000 }).toBe(true);
+      const client = clients.find((candidate) =>
+        candidate.getAvailableActions().some((action) => action.category === 'selectChar'),
+      )!;
+      const action = client.getAvailableActions().find((candidate) => candidate.category === 'selectChar')!;
+      client.sendAction(action.message);
+      await expect.poll(() => Boolean(client.view?.players[client.seatIndex]?.character)).toBe(true);
+    }
+    await expect.poll(() => host.view?.players.every((player) => !!player.character)).toBe(true);
+    await host.sendChat('认证聊天');
+    await expect.poll(() => chat).toContain('认证聊天');
+    await host.sendRestart();
+    await expect.poll(() => host.roomState?.readyPlayers).toEqual([]);
+    expect(errors).toEqual([]);
+  } finally {
+    host.disconnect();
+    guest.disconnect();
+    if (roomId) await hostAccount.context.delete(`/api/rooms/${roomId}`);
+    await hostAccount.context.dispose();
+    await guestAccount.context.dispose();
+  }
+});
+
+test('旁观者加入普通房间后能切换玩家并准备', async ({ browser }) => {
+  const host = await registerAccount('ui-host');
+  const spectator = await registerAccount('ui-spec');
+  const created = await host.context.post('/api/rooms', { data: { name: '身份切换', maxPlayers: 2 } });
+  expect(created.status()).toBe(200);
+  const { roomId } = await created.json() as { roomId: string };
+  const context = await browser.newContext({ baseURL, storageState: await spectator.context.storageState() });
+  try {
+    const page = await context.newPage();
+    await page.goto('/play');
+    await page.getByPlaceholder('输入6位房间码').last().fill(roomId);
+    await page.getByRole('button', { name: '旁观加入' }).click();
+    await expect(page.getByRole('button', { name: '准备', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: '旁观中（加入游戏）' }).click();
+    await page.getByRole('button', { name: '准备', exact: true }).click();
+    await expect(page.getByRole('button', { name: '取消准备', exact: true })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('button', { name: '取消准备', exact: true })).toBeVisible();
+  } finally {
+    await context.close();
+    await host.context.delete(`/api/rooms/${roomId}`);
+    await host.context.dispose();
+    await spectator.context.dispose();
+  }
+});
+
 
 test.describe('多人房间 API', () => {
   test('GET /api/rooms 返回空数组', async () => {
@@ -61,7 +158,7 @@ test.describe('多人房间 API', () => {
   });
 
   test('DELETE /api/rooms/:id 删除普通多人房间', async () => {
-    const ctx = await request.newContext({ baseURL: 'http://localhost:3930' });
+    const { context: ctx } = await registerAccount('delete');
     const create = await ctx.post('/api/rooms', { data: { name: 'test-delete', maxPlayers: 2 } });
     expect(create.status()).toBe(200);
     const { roomId } = await create.json();

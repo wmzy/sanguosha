@@ -79,7 +79,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (atom.type !== '使用时') return;
       const card = ctx.state.cardMap[atom.cardId];
       if (!card) return; // 纯虚拟使用(无实体牌):无牌可交,后续走防御分支
-      ctx.frame.params[EFFECTIVE_CARD_KEY] = card.shadowOf ?? atom.cardId;
+      await applyAtom(ctx.state, {
+        type: '帧参数赋值',
+        frameIndex: ctx.state.settlementStack.indexOf(ctx.frame),
+        key: EFFECTIVE_CARD_KEY,
+        value: card.shadowOf ?? atom.cardId,
+      });
     }),
   );
 

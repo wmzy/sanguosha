@@ -124,7 +124,7 @@ describe('客户端枚举的转化技 action 引擎可接受(影子 id 约定)',
     });
     // 授予武圣(父魂杀造成伤害后的本回合状态):state 侧标记 + view 侧投影镜像
     state.turn.vars['父魂/granted'] = 0;
-    state.turn.vars['__view/杀/unlimited/父魂'] = true;
+    state.turn.vars['__view/0/杀/unlimited/父魂'] = true;
 
     const view = buildView(state, 0);
     const granted = enumerateAvailableActions(view, 0, getActionsForPlayer(0)).find(

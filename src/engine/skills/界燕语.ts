@@ -66,11 +66,12 @@ function getLostSha(state: GameState, ownerId: number): number {
   return (state.players[ownerId]?.vars[LOST_SHA_KEY] as number | undefined) ?? 0;
 }
 
-function addLostSha(state: GameState, ownerId: number, n: number): void {
+async function addLostSha(state: GameState, ownerId: number, n: number): Promise<void> {
   const self = state.players[ownerId];
   if (!self) return;
   const cur = getLostSha(state, ownerId);
   self.vars[LOST_SHA_KEY] = cur + n;
+  await applyAtom(state, { type: '回合用量', player: ownerId, key: LOST_SHA_KEY, value: cur + n });
 }
 
 /** 是否处于 owner 的出牌阶段(用于增计数 hooks 的门控) */
@@ -162,6 +163,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const self = ctx.state.players[ownerId];
     if (!self) return;
     self.vars[LOST_SHA_KEY] = 0;
+    await applyAtom(ctx.state, { type: '回合用量', player: ownerId, key: LOST_SHA_KEY, value: 0 });
   });
 
   // ── 移动牌 after-hook:owner 手牌中的【杀】移出 → lostSha +1 ──
@@ -174,7 +176,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (typeof cardId !== 'string') return;
     const card = ctx.state.cardMap[cardId];
     if (card?.name !== '杀') return;
-    addLostSha(ctx.state, ownerId, 1);
+    await addLostSha(ctx.state, ownerId, 1);
   });
 
   // ── 弃置 after-hook:owner 弃置的【杀】计入 lostSha ──
@@ -184,7 +186,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (atom.player !== ownerId) return;
     const ids = Array.isArray(atom.cardIds) ? atom.cardIds : [];
     const shaCount = ids.filter((id) => ctx.state.cardMap[id]?.name === '杀').length;
-    if (shaCount > 0) addLostSha(ctx.state, ownerId, shaCount);
+    if (shaCount > 0) await addLostSha(ctx.state, ownerId, shaCount);
   });
 
   // ── 阶段结束(出牌) before-hook:owner 出牌阶段结束 → 若 lostSha≥2 触发 ──

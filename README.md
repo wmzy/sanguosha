@@ -5,7 +5,7 @@
 ## 技术栈
 
 - **前端:** React 19 + TypeScript + Vite 8
-- **后端:** Hono + WebSocket
+- **后端:** Hono REST + SSE
 - **样式:** Linaria CSS-in-JS
 - **测试:** Vitest + Playwright
 - **包管理:** pnpm
@@ -20,15 +20,21 @@ pnpm dev          # 启动开发服务器 (http://localhost:3930)
 ## 命令
 
 ```bash
-pnpm dev          # 开发服务器（前端 + API + WebSocket 共享端口）
+pnpm dev          # 开发服务器（前端 + REST API + SSE 共享端口）
 pnpm build        # 构建生产版本
-pnpm test         # 运行所有测试
-pnpm test:watch   # 监听模式运行测试
+pnpm test         # 运行 core 测试项目
+pnpm test:skills  # 运行技能测试项目
+pnpm test:all     # 运行全部 Vitest 测试
+pnpm test:watch   # 监听模式运行 core 测试
 pnpm typecheck    # TypeScript 类型检查
 pnpm lint         # ESLint 检查
 pnpm format       # Prettier 格式化
 pnpm server       # 独立运行后端服务器
 ```
+
+日常只跑变更相关测试：`pnpm test --changed --maxWorkers=2`（core）或 `pnpm test:all --changed --maxWorkers=2`（含技能）。运行前用 `free -h` 和 `nproc` 检查资源；确需全量时显式限制 worker 数。
+
+CI 包含类型检查、lint、构建、限并发全量覆盖率、普通认证房间的 HGC/Chromium 流程与插件验证。`main` 的发布工作流调用同一提交的 CI，成功后才构建并验证发布产物；其他分支与 PR 直接运行 CI。
 
 ## 游戏功能
 
@@ -38,7 +44,7 @@ pnpm server       # 独立运行后端服务器
 - **装备牌**：11 种武器、4 种防具、7 种马（标准版 + 军争篇）
 - **身份局**：主公/忠臣/反贼/内奸
 - 游戏日志与重放
-- 多人联机（WebSocket）
+- 多人联机（REST + SSE）
 
 ## 环境变量
 
@@ -46,6 +52,7 @@ pnpm server       # 独立运行后端服务器
 |------|--------|------|
 | `PORT` | `3930` | 服务器端口 |
 | `HOST` | `true` | 绑定地址（`true` = 所有网卡） |
+| `SGS_TRUSTED_PROXIES` | 空 | 逗号分隔的可信代理 IP；仅这些 peer 的转发头用于限流。代理必须覆盖 `X-Real-IP` 或追加真实来源到 `X-Forwarded-For`；修改后重启。 |
 
 ## AI agent 接入
 
@@ -73,7 +80,7 @@ Plugin 包 `sanguosha-agent-plugin` 自包含玩家向 skill + sanguosha MCP ser
     "sanguosha": {
       "command": "node",
       "args": ["<全局 node_modules>/sanguosha-agent-plugin/mcp/sanguosha-mcp.mjs"],
-      "env": { "SGS_SERVER_URL": "wss://<服务器>/ws" }
+      "env": { "SGS_SERVER_URL": "https://<服务器>" }
     }
   }
 }
@@ -94,4 +101,4 @@ Plugin 包 `sanguosha-agent-plugin` 自包含玩家向 skill + sanguosha MCP ser
 
 ### 本仓库开发
 
-本仓库自身开发用源码直跑（`pnpm mcp:serve`，连 `ws://localhost:3930/ws`），配置见仓库根 `.mcp.json`。发布 plugin npm 包用 `pnpm build:plugin` 打包 skill + MCP 为单文件。
+本仓库自身开发用源码直跑（`pnpm mcp:serve`，连 `http://localhost:3930`），配置见仓库根 `.mcp.json`。发布 plugin npm 包用 `pnpm build:plugin` 打包 skill + MCP 为单文件。

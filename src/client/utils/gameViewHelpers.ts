@@ -61,7 +61,7 @@ export function findUseActionForCard(
  *  不可主动打出;其余基本牌/锦囊(timing='出牌阶段')以及未注册 card-effect 的牌
  *  (装备牌由「装备通用」注册 use)均有 use 入口。
  *  与 use-card onMount 跳过 timing='生效前' 的逻辑同源。 */
-export function hasUseEntry(card: Card): boolean {
+export function hasUseEntry(card: Pick<Card, 'name'>): boolean {
   const effect = getCardEffect(card.name);
   // 已注册 card-effect:看 timing;未注册(装备等):默认有 use 入口(乐观)。
   return effect ? effect.timing !== '生效前' : true;

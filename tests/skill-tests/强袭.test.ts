@@ -414,7 +414,7 @@ describe('强袭', () => {
         const params = { ...a.message.params } as Record<string, unknown>;
         if (params.cost === 'discard')
           expect(typeof params.cardId, '枚举出的弃武器变体必须自带 cardId').toBe('string');
-        const target = (a.validTargets[0] ?? 1) as number;
+        const target = a.validTargets[0] ?? 1;
         const res = await dispatch(state, {
           ...a.message,
           params: { ...params, target, targets: [target] },

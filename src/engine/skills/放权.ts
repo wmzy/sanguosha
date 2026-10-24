@@ -41,10 +41,15 @@ const ORIGINAL_NEXT_KEY = '放权/originalNext';
 /** 复刻「回合结束」atom 的 per-turn 清理(cancel 回合结束后 atom.apply 不执行,需手动清理)。
  *  清空 turn.vars、清所有玩家 duration='turn' 标记、清 /usedThisTurn|/healed|/givenCount vars。
  *  marks 多数由 end action 的 清过期标记 已清(仅结束玩家),此处补全所有玩家以保持与 atom 一致。 */
-function clearPerTurnState(state: GameState): void {
+async function clearPerTurnState(state: GameState): Promise<void> {
   state.turn.vars = {};
   for (const p of state.players) {
     p.marks = p.marks.filter((m) => m.duration !== 'turn');
+    for (const key of Object.keys(p.vars)) {
+      if (key.endsWith('/usedThisTurn') || key.endsWith('/healed') || key.endsWith('/givenCount')) {
+        await applyAtom(state, { type: '回合用量', player: p.index, key, value: null });
+      }
+    }
     p.vars = Object.fromEntries(
       Object.entries(p.vars).filter(
         ([k]) => !k.endsWith('/usedThisTurn') && !k.endsWith('/healed') && !k.endsWith('/givenCount'),
@@ -218,7 +223,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         st.localVars[ORIGINAL_NEXT_KEY] = originalNext;
 
         // cancel 回合结束 → 手动清理 per-turn 状态(否则 apply 不执行,状态残留)
-        clearPerTurnState(st);
+        await clearPerTurnState(st);
 
         // 亲自启动额外目标的回合(嵌套:其 end action → 回合结束(extraTarget) → 触发情况2)
         st.currentPlayerIndex = extraTarget;
@@ -239,7 +244,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         }
 
         // cancel 回合结束 → 手动清理 per-turn 状态
-        clearPerTurnState(st);
+        await clearPerTurnState(st);
 
         // 亲自启动正常下家的回合(恢复正常座次顺序)。
         // originalNext 回合结束后,其 回合结束 before-hook 标记已清 → 放行 →

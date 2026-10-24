@@ -223,6 +223,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
 
     const hgc = new HeadlessGameClient(serverUrl, {
       onView: (v, newEvents) => {
+        if (hgcRef.current !== hgc) return;
         setView(v);
         // 出牌历史:追加批次(不可替换——WS 连发时 React 会合并 setState 丢掉中间的打出)
         if (newEvents.length > 0) {
@@ -233,15 +234,17 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         // 旁观者始终留在 spectating stage，不因 viewer>=0 跳转
         if (v.viewer >= 0 && !hgc.isSpectator) setStage('playing');
       },
-      onRoomState: (rs) => setRoomState(rs),
+      onRoomState: (rs) => { if (hgcRef.current !== hgc) return; setRoomState(rs); },
       onPhaseChange: (phase: ClientPhase) => {
+        if (hgcRef.current !== hgc) return;
         if (phase === 'lobby') setConnectionState('connected');
         // 旁观者游戏开始时进入 spectating（看旁观视图），玩家进入 playing
         if (phase === 'playing') setStage(hgc.isSpectator ? 'spectating' : 'playing');
         if (phase === 'ended' && !hgc.isSpectator) setStage('ended');
       },
-      onGameOver: (winner) => setGameOver({ winner }),
+      onGameOver: (winner) => { if (hgcRef.current !== hgc) return; setGameOver({ winner }); },
       onError: (err) => {
+        if (hgcRef.current !== hgc) return;
         // 操作类失败（ready/start/chat/config 等服务端 4xx）——显示错误提示。
         // WS 断连走 onReconnectStateChange，不会进入这里。
         const msg = err instanceof Error ? err.message : String(err);
@@ -249,12 +252,14 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         showError(msg);
       },
       onReconnectStateChange: (state: ReconnectState, attempt: number) => {
+        if (hgcRef.current !== hgc) return;
         setReconnectAttempt(attempt);
         if (state === 'idle') setConnectionState('connected');
         else if (state === 'reconnecting') setConnectionState('reconnecting');
         else if (state === 'failed') setConnectionState('failed');
       },
       onChat: (messages: ChatMessage[], source: 'chat' | 'history') => {
+        if (hgcRef.current !== hgc) return;
         setChatMessages((prev) => {
           // chat 是增量追加;chat_history 是全量替换(重连/开局后服务端重发完整历史,
           // 按来源显式区分,避免「历史恰为 1 条」被当增量追加造成重复)
@@ -264,13 +269,14 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
           return messages;
         });
       },
-      // 连接身份事件驱动同步(HGC 在 REST 建房/加房响应、room_joined、role_changed 时回调),
-      // 替代原先的 200ms getter 轮询。函数式 setState 避免闭包过期;空值不清空本地状态
-      // (清空由 leaveRoom/player_kicked 显式负责),与原轮询语义一致。
-      onIdentityChange: ({ roomId: newRoomId }) => {
+      onIdentityChange: ({ roomId: newRoomId, isSpectator: newIsSpectator }) => {
+        if (hgcRef.current !== hgc) return;
+        // URL 只同步 roomId；旁观标志从 HGC 与服务端 room_state 双重确认。
         if (newRoomId) setRoomId((prev) => (prev === newRoomId ? prev : newRoomId));
+        setHgcIsSpectator(newIsSpectator);
       },
       onMessage: (msg: ServerMessage) => {
+        if (hgcRef.current !== hgc) return;
         // 再来一局:服务端 resetToLobby 广播 game_reset,清除结算界面回到准备阶段。
         // HGC 内部已重置 view/gameOverWinner,这里同步 React state(roomId/playerId 保留)。
         if (msg.type === 'game_started') {
@@ -348,6 +354,7 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
         // - spectator→player：切回等待大厅（无论原 stage 是 waiting 还是 spectating）
         // - player→spectator：保持当前 stage（等待大厅内旁观不切换视图）
         if (msg.type === 'role_changed' && msg.playerId === hgc.playerId) {
+          setHgcIsSpectator(msg.newRole === 'spectator');
           if (msg.newRole === 'player') setStage('waiting');
         }
       },
@@ -357,7 +364,11 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
     // 按命令执行(连接命令在 HGC 内部排队,open 后 flush)
     // playerId 不再本地传:服务端从会话(Cookie)解析 userId,body.playerId 已被忽略
     if (command.type === 'create') {
-      hgc.createRoom(command.name, command.maxPlayers, command.config, undefined, command.roomType, command.password)
+      void hgc.createRoom(command.name, command.maxPlayers, command.config, undefined, command.roomType, command.password)
+        .then(() => {
+          if (hgcRef.current !== hgc) return;
+          setStage('waiting');
+        })
         .catch((err) => {
           if (hgcRef.current !== hgc) return;
           const msg = err instanceof Error ? err.message : String(err);

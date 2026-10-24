@@ -21,7 +21,7 @@
 import type { GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
-import { isCancelled, clearCancelled } from '../core/frame';
+import { isCancelled, setFrameCancelled } from '../core/frame';
 import { consumePlayedSlashes } from './cards/play-card';
 import type { SkillModule } from '../types';
 
@@ -74,7 +74,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
     // 第一次闪:清除 cancelled + 追加第二次询问
     // 闪牌已由 runUseFlow 自动移入弃牌堆,无需手动 drain
-    clearCancelled(ctx.state, killCardId, target);
+    await setFrameCancelled(ctx.state, ctx.frame, false);
     ctx.state.localVars[countKey] = count + 1;
 
     // 追加第二次询问闪:玩家出第二张闪 → resolve 自动设 cancelled;超时 → cancelled 保持 false

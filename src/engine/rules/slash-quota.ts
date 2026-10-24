@@ -23,7 +23,7 @@
 // 无模块级全局状态泄漏(与 skill.ts 的 registries 同构)。
 
 import type { GameState } from '../types';
-import { SLASH_QUOTA_USED_KEY as QUOTA_USED_VAR, SLASH_EXTRA_USED_KEY as EXTRA_USED_VAR, getSlashQuotaUsed, getSlashExtraUsed, SLASH_USED_COUNT_KEY } from './vars-keys';
+import { getSlashQuotaUsed, getSlashExtraUsed, slashQuotaUsedKey, slashExtraUsedKey, SLASH_QUOTA_USED_KEY as QUOTA_USED_VAR, SLASH_EXTRA_USED_KEY as EXTRA_USED_VAR, SLASH_USED_COUNT_KEY } from './vars-keys';
 
 /**
  * view 侧"已出杀次数"投影 key(由「回合用量」atom 同步到 view.turnUsage)。
@@ -229,19 +229,23 @@ export function slashMax(state: GameState, player: number): number {
   return slashQuotaMax(state, player) + slashExtraMax(state, player);
 }
 
-/** 该玩家本回合额定已用次数(默认 0) */
-export function slashQuotaUsed(state: GameState): number {
-  return getSlashQuotaUsed(state.turn.vars) ?? 0;
+/** 该玩家本回合额定已用次数(默认 0)。旧测试/存档的无玩家 key 仅归当前回合玩家。 */
+export function slashQuotaUsed(state: GameState, player = state.currentPlayerIndex): number {
+  const legacy = getSlashQuotaUsed(state.turn.vars);
+  if (player === state.currentPlayerIndex && legacy !== undefined) return legacy;
+  return getSlashQuotaUsed(state.turn.vars, player) ?? 0;
 }
 
-/** 该玩家本回合额外已用次数(默认 0) */
-export function slashExtraUsed(state: GameState): number {
-  return getSlashExtraUsed(state.turn.vars) ?? 0;
+/** 该玩家本回合额外已用次数(默认 0)。旧测试/存档的无玩家 key 仅归当前回合玩家。 */
+export function slashExtraUsed(state: GameState, player = state.currentPlayerIndex): number {
+  const legacy = getSlashExtraUsed(state.turn.vars);
+  if (player === state.currentPlayerIndex && legacy !== undefined) return legacy;
+  return getSlashExtraUsed(state.turn.vars, player) ?? 0;
 }
 
-/** 当前玩家本回合已出杀次数(额定 + 额外,默认 0) */
-export function slashUsed(state: GameState): number {
-  return slashQuotaUsed(state) + slashExtraUsed(state);
+/** 当前玩家本回合已出杀次数(额定 + 额外,默认 0)。 */
+export function slashUsed(state: GameState, player = state.currentPlayerIndex): number {
+  return slashQuotaUsed(state, player) + slashExtraUsed(state, player);
 }
 
 /**
@@ -307,21 +311,28 @@ export function canSlash(
   if (isSlashBlocked(state, player)) return false;
   if (cardId !== undefined && isSlashExempted(state, player, cardId)) return true;
   if (isSlashUnlimited(state, player)) return true;
-  return slashQuotaUsed(state) < slashQuotaMax(state, player)
-    || slashExtraUsed(state) < slashExtraMax(state, player);
+  return slashQuotaUsed(state, player) < slashQuotaMax(state, player)
+    || slashExtraUsed(state, player) < slashExtraMax(state, player);
 }
 
 /** 记录一次出杀(已用次数 +1)。
  *  无限出杀(诸葛连弩/咆哮)时始终计入 quotaUsed(不计入 extraUsed),
  *  即使超过 quotaMax 也不动 extraUsed——文档规定无限出杀的杀只计入额定次数。
  *  否则优先扣额定,额定满后扣额外。在杀 use 的 execute 末尾调用。 */
-export function incSlashUsed(state: GameState): void {
-  const player = state.currentPlayerIndex;
+export function incSlashUsed(state: GameState, player = state.currentPlayerIndex): void {
+  const writeQuota = (value: number) => {
+    state.turn.vars[slashQuotaUsedKey(player)] = value;
+    if (player === state.currentPlayerIndex) state.turn.vars[QUOTA_USED_VAR] = value;
+  };
+  const writeExtra = (value: number) => {
+    state.turn.vars[slashExtraUsedKey(player)] = value;
+    if (player === state.currentPlayerIndex) state.turn.vars[EXTRA_USED_VAR] = value;
+  };
   if (isSlashUnlimited(state, player)) {
-    state.turn.vars[QUOTA_USED_VAR] = slashQuotaUsed(state) + 1;
-  } else if (slashQuotaUsed(state) < slashQuotaMax(state, player)) {
-    state.turn.vars[QUOTA_USED_VAR] = slashQuotaUsed(state) + 1;
+    writeQuota(slashQuotaUsed(state, player) + 1);
+  } else if (slashQuotaUsed(state, player) < slashQuotaMax(state, player)) {
+    writeQuota(slashQuotaUsed(state, player) + 1);
   } else {
-    state.turn.vars[EXTRA_USED_VAR] = slashExtraUsed(state) + 1;
+    writeExtra(slashExtraUsed(state, player) + 1);
   }
 }

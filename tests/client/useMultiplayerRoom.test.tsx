@@ -421,6 +421,78 @@ describe('useMultiplayerRoom', () => {
     expect(result.current.isSpectator).toBe(true);
   });
 
+  it('旁观转玩家后准备能力随身份和 room_state 恢复', async () => {
+    const { result } = renderHook(() => useMultiplayerRoom());
+    act(() => result.current.joinAsSpectator('ROOM1'));
+    await flushConnect();
+    const es = MockEventSource.last!;
+    emitAndSync(es, {
+      type: 'room_state', readyPlayers: [], playerIds: ['host'], hostId: 'host',
+      maxPlayers: 2, config: DEFAULT_ROOM_CONFIG, spectatorIds: ['pid-0'],
+      seats: ['host', null], pendingSeatSwaps: {},
+      viewGrants: {}, pendingViewRequests: {},
+    });
+    expect(result.current.isSpectator).toBe(true);
+
+    emitAndSync(es, { type: 'role_changed', playerId: 'pid-0', newRole: 'player' });
+    emitAndSync(es, {
+      type: 'room_state', readyPlayers: [], playerIds: ['host', 'pid-0'], hostId: 'host',
+      maxPlayers: 2, config: DEFAULT_ROOM_CONFIG, spectatorIds: [],
+      seats: ['host', 'pid-0'], pendingSeatSwaps: {},
+      viewGrants: {}, pendingViewRequests: {},
+    });
+    expect(result.current.isSpectator).toBe(false);
+    expect(result.current.stage).toBe('waiting');
+    act(() => result.current.toggleReady());
+    expect(fetchCalls.some((call) => call.url.endsWith('/ready'))).toBe(true);
+  });
+
+  it.each(['leave', 'replace'] as const)('建房迟到成功不能覆盖 %s 后的房间状态', async (mode) => {
+    const originalFetch = globalThis.fetch;
+    let resolveCreate!: (response: Response) => void;
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
+      if (url.endsWith('/api/rooms') && init?.method === 'POST') {
+        return new Promise<Response>((resolve) => { resolveCreate = resolve; });
+      }
+      return originalFetch(url, init);
+    }));
+    const { result } = renderHook(() => useMultiplayerRoom());
+    act(() => result.current.createRoom('旧房间', 2));
+    act(() => {
+      if (mode === 'leave') result.current.leaveRoom();
+      else result.current.joinRoom('ROOM1');
+    });
+    await flushConnect();
+    const streamCount = MockEventSource.instances.length;
+    await act(async () => {
+      resolveCreate(new Response(JSON.stringify({ roomId: 'OLD', playerId: 'pid-0' }), { status: 200 }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.roomId).toBe(mode === 'leave' ? null : 'ROOM1');
+    expect(result.current.stage).toBe(mode === 'leave' ? 'lobby' : 'waiting');
+    expect(MockEventSource.instances).toHaveLength(streamCount);
+  });
+
+  it('离开后旧 SSE 所有回调不再改写当前状态', async () => {
+    const { result, es } = await openRoom();
+    act(() => result.current.leaveRoom());
+    act(() => {
+      es.emit({ type: 'room_joined', roomId: 'OLD', playerId: 'pid-0' });
+      es.emit({ type: 'initialView', state: makeBaseline(0), lastSeq: 99 });
+      es.emit({ type: 'gameOver', winner: '旧对局' });
+      es.emit({ type: 'chat', playerId: 'old', seatIndex: 0, text: '迟到', timestamp: 1 });
+      es.emit({ type: 'error', message: '旧错误' });
+      es.fireOpen();
+      es.onerror?.();
+    });
+    expect(result.current.roomId).toBeNull();
+    expect(result.current.view).toBeNull();
+    expect(result.current.gameOver).toBeNull();
+    expect(result.current.chatMessages).toEqual([]);
+    expect(result.current.error).toBeNull();
+    expect(result.current.stage).toBe('lobby');
+  });
+
   it('autoJoin 玩家加入失败(游戏已开始)时自动降级为旁观者(修复刷新死循环)', async () => {
     vi.stubGlobal(
       'fetch',

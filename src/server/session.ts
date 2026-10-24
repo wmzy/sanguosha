@@ -252,7 +252,9 @@ export class GameSession {
     // 新一局(epoch 变化):journal 重新开始,裁剪水位归零
     this.trimmedFloorSeq = 0;
     resetEventJournal(this.room.id);
-    void bootstrap(this.state, config)
+    const bootstrapState = this.state;
+    void Promise.resolve()
+      .then(() => bootstrap(bootstrapState, config))
       .then(() => {
         // bootstrap 完成后:所有角色/手牌/技能已就绪,强制刷新 baseline
         this.baselineSent.clear();
@@ -365,27 +367,30 @@ export class GameSession {
   /**
    * 整理手牌:玩家拖拽重排自己的手牌顺序。
    * 这是纯显示偏好,不调 dispatch、不写 actionLog、不触发 seq 变化 ——
-   * 直接 mutate state.players[i].hand,只给该玩家广播最新 view。
+   * 直接 mutate hand 顺序后,仅向该玩家发送新的 initialView,并持久化最新顺序。
    *
    * 重放确定性由盲选 action 在 actionLog 里 splice 的"设置手牌顺序"条目保证
    * (过河拆桥/顺手牵羊盲选时会快照顺序),state 快照也会随 persistAsync 保存最新顺序。
    * 即使重启丢失了 state 快照,下次有人盲选时顺序仍会从 actionLog 恢复。
    */
-  async handleReorderHand(playerId: string, order: string[]): Promise<void> {
-    if (this.destroyed || !this.state) return;
+  handleReorderHand(playerId: string, order: string[]): boolean {
+    if (this.destroyed || !this.state || !Array.isArray(order)) return false;
     const playerIndex = this.playerNames.get(playerId);
-    if (playerIndex === undefined) return;
-    // debug 模式不校验 ownerId——单人控制所有角色
+    if (playerIndex === undefined) return false;
     const player = this.state.players[playerIndex];
-    if (!player) return;
-    // 校验:order 必须是当前 hand 的合法排列(同集合,防注入不存在的卡)
-    if (order.length !== player.hand.length) return;
+    if (order.length !== player?.hand.length) return false;
     const handSet = new Set(player.hand);
+    const seen = new Set<string>();
     for (const id of order) {
-      if (!handSet.has(id)) return;
+      if (typeof id !== 'string' || !handSet.has(id) || seen.has(id)) return false;
+      seen.add(id);
     }
-    // 直接 mutate hand 顺序
+    if (seen.size !== handSet.size) return false;
+    // 仅完整排列通过后改动权威手牌,非法输入不广播也不持久化。
     player.hand = [...order];
+    this.sendInitialViewToPlayer(playerId);
+    this.persistAsync();
+    return true;
   }
 
   private handleGameOver(winner?: number): void {
@@ -878,10 +883,30 @@ export class GameSession {
     });
   }
 
-  /** 返回游戏动作日志(供 /api/rooms/:id/log 端点)。无 state 时返回 null。 */
+  /** 内部重放日志:含 seed、手牌顺序及未公开的前置动作,不得直接返回 HTTP。 */
   getGameLog(): ActionLogEntry[] | null {
     if (!this.state) return null;
     return this.actionLog;
+  }
+
+  /** 公开战报只保留时间、操作者和操作摘要,不投影任何原始参数或 preceding。
+   *  对所有玩家/旁观者相同;不能拿它重放,完整重放仍使用 getGameLog。 */
+  getPublicGameLog(): GameView['log'] | null {
+    if (!this.state) return null;
+    const entries: GameView['log'] = [];
+    for (const entry of this.actionLog) {
+      const { skillId, actionType, ownerId } = entry.message;
+      if (actionType === '设置手牌顺序') continue;
+      const text = actionType === 'start' ? '开始游戏'
+        : actionType === 'end' ? '结束回合'
+          : actionType === '选将' ? '完成选将'
+            : actionType === 'skip' ? '放弃回应'
+              : actionType === 'respond' ? '提交回应'
+                : actionType === 'use' ? `使用 ${skillId}`
+                  : '提交操作';
+      entries.push({ time: entry.timestamp, player: ownerId, text });
+    }
+    return entries;
   }
 
   private sendToPlayer(playerId: string, message: ServerMessage): void {

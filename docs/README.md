@@ -15,7 +15,7 @@ docs/
 ├── decisions/           ← 架构决策记录（ADR）
 ├── superpowers/         ← 历史实施计划（plans）与设计稿（specs）
 ├── card-refs/           ← 卡牌参考图
-├── api.md               ← 服务端 API 协议（REST/SSE/WebSocket）
+├── api.md               ← 服务端 API 协议（REST/SSE）
 └── _archive/            ← 已归档：被取代或过时的旧稿
 ```
 

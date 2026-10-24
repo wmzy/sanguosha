@@ -32,6 +32,7 @@
 // 命名:文件名/loader key/character skill name 均为 '界完杀';内部 Skill.name='完杀'。
 import type { HookResult, Skill, GameState } from '../types';
 import { registerBeforeHook, registerAfterHook } from '../core/skill';
+import { applyAtom } from '../core/apply';
 import { registerSuppressionProvider } from '../core/skill-suppression';
 import type { SkillModule } from '../types';
 
@@ -60,14 +61,14 @@ function anyoneDying(state: GameState): boolean {
 /**
  * 若无人处于濒死,清理所有玩家身上的 '完杀/非锁定技失效' tag。
  * 用于 击杀 / 回复体力 等濒死退出时点的防御性扫描。
- * 直接 mutate player.tags(tag 是引擎内部状态,无 view 同步需求)。
+ * 标签属于公开玩家状态,通过去标签同步所有视角。
  */
-function cleanupIfNoDying(state: GameState): void {
+async function cleanupIfNoDying(state: GameState): Promise<void> {
   if (anyoneDying(state)) return;
   for (const p of state.players) {
     if (!p) continue;
     if (!p.tags.includes(SUPPRESSION_TAG)) continue;
-    p.tags = p.tags.filter((t) => t !== SUPPRESSION_TAG);
+    await applyAtom(state, { type: '去标签', player: p.index, tag: SUPPRESSION_TAG });
   }
 }
 
@@ -132,7 +133,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           const p = ctx.state.players[i];
           if (!p?.alive) continue;
           if (p.health <= 0) continue; // 濒死者(含嵌套濒死)本人不压制
-          if (!p.tags.includes(SUPPRESSION_TAG)) p.tags.push(SUPPRESSION_TAG);
+          if (!p.tags.includes(SUPPRESSION_TAG)) {
+            await applyAtom(ctx.state, { type: '加标签', player: i, tag: SUPPRESSION_TAG });
+          }
         }
         return; // pass:不阻止陷入濒死 atom 本身
       },
@@ -143,14 +146,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // 模块 B:击杀拆分为 runDeathFlow,濒死退出时点改为「死亡后」(系统处理牌+奖惩之后)。
   unloaders.push(
     registerAfterHook(state, skill.id, ownerId, '死亡后', async (_ctx) => {
-      cleanupIfNoDying(state);
+      await cleanupIfNoDying(state);
     }),
   );
 
   // ── ④ cleanup:回复体力 after-hook(救援成功 / 不屈救活 → 濒死结束)──
   unloaders.push(
     registerAfterHook(state, skill.id, ownerId, '回复体力', async (_ctx) => {
-      cleanupIfNoDying(state);
+      await cleanupIfNoDying(state);
     }),
   );
 

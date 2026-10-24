@@ -83,6 +83,11 @@ export interface PendingSlot {
   isPaused: boolean;
   /** 取消超时定时器(不触发)。dispatch 走用户 action 路径前调用,让 respond execute 独占推进 */
   pause: () => void;
+  /** 同一响应窗口的同步占有权。已被其他 dispatch claim、已暂停或已超时时返回 false。 */
+  claim?: () => boolean;
+  readonly isClaimed?: boolean;
+  /** 释放尚未提交的占有权；已 pause 的已提交响应不得释放。 */
+  releaseClaim?: () => void;
   /** 内部:由引擎创建 pending 时挂上,供 fireTimeout 立即触发 onTimeout(绕过真实 setTimeout) */
   _fireTimeoutNow?: () => Promise<void>;
   /** 广播型 pending 中已放弃回应的玩家集合(skip 机制)。

@@ -1,12 +1,11 @@
 // src/engine/view/buildView.ts
 // src/engine/view/buildView.ts
-import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage } from '../types';
+import type { ActionPrompt, GameState, GameView, ActionLogEntry, ClientMessage, Json } from '../types';
 import { TARGET_SYSTEM, TARGET_BROADCAST } from '../types';
 import { resolveChoosePlayerCandidates } from './choosePlayerCandidates';
 import { resolveCardFilterCandidates } from './cardFilterCandidates';
-import { slashUsed } from '../rules/slash-quota';
 import { getCardResponseMode, SILENT_RESPONSE_PROMPT } from '../core/card-response-availability';
-import { getDistanceAttackMod, getDistanceDefenseMod, getDistanceAttackRange, SLASH_USED_COUNT_KEY, VIEW_MIRROR_PREFIX, USED_THIS_TURN_SUFFIX } from '../rules/vars-keys';
+import { getDistanceAttackMod, getDistanceDefenseMod, getDistanceAttackRange } from '../rules/vars-keys';
 
 /** 从 ClientMessage 生成可读日志文本(不含玩家名——player 字段单独携带,由展示层映射) */
 export function formatLogEntry(msg: ClientMessage): string {
@@ -185,26 +184,17 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
         defenseMod: getDistanceDefenseMod(p.vars),
         attackRange: getDistanceAttackRange(p.vars),
       },
-      // 本回合用量(出杀计数 + 限一次标记)的 view 投影。
-      // baseline/重连时从此处初值;运行期由「回合用量」atom applyView 增量维护。
-      // 出杀计数后端拆为 杀/quotaUsed + 杀/extraUsed(模块 K),view 仍投影为合计 '杀/usedCount'。
-      // 出杀放宽族键('杀/unlimited/*' / '杀/extra/*' / '杀/blocked/*' / '杀/target/*' /
-      // '杀/exemptSuit')由「回合用量」atom 镜像进 turn.vars(该 atom 的 apply),此处按
-      // 当前回合玩家投影——否则初始视图/重连视图丢失引擎已放宽的出杀次数/目标数,
-      // 客户端按默认上限 1 判定(出过 1 张杀后按钮消失,第 2 张杀发不出动作)。
-      turnUsage: {
-        ...(slashUsed(state) > 0 ? { [SLASH_USED_COUNT_KEY]: slashUsed(state) } : {}),
-        ...Object.fromEntries(
-          Object.entries(p.vars).filter(([k, v]) => k.endsWith(USED_THIS_TURN_SUFFIX) && v).map(([k, v]) => [k, v]),
-        ),
-        ...(i === state.currentPlayerIndex
-          ? Object.fromEntries(
-              Object.entries(state.turn.vars)
-                .filter(([k]) => k.startsWith(VIEW_MIRROR_PREFIX))
-                .map(([k, v]) => [k.slice(VIEW_MIRROR_PREFIX.length), v]),
-            )
-          : {}),
-      },
+      // 回合用量仅来自显式「回合用量」atom 的 state 镜像。
+      // 镜像按玩家归属存储，支持他人回合中的强制用牌；不再从 player.vars
+      // 自动投影 /usedThisTurn 等内部门控标记。
+      turnUsage: Object.fromEntries(
+        Object.entries(state.turn.vars)
+          .map(([k, v]) => {
+            const prefix = `__view/${i}/`;
+            return k.startsWith(prefix) ? [k.slice(prefix.length), v] : null;
+          })
+          .filter((entry): entry is [string, Json] => entry !== null),
+      ),
       // 判定区:延时锦囊的 cardId 列表(乐不思蜀/闪电/兵粮寸断)
       pendingTricks: p.pendingTricks.map((t) => t.card.id),
       ...(() => {

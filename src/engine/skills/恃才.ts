@@ -106,7 +106,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ctx.state.turn.vars[PENDING_VAR] = pending;
     // 影子卡(转化牌)入弃牌堆时被引擎还原为原卡并删除影子条目——结算结束后
     // effectiveIdOf 将无法反查。趁影子仍在,把实体原卡 id 记入当前结算帧参数。
-    ctx.frame.params[EFFECTIVE_ID_KEY] = card.shadowOf ?? atom.cardId;
+    await applyAtom(ctx.state, {
+      type: '帧参数赋值',
+      frameIndex: ctx.state.settlementStack.indexOf(ctx.frame),
+      key: EFFECTIVE_ID_KEY,
+      value: card.shadowOf ?? atom.cardId,
+    });
   });
 
   // ── 使用结算结束后 after-hook:eligible 牌 → 询问置顶摸牌 ──

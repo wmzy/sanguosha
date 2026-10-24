@@ -162,7 +162,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const resolvedTargets = ctx.frame.params.resolvedTargets as number[] | undefined;
     if (resolvedTargets) {
       const idx = resolvedTargets.indexOf(ownerId);
-      if (idx >= 0) resolvedTargets[idx] = newTarget;
+      if (idx >= 0) {
+        const redirectedTargets = [...resolvedTargets];
+        redirectedTargets[idx] = newTarget;
+        await applyAtom(ctx.state, {
+          type: '帧参数赋值',
+          frameIndex: ctx.state.settlementStack.indexOf(ctx.frame),
+          key: 'resolvedTargets',
+          value: redirectedTargets,
+        });
+      }
     }
     delete ctx.state.localVars['流离/confirmed'];
     delete ctx.state.localVars['流离/target'];

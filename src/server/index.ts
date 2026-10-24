@@ -8,8 +8,8 @@ const log = createLogger('server');
 
 const port = parseInt(process.env.PORT ?? '3930');
 const host = process.env.HOST ?? '0.0.0.0';
+await startServerLifecycle();
 const server = serve({ fetch: app.fetch, port, hostname: host });
 setupGracefulShutdown(server);
-startServerLifecycle();
 
 log.info(`服务器运行在 http://${host}:${port}`);

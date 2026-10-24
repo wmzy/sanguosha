@@ -2,32 +2,68 @@
 // 持久化层覆盖率补充:saveRoom/loadRoom 往返、sanitizeState、restoreFromLog、flushPendingWrites
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { existsSync } from 'node:fs';
+import * as nodeFs from 'node:fs/promises';
 import { join } from 'node:path';
 import { Hono } from 'hono';
-import {
-  saveRoom,
-  loadRoom,
-  deletePersistedRoom,
-  listPersistedRooms,
-  flushPendingWrites,
-  sanitizeState,
-  restoreFromLog,
-  _pendingWriteCount,
-  type PersistedRoom,
-} from '../../src/server/persistence';
-import { applyRestRoutes } from '../../src/server/rest';
-import { applyAuthRoutes } from '../../src/server/auth/routes';
-function applyAuthRoutesForTest(app: Hono): void {
-  applyAuthRoutes(app);
-}
-import { getRoom, createRoom } from '../../src/server/room';
-import { initRoomStore, closeRoomStore } from '../../src/server/roomStore';
-import { _resetForTests as resetLifecycles } from '../../src/server/lifecycles';
-import { gameSessions, playerRoomMap } from '../../src/server/registry';
+import type { PersistedRoom } from '../../src/server/persistence';
 import { createGameState } from '../../src/engine/types';
 import type { GameState, PlayerState, Card } from '../../src/engine/types';
 
 const TEST_DATA_DIR = join(process.cwd(), 'data', 'rooms');
+type PersistenceModule = typeof import('../../src/server/persistence');
+type FsPromisesModule = typeof import('node:fs/promises');
+
+let persistence!: PersistenceModule;
+let fs!: FsPromisesModule;
+let applyRestRoutes!: typeof import('../../src/server/rest').applyRestRoutes;
+let applyAuthRoutes!: typeof import('../../src/server/auth/routes').applyAuthRoutes;
+let getRoom!: typeof import('../../src/server/room').getRoom;
+let createRoom!: typeof import('../../src/server/room').createRoom;
+let initRoomStore!: typeof import('../../src/server/roomStore').initRoomStore;
+let closeRoomStore!: typeof import('../../src/server/roomStore').closeRoomStore;
+let resetLifecycles!: typeof import('../../src/server/lifecycles')._resetForTests;
+let gameSessions!: typeof import('../../src/server/registry').gameSessions;
+let playerRoomMap!: typeof import('../../src/server/registry').playerRoomMap;
+
+const saveRoom = (...args: Parameters<PersistenceModule['saveRoom']>) => persistence.saveRoom(...args);
+const loadRoom = (...args: Parameters<PersistenceModule['loadRoom']>) => persistence.loadRoom(...args);
+const deletePersistedRoom = (...args: Parameters<PersistenceModule['deletePersistedRoom']>) =>
+  persistence.deletePersistedRoom(...args);
+const listPersistedRooms = (...args: Parameters<PersistenceModule['listPersistedRooms']>) =>
+  persistence.listPersistedRooms(...args);
+const flushPendingWrites = (...args: Parameters<PersistenceModule['flushPendingWrites']>) =>
+  persistence.flushPendingWrites(...args);
+const sanitizeState = (...args: Parameters<PersistenceModule['sanitizeState']>) =>
+  persistence.sanitizeState(...args);
+const restoreFromLog = (...args: Parameters<PersistenceModule['restoreFromLog']>) =>
+  persistence.restoreFromLog(...args);
+const pendingWriteCount = (...args: Parameters<PersistenceModule['_pendingWriteCount']>) =>
+  persistence._pendingWriteCount(...args);
+
+async function loadTestModules(configureFs?: (isolatedFs: FsPromisesModule) => void): Promise<void> {
+  vi.resetModules();
+  vi.doMock('node:fs/promises', async (importOriginal) => {
+    const actual = await importOriginal<typeof nodeFs>();
+    return {
+      ...actual,
+      writeFile: vi.fn(actual.writeFile),
+      rename: vi.fn(actual.rename),
+    };
+  });
+  fs = await import('node:fs/promises');
+  configureFs?.(fs);
+  persistence = await import('../../src/server/persistence');
+  ({ applyRestRoutes } = await import('../../src/server/rest'));
+  ({ applyAuthRoutes } = await import('../../src/server/auth/routes'));
+  ({ getRoom, createRoom } = await import('../../src/server/room'));
+  ({ initRoomStore, closeRoomStore } = await import('../../src/server/roomStore'));
+  ({ _resetForTests: resetLifecycles } = await import('../../src/server/lifecycles'));
+  ({ gameSessions, playerRoomMap } = await import('../../src/server/registry'));
+}
+
+function applyAuthRoutesForTest(app: Hono): void {
+  applyAuthRoutes(app);
+}
 
 function makePlayer(index: number): PlayerState {
   return {
@@ -66,21 +102,84 @@ function makeState(): GameState {
 
 const ROOM_PREFIX = 'test-coverage-';
 
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+function saveSnapshot(roomId: string, roomName: string, immediate = true) {
+  return saveRoom(
+    roomId,
+    { roomName, maxPlayers: 2, hostId: null, debug: false },
+    makeState(),
+    [],
+    immediate,
+  );
+}
+
+interface WriteGate {
+  started: ReturnType<typeof deferred>;
+  release: ReturnType<typeof deferred>;
+  entered: boolean;
+}
+
+let activeWriteGates: WriteGate[] = [];
+
+function holdRoomWrites(roomId: string, count: number) {
+  const writeFile = nodeFs.writeFile;
+  const gates: WriteGate[] = Array.from({ length: count }, () => ({
+    started: deferred(),
+    release: deferred(),
+    entered: false,
+  }));
+  activeWriteGates = gates;
+  let next = 0;
+  const prefix = join(TEST_DATA_DIR, `${roomId}.json`);
+  vi.mocked(fs.writeFile).mockImplementation(async (path, data, options) => {
+    const gate = String(path).startsWith(prefix) ? gates[next++] : undefined;
+    if (gate) {
+      gate.entered = true;
+      gate.started.resolve();
+      await gate.release.promise;
+    }
+    await writeFile(path, data, options);
+  });
+  return gates;
+}
+
 describe('server/persistence', () => {
   let roomId: string;
+
+  beforeAll(async () => {
+    await loadTestModules();
+    await initRoomStore(':memory:');
+  });
 
   beforeEach(() => {
     roomId = `${ROOM_PREFIX}${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   });
 
   afterEach(async () => {
-    // 清理测试房间文件
+    vi.useRealTimers();
+    for (const gate of activeWriteGates) gate.release.resolve();
+    activeWriteGates = [];
+    // 清理测试房间文件及该模块实例中的所有异步写入;始终在恢复 spy 前排空队列。
     try {
       await deletePersistedRoom(roomId);
     } catch {
       // 忽略
     }
-    await flushPendingWrites();
+    try {
+      await flushPendingWrites();
+    } finally {
+      vi.mocked(fs.writeFile).mockImplementation(nodeFs.writeFile);
+      vi.mocked(fs.rename).mockImplementation(nodeFs.rename);
+      vi.restoreAllMocks();
+      vi.doUnmock('node:fs/promises');
+    }
   });
 
   describe('saveRoom + loadRoom 往返', () => {
@@ -120,10 +219,10 @@ describe('server/persistence', () => {
       );
 
       // debounce 期间 _pendingWriteCount > 0
-      expect(_pendingWriteCount()).toBeGreaterThan(0);
+      expect(pendingWriteCount()).toBeGreaterThan(0);
 
       await flushPendingWrites();
-      expect(_pendingWriteCount()).toBe(0);
+      expect(pendingWriteCount()).toBe(0);
 
       const loaded = await loadRoom(roomId);
       expect(loaded).not.toBeNull();
@@ -149,7 +248,7 @@ describe('server/persistence', () => {
         true,
       );
 
-      expect(_pendingWriteCount()).toBe(0);
+      expect(pendingWriteCount()).toBe(0);
       const loaded = await loadRoom(roomId);
       expect(loaded!.roomName).toBe('第二次');
     });
@@ -201,10 +300,10 @@ describe('server/persistence', () => {
         [],
         false,
       );
-      expect(_pendingWriteCount()).toBeGreaterThan(0);
+      expect(pendingWriteCount()).toBeGreaterThan(0);
 
       await deletePersistedRoom(roomId);
-      expect(_pendingWriteCount()).toBe(0);
+      expect(pendingWriteCount()).toBe(0);
     });
 
     it('删除不存在的房间不报错', async () => {
@@ -336,34 +435,47 @@ describe('server/persistence', () => {
   });
 
   describe('删除竞态修复', () => {
-    it('debounce 回调写盘进行中时 deletePersistedRoom 等待写入完成后再删盘', async () => {
-      vi.useFakeTimers();
-      const state = makeState();
-      // 触发 debounce 写入(1s 后定时器触发)
-      await saveRoom(
-        roomId,
-        { roomName: '竞态测试', maxPlayers: 2, hostId: null, debug: false },
-        state,
-        [],
-        false,
-      );
-      expect(_pendingWriteCount()).toBe(1);
+    it('两个重叠立即写入和删除按房间串行,删除返回后文件和房间列表均为空', async () => {
+      const gates = holdRoomWrites(roomId, 2);
+      const first = saveSnapshot(roomId, '第一份');
+      await gates[0].started.promise;
 
-      // 推进定时器 → debounce 回调开始执行 → writeNow 进入异步 I/O
-      // 回调在 await writeNow 处 yield,inflightWrites 已注册
-      vi.advanceTimersByTime(1000);
+      const second = saveSnapshot(roomId, '第二份');
+      const deleting = deletePersistedRoom(roomId);
+      gates[0].release.resolve();
+      await gates[1].started.promise;
+      gates[1].release.resolve();
 
-      // 恢复真实定时器(I/O 操作不受影响)
-      vi.useRealTimers();
+      await Promise.all([first, second, deleting]);
+      expect(await loadRoom(roomId)).toBeNull();
+      expect(await listPersistedRooms()).not.toContain(roomId);
+    });
 
-      // deletePersistedRoom 应等待 inflight writeNow 完成后再删盘
-      // 如果不等待,deleteFile 和 writeNow 竞态 → 文件可能被重新写入
-      await deletePersistedRoom(roomId);
+    it('写失败不毒化后续保存,原子写失败保留旧快照并清理临时文件', async () => {
+      await saveSnapshot(roomId, '旧快照');
+      const oldRaw = await fs.readFile(join(TEST_DATA_DIR, `${roomId}.json`), 'utf8');
+      const rename = vi.mocked(fs.rename).mockRejectedValueOnce(new Error('rename failed'));
 
-      // 文件不应存在:writeNow 先完成(写入) → deleteFile 后完成(删除)
-      const fileExists = existsSync(join(TEST_DATA_DIR, `${roomId}.json`));
-      expect(fileExists).toBe(false);
-      expect(_pendingWriteCount()).toBe(0);
+      await expect(saveSnapshot(roomId, '失败快照')).rejects.toThrow('rename failed');
+      expect(await fs.readFile(join(TEST_DATA_DIR, `${roomId}.json`), 'utf8')).toBe(oldRaw);
+      expect(
+        (await fs.readdir(TEST_DATA_DIR)).filter(
+          (entry) => entry.startsWith(`${roomId}.json.`) && entry.endsWith('.tmp'),
+        ),
+      ).toEqual([]);
+
+      rename.mockImplementation(nodeFs.rename);
+      await saveSnapshot(roomId, '新快照');
+      expect((await loadRoom(roomId))!.roomName).toBe('新快照');
+    });
+
+    it('flush 与删除交错时仍等待同一房间队列且不泄漏文件', async () => {
+      await saveSnapshot(roomId, '待 flush', false);
+      const flushing = flushPendingWrites();
+      const deleting = deletePersistedRoom(roomId);
+      await Promise.all([flushing, deleting]);
+      expect(await loadRoom(roomId)).toBeNull();
+      expect(await listPersistedRooms()).not.toContain(roomId);
     });
   });
 

@@ -29,6 +29,14 @@ export const QIZHI_COUNT_KEY = '奇制/count';
 export const SLASH_QUOTA_USED_KEY = '杀/quotaUsed';
 /** 出杀额外已用次数。读写:rules/slash-quota.ts。 */
 export const SLASH_EXTRA_USED_KEY = '杀/extraUsed';
+/** 出杀额定已用次数的按玩家回合 key。 */
+export function slashQuotaUsedKey(player: number): string {
+  return `${SLASH_QUOTA_USED_KEY}/${player}`;
+}
+/** 出杀额外已用次数的按玩家回合 key。 */
+export function slashExtraUsedKey(player: number): string {
+  return `${SLASH_EXTRA_USED_KEY}/${player}`;
+}
 
 // ── player.vars:持久标记(整局或条件驱动) ──────────────────
 
@@ -129,17 +137,18 @@ export const DANGXIAN_EXTRA_PHASE_VIEW_KEY = '当先/extraPhase';
 /** 转换技当前态(阳/阴;决定被动方向:阳=各摸一张+禁对方用牌,阴=获得其一张牌+己方禁用)。写:拒战(STATE_VIEW_KEY 别名);读:拒战 activeWhen, buildView。 */
 export const JUZHAN_STATE_VIEW_KEY = '拒战/态';
 
-/** turn.vars 中的 view 镜像前缀:『回合用量』atom 把投影值写在 '__view/<key>' 下,
- *  buildView(初始/重连视图)按此前缀还原 turnUsage——投影值形态与 state 侧无关
- *  (如 界弓骑/active state 侧存座次、view 侧存 true),不覆盖 state 侧键、可反复更新。 */
-export const VIEW_MIRROR_PREFIX = '__view/';
+/** 回合用量 atom 在 turn.vars 中的按玩家镜像 key。 */
+export function viewMirrorKey(player: number, key: string): string {
+  return `__view/${player}/${key}`;
+}
 
 /** 回合内 view 投影键(值存 turn.vars,「回合用量」atom 同步到在线视图)。
  *  buildView(初始/重连视图)据此从 state 重建 turnUsage —— 否则这些放宽只存在于
  *  在线视图,重连后丢失,前端按默认距离/次数判定,引擎放行的目标/第 2 张杀发不出动作。
- *  仅收「本回合、归属当前回合玩家」的键(值可直接投影给 state.currentPlayerIndex);
- *  按玩家维度存储的限一次标记(如 '制衡/usedThisTurn',存 player.vars)不在其列,
- *  由 buildView 的 USED_THIS_TURN_SUFFIX 过滤单独投影。 */
+ *  镜像按玩家座次存储(而非仅当前回合玩家),以覆盖被借刀/挑衅/激将等强制用牌在他人回合
+ *  触发的回合用量；「回合结束」清空整个 turn.vars,所有镜像随之清理。
+ *  限一次标记等只有显式通过「回合用量」atom 投影才会进入 view.turnUsage,
+ *  不再从 player.vars 自动捞取内部状态。 */
 export const TURN_SCOPED_VIEW_KEYS: readonly string[] = [
   XIANZHEN_WIN_TARGET_VIEW_KEY,
   CHENGLUE_SUITS_VIEW_KEY,
@@ -248,13 +257,13 @@ export function getMijiPending(vars: Record<string, Json> | undefined, ownerId: 
 export function getQizhiCount(turnVars: Record<string, Json> | undefined): number | undefined {
   return asNumber(turnVars?.[QIZHI_COUNT_KEY]);
 }
-/** 杀/quotaUsed(本回合额定已用次数)。 */
-export function getSlashQuotaUsed(turnVars: Record<string, Json> | undefined): number | undefined {
-  return asNumber(turnVars?.[SLASH_QUOTA_USED_KEY]);
+/** 杀/quotaUsed(本回合额定已用次数)。可按玩家读取按座次镜像计数。 */
+export function getSlashQuotaUsed(turnVars: Record<string, Json> | undefined, player?: number): number | undefined {
+  return asNumber(turnVars?.[player === undefined ? SLASH_QUOTA_USED_KEY : slashQuotaUsedKey(player)]);
 }
-/** 杀/extraUsed(本回合额外已用次数)。 */
-export function getSlashExtraUsed(turnVars: Record<string, Json> | undefined): number | undefined {
-  return asNumber(turnVars?.[SLASH_EXTRA_USED_KEY]);
+/** 杀/extraUsed(本回合额外已用次数)。可按玩家读取按座次镜像计数。 */
+export function getSlashExtraUsed(turnVars: Record<string, Json> | undefined, player?: number): number | undefined {
+  return asNumber(turnVars?.[player === undefined ? SLASH_EXTRA_USED_KEY : slashExtraUsedKey(player)]);
 }
 
 // 选牌面板结果(localVars)

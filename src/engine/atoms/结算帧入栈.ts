@@ -6,6 +6,7 @@
 // 返回被压入的 frame 引用(与旧同步签名行为一致)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { createRng } from '../util/rng';
+import { bindPushedFrame } from '../core/frame';
 
 export const 结算帧入栈: AtomDefinition<{
   skillId: string;
@@ -20,11 +21,12 @@ export const 结算帧入栈: AtomDefinition<{
     const frame = {
       skillId: atom.skillId,
       from: atom.from,
-      params: { ...(atom.params ?? {}) },
+      params: structuredClone(atom.params ?? {}),
       cards: [],
       cancelled: false,
     };
     state.settlementStack.push(frame);
+    bindPushedFrame(atom, frame);
   },
   toViewEvents(state, atom): ViewEventSplit {
     // 技能台词:按 skillId 播报。随机选 1 或 2 号语音(无对应文件时静默跳过)。
@@ -35,7 +37,7 @@ export const 结算帧入栈: AtomDefinition<{
       type: '结算帧入栈',
       skillId: atom.skillId,
       from: atom.from,
-      params: { ...(atom.params ?? {}) },
+      params: structuredClone(atom.params ?? {}),
       effect: { sound: `skill/${atom.skillId}/${variant}` } as const,
     };
     // 结算帧是公开信息:所有玩家看到相同的栈(包括 params)。
@@ -49,7 +51,7 @@ export const 结算帧入栈: AtomDefinition<{
     view.settlementStack.push({
       skillId: event.skillId as string,
       from: event.from as number,
-      params: { ...((event.params as Record<string, import('../types').Json>) ?? {}) },
+      params: structuredClone((event.params as Record<string, import('../types').Json>) ?? {}),
       cards: [],
       cancelled: false,
     });

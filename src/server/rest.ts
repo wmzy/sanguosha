@@ -64,6 +64,35 @@ import { sseStreamHandler } from './sse';
 
 const log = createLogger('rest');
 
+function isRestAction(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const action = value as Record<string, unknown>;
+  if (
+    typeof action.skillId !== 'string' ||
+    typeof action.actionType !== 'string' ||
+    typeof action.ownerId !== 'number' ||
+    !Number.isInteger(action.ownerId) ||
+    typeof action.baseSeq !== 'number' ||
+    !Number.isFinite(action.baseSeq) ||
+    typeof action.params !== 'object' ||
+    action.params === null ||
+    Array.isArray(action.params)
+  ) return false;
+  if (action.preceding === undefined) return true;
+  if (!Array.isArray(action.preceding)) return false;
+  return action.preceding.every((item) => {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) return false;
+    const p = item as Record<string, unknown>;
+    return (
+      typeof p.skillId === 'string' &&
+      typeof p.actionType === 'string' &&
+      typeof p.params === 'object' &&
+      p.params !== null &&
+      !Array.isArray(p.params)
+    );
+  });
+}
+
 /** 广播 room_state 给房间内所有连接。 */
 function broadcastRoomState(room: Room): void {
   broadcastMessage(room, buildRoomState(room));
@@ -117,7 +146,7 @@ export function applyRestRoutes(app: Hono): void {
         return c.json({ error: '仅房间成员可查看日志' }, 403);
       }
     }
-    const gameLog = session.getGameLog();
+    const gameLog = session.getPublicGameLog();
     if (!gameLog) return c.json({ error: '无游戏日志' }, 404);
     return c.json(gameLog);
   });
@@ -466,10 +495,14 @@ export function applyRestRoutes(app: Hono): void {
   // 时,任何知道受害者 userId 者(历史条目公开)可替其出牌/回应。
   app.post('/api/rooms/:id/action', async (c) => {
     const roomId = c.req.param('id');
-    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const rawValue: unknown = await c.req.json().catch(() => ({}));
+    const raw =
+      typeof rawValue === 'object' && rawValue !== null && !Array.isArray(rawValue)
+        ? (rawValue as Record<string, unknown>)
+        : {};
     let playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
     const action = raw.action;
-    if (!playerId || !action) return c.json({ error: '缺少 playerId 或 action' }, 400);
+    if (!playerId || !isRestAction(action)) return c.json({ error: '缺少 playerId 或 action', code: 'INVALID_ACTION' }, 400);
 
     const session = gameSessions.get(roomId);
     if (!session) return c.json({ error: '游戏会话不存在' }, 404);
@@ -492,7 +525,9 @@ export function applyRestRoutes(app: Hono): void {
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     let playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
     const order = raw.order;
-    if (!playerId || !Array.isArray(order)) return c.json({ error: '缺少参数' }, 400);
+    if (!playerId || !Array.isArray(order) || !order.every((id) => typeof id === 'string')) {
+      return c.json({ error: '缺少参数或 order 必须是字符串数组', code: 'INVALID_REORDER' }, 400);
+    }
 
     const session = gameSessions.get(roomId);
     if (!session) return c.json({ error: '游戏会话不存在' }, 404);
@@ -504,7 +539,10 @@ export function applyRestRoutes(app: Hono): void {
       playerId = user.id;
     }
 
-    await session.handleReorderHand(playerId, order as string[]);
+    const accepted = session.handleReorderHand(playerId, order);
+    if (!accepted) {
+      return c.json({ error: 'order 必须是当前手牌的完整排列', code: 'INVALID_REORDER' }, 400);
+    }
     return c.json({ success: true });
   });
 

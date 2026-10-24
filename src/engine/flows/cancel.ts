@@ -7,7 +7,7 @@
 //
 // 机制（close-reopen + 结算帧栈）：
 //   本函数操作栈顶帧的 cancelled 字段。
-//   抵消牌（闪/无懈）走 runUseFlow → resolve 时设下层帧(stack[length-2]).cancelled=true。
+//   抵消牌（闪/无懈）走 runUseFlow → resolve 通过设置帧抵消 atom 更新下层帧。
 //   循环：创建询问 → 等待 respond → 检查 frame.cancelled：
 //   - 无人 respond（超时）→ 退出
 //   - 有人 respond 且抵消牌生效 → frame.cancelled=true → 退出
@@ -21,6 +21,7 @@
 import type { GameState, Json } from '../types';
 import { TARGET_BROADCAST } from '../types';
 import { applyAtom } from '../core/apply';
+import { setFrameCancelled } from '../core/frame';
 import type { CancellableBy } from '../types';
 
 const RESPONDED_KEY = '抵消/已回应';
@@ -55,7 +56,7 @@ export async function promptCancel(
       const dodgeIds = (frame ? frame.cards : state.zones.processing)
         .filter((id) => state.cardMap[id]?.name === '闪');
       if (dodgeIds.length > 0 && frame) {
-        frame.cancelled = true;
+        await setFrameCancelled(state, frame, true);
         for (const id of dodgeIds) {
           await applyAtom(state, {
             type: '移动牌',

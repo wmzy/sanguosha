@@ -21,7 +21,24 @@ import {
   extractCardFilter,
   type PlayRules,
 } from '../utils/gameViewHelpers';
+import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../../engine/data/card-defs';
 import { viewSlashTargetMax } from '../../engine/rules/action-active';
+
+/** 产出牌的真实 CardDef(type/subtype),供转化动作查找同源 use action。
+ * 不能沿用原料牌的 type：装备原料(青釭剑)+普通牌在丈八组合中若沿用
+ * type='装备牌',会先匹配「装备通用」而不是产出杀的 action，生成缺 targets 的坏动作。 */
+const CARD_DEFS_BY_NAME = new Map(
+  [...基本牌列表, ...锦囊牌列表, ...装备牌列表].map((def) => [def.name, def]),
+);
+
+function asProducedCard(source: Card, outputName: string): Card {
+  const def = CARD_DEFS_BY_NAME.get(outputName);
+  return {
+    ...source,
+    name: outputName,
+    ...(def ? { type: def.type, subtype: def.subtype } : {}),
+  };
+}
 
 /** 从 use action 的 prompt 取 targetFilter（useCardAndTarget/selectTarget 才有）。 */
 function getTargetFilter(prompt: SkillActionDef['prompt']): TargetFilter | null {
@@ -212,7 +229,7 @@ function enumerateTransformActions(
             const c1 = matchingCards[i];
             const c2 = matchingCards[j];
             if (!combosOk(c1, c2)) continue;
-            const wrapperName = action.transform!(c1).name;
+            const wrapperName = action.transform(c1).name;
             if (wrapperName !== pendingRequestedName) continue; // 产出牌名 = 请求牌名时可用
             const shadowCardId = `${c1.id}#${c2.id}#${action.skillId}`;
             const desc = `${c1.suit}${c1.rank}+${c2.suit}${c2.rank}`;
@@ -251,13 +268,13 @@ function enumerateTransformActions(
           // 乱击/界乱击 → 万箭齐发;多向转化技(产出牌名随组合变化)不能只按
           // matchingCards[0] 取一次。硬编码 '杀' 会让非杀产出的主 action 恒为 杀.use,
           // 引擎读影子卡名 validate 恒拒「不是杀」→ 该转化技整类不可用。
-          const wrapperName = action.transform!(c1).name;
+          const wrapperName = action.transform(c1).name;
           // 产出牌门(与单卡分支对称):产出牌无主动 use 入口(闪/无懈可击 等
           // timing='生效前')、或产出牌的 use action 未激活(桃 需已受伤)时不枚举
           // 必拒动作;目标语义取产出牌自己的 use action,而非 transform 自身的
           // targetFilter(那是为原料牌方向设计的)。
-          const produced = findUseActionForCard(skillActions, { ...c1, name: wrapperName });
-          if (!hasUseEntry({ name: wrapperName } as Card)) continue;
+          const produced = findUseActionForCard(skillActions, asProducedCard(c1, wrapperName));
+          if (!hasUseEntry({ name: wrapperName })) continue;
           if (produced && !isActiveAction(produced, ctx)) continue;
           const cardTargetFilter = produced ? getTargetFilter(produced.prompt) : targetFilter;
           const cardRules = produced
@@ -350,11 +367,11 @@ function enumerateTransformActions(
       // 自动以自己为目标)、桃→酒 产出【酒】(无目标牌);沿用 transform 的「其他角色」目标
       // 会枚举出引擎必拒的动作(「只能对自己使用酒」/「桃只能对受伤角色使用」)。
       // 产出牌无 use action(闪/无懈 等回应牌)时回退到 transform 自身规则。
-      const produced = findUseActionForCard(skillActions, { ...card, name: wrapperName });
+      const produced = findUseActionForCard(skillActions, asProducedCard(card, wrapperName));
       // 产出牌在出牌阶段必须真的能用:闪/无懈可击(timing='生效前')没有主动 use 入口,
       // 「当闪使用」在出牌阶段无意义(引擎无对应 action,提交恒拒);产出牌的 use action
       // 未激活(如 桃 需自己已受伤)时同理 —— 不枚举必然被拒的动作。
-      if (!hasUseEntry({ name: wrapperName } as Card)) continue;
+      if (!hasUseEntry({ name: wrapperName })) continue;
       if (produced && !isActiveAction(produced, ctx)) continue;
       const cardTargetFilter = produced ? getTargetFilter(produced.prompt) : targetFilter;
       const cardRules = produced

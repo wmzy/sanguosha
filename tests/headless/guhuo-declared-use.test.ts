@@ -48,7 +48,7 @@ function mkPlayer(opts: {
     pendingTricks: [],
     tags: [],
     judgeZone: [],
-  } as PlayerState;
+  };
 }
 
 /** 组装 state 并按真实客户端路径注册技能 + 枚举 seat 的可执行动作。 */

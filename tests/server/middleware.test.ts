@@ -69,23 +69,73 @@ describe('rateLimit middleware', () => {
     expect(res.headers.get('X-RateLimit-Remaining')).toBeTruthy();
   });
 
-  it('should block requests exceeding the limit', async () => {
-    const app = new Hono();
-    // 测试用低限制实例
-    const testLimit = createRateLimit(5);
-    app.use('*', testLimit);
-    app.get('/test', (c) => c.json({ ok: true }));
+  it('should use the fixed peer instead of spoofable forwarding headers', async () => {
+    const previous = process.env.SGS_TRUSTED_PROXIES;
+    delete process.env.SGS_TRUSTED_PROXIES;
+    try {
+      const app = new Hono();
+      const testLimit = createRateLimit(1);
+      app.use('*', testLimit);
+      app.get('/test', (c) => c.json({ ok: true }));
+      const env = {
+        incoming: { socket: { remoteAddress: '203.0.113.7', remotePort: 1234 } },
+      };
 
-    const results: number[] = [];
-    for (let i = 0; i < 7; i++) {
-      const res = await app.fetch(
-        new Request('http://localhost/test', {
-          headers: { 'X-Forwarded-For': '1.2.3.4' },
-        }),
+      const first = await app.fetch(
+        new Request('http://localhost/test', { headers: { 'X-Forwarded-For': '198.51.100.1' } }),
+        env,
       );
-      results.push(res.status);
+      const second = await app.fetch(
+        new Request('http://localhost/test', { headers: { 'X-Forwarded-For': '198.51.100.2' } }),
+        env,
+      );
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(429);
+      const otherPeer = await app.fetch(new Request('http://localhost/test'), {
+        incoming: { socket: { remoteAddress: '203.0.113.8', remotePort: 1235 } },
+      });
+      expect(otherPeer.status).toBe(200);
+    } finally {
+      if (previous === undefined) delete process.env.SGS_TRUSTED_PROXIES;
+      else process.env.SGS_TRUSTED_PROXIES = previous;
     }
-    expect(results.filter((s) => s === 429).length).toBeGreaterThan(0);
+  });
+
+  it('should honor forwarding headers only when the peer is explicitly trusted', async () => {
+    const previous = process.env.SGS_TRUSTED_PROXIES;
+    process.env.SGS_TRUSTED_PROXIES = '10.0.0.1';
+    try {
+      const app = new Hono();
+      const testLimit = createRateLimit(1);
+      app.use('*', testLimit);
+      app.get('/test', (c) => c.json({ ok: true }));
+      const env = {
+        incoming: { socket: { remoteAddress: '10.0.0.1', remotePort: 1234 } },
+      };
+
+      const first = await app.fetch(
+        new Request('http://localhost/test', { headers: { 'X-Forwarded-For': '198.51.100.1' } }),
+        env,
+      );
+      const secondClient = await app.fetch(
+        new Request('http://localhost/test', { headers: { 'X-Forwarded-For': '198.51.100.2' } }),
+        env,
+      );
+      const repeated = await app.fetch(
+        new Request('http://localhost/test', { headers: { 'X-Forwarded-For': '198.51.100.1' } }),
+        env,
+      );
+      expect(first.status).toBe(200);
+      expect(secondClient.status).toBe(200);
+      expect(repeated.status).toBe(429);
+      const forgedPrefix = await app.fetch(new Request('http://localhost/test', {
+        headers: { 'X-Forwarded-For': '192.0.2.99, 198.51.100.1' },
+      }), { server: env });
+      expect(forgedPrefix.status).toBe(429);
+    } finally {
+      if (previous === undefined) delete process.env.SGS_TRUSTED_PROXIES;
+      else process.env.SGS_TRUSTED_PROXIES = previous;
+    }
   });
 });
 

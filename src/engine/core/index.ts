@@ -322,7 +322,7 @@ function normalizeTargetShape(params: Record<string, Json>): Record<string, Json
   const targets = Array.isArray(params.targets) ? params.targets : undefined;
   if (target !== undefined && targets !== undefined) return params;
   if (target !== undefined) return { ...params, targets: [target] };
-  const first = targets && typeof targets[0] === 'number' ? (targets[0] as number) : undefined;
+  const first = targets && typeof targets[0] === 'number' ? targets[0] : undefined;
   if (first !== undefined) return { ...params, target: first };
   return params;
 }
@@ -337,10 +337,19 @@ function normalizeMessageTargetShape(message: ClientMessage): ClientMessage {
   return { ...message, params, ...(preceding ? { preceding } : {}) };
 }
 
+const preparingStates = new WeakSet<GameState>();
+
 export async function dispatch(
   state: GameState,
   rawMessage: ClientMessage,
 ): Promise<DispatchResult> {
+  if (preparingStates.has(state)) {
+    return { accepted: false, settle: Promise.resolve(undefined) };
+  }
+  const initialSlot = findPendingSlot(state, rawMessage.ownerId);
+  if (initialSlot && (initialSlot.isTimeout || initialSlot.isPaused || initialSlot.isClaimed)) {
+    return { accepted: false, settle: Promise.resolve(undefined) };
+  }
   const message = normalizeMessageTargetShape(rawMessage);
   // settle 信号:execute 是 fire-and-forget,restore 需要知道它何时「挂起或完成」。
   // 挂起点由 createAndAwaitSlot 在 slot 入 pendingSlots 后调 state.onExecuteSettle 通知;
@@ -352,15 +361,25 @@ export async function dispatch(
     settleResolve = r;
   });
   let settled = false;
+  const settleListeners =
+    state.onExecuteSettleListeners ?? (state.onExecuteSettleListeners = new Set());
+  let onExecuteSettle: (slot: PendingSlot) => void = () => {};
   const signalSettle = (error?: Error) => {
     if (settled) return;
     settled = true;
-    state.onExecuteSettle = null;
+    settleListeners.delete(onExecuteSettle);
     settleResolve(error);
   };
-  state.onExecuteSettle = signalSettle;
-  const reject = (): DispatchResult => {
-    signalSettle();
+  let ownsPreparation = false;
+  const releasePreparation = () => {
+    if (!ownsPreparation) return;
+    preparingStates.delete(state);
+    ownsPreparation = false;
+  };
+  const reject = (error?: Error): DispatchResult => {
+    releasePreparation();
+    signalSettle(error);
+    if (error) state.onError?.(error);
     return { accepted: false, settle };
   };
   const accept = (): DispatchResult => ({ accepted: true, settle });
@@ -381,6 +400,7 @@ export async function dispatch(
   // ── view 缓冲:preceding 的 ViewEvent 缓冲,主 validate 失败时截断 atomHistory,不广播 ──
   const hasPreceding = !!message.preceding?.length;
   const bufferSnapshot = hasPreceding ? state.atomHistory.length : 0;
+  const bufferWasActive = state.viewBuffering === true;
   if (hasPreceding) state.viewBuffering = true;
   // ── 有序数组快照:preceding(转化技的 当作/去标记 等)直接 mutate players[i].hand / marks,
   //    而各技能 rollback 回调的恢复方式不一致(多张牌 push 回末尾、单张写回影子卡位置),
@@ -389,57 +409,133 @@ export async function dispatch(
   //    否则在线客户端(增量视图看不到被回滚的 preceding 事件)与权威 buildView 顺序不一致,
   //    玩家按位置选到的牌与点击的不是同一张。回滚后按快照整体还原(内容 + 顺序)。
   const orderedSnapshot = hasPreceding
-    ? state.players.map((p) => ({ hand: [...p.hand], marks: [...p.marks] }))
+    ? state.players.map((p) => ({
+        hand: [...p.hand],
+        marks: structuredClone(p.marks),
+        vars: structuredClone(p.vars),
+        equipment: { ...p.equipment },
+        tags: [...p.tags],
+      }))
     : null;
+  const cardMapSnapshot = hasPreceding ? { ...state.cardMap } : null;
+  const localVarsSnapshot = hasPreceding ? structuredClone(state.localVars) : null;
+  const turnVarsSnapshot = hasPreceding ? structuredClone(state.turn.vars) : null;
+  const atomStackSnapshot = hasPreceding ? [...state.atomStack] : null;
+  const settlementSnapshot = hasPreceding ? [...state.settlementStack] : null;
+  const seqSnapshot = state.seq;
   // 回滚 preceding(逆序调用 rollback)+ 截断缓冲的 atomHistory + 恢复 viewBuffering
   // + 还原有序数组快照(hand/marks:技能回调各自恢复顺序不可靠)
   const rollbackPreceding = async (): Promise<void> => {
-    for (let i = rollbacks.length - 1; i >= 0; i--) {
-      await rollbacks[i].entry.rollback?.(state, rollbacks[i].params);
-    }
-    if (orderedSnapshot) {
-      for (let i = 0; i < orderedSnapshot.length; i++) {
-        const p = state.players[i];
-        if (!p) continue;
-        p.hand = [...orderedSnapshot[i].hand];
-        p.marks = [...orderedSnapshot[i].marks];
+    try {
+      for (let i = rollbacks.length - 1; i >= 0; i--) {
+        try {
+          await rollbacks[i].entry.rollback?.(state, rollbacks[i].params);
+        } catch (error) {
+          state.onError?.(error instanceof Error ? error : new Error(String(error)));
+        }
+      }
+    } finally {
+      if (orderedSnapshot) {
+        for (let i = 0; i < orderedSnapshot.length; i++) {
+          const p = state.players[i];
+          if (!p) continue;
+          p.hand = [...orderedSnapshot[i].hand];
+          p.marks = structuredClone(orderedSnapshot[i].marks);
+          p.vars = structuredClone(orderedSnapshot[i].vars);
+          p.equipment = { ...orderedSnapshot[i].equipment };
+          // rollback 回调可恢复装备槽位；用装备牌面重建依赖 vars，避免快照中的旧
+          // 直接构造状态没有通过「装备」atom而缺少距离变量。
+          const weaponId = p.equipment['武器'];
+          if (weaponId) {
+            const weapon = state.cardMap[weaponId];
+            if (weapon?.range !== undefined) p.vars['距离/出杀范围'] = weapon.range;
+          }
+          p.tags = [...orderedSnapshot[i].tags];
+        }
+      }
+      if (hasPreceding) {
+        if (cardMapSnapshot) {
+          for (const id of Object.keys(state.cardMap)) {
+            if (!(id in cardMapSnapshot)) delete state.cardMap[id];
+          }
+          Object.assign(state.cardMap, cardMapSnapshot);
+        }
+        state.localVars = localVarsSnapshot!;
+        state.turn.vars = turnVarsSnapshot!;
+        state.atomStack = atomStackSnapshot!;
+        state.settlementStack = settlementSnapshot!;
+        for (const [key, slot] of state.pendingSlots) {
+          if (!createdPending.has(slot)) continue;
+          state.pendingSlots.delete(key);
+          slot.resolve();
+          const previous = pendingEntriesSnapshot.get(key);
+          if (previous) state.pendingSlots.set(key, previous);
+        }
+        state.atomHistory.length = bufferSnapshot;
+        state.seq = seqSnapshot;
+        state.viewBuffering = bufferWasActive;
       }
     }
-    if (hasPreceding) {
-      state.atomHistory.length = bufferSnapshot;
-      state.viewBuffering = false;
+  };
+  const pendingEntriesSnapshot = new Map(state.pendingSlots);
+  const pendingSnapshot = new Set(state.pendingSlots.values());
+  const createdPending = new Set<PendingSlot>();
+  onExecuteSettle = (slot: PendingSlot) => {
+    if (!pendingSnapshot.has(slot)) {
+      createdPending.add(slot);
+      signalSettle();
     }
   };
-  // 辅助:preceding 阶段抛错 / 失败时,清理可能由 execute 创建的残留 pending slot。
-  // execute 是 fire-and-forget 风格的 applyAtom,可能在 pendingSlots 留下未 resolve 的 slot。
-  // 若 main 不启动,这些 slot 的父 await 永远不返回 → 死锁。
+  if (!hasPreceding) settleListeners.add(onExecuteSettle);
+  const trackNewPending = () => {
+    for (const slot of state.pendingSlots.values()) {
+      if (!pendingSnapshot.has(slot)) createdPending.add(slot);
+    }
+  };
+  // 只清理由本次 preceding 新创建的 slot；旧 slot 可能属于其他玩家正在等待的流程，
+  // 绝不能因本次 action 被拒而 resolve/delete。
   const cleanupResidualPending = () => {
-    const resolved: PendingSlot[] = [];
-    for (const [k, slot] of state.pendingSlots) {
+    for (const [key, slot] of state.pendingSlots) {
+      if (!createdPending.has(slot)) continue;
+      if (state.pendingSlots.get(key) === slot) state.pendingSlots.delete(key);
       slot.resolve();
-      state.pendingSlots.delete(k);
-      resolved.push(slot);
     }
-    for (const slot of resolved) notifyPendingResolved(state, slot);
   };
-  if (message.preceding) {
+  if (message.preceding?.length) {
+    preparingStates.add(state);
+    ownsPreparation = true;
     for (const p of message.preceding) {
       const pEntry = findActionEntry(state, p.skillId, message.ownerId, p.actionType);
-      if (pEntry?.validate(state, p.params) !== null) {
+      let pError: unknown;
+      try {
+        pError = !pEntry ? new Error('preceding action not found') : pEntry.validate(state, p.params);
+      } catch (error) {
+        pError = error;
+      }
+      if (pError !== null) {
         await rollbackPreceding();
         cleanupResidualPending();
         return reject();
       }
-      await pEntry.execute(state, p.params);
-      rollbacks.push({ entry: pEntry, params: p.params });
+      rollbacks.push({ entry: pEntry!, params: p.params });
+      try {
+        await pEntry!.execute(state, p.params);
+      } catch {
+        trackNewPending();
+        await rollbackPreceding();
+        cleanupResidualPending();
+        return reject();
+      }
+      trackNewPending();
     }
   }
   // skip action:玩家放弃当前 pending 的回应(不打出无懈可击等)
   // preceding+skip 是矛盾的(skip 无转化),但安全处理:flush 缓冲
   if (message.actionType === 'skip') {
     if (hasPreceding) {
-      state.viewBuffering = false;
-      notifyStateChange(state);
+      await rollbackPreceding();
+      cleanupResidualPending();
+      return reject();
     }
     // 优先查找广播型 slot(target<0,如无懈可击):出牌阶段 findPendingSlot 可能返回
     // 当前玩家的出牌窗口 slot(target=0),导致 skip 误匹配非广播型 pending。
@@ -448,7 +544,7 @@ export async function dispatch(
       return typeof t === 'number' && t < 0;
     });
     const slot = broadcastSlot ?? findPendingSlot(state, message.ownerId);
-    if (!slot || slot.isTimeout) return reject();
+    if (!slot || slot.isTimeout || slot.isPaused || slot.isClaimed) return reject();
     const atomTarget = (slot.atom as { target?: number }).target;
     const isBroadcast = typeof atomTarget === 'number' && atomTarget < 0;
     if (isBroadcast) {
@@ -481,20 +577,29 @@ export async function dispatch(
     return reject();
   }
   const entry = findActionEntry(state, message.skillId, message.ownerId, message.actionType);
-  if (entry?.validate(state, message.params) !== null) {
-    await rollbackPreceding();
-    return reject();
-  }
   // 回应路径:定位该玩家对应的 slot。
-  // 单 target 询问(询问闪/杀/弃牌):Map 只有该 target 一个 slot → 直接 ownerId 命中。
-  // 并行询问(拼点/选将):Map 有多个 slot,各自独立 resolve → ownerId 各自命中。
-  // 无瓣可击广播型(target===TARGET_BROADCAST):任意玩家 respond 都命中同一 slot(先到先得)。
-  //   findPendingSlot 负责按 ownerId→广播→唯一 slot 的 fallback 顺序查找。
   const targetKey = message.ownerId;
   const oldSlot = findPendingSlot(state, targetKey);
+  if (!oldSlot && message.pendingSeq !== undefined && message.actionType === 'respond') {
+    await rollbackPreceding();
+    cleanupResidualPending();
+    return reject();
+  }
+  let entryError: unknown;
+  try {
+    entryError = entry?.validate(state, message.params);
+  } catch (error) {
+    entryError = error;
+  }
+  if (!entry || entryError !== null) {
+    await rollbackPreceding();
+    cleanupResidualPending();
+    return reject();
+  }
   if (oldSlot) {
-    if (oldSlot.isTimeout) {
+    if (oldSlot.isTimeout || oldSlot.isPaused || oldSlot.isClaimed) {
       await rollbackPreceding();
+      cleanupResidualPending();
       return reject();
     }
     // pending-scoped 版本校验：只影响 respond 路径(阻塞型 pending 如 请求回应/询问闪)
@@ -510,14 +615,24 @@ export async function dispatch(
       message.pendingSeq < oldSlot.createdSeq
     ) {
       await rollbackPreceding();
+      cleanupResidualPending();
+      return reject();
+    }
+    const claim = oldSlot.claim;
+    const claimedHere = claim ? claim() : false;
+    if (claim && !claimedHere) {
+      await rollbackPreceding();
+      cleanupResidualPending();
       return reject();
     }
     oldSlot.pause();
   }
 
+  releasePreparation();
+  settleListeners.add(onExecuteSettle);
   // ── 全部校验通过:flush 缓冲的 ViewEvent(一次性广播所有积压 event) ──
   if (hasPreceding) {
-    state.viewBuffering = false;
+    state.viewBuffering = bufferWasActive;
     notifyStateChange(state);
   }
 
@@ -543,6 +658,7 @@ export async function dispatch(
     }
     if (deleted) notifyPendingResolved(state, oldSlot);
     resolve();
+    oldSlot.releaseClaim?.();
   };
   // fire-and-forget 启动 execute,完成后 resolve 该玩家的 slot.
   // then/finally 都走 cleanupSlot。safeResolve 防重入 + 删除幂等 → 无副作用重复执行。

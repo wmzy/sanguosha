@@ -24,6 +24,10 @@ import {
   updateDisplayName,
   changePassword,
 } from '../../src/server/auth/store';
+import { createGameState } from '../../src/engine/types';
+import { dispatch, registerSkillsFromState } from '../../src/engine/index';
+import { VirtualClock } from '../../src/engine/core/clock';
+import { fireTimeoutAndWait } from '../engine-harness';
 import { GameSession } from '../../src/server/session';
 import { gameSessions } from '../../src/server/registry';
 import { setRoomStatus } from '../../src/server/room';
@@ -808,13 +812,23 @@ describe('房间登录强制', () => {
     ).json()) as { roomId: string };
     gameSessions.set(roomId, new GameSession(getRoom(roomId)!, false));
 
-    // 未登录携带他人 playerId 提交 action → 401(修复前返回 accepted:true)
+    // 未登录携带他人 playerId 提交结构完整 action → 401(修复前返回 accepted:true)
     const anonAction = await app.request(`/api/rooms/${roomId}/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: host.userId, action: { ownerId: 0 } }),
+      body: JSON.stringify({
+        playerId: host.userId,
+        action: { skillId: '系统规则', actionType: 'end', ownerId: 0, params: {}, baseSeq: 0 },
+      }),
     });
     expect(anonAction.status).toBe(401);
+
+    const malformedAction = await app.request(`/api/rooms/${roomId}/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ playerId: host.userId, action: { ownerId: 0 } }),
+    });
+    expect(malformedAction.status).toBe(400);
 
     // 未登录 reorder 同样 401
     const anonReorder = await app.request(`/api/rooms/${roomId}/reorder`, {
@@ -828,14 +842,122 @@ describe('房间登录强制', () => {
     const ok = await app.request(`/api/rooms/${roomId}/action`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
-      body: JSON.stringify({ playerId: 'forged-but-ignored', action: { ownerId: 0 } }),
+      body: JSON.stringify({
+        playerId: 'forged-but-ignored',
+        action: { skillId: '系统规则', actionType: 'end', ownerId: 0, params: {}, baseSeq: 0 },
+      }),
     });
     expect(ok.status).toBe(200);
     expect(((await ok.json()) as { accepted: boolean }).accepted).toBe(true);
     gameSessions.delete(roomId);
   });
 
+  it('重排拒绝重复/缺失/未知牌且不改变手牌', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'auth_reorder_host');
+    const { roomId } = (await (await app.request('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ name: '重排鉴权房', maxPlayers: 2 }),
+    })).json()) as { roomId: string };
+    const session = new GameSession(getRoom(roomId)!, false);
+    gameSessions.set(roomId, session);
+    const state = createGameState({
+      players: [{ index: 0, name: 'P0', character: '', health: 4, maxHealth: 4, alive: true,
+        hand: ['a', 'b'], equipment: {}, pendingTricks: [], skills: [], vars: {}, marks: [], tags: [] }],
+      cardMap: { a: { id: 'a', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' }, b: { id: 'b', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' } },
+    });
+    (session as unknown as { state: typeof state }).state = state;
+    (session as unknown as { playerNames: Map<string, number> }).playerNames.set(host.userId, 0);
+    const messages: import('../../src/server/protocol').ServerMessage[] = [];
+    getRoom(roomId)!.players.set(host.userId, { send: (message) => messages.push(message), close() {}, isAlive: true });
+    const before = [...state.players[0].hand];
+    for (const order of [['a', 'a'], ['a'], ['a', 'x'], [1, 'b']] as unknown[]) {
+      const res = await app.request(`/api/rooms/${roomId}/reorder`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+        body: JSON.stringify({ playerId: host.userId, order }),
+      });
+      expect(res.status).toBe(400);
+      expect(state.players[0].hand).toEqual(before);
+      expect(messages).toEqual([]);
+    }
+    const reordered = await app.request(`/api/rooms/${roomId}/reorder`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ playerId: host.userId, order: ['b', 'a'] }),
+    });
+    expect(reordered.status).toBe(200);
+    expect(state.players[0].hand).toEqual(['b', 'a']);
+    expect(messages).toEqual([expect.objectContaining({
+      type: 'initialView', state: expect.objectContaining({ players: [expect.objectContaining({
+        hand: [expect.objectContaining({ id: 'b' }), expect.objectContaining({ id: 'a' })],
+      })] }),
+    })]);
+    await session.destroy();
+    gameSessions.delete(roomId);
+  });
+
+  it('盲选过程中玩家和未授权旁观者只能读取公开战报,内部重放顺序保留', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'log_private_host');
+    const spectator = await registerUser(app, 'log_private_spectator');
+    const created = await app.request('/api/rooms', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ name: '日志隔离', maxPlayers: 2 }),
+    });
+    const { roomId } = await created.json() as { roomId: string };
+    await app.request(`/api/rooms/${roomId}/join-spectator`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: spectator.cookie },
+      body: '{}',
+    });
+    const session = new GameSession(getRoom(roomId)!);
+    const state = createGameState({
+      players: [0, 1].map((index) => ({
+        index, name: `P${index}`, character: '', health: 4, maxHealth: 4, alive: true,
+        hand: index === 0 ? ['snatch'] : ['secret-a', 'secret-b'], equipment: {},
+        skills: ['使用牌', '打出牌'], vars: {}, marks: [], pendingTricks: [], tags: [],
+      })),
+      cardMap: {
+        snatch: { id: 'snatch', name: '顺手牵羊', suit: '♠', color: '黑', rank: '3', type: '锦囊牌' },
+        'secret-a': { id: 'secret-a', name: '桃', suit: '♥', color: '红', rank: '3', type: '基本牌' },
+        'secret-b': { id: 'secret-b', name: '闪', suit: '♦', color: '红', rank: '4', type: '基本牌' },
+      },
+      currentPlayerIndex: 0, phase: '出牌', turn: { round: 1, phase: '出牌', vars: {} },
+      clock: new VirtualClock(),
+    });
+    Object.assign(session, { state, actionLog: state.actionLog });
+    gameSessions.set(roomId, session);
+    try {
+      await registerSkillsFromState(state);
+      const result = await dispatch(state, {
+        skillId: '顺手牵羊', actionType: 'use', ownerId: 0,
+        params: { cardId: 'snatch', targets: [1] }, baseSeq: 0,
+      });
+      expect(result.accepted).toBe(true);
+      await result.settle;
+      await fireTimeoutAndWait(state);
+      expect(state.pendingSlots.get(0)?.atom).toMatchObject({ requestType: '顺手牵羊_选牌' });
+      expect(session.getGameLog()).toEqual(expect.arrayContaining([
+        expect.objectContaining({ message: expect.objectContaining({
+          actionType: '设置手牌顺序', params: { target: 1, order: ['secret-a', 'secret-b'] },
+        }) }),
+      ]));
+      for (const cookie of [host.cookie, spectator.cookie]) {
+        const response = await app.request(`/api/rooms/${roomId}/log`, { headers: { Cookie: cookie } });
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual([
+          { time: 0, player: 0, text: '使用 顺手牵羊' },
+        ]);
+      }
+      expect(getRoom(roomId)!.viewGrants.has(spectator.userId)).toBe(false);
+      await fireTimeoutAndWait(state);
+    } finally {
+      gameSessions.delete(roomId);
+      await session.destroy();
+    }
+  });
+
   it('log:未登录 401、非成员 403、本房玩家可访问(到达业务层)', async () => {
+
     const app = makeApp();
     const host = await registerUser(app, 'auth_log_host');
     const outsider = await registerUser(app, 'auth_log_out');

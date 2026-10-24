@@ -851,39 +851,14 @@ function normalizePending(pending: GameView['pending'], viewer: number): unknown
   };
 }
 
-/** 规范化整个 view 用于对比:去掉非 atom 职责字段,规范化含函数的字段 */
+/** 默认比较所有视图字段;只排除来源不同的日志、实时截止时间和规范化后的 pending。 */
 function normalizeViewForCompare(view: GameView): unknown {
+  const { log: _log, deadline: _deadline, deadlineTotalMs: _deadlineTotalMs, pending, ...comparable } = view;
   return {
-    viewer: view.viewer,
-    currentPlayerIndex: view.currentPlayerIndex,
-    phase: view.phase,
-    turn: view.turn,
-    players: view.players.map((p) => ({
-      index: p.index,
-      name: p.name,
-      character: p.character,
-      health: p.health,
-      maxHealth: p.maxHealth,
-      alive: p.alive,
-      equipment: p.equipment,
-      skills: p.skills,
-      handCount: p.handCount,
-      // hand 是 owner 专属:owner 见牌面,其他人 undefined。两边都按 viewer 走 buildView,
-      // 所以同一 viewer 的 hand 可比。card 是纯数据可深比。
-      hand: p.hand,
-      marks: p.marks,
-      identity: p.identity,
-      identityHidden: p.identityHidden,
-      distanceVars: p.distanceVars,
-      pendingTricks: p.pendingTricks,
-    })),
-    // cardMap 是全局共享纯数据,可比(但量大,只在不一致时报具体 key)
-    cardMap: view.cardMap,
-    pending: normalizePending(view.pending, view.viewer),
-    zones: view.zones,
-    // log: 排除 —— buildView 用 actionLog(formatLogEntry),
-    // processedView 用 toViewLog(ViewEvent),来源不同。log 完整性由专门检查覆盖。
-    // deadline/deadlineTotalMs: 排除 —— Date.now() 近似值,两条路径必不同步。
+    ...comparable,
+    pending: normalizePending(pending, view.viewer),
+    // log: buildView 用 actionLog,processedView 用 toViewLog,由专门检查覆盖。
+    // deadline/deadlineTotalMs: 两条路径读取实时时钟,不要求数值完全一致。
   };
 }
 

@@ -16,7 +16,7 @@
 //   - 通用 key:value 约定:数字 key 表示已用次数('杀/usedCount'),
 //     真值 key 表示限一次标记('* /usedThisTurn')。前端 activeWhen 按需读取。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent, Json } from '../types';
-import { TURN_SCOPED_VIEW_KEYS, VIEW_MIRROR_PREFIX } from '../rules/vars-keys';
+import { viewMirrorKey } from '../rules/vars-keys';
 
 export const 回合用量: AtomDefinition<{ player: number; key: string; value: Json }> = {
   type: '回合用量',
@@ -25,27 +25,11 @@ export const 回合用量: AtomDefinition<{ player: number; key: string; value: 
     return null;
   },
   apply(state, atom) {
-    // 默认 no-op:限一次标记/用量计数等 state 侧 vars 由技能 execute 同步维护
-    // (限一次标记必须在 execute 第一个 await 之前设置以防 dispatch 重入)。
-    // 例外:出杀放宽族键('杀/unlimited/*'、'杀/extra/*'、'杀/blocked/*'、'杀/target/*'、
-    // '杀/exemptSuit'、'杀/usedCount')的 state 侧真相在 provider 注册表而非 vars,
-    // 仅投影 view 会让「初始视图/重连视图」(buildView 从 state 重建)丢失放宽,
-    // 重连后玩家/AI 按默认上限 1 判定 → 引擎允许的第 2 张杀发不出动作。
-    // 故把这些键镜像进 turn.vars(前缀 '__view/',buildView 据此重建 turnUsage)。
-    // 独立前缀而非同名键:同名键在 界弓骑/active、将驰/choice2 上 state 侧存「座次」、
-    // view 侧存 true,直接覆盖会让引擎侧谓词(=== 座次)失配、技能整段失效。
-    // 回合结束随 turn.vars 自动清空;同一键可反复更新(如 往烈/首张可用 true→false)。
-    const mirrorable =
-      atom.key.startsWith('杀/') || TURN_SCOPED_VIEW_KEYS.includes(atom.key);
-    // 镜像只属于当前回合玩家:buildView 把 __view/* 统一投影给 state.currentPlayerIndex
-    // (键不含玩家维度)。若非当前回合玩家写入(如 界鞬出 在别人回合被 借刀杀人/挑衅
-    // 逼杀时以 player: ownerId 写 '杀/extra/界鞬出'),这条镜像会被 buildView 永远归错人
-    // ——重建视图把 +1 记到当前回合玩家头上,重连后 viewSlashMax ≠ 引擎 slashMax,
-    // 客户端枚举的第 2 张杀必被引擎拒。故非当前玩家的写入不落镜像(在线增量投影按
-    // event.player 归属正确玩家,不受此守卫影响)。
-    if (mirrorable && atom.player === state.currentPlayerIndex) {
-      state.turn.vars[VIEW_MIRROR_PREFIX + atom.key] = atom.value;
-    }
+    // 按玩家归属保存镜像，覆盖被借刀/挑衅/激将等在他人回合触发的用量。
+    // key 保持原样，仅在 turn.vars 中增加玩家维度，buildView 可按玩家重建。
+    const mirror = viewMirrorKey(atom.player, atom.key);
+    if (atom.value === null) delete state.turn.vars[mirror];
+    else state.turn.vars[mirror] = atom.value;
   },
   toViewEvents(_state, atom): ViewEventSplit {
     const view: ViewEvent = {
@@ -61,7 +45,12 @@ export const 回合用量: AtomDefinition<{ player: number; key: string; value: 
     const p = view.players[event.player as number];
     if (!p) return;
     p.turnUsage ??= {};
-    p.turnUsage[event.key as string] = event.value as Json;
+    const key = event.key as string;
+    if (event.value === null) {
+      delete p.turnUsage[key];
+      return;
+    }
+    p.turnUsage[key] = event.value as Json;
   },
 };
 
