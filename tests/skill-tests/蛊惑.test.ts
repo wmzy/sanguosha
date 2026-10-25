@@ -116,13 +116,13 @@ describe('蛊惑', () => {
     // 于吉扣置真杀,声明为杀,目标 P1
     await YJ.triggerAction('蛊惑', 'use:杀', { cardId: 's1', target: 1 });
     expect(pendingType(harness.state)).toBe('请求回应');
-    expect(pendingTarget(harness.state)).toBe(1); // 先问 P1
+    expect(pendingTarget(harness.state)).toBe(2); // 逆时针先问 P2
 
-    await P1.pass(); // P1 不质疑
+    await P2.pass(); // P2 不质疑
     expect(pendingType(harness.state)).toBe('请求回应');
-    expect(pendingTarget(harness.state)).toBe(2); // 再问 P2
+    expect(pendingTarget(harness.state)).toBe(1); // 再问 P1
 
-    await P2.pass(); // P2 不质疑 → 无人质疑 → 杀生效
+    await P1.pass(); // P1 不质疑 → 无人质疑 → 杀生效
     expect(pendingType(harness.state)).toBe('询问闪');
     expect(pendingTarget(harness.state)).toBe(1); // 目标 P1 被询问闪
 
@@ -138,25 +138,25 @@ describe('蛊惑', () => {
   it('质疑真牌 → 质疑者失1体力,声明杀仍生效', async () => {
     const s1 = mkCard('s1', '杀', '♠', '7'); // 真杀
     const d1 = mkCard('d1', '闪', '♥', '2');
-    await harness.setup(baseState({ yujiHand: ['s1'], p2Hand: ['d1'], cardMap: { s1, d1 } }));
+    await harness.setup(baseState({ yujiHand: ['s1'], p1Hand: ['d1'], cardMap: { s1, d1 } }));
     const YJ = harness.player('于吉');
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    // 于吉扣置真杀,声明杀,目标 P2
-    await YJ.triggerAction('蛊惑', 'use:杀', { cardId: 's1', target: 2 });
-    expect(pendingTarget(harness.state)).toBe(1); // 先问 P1
+    // 于吉扣置真杀,声明杀,目标 P1
+    await YJ.triggerAction('蛊惑', 'use:杀', { cardId: 's1', target: 1 });
+    expect(pendingTarget(harness.state)).toBe(2); // 逆时针先问 P2
 
-    await P1.respond('蛊惑', {}); // P1 质疑 → 翻牌(真杀)
-    // 真: P1 失1体力,然后杀生效 → 询问 P2 闪
+    await P2.respond('蛊惑', {}); // P2 质疑 → 翻牌(真杀)
+    // 真: P2 失1体力,然后杀生效 → 询问 P1 闪
     expect(pendingType(harness.state)).toBe('询问闪');
-    expect(pendingTarget(harness.state)).toBe(2);
+    expect(pendingTarget(harness.state)).toBe(1);
 
-    await P2.pass(); // P2 不闪 → 受伤
+    await P1.pass(); // P1 不闪 → 受伤
     await harness.waitForStable();
 
-    expect(harness.state.players[1].health).toBe(3); // P1(质疑者)失1体力
-    expect(harness.state.players[2].health).toBe(3); // P2(目标)受杀伤害
+    expect(harness.state.players[2].health).toBe(3); // P2(质疑者)失1体力
+    expect(harness.state.players[1].health).toBe(3); // P1(目标)受杀伤害
     expect(harness.state.zones.discardPile).toContain('s1'); // 真牌按声明使用,入弃牌堆
   });
 
@@ -164,19 +164,19 @@ describe('蛊惑', () => {
     const s1 = mkCard('s1', '闪', '♥', '7'); // 假牌(非杀)
     await harness.setup(baseState({ yujiHand: ['s1'], cardMap: { s1 } }));
     const YJ = harness.player('于吉');
-    const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
 
     // 于吉扣置闪,声明为杀,目标 P2(虚张声势)
     await YJ.triggerAction('蛊惑', 'use:杀', { cardId: 's1', target: 2 });
-    expect(pendingTarget(harness.state)).toBe(1);
+    expect(pendingTarget(harness.state)).toBe(2); // 逆时针先问 P2
 
-    await P1.respond('蛊惑', {}); // P1 质疑 → 翻牌(闪,假)
+    await P2.respond('蛊惑', {}); // P2 质疑 → 翻牌(闪,假)
     await harness.waitForStable();
 
-    // 假: P1 获得此牌,作废(无伤害)
-    expect(harness.state.players[1].health).toBe(4); // 质疑者不失体力
-    expect(harness.state.players[2].health).toBe(4); // 目标未受伤(作废)
-    expect(harness.state.players[1].hand).toContain('s1'); // 质疑者获得扣牌
+    // 假: P2 获得此牌,作废(无伤害)
+    expect(harness.state.players[2].health).toBe(4); // 质疑者不失体力
+    expect(harness.state.players[1].health).toBe(4); // 其他角色未受伤(作废)
+    expect(harness.state.players[2].hand).toContain('s1'); // 质疑者获得扣牌
     expect(harness.state.zones.discardPile).not.toContain('s1'); // 扣牌被取走
     expect(harness.state.players[0].hand).not.toContain('s1'); // 于吉失去此牌
   });

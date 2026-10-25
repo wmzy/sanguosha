@@ -88,7 +88,9 @@ describe('useMultiplayerRoom', () => {
   beforeEach(() => {
     MockEventSource.reset();
     fetchCalls.length = 0;
-    localStorage.clear();
+    // Node 26 + jsdom 29 下全局 localStorage 可能不可用（opaque origin），
+    // 本测试不使用存储；有则清空，无则跳过。
+    (globalThis as { localStorage?: Storage }).localStorage?.clear();
     vi.stubGlobal('EventSource', MockEventSource);
     vi.stubGlobal('fetch', vi.fn(async (url: string, opts?: RequestInit) => {
       const body = opts?.body ? JSON.parse(opts.body as string) : {};

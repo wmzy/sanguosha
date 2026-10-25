@@ -123,7 +123,15 @@ export interface MultiplayerRoom {
   cancelReconnect: () => void;
 }
 
-export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
+export interface MultiplayerRoomOpts {
+  /** URL 直达时强制以旁观者身份进入(?spectate=1)。演示/观战链接使用。 */
+  forceSpectate?: boolean;
+}
+
+export function useMultiplayerRoom(
+  initialRoomId?: string,
+  opts: MultiplayerRoomOpts = {},
+): MultiplayerRoom {
   const [stage, setStage] = useState<MultiplayerStage>('lobby');
   const [roomId, setRoomId] = useState<string | null>(null);
   // 身份来自登录会话(RRequireAuth 门禁保证 user 已就绪):userId 即 playerId。
@@ -182,16 +190,22 @@ export function useMultiplayerRoom(initialRoomId?: string): MultiplayerRoom {
   /** 待输入房间密码的加入请求 */
   const [passwordPrompt, setPasswordPrompt] = useState<PasswordPrompt | null>(null);
 
-  // 初始命令:有 initialRoomId 则自动 join(分享链接直达)
+  // 初始命令:有 initialRoomId 则自动 join(分享链接直达);
+  // forceSpectate(?spectate=1)优先走旁观,不占座、不会因房间满员而失败。
   const [command, setCommand] = useState<Command>(() =>
-    initialRoomId ? { type: 'autoJoin', roomId: initialRoomId } : { type: 'idle' },
+    initialRoomId
+      ? opts.forceSpectate
+        ? { type: 'spectate', roomId: initialRoomId }
+        : { type: 'autoJoin', roomId: initialRoomId }
+      : { type: 'idle' },
   );
 
   const hgcRef = useRef<HeadlessGameClient | null>(null);
 
   // 事件播放队列:把后端 event 消息按 seq 入队,逐个暴露给 GameViewComponent 中央动效。
   // 用 ref 在 onMessage 闭包中取最新 playback,避免闭包竞态。
-  const playback = useEventPlayback();
+  // 旁观者用 compact 模式：不补播历史动效，始终展示最新事件（AI 对局节奏快）。
+  const playback = useEventPlayback({ compact: hgcIsSpectator });
   const playbackRef = useRef(playback);
   useEffect(() => {
     playbackRef.current = playback;

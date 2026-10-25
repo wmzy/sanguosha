@@ -817,6 +817,31 @@ describe('rankActions / pickBestAction', () => {
     expect(best!.message.skillId).toBe('杀');
   });
 
+  it('多目标推荐自动补 minTarget 个 targets（避免空 targets 恒拒）', () => {
+    const view = makeView();
+    const actions: AvailableAction[] = [
+      {
+        description: '离间两名男性角色（需填 targets）',
+        message: {
+          skillId: '离间',
+          actionType: 'use',
+          ownerId: 0,
+          params: {},
+          baseSeq: 0,
+        },
+        validTargets: [1, 2],
+        minTarget: 2,
+        maxTarget: 2,
+        category: 'play',
+      },
+    ];
+    const best = pickBestAction(view, actions);
+    expect(best).not.toBeNull();
+    expect(best!.message.params.targets).toEqual([1, 2]);
+    // 原始动作不被修改
+    expect(actions[0].message.params.targets).toBeUndefined();
+  });
+
   it('pickBestAction 空数组返回 null', () => {
     const view = makeView();
     expect(pickBestAction(view, [])).toBeNull();

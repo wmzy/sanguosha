@@ -12,7 +12,7 @@ import { applyAtom } from '../../core/apply'
 import { frameCards } from '../../core/frame';
 import type { CardEffect, ResolveCtx } from '../../types';
 
-/** 从使用者开始,按座次旋转的所有存活玩家 */
+/** 从使用者开始,按逆时针旋转的所有存活玩家 */
 function alivePlayersFrom(state: import('../../types').GameState, from: number): number[] {
   const alive = state.players.filter((p) => p.alive);
   const n = alive.length;
@@ -21,7 +21,7 @@ function alivePlayersFrom(state: import('../../types').GameState, from: number):
   if (fromPos < 0) return alive.map((p) => p.index);
   const result: number[] = [];
   for (let i = 0; i < n; i++) {
-    result.push(alive[(fromPos + i) % n].index);
+    result.push(alive[(fromPos - i + n) % n].index);
   }
   return result;
 }

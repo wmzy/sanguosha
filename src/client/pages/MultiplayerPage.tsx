@@ -4,7 +4,7 @@
 // 404 分支与 stage 分发;各阶段 JSX 在 ./multiplayer/ 下的 Stage 子组件中,
 // mp 经 MultiplayerRoomCtx 下发,重连横幅与错误 toast 由各 Stage 自行渲染。
 import { useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMultiplayerRoom } from '../hooks/useMultiplayerRoom';
 import { useRoomHistory } from '../hooks/useRoomHistory';
 import { useBattleStatsEvents } from '../utils/battleStats';
@@ -20,7 +20,11 @@ import { buttonRow, notFoundPage, notFoundCode, notFoundTitle, notFoundDesc, not
 export function MultiplayerPage() {
   const navigate = useNavigate();
   const { roomId: urlRoomId } = useParams<{ roomId?: string }>();
-  const mp = useMultiplayerRoom(urlRoomId);
+  const [searchParams] = useSearchParams();
+  // ?spectate=1:观战链接直达,未开局也不会误占 AI/玩家座位。
+  const mp = useMultiplayerRoom(urlRoomId, {
+    forceSpectate: searchParams.get('spectate') === '1',
+  });
   // 解构供下方 URL 同步 effect 使用(leaveRoom 是稳定 useCallback,避免整包 mp 进依赖)
   const { roomId: mpRoomId, leaveRoom } = mp;
   // 对局历史:等待大厅展示;对局结束(gameOver)/回到等待(stage)时刷新

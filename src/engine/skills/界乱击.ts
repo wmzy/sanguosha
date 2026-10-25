@@ -141,7 +141,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const from = ownerId;
       const cardId = params.cardId as string;
 
-      // 计算默认目标:除使用者外所有存活角色,按座次从 from+1 顺时针
+      // 计算默认目标:除使用者外所有存活角色,从下家起逆时针
       const alivePlayers = state.players.filter((p) => p.alive);
       const n = alivePlayers.length;
       const defaultTargets: number[] = [];
@@ -149,7 +149,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const fromPos = alivePlayers.findIndex((p) => p.index === from);
         if (fromPos >= 0) {
           for (let i = 1; i < n; i++) {
-            defaultTargets.push(alivePlayers[(fromPos + i) % n].index);
+            defaultTargets.push(alivePlayers[(fromPos - i + n) % n].index);
           }
         }
       }

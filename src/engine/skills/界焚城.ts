@@ -122,13 +122,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           const startTarget = startArr[0];
           if (!st.players[startTarget]?.alive) return;
 
-          // ── 2) 从起点按座次依次遍历每个其他存活角色 ──
+          // ── 2) 从起点逆时针遍历每个其他存活角色 ──
           // 重置上家弃牌数(本回合本次焚城专用)
           st.turn.vars[LASTCOUNT_KEY] = 0;
           const n = st.players.length;
           // 遍历 n-1 步(所有其他角色)
           for (let step = 0; step < n; step++) {
-            const p = (startTarget + step) % n;
+            const p = (startTarget - step + n) % n;
             if (p === from) continue;
             if (!st.players[p]?.alive) continue;
 

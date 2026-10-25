@@ -198,11 +198,11 @@ async function runQuestioning(
   // ① 扣牌(面朝下,声明公开,真身对他人隐藏)
   await applyAtom(state, { type: '扣牌', player: yuji, cardId, declaredName });
 
-  // ② 质疑循环:从下家起按座次逐个询问,首个质疑者即翻牌
+  // ② 质疑循环:从下家起逆时针逐个询问,首个质疑者即翻牌
   const n = state.players.length;
   let questioner: number | undefined = undefined;
   for (let step = 1; step < n; step++) {
-    const p = (yuji + step) % n;
+    const p = (yuji - step + n) % n;
     if (p === yuji) continue;
     if (!state.players[p]?.alive) continue;
     delete state.localVars[QUESTIONER_VAR];

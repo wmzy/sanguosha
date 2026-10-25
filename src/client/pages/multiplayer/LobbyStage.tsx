@@ -99,9 +99,12 @@ export function LobbyStage() {
     }
   }, []);
 
-  // 进入 lobby 时加载房间列表
+  // 进入 lobby 时加载房间列表，并每 5s 自动刷新：
+  // 演示时 AI 房间往往在页面打开之后才创建，只能手刷会让观众错过开局。
   useEffect(() => {
     void fetchRooms();
+    const timer = setInterval(() => void fetchRooms(), 5000);
+    return () => clearInterval(timer);
   }, [fetchRooms]);
 
   // 删除房间(参考 DebugLobby 的 handleDeleteDebugRoom)

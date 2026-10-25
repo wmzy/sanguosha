@@ -88,7 +88,16 @@ export interface EventPlaybackState {
  *   - pendingCount: 待播队列积压数(不含 current,供「+N 排队中」角标)
  *   - skipAll: 一键清空积压并按最新 seq 对齐(供横幅跳过按钮)
  */
-export function useEventPlayback() {
+export interface EventPlaybackOptions {
+  /** 观战/追赶模式：新批次只保留最后一条横幅事件，丢弃历史积压。
+   *  观战者不参与操作，实时局面比补播历史动效更重要；普通玩家保持串行播放。 */
+  compact?: boolean;
+}
+
+export function useEventPlayback(options: EventPlaybackOptions = {}) {
+  // 用 ref 读取最新开关：compact 随「旁观身份」变化，而 enqueue 由 socket 回调持有。
+  const compactRef = useRef(options.compact ?? false);
+  compactRef.current = options.compact ?? false;
   const [current, setCurrent] = useState<QueuedEvent | null>(null);
   /** 最近入队批次;每次 enqueue 新鲜事件时更新,供 PlayHistory 立即入条 */
   const [ingested, setIngested] = useState<QueuedEvent[]>([]);
@@ -163,6 +172,19 @@ export function useEventPlayback() {
         (e) => !isStructural(e.event) && !STICKY_REVEAL_TYPES.has(e.event.type),
       );
       if (bannerEvents.length > 0) {
+        if (compactRef.current) {
+          // 观战模式:清掉当前定时器与积压，只播放本批最后一条。
+          // 否则 5 个 AI 每秒产生多条事件，串行 400ms/条永远追不上实时局面。
+          if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+          }
+          queueRef.current = [bannerEvents[bannerEvents.length - 1]];
+          setPendingCount(0);
+          isPlayingRef.current = false;
+          playNext();
+          return;
+        }
         queueRef.current.push(...bannerEvents);
         setPendingCount(queueRef.current.length);
         // 若空闲,立即开始播放(用 ref 判断,避免闭包竞态)

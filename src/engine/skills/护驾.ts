@@ -65,10 +65,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, _params: Record<string, Json>): Promise<void> => {
-      // 按座次顺序逐个询问魏势力角色
+      // 从主公起逆时针逐个询问魏势力角色
       const numPlayers = st.players.length;
       for (let offset = 1; offset < numPlayers; offset++) {
-        const allyIdx = (ownerId + offset) % numPlayers;
+        const allyIdx = (ownerId - offset + numPlayers) % numPlayers;
         const ally = st.players[allyIdx];
         if (!ally?.alive) continue;
         if (ally.faction !== '魏') continue;

@@ -42,17 +42,23 @@ export function WaitingStage({ history }: WaitingStageProps) {
 
   // 房间码/邀请链接复制反馈:成功后按钮短暂显示 ✓,2 秒后恢复(范式同 DebugPerspectiveBar)。
   // 用单一状态 + 可清除计时器:连续点两个按钮时,后点的反馈覆盖先点的,旧计时器不残留。
-  const [copiedKind, setCopiedKind] = useState<'code' | 'link' | null>(null);
+  const [copiedKind, setCopiedKind] = useState<'code' | 'link' | 'spectate' | null>(null);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     // 卸载清理计时器,避免对已卸载组件 setState
     if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
   }, []);
   const handleCopyRoomInfo = useCallback(
-    async (kind: 'code' | 'link') => {
+    async (kind: 'code' | 'link' | 'spectate') => {
       if (!mp.roomId) return;
-      // 邀请链接走 /play/:roomId 路由,App.tsx 已支持 autoJoin 直达
-      const text = kind === 'code' ? mp.roomId : `${window.location.origin}/play/${mp.roomId}`;
+      // 玩家链接走 /play/:roomId(座位空则入座);旁观链接带 ?spectate=1,
+      // 演示时用来「只看不下场」,房间满员/未开局都不会误占座位。
+      const text =
+        kind === 'code'
+          ? mp.roomId
+          : kind === 'spectate'
+            ? `${window.location.origin}/play/${mp.roomId}?spectate=1`
+            : `${window.location.origin}/play/${mp.roomId}`;
       const ok = await copyToClipboard(text);
       if (ok) {
         setCopiedKind(kind);
@@ -134,6 +140,20 @@ export function WaitingStage({ history }: WaitingStageProps) {
                 } as React.CSSProperties}
               >
                 {copiedKind === 'link' ? '✓ 已复制' : '复制邀请链接'}
+              </button>
+              <button
+                className={btnStyle}
+                disabled={!mp.roomId}
+                onClick={() => void handleCopyRoomInfo('spectate')}
+                style={{
+                  '--btn-bg': colors.bg.input,
+                  '--btn-padding': '4px 14px',
+                  '--btn-font-size': '12px',
+                  '--btn-cursor': mp.roomId ? 'pointer' : 'not-allowed',
+                  opacity: mp.roomId ? 1 : 0.6,
+                } as React.CSSProperties}
+              >
+                {copiedKind === 'spectate' ? '✓ 已复制' : '复制旁观链接'}
               </button>
             </div>
           </div>

@@ -193,10 +193,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
           // ── 响应型(代打出):逐个请求蜀角色出杀,第一个出杀即止 ──
           if (atom?.type === '询问杀') {
-            // 按座次顺序逐个询问蜀势力角色
+            // 从主公起逆时针逐个询问蜀势力角色
             const numPlayers = st.players.length;
             for (let offset = 1; offset < numPlayers; offset++) {
-              const allyIdx = (seat + offset) % numPlayers;
+              const allyIdx = (seat - offset + numPlayers) % numPlayers;
               const ally = st.players[allyIdx];
               if (!ally?.alive) continue;
               if (ally.faction !== '蜀') continue;

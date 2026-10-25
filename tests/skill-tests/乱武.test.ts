@@ -207,8 +207,14 @@ describe('乱武', () => {
     await JX.triggerAction('乱武', 'use');
     await harness.waitForStable();
 
-    // 先问 P2(贾诩下家);P2 的最近集合={贾诩,P3},选 P3
+    // 逆时针先问 P3(贾诩下家,index2);P3 无杀 → 失去1体力
     let slot = [...harness.state.pendingSlots.values()][0];
+    expect((slot.atom as { target: number }).target).toBe(2);
+    await P3.pass();
+    await harness.waitForStable();
+
+    // 再问 P2;P2 的最近集合={贾诩,P3},选 P3
+    slot = [...harness.state.pendingSlots.values()][0];
     expect((slot.atom as { target: number }).target).toBe(1);
     await P2.respond('乱武', { cardId: 'sk2', target: 2 });
     await harness.waitForStable();
@@ -218,13 +224,7 @@ describe('乱武', () => {
     await P3.pass(); // P3 不闪 → 受伤
     await harness.waitForStable();
 
-    // P2 的杀结算完,继续问 P3(无杀)→ 失去1体力
-    slot = [...harness.state.pendingSlots.values()][0];
-    expect((slot.atom as { target: number }).target).toBe(2);
-    await P3.pass();
-    await harness.waitForStable();
-
-    // P3:受 P2 杀 1 点 + 乱武失血 1 点 = 共失 2 点
+    // P3:乱武失血 1 点 + 受 P2 杀 1 点 = 共失 2 点
     expect(harness.state.players[2].health).toBe(2);
     expect(harness.state.players[0].health).toBe(3); // 贾诩未受影响
     expect(harness.state.zones.discardPile).toContain('sk2');

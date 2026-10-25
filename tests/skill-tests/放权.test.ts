@@ -201,22 +201,22 @@ describe('放权', () => {
     // 放权内部标记已记录
     expect(harness.state.localVars['放权/extraTarget']).toBe(2);
 
-    // 4. P2 结束额外回合 → 情况2 → 启动 P1(刘禅的正常下家)
+    // 4. P2 结束额外回合 → 情况2 → 启动刘禅的正常下家
+    //    逆时针约定下,刘禅(0)的正常下家是 P2(2),因此 P2 会连续获得额外回合 + 正常回合。
     const P2 = harness.player('P2');
     await P2.triggerAction('回合管理', 'end', {});
     await harness.waitForStable();
     harness.processAllEvents();
-    expect(harness.state.currentPlayerIndex).toBe(1); // 正常下家 P1
+    expect(harness.state.currentPlayerIndex).toBe(2); // 正常下家 P2(逆时针)
     // 情况2 已清除放权内部标记
     expect(harness.state.localVars['放权/extraTarget']).toBeFalsy();
     expect(harness.state.localVars['放权/originalNext']).toBeFalsy();
 
-    // 5. P1 结束回合 → 座次恢复正常:轮到 P2(而非刘禅)
-    const P1 = harness.player('P1');
-    await P1.triggerAction('回合管理', 'end', {});
+    // 5. P2 正常回合结束 → 逆时针轮到 P1,座次顺序恢复正常
+    await P2.triggerAction('回合管理', 'end', {});
     await harness.waitForStable();
     harness.processAllEvents();
-    expect(harness.state.currentPlayerIndex).toBe(2); // P2 正常回合,座次顺序已恢复
+    expect(harness.state.currentPlayerIndex).toBe(1); // 下一个正常回合 P1
   });
 
   it('2人局:放权选对方 → 对方额外回合用制衡 → 标记清空 → 正常回合可再用', async () => {
@@ -346,8 +346,9 @@ describe('放权', () => {
     expect(harness.state.localVars['放权/extraTarget']).toBeFalsy();
     // 刘禅未弃出 c1(代价未支付)
     expect(harness.state.players[0].hand).toEqual(['c1']);
-    // 正常切换到下家 P1(而非额外回合目标 P2)→ 证明未发动额外回合
-    expect(harness.state.currentPlayerIndex).toBe(1);
+    // 正常切换到逆时针下家 P2(而非额外回合目标 P2)→ 证明未发动额外回合
+    // (刘禅 index0 的逆时针下家是 2,不是 1)
+    expect(harness.state.currentPlayerIndex).toBe(2);
     expect(harness.state.phase).toBe('出牌');
   });
 });

@@ -4,6 +4,43 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] — 2026-10-25
 
+### Fixed — 出牌方向与视图一致性
+
+- 出牌方向改为**逆时针**：`下一玩家`、`回合管理.findNextAlive`、闪电传递、乱武/界乱武、
+  界焚城、蛊惑/界蛊惑、护驾/激将、五谷丰登、AOE 默认目标与 `computeAutoTargets` 的座次
+  遍历统一改为索引递减；UI 座位环保持不变（下家在右手侧），出牌高亮现在逆时针移动。
+- `下一玩家` 事件携带递增后的 round 并同步到增量视图，避免放权/额外回合路径 round 漂移。
+- `buildView` 的 `turn` 改为快照：此前与 `state.turn` 共享引用，processedView 回放
+  「回合结束」会清掉权威 `turn.vars`，导致观星等 `turnUsage` 重连视图漂移。
+- 无头/MCP 广播型 pending 记录本客户端已 skip 的窗口，同一窗口不再反复 `needsAction`；
+  观星 arrange 生成可直接提交的 `{top,bottom}`；弃牌/强制弃牌预填前 N 张；
+  多目标推荐自动补 `minTarget` 个 targets——AI 不再因空 `cardIds`/`targets` 被拒空转。
+
+### Added — 演示视频音效
+
+- `record-demo.mjs` 支持从 PulseAudio monitor 采集游戏音效（移除 Playwright 默认
+  `--mute-audio`，通过可信点击解锁 AudioContext），`compose-demo-video.sh` 自动混音。
+
+### Added — 多 AI 演示与观战体验
+
+- 新增 `scripts/demo-ai-match.sh`：一键启动 N 个独立 omp 进程（每个进程独立 MCP 连接、独立演示账号），
+  支持 headless 与 tmux interactive 两种模式；房主 `minPlayers` 到齐才自动开局，避免第 2 人就绪
+  即开局导致后续 guest 全部被拒「游戏已开始」。
+- 新增 `scripts/demo-stage.mjs` / `scripts/record-demo.mjs` / `scripts/compose-demo-video.sh`：
+  上半屏游戏旁观、下半屏 5 个 tmux 终端实况，可录制为 mp4；`pnpm demo:record` 一键完成。
+- 首页新增「AI 对战演示」入口；大厅房间列表 5s 自动刷新并标注「AI 对局」；新增 `?spectate=1`
+  旁观链接与「复制旁观链接」。
+- MCP `createRoom` 新增 `minPlayers`（默认 = maxPlayers），从根上保证多进程编排等齐再开局。
+
+### Changed — 观战与日志可读性
+
+- 旁观 = 只读：隐藏回应按钮、选将/身份遮罩与视角申请（全 AI 对局无人类可审批）。
+- 观战事件播放改为 compact 模式：不再补播历史动效，始终展示最新事件，避免 AI 快节奏下
+  「+N 排队中」永久积压。
+- 游戏日志面向玩家格式化：内部 cardId 转为【牌名】(花色点数)，目标座次转角色名，
+  自动跳过（__skip）不再刷屏。
+
+
 ### Changed — 执行生命周期、目标约束与 pending 投影的统一
 
 - **执行生命周期显式化**：新增 `core/run-tracker.ts`（active/suspended run 记账、

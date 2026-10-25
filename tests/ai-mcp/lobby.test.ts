@@ -304,6 +304,51 @@ describe('createLobbyAdvancer', () => {
     expect(sendStartGame).not.toHaveBeenCalled();
   });
 
+
+  it('minPlayers 未到齐：即便当前已加入者全部就绪也不开局', () => {
+    const { hgc, sendStartGame } = makeAdvancerHgc({
+      phase: 'lobby',
+      playerId: 'p-host',
+      hostId: 'p-host',
+      ready: true,
+    });
+    createLobbyAdvancer(hgc, { minPlayers: 5 })();
+    expect(sendStartGame).not.toHaveBeenCalled();
+  });
+
+  it('minPlayers 到齐且全员就绪：开局', () => {
+    const sendStartGame = vi.fn(async () => {});
+    let size = 2;
+    const hgc = {
+      get phase() {
+        return 'lobby' as ClientPhase;
+      },
+      get playerId() {
+        return 'p-host';
+      },
+      get roomState() {
+        const playerIds = Array.from({ length: size }, (_, i) => `p${i}`);
+        return {
+          readyPlayers: [...playerIds],
+          playerIds,
+          hostId: 'p-host',
+          maxPlayers: 5,
+          config: BASE_CONFIG,
+          spectatorIds: [],
+          viewGrants: {},
+          pendingViewRequests: {},
+        } as RoomState;
+      },
+      sendStartGame,
+    } as unknown as HeadlessGameClient;
+    const advance = createLobbyAdvancer(hgc, { minPlayers: 5 });
+    advance();
+    expect(sendStartGame).not.toHaveBeenCalled();
+    size = 5;
+    advance();
+    expect(sendStartGame).toHaveBeenCalledTimes(1);
+  });
+
   it('已进入 playing：不发 startGame', () => {
     const { hgc, sendStartGame } = makeAdvancerHgc({
       phase: 'playing',

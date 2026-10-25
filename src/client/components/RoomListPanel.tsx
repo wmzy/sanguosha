@@ -185,6 +185,16 @@ const hostBadge = css`
   margin-left: 6px;
 `;
 
+const aiBadge = css`
+  font-size: 11px;
+  color: #cbb2ff;
+  background: rgba(180, 140, 242, 0.14);
+  border: 1px solid rgba(180, 140, 242, 0.35);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+`;
+
 const hostTag = css`
   font-size: 11px;
   color: ${colors.text.secondary};
@@ -273,6 +283,9 @@ export const RoomListPanel = memo(
                       {room.hasPassword && <span title="需要密码" aria-label="密码房间">🔒</span>}
                       {room.name}
                       {isMyRoom && <span className={hostBadge}>我建的</span>}
+                      {/AI|机器人|agent/i.test(room.name) && (
+                        <span className={aiBadge}>AI 对局</span>
+                      )}
                     </div>
                     <div className={roomIdMono}>{room.id}</div>
                     <div className={roomMeta}>
@@ -311,7 +324,9 @@ export const RoomListPanel = memo(
                         )}
                       </>
                     )}
-                    {onDelete && (
+                    {/* 普通房间只有房主能删（服务端同样校验）；非房主点删除只会收到
+                        「只有房主可以删除房间」的静默失败，徒增困惑。debug 房间保留全员删除。 */}
+                    {onDelete && (isMyRoom === true || allowJoinAlways) && (
                       <button onClick={() => onDelete(room.id)} className={cx(btnGhost, btnGhostRed)}>
                         删除
                       </button>

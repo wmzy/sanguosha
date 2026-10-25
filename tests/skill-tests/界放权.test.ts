@@ -316,22 +316,32 @@ describe('界放权', () => {
     // P2 的预设限一次标记已被情况1 的 per-turn 清理清空(额外回合是全新回合)
     expect(harness.state.players[2].vars['测试/usedThisTurn']).toBeFalsy();
 
-    // 4. P2 结束额外回合 → 情况2 → 启动 P1(界刘禅的正常下家)
+    // 4. P2 结束额外回合 → 情况2 → 启动界刘禅的正常下家。
+    //    逆时针约定下,界刘禅(0)的正常下家是 P2(2),因此 P2 连续获得额外回合 + 正常回合。
     const P2 = harness.player('P2');
     await P2.triggerAction('回合管理', 'end', {});
     await harness.waitForStable();
     harness.processAllEvents();
-    expect(harness.state.currentPlayerIndex).toBe(1); // 正常下家 P1
+    expect(harness.state.currentPlayerIndex).toBe(2); // 正常下家 P2(逆时针)
     // 情况2 已清除放权内部标记
     expect(harness.state.localVars['放权/extraTarget']).toBeFalsy();
     expect(harness.state.localVars['放权/originalNext']).toBeFalsy();
 
-    // 5. P1 结束回合 → 座次恢复正常:轮到 P2(而非界刘禅)
-    const P1 = harness.player('P1');
-    await P1.triggerAction('回合管理', 'end', {});
+    // 5. P2 正常回合结束 → 弃牌阶段 → 逆时针轮到 P1
+    await P2.triggerAction('回合管理', 'end', {});
     await harness.waitForStable();
     harness.processAllEvents();
-    expect(harness.state.currentPlayerIndex).toBe(2); // P2 正常回合,座次顺序已恢复
+    if (harness.state.phase === '弃牌') {
+      const excess = harness.state.players[2].hand.length - harness.state.players[2].health;
+      if (excess > 0) {
+        await P2.respond('系统规则', {
+          cardIds: harness.state.players[2].hand.slice(0, excess),
+        });
+        await harness.waitForStable();
+        harness.processAllEvents();
+      }
+    }
+    expect(harness.state.currentPlayerIndex).toBe(1); // 下一个正常回合 P1
   });
 
   it('禁止自选:选自己作目标被 validate 拒绝(不采用官方“可为自己”)', async () => {

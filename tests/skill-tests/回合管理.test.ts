@@ -502,8 +502,8 @@ describe('回合管理 · 翻面跳过整回合', () => {
       .find((a) => a.type === type && (a as { player?: number }).player === player);
   }
 
-  it('翻面玩家整回合被跳过:不 fire 回合开始/回合结束,翻回正面,cPI 跳到下下家', async () => {
-    // 3 人:P0 当前出牌(将 end),P1 翻面(应被跳过),P2 正常
+  it('翻面玩家整回合被跳过:不 fire 回合开始/回合结束,翻回正面,cPI 逆时针跳到下下家', async () => {
+    // 3 人:P0 当前出牌(将 end)。逆时针顺序 0→2→1,P2 翻面(应被跳过),P1 正常
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['c1'] }),
@@ -516,32 +516,32 @@ describe('回合管理 · 翻面跳过整回合', () => {
       turn: { round: 1, phase: '出牌', vars: {} },
     });
     fillDeck(state, 20);
-    // P1 已翻面(模拟上一回合被放逐/悲歌等翻面)
-    state.players[1].tags = ['放逐/翻面'];
+    // P2 已翻面(模拟上一回合被放逐/悲歌等翻面)
+    state.players[2].tags = ['放逐/翻面'];
     await harness.setup(state);
     const P0 = harness.player('P0');
 
     const startLen = state.atomHistory.length;
-    // P0 结束回合 → 完整级联 → P1 被跳过 → P2 回合开始
+    // P0 结束回合 → 完整级联 → P2 被跳过 → P1 回合开始
     await P0.triggerAction('回合管理', 'end', {});
 
-    // P1 整回合被跳过:cPI 从 P0 直接到 P2
-    expect(state.currentPlayerIndex).toBe(2);
+    // P2 整回合被跳过:cPI 从 P0 直接到 P1
+    expect(state.currentPlayerIndex).toBe(1);
     expect(state.phase).toBe('出牌');
-    // P2 正常开始回合(摸了 2 张)
-    expect(state.players[2].hand.length).toBe(2);
-    // P1 翻回正面(翻面标签被消费)
-    expect(state.players[1].tags).not.toContain('放逐/翻面');
+    // P1 正常开始回合(摸了 2 张)
+    expect(state.players[1].hand.length).toBe(2);
+    // P2 翻回正面(翻面标签被消费)
+    expect(state.players[2].tags).not.toContain('放逐/翻面');
 
     // 核心:翻面角色不 fire 回合开始/回合结束 atom
-    expect(findAtomFor(state, startLen, '回合开始', 1)).toBeUndefined();
-    expect(findAtomFor(state, startLen, '回合结束', 1)).toBeUndefined();
-    // 对照:P2 的回合开始正常 fire
-    expect(findAtomFor(state, startLen, '回合开始', 2)).toBeDefined();
+    expect(findAtomFor(state, startLen, '回合开始', 2)).toBeUndefined();
+    expect(findAtomFor(state, startLen, '回合结束', 2)).toBeUndefined();
+    // 对照:P1 的回合开始正常 fire
+    expect(findAtomFor(state, startLen, '回合开始', 1)).toBeDefined();
   });
 
   it('连续两个翻面玩家都被跳过:cPI 连跳到第一个正面玩家', async () => {
-    // 4 人:P0 end,P1/P2 翻面(连跳),P3 正常
+    // 4 人:P0 end,逆时针 0→3→2→1,P3/P2 翻面(连跳),P1 正常
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['c1'] }),
@@ -555,7 +555,7 @@ describe('回合管理 · 翻面跳过整回合', () => {
       turn: { round: 1, phase: '出牌', vars: {} },
     });
     fillDeck(state, 20);
-    state.players[1].tags = ['放逐/翻面'];
+    state.players[3].tags = ['放逐/翻面'];
     state.players[2].tags = ['悲歌/翻面'];
     await harness.setup(state);
     const P0 = harness.player('P0');
@@ -563,19 +563,18 @@ describe('回合管理 · 翻面跳过整回合', () => {
     const startLen = state.atomHistory.length;
     await P0.triggerAction('回合管理', 'end', {});
 
-    // P1、P2 均被跳过:cPI 直接到 P3
-    expect(state.currentPlayerIndex).toBe(3);
-    expect(state.players[3].hand.length).toBe(2);
+    // P3、P2 均被跳过:cPI 直接到 P1
+    expect(state.currentPlayerIndex).toBe(1);
+    expect(state.players[1].hand.length).toBe(2);
     // 两者都翻回正面
-    expect(state.players[1].tags).not.toContain('放逐/翻面');
+    expect(state.players[3].tags).not.toContain('放逐/翻面');
     expect(state.players[2].tags).not.toContain('悲歌/翻面');
-    // P1/P2 均不 fire 回合开始/回合结束
-    expect(findAtomFor(state, startLen, '回合开始', 1)).toBeUndefined();
-    expect(findAtomFor(state, startLen, '回合开始', 2)).toBeUndefined();
-    expect(findAtomFor(state, startLen, '回合结束', 1)).toBeUndefined();
+    // P3/P2 均不 fire 回合开始/回合结束
+    expect(findAtomFor(state, startLen, '回合开始', 3)).toBeUndefined();
     expect(findAtomFor(state, startLen, '回合结束', 2)).toBeUndefined();
-    // P3 回合开始正常 fire
-    expect(findAtomFor(state, startLen, '回合开始', 3)).toBeDefined();
+    expect(findAtomFor(state, startLen, '回合结束', 3)).toBeUndefined();
+    // P1 回合开始正常 fire
+    expect(findAtomFor(state, startLen, '回合开始', 1)).toBeDefined();
   });
 
   it('回归:无翻面时正常轮转(不误跳)', async () => {

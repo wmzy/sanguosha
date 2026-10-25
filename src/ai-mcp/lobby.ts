@@ -66,11 +66,13 @@ export async function applyConfigUpdate(
   return changed;
 }
 
-/** 判定全员就绪：readyPlayers 集合 === playerIds 集合，且至少 2 人。 */
-function isAllReady(hgc: HeadlessGameClient): boolean {
+/** 判定全员就绪：readyPlayers 集合 === playerIds 集合，且至少 minPlayers 人。
+ *  minPlayers 仅用于「等齐开局」：AI 编排/多进程演示必须等全部座位到齐，
+ *  否则房主的 play 循环会在第 2 人就绪时立刻开局，后续 guest 全部撞「游戏已开始」。 */
+function isAllReady(hgc: HeadlessGameClient, minPlayers = 2): boolean {
   const rs = hgc.roomState;
   if (!rs) return false;
-  if (rs.playerIds.length < 2) return false;
+  if (rs.playerIds.length < Math.max(2, minPlayers)) return false;
   if (rs.readyPlayers.length !== rs.playerIds.length) return false;
   return true;
 }
@@ -133,6 +135,11 @@ export async function advanceToStart(
   return isPlaying(hgc);
 }
 
+export interface LobbyAdvancerOpts {
+  /** 开局所需的最少玩家数。默认 2；AI 编排应传房间满员数，等齐再开局。 */
+  minPlayers?: number;
+}
+
 /**
  * 创建 lobby 推进器：返回幂等、非阻塞的推进函数，供 playHandler 的 tick 循环
  * 在 lobby/connecting 阶段周期调用。
@@ -141,12 +148,16 @@ export async function advanceToStart(
  * 非房主 / 未全员就绪 / 已进入 playing 时为 no-op。这样 runPlay 在 lobby 阶段可持续
  * 阻塞等待进入 playing + needsAction，而非立即返回迫使 agent 高频轮询浪费 token。
  */
-export function createLobbyAdvancer(hgc: HeadlessGameClient): () => void {
+export function createLobbyAdvancer(
+  hgc: HeadlessGameClient,
+  opts: LobbyAdvancerOpts = {},
+): () => void {
+  const minPlayers = Math.max(2, opts.minPlayers ?? 2);
   let startRequested = false;
   return () => {
     if (startRequested) return;
     if (isPlaying(hgc)) return;
-    if (!isAllReady(hgc)) return;
+    if (!isAllReady(hgc, minPlayers)) return;
     // 全员就绪：房主发一次开局；非房主无需动作。置 startRequested 避免重复发送。
     startRequested = true;
     const rs = hgc.roomState;

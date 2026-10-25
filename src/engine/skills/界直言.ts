@@ -50,7 +50,8 @@ const TARGET_KEY = '界直言/target';
 function findNextAlive(state: { players: { alive: boolean }[] }, fromIndex: number): number {
   const n = state.players.length;
   for (let i = 1; i <= n; i++) {
-    const idx = (fromIndex + i) % n;
+    // 逆时针 = 座次递减(与回合推进方向一致)
+    const idx = (fromIndex - i + n) % n;
     if (state.players[idx]?.alive) return idx;
   }
   return fromIndex;

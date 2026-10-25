@@ -86,12 +86,14 @@ describe('标签与结算帧真实 atom 增量投影', () => {
     ['兵粮寸断/跳过摸牌', '摸牌'],
   ])('%s 在跳过阶段时通过真实去标签事件清理', async (tag, phase) => {
     const state = makeState();
+    // 阶段在初始化时即为目标阶段:取消的「阶段开始」不会产生 view 事件,
+    // 若在 trackProjection 之后再手改 state.phase,增量视图必然落后于 buildView。
+    state.phase = phase as GameState['phase'];
+    state.turn.phase = phase as GameState['phase'];
     registerDelayedTrickHooks(state);
     const projection = trackProjection(state);
     await applyAtom(state, { type: '加标签', player: 1, tag });
     projection.flush();
-    state.phase = phase as GameState['phase'];
-    state.turn.phase = phase as GameState['phase'];
     expect(await applyAtom(state, { type: '阶段开始', player: 1, phase })).toBe(false);
     projection.flush();
     expect(state.players[1].tags).toEqual([]);

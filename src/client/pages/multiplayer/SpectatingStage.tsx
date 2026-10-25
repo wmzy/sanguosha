@@ -20,6 +20,10 @@ export function SpectatingStage() {
   const myGrant = mp.playerId ? viewGrants[mp.playerId] : undefined;
   // 构建玩家名称列表（座次序号 → playerId）
   const playerIds = mp.roomState?.playerIds ?? [];
+  // AI 全座对局：没有人类玩家可审批视角，隐藏「申请查看视角」下拉，避免点了永远没反应。
+  const allAiSeats =
+    playerIds.length > 0 &&
+    playerIds.every((pid) => /^AI/i.test(mp.roomState?.playerNames?.[pid] ?? ''));
   return (
     <>
       <ReconnectBanner
@@ -41,8 +45,22 @@ export function SpectatingStage() {
           <span style={{ color: colors.text.muted, fontSize: '13px' }}>
             {myGrant !== undefined ? `已授权查看 P${myGrant} 视角` : '公开视图'}
           </span>
-          {/* 申请查看下拉 */}
-          {myGrant === undefined && (
+          {allAiSeats && (
+            <span
+              style={{
+                fontSize: '12px',
+                color: '#cbb2ff',
+                border: '1px solid rgba(180,140,242,.35)',
+                background: 'rgba(180,140,242,.1)',
+                borderRadius: 999,
+                padding: '2px 9px',
+              }}
+            >
+              全 AI 对局
+            </span>
+          )}
+          {/* 申请查看下拉（全 AI 对局无人类可审批，隐藏） */}
+          {myGrant === undefined && !allAiSeats && (
             <>
               <select
                 className={inputStyle}
@@ -81,6 +99,7 @@ export function SpectatingStage() {
           onAction={() => {}}
           onReorderHand={() => {}}
           fit="fill"
+          readOnly
           currentEvent={mp.currentEvent}
           ingestedEvents={mp.ingestedEvents}
           pendingCount={mp.pendingCount}

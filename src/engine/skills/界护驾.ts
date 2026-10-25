@@ -85,7 +85,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         // 按座次顺序逐个询问魏势力角色
         const numPlayers = st.players.length;
         for (let offset = 1; offset < numPlayers; offset++) {
-          const allyIdx = (ownerId + offset) % numPlayers;
+          // 逆时针 = 座次递减
+          const allyIdx = (ownerId - offset + numPlayers) % numPlayers;
           const ally = st.players[allyIdx];
           if (!ally?.alive) continue;
           if (ally.faction !== '魏') continue;

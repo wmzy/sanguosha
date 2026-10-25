@@ -31,11 +31,11 @@ function isLightningHit(card: Card): boolean {
   return n >= 2 && n <= 9;
 }
 
-/** 找下一个判定区没有闪电的存活玩家（从 current 之后按座次环形搜索） */
+/** 找逆时针下一位判定区没有闪电的存活玩家（从 current 起环形搜索） */
 function findNextRecipient(state: GameState, current: number): number | null {
   const n = state.players.length;
   for (let i = 1; i <= n; i++) {
-    const idx = (current + i) % n;
+    const idx = (current - i + n) % n;
     const p = state.players[idx];
     if (!p.alive) continue;
     if (p.pendingTricks.some((t) => t.name === TRICK_NAME)) continue;

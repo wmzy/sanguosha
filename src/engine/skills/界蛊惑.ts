@@ -283,11 +283,11 @@ async function runQuestioning(
   // ① 扣牌(面朝下,声明公开,真身对他人隐藏)
   await applyAtom(state, { type: '扣牌', player: yuji, cardId, declaredName });
 
-  // ② 质疑循环:从下家起按座次逐个询问,全部询问完毕才翻牌(同时质疑语义)
+  // ② 质疑循环:从下家起逆时针逐个询问,全部询问完毕才翻牌(同时质疑语义)
   const n = state.players.length;
   const questioners: number[] = [];
   for (let step = 1; step < n; step++) {
-    const p = (yuji + step) % n;
+    const p = (yuji - step + n) % n;
     if (p === yuji) continue;
     if (!state.players[p]?.alive) continue;
     delete state.localVars[QUESTIONERS_VAR];
@@ -315,15 +315,15 @@ async function runQuestioning(
   const isReal = state.cardMap[downCard]?.name === declaredName;
   if (isReal) {
     // 真:扣牌按声明生效(voided=false);每个质疑者:缠怨 + 弃一张牌或失去1点体力
-    // 按座次顺序逐个结算(保证视图可预测)
-    for (const q of [...questioners].sort((a, b) => a - b)) {
+    // 按质疑询问顺序(逆时针)逐个结算,保证视图可预测且符合方向约定
+    for (const q of questioners) {
       if (!state.players[q]?.alive) continue; // 结算过程中死亡则跳过
       await applyTruthConsequence(state, q, yuji);
     }
     return { voided: false, downCard, questioners };
   }
   // 假:扣牌作废(留弃牌堆);每个质疑者摸一张牌
-  for (const q of [...questioners].sort((a, b) => a - b)) {
+  for (const q of questioners) {
     if (!state.players[q]?.alive) continue;
     await applyAtom(state, { type: '摸牌', player: q, count: 1 });
   }

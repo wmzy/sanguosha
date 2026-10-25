@@ -321,7 +321,7 @@ describe('界好施', () => {
         d2: makeCard('d2', '闪', '♥'),
       },
       zones: { deck: ['d1', 'd2'], discardPile: [], processing: [] },
-      currentPlayerIndex: 2, // P2 的回合
+      currentPlayerIndex: 1, // P1 的回合(逆时针下一位是鲁肃 index0)
       phase: '出牌',
       turn: { round: 2, phase: '出牌', vars: {} },
     });
@@ -330,10 +330,10 @@ describe('界好施', () => {
     state.localVars['界好施/受益者'] = 1; // P1
 
     await harness.setup(state);
-    const P2 = harness.player('P2');
+    const P1 = harness.player('P1');
 
-    // P2 结束回合 → 座次推进到鲁肃 → 鲁肃回合开始的 after-hook 清除被动
-    await P2.triggerAction('回合管理', 'end');
+    // P1 结束回合 → 逆时针推进到鲁肃 → 鲁肃回合开始的 after-hook 清除被动
+    await P1.triggerAction('回合管理', 'end');
 
     // 被动已失效
     expect(harness.state.localVars['界好施/被动激活']).toBeUndefined();

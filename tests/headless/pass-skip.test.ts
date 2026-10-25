@@ -131,6 +131,30 @@ describe('HeadlessGameClient.pass() — 广播型 pending 发 skip', () => {
     });
   });
 
+  it('广播型 skip 后同一窗口不再 needsAction;新窗口恢复', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    const pending = makeBroadcastPending();
+    (hgc as unknown as { _view: GameView | null })._view = makeView(pending);
+    // 阻止真实网络请求,保留 sendAction 的本地标记逻辑
+    vi.spyOn(hgc as unknown as { postAction: () => Promise<void> }, 'postAction').mockResolvedValue(
+      undefined,
+    );
+    expect(hgc.needsAction()).toBe(true);
+    hgc.pass();
+    expect(hgc.needsAction()).toBe(false);
+
+    // 新的广播窗口(deadline 变化)→ 需要重新决策
+    const next = makeBroadcastPending();
+    next.deadline = (pending.deadline ?? 0) + 1000;
+    (hgc as unknown as { _view: GameView | null })._view = makeView(next);
+    expect(hgc.needsAction()).toBe(true);
+
+    // 窗口结束 → 无需行动,并清空标记
+    (hgc as unknown as { _view: GameView | null })._view = makeView(null);
+    expect(hgc.needsAction()).toBe(false);
+  });
+
   it('无 pending 时:pass() 走旧逻辑(发 respond)', () => {
     const hgc = new HeadlessGameClient('ws://localhost:0');
     (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
@@ -141,6 +165,74 @@ describe('HeadlessGameClient.pass() — 广播型 pending 发 skip', () => {
 
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy.mock.calls[0][0].actionType).toBe('respond');
+  });
+});
+
+describe('HeadlessGameClient.getAvailableActions() — 弃牌默认参数', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('__弃牌 pending 预填前 N 张，推荐动作可直接提交', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    const c1: Card = { id: 'c1', name: '杀', suit: '♠', color: '黑', rank: '2', type: '基本牌' };
+    const c2: Card = { id: 'c2', name: '闪', suit: '♥', color: '红', rank: '3', type: '基本牌' };
+    const pending: PendingView = {
+      type: 'awaits',
+      atom: {
+        type: '请求回应',
+        requestType: '__弃牌',
+        target: 0,
+        prompt: { type: 'confirm', title: '弃牌阶段' },
+      },
+      prompt: {
+        type: 'useCard',
+        title: '弃牌阶段:需弃 2 张牌',
+        cardFilter: { filter: () => true, min: 2, max: 2 },
+      },
+      target: 0,
+      isBlocking: true,
+    };
+    (hgc as unknown as { _view: GameView | null })._view = makeViewWithHand(pending, 0, [c1, c2]);
+    const action = hgc.getAvailableActions().find((a) => a.category === 'discard');
+    expect(action).toBeDefined();
+    expect(action!.message.params.cardIds).toEqual(['c1', 'c2']);
+  });
+});
+
+describe('HeadlessGameClient.getAvailableActions() — 观星 arrange', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('观星/arrange 生成可直接提交的 top/bottom（保持原牌序）', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+    const pending: PendingView = {
+      type: 'awaits',
+      atom: {
+        type: '请求回应',
+        requestType: '观星/arrange',
+        target: 0,
+        prompt: { type: 'distribute', title: '观星：排列牌堆顶牌', cardIds: ['d1', 'd2'], mode: 'select' },
+      },
+      prompt: {
+        type: 'distribute',
+        title: '观星：排列牌堆顶牌',
+        mode: 'select',
+        cardIds: ['d1', 'd2'],
+        minTotal: 0,
+        maxTotal: 2,
+      },
+      target: 0,
+      isBlocking: true,
+    };
+    (hgc as unknown as { _view: GameView | null })._view = makeView(pending);
+    const action = hgc.getAvailableActions().find((a) => a.description.includes('观星'));
+    expect(action).toBeDefined();
+    expect(action!.message.actionType).toBe('respond');
+    expect(action!.message.params).toEqual({ top: ['d2', 'd1'], bottom: [] });
   });
 });
 

@@ -89,9 +89,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         await pushFrame(state, '乱武', from, {});
         try {
           const n = st.players.length;
-          // 从贾诩下家起,按座次依次处理每个其他存活角色
+          // 从贾诩下家起逆时针处理每个其他存活角色
           for (let step = 1; step < n; step++) {
-            const p = (from + step) % n;
+            const p = (from - step + n) % n;
             if (p === from) continue;
             if (!st.players[p]?.alive) continue;
 

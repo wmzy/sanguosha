@@ -134,15 +134,16 @@ describe('五谷丰登', () => {
     const P3 = harness.player('P3');
 
     await P1.useCard('五谷丰登', 'wg1');
+    // 逆时针选牌顺序:P1(0) → P3(2) → P2(1)
     // P1 选牌前无懈 → pass → P1 选牌
     await P1.pass();
     await P1.respond('五谷丰登', { cardId: 'pa' });
-    // P2 选牌前无懈 → pass → P2 超时不选(fireTimeout 触发兜底拿 pb)
-    await P1.pass();
-    await P1.pass(); // fireTimeout 触发 P2 的选牌 slot,兜底拿处理区第一张(pb)
     // P3 选牌前无懈 → pass → P3 选牌
     await P1.pass();
     await P3.respond('五谷丰登', { cardId: 'pc' });
+    // P2 选牌前无懈 → pass → P2 超时不选(fireTimeout 触发兜底拿 pb)
+    await P1.pass();
+    await P1.pass(); // fireTimeout 触发 P2 的选牌 slot,兜底拿处理区第一张(pb)
 
     // P1 / P2 / P3 各拿到牌(P2 兜底拿 pb)
     expect(harness.state.players[0].hand).toContain('pa');
@@ -187,7 +188,7 @@ describe('五谷丰登', () => {
   // ─────────────────────────────────────────────────────────────
   // 4. 选牌顺序:使用者不是 0 号座次 → 从使用者开始旋转
   // ─────────────────────────────────────────────────────────────
-  it('用例4:使用者=2号座次 → 选牌顺序从 P3 开始按座次 [P3, P1, P2]', async () => {
+  it('用例4:使用者=2号座次 → 逆时针选牌顺序 [P3, P2, P1]', async () => {
     const wugu: Card = makeCard('wg1', '五谷丰登', '♥', '3');
     const cards = [
       makeCard('pa', '杀', '♠', '7', '基本牌'),
@@ -214,23 +215,23 @@ describe('五谷丰登', () => {
     const P2 = harness.player('P2');
 
     await P3.useCard('五谷丰登', 'wg1');
-    // 选牌顺序 [P3, P1, P2]:每人选牌前问无懈 → pass
+    // 逆时针选牌顺序 [P3, P2, P1]:每人选牌前问无懈 → pass
     // P3 选牌前问无懈 → pass
     await P3.pass();
     expect(harness.state.pendingSlots.get(2)).toBeDefined();
     await P3.respond('五谷丰登', { cardId: 'pa' });
-    // P1 选牌前问无懈 → pass
-    await P3.pass();
-    expect(harness.state.pendingSlots.get(0)).toBeDefined();
-    await P1.respond('五谷丰登', { cardId: 'pb' });
     // P2 选牌前问无懈 → pass
     await P3.pass();
     expect(harness.state.pendingSlots.get(1)).toBeDefined();
-    await P2.respond('五谷丰登', { cardId: 'pc' });
+    await P2.respond('五谷丰登', { cardId: 'pb' });
+    // P1 选牌前问无懈 → pass
+    await P3.pass();
+    expect(harness.state.pendingSlots.get(0)).toBeDefined();
+    await P1.respond('五谷丰登', { cardId: 'pc' });
 
     expect(harness.state.players[2].hand).toContain('pa');
-    expect(harness.state.players[0].hand).toContain('pb');
-    expect(harness.state.players[1].hand).toContain('pc');
+    expect(harness.state.players[1].hand).toContain('pb');
+    expect(harness.state.players[0].hand).toContain('pc');
     expect(harness.state.zones.processing.length).toBe(0);
     expect(harness.state.zones.discardPile).toContain('wg1');
     expect(harness.state.pendingSlots.size).toBe(0);
@@ -239,7 +240,7 @@ describe('五谷丰登', () => {
   // ─────────────────────────────────────────────────────────────
   // 5. 无懈抵消:P1 选牌前被无懈 → P1 不参与选牌,P2 仍可选
   // ─────────────────────────────────────────────────────────────
-  it('用例5:无懈抵消 P1 的选牌 → P1 不参与,P2/P3 各选1张', async () => {
+  it('用例5:无懈抵消 P1 的选牌 → P1 不参与,P3/P2 各选1张', async () => {
     const wugu: Card = makeCard('wg1', '五谷丰登', '♥', '3');
     const cards = [
       makeCard('pa', '杀', '♠', '7', '基本牌'),
@@ -271,18 +272,18 @@ describe('五谷丰登', () => {
     await P2.respond('无懈可击', { cardId: 'wx1' });
     // 反无懈窗口结束(超时)
     await P1.pass();
-    // 直接进入 P2 选牌(P1 被抵消,跳过)
-    // P2 选牌前问无懈 → pass
-    await P1.pass();
-    await P2.respond('五谷丰登', { cardId: 'pa' });
+    // 直接进入 P3 选牌(P1 被抵消,跳过;逆时针顺序 1 → 3 → 2)
     // P3 选牌前问无懈 → pass
     await P1.pass();
-    await P3.respond('五谷丰登', { cardId: 'pb' });
+    await P3.respond('五谷丰登', { cardId: 'pa' });
+    // P2 选牌前问无懈 → pass
+    await P1.pass();
+    await P2.respond('五谷丰登', { cardId: 'pb' });
 
-    // P1 没拿到牌;P2/P3 各拿到一张;剩 pc 进弃牌堆
+    // P1 没拿到牌;P3/P2 各拿到一张;剩 pc 进弃牌堆
     expect(harness.state.players[0].hand.length).toBe(0);
-    expect(harness.state.players[1].hand).toContain('pa');
-    expect(harness.state.players[2].hand).toContain('pb');
+    expect(harness.state.players[2].hand).toContain('pa');
+    expect(harness.state.players[1].hand).toContain('pb');
     expect(harness.state.zones.discardPile).toContain('pc');
     expect(harness.state.zones.discardPile).toContain('wg1');
     expect(harness.state.zones.discardPile).toContain('wx1');

@@ -92,6 +92,8 @@ async function main(): Promise<void> {
   logErr(`auth account: ${'username' in auth ? auth.username : '(token)'}`);
 
   let startedRole: StartedRole | null = null;
+  // 房主的 minPlayers 门槛在 createRoom 成功后才确定，故用可变实现 + 稳定包装。
+  let lobbyAdvanceImpl: () => void = () => {};
 
   const assertNotStarted = (attempting: StartedRole): void => {
     if (startedRole === null) return;
@@ -108,15 +110,21 @@ async function main(): Promise<void> {
   const doCreateRoom = async (opts: CreateRoomOpts): Promise<void> => {
     assertNotStarted('host');
     const config = buildRoomConfig(opts, '房间');
+    const maxPlayers = opts.maxPlayers ?? PLAYER_COUNT;
     const result = await joinAndReady(hgc, {
       mode: 'create',
       name: opts.name,
-      maxPlayers: opts.maxPlayers ?? PLAYER_COUNT,
+      maxPlayers,
       playerId: opts.playerId ?? PLAYER_ID ?? undefined,
       config,
     });
+    // 自动开局门槛：默认等房间满员。多 AI 编排时若只等「当前已加入者就绪」，
+    // 第 2 人一到就开局，后续 guest 全部撞「游戏已开始」而无法入座。
+    lobbyAdvanceImpl = createLobbyAdvancer(hgc, {
+      minPlayers: opts.minPlayers ?? maxPlayers,
+    });
     startedRole = 'host';
-    logErr(`multiplayer room created: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost}`);
+    logErr(`multiplayer room created: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost} minPlayers=${opts.minPlayers ?? maxPlayers}`);
     // 房主建房后允许 timeoutSec 后续在 play 内通过 applyConfigUpdate 应用（已 ready 后服务端仍接受 updateConfig 在 lobby）。
   };
 
@@ -131,6 +139,7 @@ async function main(): Promise<void> {
       config,
     });
     startedRole = 'guest';
+    lobbyAdvanceImpl = createLobbyAdvancer(hgc);
     logErr(`multiplayer room joined: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost}`);
   };
 
@@ -145,7 +154,7 @@ async function main(): Promise<void> {
   // lobby 推进器：runPlay 在 lobby 阶段周期调用，全员就绪且房主时发一次 startGame。
   // 非阻塞、幂等，替代原先 play 前单独阻塞 advanceToStart(5s) 的做法——推进融入
   // runPlay 的 tick 循环，lobby 阶段持续阻塞等待 playing，避免 agent 高频轮询浪费 token。
-  const lobbyAdvance = createLobbyAdvancer(hgc);
+  const lobbyAdvance = (): void => lobbyAdvanceImpl();
 
   const isStarted = (): boolean => startedRole !== null;
 

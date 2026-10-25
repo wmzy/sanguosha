@@ -681,13 +681,32 @@ export function rankActions(view: AiViewSnapshot, actions: AvailableAction[]): A
 /**
  * 选择评分最高的动作；无动作时返回 null。
  */
+/** 给推荐的「多目标」动作补默认目标:agent 按 recommendedAction.message 原样提交时,
+ *  空 targets 会被引擎拒(「需要选择 N 名角色」)。从 validTargets 取前 minTarget 个,
+ *  与无头枚举给出的目标约束同源。单目标/无目标/distribute 不动。 */
+function withDefaultTargets(action: AvailableAction): AvailableAction {
+  const min = action.minTarget;
+  if (!min || min < 1) return action;
+  const params = action.message.params as Record<string, unknown>;
+  const current = Array.isArray(params.targets) ? params.targets : [];
+  if (current.length >= min) return action;
+  if (action.validTargets.length < min) return action;
+  return {
+    ...action,
+    message: {
+      ...action.message,
+      params: { ...params, targets: action.validTargets.slice(0, min) },
+    },
+  };
+}
+
 export function pickBestAction(
   view: AiViewSnapshot,
   actions: AvailableAction[],
 ): AvailableAction | null {
   if (actions.length === 0) return null;
   const ranked = rankActions(view, actions);
-  return ranked[0];
+  return withDefaultTargets(ranked[0]);
 }
 
 /**

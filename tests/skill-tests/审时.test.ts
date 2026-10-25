@@ -268,8 +268,9 @@ describe('审时', () => {
     // P1 结束回合 → 回合结束阶段 → 审时检查:P1 未失去 give1 → P0 摸至四张
     await P1.triggerAction('回合管理', 'end');
 
-    // P0 摸至四张(原 1 张 → 4 张,摸 3 张)
-    expect(harness.state.players[0].hand.length).toBe(4);
+    // 审时在 P1 回合结束阶段把 P0 摸至 4 张;随后逆时针轮到 P0,
+    // P0 的正常摸牌阶段再摸 2 张 → 最终 6 张(若审时未触发则只有 3 张)。
+    expect(harness.state.players[0].hand.length).toBe(6);
   });
 
   // ─── 阴:不发动 → 不翻转 ────────────────────────────

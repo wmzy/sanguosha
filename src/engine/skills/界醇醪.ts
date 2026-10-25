@@ -55,11 +55,13 @@ function getAleTokenIds(state: GameState, ownerId: number): string[] {
 function getNeighbors(state: GameState, ownerId: number): number[] {
   const n = state.players.length;
   if (n <= 1) return [];
-  const prev = (ownerId - 1 + n) % n;
-  const next = (ownerId + 1) % n;
+  // 索引递减 = 逆时针下家;索引递增 = 顺时针上家。二者都算"相邻"。
+  const nextSeat = (ownerId - 1 + n) % n;
+  const prevSeat = (ownerId + 1) % n;
   const result: number[] = [];
-  if (prev !== ownerId && state.players[prev]?.alive) result.push(prev);
-  if (next !== ownerId && next !== prev && state.players[next]?.alive) result.push(next);
+  if (nextSeat !== ownerId && state.players[nextSeat]?.alive) result.push(nextSeat);
+  if (prevSeat !== ownerId && prevSeat !== nextSeat && state.players[prevSeat]?.alive)
+    result.push(prevSeat);
   return result;
 }
 

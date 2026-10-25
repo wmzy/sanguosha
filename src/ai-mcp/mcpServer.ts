@@ -51,6 +51,12 @@ export const CREATE_ROOM_TOOL = {
     properties: {
       name: { type: 'string', description: '房间名（可选，默认随机生成）' },
       maxPlayers: { type: 'number', description: '最大人数，默认 2' },
+      minPlayers: {
+        type: 'number',
+        description:
+          '自动开局所需的最少玩家数（默认 = maxPlayers）。多 AI 编排必须等齐再开局，' +
+          '否则第 2 人就绪即开局，后续玩家会被拒「游戏已开始」。',
+      },
       playerId: { type: 'string', description: '指定玩家 id，否则服务端自动生成' },
       timeoutSec: {
         type: 'number',
@@ -194,6 +200,8 @@ export const REPORT_BUG_TOOL = {
 export interface CreateRoomOpts {
   name?: string;
   maxPlayers?: number;
+  /** 自动开局所需最少玩家数（默认 maxPlayers）。 */
+  minPlayers?: number;
   playerId?: string;
   timeoutSec?: number;
 }
@@ -252,6 +260,7 @@ function parseCreateRoomOpts(args: unknown): CreateRoomOpts {
   return {
     name: optString(o, 'name'),
     maxPlayers: optNumber(o, 'maxPlayers'),
+    minPlayers: optNumber(o, 'minPlayers'),
     playerId: optString(o, 'playerId'),
     timeoutSec: optNumber(o, 'timeoutSec'),
   };

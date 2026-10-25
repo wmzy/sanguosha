@@ -89,8 +89,9 @@ export function computeAutoTargets(
   if (fromPos < 0) return alive.map((p) => p.index);
   const result: number[] = [];
   const start = spec.kind === 'allOthers' ? 1 : 0;
+  // 多目标结算顺序:从使用者起逆时针(含使用者时 i=0 先自己)。
   for (let i = start; i < n; i++) {
-    result.push(alive[(fromPos + i) % n].index);
+    result.push(alive[(fromPos - i + n) % n].index);
   }
   return result;
 }

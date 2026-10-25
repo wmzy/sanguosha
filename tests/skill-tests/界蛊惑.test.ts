@@ -107,11 +107,11 @@ describe('界蛊惑', () => {
     // 界于吉扣置真杀,声明为杀,目标 P1
     await YJ.triggerAction('界蛊惑', 'use:杀', { cardId: 's1', target: 1 });
 
-    // 顺序质疑:先问 P1
-    expect(activeTargets(harness.state)).toEqual([1]);
-    await P1.pass(); // P1 不质疑 → 再问 P2
+    // 顺序质疑:逆时针先问 P2
     expect(activeTargets(harness.state)).toEqual([2]);
-    await P2.pass(); // P2 不质疑 → 无人质疑 → 杀生效
+    await P2.pass(); // P2 不质疑 → 再问 P1
+    expect(activeTargets(harness.state)).toEqual([1]);
+    await P1.pass(); // P1 不质疑 → 无人质疑 → 杀生效
     await harness.waitForStable();
 
     // 杀生效 → 询问 P1 闪
@@ -136,8 +136,8 @@ describe('界蛊惑', () => {
 
     // 界于吉扣置真杀,声明为杀,目标 P2
     await YJ.triggerAction('界蛊惑', 'use:杀', { cardId: 's1', target: 2 });
-    await P1.pass(); // 不质疑
-    await P2.pass(); // 不质疑 → 无人质疑 → 杀生效
+    await P2.pass(); // P2 先被问,不质疑
+    await P1.pass(); // P1 不质疑 → 无人质疑 → 杀生效
     await harness.waitForStable();
 
     // 杀生效 → 询问 P2 闪 → P2 出真闪(走 runUseFlow,设杀帧 cancelled=true,牌入弃牌堆)
@@ -161,65 +161,65 @@ describe('界蛊惑', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    // 界于吉扣置真杀,声明杀,目标 P2
-    await YJ.triggerAction('界蛊惑', 'use:杀', { cardId: 's1', target: 2 });
-    // 顺序询问窗口:先 P1
-    expect(activeTargets(harness.state)).toEqual([1]);
+    // 界于吉扣置真杀,声明杀,目标 P1
+    await YJ.triggerAction('界蛊惑', 'use:杀', { cardId: 's1', target: 1 });
+    // 顺序询问窗口:逆时针先问 P2
+    expect(activeTargets(harness.state)).toEqual([2]);
 
-    await P1.respond('界蛊惑', { choice: true }); // P1 质疑
-    await P2.pass(); // P2 不质疑(顺序问完全体后才翻牌)
+    await P2.respond('界蛊惑', { choice: true }); // P2 质疑
+    await P1.pass(); // P1 不质疑(顺序问完全体后才翻牌)
     await harness.waitForStable();
 
-    // 真: P1 选择弃一张牌或失去1点体力(此时是询问 P1)
-    expect(activeTargets(harness.state)).toContain(1);
-    await P1.respond('界蛊惑', { choice: true }); // 选弃一张牌
+    // 真: P2 选择弃一张牌或失去1点体力(此时是询问 P2)
+    expect(activeTargets(harness.state)).toContain(2);
+    await P2.respond('界蛊惑', { choice: true }); // 选弃一张牌
     await harness.waitForStable();
 
-    // 杀生效 → 询问 P2 闪
+    // 杀生效 → 询问 P1 闪
     const slots = [...harness.state.pendingSlots.values()].filter((s) => !s.isPaused);
     expect(slots[0]?.atom.type).toBe('询问闪');
-    await P2.pass(); // P2 不闪 → 受伤
+    await P1.pass(); // P1 不闪 → 受伤
     await harness.waitForStable();
 
-    // P1(质疑者):获缠怨标记 + 弃了 1 张手牌(health 不变)
-    expect(harness.state.players[1].marks.some((m) => m.id === '缠怨')).toBe(true);
-    expect(harness.state.players[1].health).toBe(4); // 选择弃牌不失体力
-    expect(harness.state.players[1].hand).not.toContain('p1x'); // 已弃
-    expect(harness.state.zones.discardPile).toContain('p1x');
-    // P2(目标)受杀伤害
-    expect(harness.state.players[2].health).toBe(3);
+    // P2(质疑者):获缠怨标记 + 弃了 1 张手牌(health 不变)
+    expect(harness.state.players[2].marks.some((m) => m.id === '缠怨')).toBe(true);
+    expect(harness.state.players[2].health).toBe(4); // 选择弃牌不失体力
+    expect(harness.state.players[2].hand).not.toContain('p2x'); // 已弃
+    expect(harness.state.zones.discardPile).toContain('p2x');
+    // P1(目标)受杀伤害
+    expect(harness.state.players[1].health).toBe(3);
     // 真牌按声明使用,入弃牌堆
     expect(harness.state.zones.discardPile).toContain('s1');
   });
 
   it('同时质疑·真牌 → 质疑者选择失去1点体力', async () => {
     const s1 = mkCard('s1', '杀', '♠', '7'); // 真杀
-    const p1x = mkCard('p1x', '闪', '♥', '2');
+    const p2x = mkCard('p2x', '闪', '♥', '2');
     await harness.setup(
-      baseState({ yujiHand: ['s1'], p1Hand: ['p1x'], cardMap: { s1, p1x } }),
+      baseState({ yujiHand: ['s1'], p2Hand: ['p2x'], cardMap: { s1, p2x } }),
     );
     const YJ = harness.player('界于吉');
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await YJ.triggerAction('界蛊惑', 'use:杀', { cardId: 's1', target: 2 });
-    await P1.respond('界蛊惑', { choice: true }); // P1 质疑
-    await P2.pass();
+    await YJ.triggerAction('界蛊惑', 'use:杀', { cardId: 's1', target: 1 });
+    await P2.respond('界蛊惑', { choice: true }); // P2 质疑
+    await P1.pass();
     await harness.waitForStable();
 
-    // P1 选失去1点体力(choice=false)
-    await P1.respond('界蛊惑', { choice: false });
+    // P2 选失去1点体力(choice=false)
+    await P2.respond('界蛊惑', { choice: false });
     await harness.waitForStable();
 
-    // 杀生效 → P2 被询问闪
-    await P2.pass();
+    // 杀生效 → P1 被询问闪
+    await P1.pass();
     await harness.waitForStable();
 
-    // P1:缠怨 + 失去1点体力(health=3,手牌仍在)
-    expect(harness.state.players[1].marks.some((m) => m.id === '缠怨')).toBe(true);
-    expect(harness.state.players[1].health).toBe(3); // 失去1点体力
-    expect(harness.state.players[1].hand).toContain('p1x'); // 未弃
-    expect(harness.state.players[2].health).toBe(3); // P2 受杀伤害
+    // P2:缠怨 + 失去1点体力(health=3,手牌仍在)
+    expect(harness.state.players[2].marks.some((m) => m.id === '缠怨')).toBe(true);
+    expect(harness.state.players[2].health).toBe(3); // 失去1点体力
+    expect(harness.state.players[2].hand).toContain('p2x'); // 未弃
+    expect(harness.state.players[1].health).toBe(3); // P1 受杀伤害
   });
 
   it('同时质疑·真牌 → 质疑者无手牌时强制失去1点体力', async () => {
@@ -231,18 +231,18 @@ describe('界蛊惑', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    await YJ.triggerAction('界蛊惑', 'use:杀', { cardId: 's1', target: 2 });
-    await P1.respond('界蛊惑', { choice: true }); // P1 质疑
-    await P2.pass();
+    await YJ.triggerAction('界蛊惑', 'use:杀', { cardId: 's1', target: 1 });
+    await P2.respond('界蛊惑', { choice: true }); // P2 质疑(无手牌)
+    await P1.pass();
     await harness.waitForStable();
 
-    // P1 无手牌 → 不询问选择,直接失去1点体力 → 杀生效
-    await P2.pass(); // P2 不闪
+    // P2 无手牌 → 不询问选择,直接失去1点体力 → 杀生效
+    await P1.pass(); // P1 不闪
     await harness.waitForStable();
 
-    expect(harness.state.players[1].marks.some((m) => m.id === '缠怨')).toBe(true);
-    expect(harness.state.players[1].health).toBe(3); // 失去1点体力
-    expect(harness.state.players[2].health).toBe(3); // 受杀伤害
+    expect(harness.state.players[2].marks.some((m) => m.id === '缠怨')).toBe(true);
+    expect(harness.state.players[2].health).toBe(3); // 失去1点体力
+    expect(harness.state.players[1].health).toBe(3); // 受杀伤害
   });
 
   it('同时质疑·假牌 → 此牌作废,质疑者摸一张牌(扣牌留弃牌堆)', async () => {
@@ -257,14 +257,14 @@ describe('界蛊惑', () => {
 
     // 界于吉扣置闪,声明为杀(假)
     await YJ.triggerAction('界蛊惑', 'use:杀', { cardId: 's1', target: 2 });
-    await P1.respond('界蛊惑', { choice: true }); // P1 质疑
-    await P2.pass(); // P2 不质疑 → P1 为唯一质疑者,翻牌(闪,假)
+    await P2.respond('界蛊惑', { choice: true }); // P2 质疑
+    await P1.pass(); // P1 不质疑 → P2 为唯一质疑者,翻牌(闪,假)
     await harness.waitForStable();
 
     // 假:扣牌作废(留弃牌堆,不给质疑者),质疑者摸一张牌
-    expect(harness.state.players[1].health).toBe(4); // 质疑者不失体力
-    expect(harness.state.players[2].health).toBe(4); // 目标未受伤(作废)
-    expect(harness.state.players[1].hand).toContain('top'); // 质疑者摸了牌堆顶
+    expect(harness.state.players[2].health).toBe(4); // 质疑者不失体力
+    expect(harness.state.players[1].health).toBe(4); // 其他角色未受伤(作废)
+    expect(harness.state.players[2].hand).toContain('top'); // 质疑者摸了牌堆顶
     expect(harness.state.zones.discardPile).toContain('s1'); // 扣牌留弃牌堆(不给质疑者)
     expect(harness.state.players[0].hand).not.toContain('s1'); // 于吉失去此牌
   });
@@ -281,22 +281,22 @@ describe('界蛊惑', () => {
     const P2 = harness.player('P2');
 
     await YJ.triggerAction('界蛊惑', 'use:杀', { cardId: 's1', target: 1 });
-    // 顺序询问窗口:先问 P1
-    expect(activeTargets(harness.state)).toEqual([1]);
-
-    await P1.respond('界蛊惑', { choice: true }); // P1 质疑
-    await harness.waitForStable();
-    // 再问 P2
+    // 顺序询问窗口:逆时针先问 P2
     expect(activeTargets(harness.state)).toEqual([2]);
-    await P2.respond('界蛊惑', { choice: true }); // P2 也质疑 → 翻牌
+
+    await P2.respond('界蛊惑', { choice: true }); // P2 质疑
+    await harness.waitForStable();
+    // 再问 P1
+    expect(activeTargets(harness.state)).toEqual([1]);
+    await P1.respond('界蛊惑', { choice: true }); // P1 也质疑 → 翻牌
     await harness.waitForStable();
 
-    // 真牌:P1 先选(按座次)→ P2 后选
-    expect(activeTargets(harness.state)).toContain(1);
-    await P1.respond('界蛊惑', { choice: true }); // P1 弃牌
-    await harness.waitForStable();
+    // 真牌:按逆时针询问顺序 P2 先选 → P1 后选
     expect(activeTargets(harness.state)).toContain(2);
     await P2.respond('界蛊惑', { choice: false }); // P2 失体力
+    await harness.waitForStable();
+    expect(activeTargets(harness.state)).toContain(1);
+    await P1.respond('界蛊惑', { choice: true }); // P1 弃牌
     await harness.waitForStable();
 
     // 杀生效 → 询问 P1 闪

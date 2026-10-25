@@ -42,6 +42,9 @@ export class HeadlessGameClient {
   private _pendingNewEvents: ViewEvent[] = [];
   /** 最近一次 action 是否被服务端拒（供 runPlay 轮询）。每次 sendAction 重置。 */
   private _lastActionRejected = false;
+  /** 本客户端已 skip 的广播窗口 deadline;同一窗口内 needsAction 返回 false,
+   *  避免 MCP agent 对已放弃的无懈窗口反复提交 skip(rejected/空转)。 */
+  private _skippedBroadcastDeadline: number | null = null;
   private readonly callbacks: HeadlessCallbacks;
   /** REST/SSE base URL，如 'http://localhost:3930'（无 /ws 后缀） */
   private readonly baseUrl: string;
@@ -585,9 +588,22 @@ export class HeadlessGameClient {
 
   needsAction(): boolean {
     const v = this._view;
-    if (!v?.pending) return false;
+    if (!v?.pending) {
+      this._skippedBroadcastDeadline = null;
+      return false;
+    }
     const p = v.pending;
-    if (p.target < 0) return true; // 广播型（无懈可击等）
+    if (p.target < 0) {
+      // 广播型（无懈可击等）：已对同一窗口 skip 过则不再要求本客户端行动，
+      // 等窗口 resolve / 换成新窗口（deadline 变化）再重新参与。
+      if (this._skippedBroadcastDeadline !== null) {
+        const deadline = p.deadline ?? -1;
+        if (deadline === this._skippedBroadcastDeadline) return false;
+        this._skippedBroadcastDeadline = null;
+      }
+      return true;
+    }
+    this._skippedBroadcastDeadline = null;
     if (p.target !== this._seatIndex) {
       // debug 模式下其他座次的阻塞型 pending：仅在无独立 AI 代理时由当前 viewer 代管。
       // 多 AI 实例同进 debug 房时，各实例只应响应自己座次的 pending；
@@ -755,15 +771,18 @@ export class HeadlessGameClient {
       return;
     }
     // 弃牌阶段：引擎注册 系统规则:respond，validate 要求 params.cardIds。
-    // 此处给出一个"选择弃牌"占位 action，agent 须自行从手牌选足 discardMin 张填入 cardIds。
+    // 预填「前 N 张」作为可执行默认值，agent 可直接提交；需要优化时再改 cardIds。
     if (reqType === '__弃牌') {
+      const minCount = pending.prompt?.type === 'useCard' ? pending.prompt.cardFilter.min : 1;
+      const me = view.players[ownerId];
+      const discardIds = (me?.hand ?? []).slice(0, Math.max(minCount, 1)).map((c) => c.id);
       out.push({
-        description: '弃牌（需选弃牌张数后提交 cardIds）',
+        description: `弃牌（默认选前 ${discardIds.length} 张，可改 cardIds）`,
         message: {
           skillId: '系统规则',
           actionType: 'respond',
           ownerId,
-          params: { cardIds: [] },
+          params: { cardIds: discardIds },
           baseSeq: 0,
         },
         validTargets: [],
@@ -777,13 +796,17 @@ export class HeadlessGameClient {
     if (pending.mandatory === true && pending.prompt?.type === 'useCard') {
       const minfo = resolvePendingRespond(pending, skillActions);
       const minCount = pending.prompt.cardFilter.min;
+      const me = view.players[ownerId];
+      const candidates = pending.prompt.cardFilter.candidates;
+      const baseIds = candidates ? [...candidates] : (me?.hand ?? []).map((c) => c.id);
+      const discardIds = baseIds.slice(0, Math.max(minCount, 1));
       out.push({
-        description: `强制弃牌（需选 ${minCount} 张后提交 cardIds）`,
+        description: `强制弃牌（默认选前 ${discardIds.length} 张，可改 cardIds）`,
         message: {
           skillId: minfo?.skillId ?? '系统规则',
           actionType: 'respond',
           ownerId,
-          params: { cardIds: [] },
+          params: { cardIds: discardIds },
           baseSeq: 0,
         },
         validTargets: [],
@@ -895,6 +918,25 @@ export class HeadlessGameClient {
         const me = view.players[ownerId];
         const equip = (me?.equipment ?? {}) as Partial<Record<string, string>>;
         if (mode === 'select') {
+          const requestType = (pending.atom as { requestType?: string }).requestType;
+          if (requestType === '观星/arrange') {
+            // 观星的 distribute 契约不是 cardIds，而是 { top, bottom }。默认「全留顶、
+            // 保持原顺序」：top[0]=最先摸到=牌堆顶，因此 top 是 observed 的逆序；
+            // 这样整理牌堆后顺序不变，是无需 LLM 补参的可执行动作。
+            const observed = distPrompt.cardIds ?? [];
+            out.push({
+              description: `发动【${info.skillId}】（观星：全部留在牌堆顶，保持原顺序）`,
+              message: {
+                skillId: info.skillId,
+                actionType: 'respond',
+                ownerId,
+                params: { top: [...observed].reverse(), bottom: [] },
+                baseSeq: 0,
+              },
+              validTargets: [],
+              category: 'distribute',
+            });
+          } else {
           // select 模式（贯石斧/神速②/制衡式弃牌 等）：选 minTotal..maxTotal 张。
           // 候选可凑足下限时才生成 distribute（否则只 skip）；params.cardIds 留空由
           // agent/LLM 补全——与主动 distribute（enumerateDistributeActions 制衡）一致，
@@ -905,17 +947,19 @@ export class HeadlessGameClient {
             out.push({
               description: `发动【${info.skillId}】（选 ${minTotal} 张${
                 distPrompt.source === 'handAndEquip' ? '手牌或装备' : '手牌'
-              }弃置，需填 cardIds）`,
+              }弃置）`,
               message: {
                 skillId: info.skillId,
                 actionType: 'respond',
                 ownerId,
-                params: { cardIds: [] },
+                // 预填可执行的下限选择，避免 agent 原样提交空 cardIds 被拒。
+                params: { cardIds: candidateIds.slice(0, Math.max(minTotal, 1)) },
                 baseSeq: 0,
               },
               validTargets: [],
               category: 'distribute',
             });
+          }
           }
         } else {
           // allocate 模式（遗计/界遗计 分配 等）：params.allocation 由 agent 补全。
@@ -1103,6 +1147,9 @@ export class HeadlessGameClient {
     this._lastActionRejected = false;
     // 阻塞型 pending 期间 respond 携带 pendingSeq（当前窗口 seq），非阻塞（出牌窗口）不带
     const pending = this._view?.pending;
+    if (action.skillId === '__skip' && pending && pending.target < 0) {
+      this._skippedBroadcastDeadline = pending.deadline ?? -1;
+    }
     const pendingSeq = pending?.isBlocking ? this._lastSeq : undefined;
     const fullAction = { ...action, baseSeq: this._lastSeq, pendingSeq };
     void this.postAction(fullAction);

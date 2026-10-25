@@ -230,10 +230,10 @@ describe('护驾', () => {
     expect(harness.state.players[0].health).toBe(3);
   });
 
-  // ─── 多魏势力角色:座次顺序逐个询问,先拒后出 ────────────────────
-  // 实现 onInit 的 execute 按 ownerId+offset 座次顺序逐个询问魏势力角色;
+  // ─── 多魏势力角色:逆时针逐个询问,先拒后出 ────────────────────
+  // 实现 onInit 的 execute 从 ownerId 起逆时针(座次递减)逐个询问魏势力角色;
   // 前一个拒绝(不出闪)时继续询问下一个,任一角色出闪即结束并抵消。
-  it('P0(曹操)被杀 → 护驾 → P2(魏)拒绝 → P3(魏)出闪 → 伤害抵消', async () => {
+  it('P0(曹操)被杀 → 护驾 → P3(魏)拒绝 → P2(魏)出闪 → 伤害抵消', async () => {
     const restoreAutoCompare = disableAutoCompare();
     const slash = makeCard('k1', '杀', '♠', '7');
     const dodgeP1 = makeCard('s_p1', '闪', '♥', '2');
@@ -259,7 +259,7 @@ describe('护驾', () => {
           skills: ['杀'],
           faction: '蜀',
         }),
-        // P2 = 魏势力(座次 owner+2,被先询问,将拒绝)
+        // P2 = 魏势力(逆时针后询问,出闪抵消)
         makePlayer({
           index: 2,
           name: 'P2',
@@ -268,7 +268,7 @@ describe('护驾', () => {
           skills: ['闪'],
           faction: '魏',
         }),
-        // P3 = 魏势力(被后询问,出闪抵消)
+        // P3 = 魏势力(逆时针先询问,将拒绝)
         makePlayer({
           index: 3,
           name: 'P3',
@@ -299,22 +299,22 @@ describe('护驾', () => {
     await P0.respond('护驾', {});
     await harness.waitForStable();
 
-    // 座次顺序(ownerId+offset):P1(蜀) 跳过 → P2(魏) 先被询问
-    expect(harness.state.pendingSlots.get(2)?.atom.type).toBe('请求回应');
-    await P2.pass(); // P2 拒绝出闪
-    await harness.waitForStable();
-
-    // P2 拒绝后,execute 继续询问下一个魏势力角色 P3
+    // 逆时针顺序(ownerId- offset):P3(魏) 先被询问,P1(蜀) 跳过
     expect(harness.state.pendingSlots.get(3)?.atom.type).toBe('请求回应');
-    await P3.respond('护驾', { cardId: 's3' });
+    await P3.pass(); // P3 拒绝出闪
     await harness.waitForStable();
 
-    // P3 出闪 → 闪移入处理区 → 杀被抵消 → P0 不受伤
+    // P3 拒绝后,execute 继续询问下一个魏势力角色 P2
+    expect(harness.state.pendingSlots.get(2)?.atom.type).toBe('请求回应');
+    await P2.respond('护驾', { cardId: 's_p1' });
+    await harness.waitForStable();
+
+    // P2 出闪 → 闪移入处理区 → 杀被抵消 → P0 不受伤
     expect(harness.state.players[0].health).toBe(4);
-    // P2 未出闪,仍持有自己的闪
-    expect(harness.state.players[2].hand).toContain('s_p1');
-    // P3 的闪已消耗
-    expect(harness.state.players[3].hand).not.toContain('s3');
+    // P3 未出闪,仍持有自己的闪
+    expect(harness.state.players[3].hand).toContain('s3');
+    // P2 的闪已消耗
+    expect(harness.state.players[2].hand).not.toContain('s_p1');
     restoreAutoCompare();
   });
 });

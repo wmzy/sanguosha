@@ -134,15 +134,16 @@ describe('界焚城', () => {
     P1.expectPending('请求回应'); // 弃牌
     await P1.respond('界焚城', { cardIds: ['p1a'] });
 
+    // 逆时针顺序:P1 → P3 → P2
+    // P3 选择受伤(choice=false)
+    P3.expectPending('请求回应');
+    await P3.respond('界焚城', { choice: false });
+
     // P2 弃 ≥ 2 张(confirm=true)
     P2.expectPending('请求回应');
     await P2.respond('界焚城', { choice: true });
     P2.expectPending('请求回应');
     await P2.respond('界焚城', { cardIds: ['p2a', 'p2b'] });
-
-    // P3 选择受伤(choice=false)
-    P3.expectPending('请求回应');
-    await P3.respond('界焚城', { choice: false });
     await harness.waitForStable();
 
     // P1 弃 1,P2 弃 2,P3 受 2 点火焰伤害
@@ -154,8 +155,8 @@ describe('界焚城', () => {
     expect(harness.state.players[0].vars['界焚城/used']).toBe(true);
   });
 
-  // ─── 2. 选 P2 起点 → 从 P2 开始遍历(P2 → P3 → P1)────────
-  it('选 P2 起点 → 从 P2 开始: P2 → P3 → P1', async () => {
+  // ─── 2. 选 P2 起点 → 从 P2 开始逆时针遍历(P2 → P1 → P3)────────
+  it('选 P2 起点 → 从 P2 开始逆时针: P2 → P1 → P3', async () => {
     const state: GameState = createGameState({
       players: [
         makePlayer({
@@ -208,28 +209,24 @@ describe('界焚城', () => {
     P0.expectPending('请求回应');
     await P0.respond('界焚城', { targets: [2] }); // 起点 P2
 
-    // 顺序:P2 → P3 → P1
+    // 逆时针顺序:P2 → P1 → P3
     P2.expectPending('请求回应');
     await P2.respond('界焚城', { choice: true });
     P2.expectPending('请求回应');
     await P2.respond('界焚城', { cardIds: ['p2a'] }); // 弃 1
 
-    // P3:必须 ≥2 张(手牌恰好 2)
-    P3.expectPending('请求回应');
-    await P3.respond('界焚城', { choice: true });
-    P3.expectPending('请求回应');
-    await P3.respond('界焚城', { cardIds: ['p3a', 'p3b'] }); // 弃 2
-
-    // P1:必须 ≥3 张(手牌恰好 3)
+    // P1:必须 ≥2 张(手牌恰好 3)
     P1.expectPending('请求回应');
     await P1.respond('界焚城', { choice: true });
     P1.expectPending('请求回应');
-    await P1.respond('界焚城', { cardIds: ['p1a', 'p1b', 'p1c'] }); // 弃 3
+    await P1.respond('界焚城', { cardIds: ['p1a', 'p1b'] }); // 弃 2
 
+    // P3:必须 ≥3 张,但手牌仅 2 张 → 不产生询问,直接强制受伤
     await harness.waitForStable();
-    expect(harness.state.players[1].hand).toEqual([]);
+    expect(harness.state.players[1].hand).toEqual(['p1c']);
     expect(harness.state.players[2].hand).toEqual([]);
-    expect(harness.state.players[3].hand).toEqual([]);
+    expect(harness.state.players[3].hand).toEqual(['p3a', 'p3b']); // 未弃
+    expect(harness.state.players[3].health).toBe(1); // 3 - 2 = 1
   });
 
   // ─── 3. 目标手牌不足 → 强制受伤 ──────────────────────────

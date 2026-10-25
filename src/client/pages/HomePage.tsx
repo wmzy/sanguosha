@@ -6,6 +6,8 @@ import { loadReplay } from '../replay/replayFile';
 import type { ReplayFile } from '../replay/types';
 import { AuthPanel } from '../components/AuthPanel';
 import { useAuth } from '../hooks/useAuth';
+import { apiFetch } from '../api/client';
+import type { RoomInfo } from '../../server/protocol';
 
 // ─── 首页视觉:深色牌匾质感 + 金色书法标题 + 卡片式入口 ───
 
@@ -155,6 +157,18 @@ const linkGray = css`
   color: ${colors.text.secondary};
 `;
 
+const linkAi = css`
+  color: #b48cf2;
+`;
+
+const aiHint = css`
+  margin: -6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: ${colors.text.muted};
+  text-align: center;
+`;
+
 const linkTexts = css`
   display: flex;
   flex-direction: column;
@@ -205,6 +219,32 @@ export function HomePage() {
     const m = window.location.search.match(/[?&]authError=([\w-]+)/);
     return m ? m[1] : null;
   });
+  // AI 演示入口:找到正在进行的 AI 房间就以旁观身份直达;没有则提示启动命令。
+  const [aiHintText, setAiHintText] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const handleWatchAiDemo = async () => {
+    if (aiLoading) return;
+    setAiLoading(true);
+    setAiHintText(null);
+    try {
+      const rooms = await apiFetch<RoomInfo[]>('/api/rooms?type=multiplayer');
+      const live = rooms
+        .filter(
+          (r) =>
+            r.name.includes('AI') && (r.status === '进行中' || r.status === '等待中'),
+        )
+        .sort((a, b) => (a.status === '进行中' ? -1 : 0) - (b.status === '进行中' ? -1 : 0))[0];
+      if (live) {
+        navigate(`/play/${live.id}?spectate=1`);
+      } else {
+        setAiHintText('暂无 AI 对局：在终端运行 pnpm demo:ai 启动 5 个 omp 进程即可。');
+      }
+    } catch {
+      setAiHintText('查询房间失败，请确认服务器已启动（pnpm dev）。');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const handleLoadReplay = () => {
     fileInputRef.current?.click();
@@ -237,6 +277,16 @@ export function HomePage() {
         <AuthPanel auth={auth} />
       </div>
       <div className={actionList}>
+        <button className={linkButtonBase} onClick={() => void handleWatchAiDemo()} disabled={aiLoading}>
+          <span className={`${linkIcon} ${linkAi}`}>🤖</span>
+          <span className={linkTexts}>
+            <span className={linkTitle}>AI 对战演示</span>
+            <span className={linkDesc}>
+              {aiLoading ? '正在寻找 AI 对局…' : '旁观多个 AI agent 实时对战（终端多进程 MCP）'}
+            </span>
+          </span>
+        </button>
+        {aiHintText && <p className={aiHint}>{aiHintText}</p>}
         <Link to="/play" className={linkButtonBase}>
           <span className={`${linkIcon} ${linkBlue}`}>⚔</span>
           <span className={linkTexts}>

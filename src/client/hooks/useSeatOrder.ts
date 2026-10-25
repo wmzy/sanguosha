@@ -1,16 +1,17 @@
 // src/client/hooks/useSeatOrder.ts
 // 座位排列 hook。从 GameView.tsx 提取。
 //
-// 自己始终在 result[0](底部中央);其余玩家从"上家"开始逆时针排,
-// 这样弧形座位按 leftPct 从左到右呈现 [上家(左) ... 下家(右)],
-// 符合三国杀惯例:自己正对面为逆时针出牌方向,自己的下家在右手侧。
+// 自己始终在 result[0](底部中央);其余玩家从"下家"开始逆时针排,
+// 这样弧形座位按 leftPct 从左到右呈现 [下家(右) ... 上家(左)],
+// 符合三国杀惯例:出牌方向为逆时针,自己的下家在右手侧。
+// 引擎座次约定:currentPlayerIndex 递减 = 逆时针下一位。
 
 import { useMemo } from 'react';
 import type { GameView } from '../../engine/types';
 
 /**
  * 计算以 perspectiveIdx 为中心的有序玩家列表。
- * @returns result[0] = perspectiveIdx;其后依次为上家、上上家、…、下家(逆时针)
+ * @returns result[0] = perspectiveIdx;其后依次为下家、下下家、…、上家(逆时针)
  */
 export function useSeatOrder(view: GameView, perspectiveIdx: number): typeof view.players {
   const players = view.players;
@@ -19,7 +20,7 @@ export function useSeatOrder(view: GameView, perspectiveIdx: number): typeof vie
     if (n === 0) return [] as typeof players;
     const result: typeof players = [players[perspectiveIdx]];
     for (let i = 1; i < n; i++) {
-      // (perspectiveIdx - i + n) % n 走的是 [上家, 上上家, ..., 下家] 的逆时针路径
+      // (perspectiveIdx - i + n) % n 走的是 [下家, 下下家, ..., 上家] 的逆时针路径
       result.push(players[(perspectiveIdx - i + n) % n]);
     }
     return result;

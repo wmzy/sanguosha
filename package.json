@@ -28,7 +28,10 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "db:generate": "drizzle-kit generate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "demo:ai": "bash scripts/demo-ai-match.sh 5 interactive",
+    "demo:ai:headless": "bash scripts/demo-ai-match.sh 5 headless",
+    "demo:record": "bash scripts/demo-record.sh 120"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

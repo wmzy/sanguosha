@@ -119,20 +119,25 @@ describe('南蛮入侵', () => {
     const _P3 = harness.player('P3');
 
     await P1.useCardAndTarget('南蛮入侵', 'nm1', []);
-    // 先有无懈可击询问 → pass
+    // 逆时针顺序:0 → 2 → 1。先处理 P3(无手牌,询问杀 skip,直接扣血),
+    // 再处理 P2(有杀)。
+    // P3 的无懈窗口 → pass
     const slot0 = [...harness.state.pendingSlots.values()][0];
     if (slot0 && (slot0.atom as { type: string }).type === '请求回应') {
       await P2.pass();
     }
-    // P2 先被询问(有杀 → normal)
-    P2.expectPending('询问杀');
-    await P2.respond('杀', { cardId: 'c2' });
-    // 目标间无懈窗口
+    // P2 的无懈窗口 → pass,然后 P2 被询问杀
     const slot1 = [...harness.state.pendingSlots.values()][0];
     if (slot1 && (slot1.atom as { type: string }).type === '请求回应') {
       await P2.pass();
     }
-    // P3 手牌为 0 → 询问杀 skip:不创建 slot、无延时,直接扣血
+    P2.expectPending('询问杀');
+    await P2.respond('杀', { cardId: 'c2' });
+    // 目标间无懈窗口
+    const slot2 = [...harness.state.pendingSlots.values()][0];
+    if (slot2 && (slot2.atom as { type: string }).type === '请求回应') {
+      await P2.pass();
+    }
     expect(harness.state.pendingSlots.size).toBe(0);
 
     expect(harness.state.players[1].health).toBe(4); // P2 出杀不扣血
@@ -163,9 +168,8 @@ describe('南蛮入侵', () => {
     });
   });
 
-  // Bug1 回归:4人局中当前为 index 0,顺时针顺序应为 1→2→3。
-  // 修复前 filter() 顺序是 1→2→3(刚好也对),无法区分;改用 3 人局 from=2 验证。
-  it('3人局 from=2: 顺时针目标顺序应为 [0, 1](从下家 0 开始)', async () => {
+  // Bug1 回归:出牌方向为逆时针(座次递减)。3 人局 from=2 的目标顺序应为 [1, 0]。
+  it('3人局 from=2: 逆时针目标顺序应为 [1, 0](从下家 1 开始)', async () => {
     const state = build({ p3: true });
     // 改 currentPlayerIndex 为 2(P3 为发起者)
     state.currentPlayerIndex = 2;
@@ -184,23 +188,23 @@ describe('南蛮入侵', () => {
     // 先过无懈窗口
     const nullifSlot = [...harness.state.pendingSlots.values()][0];
     if (nullifSlot && (nullifSlot.atom as { type: string }).type === '请求回应') {
-      await harness.player(0).pass();
+      await harness.player(1).pass();
     }
-    // 期望先问 P1(index 0),再问 P2(index 1):断言 询问杀 slot 的 target 座次
+    // 期望先问 P2(index 1),再问 P1(index 0):断言 询问杀 slot 的 target 座次
     const ask1 = [...harness.state.pendingSlots.values()][0];
-    expect((ask1.atom as { target: number }).target).toBe(0);
-    harness.player(0).expectPending('询问杀');
-    await harness.player(0).pass();
+    expect((ask1.atom as { target: number }).target).toBe(1);
+    harness.player(1).expectPending('询问杀');
+    await harness.player(1).pass();
     // 第二个目标的无懈窗口 → pass
     const nullifSlot2 = [...harness.state.pendingSlots.values()][0];
     if (nullifSlot2 && (nullifSlot2.atom as { type: string }).type === '请求回应') {
-      await harness.player(1).pass();
+      await harness.player(0).pass();
     }
-    // 第二个 询问杀 座次应为 P2(index 1)
+    // 第二个 询问杀 座次应为 P1(index 0)
     const ask2 = [...harness.state.pendingSlots.values()][0];
-    expect((ask2.atom as { target: number }).target).toBe(1);
-    harness.player(1).expectPending('询问杀');
-    await harness.player(1).pass();
+    expect((ask2.atom as { target: number }).target).toBe(0);
+    harness.player(0).expectPending('询问杀');
+    await harness.player(0).pass();
 
     // P1、P2 都未出杀 → 各扣 1 血;P3 自己是发起者不扣血
     expect(harness.state.players[0].health).toBe(3);
@@ -237,19 +241,17 @@ describe('南蛮入侵', () => {
 
     await P3.useCardAndTarget('南蛮入侵', 'nm1', []);
 
-    // 目标顺序 [P1, P2],每个目标独立询问无懈
-    // 第一个目标 P1 的无懈窗口:pass → P1 无手牌,询问杀 skip,直接受伤
-    await harness.player(0).pass();
-
-    // 第二个目标 P2 的无懈窗口:P3 出无懈抵消对 P2 的效果
-    // 当前 pending 应是无懈可击广播窗口
+    // 逆时针目标顺序 [P2, P1],每个目标独立询问无懈。
+    // 第一个目标是 P2:P3 出无懈抵消对 P2 的效果。
     const nullifSlot = [...harness.state.pendingSlots.values()][0];
     expect((nullifSlot.atom as { requestType?: string }).requestType).toBe('无懈可击');
     await P3.respond('无懈可击', { cardId: 'wx1' });
     // 无懈 close-reopen:respond 后旧 slot resolve，询问无懈可击 创建新窗口，需 pass 结束
     await P3.pass();
 
-    // P2 被抵消 → 不会被询问杀,直接结束
+    // 第二个目标 P1 的无懈窗口:pass → P1 无手牌,询问杀 skip,直接受伤
+    await harness.player(0).pass();
+
     expect(harness.state.players[0].health).toBe(3); // P1 正常受伤
     expect(harness.state.players[1].health).toBe(4); // P2 被抵消不受伤
     expect(harness.state.players[2].health).toBe(4); // P3 发起者

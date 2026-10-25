@@ -108,16 +108,17 @@ describe('祸首', () => {
     const P1 = harness.player('P1');
     const P2 = harness.player('P2');
 
-    // P1 使用南蛮入侵,目标顺序 [P2(2), 孟获(0)]
+    // P1 使用南蛮入侵,逆时针目标顺序 [孟获(0), P2(2)]
     await P1.useCardAndTarget('南蛮入侵', 'nm1', []);
 
-    // 第一个目标 P2:过无懈窗口 → 询问杀 → P2 无杀 pass → 受伤(来源改为孟获)
+    // 第一个目标 孟获:过无懈窗口(祸首持有者免疫:不被询问杀、不受伤害)
+    await passWuxieIfAny(harness, P1);
+    await harness.waitForStable();
+
+    // 第二个目标 P2:过无懈窗口 → 询问杀 → P2 无杀 pass → 受伤(来源改为孟获)
     await passWuxieIfAny(harness, P1);
     P2.expectPending('询问杀');
     await P2.pass();
-
-    // 第二个目标 孟获:过无懈窗口(孟获免疫:不被询问杀、不受伤害)
-    await passWuxieIfAny(harness, P1);
     await harness.waitForStable();
 
     // P2 受 1 点伤害

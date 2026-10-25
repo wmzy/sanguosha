@@ -343,15 +343,13 @@ describe('界谦逊', () => {
     await harness.setup(state);
     const P0 = harness.player('P0');
     const P1 = harness.player('P1');
+    const P2 = harness.player('P2');
 
-    // P1 使用南蛮入侵(自动结算所有其他存活角色)
+    // P1 使用南蛮入侵(逆时针目标顺序:P0(陆逊) → P2)
     await P1.triggerAction('南蛮入侵', 'use', { cardId: 'nm1' });
 
-    // 第一个无懈窗口(对陆逊)→ pass
+    // 第一个目标陆逊:无懈窗口 → pass
     P1.expectPending('请求回应');
-    await P1.pass();
-    await harness.waitForStable();
-    // P1/P2 0手牌→无无懈 skip;P0 有手牌无无懈→silent slot,需额外 pass
     await P1.pass();
     await harness.waitForStable();
 
@@ -359,19 +357,19 @@ describe('界谦逊', () => {
     expect(harness.state.players[0].vars['界谦逊/移出']).toBeUndefined();
     expect(harness.state.players[0].hand).toEqual(['c2']);
 
-    // 接下来是询问杀(陆逊可出杀)→ 出杀以结束本目标结算
+    // 陆逊可出杀 → 出杀以结束本目标结算
     P0.expectPending('询问杀');
     await P0.respond('杀', { cardId: 'c2' });
     await harness.waitForStable();
 
-    // P2 的无懈+询问杀:逐个 pass 直到稳定
+    // 下一个目标 P2 的无懈+询问杀:逐个 pass 直到稳定
     while ([...harness.state.pendingSlots.values()].length > 0) {
       const slot = [...harness.state.pendingSlots.values()][0];
       const slotType = (slot.atom as { type: string }).type;
       if (slotType === '询问杀') {
-        await P1.pass(); // P2 无杀 → 超时
+        await P2.pass(); // P2 无杀 → 超时
       } else {
-        await P1.pass(); // 无懈窗口
+        await P2.pass(); // 无懈窗口
       }
       await harness.waitForStable();
     }

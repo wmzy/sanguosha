@@ -19,11 +19,12 @@ function nextPhase(current: string): string | null {
   return PHASE_ORDER[idx + 1];
 }
 
-/** 从 fromIndex 之后找第一个存活玩家的索引;全死亡时返回 fromIndex */
+/** 逆时针从 fromIndex 的下一位找第一个存活玩家;全死亡时返回 fromIndex。
+ *  座次约定:索引递减 = 逆时针出牌方向(与 下一玩家 atom 一致)。 */
 function findNextAlive(state: { players: { alive: boolean }[] }, fromIndex: number): number {
   const n = state.players.length;
   for (let i = 1; i <= n; i++) {
-    const idx = (fromIndex + i) % n;
+    const idx = (fromIndex - i + n) % n;
     if (state.players[idx].alive) return idx;
   }
   return fromIndex;
