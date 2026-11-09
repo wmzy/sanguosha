@@ -16,6 +16,7 @@ import { getCardEffect, getAllCardEffects, requireCardEffect } from '../../skill
 
 import { registerWineHook } from './酒';
 import { registerChainConductionHook } from '../../flows/face-down';
+import { extraCardTarget } from '../../rules/extra-card-target';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -99,6 +100,8 @@ export interface RunUseFlowOpts {
    *  其余时机 atom（选择目标时/使用时/指定目标/成为目标/...）全部正常触发，
    *  保证事件一致。调用方负责创建/清理虚拟卡 cardMap 条目。 */
   virtual?: boolean;
+  /** 虚拟普通锦囊仍开启无懈可击询问；虚拟牌只省略牌区移动，不改变抵消规则。 */
+  allowWuxieForVirtual?: boolean;
   /** 跳过抵消询问（如界看破转化的无懈不可被响应）。 */
   skipCancelQuery?: boolean;
   /** 结算后、popFrame 前的回调（保持帧作用域，五谷丰登.onSettle 的清理依赖 frameCards）。
@@ -157,7 +160,15 @@ export async function runUseFlow(
       }
       await applyAtom(state, { type: '使用时', source, cardId });
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- 布尔 OR 语义:false || true 必须为 true,?? 会误返回 false
-      await runSettlementPhase(state, effect, source, source, cardId, 0, opts?.virtual || opts?.skipCancelQuery);
+      await runSettlementPhase(
+        state,
+        effect,
+        source,
+        source,
+        cardId,
+        0,
+        (opts?.virtual === true && opts.allowWuxieForVirtual !== true) || opts?.skipCancelQuery === true,
+      );
       // ── 使用结算后：使用结算结束后时机（use.md 使用结算后）──
       // Ⅰ. 若使用的不是装备牌，将处理区里此牌置入弃牌堆
       if (!opts?.virtual && frameCards(state).includes(cardId)) {
@@ -281,7 +292,15 @@ export async function runUseFlow(
       if (effect.delayed) continue;
       if ((frame.params.skippedTargets as number[]).includes(target)) continue;
       // 使用结算中：检测有效性 → 生效前 → 生效时 → 生效后 → 使用结算结束时
-      await runSettlementPhase(state, effect, source, target, cardId, i, opts?.virtual);
+      await runSettlementPhase(
+        state,
+        effect,
+        source,
+        target,
+        cardId,
+        i,
+        (opts?.virtual === true && opts.allowWuxieForVirtual !== true) || opts?.skipCancelQuery === true,
+      );
     }
 
     // ── 使用结算后：使用结算结束后时机（use.md 使用结算后）──
@@ -486,8 +505,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
           ? effect.preUse(state, ownerId, params)
           : ((params.targets as number[]) ?? []);
         // 自动计算目标：self → [ownerId](强制,忽略客户端误传目标);AOE(allOthers/allPlayers) → 全场
-        if (effect.target.kind === 'self') {
-          targets = [ownerId];
+    if (effect.target.kind === 'self') {
+      const extraTarget = extraCardTarget(state, ownerId, cardName);
+      const requested = [...new Set(targets)];
+      targets = requested.includes(ownerId) &&
+        requested.every((target) => target === ownerId || target === extraTarget)
+        ? requested
+        : [ownerId];
         } else if (targets.length === 0) {
           targets = computeAutoTargets(state, ownerId, cardName);
         }

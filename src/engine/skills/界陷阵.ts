@@ -20,16 +20,13 @@
 //       turn.vars['陷阵/winTarget'] = target(座次下标,回合结束自动清空)。
 //       · 无距离:distance.ts 的 inAttackRange/effectiveDistance 据此对 target 放行(横切)。
 //         覆盖【杀】(inAttackRange)与所有 distance-based 锦囊(effectiveDistance,如顺手牵羊)。
-//       · 无次数:registerSlashUnlimitedProvider 返回 true(owner 本回合出杀无上限)。
-//         严格规则下"仅对此目标无次数",但引擎 slash-quota 不感知 target,简化为全局无限。
+//       · 无次数:slash-quota 按本次 targets 检查，只对 winTarget 放行。
 //       · 无视防具:青釭剑模式——指定目标 after-hook 临时卸载 target 防具技能实例,
 //         造成伤害 after-hook 恢复。仅对 winTarget 触发,其他 target 不受影响。
-//       · 多指定为目标:需各锦囊/杀 validate 配合,引擎层不易统一,本实现暂以 distance/次数
-//         放行间接落实【杀】多目标(目标数不限+距离无限);普通锦囊多目标保留为待扩展。
+//       · 多指定为目标:共享目标选择与卡牌校验允许在普通上限之外增加 winTarget。
 //   - 没赢效果:
 //       turn.vars['陷阵/lostTarget'] = target(座次下标)。
-//       · 不能对其使用【杀】:成为目标 before-hook(owner 为 source 且 target=lostTarget)→ cancel。
-//         杀.execute 检测 becameTarget=false 跳过该目标结算(不询问闪、不伤害)。
+//       · 不能对其使用【杀】:杀的使用校验在耗牌前拒绝；成为目标 hook 供虚拟路径兜底。
 //       · 你的【杀】不计入手牌上限:registerHandLimitProvider 返回 默认公式+手牌中杀牌数。
 //         (镜像 界将驰 选项① / 界洛神 思路)
 //   - 拼点点数:A=1, 2-10=面值, J=11, Q=12, K=13;严格大于才算赢,相等算没赢。
@@ -54,8 +51,6 @@ import {
 } from '../core/skill';
 import { unloadSkillInstance, instantiateSkill } from './lifecycle';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
-import { slashUnlimitedKey } from '../rules/vars-keys';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import { registerDistanceExemptor } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
@@ -113,14 +108,7 @@ function getTempUnloadMap(
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
-  // ─── 无限出杀提供者:拼点赢后本回合 ∞(对其使用牌无次数限制)──
-  //   严格规则下"仅对 winTarget 无次数",slash-quota 不感知 target,简化为全局 ∞。
-  const unloadProvider = registerSlashUnlimitedProvider(
-    state,
-    ownerId,
-    (st: GameState, player: number) =>
-      typeof st.turn.vars[WIN_VAR] === 'number' && player === ownerId,
-  );
+  // 次数与额外目标由共享规则按 winTarget 判断，不放宽其他目标。
 
   // ─── 通用距离豁免器:拼点赢后对其用牌无距离(覆盖杀 + distance-based 锦囊) ──
   //   通过 distance.registerDistanceExemptor 注册,避免污染 杀.ts/distance.ts。
@@ -224,14 +212,6 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (win) {
         st.turn.vars[WIN_VAR] = target;
         await applyAtom(st, { type: '回合用量', player: from, key: WIN_VAR, value: target });
-        // 「对其使用牌无次数限制」须投影到 view:前端 viewCanSlash/无头枚举读
-        // view.turnUsage['杀/unlimited/*'],缺失则拼点赢后第 2 张杀在客户端不可用。
-        await applyAtom(st, {
-          type: '回合用量',
-          player: from,
-          key: slashUnlimitedKey('界陷阵'),
-          value: true,
-        });
       } else {
         st.turn.vars[LOST_VAR] = target;
         await applyAtom(st, { type: '回合用量', player: from, key: LOST_VAR, value: target });
@@ -331,8 +311,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   }
 
   // ─── 成为目标 before hook:lost 效果——owner 不能对 lostTarget 使用杀 ──
-  //   杀.execute 检测 becameTarget=false → 跳过该目标结算(不询问闪、不伤害)。
-  //   杀牌仍被消耗(移入弃牌堆),owner 等同"白白打出一张杀"——符合"不能用"的语义。
+  //   普通主动使用先由杀.canUse拒绝；虚拟结算仍在这里阻止目标生效。
   registerBeforeHook(
     state,
     skill.id,
@@ -354,7 +333,6 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   return () => {
-    unloadProvider();
     unloadHandLimit();
     unloadDistExemptor();
   };

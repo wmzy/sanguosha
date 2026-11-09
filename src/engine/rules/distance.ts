@@ -8,6 +8,7 @@
 
 import type { GameState } from '../types';
 import { getDistanceAttackMod, getDistanceDefenseMod, getDistanceAttackRange } from './vars-keys';
+import { isSkillSuppressed } from '../core/skill-suppression';
 
 /**
  * 环形座位距离(只算存活玩家)。
@@ -39,7 +40,9 @@ export function effectiveDistance(state: GameState, from: number, to: number, ca
   if (aliveFrom < 0 || aliveTo < 0) return Infinity;
   let dist = seatDistance(alive.length, aliveFrom, aliveTo);
   // 进攻修正:缩短距离(进攻马/马术)
-  const attackMod = getDistanceAttackMod(state.players[from].vars) ?? 0;
+  const hasMashi = state.players[from].skills.includes('马术');
+  const attackMod = (getDistanceAttackMod(state.players[from].vars) ?? 0) -
+    (hasMashi && isSkillSuppressed(state, from, '马术') ? 1 : 0);
   dist -= attackMod;
   // 防御修正:增加距离(防御马)
   const defenseMod = getDistanceDefenseMod(state.players[to].vars) ?? 0;

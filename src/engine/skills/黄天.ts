@@ -94,6 +94,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   // (GameView 不暴露 faction,activeWhen 仅做能力范围内的 UI 过滤)。
   api.defineAction('use', {
     label: '黄天',
+    availableToOthers: true,
     style: 'primary',
     prompt: {
       type: 'useCard',
@@ -106,7 +107,9 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     },
     activeWhen: (ctx) =>
       // 主公本人不应发动黄天(黄天是其他群势力角色交给主公的技能)
+      ownerId === 0 && ctx.view.players[ownerId]?.alive === true &&
       ctx.perspectiveIdx !== ownerId &&
+      ctx.view.players[ctx.perspectiveIdx]?.faction === '群' &&
       activeUnlessUsedThisTurn('黄天')(ctx) &&
       // 手中有可交的牌时才渲染
       ctx.view.players[ctx.perspectiveIdx]?.hand?.some(

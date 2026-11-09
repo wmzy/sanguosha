@@ -15,6 +15,8 @@ import { createGameState } from '../types';
 import { VirtualClock } from './clock';
 import { buildView as buildViewImpl } from '../view/buildView';
 import { findActionEntry, findPendingSlot, setSkillInstanceUnload } from './skill';
+import { isHookSuppressed } from './skill-suppression';
+import { isCharacterSkillId } from '../skills/registry';
 // unloadSkillInstance 已迁至 skills/lifecycle.ts（可直接访问 skillLoaders/cardEffectMap）
 import { unloadSkillInstance } from '../skills/lifecycle';
 import { createStandardDeck } from './deck';
@@ -343,6 +345,13 @@ function normalizeMessageTargetShape(message: ClientMessage): ClientMessage {
 
 const preparingStates = new WeakSet<GameState>();
 
+function isSuppressedCharacterSkillAction(state: GameState, ownerId: number, skillId: string): boolean {
+  const player = state.players[ownerId];
+  return player?.skills.includes(skillId) === true &&
+    isCharacterSkillId(skillId) &&
+    isHookSuppressed(state, ownerId, skillId);
+}
+
 export async function dispatch(
   state: GameState,
   rawMessage: ClientMessage,
@@ -530,6 +539,11 @@ export async function dispatch(
     ownsPreparation = true;
     for (const p of message.preceding) {
       const pEntry = findActionEntry(state, p.skillId, message.ownerId, p.actionType);
+      if (isSuppressedCharacterSkillAction(state, message.ownerId, p.skillId)) {
+        await rollbackPreceding();
+        cleanupResidualPending();
+        return reject();
+      }
       // preceding 必须自带 rollback:主 action 校验失败/抛错时能逆向撤销已生效的部分效果。
       // 没有 rollback 的动作(如 制衡)一律不允许作为 preceding —— 否则会出现
       // 「牌已弃置进弃牌堆、主 action 被拒、牌仍在手牌」的重复归属。
@@ -609,6 +623,11 @@ export async function dispatch(
     return reject();
   }
   const entry = findActionEntry(state, message.skillId, message.ownerId, message.actionType);
+  if (isSuppressedCharacterSkillAction(state, message.ownerId, message.skillId)) {
+    await rollbackPreceding();
+    cleanupResidualPending();
+    return reject();
+  }
   // 回应路径:定位该玩家对应的 slot。
   const targetKey = message.ownerId;
   const oldSlot = findPendingSlot(state, targetKey);

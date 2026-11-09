@@ -31,16 +31,21 @@ import type {
   GameState,
   Json,
   Skill,
+  AtomBeforeContext,
 } from '../types';
+import { TARGET_SYSTEM } from '../types';
 import { applyAtom } from '../core/apply'
-import { popFrame, pushFrame } from '../core/frame';
+import { popFrame, pushFrame, topFrame } from '../core/frame';
 import {
   registerAction,
   registerAfterHook,
+  registerBeforeHook,
   hasBlockingPending,
 } from '../core/skill';
+import { registerAttackRangeExemptor, registerDistanceExemptor } from '../rules/distance';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
+import { luoyingCardViewKey } from '../rules/vars-keys';
 
 const SKILL_ID = '界酒诗';
 const DISPLAY_NAME = '酒诗';
@@ -50,6 +55,8 @@ const USE_RT_CONFIRM = '界酒诗/confirm';
 const USE_CONFIRM_KEY = '酒诗/useConfirmed';
 const DAMAGE_FLIP_RT = '界酒诗/damageFlip';
 const DAMAGE_FLIP_KEY = '酒诗/damageFlipChoice';
+const LIYING_CARD_IDS_KEY = '酒诗/落英牌';
+const LIYING_FRAME_FLAG = '酒诗/落英增强';
 /** 共享给界落英 的翻回询问 localVars 键 */
 export const FLIP_BACK_RT = '界酒诗/flipBack';
 export const FLIP_BACK_KEY = '酒诗/flipChoice';
@@ -67,6 +74,25 @@ export function createSkill(id: string, ownerId: number): Skill {
 /** 武将牌是否背面朝上(存在任意 '/翻面' 后缀标签) */
 function isFlipped(tags: string[]): boolean {
   return tags.some((t) => t.endsWith('/翻面'));
+}
+
+function physicalCardId(state: GameState, cardId: string | undefined): string | undefined {
+  if (!cardId) return undefined;
+  return state.cardMap[cardId]?.shadowOf ?? cardId;
+}
+
+function isLiyingCard(state: GameState, ownerId: number, cardId: string | undefined): boolean {
+  const physicalId = physicalCardId(state, cardId);
+  const ids = state.players[ownerId]?.vars[LIYING_CARD_IDS_KEY];
+  return !!physicalId && Array.isArray(ids) && ids.includes(physicalId);
+}
+
+function currentLiyingFrame(state: GameState, ownerId: number): { cardId: string; frame: NonNullable<ReturnType<typeof topFrame>> } | undefined {
+  const frame = topFrame(state);
+  const cardId = frame?.params.cardId;
+  if (frame?.from !== ownerId || typeof cardId !== 'string') return undefined;
+  if (frame.params[LIYING_FRAME_FLAG] !== true) return undefined;
+  return { cardId, frame };
 }
 
 /** 翻回正面:清除所有 '/翻面' 后缀标签,并补发「翻面后」时机(与 flipFaceDown 对称,
@@ -92,6 +118,45 @@ async function virtualWine(state: GameState, source: number): Promise<void> {
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
+
+  const unloadDistance = registerDistanceExemptor(state, ownerId, (st, from, _to, cardId) =>
+    from === ownerId && isFlipped(st.players[ownerId]?.tags ?? []) && isLiyingCard(st, ownerId, cardId),
+  );
+  const unloadAttackRange = registerAttackRangeExemptor(state, ownerId, (st, from, _to, cardId) =>
+    from === ownerId && isFlipped(st.players[ownerId]?.tags ?? []) && isLiyingCard(st, ownerId, cardId),
+  );
+
+  // 使用时把落英牌身份写入结算帧,后续响应窗口按该帧拦截。
+  registerAfterHook(state, skill.id, ownerId, '使用时', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.type !== '使用时' || atom.source !== ownerId) return;
+    const physicalId = physicalCardId(ctx.state, atom.cardId);
+    if (!physicalId || !isLiyingCard(ctx.state, ownerId, physicalId)) return;
+    const frame = topFrame(ctx.state);
+    if (frame?.from === ownerId && frame.params.cardId === atom.cardId) {
+      (frame.params)[LIYING_FRAME_FLAG] = true;
+    }
+  });
+
+  const blockResponse = async (ctx: AtomBeforeContext) => {
+    const frame = currentLiyingFrame(ctx.state, ownerId);
+    if (!frame || !isFlipped(ctx.state.players[ownerId]?.tags ?? [])) return;
+    if (ctx.atom.type === '请求回应' && ctx.atom.requestType !== '无懈可击') return;
+    if (ctx.atom.type !== '请求回应' && ctx.atom.type !== '询问闪' && ctx.atom.type !== '询问杀') return;
+    return { kind: 'cancel' as const };
+  };
+  const unloadQuestionDodge = registerBeforeHook(state, skill.id, TARGET_SYSTEM, '询问闪', blockResponse);
+  const unloadQuestionSlash = registerBeforeHook(state, skill.id, TARGET_SYSTEM, '询问杀', blockResponse);
+  const unloadNullification = registerBeforeHook(state, skill.id, TARGET_SYSTEM, '请求回应', blockResponse);
+
+  registerAfterHook(state, skill.id, ownerId, '使用结算结束后', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.type !== '使用结算结束后' || atom.source !== ownerId || !isLiyingCard(ctx.state, ownerId, atom.cardId)) return;
+    const physicalId = physicalCardId(ctx.state, atom.cardId)!;
+    const ids = ctx.state.players[ownerId].vars[LIYING_CARD_IDS_KEY];
+    if (Array.isArray(ids)) ctx.state.players[ownerId].vars[LIYING_CARD_IDS_KEY] = ids.filter((id) => id !== physicalId);
+    await applyAtom(ctx.state, { type: '回合用量', player: ownerId, key: luoyingCardViewKey(physicalId), value: null });
+  });
 
   // ── use:主动发动界酒诗(翻至背面 + 视为酒) ──────────────────────
   registerAction(
@@ -186,7 +251,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await flipBackToFaceUp(ctx.state, ownerId);
   });
 
-  return () => {};
+  return () => {
+    unloadDistance();
+    unloadAttackRange();
+    unloadQuestionDodge();
+    unloadQuestionSlash();
+    unloadNullification();
+  };
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {

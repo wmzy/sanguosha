@@ -86,12 +86,13 @@ export const snatchEffect: CardEffect = {
     targetFilter: {
       min: 1,
       max: 1,
-      filter: (view: GameView, t: number) => {
+      filter: (view: GameView, t: number, card?: Partial<Card>) => {
         if (t === view.currentPlayerIndex) return false;
         const tp = view.players[t];
         if (!tp || tp.alive === false) return false;
+        if (tp.handCount === 0 && !Object.values(tp.equipment).some(Boolean) && !(tp.pendingTricks?.length)) return false;
         if (view.players[view.currentPlayerIndex]?.tags?.includes('奇才/无距离限制')) return true;
-        return viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1;
+        return viewEffectiveDistance(view.players, view.currentPlayerIndex, t, card) <= 1;
       },
     },
   },

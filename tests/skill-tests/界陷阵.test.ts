@@ -151,7 +151,7 @@ describe('界陷阵', () => {
   });
 
   // ─── 3. 拼点赢 → 对 winTarget 出杀无次数限制 ──────────────────
-  it('拼点赢 → slashMax=∞,可连出多张杀', async () => {
+  it('拼点赢 → 普通次数上限不变,仍可对拼点目标连出多张杀', async () => {
     const pdWin = makeCard('c1', '杀', '♠', 'K');
     const pdLow = makeCard('c2', '闪', '♥', '2');
     const s1 = makeCard('s1', '杀', '♣', '5');
@@ -186,7 +186,7 @@ describe('界陷阵', () => {
     await waitForStable(harness.state);
 
     // 拼点赢 → slashMax=∞
-    expect(slashMax(harness.state, 0)).toBe(Infinity);
+    expect(slashMax(harness.state, 0)).toBe(1);
 
     // 连出两张杀
     await P0.useCardAndTarget('杀', 's1', [1]);
@@ -288,12 +288,12 @@ describe('界陷阵', () => {
     expect(harness.state.turn.vars['陷阵/winTarget']).toBeUndefined();
     expect(harness.state.turn.vars['陷阵/lostTarget']).toBe(1);
 
-    // 对 lostTarget(P1)出杀:成为目标被 cancel → 不伤害
+    // 对 lostTarget(P1)出杀应在使用前拒绝，不消耗杀。
     await P0.useCardAndTarget('杀', 's1', [1]);
     await waitForStable(harness.state);
     expect(harness.state.players[1].health).toBe(4); // 未受伤
-    // 杀牌仍被消耗(进弃牌堆)
-    expect(harness.state.zones.discardPile).toContain('s1');
+    expect(harness.state.zones.discardPile).not.toContain('s1');
+    expect(harness.state.players[0].hand).toContain('s1');
   });
 
   // ─── 6. 拼点没赢 → 杀不计入手牌上限 ──────────────────

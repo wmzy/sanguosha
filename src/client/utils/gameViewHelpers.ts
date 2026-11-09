@@ -16,6 +16,7 @@ import type {
 import { getCardEffect } from '../../engine/skills/cards';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { defaultPlayActive } from '../../engine/rules/action-active';
+import { isCharacterSkillId } from '../../engine/skills/registry';
 import { validateTargetSelection } from '../../engine/rules/target-selection';
 
 // ─── use action 查找(filter-based) ───
@@ -113,6 +114,9 @@ export function findAltActionsForCard(
  *  这是“声明时机”原则的落地点:激活条件由 action 自己说,GameView 不再硬编码分支。
  *  defaultPlayActive 与 engine/action-active 同源(技能 onMount 也复用它)。 */
 export function isActiveAction(action: SkillActionDef, ctx: ActionContext): boolean {
+  const player = ctx.view.players[ctx.perspectiveIdx];
+  if (player?.health <= 1 && player.skills.includes('缠怨') && action.skillId !== '缠怨' &&
+    player.skills.includes(action.skillId) && isCharacterSkillId(action.skillId)) return false;
   return action.activeWhen ? action.activeWhen(ctx) : defaultPlayActive(ctx);
 }
 
@@ -227,15 +231,17 @@ export function resolveDistributeCardIds(
   prompt: DistributePrompt,
   hand: Card[],
   equipment: Partial<Record<string, string>>,
+  cardMap: Record<string, Card> = {},
 ): string[] {
-  if (Array.isArray(prompt.cardIds) && prompt.cardIds.length > 0) {
-    return prompt.cardIds;
-  }
-  if (prompt.source === 'handAndEquip') {
-    const equipIds = Object.values(equipment).filter((id): id is string => typeof id === 'string');
-    return [...hand.map((c) => c.id), ...equipIds];
-  }
-  return hand.map((c) => c.id);
+  const handIds = hand.map((card) => card.id);
+  const ids = Array.isArray(prompt.cardIds)
+    ? prompt.cardIds
+    : prompt.source === 'handAndEquip'
+      ? [...handIds, ...Object.values(equipment).filter((id): id is string => typeof id === 'string')]
+      : handIds;
+  if (!prompt.filter) return ids;
+  const cards = { ...Object.fromEntries(hand.map((card) => [card.id, card])), ...cardMap };
+  return ids.filter((id) => !!cards[id] && prompt.filter!(cards[id]));
 }
 
 // ─── 主动技按钮的提交变体 ───

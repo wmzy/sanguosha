@@ -17,7 +17,7 @@
 //      通道互相收敛,抓不到「state 变了但没人投影」——本文件补这个洞)。
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import type { Card, GameState, GameView, Json } from '../../src/engine/types';
 import { createGameState, suitColor } from '../../src/engine/types';
 import * as varsKeys from '../../src/engine/rules/vars-keys';
@@ -133,7 +133,10 @@ describe('turnUsage 投影 key 静态契约', () => {
     const re = /type:\s*'回合用量'[\s\S]{0,300}?key:\s*([A-Za-z_$][\w$]*\([^)]*\)|`[^`]*`|'[^']*'|[A-Za-z_$][\w$]*)/g;
     for (const f of files) {
       const src = readFileSync(f, 'utf8');
-      for (const m of src.matchAll(re)) hits.push({ file: f.replace(`${ENGINE_ROOT  }/`, ''), expr: m[1] });
+      for (const m of src.matchAll(re)) {
+        const file = relative(ENGINE_ROOT, f).split(sep).join('/');
+        hits.push({ file, expr: m[1] });
+      }
     }
     return hits;
   }

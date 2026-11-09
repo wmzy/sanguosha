@@ -36,7 +36,10 @@ export function effectiveDist(
   const fromP = players[fromIdx];
   const toP = players[toIdx];
   // 进攻修正:缩短距离(进攻马/马术等技能设此 var)
-  const attackMod = fromP?.distanceVars?.attackMod ?? 0;
+  const mashiSuppressed = fromP?.skills.includes('马术') === true &&
+    fromP.skills.includes('缠怨') && fromP.health <= 1;
+  // 缠怨失效马术时，仅扣除马术的 1 点缩距；进攻马仍然生效。
+  const attackMod = (fromP?.distanceVars?.attackMod ?? 0) - (mashiSuppressed ? 1 : 0);
   dist -= attackMod;
   // 防御修正:增加距离(防御马等技能设此 var)
   const defenseMod = toP?.distanceVars?.defenseMod ?? 0;

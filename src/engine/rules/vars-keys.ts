@@ -108,6 +108,11 @@ export function usedThisTurnKey(skillName: string): string {
 
 /** 拼点赢后本回合对其用牌无距离限制(值=目标座次)。写:界陷阵(WIN_VAR 别名);读:viewDistance。 */
 export const XIANZHEN_WIN_TARGET_VIEW_KEY = '陷阵/winTarget';
+/** 界酒诗落英所得牌的逐牌公开用量投影。 */
+export const LUOYING_CARD_VIEW_PREFIX = '酒诗/落英牌/';
+export function luoyingCardViewKey(cardId: string): string {
+  return LUOYING_CARD_VIEW_PREFIX + cardId;
+}
 /** 本回合弃置牌花色数组(同花色牌无距离/次数限制,前端宽松放行)。写:成略(SUITS_VAR 别名);读:viewDistance。 */
 export const CHENGLUE_SUITS_VIEW_KEY = '成略/suits';
 /** 选项②激活:杀无距离限制。写:界将驰(CHOICE2_VAR 别名);读:viewDistance。 */

@@ -11,7 +11,8 @@
 // 注:src/client/utils/distance.ts 的同名函数语义一致,前端组件可直接用本模块,
 // 也可继续用 client util(两者基于同一套 distanceVars 投影)。
 
-import type { GameView } from '../types';
+import type { Card, GameView } from '../types';
+import { luoyingCardViewKey } from './vars-keys';
 import {
   XIANZHEN_WIN_TARGET_VIEW_KEY,
   CHENGLUE_SUITS_VIEW_KEY,
@@ -41,17 +42,27 @@ export function viewSeatDistance(
   return Math.min(d, n - d);
 }
 
+/** 背面界曹植使用本次落英所得的实体牌，无距离限制。 */
+export function viewCardIgnoresDistance(players: GameView['players'], from: number, card?: Partial<Card>): boolean {
+  const player = players[from];
+  const id = card?.shadowOf ?? card?.id;
+  return !!id && player?.skills.includes('界酒诗') === true &&
+    player.tags?.some((tag) => tag.endsWith('/翻面')) === true &&
+    player.turnUsage?.[luoyingCardViewKey(id)] === true;
+}
+
 /** GameView 上 from 到 to 的实际距离(含马修正,>= 1) */
 export function viewEffectiveDistance(
   players: GameView['players'],
   fromIdx: number,
   toIdx: number,
+  card?: Partial<Card>,
 ): number {
+  if (viewCardIgnoresDistance(players, fromIdx, card)) return 1;
   // 界陷阵(界高顺):拼点赢后对其用牌无距离限制。
   // turnUsage 由 回合用量 atom 同步;winTarget 存目标座次。
-  // 注:GameView 不携带 currentPlayerIndex 区分发起方,这里宽松返回 1(可被所有距离检查放行)。
-  // 后端 distance.ts effectiveDistance 严格按 turn.vars 校验(仅对持有界陷阵技能的发起方生效)。
-  if (players.some((p) => p.turnUsage?.[XIANZHEN_WIN_TARGET_VIEW_KEY] === toIdx)) return 1;
+  // 仅检查发起方自己的投影，不能把其他角色的陷阵收益共享给所有人。
+  if (players[fromIdx]?.turnUsage?.[XIANZHEN_WIN_TARGET_VIEW_KEY] === toIdx) return 1;
   // 成略(许攸):本阶段同花色牌无距离限制。turnUsage['成略/suits'] 由回合用量 atom 同步。
   // 前端 filter 无法感知选中卡的花色,保持宽松(成略激活时一律放行);
   // 后端 distance.ts 的 DistanceExemptor 按 cardId 花色严格校验(仅同花色放行)。
@@ -65,7 +76,10 @@ export function viewEffectiveDistance(
   const fromP = players[fromIdx];
   const toP = players[toIdx];
   // 进攻修正:缩短距离(进攻马/马术等)
-  dist -= fromP?.distanceVars?.attackMod ?? 0;
+  const mashiSuppressed = fromP?.skills.includes('马术') === true &&
+    fromP.skills.includes('缠怨') && fromP.health <= 1;
+  // 缠怨失效马术时，仅扣除马术的 1 点缩距；进攻马仍然生效。
+  dist -= (fromP?.distanceVars?.attackMod ?? 0) - (mashiSuppressed ? 1 : 0);
   // 防御修正:增加距离(防御马等)
   dist += toP?.distanceVars?.defenseMod ?? 0;
   return Math.max(1, dist);
@@ -77,12 +91,14 @@ export function viewCanAttack(
   cardMap: Record<string, unknown>,
   fromIdx: number,
   toIdx: number,
+  card?: Partial<Card>,
 ): boolean {
   void cardMap; // 签名与 client utils/distance 对齐,GameView 投影不需要 cardMap
   if (fromIdx === toIdx) return false;
+  if (viewCardIgnoresDistance(players, fromIdx, card)) return true;
   // 界陷阵(界高顺):拼点赢后本回合对 winTarget 使用牌无距离限制。
   // turnUsage 由 回合用量 atom 同步;winTarget 存目标座次。
-  if (players.some((p) => p.turnUsage?.[XIANZHEN_WIN_TARGET_VIEW_KEY] === toIdx)) return true;
+  if (players[fromIdx]?.turnUsage?.[XIANZHEN_WIN_TARGET_VIEW_KEY] === toIdx) return true;
   // 天义:拼点赢后本回合攻击范围无限(值=发起者座次)。仅覆盖杀(攻击范围豁免)。
   if (players[fromIdx]?.turnUsage?.[TIANYI_WIN_VIEW_KEY] === fromIdx) return true;
   // 诈降(界黄盖):失去体力后本回合【红色杀】无距离限制。turnUsage 由回合用量 atom 同步。

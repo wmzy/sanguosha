@@ -76,6 +76,7 @@ describe('界若愚', () => {
     expect(harness.state.players[0].maxHealth).toBe(4); // 3→4 增1上限
     expect(harness.state.players[0].health).toBe(3); // 1→3 回复至3点(非标版的1→2)
     expect(harness.state.players[0].skills).toContain('激将'); // 永久获得激将
+    expect(harness.state.players[0].skills).toContain('思蜀'); // 永久获得思蜀
     expect(harness.state.players[0].vars['界若愚/awakened']).toBe(true);
   });
 

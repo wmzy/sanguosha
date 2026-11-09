@@ -24,6 +24,7 @@ import {
 import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../../engine/data/card-defs';
 import { viewSlashTargetMax } from '../../engine/rules/action-active';
 import { resolveTargetSelection, validateTargetSelection } from '../../engine/rules/target-selection';
+import { viewExtraCardTarget } from '../../engine/rules/extra-card-target';
 
 /** 产出牌的真实 CardDef(type/subtype),供转化动作查找同源 use action。
  * 不能沿用原料牌的 type：装备原料(青釭剑)+普通牌在丈八组合中若沿用
@@ -61,10 +62,11 @@ function computeValidTargets(
   seatIndex: number,
   targetFilter: TargetFilter | null,
   rules: PlayRules,
+  card?: Card & { countsAsSlash?: boolean },
 ): number[] {
   if (rules.selfTarget) return [seatIndex];
   if (!rules.needsTarget || !targetFilter) return [];
-  const selection = resolveTargetSelection(view, seatIndex, targetFilter);
+  const selection = resolveTargetSelection(view, seatIndex, targetFilter, card);
   return selection.targets ? selection.contract.candidates : [];
 }
 
@@ -102,7 +104,8 @@ function enumeratePlayActions(
     const targetFilter = getTargetFilter(action.prompt);
     const rules = derivePlayRules(targetFilter, getSelfTarget(action.prompt));
     // 算合法目标（allowSelf 时含自己）
-    const validTargets = computeValidTargets(view, seatIndex, targetFilter, rules);
+    const validTargets = computeValidTargets(view, seatIndex, targetFilter, rules,
+      { ...card, countsAsSlash: card.name === action.skillId });
     // 需要目标但无合法目标(如距离不够),跳过此牌
     if (rules.needsTarget && !rules.selfTarget && validTargets.length === 0) continue;
     // 构造示例 message：无目标牌直接完整；有目标牌 targets 待 agent 补全
@@ -138,6 +141,14 @@ function enumeratePlayActions(
       ...bounds,
       ...(slashMax !== undefined ? { maxTarget: slashMax } : {}),
     });
+    const extra = viewExtraCardTarget(view, seatIndex, card.name);
+    if (card.name === '无中生有' && extra !== undefined) {
+      result.push({
+        description: `使用【无中生有】并以陷阵额外指定 ${view.players[extra]?.name}`,
+        message: { ...message, params: { cardId: card.id, targets: [seatIndex, extra] } },
+        validTargets: [seatIndex, extra], minTarget: 2, maxTarget: 2, category: 'play',
+      });
+    }
   }
   return result;
 }
@@ -272,7 +283,7 @@ function enumerateTransformActions(
           const cardRules = produced
             ? derivePlayRules(cardTargetFilter, getSelfTarget(produced.prompt))
             : rules;
-          const validTargets = computeValidTargets(view, seatIndex, cardTargetFilter, cardRules);
+          const validTargets = computeValidTargets(view, seatIndex, cardTargetFilter, cardRules, asProducedCard(c1, wrapperName));
           // 需要目标但无合法目标(如距离不够)→ 跳过该组合
           if (cardRules.needsTarget && !cardRules.selfTarget && validTargets.length === 0) continue;
           const shadowCardId = `${c1.id}#${c2.id}#${action.skillId}`;
@@ -371,7 +382,7 @@ function enumerateTransformActions(
         : rules;
 
       // 算合法目标（allowSelf 时含自己，与 enumeratePlayActions 同模式）
-      const validTargets = computeValidTargets(view, seatIndex, cardTargetFilter, cardRules);
+      const validTargets = computeValidTargets(view, seatIndex, cardTargetFilter, cardRules, asProducedCard(card, wrapperName));
       // 需要目标但无合法目标(如距离不够),跳过此牌
       if (cardRules.needsTarget && !cardRules.selfTarget && validTargets.length === 0) continue;
 
@@ -504,7 +515,10 @@ function enumerateAltActions(
       // 义绝/界断粮 等 useCardAndTarget 型替代出法需要目标,旧实现固定
       // validTargets=[] 且 params 只有 cardId → AI 提交缺目标,引擎恒拒
       // 「需要选择目标」,整类替代出法在无头/AI 客户端不可用。
-      const validTargets = computeValidTargets(view, seatIndex, targetFilter, rules);
+      const declaration = action.actionType.startsWith('use:') ? action.actionType.slice(4) : undefined;
+      const declared = declaration && CARD_DEFS_BY_NAME.has(declaration) ? declaration : undefined;
+      const validTargets = computeValidTargets(view, seatIndex, targetFilter, rules,
+        { ...card, ...(declared ? { name: declared } : {}), countsAsSlash: !!declared || card.name === action.skillId });
       if (rules.needsTarget && !rules.selfTarget && validTargets.length === 0) continue;
       const cardDesc = `${card.suit}${card.rank}`;
       const sampleParams = rules.selfTarget
@@ -775,9 +789,11 @@ export function enumerateAvailableActions(
     // 而技能自带 cardFilter 的代价牌(离间 弃一张牌 + 选两名男性)动作名是技能名,
     // 那张牌不是被使用的牌——按杀解释会让 min=max=2 塌成 1,引擎随即拒
     // 「需要选择两名男性角色」。故用「动作名 === 牌名」判定是否同一张牌。
-    const slashScaled = !!message.preceding?.length || source?.name === message.skillId;
+    const declaration = message.actionType.startsWith('use:') ? message.actionType.slice(4) : undefined;
+    const declaredName = declaration && CARD_DEFS_BY_NAME.has(declaration) ? declaration : undefined;
+    const slashScaled = !!message.preceding?.length || !!declaredName || source?.name === message.skillId;
     const card = source
-      ? { ...source, countsAsSlash: slashScaled }
+      ? { ...source, ...(declaredName ? { name: declaredName } : {}), countsAsSlash: slashScaled }
       : ingredient
         ? { ...ingredient, name: message.skillId, countsAsSlash: slashScaled }
         : undefined;

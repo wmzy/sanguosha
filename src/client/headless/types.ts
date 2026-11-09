@@ -111,12 +111,17 @@ export interface AiViewSnapshot {
     handCount: number;
     hand?: Card[];
     equipment: GameView['players'][number]['equipment'];
+    equipmentCards?: Card[];
     skills: string[];
     /** 玩家标记(横置/连环等)。横置状态以 'chained' 标记代表,
      *  AI 据此判断铁索连环应横置还是重置(toggle)。 */
     marks: Array<{ id: string; scope: number }>;
     faction?: string;
     identity?: string;
+    pendingTricks?: Card[];
+    distanceVars?: GameView['players'][number]['distanceVars'];
+    turnUsage?: GameView['players'][number]['turnUsage'];
+    tags?: string[];
   }>;
   pending: {
     target: number;
@@ -133,5 +138,7 @@ export interface AiViewSnapshot {
     playerCandidates?: Array<{ index: number; name: string }>;
   } | null;
   zones: { deckCount: number; discardPileCount: number };
+  deadline?: number | null;
+  processing?: Card[];
   log: { time: number; player: number; text: string }[];
 }

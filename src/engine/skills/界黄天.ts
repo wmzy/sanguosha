@@ -96,6 +96,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   // (GameView 不暴露 faction,activeWhen 仅做能力范围内的 UI 过滤)。
   api.defineAction('use', {
     label: DISPLAY_NAME,
+    availableToOthers: true,
     style: 'primary',
     prompt: {
       type: 'useCard',
@@ -108,7 +109,9 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     },
     activeWhen: (ctx) =>
       // 主公本人不应发动界黄天
+      ownerId === 0 && ctx.view.players[ownerId]?.alive === true &&
       ctx.perspectiveIdx !== ownerId &&
+      ctx.view.players[ctx.perspectiveIdx]?.faction === '群' &&
       activeUnlessUsedThisTurn(SKILL_ID)(ctx) &&
       // 手中有可交的牌时才渲染
       ctx.view.players[ctx.perspectiveIdx]?.hand?.some(

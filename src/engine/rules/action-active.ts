@@ -6,6 +6,7 @@
 // 会形成 engine→client 反向依赖。故放 engine 层,与 ActionContext(engine/types)同层。
 // client/utils/gameViewHelpers 的 DEFAULT_PLAY_ACTIVE 复用此处,消除重复。
 import type { ActionContext } from '../types';
+import { viewExtraCardTarget } from './extra-card-target';
 import {
   SLASH_USED_COUNT_KEY,
   SLASH_EXEMPT_SUIT_KEY,
@@ -54,8 +55,11 @@ export function viewSlashMax(view: ActionContext['view'], player: number): numbe
   if (weapon?.slashUnlimited) return Infinity;
   // 回合制效果:前缀聚合('杀/unlimited/' 任一 true → ∞)
   const tu = p.turnUsage ?? {};
+  const roarSuppressed = p.skills.includes('咆哮') && p.skills.includes('缠怨') && p.health <= 1;
   for (const [k, v] of Object.entries(tu)) {
-    if (k.startsWith(SLASH_UNLIMITED_PREFIX) && v) return Infinity;
+    if (k.startsWith(SLASH_UNLIMITED_PREFIX) && v && !(roarSuppressed && k === `${SLASH_UNLIMITED_PREFIX}咆哮`)) {
+      return Infinity;
+    }
   }
   let max = 1;
   for (const [k, v] of Object.entries(tu)) {
@@ -119,5 +123,14 @@ export function viewCanSlash(view: ActionContext['view'], player: number): boole
       return true;
     }
   }
-  return viewSlashUsed(view, player) < viewSlashMax(view, player);
+  return viewSlashUsed(view, player) < viewSlashMax(view, player) || viewExtraCardTarget(view, player, '杀') !== undefined;
+}
+
+export function viewCanSlashTarget(view: ActionContext['view'], player: number, target: number): boolean {
+  const usage = view.players[player]?.turnUsage;
+  if (usage?.['陷阵/lostTarget'] === target) return false;
+  if (!viewCanSlash(view, player)) return false;
+  if (viewSlashUsed(view, player) < viewSlashMax(view, player)) return true;
+  const extra = viewExtraCardTarget(view, player, '杀');
+  return extra === undefined || target === extra;
 }

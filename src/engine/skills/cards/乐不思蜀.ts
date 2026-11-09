@@ -37,8 +37,11 @@ async function resolveIndulgence(ctx: ResolveCtx): Promise<void> {
   // 判定结果属于本次调用,不受嵌套判定或天妒收牌影响。
   const judgeCardId = await runJudgeFlow(state, target, '乐不思蜀');
   const judgeCard = judgeCardId ? state.cardMap[judgeCardId] : undefined;
-  if (judgeCard && judgeCard.suit !== '♥') {
-    // 非♥：加跳过出牌阶段标签
+  const reversed = state.players[target]?.tags?.includes('思蜀/反转') === true;
+  const skipsPlayPhase = judgeCard &&
+    (reversed ? judgeCard.suit === '♥' : judgeCard.suit !== '♥');
+  if (skipsPlayPhase) {
+    // 默认非♥跳过；思蜀反转后改为红桃跳过。
     await applyAtom(state, { type: '加标签', player: target, tag: SKIP_TAG });
   }
   // 移除延时锦囊（♥时无效弃置，非♥时生效后弃置）

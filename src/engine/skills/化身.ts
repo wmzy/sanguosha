@@ -47,8 +47,7 @@
 //     (主公第一回合开始即游戏开始,此时所有左慈实例同步初始化)。
 //   - 技能选择 UI(从亮出武将挑一个技能):用 chooseOption prompt + respond{option} 实现。
 //   - 只有一个可选技能时自动选取(无需询问)。
-//   - 界版"移去至多两张":简化为移去池末尾的卡片(不弹面板让玩家选具体哪张),
-//     但始终保留展示牌(避免歧义——展示牌被移去后技能归属未明确)。
+//   - 界版"移去至多两张":玩家从未展示的化身牌中选择具体要移去的牌。
 import type { Faction, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { createRng } from '../util/rng';
@@ -75,6 +74,7 @@ const SWITCH_CHOICE_KEY = '化身/switchChoice';
 // 界版
 const ACTION_CHOICE_KEY = '化身/actionChoice';
 const SWAP_COUNT_KEY = '化身/swapCount';
+const SWAP_SELECTED_KEY = '化身/swapSelected';
 
 // ── 请求回应 requestType(标版与界版共用 '化身/' 前缀) ──
 const SKILL_REQUEST = '化身/选技能';
@@ -84,6 +84,7 @@ const SWITCH_REQUEST = '化身/是否切换';
 // 界版
 const ACTION_REQUEST = '化身/选择行动';
 const SWAP_COUNT_REQUEST = '化身/移除数量';
+const SWAP_SELECT_REQUEST = '化身/选择移去牌';
 
 // 选技能询问时,把候选技能列表暂存到 localVars(供 respond validate 校验)
 const CANDIDATES_KEY = (ownerId: number) => `化身/candidates/${ownerId}`;
@@ -202,6 +203,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (count > maxRemovable) return `最多移去 ${maxRemovable} 张`;
         return null;
       }
+      if (rt === SWAP_SELECT_REQUEST) {
+        const prompt = (slot.atom as unknown as { prompt?: { options?: Array<{ value: string }> } }).prompt;
+        if (typeof params.option !== 'string' || !prompt?.options?.some((option) => option.value === params.option)) return '请选择一张候选化身牌';
+        return null;
+      }
       // ── 标版:是否切换(choice 布尔) ──
       if (rt === SWITCH_REQUEST) {
         if (typeof params.choice !== 'boolean') return '需要 choice(布尔)';
@@ -232,6 +238,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
         st.localVars[ACTION_CHOICE_KEY] = Number(params.option);
       } else if (rt === SWAP_COUNT_REQUEST) {
         st.localVars[SWAP_COUNT_KEY] = Number(params.option);
+      } else if (rt === SWAP_SELECT_REQUEST) {
+        const selected = (st.localVars[SWAP_SELECTED_KEY] as string[] | undefined) ?? [];
+        st.localVars[SWAP_SELECTED_KEY] = [...selected, params.option];
       } else if (rt === SWITCH_REQUEST) {
         st.localVars[SWITCH_CHOICE_KEY] = params.choice === true;
       } else if (rt === CHARACTER_REQUEST) {
@@ -448,7 +457,7 @@ async function doReplace(state: GameState, ownerId: number): Promise<void> {
 
 /**
  * 界版行动 2:移去至多两张化身牌并获得等量新的化身牌。
- * 简化:移去池末尾的卡片,始终保留展示牌(避免歧义)。
+ * 由玩家指定移去的非展示牌,再抽取等量新牌。
  * 不改变当前展示的化身牌和技能。
  */
 async function doSwap(state: GameState, ownerId: number): Promise<void> {
@@ -482,22 +491,37 @@ async function doSwap(state: GameState, ownerId: number): Promise<void> {
   const count = Math.min(rawCount, maxRemovable);
   if (count < 1) return;
 
-  // 选择要移除的索引:优先末尾的非展示牌
-  const toRemove: number[] = [];
-  for (let i = pool.length - 1; i >= 0 && toRemove.length < count; i--) {
-    if (i !== litIdx) toRemove.push(i);
+  delete state.localVars[SWAP_SELECTED_KEY];
+  for (let i = 0; i < count; i++) {
+    const selected = (state.localVars[SWAP_SELECTED_KEY] as string[] | undefined) ?? [];
+    const available = pool.filter((name, index) => index !== litIdx && !selected.includes(name));
+    if (available.length === 0) break;
+    await applyAtom(state, {
+      type: '请求回应',
+      requestType: SWAP_SELECT_REQUEST,
+      target: ownerId,
+      prompt: {
+        type: 'chooseOption',
+        title: `化身:选择要移去的第 ${i + 1} 张牌`,
+        options: available.map((name) => ({ value: name, label: name })),
+      },
+      timeout: 30,
+    });
   }
-  const removeSet = new Set(toRemove);
+  const selected = (state.localVars[SWAP_SELECTED_KEY] as string[] | undefined) ?? [];
+  delete state.localVars[SWAP_SELECTED_KEY];
+  if (selected.length === 0) return;
+  const removeSet = new Set(selected);
   // 保留池:过滤掉被移除的索引
   const kept: string[] = [];
   let newLitIdx = 0;
   for (let i = 0; i < pool.length; i++) {
-    if (removeSet.has(i)) continue;
+    if (removeSet.has(pool[i])) continue;
     if (i === litIdx) newLitIdx = kept.length;
     kept.push(pool[i]);
   }
   // 抽等量新牌追加到池
-  const drawn = draw化身Cards(state, ownerId, count);
+  const drawn = draw化身Cards(state, ownerId, selected.length);
   kept.push(...drawn);
 
   player.vars[POOL_KEY] = kept;

@@ -72,6 +72,8 @@ export interface PickTargetCardOptions {
   /** 是否允许选判定区延时锦囊。过河拆桥/顺手牵羊=true(默认);
    *  反馈=false(经典规则仅手牌+装备,不含判定区)。 */
   includeJudge?: boolean;
+  /** 是否纳入目标手牌。清侧只允许弃置装备区/判定区牌。默认 true。 */
+  includeHand?: boolean;
 }
 
 /** 弹 pickTargetCard 选牌面板,使用者(from)从目标区域选一张牌(弃置或获得)。
@@ -101,7 +103,7 @@ export async function runPickTargetCardPanel(
           cardId: t.card.id,
           cardName: t.card.name,
         }));
-  const handCount = targetPlayer.hand.length;
+  const handCount = opts.includeHand === false ? 0 : targetPlayer.hand.length;
 
   // 超时默认选择:明牌优先(装备第一张→判定第一张),否则手牌[0]
   const defaultZone =
