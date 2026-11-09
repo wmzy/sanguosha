@@ -25,6 +25,8 @@ import {
 import { joinAndReady, createLobbyAdvancer } from './lobby';
 import type { RoomConfig } from '../server/protocol';
 import { DEFAULT_CHAT_CONFIG } from '../server/protocol';
+import { ArenaArchive } from '../arena/archive';
+import { ArenaPlayerSession } from '../arena/player';
 
 // 构建期注入的默认服务器 URL。
 // tsx 直跑源码时该符号未定义 → typeof 守卫避免 ReferenceError，兜底 localhost（本仓库开发用）。
@@ -78,6 +80,7 @@ function buildRoomConfig(opts: { timeoutSec?: number; name?: string }, defaultNa
 }
 
 async function main(): Promise<void> {
+  let arena: ArenaPlayerSession | undefined;
   // auth:显式配置优先;否则每进程生成随机自动账号(注册一次,token 随进程存活)
   const auth = MCP_AUTH.token
     ? { token: MCP_AUTH.token }
@@ -88,12 +91,25 @@ async function main(): Promise<void> {
     onError: (e) => logErr(`WS error: ${e.message}`),
     onPhaseChange: (p) => logErr(`phase -> ${p}`),
     onGameOver: (w) => logErr(`game over: ${w}`),
+    onChat: (messages, source) => arena?.addChat(messages, source),
   }, auth);
   logErr(`auth account: ${'username' in auth ? auth.username : '(token)'}`);
 
   let startedRole: StartedRole | null = null;
   // 房主的 minPlayers 门槛在 createRoom 成功后才确定，故用可变实现 + 稳定包装。
   let lobbyAdvanceImpl: () => void = () => {};
+
+  const attachArena = () => {
+    const matchId = process.env.SGS_ARENA_ID ?? `mcp-${hgc.roomId}`;
+    const archive = new ArenaArchive(matchId, process.env.SGS_ARENA_DIR);
+    const playerId = process.env.SGS_ARENA_PLAYER_ID ?? `seat-${hgc.seatIndex}-${process.pid}`;
+    arena = new ArenaPlayerSession(hgc, playerId, archive, process.env.SGS_ARENA_PERSONA);
+    ctx.arena = arena;
+    if (!archive.manifest()) archive.write('manifest.json', {
+      id: matchId, name: 'MCP 对局', roomId: hgc.roomId, startedAt: Date.now(), status: 'playing',
+      players: [{ id: playerId, name: MCP_AUTH.username ?? playerId, mode: 'mcp' }],
+    });
+  };
 
   const assertNotStarted = (attempting: StartedRole): void => {
     if (startedRole === null) return;
@@ -124,6 +140,7 @@ async function main(): Promise<void> {
       minPlayers: opts.minPlayers ?? maxPlayers,
     });
     startedRole = 'host';
+    attachArena();
     logErr(`multiplayer room created: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost} minPlayers=${opts.minPlayers ?? maxPlayers}`);
     // 房主建房后允许 timeoutSec 后续在 play 内通过 applyConfigUpdate 应用（已 ready 后服务端仍接受 updateConfig 在 lobby）。
   };
@@ -139,6 +156,7 @@ async function main(): Promise<void> {
       config,
     });
     startedRole = 'guest';
+    attachArena();
     lobbyAdvanceImpl = createLobbyAdvancer(hgc);
     logErr(`multiplayer room joined: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost}`);
   };
@@ -163,7 +181,7 @@ async function main(): Promise<void> {
     doCreateRoom,
     doJoinRoom,
     doSpectateRoom,
-    lobbyAdvance,
+    lobbyAdvance: process.env.SGS_ARENA_ID ? () => {} : lobbyAdvance,
     isStarted,
     seat: SEAT,
     playState: { lastView: null },

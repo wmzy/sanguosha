@@ -64,6 +64,8 @@ export const DEFAULT_CHAT_CONFIG: ChatConfig = {
 
 /** 房间级游戏配置(调试/普通房间通用)。在 startGame 时传给引擎。 */
 export interface RoomConfig {
+  /** Local arena writes its own permanent archive instead of restartable room snapshots. */
+  managedByArena?: boolean;
   /** 房间名 */
   name: string;
   /** 操作倒计时秒数(绝对值)。正值=秒数; 0=无限。默认 30。 */
@@ -146,7 +148,9 @@ export function normalizeRoomConfig(raw: unknown): RoomConfig {
     typeof rawMode === 'string' && (GAME_MODES as readonly string[]).includes(rawMode)
       ? (rawMode as GameMode)
       : DEFAULT_ROOM_CONFIG.gameMode;
-  return { name, timeoutSec, charPool, handSize, chat, gameMode };
+  return { name, timeoutSec, charPool, handSize, chat, gameMode,
+    ...(r['managedByArena'] === true ? { managedByArena: true } : {}),
+  };
 }
 
 /** 倒计时信息(pending 优先,否则出牌/弃牌阶段的 idleDeadline)。

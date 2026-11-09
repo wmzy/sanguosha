@@ -1,0 +1,22 @@
+{
+  "name": "Gemma 4 实战",
+  "timeoutSec": 60,
+  "decisionTimeoutMs": 45000,
+  "maxDurationMs": 1800000,
+  "maxDecisions": 500,
+  "charPool": "standard",
+  "players": [
+    {
+      "id": "gemma",
+      "name": "Gemma4",
+      "mode": "api",
+      "api": {
+        "protocol": "gemini",
+        "model": "gemma-4-26b-a4b-it",
+        "apiKeyEnv": "GEMINI_API_KEY",
+        "maxOutputTokens": 1500
+      }
+    },
+    { "id": "baseline", "name": "基线玩家", "mode": "heuristic" }
+  ]
+}

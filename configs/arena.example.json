@@ -1,0 +1,27 @@
+{
+  "name": "五 AI 身份局",
+  "serverUrl": "http://localhost:3930",
+  "timeoutSec": 60,
+  "decisionTimeoutMs": 40000,
+  "maxDurationMs": 1800000,
+  "charPool": "standard",
+  "players": [
+    {
+      "id": "gemini",
+      "name": "Gemini",
+      "mode": "api",
+      "persona": "谨慎判断阵营，善于观察其他玩家的行动。",
+      "api": { "protocol": "gemini", "model": "填入当前账号可用的模型ID", "apiKeyEnv": "GEMINI_API_KEY" }
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "mode": "api",
+      "persona": "积极寻找击杀机会，也愿意通过公开发言交涉。",
+      "api": { "protocol": "openai-compatible", "baseUrl": "https://api.deepseek.com", "model": "填入当前账号可用的模型ID", "apiKeyEnv": "DEEPSEEK_API_KEY" }
+    },
+    { "id": "external", "name": "MCP 选手", "mode": "mcp" },
+    { "id": "baseline1", "name": "基线甲", "mode": "heuristic" },
+    { "id": "baseline2", "name": "基线乙", "mode": "heuristic" }
+  ]
+}

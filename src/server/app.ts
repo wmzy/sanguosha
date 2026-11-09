@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import { cors, requestLogger, errorHandler, rateLimit } from './middleware';
 import { gameSessions } from './registry';
 import { applyRestRoutes } from './rest';
+import { applyArenaRoutes } from './arena';
 import { applyAuthRoutes } from './auth/routes';
 import { GameSession } from './session';
 import { createLogger } from './logger';
@@ -28,6 +29,7 @@ app.onError(errorHandler);
 // REST 路由注册到主 app 实例(中间件照常生效)
 applyAuthRoutes(app);
 applyRestRoutes(app);
+applyArenaRoutes(app);
 
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 /** 无连接快速/debug 房间扫描间隔。

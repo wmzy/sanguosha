@@ -41,7 +41,7 @@ describe('projectView', () => {
     expect(snap.viewer).toBe(0);
     expect(snap.players[0].hand).toHaveLength(1);
     expect(snap.log.length).toBeLessThanOrEqual(20); // 截断
-    expect((snap.players[0] as { distanceVars?: unknown }).distanceVars).toBeUndefined(); // 丢弃
+    expect(snap.players[0].distanceVars?.attackRange).toBe(1); // AI 决策需要公开距离信息
     expect((snap as { settlementStack?: unknown }).settlementStack).toBeUndefined();
   });
 

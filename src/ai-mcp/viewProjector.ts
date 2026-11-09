@@ -3,7 +3,7 @@
 // projectView: 完整投影（getSnapshot 工具用）。
 // projectDiff: 两次投影之间的增量（play 工具用，降低 token）。
 // 纯函数。见 spec §4.4。
-import type { GameView } from '../engine/types';
+import type { Card, GameView } from '../engine/types';
 import type { AiViewSnapshot } from '../client/headless/types';
 import { getPendingRequestType } from '../client/utils/pendingRespond';
 
@@ -41,11 +41,17 @@ export function projectView(view: GameView): AiViewSnapshot {
       handCount: p.handCount,
       hand: p.hand,
       equipment: p.equipment,
+      equipmentCards: Object.values(p.equipment).map((id) => view.cardMap[id]).filter(Boolean),
       skills: p.skills,
       // marks(横置/连环等):AI 据此判断铁索连环应横置还是重置。
       // 只投影 id+scope(丢弃 payload,降低 token)。
       marks: (p.marks ?? []).map((m) => ({ id: m.id, scope: m.scope })),
       identity: p.identity,
+      faction: p.faction,
+      pendingTricks: p.pendingTricks?.map((id) => view.cardMap[id]).filter(Boolean),
+      distanceVars: p.distanceVars,
+      turnUsage: p.turnUsage,
+      tags: p.tags,
     })),
     pending: view.pending
       ? {
@@ -76,6 +82,8 @@ export function projectView(view: GameView): AiViewSnapshot {
       ? { deckCount: view.zones.deckCount, discardPileCount: view.zones.discardPileCount }
       : { deckCount: 0, discardPileCount: 0 },
     log: view.log.slice(-MAX_LOG),
+    deadline: view.deadline,
+    processing: view.zones?.processing?.map((id) => view.cardMap[id]).filter(Boolean) ?? [],
   };
 }
 
@@ -97,6 +105,11 @@ export interface PlayerStateDiff {
   identity?: string;
   /** 标记(横置/连环等)变化。 */
   marks?: Array<{ id: string; scope: number }>;
+  pendingTricks?: AiViewSnapshot['players'][number]['pendingTricks'];
+  distanceVars?: AiViewSnapshot['players'][number]['distanceVars'];
+  turnUsage?: AiViewSnapshot['players'][number]['turnUsage'];
+  tags?: string[];
+  equipmentCards?: Card[];
 }
 
 /** 状态增量：只含变化的玩家和区域。 */
@@ -130,6 +143,12 @@ function diffPlayer(
   if (!jsonEq(prev.marks, curr.marks)) { d.marks = curr.marks; changed = true; }
   if (prev.faction !== curr.faction) { d.faction = curr.faction; changed = true; }
   if (prev.identity !== curr.identity) { d.identity = curr.identity; changed = true; }
+  for (const key of ['pendingTricks', 'distanceVars', 'turnUsage', 'tags', 'equipmentCards'] as const) {
+    if (!jsonEq(prev[key], curr[key])) {
+      Object.assign(d, { [key]: curr[key] });
+      changed = true;
+    }
+  }
   return changed ? d : null;
 }
 

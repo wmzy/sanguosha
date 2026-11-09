@@ -1,0 +1,14 @@
+{
+  "name": "五 AI 完整对局检查",
+  "timeoutSec": 2,
+  "maxDurationMs": 180000,
+  "maxDecisions": 2000,
+  "charPool": "standard",
+  "players": [
+    { "id": "alpha", "name": "AI 甲", "mode": "heuristic" },
+    { "id": "beta", "name": "AI 乙", "mode": "heuristic" },
+    { "id": "gamma", "name": "AI 丙", "mode": "heuristic" },
+    { "id": "delta", "name": "AI 丁", "mode": "heuristic" },
+    { "id": "epsilon", "name": "AI 戊", "mode": "heuristic" }
+  ]
+}
