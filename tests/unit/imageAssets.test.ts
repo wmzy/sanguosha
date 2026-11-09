@@ -16,6 +16,11 @@ const testIndex: PacksIndex = {
       resources: [
         { id: 'character/曹操', type: 'image' },
         { id: 'character/刘备', type: 'image' },
+        { id: 'character/关羽', type: 'image' },
+        { id: 'character/诸葛亮', type: 'image' },
+        { id: 'character/张昭张纮', type: 'image' },
+        { id: 'character/甄姬', type: 'image' },
+        { id: 'character/界刘备', type: 'image', file: 'character/界刘备_special.png' },
         // basic 牌用显式 .jpg file
         { id: 'card/杀-10-♠', type: 'image', file: 'card/杀-10-♠.jpg' },
         { id: 'card/杀-4-♥', type: 'image', file: 'card/杀-4-♥.jpg' },
@@ -51,12 +56,45 @@ describe('getCharacterImage', () => {
     expect(getCharacterImage('刘备')).toBe('/packs/base/character/刘备.png');
   });
 
+  it('界限突破武将在无独立立绘时自动无缝回退至标准版立绘', () => {
+    // 界曹操、界关羽未单独注册，回退至曹操、关羽
+    expect(getCharacterImage('界曹操')).toBe('/packs/base/character/曹操.png');
+    expect(getCharacterImage('界关羽')).toBe('/packs/base/character/关羽.png');
+    expect(getCharacterImage('界诸葛亮')).toBe('/packs/base/character/诸葛亮.png');
+  });
+
+  it('当存在独立界限突破立绘时优先使用独立立绘', () => {
+    // 界刘备单独注册了界刘备_special.png
+    expect(getCharacterImage('界刘备')).toBe('/packs/base/character/界刘备_special.png');
+    // 标准版刘备仍使用标准版
+    expect(getCharacterImage('刘备')).toBe('/packs/base/character/刘备.png');
+  });
+
+  it('支持武将别名及同系武将立绘自动回退', () => {
+    // 卧龙诸葛亮 -> 卧龙诸葛 -> 诸葛亮
+    expect(getCharacterImage('卧龙诸葛亮')).toBe('/packs/base/character/诸葛亮.png');
+    // 界卧龙诸葛 -> 卧龙诸葛 -> 诸葛亮
+    expect(getCharacterImage('界卧龙诸葛')).toBe('/packs/base/character/诸葛亮.png');
+    // 诸葛瞻 -> 诸葛亮
+    expect(getCharacterImage('诸葛瞻')).toBe('/packs/base/character/诸葛亮.png');
+    // 张昭张弘 -> 张昭张纮
+    expect(getCharacterImage('张昭张弘')).toBe('/packs/base/character/张昭张纮.png');
+    // 界张昭张弘 -> 张昭张弘 -> 张昭张纮
+    expect(getCharacterImage('界张昭张弘')).toBe('/packs/base/character/张昭张纮.png');
+    // 界郭皇后 -> 郭皇后 -> 甄姬
+    expect(getCharacterImage('界郭皇后')).toBe('/packs/base/character/甄姬.png');
+  });
+
   it('returns null for unregistered character', () => {
     expect(getCharacterImage('不存在')).toBeNull();
   });
 
   it('returns null only for empty name', () => {
     expect(getCharacterImage('')).toBeNull();
+  });
+
+  it('界限突破武将若其标准版武将亦未注册则返回 null', () => {
+    expect(getCharacterImage('界不存在')).toBeNull();
   });
 });
 

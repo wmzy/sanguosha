@@ -15,6 +15,7 @@ const MANIFEST_PATH = join(PACK_DIR, 'manifest.json');
 const CONCURRENCY = 6;
 
 const generals = [
+  // 基础标准版与风包（原有31将）
   ['曹操', 'caocao'], ['司马懿', 'simayi'], ['夏侯惇', 'xiahoudun'],
   ['张辽', 'zhangliao'], ['许褚', 'xuchu'], ['郭嘉', 'guojia'], ['甄姬', 'zhenji'],
   ['刘备', 'liubei'], ['关羽', 'guanyu'], ['张飞', 'zhangfei'], ['赵云', 'zhaoyun'],
@@ -22,9 +23,38 @@ const generals = [
   ['甘宁', 'ganning'], ['吕蒙', 'lvmeng'], ['黄盖', 'huanggai'], ['周瑜', 'zhouyu'],
   ['大乔', 'daqiao'], ['陆逊', 'luxun'], ['孙尚香', 'sunshangxiang'],
   ['华佗', 'huatuo'], ['吕布', 'lvbu'], ['貂蝉', 'diaochan'],
-  // Wind expansion (张角 is already represented above only if present in base list; add below).
   ['夏侯渊', 'xiahouyuan'], ['黄忠', 'huangzhong'], ['魏延', 'weiyan'],
   ['小乔', 'xiaoqiao'], ['周泰', 'zhoutai'], ['张角', 'zhangjiao'], ['于吉', 'yuji'],
+
+  // 魏国扩充武将
+  ['曹仁', 'caoren'], ['荀彧', 'xunyu'], ['典韦', 'dianwei'],
+  ['曹丕', 'caopi'], ['徐晃', 'xuhuang'], ['张郃', 'zhanghe'], ['邓艾', 'dengai'],
+  ['于禁', 'yujin'], ['张春华', 'zhangchunhua'], ['曹冲', 'caochong'], ['曹彰', 'caozhang'],
+  ['曹植', 'caozhi'], ['李典', 'lidian'], ['王异', 'wangyi'], ['郭淮', 'guohuai'],
+
+  // 蜀国扩充武将
+  ['马超', 'machao'], ['马岱', 'madai'], ['卧龙诸葛', 'wolong'],
+  ['庞统', 'pangtong'], ['孟获', 'menghuo'], ['祝融', 'zhurong'], ['姜维', 'jiangwei'],
+  ['刘禅', 'liushan'], ['关兴张苞', 'guanxingzhangbao'], ['夏侯氏', 'xiahoushi'], ['廖化', 'liaohua'],
+  ['张松', 'zhangsong'], ['徐庶', 'xushu'], ['法正', 'fazheng'], ['简雍', 'jianyong'],
+
+  // 吴国扩充武将
+  ['太史慈', 'taishici'], ['鲁肃', 'lusu'], ['孙坚', 'sunjian'], ['孙策', 'sunce'],
+  ['张昭张纮', 'erzhang'], ['凌统', 'lingtong'], ['吴国太', 'wuguotai'],
+  ['徐盛', 'xusheng'], ['程普', 'chengpu'], ['虞翻', 'yufan'],
+  ['韩当', 'handang'], ['陆抗', 'lukang'],
+
+  // 群雄扩充武将
+  ['袁绍', 'yuanshao'], ['庞德', 'pangde'], ['颜良文丑', 'yanliangwenchou'], ['董卓', 'dongzhuo'],
+  ['贾诩', 'jiaxu'], ['左慈', 'zuoci'], ['蔡文姬', 'caiwenji'], ['伏皇后', 'fuhuanghou'],
+  ['公孙瓒', 'gongsunzan'], ['刘表', 'liubiao'], ['华雄', 'huaxiong'], ['李儒', 'liru'],
+  ['沮授', 'jvshou'], ['蔡夫人', 'caifuren'], ['陈宫', 'chengong'], ['高顺', 'gaoshun'],
+  ['袁术', 'yuanshu'], ['许攸', 'wis_xuyou'],
+];
+
+const generalAliases = [
+  ['卧龙诸葛亮', 'wolong'],
+  ['张昭张弘', 'erzhang'],
 ];
 
 const cards = [
@@ -48,6 +78,15 @@ const cards = [
 const assets = [
   ...generals.map(([name, file]) => ({
     id: `character/${name}`,
+    source: `image/fullskin/generals/full/${file}.png`,
+  })),
+  ...generalAliases.map(([name, file]) => ({
+    id: `character/${name}`,
+    source: `image/fullskin/generals/full/${file}.png`,
+  })),
+  // 为界限突破武将自动映射复用同名标准版立绘（无独立立绘时）
+  ...generals.map(([name, file]) => ({
+    id: `character/界${name}`,
     source: `image/fullskin/generals/full/${file}.png`,
   })),
   ...cards.map(([name, file]) => ({ id: `card/art/${name}`, source: `image/card/${file}.png` })),
@@ -106,9 +145,18 @@ async function downloadOne(item) {
   }
 
   const url = `${RAW_ROOT}/${item.source}`;
-  const response = await fetch(url, { redirect: 'error' });
-  if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}: ${url}`);
+  let response;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      response = await fetch(url, { redirect: 'error' });
+      if (response && response.ok) break;
+      if (attempt === 4) {
+        throw new Error(`${response?.status ?? 'error'} ${response?.statusText ?? 'failed'}: ${url}`);
+      }
+    } catch (err) {
+      if (attempt === 4) throw err;
+      await new Promise((r) => setTimeout(r, 500 * attempt));
+    }
   }
   const bytes = Buffer.from(await response.arrayBuffer());
   const temporary = `${target}.download-${process.pid}`;
