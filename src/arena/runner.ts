@@ -66,7 +66,13 @@ export async function runArena(config: ArenaConfig, options: { signal?: AbortSig
   let lastAudienceSeq = -1;
   let publicChat: ChatMessage[] = [];
   const started = Date.now();
-  const stopped = () => finished || options.signal?.aborted === true || Date.now() - started > (config.maxDurationMs ?? 1_800_000) || decisions + externalDecisions >= (config.maxDecisions ?? 4000);
+  const currentRound = () => observer?.view?.turn?.round ?? 0;
+  const stopped = () =>
+    finished ||
+    options.signal?.aborted === true ||
+    Date.now() - started > (config.maxDurationMs ?? 14_400_000) ||
+    decisions + externalDecisions >= (config.maxDecisions ?? 10_000) ||
+    (Boolean(config.maxRounds) && currentRound() > config.maxRounds!);
   const request = async (path: string, token?: string, body?: unknown, method?: string) => {
     const response = await fetch(`${server}${path}`, {
       method: method ?? (body === undefined ? 'GET' : 'POST'),
@@ -246,7 +252,8 @@ export async function runArena(config: ArenaConfig, options: { signal?: AbortSig
     await captureAudience(observerToken);
     manifest.status = manifest.winner ? 'completed' : 'interrupted';
     if (!manifest.winner) manifest.error = options.signal?.aborted ? '用户取消对局'
-      : decisions + externalDecisions >= (config.maxDecisions ?? 4000) ? '达到决策数量上限' : '达到对局时长上限';
+      : (config.maxRounds && currentRound() > config.maxRounds) ? `达到最大回合数上限（${config.maxRounds}）`
+      : decisions + externalDecisions >= (config.maxDecisions ?? 10_000) ? '达到决策数量上限' : '达到对局时长上限';
     const replay = await request(`/api/rooms/${manifest.roomId}/arena-replay`, observerToken);
     if (replay) archive.write('replay.json', replay);
     // History persistence is asynchronous; allow its final write to finish before exporting.

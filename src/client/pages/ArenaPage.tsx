@@ -8,9 +8,15 @@ import { GameViewScaler } from '../components/GameViewScaler';
 import { ArenaTable } from '../components/arena/ArenaTable';
 import './arena.css';
 
+interface AudienceFrame {
+  seq: number;
+  at: number;
+  view: GameView;
+}
+
 interface ArenaMatchResponse {
   manifest: ArenaManifest;
-  audience: { seq: number; at: number; view: GameView } | null;
+  audience: AudienceFrame | null;
   publicChat: ChatMessage[];
 }
 const statusLabels = {
@@ -27,6 +33,10 @@ export function ArenaPage() {
   const [error, setError] = useState('');
   const [dock, setDock] = useState<'matches' | 'chat' | 'log' | null>(null);
   const [clean, setClean] = useState(false);
+  const [frames, setFrames] = useState<AudienceFrame[]>([]);
+  const [frameIndex, setFrameIndex] = useState<number>(-1);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playSpeed, setPlaySpeed] = useState<number>(1);
   const { ready } = useResourcePacks();
 
   useEffect(() => {
@@ -55,6 +65,9 @@ export function ArenaPage() {
   useEffect(() => {
     let active = true;
     setDetail(null);
+    setFrames([]);
+    setFrameIndex(-1);
+    setIsPlaying(false);
     if (!matchId)
       return () => {
         active = false;
@@ -72,15 +85,52 @@ export function ArenaPage() {
         if (active) setError(cause instanceof Error ? cause.message : '对局读取失败');
       }
     };
+    const loadFrames = async () => {
+      try {
+        const response = await fetch(`/api/arena/${encodeURIComponent(matchId)}/frames`);
+        if (response.ok) {
+          const data = (await response.json()) as { frames: AudienceFrame[] };
+          if (active && data.frames?.length) {
+            setFrames(data.frames);
+          }
+        }
+      } catch {}
+    };
     void load();
-    const timer = window.setInterval(() => void load(), 1000);
+    void loadFrames();
+    const timer = window.setInterval(() => {
+      void load();
+      void loadFrames();
+    }, 1500);
     return () => {
       active = false;
       window.clearInterval(timer);
     };
   }, [matchId]);
 
-  const view = detail?.audience?.view;
+  useEffect(() => {
+    if (!isPlaying || frames.length <= 1) return;
+    const interval = Math.max(100, Math.round(800 / playSpeed));
+    const timer = window.setInterval(() => {
+      setFrameIndex((prev) => {
+        const cur = prev === -1 ? 0 : prev;
+        if (cur >= frames.length - 1) {
+          setIsPlaying(false);
+          return frames.length - 1;
+        }
+        return cur + 1;
+      });
+    }, interval);
+    return () => window.clearInterval(timer);
+  }, [isPlaying, playSpeed, frames.length]);
+
+  const currentFrameIndex =
+    frameIndex === -1 ? (frames.length > 0 ? frames.length - 1 : -1) : frameIndex;
+  const currentFrame =
+    frames.length > 0 && currentFrameIndex >= 0 && currentFrameIndex < frames.length
+      ? frames[currentFrameIndex]
+      : detail?.audience;
+  const view = currentFrame?.view;
   const toggleDock = (tab: typeof dock) => setDock(dock === tab ? null : tab);
   const fullScreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -239,6 +289,84 @@ export function ArenaPage() {
                 </div>
               </aside>
             )}
+            {frames.length > 1 && (
+              <div className="arena-playback-bar" data-testid="arena-playback">
+                <div className="arena-playback-actions">
+                  <button
+                    title="从头开始查看（第 1 帧）"
+                    onClick={() => {
+                      setFrameIndex(0);
+                      setIsPlaying(false);
+                    }}
+                  >
+                    ⏮ 从头开始
+                  </button>
+                  <button
+                    title="上一帧"
+                    onClick={() => {
+                      setFrameIndex(Math.max(0, currentFrameIndex - 1));
+                      setIsPlaying(false);
+                    }}
+                  >
+                    ◀ 上一帧
+                  </button>
+                  <button
+                    className="arena-play-btn"
+                    title={isPlaying ? '暂停' : '自动回放'}
+                    onClick={() => {
+                      if (!isPlaying && currentFrameIndex >= frames.length - 1) {
+                        setFrameIndex(0);
+                      }
+                      setIsPlaying(!isPlaying);
+                    }}
+                  >
+                    {isPlaying ? '⏸ 暂停' : '▶ 播放'}
+                  </button>
+                  <button
+                    title="下一帧"
+                    onClick={() => {
+                      setFrameIndex(Math.min(frames.length - 1, currentFrameIndex + 1));
+                      setIsPlaying(false);
+                    }}
+                  >
+                    下一帧 ▶
+                  </button>
+                  <button
+                    title="跳至最新帧"
+                    onClick={() => {
+                      setFrameIndex(-1);
+                      setIsPlaying(false);
+                    }}
+                  >
+                    最新 ⏭
+                  </button>
+                  <button
+                    className="arena-speed-btn"
+                    onClick={() => setPlaySpeed((s) => (s === 1 ? 2 : s === 2 ? 5 : 1))}
+                    title="切换播放倍速"
+                  >
+                    {playSpeed}x 倍速
+                  </button>
+                </div>
+                <div className="arena-scrubber">
+                  <input
+                    type="range"
+                    min={0}
+                    max={frames.length - 1}
+                    value={currentFrameIndex}
+                    onChange={(e) => {
+                      setFrameIndex(Number(e.target.value));
+                      setIsPlaying(false);
+                    }}
+                    aria-label="回放进度"
+                  />
+                  <span className="arena-scrubber-info">
+                    第 <b>{currentFrameIndex + 1}</b> / {frames.length} 帧
+                    {view?.turn?.round ? ` · 第 ${view.turn.round} 轮 ${view.phase}` : ''}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
           <footer className="arena-footer">
             <span>
@@ -247,7 +375,10 @@ export function ArenaPage() {
             </span>
             <span>主公明置 · 阵亡亮身份 · 牌堆不公开</span>
             <span data-testid="arena-refresh">
-              每秒同步{detail?.audience ? ` · 第 ${detail.audience.seq} 帧` : ''}
+              {currentFrame ? `当前第 ${currentFrame.seq} 帧` : '等待中'}
+              {frames.length > 0 && frameIndex !== -1 && frameIndex < frames.length - 1
+                ? '（回放模式）'
+                : '（最新）'}
             </span>
           </footer>
         </div>

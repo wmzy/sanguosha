@@ -3,8 +3,9 @@
   "serverUrl": "http://localhost:3930",
   "timeoutSec": 60,
   "decisionTimeoutMs": 45000,
-  "maxDurationMs": 1800000,
-  "maxDecisions": 800,
+  "maxDurationMs": 14400000,
+  "maxDecisions": 10000,
+  "maxRounds": 128,
   "charPool": "standard",
   "players": [
     {

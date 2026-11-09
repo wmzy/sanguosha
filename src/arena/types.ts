@@ -27,6 +27,7 @@ export interface ArenaConfig {
   decisionTimeoutMs?: number;
   maxDurationMs?: number;
   maxDecisions?: number;
+  maxRounds?: number;
   charPool?: 'standard' | 'extended' | 'all';
   archiveDir?: string;
 }

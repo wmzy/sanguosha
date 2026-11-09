@@ -63,4 +63,17 @@ export function applyArenaRoutes(app: Hono): void {
       publicChat: readJson(join(dir, 'chat.json')) ?? [],
     });
   });
+
+  app.get('/api/arena/:id/frames', (c) => {
+    const dir = join(DEFAULT_ARENA_DIR, safeName(c.req.param('id')));
+    const jsonlPath = join(dir, 'audience.jsonl');
+    if (!existsSync(jsonlPath)) return c.json({ frames: [] });
+    try {
+      const content = readFileSync(jsonlPath, 'utf8');
+      const frames = content.trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+      return c.json({ frames });
+    } catch {
+      return c.json({ frames: [] });
+    }
+  });
 }

@@ -647,6 +647,81 @@
   text-shadow: 0 1px 3px #000;
   background: #130d0b6b;
 }
+.arena-playback-bar {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 16px;
+  background: linear-gradient(180deg, #222923f5, #141b17f5);
+  border: 1px solid #7c6843;
+  border-radius: 4px;
+  box-shadow: 0 6px 20px #000000bb;
+  color: #dfd5bc;
+  font-size: 11px;
+  z-index: 15;
+  backdrop-filter: blur(4px);
+}
+.arena-playback-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.arena-playback-actions button {
+  padding: 4px 10px;
+  background: #2b352c;
+  border: 1px solid #6b5c3e;
+  border-radius: 3px;
+  color: #e5ddc5;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.arena-playback-actions button:hover {
+  background: #3e4d3f;
+  border-color: #d1b46a;
+  color: #fff;
+}
+.arena-play-btn {
+  background: #4a3818 !important;
+  border-color: #d4a94b !important;
+  color: #ffd88a !important;
+  font-weight: bold;
+}
+.arena-speed-btn {
+  color: #b5ba9c !important;
+  font-family: monospace;
+}
+.arena-scrubber {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 580px;
+}
+.arena-scrubber input[type='range'] {
+  flex: 1;
+  accent-color: #d4a94b;
+  cursor: pointer;
+  height: 4px;
+}
+.arena-scrubber-info {
+  white-space: nowrap;
+  font-size: 11px;
+  color: #b0ab94;
+}
+.arena-scrubber-info b {
+  color: #ffd88a;
+  font-family: Georgia, serif;
+}
+.arena-clean .arena-playback-bar {
+  display: none;
+}
+
 .arena-footer {
   flex-shrink: 0;
   height: 30px;
