@@ -1,3 +1,7 @@
+import { spawn } from 'node:child_process';
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { ApiPlayerConfig, ArenaDecision, ModelMessage, ModelReply } from './types';
 
 const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
@@ -73,7 +77,72 @@ function asText(value: unknown): string {
 }
 
 export async function callModel(config: ApiPlayerConfig, messages: ModelMessage[], signal?: AbortSignal): Promise<ModelReply> {
-  const apiKey = process.env[config.apiKeyEnv];
+  if (config.protocol === 'codex-cli') {
+    const tmpDir = tmpdir();
+    const id = `codex_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const tmpFile = join(tmpDir, `${id}.json`);
+    const prompt = messages.map((m) => `[${m.role}]\n${m.content}`).join('\n\n');
+    const effort = config.reasoningEffort ?? 'high';
+
+    return new Promise<ModelReply>((resolvePromise, rejectPromise) => {
+      const child = spawn('codex', [
+        'exec',
+        '-m', config.model,
+        '-c', `model_reasoning_effort="${effort}"`,
+        '-c', 'features.plugins=false',
+        '-c', 'features.hooks=false',
+        '--ephemeral',
+        '-o', tmpFile,
+        '-',
+      ], { shell: true });
+
+      const onAbort = () => {
+        child.kill();
+        try { if (existsSync(tmpFile)) unlinkSync(tmpFile); } catch {}
+        rejectPromise(new Error('Codex CLI execution aborted'));
+      };
+      if (signal) signal.addEventListener('abort', onAbort, { once: true });
+
+      child.stdin.write(prompt);
+      child.stdin.end();
+
+      child.on('close', (code) => {
+        if (signal) signal.removeEventListener('abort', onAbort);
+        if (code !== 0 && !existsSync(tmpFile)) {
+          return rejectPromise(new Error(`Codex CLI failed with exit code ${code}`));
+        }
+        try {
+          if (!existsSync(tmpFile)) {
+            return rejectPromise(new Error('Codex CLI produced no output file'));
+          }
+          const content = readFileSync(tmpFile, 'utf8');
+          try { unlinkSync(tmpFile); } catch {}
+          resolvePromise({ decision: parseModelDecision(content) });
+        } catch (err) {
+          rejectPromise(err);
+        }
+      });
+
+      child.on('error', (err) => {
+        if (signal) signal.removeEventListener('abort', onAbort);
+        rejectPromise(err);
+      });
+    });
+  }
+
+  let apiKey = config.apiKeyEnv ? process.env[config.apiKeyEnv] : undefined;
+  if (!apiKey && config.apiKeyEnv) {
+    try {
+      const credPath = join(homedir(), '.dsh', '.credentials.yaml');
+      if (existsSync(credPath)) {
+        const match = readFileSync(credPath, 'utf8').match(new RegExp(`${config.apiKeyEnv}:\\s*([^\\s]+)`));
+        if (match) {
+          apiKey = match[1];
+          process.env[config.apiKeyEnv] = apiKey;
+        }
+      }
+    } catch {}
+  }
   if (!apiKey?.trim()) {
     throw new Error(`API key is missing: set environment variable ${config.apiKeyEnv}.`);
   }

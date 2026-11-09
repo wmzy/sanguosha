@@ -1,0 +1,68 @@
+{
+  "name": "五 AI 巅峰对决 (Haiku / Gemini 3.7 / Gemma 4 / DeepSeek v4.1 / GPT-6 Luna)",
+  "serverUrl": "http://localhost:3930",
+  "timeoutSec": 60,
+  "decisionTimeoutMs": 45000,
+  "maxDurationMs": 1800000,
+  "maxDecisions": 800,
+  "charPool": "standard",
+  "players": [
+    {
+      "id": "claude-haiku",
+      "name": "Claude-Haiku",
+      "mode": "api",
+      "persona": "沉着冷静，注意隐蔽身份，注重手牌防御与节奏。",
+      "api": {
+        "protocol": "openai-compatible",
+        "baseUrl": "http://127.0.0.1:8045/v1",
+        "model": "gemini-3.8-flash-high",
+        "apiKeyEnv": "ANTHROPIC_AUTH_TOKEN"
+      }
+    },
+    {
+      "id": "gemini-37",
+      "name": "Gemini-3.7-Flash",
+      "mode": "api",
+      "persona": "洞察全局，积极进攻，善于寻找击杀突破口。",
+      "api": {
+        "protocol": "gemini",
+        "model": "gemini-3.7-flash",
+        "apiKeyEnv": "GEMINI_API_KEY"
+      }
+    },
+    {
+      "id": "gemma-4",
+      "name": "Gemma-4-31B",
+      "mode": "api",
+      "persona": "务实求稳，保持自身血量，配合盟友行动。",
+      "api": {
+        "protocol": "gemini",
+        "model": "gemma-4-31b-it",
+        "apiKeyEnv": "GEMINI_API_KEY"
+      }
+    },
+    {
+      "id": "deepseek-v41",
+      "name": "DeepSeek-v4.1",
+      "mode": "api",
+      "persona": "谋定后动，擅长计算牌序，愿意在适当时机发言。",
+      "api": {
+        "protocol": "openai-compatible",
+        "baseUrl": "https://chickener.top/v1",
+        "model": "deepseek-v4.1-flash-1017",
+        "apiKeyEnv": "CHICKENER_API_KEY"
+      }
+    },
+    {
+      "id": "codex-gpt6",
+      "name": "Codex-GPT6-Luna",
+      "mode": "api",
+      "persona": "深度推理，精密把控距离与防具收益，关键轮次全力爆发。",
+      "api": {
+        "protocol": "codex-cli",
+        "model": "gpt-6-luna",
+        "reasoningEffort": "high"
+      }
+    }
+  ]
+}

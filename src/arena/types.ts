@@ -2,12 +2,13 @@ import type { GameView, ClientMessage, Card, ViewEvent } from '../engine/types';
 import type { AiViewSnapshot, AvailableAction, ChatMessage } from '../client/headless/types';
 
 export interface ApiPlayerConfig {
-  protocol: 'openai-compatible' | 'gemini';
+  protocol: 'openai-compatible' | 'gemini' | 'codex-cli';
   model: string;
   baseUrl?: string;
-  apiKeyEnv: string;
+  apiKeyEnv?: string;
   temperature?: number;
   maxOutputTokens?: number;
+  reasoningEffort?: string;
 }
 
 export interface ArenaPlayerConfig {

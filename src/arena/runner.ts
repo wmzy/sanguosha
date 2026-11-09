@@ -30,7 +30,22 @@ export async function runArena(config: ArenaConfig, options: { signal?: AbortSig
   if (config.players.length < 2 || config.players.length > 8) throw new Error('AI 对局人数必须为 2–8');
   if (new Set(config.players.map((p) => p.id)).size !== config.players.length) throw new Error('玩家 id 不能重复');
   for (const p of config.players) {
-    if (p.mode === 'api' && (!p.api || !process.env[p.api.apiKeyEnv])) throw new Error(`${p.name}: 请配置 API 和 ${p.api?.apiKeyEnv ?? 'apiKeyEnv'}`);
+    if (p.mode === 'api') {
+      if (!p.api) throw new Error(`${p.name}: 请配置 API`);
+      if (p.api.protocol !== 'codex-cli') {
+        const envKey = p.api.apiKeyEnv;
+        if (envKey && !process.env[envKey]) {
+          try {
+            const credPath = resolve(process.env.USERPROFILE || process.env.HOME || '', '.dsh', '.credentials.yaml');
+            if (existsSync(credPath)) {
+              const match = readFileSync(credPath, 'utf8').match(new RegExp(`${envKey}:\\s*([^\\s]+)`));
+              if (match) process.env[envKey] = match[1];
+            }
+          } catch {}
+        }
+        if (envKey && !process.env[envKey]) throw new Error(`${p.name}: 请配置 API 和 ${envKey}`);
+      }
+    }
   }
   const server = (config.serverUrl ?? 'http://localhost:3930').replace(/\/$/, '');
   const id = `${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
@@ -151,6 +166,7 @@ export async function runArena(config: ArenaConfig, options: { signal?: AbortSig
       session.record({ decisionId: observation.decisionId, seq: observation.seq, at, playerId: player.id,
         seat: observation.state.viewer, decision, action: submitted, source, elapsedMs: Date.now() - at,
         result: response.lastActionResult, error: [error, speechError].filter(Boolean).join('; ') || undefined, usage });
+      log(`[${player.name}] 决策 #${decisions + 1} (${source}, ${response.lastActionResult}): ${decision.strategySummary?.slice(0, 50) ?? ''}`);
       decisions++;
     }
   };
