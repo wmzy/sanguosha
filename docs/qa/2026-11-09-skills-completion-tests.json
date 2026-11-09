@@ -1,0 +1,12 @@
+{
+  "command": "pnpm test:all --reporter=json --outputFile=docs/qa/2026-11-09-skills-completion-tests.json",
+  "success": true,
+  "files": 465,
+  "passedFiles": 465,
+  "failedFiles": 0,
+  "totalTests": 4176,
+  "passedTests": 4176,
+  "failedTests": 0,
+  "skippedTests": 0,
+  "failures": []
+}

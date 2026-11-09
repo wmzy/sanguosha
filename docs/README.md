@@ -30,6 +30,9 @@ docs/
 | **查某个技能/卡牌的官方规则** | [research/武将技能.md](research/武将技能.md) · [research/卡牌信息.md](research/卡牌信息.md) · [research/基础规则.md](research/基础规则.md) |
 | **写技能测试** | [testing/技能测试框架.md](testing/技能测试框架.md) |
 | **接前后端协议** | [api.md](api.md) |
+| **多 AI 对战、独立上下文与观众归档** | [guides/AI对局接入.md](guides/AI对局接入.md) |
+| **查全部武将技能清单、当前缺口和实现可行性** | [qa/2026-11-09-skills-audit.md](qa/2026-11-09-skills-audit.md)（689份研究档案、165名可选武将） |
+| **查2026-11-09技能补全验收文档** | [qa/2026-11-09-skills-completion.md](qa/2026-11-09-skills-completion.md)（实现范围、测试结果、已知限制） |
 | **查某次架构决策的来龙去脉** | [decisions/](decisions/)（按编号 ADR） |
 
 ## 各目录说明

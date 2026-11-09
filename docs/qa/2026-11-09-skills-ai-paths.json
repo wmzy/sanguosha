@@ -1,0 +1,32 @@
+[
+  {
+    "skill": "黄天",
+    "scenario": "群势力盟友持闪、自己的出牌阶段",
+    "backendActionExists": true,
+    "skillActions": [],
+    "allDescriptions": [
+      "结束出牌阶段"
+    ],
+    "executableSuitChoices": 0
+  },
+  {
+    "skill": "界黄天",
+    "scenario": "群势力盟友持闪、自己的出牌阶段",
+    "backendActionExists": true,
+    "skillActions": [],
+    "allDescriptions": [
+      "结束出牌阶段"
+    ],
+    "executableSuitChoices": 0
+  },
+  {
+    "skill": "反间",
+    "scenario": "目标收到选花色询问",
+    "backendActionExists": true,
+    "skillActions": [],
+    "allDescriptions": [
+      "无牌可出，跳过"
+    ],
+    "executableSuitChoices": 0
+  }
+]

@@ -1,0 +1,6774 @@
+{
+  "scope": "Module import + createSkill + onInit + onMount on a five-player empty-hand fixture; no skill effect acceptance claim.",
+  "characters": [
+    {
+      "name": "曹操",
+      "faction": "魏",
+      "skills": [
+        "奸雄",
+        "护驾"
+      ]
+    },
+    {
+      "name": "司马懿",
+      "faction": "魏",
+      "skills": [
+        "反馈",
+        "鬼才"
+      ]
+    },
+    {
+      "name": "夏侯惇",
+      "faction": "魏",
+      "skills": [
+        "刚烈"
+      ]
+    },
+    {
+      "name": "张辽",
+      "faction": "魏",
+      "skills": [
+        "突袭"
+      ]
+    },
+    {
+      "name": "许褚",
+      "faction": "魏",
+      "skills": [
+        "裸衣"
+      ]
+    },
+    {
+      "name": "郭嘉",
+      "faction": "魏",
+      "skills": [
+        "天妒",
+        "遗计"
+      ]
+    },
+    {
+      "name": "甄姬",
+      "faction": "魏",
+      "skills": [
+        "倾国",
+        "洛神"
+      ]
+    },
+    {
+      "name": "夏侯渊",
+      "faction": "魏",
+      "skills": [
+        "神速"
+      ]
+    },
+    {
+      "name": "曹仁",
+      "faction": "魏",
+      "skills": [
+        "据守"
+      ]
+    },
+    {
+      "name": "荀彧",
+      "faction": "魏",
+      "skills": [
+        "驱虎",
+        "节命"
+      ]
+    },
+    {
+      "name": "典韦",
+      "faction": "魏",
+      "skills": [
+        "强袭"
+      ]
+    },
+    {
+      "name": "曹丕",
+      "faction": "魏",
+      "skills": [
+        "行殇",
+        "放逐",
+        "颂威"
+      ]
+    },
+    {
+      "name": "徐晃",
+      "faction": "魏",
+      "skills": [
+        "断粮"
+      ]
+    },
+    {
+      "name": "张郃",
+      "faction": "魏",
+      "skills": [
+        "巧变"
+      ]
+    },
+    {
+      "name": "邓艾",
+      "faction": "魏",
+      "skills": [
+        "屯田",
+        "凿险"
+      ]
+    },
+    {
+      "name": "界曹操",
+      "faction": "魏",
+      "skills": [
+        "界奸雄",
+        "界护驾"
+      ]
+    },
+    {
+      "name": "界司马懿",
+      "faction": "魏",
+      "skills": [
+        "反馈",
+        "界鬼才"
+      ]
+    },
+    {
+      "name": "界夏侯惇",
+      "faction": "魏",
+      "skills": [
+        "界刚烈"
+      ]
+    },
+    {
+      "name": "界张辽",
+      "faction": "魏",
+      "skills": [
+        "界突袭"
+      ]
+    },
+    {
+      "name": "界许褚",
+      "faction": "魏",
+      "skills": [
+        "界裸衣"
+      ]
+    },
+    {
+      "name": "界郭嘉",
+      "faction": "魏",
+      "skills": [
+        "天妒",
+        "界遗计"
+      ]
+    },
+    {
+      "name": "界甄姬",
+      "faction": "魏",
+      "skills": [
+        "倾国",
+        "界洛神"
+      ]
+    },
+    {
+      "name": "界夏侯渊",
+      "faction": "魏",
+      "skills": [
+        "界神速"
+      ]
+    },
+    {
+      "name": "界曹仁",
+      "faction": "魏",
+      "skills": [
+        "界据守",
+        "解围"
+      ]
+    },
+    {
+      "name": "界荀彧",
+      "faction": "魏",
+      "skills": [
+        "驱虎",
+        "界节命"
+      ]
+    },
+    {
+      "name": "界典韦",
+      "faction": "魏",
+      "skills": [
+        "界强袭"
+      ]
+    },
+    {
+      "name": "界曹丕",
+      "faction": "魏",
+      "skills": [
+        "行殇",
+        "界放逐",
+        "颂威"
+      ]
+    },
+    {
+      "name": "界徐晃",
+      "faction": "魏",
+      "skills": [
+        "界断粮",
+        "截辎"
+      ]
+    },
+    {
+      "name": "界张郃",
+      "faction": "魏",
+      "skills": [
+        "界巧变"
+      ]
+    },
+    {
+      "name": "界邓艾",
+      "faction": "魏",
+      "skills": [
+        "界屯田",
+        "界凿险",
+        "急袭"
+      ]
+    },
+    {
+      "name": "界于禁",
+      "faction": "魏",
+      "skills": [
+        "界镇军",
+        "界毅重"
+      ]
+    },
+    {
+      "name": "界张春华",
+      "faction": "魏",
+      "skills": [
+        "界绝情",
+        "界伤逝",
+        "界翦灭"
+      ]
+    },
+    {
+      "name": "界曹冲",
+      "faction": "魏",
+      "skills": [
+        "界称象",
+        "界仁心"
+      ]
+    },
+    {
+      "name": "界曹彰",
+      "faction": "魏",
+      "skills": [
+        "界将驰"
+      ]
+    },
+    {
+      "name": "界曹植",
+      "faction": "魏",
+      "skills": [
+        "界落英",
+        "界酒诗"
+      ]
+    },
+    {
+      "name": "界李典",
+      "faction": "魏",
+      "skills": [
+        "界恂恂",
+        "界忘隙"
+      ]
+    },
+    {
+      "name": "界王异",
+      "faction": "魏",
+      "skills": [
+        "界贞烈",
+        "界秘计"
+      ]
+    },
+    {
+      "name": "界郭淮",
+      "faction": "魏",
+      "skills": [
+        "界精策"
+      ]
+    },
+    {
+      "name": "界郭皇后",
+      "faction": "魏",
+      "skills": [
+        "界矫诏",
+        "界殚心"
+      ]
+    },
+    {
+      "name": "毌丘俭",
+      "faction": "魏",
+      "skills": [
+        "征荣",
+        "鸿举"
+      ]
+    },
+    {
+      "name": "王基",
+      "faction": "魏",
+      "skills": [
+        "奇制",
+        "进趋"
+      ]
+    },
+    {
+      "name": "蒯越蒯良",
+      "faction": "魏",
+      "skills": [
+        "荐降",
+        "审时"
+      ]
+    },
+    {
+      "name": "郝昭",
+      "faction": "魏",
+      "skills": [
+        "镇骨"
+      ]
+    },
+    {
+      "name": "刘备",
+      "faction": "蜀",
+      "skills": [
+        "仁德",
+        "激将"
+      ]
+    },
+    {
+      "name": "界刘备",
+      "faction": "蜀",
+      "skills": [
+        "界仁德",
+        "界激将"
+      ]
+    },
+    {
+      "name": "关羽",
+      "faction": "蜀",
+      "skills": [
+        "武圣"
+      ]
+    },
+    {
+      "name": "界关羽",
+      "faction": "蜀",
+      "skills": [
+        "界武圣",
+        "义绝"
+      ]
+    },
+    {
+      "name": "张飞",
+      "faction": "蜀",
+      "skills": [
+        "咆哮"
+      ]
+    },
+    {
+      "name": "界张飞",
+      "faction": "蜀",
+      "skills": [
+        "界咆哮"
+      ]
+    },
+    {
+      "name": "赵云",
+      "faction": "蜀",
+      "skills": [
+        "龙胆"
+      ]
+    },
+    {
+      "name": "界赵云",
+      "faction": "蜀",
+      "skills": [
+        "界龙胆",
+        "涯角"
+      ]
+    },
+    {
+      "name": "黄月英",
+      "faction": "蜀",
+      "skills": [
+        "集智",
+        "奇才"
+      ]
+    },
+    {
+      "name": "界黄月英",
+      "faction": "蜀",
+      "skills": [
+        "界集智",
+        "界奇才"
+      ]
+    },
+    {
+      "name": "马超",
+      "faction": "蜀",
+      "skills": [
+        "马术",
+        "铁骑"
+      ]
+    },
+    {
+      "name": "界马超",
+      "faction": "蜀",
+      "skills": [
+        "马术",
+        "界铁骑"
+      ]
+    },
+    {
+      "name": "界马岱",
+      "faction": "蜀",
+      "skills": [
+        "马术",
+        "界潜袭"
+      ]
+    },
+    {
+      "name": "黄忠",
+      "faction": "蜀",
+      "skills": [
+        "烈弓"
+      ]
+    },
+    {
+      "name": "界黄忠",
+      "faction": "蜀",
+      "skills": [
+        "界烈弓"
+      ]
+    },
+    {
+      "name": "魏延",
+      "faction": "蜀",
+      "skills": [
+        "狂骨"
+      ]
+    },
+    {
+      "name": "界魏延",
+      "faction": "蜀",
+      "skills": [
+        "界狂骨",
+        "奇谋"
+      ]
+    },
+    {
+      "name": "卧龙诸葛",
+      "faction": "蜀",
+      "skills": [
+        "八阵",
+        "火计",
+        "看破"
+      ]
+    },
+    {
+      "name": "界卧龙诸葛",
+      "faction": "蜀",
+      "skills": [
+        "八阵",
+        "界火计",
+        "界看破"
+      ]
+    },
+    {
+      "name": "诸葛亮",
+      "faction": "蜀",
+      "skills": [
+        "观星",
+        "空城"
+      ]
+    },
+    {
+      "name": "界诸葛亮",
+      "faction": "蜀",
+      "skills": [
+        "界观星",
+        "界空城"
+      ]
+    },
+    {
+      "name": "庞统",
+      "faction": "蜀",
+      "skills": [
+        "连环",
+        "涅槃"
+      ]
+    },
+    {
+      "name": "界庞统",
+      "faction": "蜀",
+      "skills": [
+        "界连环",
+        "界涅槃"
+      ]
+    },
+    {
+      "name": "孟获",
+      "faction": "蜀",
+      "skills": [
+        "祸首",
+        "再起"
+      ]
+    },
+    {
+      "name": "界孟获",
+      "faction": "蜀",
+      "skills": [
+        "祸首",
+        "界再起"
+      ]
+    },
+    {
+      "name": "祝融",
+      "faction": "蜀",
+      "skills": [
+        "巨象",
+        "烈刃"
+      ]
+    },
+    {
+      "name": "界祝融",
+      "faction": "蜀",
+      "skills": [
+        "巨象",
+        "烈刃"
+      ]
+    },
+    {
+      "name": "姜维",
+      "faction": "蜀",
+      "skills": [
+        "挑衅",
+        "志继"
+      ]
+    },
+    {
+      "name": "界姜维",
+      "faction": "蜀",
+      "skills": [
+        "界挑衅",
+        "界志继"
+      ]
+    },
+    {
+      "name": "刘禅",
+      "faction": "蜀",
+      "skills": [
+        "享乐",
+        "放权",
+        "若愚"
+      ]
+    },
+    {
+      "name": "界刘禅",
+      "faction": "蜀",
+      "skills": [
+        "享乐",
+        "界放权",
+        "界若愚"
+      ]
+    },
+    {
+      "name": "界关兴张苞",
+      "faction": "蜀",
+      "skills": [
+        "界父魂"
+      ]
+    },
+    {
+      "name": "界夏侯氏",
+      "faction": "蜀",
+      "skills": [
+        "界樵拾",
+        "界燕语"
+      ]
+    },
+    {
+      "name": "界廖化",
+      "faction": "蜀",
+      "skills": [
+        "界当先",
+        "界伏枥"
+      ]
+    },
+    {
+      "name": "界张松",
+      "faction": "蜀",
+      "skills": [
+        "界强识",
+        "界献图"
+      ]
+    },
+    {
+      "name": "界徐庶",
+      "faction": "蜀",
+      "skills": [
+        "界诛害",
+        "界潜心"
+      ]
+    },
+    {
+      "name": "界法正",
+      "faction": "蜀",
+      "skills": [
+        "界眩惑",
+        "界恩怨"
+      ]
+    },
+    {
+      "name": "界简雍",
+      "faction": "蜀",
+      "skills": [
+        "界纵适",
+        "界巧说"
+      ]
+    },
+    {
+      "name": "王平",
+      "faction": "蜀",
+      "skills": [
+        "飞军",
+        "兵略"
+      ]
+    },
+    {
+      "name": "诸葛瞻",
+      "faction": "蜀",
+      "skills": [
+        "罪论",
+        "父荫"
+      ]
+    },
+    {
+      "name": "陈到",
+      "faction": "蜀",
+      "skills": [
+        "往烈"
+      ]
+    },
+    {
+      "name": "卧龙诸葛亮",
+      "faction": "蜀",
+      "skills": [
+        "八阵",
+        "火计",
+        "看破"
+      ]
+    },
+    {
+      "name": "严颜",
+      "faction": "蜀",
+      "skills": [
+        "拒战"
+      ]
+    },
+    {
+      "name": "孙权",
+      "faction": "吴",
+      "skills": [
+        "制衡",
+        "救援"
+      ]
+    },
+    {
+      "name": "界孙权",
+      "faction": "吴",
+      "skills": [
+        "界制衡",
+        "界救援"
+      ]
+    },
+    {
+      "name": "甘宁",
+      "faction": "吴",
+      "skills": [
+        "奇袭"
+      ]
+    },
+    {
+      "name": "界甘宁",
+      "faction": "吴",
+      "skills": [
+        "奇袭",
+        "奋威"
+      ]
+    },
+    {
+      "name": "吕蒙",
+      "faction": "吴",
+      "skills": [
+        "克己"
+      ]
+    },
+    {
+      "name": "界吕蒙",
+      "faction": "吴",
+      "skills": [
+        "界克己",
+        "勤学",
+        "博图"
+      ]
+    },
+    {
+      "name": "黄盖",
+      "faction": "吴",
+      "skills": [
+        "苦肉"
+      ]
+    },
+    {
+      "name": "界黄盖",
+      "faction": "吴",
+      "skills": [
+        "界苦肉",
+        "诈降"
+      ]
+    },
+    {
+      "name": "周瑜",
+      "faction": "吴",
+      "skills": [
+        "反间",
+        "英姿"
+      ]
+    },
+    {
+      "name": "界周瑜",
+      "faction": "吴",
+      "skills": [
+        "界英姿",
+        "界反间"
+      ]
+    },
+    {
+      "name": "大乔",
+      "faction": "吴",
+      "skills": [
+        "国色",
+        "流离"
+      ]
+    },
+    {
+      "name": "界大乔",
+      "faction": "吴",
+      "skills": [
+        "界国色",
+        "流离"
+      ]
+    },
+    {
+      "name": "陆逊",
+      "faction": "吴",
+      "skills": [
+        "谦逊",
+        "连营"
+      ]
+    },
+    {
+      "name": "界陆逊",
+      "faction": "吴",
+      "skills": [
+        "界谦逊",
+        "界连营"
+      ]
+    },
+    {
+      "name": "孙尚香",
+      "faction": "吴",
+      "skills": [
+        "结姻",
+        "枭姬"
+      ]
+    },
+    {
+      "name": "界孙尚香",
+      "faction": "吴",
+      "skills": [
+        "界结姻",
+        "枭姬"
+      ]
+    },
+    {
+      "name": "小乔",
+      "faction": "吴",
+      "skills": [
+        "天香",
+        "红颜"
+      ]
+    },
+    {
+      "name": "界小乔",
+      "faction": "吴",
+      "skills": [
+        "界红颜",
+        "界天香",
+        "飘零"
+      ]
+    },
+    {
+      "name": "周泰",
+      "faction": "吴",
+      "skills": [
+        "不屈"
+      ]
+    },
+    {
+      "name": "界周泰",
+      "faction": "吴",
+      "skills": [
+        "界不屈",
+        "奋激"
+      ]
+    },
+    {
+      "name": "太史慈",
+      "faction": "吴",
+      "skills": [
+        "天义"
+      ]
+    },
+    {
+      "name": "界太史慈",
+      "faction": "吴",
+      "skills": [
+        "天义",
+        "酣战"
+      ]
+    },
+    {
+      "name": "鲁肃",
+      "faction": "吴",
+      "skills": [
+        "好施",
+        "缔盟"
+      ]
+    },
+    {
+      "name": "界鲁肃",
+      "faction": "吴",
+      "skills": [
+        "界好施",
+        "界缔盟"
+      ]
+    },
+    {
+      "name": "孙坚",
+      "faction": "吴",
+      "skills": [
+        "英魂"
+      ]
+    },
+    {
+      "name": "界孙坚",
+      "faction": "吴",
+      "skills": [
+        "英魂",
+        "武烈"
+      ]
+    },
+    {
+      "name": "孙策",
+      "faction": "吴",
+      "skills": [
+        "激昂",
+        "魂姿",
+        "制霸"
+      ]
+    },
+    {
+      "name": "界孙策",
+      "faction": "吴",
+      "skills": [
+        "界激昂",
+        "界魂姿",
+        "界制霸"
+      ]
+    },
+    {
+      "name": "张昭张纮",
+      "faction": "吴",
+      "skills": [
+        "直谏",
+        "固政"
+      ]
+    },
+    {
+      "name": "界张昭张纮",
+      "faction": "吴",
+      "skills": [
+        "界直谏",
+        "界固政"
+      ]
+    },
+    {
+      "name": "界凌统",
+      "faction": "吴",
+      "skills": [
+        "界旋风"
+      ]
+    },
+    {
+      "name": "界吴国太",
+      "faction": "吴",
+      "skills": [
+        "界甘露",
+        "界补益"
+      ]
+    },
+    {
+      "name": "界徐盛",
+      "faction": "吴",
+      "skills": [
+        "界破军"
+      ]
+    },
+    {
+      "name": "界程普",
+      "faction": "吴",
+      "skills": [
+        "界疠火",
+        "界醇醪"
+      ]
+    },
+    {
+      "name": "界虞翻",
+      "faction": "吴",
+      "skills": [
+        "界纵玄",
+        "界直言"
+      ]
+    },
+    {
+      "name": "界韩当",
+      "faction": "吴",
+      "skills": [
+        "界弓骑",
+        "界解烦"
+      ]
+    },
+    {
+      "name": "陆抗",
+      "faction": "吴",
+      "skills": [
+        "谦节",
+        "决堰",
+        "破势"
+      ]
+    },
+    {
+      "name": "陆绩",
+      "faction": "吴",
+      "skills": [
+        "怀橘",
+        "遗礼",
+        "整论"
+      ]
+    },
+    {
+      "name": "张昭张弘",
+      "faction": "吴",
+      "skills": [
+        "直谏",
+        "固政"
+      ]
+    },
+    {
+      "name": "周妃",
+      "faction": "吴",
+      "skills": [
+        "良姻",
+        "箜声"
+      ]
+    },
+    {
+      "name": "孙亮",
+      "faction": "吴",
+      "skills": [
+        "溃诛",
+        "掣政",
+        "立军"
+      ]
+    },
+    {
+      "name": "华佗",
+      "faction": "群",
+      "skills": [
+        "急救",
+        "青囊"
+      ]
+    },
+    {
+      "name": "吕布",
+      "faction": "群",
+      "skills": [
+        "无双"
+      ]
+    },
+    {
+      "name": "貂蝉",
+      "faction": "群",
+      "skills": [
+        "离间",
+        "闭月"
+      ]
+    },
+    {
+      "name": "界貂蝉",
+      "faction": "群",
+      "skills": [
+        "离间",
+        "界闭月"
+      ]
+    },
+    {
+      "name": "张角",
+      "faction": "群",
+      "skills": [
+        "雷击",
+        "鬼道",
+        "黄天"
+      ]
+    },
+    {
+      "name": "于吉",
+      "faction": "群",
+      "skills": [
+        "蛊惑"
+      ]
+    },
+    {
+      "name": "界于吉",
+      "faction": "群",
+      "skills": [
+        "界蛊惑"
+      ]
+    },
+    {
+      "name": "袁绍",
+      "faction": "群",
+      "skills": [
+        "乱击"
+      ]
+    },
+    {
+      "name": "界袁绍",
+      "faction": "群",
+      "skills": [
+        "界乱击",
+        "界血裔"
+      ]
+    },
+    {
+      "name": "庞德",
+      "faction": "群",
+      "skills": [
+        "马术",
+        "鞬出"
+      ]
+    },
+    {
+      "name": "界庞德",
+      "faction": "群",
+      "skills": [
+        "马术",
+        "界鞬出"
+      ]
+    },
+    {
+      "name": "颜良文丑",
+      "faction": "群",
+      "skills": [
+        "双雄"
+      ]
+    },
+    {
+      "name": "界颜良文丑",
+      "faction": "群",
+      "skills": [
+        "界双雄"
+      ]
+    },
+    {
+      "name": "董卓",
+      "faction": "群",
+      "skills": [
+        "酒池",
+        "肉林",
+        "崩坏",
+        "暴虐"
+      ]
+    },
+    {
+      "name": "界董卓",
+      "faction": "群",
+      "skills": [
+        "界酒池",
+        "肉林",
+        "界崩坏",
+        "界暴虐"
+      ]
+    },
+    {
+      "name": "贾诩",
+      "faction": "群",
+      "skills": [
+        "完杀",
+        "乱武",
+        "帷幕"
+      ]
+    },
+    {
+      "name": "界贾诩",
+      "faction": "群",
+      "skills": [
+        "界帷幕",
+        "界乱武",
+        "界完杀"
+      ]
+    },
+    {
+      "name": "左慈",
+      "faction": "群",
+      "skills": [
+        "化身",
+        "新生"
+      ]
+    },
+    {
+      "name": "蔡文姬",
+      "faction": "群",
+      "skills": [
+        "悲歌",
+        "断肠"
+      ]
+    },
+    {
+      "name": "界蔡文姬",
+      "faction": "群",
+      "skills": [
+        "界悲歌",
+        "断肠"
+      ]
+    },
+    {
+      "name": "界伏皇后",
+      "faction": "群",
+      "skills": [
+        "界惴恐",
+        "界求援"
+      ]
+    },
+    {
+      "name": "界公孙瓒",
+      "faction": "群",
+      "skills": [
+        "界义从",
+        "界趫猛"
+      ]
+    },
+    {
+      "name": "界刘表",
+      "faction": "群",
+      "skills": [
+        "界自守",
+        "界宗室"
+      ]
+    },
+    {
+      "name": "界华佗",
+      "faction": "群",
+      "skills": [
+        "急救",
+        "界除疠"
+      ]
+    },
+    {
+      "name": "界华雄",
+      "faction": "群",
+      "skills": [
+        "界耀武",
+        "界势斩"
+      ]
+    },
+    {
+      "name": "界吕布",
+      "faction": "群",
+      "skills": [
+        "无双",
+        "界利驭"
+      ]
+    },
+    {
+      "name": "界左慈",
+      "faction": "群",
+      "skills": [
+        "化身",
+        "新生"
+      ]
+    },
+    {
+      "name": "界张角",
+      "faction": "群",
+      "skills": [
+        "界雷击",
+        "界鬼道",
+        "界黄天"
+      ]
+    },
+    {
+      "name": "界李儒",
+      "faction": "群",
+      "skills": [
+        "界灭计",
+        "界绝策",
+        "界焚城"
+      ]
+    },
+    {
+      "name": "界沮授",
+      "faction": "群",
+      "skills": [
+        "界矢北",
+        "界渐营"
+      ]
+    },
+    {
+      "name": "界蔡夫人",
+      "faction": "群",
+      "skills": [
+        "界窃听",
+        "界献州"
+      ]
+    },
+    {
+      "name": "界陈宫",
+      "faction": "群",
+      "skills": [
+        "界智迟",
+        "界明策"
+      ]
+    },
+    {
+      "name": "界高顺",
+      "faction": "群",
+      "skills": [
+        "界陷阵",
+        "界禁酒"
+      ]
+    },
+    {
+      "name": "华雄",
+      "faction": "群",
+      "skills": [
+        "耀武"
+      ]
+    },
+    {
+      "name": "袁术",
+      "faction": "群",
+      "skills": [
+        "庸肆",
+        "伪帝"
+      ]
+    },
+    {
+      "name": "卢植",
+      "faction": "群",
+      "skills": [
+        "明任",
+        "贞良"
+      ]
+    },
+    {
+      "name": "张绣",
+      "faction": "群",
+      "skills": [
+        "雄乱",
+        "从谏"
+      ]
+    },
+    {
+      "name": "许攸",
+      "faction": "群",
+      "skills": [
+        "成略",
+        "恃才",
+        "寸目"
+      ]
+    }
+  ],
+  "counts": {
+    "characters": 165,
+    "characterSkills": 282,
+    "modules": 313,
+    "loadErrors": 0,
+    "declaredActions": 319,
+    "missingBackendActions": 2,
+    "missingBackendOnAllSeats": 0
+  },
+  "missingDerivedModules": [
+    "清侧",
+    "怀柔",
+    "思蜀"
+  ],
+  "skills": [
+    {
+      "id": "奸雄",
+      "spec": "skills/奸雄",
+      "description": "当你受到伤害后,你可以获得造成此伤害的牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "奸雄",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "护驾",
+      "spec": "skills/护驾",
+      "description": "主公技:需要闪时,令其他魏势力角色替你打出闪",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "护驾",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "反馈",
+      "spec": "skills/反馈",
+      "description": "受到伤害后,你可以获得伤害来源的一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "反馈",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "鬼才",
+      "spec": "skills/鬼才",
+      "description": "判定牌生效前,你可以打出一张手牌代替之",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "鬼才",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "刚烈",
+      "spec": "skills/刚烈",
+      "description": "受到伤害后判定,非红桃则来源弃两张手牌或受 1 点伤害",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "刚烈",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "突袭",
+      "spec": "skills/突袭",
+      "description": "摸牌阶段,你可以改为获得至多两名角色的各一张手牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "突袭",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "裸衣",
+      "spec": "skills/裸衣",
+      "description": "摸牌阶段少摸一张牌,本回合使用【杀】或【决斗】造成的伤害+1",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "裸衣",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "天妒",
+      "spec": "skills/天妒",
+      "description": "当你的判定牌生效后,你可以获得此判定牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "天妒",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "遗计",
+      "spec": "skills/遗计",
+      "description": "受到 1 点伤害后,观看牌堆顶的两张牌,然后将这些牌交给任意角色",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "遗计",
+          "actionType": "respond",
+          "prompt": "distribute",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "倾国",
+      "spec": "skills/倾国",
+      "description": "你可以将一张黑色手牌当【闪】使用或打出",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "倾国",
+          "actionType": "transform",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "洛神",
+      "spec": "skills/洛神",
+      "description": "准备阶段判定:黑色获得判定牌并重复,直到红色或停止",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "洛神",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "神速",
+      "spec": "skills/神速",
+      "description": "可选择至多三项:①跳过判定+摸牌;②弃装备+跳过出牌;③翻面+跳过弃牌。每项视为出杀",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "神速",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "据守",
+      "spec": "skills/据守",
+      "description": "结束阶段:翻面并摸四张牌,然后弃置一张手牌(装备牌改为使用之)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "据守",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "驱虎",
+      "spec": "skills/驱虎",
+      "description": "出牌阶段限一次,与一名角色拼点:赢则该角色对其攻击范围内另一角色造成1伤害,没赢则其对你造成1伤害",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "驱虎",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "驱虎",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "节命",
+      "spec": "skills/节命",
+      "description": "受到伤害后,令一名角色将手牌摸至其体力上限(最多5张)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "节命",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "强袭",
+      "spec": "skills/强袭",
+      "description": "出牌阶段限两次:失去1点体力或弃一张武器牌,对一名本回合未以此法指定过的其他角色造成1点伤害",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "强袭",
+          "actionType": "use",
+          "prompt": "selectTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "行殇",
+      "spec": "skills/行殇",
+      "description": "当其他角色死亡时,你可以获得其所有牌(手牌/装备/判定区)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "行殇",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "放逐",
+      "spec": "skills/放逐",
+      "description": "受到伤害后,令一名其他角色摸 X 张牌(X=已损失体力)并翻面",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "放逐",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "颂威",
+      "spec": "skills/颂威",
+      "description": "主公技:其他魏势力角色判定牌黑色且生效后,你可以摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "颂威",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "断粮",
+      "spec": "skills/断粮",
+      "description": "将一张黑色基本牌或装备牌当【兵粮寸断】使用;对手牌数不小于你的角色无距离限制",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "断粮",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "巧变",
+      "spec": "skills/巧变",
+      "description": "弃一张手牌跳过阶段:摸牌阶段可从至多两名其他角色各获得一张手牌;出牌阶段可移动场上的一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "巧变",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "屯田",
+      "spec": "skills/屯田",
+      "description": "回合外失去牌时判定,非红桃则置于武将牌上为田,每张田与其他角色距离 -1",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "屯田",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "凿险",
+      "spec": "skills/凿险",
+      "description": "觉醒技:准备阶段田≥3时,减1体力上限并获得\"急袭\"(田当顺手牵羊)",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界奸雄",
+      "spec": "skills/界奸雄",
+      "description": "当你受到伤害后,你可以摸一张牌,并获得造成此伤害的牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界奸雄",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界护驾",
+      "spec": "skills/界护驾",
+      "description": "主公技:魏势力角色可代你使用或打出闪;每回合限一次,魏角色回合外用闪时可令你摸1张",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界护驾",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界鬼才",
+      "spec": "skills/界鬼才",
+      "description": "判定牌生效前,你可以打出一张手牌或装备牌代替之",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界鬼才",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界刚烈",
+      "spec": "skills/界刚烈",
+      "description": "受到伤害后判定,红色对其造成1点伤害,黑色弃置其一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界刚烈",
+          "actionType": "respond",
+          "prompt": "pickTargetCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界突袭",
+      "spec": "skills/界突袭",
+      "description": "摸牌阶段,你可以少摸任意张牌并获得等量其他角色的各一张手牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界突袭",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界裸衣",
+      "spec": "skills/界裸衣",
+      "description": "摸牌阶段开始前,可亮出牌堆顶3张;可跳过摸牌阶段并获得其中的基本牌/武器牌/决斗,且直到你的下回合开始,杀/决斗伤害+1",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界裸衣",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界遗计",
+      "spec": "skills/界遗计",
+      "description": "受到 1 点伤害后,摸两张牌,然后可以将至多两张手牌交给至多两名其他角色",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界遗计",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界洛神",
+      "spec": "skills/界洛神",
+      "description": "准备阶段判定:黑色获得判定牌并重复;以此法获得的牌本回合不计入手牌上限",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界洛神",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界神速",
+      "spec": "skills/界神速",
+      "description": "选择至多三项:①跳过判定+摸牌;②弃装备+跳过出牌;③翻面+跳过弃牌。每项视为出杀",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界神速",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界据守",
+      "spec": "skills/界据守",
+      "description": "结束阶段:翻面并摸四张牌,然后弃置一张手牌(装备牌改为使用之)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界据守",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "解围",
+      "spec": "skills/解围",
+      "description": "装备区的一张牌当无懈可击使用;武将牌从背面翻至正面时可弃置一张牌移动场上的一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "解围",
+          "actionType": "transform",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "解围",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界节命",
+      "spec": "skills/界节命",
+      "description": "受到1点伤害后或死亡时,令一名角色摸X张牌,然后将手牌弃至X张(X为其体力上限且至多为5)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界节命",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界强袭",
+      "spec": "skills/界强袭",
+      "description": "出牌阶段限两次:受到1点伤害或弃一张武器牌,对一名本回合未以此法指定过的其他角色造成1点伤害",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界强袭",
+          "actionType": "use",
+          "prompt": "selectTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界放逐",
+      "spec": "skills/界放逐",
+      "description": "受到伤害后,令一名其他角色翻面,并摸 X 张牌(X=已损失体力)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界放逐",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界断粮",
+      "spec": "skills/界断粮",
+      "description": "将一张黑色基本牌或黑色装备牌当【兵粮寸断】使用;若本回合未造成过伤害,使用时无距离限制",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界断粮",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "截辎",
+      "spec": "skills/截辎",
+      "description": "当一名角色跳过摸牌阶段后,你可以选择一名角色:若其手牌数全场最少且没有\"辎\",其获得\"辎\"标记,否则其摸一张牌。有\"辎\"的角色于其摸牌阶段结束时移除\"辎\"并执行一个额外的摸牌阶段",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "截辎",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界巧变",
+      "spec": "skills/界巧变",
+      "description": "游戏开始获得2枚\"变\"标记;弃一张牌或移除1枚\"变\"跳过阶段(摸牌:至多两名角色各获得一张手牌;出牌:移动场上的一张牌);结束阶段手牌数与历史均不相等则获得1枚\"变\"",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界巧变",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界屯田",
+      "spec": "skills/界屯田",
+      "description": "回合外失去牌或回合内弃置杀时判定,非红桃则置于武将牌上为田,每张田与其他角色距离 -1",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界屯田",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界凿险",
+      "spec": "skills/界凿险",
+      "description": "觉醒技:准备阶段田≥3时,减1体力上限、获得\"急袭\",且本回合结束后进行一个额外回合",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "急袭",
+      "spec": "skills/急袭",
+      "description": "将一张\"田\"当【顺手牵羊】使用",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "急袭",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界镇军",
+      "spec": "skills/界镇军",
+      "description": "准备阶段,弃置一名角色X张牌(X为其手牌数减体力值且至少为1),然后选择:1.你弃置等量非装备牌数的牌;2.结束阶段其摸等量非装备牌数的牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界镇军",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界毅重",
+      "spec": "skills/界毅重",
+      "description": "锁定技,体力值大于等于你的角色的黑色【杀】对你无效;手牌数小于等于你的角色无法响应你的黑色【杀】",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界绝情",
+      "spec": "skills/界绝情",
+      "description": "锁定技:你即将造成的伤害视为失去体力",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界伤逝",
+      "spec": "skills/界伤逝",
+      "description": "当你的手牌数小于X后,你可以将手牌摸至X张(X为你已损失体力值)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界伤逝",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界翦灭",
+      "spec": "skills/界翦灭",
+      "description": "出牌阶段限一次:与一名其他角色各选一种颜色,各自弃置所选颜色的手牌,弃牌较多者视为对另一方使用决斗",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界翦灭",
+          "actionType": "use",
+          "prompt": "selectTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界翦灭",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界称象",
+      "spec": "skills/界称象",
+      "description": "受到1点伤害后,亮出牌堆顶4张牌,获得其中点数和≤13的若干张;若点数和恰好为13,下次发动多亮出1张",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界称象",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界仁心",
+      "spec": "skills/界仁心",
+      "description": "其他角色进入濒死时,可弃置一张装备牌并翻面,令其回复至1点体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界仁心",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界将驰",
+      "spec": "skills/界将驰",
+      "description": "摸牌阶段结束时选择一项:①摸一张牌,本回合杀次数-1且杀不计入手牌上限;②重铸一张牌,本回合杀次数+1且杀无距离限制",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界落英",
+      "spec": "skills/界落英",
+      "description": "其他角色的梅花牌因弃置或判定而置入弃牌堆后,你可以获得其中任意张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界落英",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界酒诗",
+      "spec": "skills/界酒诗",
+      "description": "翻面视为使用酒;背面朝上时落英牌增强;受伤后或回合外累计获X张落英牌后可翻回正面",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界酒诗",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界酒诗",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界恂恂",
+      "spec": "skills/界恂恂",
+      "description": "摸牌阶段开始时,观看牌堆顶4张牌,将其中2张置于牌堆顶,其余置于牌堆底",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界恂恂",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界忘隙",
+      "spec": "skills/界忘隙",
+      "description": "对其他角色造成1点伤害后,或受到其他角色1点伤害后,摸两张牌并交给该角色其中一张",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界忘隙",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界贞烈",
+      "spec": "skills/界贞烈",
+      "description": "成为其他角色杀或普通锦囊的目标后,可失1体力令此牌对你无效,然后二选一:获得使用者一张牌或本回合结束阶段发动一次秘计",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界贞烈",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界秘计",
+      "spec": "skills/界秘计",
+      "description": "结束阶段,你可以摸X张牌(X为你已损失的体力值),然后你可以交给其他角色至多X张牌",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界精策",
+      "spec": "skills/界精策",
+      "description": "本回合每使用一种新花色手牌,手牌上限+1;出牌阶段结束时,可以摸X张牌(X为本回合使用过牌的类型数)",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界矫诏",
+      "spec": "skills/界矫诏",
+      "description": "出牌阶段限一次,你可将一张牌当本轮未有角色使用过的基本或普通锦囊牌使用",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:杀",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:桃",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:酒",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:决斗",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:过河拆桥",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:顺手牵羊",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:无中生有",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:借刀杀人",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:桃园结义",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:五谷丰登",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:南蛮入侵",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:万箭齐发",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:火攻",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界矫诏",
+          "actionType": "transform:铁索连环",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界殚心",
+      "spec": "skills/界殚心",
+      "description": "当你受到伤害后,你可摸X张牌,然后修改\"矫诏\"(X为你修改\"矫诏\"的次数)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界殚心",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "征荣",
+      "spec": "skills/征荣",
+      "description": "使用杀或伤害锦囊牌时,可将一名手牌数不小于你的目标角色的一张牌置于武将牌上为\"荣\"",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "征荣",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "鸿举",
+      "spec": "skills/鸿举",
+      "description": "觉醒技:准备阶段若荣≥3,用任意手牌替换等量的荣,减1体力上限并获得\"清侧\"",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "奇制",
+      "spec": "skills/奇制",
+      "description": "回合内使用非装备牌指定目标后,可弃置另一名角色一张牌并令其摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "奇制",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "进趋",
+      "spec": "skills/进趋",
+      "description": "结束阶段可摸两张牌,然后将手牌弃至X张(X为本回合发动奇制的次数)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "进趋",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "荐降",
+      "spec": "skills/荐降",
+      "description": "当你成为其他角色使用牌的目标后，你可以令手牌数最少的一名角色摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "荐降",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "审时",
+      "spec": "skills/审时",
+      "description": "转换技。阳:出牌阶段限一次,交给手牌数最多的其他角色一张牌并对其造成1点伤害,若其因此死亡,可令一名角色摸至四张。阴:其他角色对你造成伤害后,观看其手牌并交给其一张牌,当前回合结束阶段若其未失去此牌,你将手牌摸至四张",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "审时",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "审时",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "镇骨",
+      "spec": "skills/镇骨",
+      "description": "结束阶段,你可以选择一名其他角色,本回合结束时和其下回合结束时,其将手牌调整至与你手牌数相同(至多摸至五张)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "镇骨",
+          "actionType": "respond",
+          "prompt": "choosePlayer",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "仁德",
+      "spec": "skills/仁德",
+      "description": "出牌阶段:将任意张手牌交给其他角色;以此法失去第二张牌时回复1点体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "仁德",
+          "actionType": "use",
+          "prompt": "distribute",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "激将",
+      "spec": "skills/激将",
+      "description": "主公技,其他蜀势力角色可以在你需要时代替你使用或打出【杀】(视为由你使用或打出)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "激将",
+          "actionType": "use",
+          "prompt": "choosePlayer",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "激将",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界仁德",
+      "spec": "skills/界仁德",
+      "description": "出牌阶段:每名角色限一次,将任意张手牌交给一名其他角色;本阶段给出第二张时,可视为使用一张基本牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界仁德",
+          "actionType": "use",
+          "prompt": "distribute",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界仁德",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界激将",
+      "spec": "skills/界激将",
+      "description": "主公技:蜀势力角色可代你使用或打出杀;每回合限一次,蜀角色回合外用杀时可令你摸1张",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界激将",
+          "actionType": "use",
+          "prompt": "choosePlayer",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界激将",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "武圣",
+      "spec": "skills/武圣",
+      "description": "你可以将一张红色牌当【杀】使用或打出",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "武圣",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界武圣",
+      "spec": "skills/界武圣",
+      "description": "你可以将一张红色牌(手牌或装备区)当【杀】使用或打出",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界武圣",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "义绝",
+      "spec": "skills/义绝",
+      "description": "出牌阶段限一次,弃置一张牌并令一名其他角色展示一张手牌;黑色则其本回合非锁定技失效且不能使用或打出手牌,你对其红桃杀伤害+1;红色则你获得之,然后可令其回1点体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "义绝",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "义绝",
+          "actionType": "respond",
+          "prompt": "pickProcessingCard",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "咆哮",
+      "spec": "skills/咆哮",
+      "description": "锁定技:出牌阶段使用【杀】无次数限制",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界咆哮",
+      "spec": "skills/界咆哮",
+      "description": "锁定技:出牌阶段使用【杀】无次数限制;杀被【闪】抵消时摸一张牌",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "龙胆",
+      "spec": "skills/龙胆",
+      "description": "你可以将一张【杀】当【闪】使用或打出,或将一张【闪】当【杀】使用或打出",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "龙胆",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界龙胆",
+      "spec": "skills/界龙胆",
+      "description": "你可以将一张【杀】当【闪】、【闪】当【杀】、【酒】当【桃】、【桃】当【酒】使用或打出",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界龙胆",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "涯角",
+      "spec": "skills/涯角",
+      "description": "每当你于回合外使用或打出手牌时,你可以展示牌堆顶的一张牌,若这两张牌的类别相同,你可以将牌堆顶的一张牌交给一名角色;若不同,你可以弃置攻击范围内包含你的一名角色区域里的一张牌。",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "涯角",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "集智",
+      "spec": "skills/集智",
+      "description": "被动技:使用非延时锦囊牌时,你可以摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "集智",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "奇才",
+      "spec": "skills/奇才",
+      "description": "锁定技:你使用任何锦囊牌无距离限制",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界集智",
+      "spec": "skills/界集智",
+      "description": "被动技:使用非转化锦囊牌时你可以摸一张牌;若此牌是基本牌,可弃之令本回合手牌上限+1",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界集智",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界奇才",
+      "spec": "skills/界奇才",
+      "description": "锁定技:你使用任何锦囊牌无距离限制;其他角色不能弃置你装备区的防具或宝物",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "马术",
+      "spec": "skills/马术",
+      "description": "锁定技:你与其他角色的距离-1",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "铁骑",
+      "spec": "skills/铁骑",
+      "description": "使用杀指定目标后可判定,红色则目标不能出闪抵消",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "铁骑",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界铁骑",
+      "spec": "skills/界铁骑",
+      "description": "使用杀指定目标后,可令其本回合非锁定技失效并判定;除非其弃一张与判定结果同花色的牌,否则不能抵消此杀",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界铁骑",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界潜袭",
+      "spec": "skills/界潜袭",
+      "description": "准备阶段,你可以摸一张牌并展示一张牌;距离为1的其他角色本回合不能使用或打出与\"潜袭\"牌颜色相同的手牌,你本回合使用\"潜袭\"牌造成的伤害+1",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界潜袭",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "烈弓",
+      "spec": "skills/烈弓",
+      "description": "使用杀指定目标后,若其手牌数不小于你的体力值或不大于你的攻击范围,可令其不能抵消此杀",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "烈弓",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界烈弓",
+      "spec": "skills/界烈弓",
+      "description": "你的杀攻击范围为此杀点数;指定目标后,若其手牌数不大于你,其不能抵消;若其体力值不小于你,伤害+1",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界烈弓",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "狂骨",
+      "spec": "skills/狂骨",
+      "description": "对距离1以内的角色每造成1点伤害后,你可以回复1点体力或摸一张牌",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界狂骨",
+      "spec": "skills/界狂骨",
+      "description": "对距离1以内的角色每造成1点伤害时,你可以回复1点体力或摸一张牌",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "奇谋",
+      "spec": "skills/奇谋",
+      "description": "限定技,出牌阶段,你可以失去任意点体力并摸等量的牌,然后本回合你计算与其他角色的距离-X且使用【杀】的限制次数+X(X为失去的体力值)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "奇谋",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "奇谋",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "八阵",
+      "spec": "skills/八阵",
+      "description": "锁定技:没有装备防具时,视为装备着八卦阵",
+      "locked": true,
+      "actions": [
+        {
+          "skillId": "八阵",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "火计",
+      "spec": "skills/火计",
+      "description": "你可以将一张红色手牌当【火攻】使用",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "火计",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "看破",
+      "spec": "skills/看破",
+      "description": "你可以将一张黑色手牌当【无懈可击】使用",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "看破",
+          "actionType": "transform",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界火计",
+      "spec": "skills/界火计",
+      "description": "你可以将一张红色牌当【火攻】使用;你的【火攻】改为目标展示随机手牌,你弃同颜色牌造伤",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界火计",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界火计",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界看破",
+      "spec": "skills/界看破",
+      "description": "你可以将一张黑色牌当【无懈可击】使用;你的【无懈可击】不能被响应",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界看破",
+          "actionType": "transform",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "观星",
+      "spec": "skills/观星",
+      "description": "准备阶段开始时,观看牌堆顶X张牌(X为全场角色数至多5),调整顺序,余者置牌堆底",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "观星",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "空城",
+      "spec": "skills/空城",
+      "description": "锁定技:若你没有手牌,你不是杀和决斗的合法目标",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界观星",
+      "spec": "skills/界观星",
+      "description": "准备阶段,观看牌堆顶 5 张(存活角色数<4 时为 3 张),任意排序置顶/置底;若皆置底,结束阶段可再次发动",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界观星",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界空城",
+      "spec": "skills/界空城",
+      "description": "锁定技:若你没有手牌,你不是杀和决斗的合法目标;你使用的杀被闪抵消后摸一张牌",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "连环",
+      "spec": "skills/连环",
+      "description": "你可以将一张梅花手牌当【铁索连环】使用或重铸",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "连环",
+          "actionType": "recycle",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "连环",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "涅槃",
+      "spec": "skills/涅槃",
+      "description": "限定技:濒死时弃置所有牌和判定区牌,重置武将牌,摸三张并回复至3点体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "涅槃",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界连环",
+      "spec": "skills/界连环",
+      "description": "你可以将一张梅花牌当【铁索连环】使用或重铸;你使用【铁索连环】可以多指定一个目标(至多3名)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界连环",
+          "actionType": "recycle",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界连环",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界涅槃",
+      "spec": "skills/界涅槃",
+      "description": "限定技:濒死时弃置所有牌,复原武将牌,摸三张并回复至3点体力,然后获得八阵/火计/看破中的一个",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界涅槃",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "祸首",
+      "spec": "skills/祸首",
+      "description": "锁定技:南蛮入侵对你无效;你是任何南蛮入侵造成伤害的来源",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "再起",
+      "spec": "skills/再起",
+      "description": "摸牌阶段,若已受伤,可放弃摸牌,展示牌堆顶X张(X=已损失体力+1),红桃回血弃置,其余入门",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "再起",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界再起",
+      "spec": "skills/界再起",
+      "description": "结束阶段,你可以令至多X名角色各选一项(X=本回合置入弃牌堆的红色牌数):1.摸一张牌;2.令你回复1点体力",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "巨象",
+      "spec": "skills/巨象",
+      "description": "锁定技:南蛮入侵对你无效;其他角色使用的南蛮入侵结算后进入弃牌堆时,你获得它",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "烈刃",
+      "spec": "skills/烈刃",
+      "description": "使用杀造成伤害后,可与受害者拼点,赢则获得对方一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "烈刃",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "挑衅",
+      "spec": "skills/挑衅",
+      "description": "出牌阶段限一次:指定一名能用杀攻击到你的角色,其须对你出杀,否则你弃其一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "挑衅",
+          "actionType": "use",
+          "prompt": "selectTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "挑衅",
+          "actionType": "respond",
+          "prompt": "pickTargetCard",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "志继",
+      "spec": "skills/志继",
+      "description": "觉醒技:准备阶段且无手牌时,回复1体力或摸2牌,减1体力上限并永久获得\"观星\"",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "志继",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界挑衅",
+      "spec": "skills/界挑衅",
+      "description": "出牌阶段限两次:指定一名攻击范围包含你的角色,其须对你出杀且造成伤害,否则你弃其一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界挑衅",
+          "actionType": "use",
+          "prompt": "selectTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界挑衅",
+          "actionType": "respond",
+          "prompt": "pickTargetCard",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界志继",
+      "spec": "skills/界志继",
+      "description": "觉醒技:准备阶段或结束阶段且无手牌时,回复1体力或摸2牌,减1体力上限并永久获得\"观星\"",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界志继",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "享乐",
+      "spec": "skills/享乐",
+      "description": "锁定技:其他角色用杀指定你为目标时,需额外弃一张基本牌,否则杀对你无效",
+      "locked": true,
+      "actions": [
+        {
+          "skillId": "享乐",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "放权",
+      "spec": "skills/放权",
+      "description": "跳过出牌阶段,回合结束时弃一张手牌,令一名其他角色进行一个额外回合",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "放权",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "若愚",
+      "spec": "skills/若愚",
+      "description": "主公技/觉醒技:回合开始且体力全场最少时,增加1体力上限、回复1体力并永久获得\"激将\"",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界放权",
+      "spec": "skills/界放权",
+      "description": "跳过出牌阶段,弃牌阶段开始时弃一张手牌,令一名其他角色进行一个额外回合",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界放权",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界若愚",
+      "spec": "skills/界若愚",
+      "description": "主公技/觉醒技:回合开始且体力全场最少时,增加1体力上限、回复至3点体力并永久获得\"激将\"",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界父魂",
+      "spec": "skills/界父魂",
+      "description": "转化技:两张牌当杀;转化杀目标只能用同色手牌响应;出牌阶段杀造成伤害后本回合获得武圣咆哮",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界父魂",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界父魂",
+          "actionType": "武圣transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界樵拾",
+      "spec": "skills/界樵拾",
+      "description": "每个结束阶段,你可以与当前回合角色各摸一张牌;然后若其与你手牌数不相等,此技能本轮失效",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界樵拾",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界燕语",
+      "spec": "skills/界燕语",
+      "description": "出牌阶段,你可以重铸【杀】;出牌阶段结束时,若你本阶段失去过至少两张【杀】,可令一名男性角色摸两张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界燕语",
+          "actionType": "recycle",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界燕语",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界当先",
+      "spec": "skills/界当先",
+      "description": "锁定技:回合开始时执行一个额外的出牌阶段;此阶段开始时可获得一张无距离限制的杀;若未于此阶段造成过伤害,阶段结束时受1点伤害",
+      "locked": true,
+      "actions": [
+        {
+          "skillId": "界当先",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界当先",
+          "actionType": "end",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界伏枥",
+      "spec": "skills/界伏枥",
+      "description": "限定技:濒死时,将体力回复至X点且手牌摸至X张(X为全场势力数);然后若X大于你造成的伤害数,你翻面",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界伏枥",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界强识",
+      "spec": "skills/界强识",
+      "description": "出牌阶段开始时,你可观看一名其他角色的手牌并展示其中一张牌;本阶段你使用此类别的牌后可摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界强识",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界献图",
+      "spec": "skills/界献图",
+      "description": "其他角色出牌阶段开始时,你可以摸至多两张牌,然后交给其等量牌;此阶段结束时若其造成伤害小于你以此法交给其的牌数,你失去1点体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界献图",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界诛害",
+      "spec": "skills/界诛害",
+      "description": "其他角色的结束阶段,若其本回合造成过伤害,你可以对其使用一张【杀】",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界诛害",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界潜心",
+      "spec": "skills/界潜心",
+      "description": "觉醒技:造成伤害后,若你已受伤,你减少1点体力上限并获得\"荐言\"",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界眩惑",
+      "spec": "skills/界眩惑",
+      "description": "摸牌阶段结束时,交给一名其他角色两张牌,令其选:①对你指定的另一名角色出杀;②你观看其手牌并获得两张",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界眩惑",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界恩怨",
+      "spec": "skills/界恩怨",
+      "description": "获得一名其他角色≥2张牌后可令其摸1张;受到1点伤害后令来源选:交红色手牌或失去1点体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界恩怨",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界纵适",
+      "spec": "skills/界纵适",
+      "description": "当你拼点赢时,你可以获得点数较小的拼点牌;当你没赢时,你可以获得你的拼点牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界纵适",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界巧说",
+      "spec": "skills/界巧说",
+      "description": "出牌阶段限一次拼点:赢则本回合下一张牌可多/少指定一个目标;没赢则本回合不能使用锦囊牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界巧说",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界巧说",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "飞军",
+      "spec": "skills/飞军",
+      "description": "出牌阶段限一次,弃置一张牌,令一名手牌数大于你的角色交给你一张牌,或令一名装备区里牌数大于你的角色弃置一张装备",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "飞军",
+          "actionType": "use",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "飞军",
+          "actionType": "respond",
+          "prompt": "chooseOption",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "兵略",
+      "spec": "skills/兵略",
+      "description": "锁定技,当你首次对一名角色发动\"飞军\"时,你摸两张牌",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "罪论",
+      "spec": "skills/罪论",
+      "description": "结束阶段可观看牌堆顶三张牌,获得其中X张(X为满足项数:本回合造成过伤害/未弃置过牌/手牌数全场最少),余牌任意顺序置牌堆顶;均不满足则自己与一名其他角色各失去1点体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "罪论",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "父荫",
+      "spec": "skills/父荫",
+      "description": "锁定技:每回合首次成为其他角色杀或决斗的目标后,若其手牌数不小于你,此牌对你无效",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "往烈",
+      "spec": "skills/往烈",
+      "description": "你出牌阶段使用的首张牌无距离限制;当你于出牌阶段使用基本牌或普通锦囊牌时,你可以令此牌不能被响应,然后你本阶段不能再使用牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "往烈",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "拒战",
+      "spec": "skills/拒战",
+      "description": "转换技。阳:成为其他角色杀的目标后,你可与其各摸一张牌,然后其本回合不能再对你使用牌。阴:使用杀指定目标后,你可获得其一张牌,然后你本回合不能再对其使用牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "拒战",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "制衡",
+      "spec": "skills/制衡",
+      "description": "出牌阶段限一次:弃任意张牌(手牌/装备),摸等量的牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "制衡",
+          "actionType": "use",
+          "prompt": "distribute",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "救援",
+      "spec": "skills/救援",
+      "description": "主公技,锁定技:其他吴势力角色对你使用【桃】的回复值+1",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界制衡",
+      "spec": "skills/界制衡",
+      "description": "出牌阶段限一次:弃任意张牌(手牌/装备),摸等量张;若弃置了所有手牌,额外摸一张",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界制衡",
+          "actionType": "use",
+          "prompt": "distribute",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界救援",
+      "spec": "skills/界救援",
+      "description": "主公技:其他吴势力角色于其回合内回复体力时,若其体力≥你,其可改为令你回复1点体力,然后其摸一张牌",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "奇袭",
+      "spec": "skills/奇袭",
+      "description": "你可以将一张黑色牌当【过河拆桥】使用",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "奇袭",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "奋威",
+      "spec": "skills/奋威",
+      "description": "限定技,当一张锦囊牌指定多个目标后,你可以令此牌对任意个目标无效",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "奋威",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "克己",
+      "spec": "skills/克己",
+      "description": "出牌阶段结束时,若你本回合未使用或打出过【杀】,你可以跳过弃牌阶段",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "克己",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界克己",
+      "spec": "skills/界克己",
+      "description": "若你未于本回合出牌阶段使用或打出过【杀】,你可以跳过弃牌阶段",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界克己",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "勤学",
+      "spec": "skills/勤学",
+      "description": "觉醒技:准备或结束阶段,若手牌数比体力值多2或更多,减1体力上限,回复1体力或摸2牌,然后获得\"攻心\"",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "勤学",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "博图",
+      "spec": "skills/博图",
+      "description": "每轮限X次(X为存活角色数至多3),回合结束后若本回合弃牌堆含四种花色,可执行一个额外回合",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "苦肉",
+      "spec": "skills/苦肉",
+      "description": "出牌阶段，你可以失去1点体力，然后摸两张牌。",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "苦肉",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界苦肉",
+      "spec": "skills/界苦肉",
+      "description": "出牌阶段限一次，你可以弃置一张牌，然后失去1点体力。",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界苦肉",
+          "actionType": "use",
+          "prompt": "distribute",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "诈降",
+      "spec": "skills/诈降",
+      "description": "锁定技：当你失去1点体力后，你摸三张牌，若在你的出牌阶段，你本回合使用【杀】的限制次数+1、使用红色【杀】无距离限制且不能被抵消。",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "反间",
+      "spec": "skills/反间",
+      "description": "出牌阶段限一次，你可以令一名其他角色选择一种花色，令其获得并展示你的一张手牌，若此牌花色与其选择的花色不同，你对其造成1点伤害",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "反间",
+          "actionType": "use",
+          "prompt": "selectTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "反间",
+          "actionType": "respond",
+          "prompt": "chooseSuit",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "英姿",
+      "spec": "skills/英姿",
+      "description": "摸牌阶段，你可以额外摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "英姿",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界英姿",
+      "spec": "skills/界英姿",
+      "description": "锁定技:摸牌阶段你多摸一张牌;你的手牌上限为你的体力上限",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界反间",
+      "spec": "skills/界反间",
+      "description": "出牌阶段限一次,展示并交给一名其他角色一张手牌,其选择:弃置同色牌或失去1点体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界反间",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界反间",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "国色",
+      "spec": "skills/国色",
+      "description": "你可以将一张方块牌当【乐不思蜀】使用",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "国色",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "流离",
+      "spec": "skills/流离",
+      "description": "当你成为杀的目标时,可弃一张牌,将此杀转移给攻击范围内一名其他角色",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "流离",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界国色",
+      "spec": "skills/界国色",
+      "description": "出牌阶段限一次,选一项后摸一张牌:①方片牌当乐不思蜀使用;②弃方片牌和场上乐不思蜀",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界国色",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界国色",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "谦逊",
+      "spec": "skills/谦逊",
+      "description": "锁定技:你不能成为顺手牵羊和乐不思蜀的目标",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "连营",
+      "spec": "skills/连营",
+      "description": "被动技:当你失去最后的手牌时,你可以摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "连营",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界谦逊",
+      "spec": "skills/界谦逊",
+      "description": "当延时锦囊或他人普通锦囊对你生效且你为唯一目标时,你可以将所有手牌移出游戏直到回合结束",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界谦逊",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界连营",
+      "spec": "skills/界连营",
+      "description": "被动技:当你失去所有手牌后,你可以令至多X名角色各摸一张牌(X为你失去的手牌数)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界连营",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "结姻",
+      "spec": "skills/结姻",
+      "description": "出牌阶段限一次,弃两张手牌,令你与一名已受伤的男性角色各回复1点体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "结姻",
+          "actionType": "use",
+          "prompt": "distribute",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "枭姬",
+      "spec": "skills/枭姬",
+      "description": "失去装备区的牌时,你可以摸两张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "枭姬",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界结姻",
+      "spec": "skills/界结姻",
+      "description": "出牌阶段限一次:选一名男性角色,弃一张手牌或置一张装备牌入其装备区,体力大者摸1张,小者回1点",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界结姻",
+          "actionType": "use",
+          "prompt": "distribute",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "天香",
+      "spec": "skills/天香",
+      "description": "受到伤害时,弃一张红桃手牌防止之,令一名其他角色二选一:①受来源1伤害并摸X(X为已损失体力至多5);②失去1体力并获得弃置的牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "天香",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "红颜",
+      "spec": "skills/红颜",
+      "description": "锁定技:你的黑桃牌均视为红桃牌",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界红颜",
+      "spec": "skills/界红颜",
+      "description": "锁定技:你的黑桃牌和黑桃判定牌视为红桃牌;装备区有红桃牌时手牌上限等于体力上限",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界天香",
+      "spec": "skills/界天香",
+      "description": "受到伤害时,弃一张红桃牌防止之,令一名其他角色二选一:①受来源1伤害并摸X(X为已损失体力至多5);②失去1体力并获得弃置的牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界天香",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "飘零",
+      "spec": "skills/飘零",
+      "description": "结束阶段可判定,红桃则将判定牌置牌堆顶或交给一名角色(给自己则弃一张牌)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "飘零",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "不屈",
+      "spec": "skills/不屈",
+      "description": "锁定技:濒死时将牌堆顶一张牌作\"创\"牌置于武将牌上,点数与已有创牌均不同则回复至1体力,相同则移去此牌",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界不屈",
+      "spec": "skills/界不屈",
+      "description": "锁定技:濒死时翻牌堆顶作\"创\"牌置于武将牌上,点数与已有创均不同则回复至1体力,相同则移去此牌;武将牌上有\"创\"时手牌上限为\"创\"的数量",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "奋激",
+      "spec": "skills/奋激",
+      "description": "当一名角色的手牌被弃置或获得后,你可以失去1点体力令其摸两张牌",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "天义",
+      "spec": "skills/天义",
+      "description": "出牌阶段限一次,与一名角色拼点:赢则本回合攻击范围无限、可额外使用一张杀、杀可额外指定一个目标;没赢则本回合不能使用杀",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "天义",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "天义",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "酣战",
+      "spec": "skills/酣战",
+      "description": "拼点前可令对方用随机手牌拼点;拼点后可获得两张拼点牌中点数最大的杀",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "好施",
+      "spec": "skills/好施",
+      "description": "摸牌阶段，你可以额外摸两张牌，若此时你的手牌数超过五张，你必须将一半（向下取整）的手牌交给除你外手牌数最少的一名角色",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "好施",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "缔盟",
+      "spec": "skills/缔盟",
+      "description": "出牌阶段限一次,选择两名其他角色,弃置等同于他们手牌数差的牌,然后交换他们的手牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "缔盟",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "缔盟",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界好施",
+      "spec": "skills/界好施",
+      "description": "摸牌阶段多摸两张,手牌>5时分半给最少者;给牌后直到下回合开始,成为杀/普通锦囊目标时其可给你一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界好施",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界缔盟",
+      "spec": "skills/界缔盟",
+      "description": "出牌阶段限一次,令两名角色交换手牌(差不大于你的牌数),出牌阶段结束时弃X张牌(X为手牌数差)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界缔盟",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界缔盟",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "英魂",
+      "spec": "skills/英魂",
+      "description": "回合开始阶段,若你已受伤,可令一名其他角色选择一项:摸X张牌再弃一张牌,或摸一张牌再弃X张牌(X为你已损失体力值)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "英魂",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "武烈",
+      "spec": "skills/武烈",
+      "description": "限定技,结束阶段,你可以失去任意点体力,令等量的其他角色各获得1个「烈」标记。有「烈」的角色受到伤害时,防止此伤害,然后移去「烈」",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "激昂",
+      "spec": "skills/激昂",
+      "description": "使用或被使用【决斗】或红色【杀】时,你可以摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "激昂",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "魂姿",
+      "spec": "skills/魂姿",
+      "description": "觉醒技:准备阶段且体力为1时,减1体力上限并永久获得\"英姿\"和\"英魂\"",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "制霸",
+      "spec": "skills/制霸",
+      "description": "主公技:其他吴势力角色出牌阶段可与你拼点,若其没赢你可获得双方拼点牌;觉醒后可拒绝拼点",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "制霸",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界激昂",
+      "spec": "skills/界激昂",
+      "description": "使用/被使用【决斗】或红色【杀】时可摸一张牌;每回合首次此类牌因弃置入弃牌堆时可失去1体力获得之",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界激昂",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界魂姿",
+      "spec": "skills/界魂姿",
+      "description": "觉醒技:准备阶段且体力为1时,减1体力上限并永久获得\"界英姿\"\"英魂\";本回合结束阶段摸2牌或回复1体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界魂姿",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界制霸",
+      "spec": "skills/界制霸",
+      "description": "主公技:你与其他吴势力角色可互相拼点;若发起方没赢,你可以获得两张拼点牌;觉醒后可拒绝盟友发起的拼点",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界制霸",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界制霸",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "直谏",
+      "spec": "skills/直谏",
+      "description": "出牌阶段:将一张装备牌置于一名其他角色的空装备区,然后摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "直谏",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "固政",
+      "spec": "skills/固政",
+      "description": "其他角色弃牌阶段结束时:将其一张弃牌返回其手牌,然后获得其余弃牌",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界直谏",
+      "spec": "skills/界直谏",
+      "description": "出牌阶段:将一张装备牌置入一名其他角色的装备区(可替换原装备),然后摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界直谏",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界固政",
+      "spec": "skills/界固政",
+      "description": "每阶段限一次,其他角色≥2张牌因弃置置入弃牌堆后,可将其中一张交给该角色,然后可获其余",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界旋风",
+      "spec": "skills/界旋风",
+      "description": "失去装备区里的牌,或一次性失去至少两张牌后,可依次弃置至多两名其他角色共计至多两张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界旋风",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界甘露",
+      "spec": "skills/界甘露",
+      "description": "出牌阶段限一次:令两名角色交换装备区里的牌;若两人装备数差 X 大于你已损失的体力值,你须弃 X 张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界甘露",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界补益",
+      "spec": "skills/界补益",
+      "description": "当一名角色进入濒死状态时,可选其一张牌;若非基本牌,弃置之并回复1点体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界补益",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界破军",
+      "spec": "skills/界破军",
+      "description": "当你使用【杀】指定目标后,你可以将其至多X张牌移出游戏直到回合结束(X为其体力值)。你使用的【杀】对手牌区与装备区内牌数皆不大于你的角色造成的伤害+1",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界破军",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界疠火",
+      "spec": "skills/界疠火",
+      "description": "你使用的非火【杀】可以改为火【杀】;此牌造成伤害后,你弃1牌或失去1体力;你使用的火【杀】可多指定一个目标",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界疠火",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界疠火",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界醇醪",
+      "spec": "skills/界醇醪",
+      "description": "你或相邻角色的【杀】因弃置置入弃牌堆后,将之置于你的武将牌上为\"醇\";濒死时你可移去X张\"醇\"视为一张【酒】(X为本轮以此法使用酒的次数)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界醇醪",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界纵玄",
+      "spec": "skills/界纵玄",
+      "description": "当你的牌因弃置置入弃牌堆后,或你上家每回合首次因弃置置入弃牌堆后,你可以将其中任意张牌置于牌堆顶",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界直言",
+      "spec": "skills/界直言",
+      "description": "你上家或你的结束阶段,你可令一名角色摸一张牌并展示之;装备牌:其使用之并回复1点体力;非装备且其体力不等于你:其失去1点体力",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界弓骑",
+      "spec": "skills/界弓骑",
+      "description": "出牌阶段限一次,弃一张牌使本回合攻击范围无限,且同花色杀无次数限制;弃装备可再弃一名其他角色一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界弓骑",
+          "actionType": "use",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界弓骑",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界解烦",
+      "spec": "skills/界解烦",
+      "description": "限定技,出牌阶段选择一名角色,令所有攻击范围内包含其的角色各选:弃一张武器牌 或 令该角色摸一张牌。第一轮发动后回合结束视为未发动",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界解烦",
+          "actionType": "use",
+          "prompt": "selectTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界解烦",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "谦节",
+      "spec": "skills/谦节",
+      "description": "锁定技:当你进入连环状态时防止之;你不能成为延时锦囊牌和其他角色拼点的目标",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "决堰",
+      "spec": "skills/决堰",
+      "description": "出牌阶段限一次,废除一个装备栏并于本回合获得对应效果:武器栏杀次数+3;防具栏摸三张且手牌上限+3;坐骑栏使用牌无距离限制;宝物栏获得集智",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "决堰",
+          "actionType": "use",
+          "prompt": "chooseOption",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "破势",
+      "spec": "skills/破势",
+      "description": "觉醒技:准备阶段,若装备栏均被废除或体力值为1,减少1点体力上限,将手牌摸至体力上限,失去决堰并获得怀柔",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "怀橘",
+      "spec": "skills/怀橘",
+      "description": "锁定技:游戏开始时获得3枚橘标记;有橘的角色受到伤害时防止伤害并移除1枚橘;有橘的角色摸牌阶段多摸一张牌",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "遗礼",
+      "spec": "skills/遗礼",
+      "description": "出牌阶段开始时,你可以失去1点体力或移除1枚橘,然后令一名其他角色获得1枚橘",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "整论",
+      "spec": "skills/整论",
+      "description": "若你没有橘,你可以跳过摸牌阶段并获得1枚橘",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "良姻",
+      "spec": "skills/良姻",
+      "description": "每回合首次有牌移出/移入游戏后,你可以与一名其他角色各摸/弃置一张牌,然后可令其中一名手牌数为X的角色回复1点体力(X为箜声牌数)",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "箜声",
+      "spec": "skills/箜声",
+      "description": "准备阶段,你可以将任意张牌置于你的武将牌上;结束阶段,你获得其中的非装备牌,然后令一名角色使用剩余牌并失去1点体力",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "溃诛",
+      "spec": "skills/溃诛",
+      "description": "弃牌阶段结束时,选择一项:令至多X名角色各摸一张牌,或对体力值之和为X的角色各造成1点伤害(X为本阶段弃牌数)",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "掣政",
+      "spec": "skills/掣政",
+      "description": "锁定技:防止你出牌阶段对攻击范围内不含你的角色造成的伤害;出牌阶段结束时若用牌数少于这些角色数,弃置其中一名角色一张牌",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "立军",
+      "spec": "skills/立军",
+      "description": "主公技:其他吴势力角色用杀后可交给你获得,你可令其摸一张牌且本回合使用杀的限制次数+1",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "急救",
+      "spec": "skills/急救",
+      "description": "在你的回合外,你可以将一张红色牌当【桃】使用。",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "急救",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "青囊",
+      "spec": "skills/青囊",
+      "description": "出牌阶段限一次,弃一张手牌,令一名角色回复 1 点体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "青囊",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "无双",
+      "spec": "skills/无双",
+      "description": "锁定技:你使用【杀】的目标需连续出两张【闪】才能抵消;与你【决斗】的角色每次需连续打出两张【杀」",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "离间",
+      "spec": "skills/离间",
+      "description": "出牌阶段限一次,弃一张牌,令一名男性角色视为对另一名男性角色使用决斗",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "离间",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "闭月",
+      "spec": "skills/闭月",
+      "description": "回合结束阶段,你可以摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "闭月",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界闭月",
+      "spec": "skills/界闭月",
+      "description": "结束阶段,若你没有手牌,你可以摸两张牌,否则你可以摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界闭月",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "雷击",
+      "spec": "skills/雷击",
+      "description": "当你使用或打出【闪】时,可令一名其他角色判定,黑桃则造成2点雷电伤害;梅花则你回复1点体力并对其造成1点雷电伤害",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "雷击",
+          "actionType": "respond",
+          "prompt": "choosePlayer",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "鬼道",
+      "spec": "skills/鬼道",
+      "description": "判定牌生效前,你可以用一张黑色牌替换之",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "鬼道",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "黄天",
+      "spec": "skills/黄天",
+      "description": "主公技:其他群势力角色可在出牌阶段将一张【闪】或【闪电】交给你",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "黄天",
+          "actionType": "use",
+          "prompt": "useCard",
+          "backend": false,
+          "backendOwners": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "蛊惑",
+      "spec": "skills/蛊惑",
+      "description": "每回合限一次,扣置一张手牌声明为基本牌(杀/闪/桃/酒)使用或打出;其他角色可质疑",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "蛊惑",
+          "actionType": "use:杀",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "蛊惑",
+          "actionType": "use:桃",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "蛊惑",
+          "actionType": "use:酒",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "蛊惑",
+          "actionType": "dodge",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "蛊惑",
+          "actionType": "rescue",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "蛊惑",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界蛊惑",
+      "spec": "skills/界蛊惑",
+      "description": "每回合限一次,扣置一张手牌声明为基本牌使用/打出;其他角色可同时质疑:真→缠怨+弃牌或失1体力,假→作废+质疑者摸1牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界蛊惑",
+          "actionType": "use:杀",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界蛊惑",
+          "actionType": "use:桃",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界蛊惑",
+          "actionType": "use:酒",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界蛊惑",
+          "actionType": "dodge",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界蛊惑",
+          "actionType": "rescue",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界蛊惑",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "乱击",
+      "spec": "skills/乱击",
+      "description": "你可以将两张同花色的手牌当【万箭齐发】使用",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "乱击",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界乱击",
+      "spec": "skills/界乱击",
+      "description": "你可以将两张花色相同的手牌当【万箭齐发】使用;你使用【万箭齐发】可以少选一个目标",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界乱击",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界乱击",
+          "actionType": "respond",
+          "prompt": "choosePlayer",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界血裔",
+      "spec": "skills/界血裔",
+      "description": "主公技:游戏开始时获得X枚裔标记(X为群势力角色数的两倍);出牌阶段开始时可移除1枚裔并摸一张牌;每枚裔手牌上限+1",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "鞬出",
+      "spec": "skills/鞬出",
+      "description": "使用杀指定目标后,可弃其一张牌:装备牌则其不能出闪,非装备牌则其获得此杀",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "鞬出",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界鞬出",
+      "spec": "skills/界鞬出",
+      "description": "使用杀指定目标后,可弃其一张牌:基本牌则其获得此杀;非基本牌则其不能抵消此杀且本回合出杀次数+1",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界鞬出",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "双雄",
+      "spec": "skills/双雄",
+      "description": "摸牌阶段,改为进行一次判定,获得判定牌,本回合可将与之颜色不同的手牌当决斗使用",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "双雄",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "双雄",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界双雄",
+      "spec": "skills/界双雄",
+      "description": "摸牌阶段结束时弃置一张牌,本回合可将与之颜色不同的牌当决斗使用;结束阶段获得本回合对你造成伤害的牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界双雄",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界双雄",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "酒池",
+      "spec": "skills/酒池",
+      "description": "你可以将一张黑桃手牌当【酒】使用",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "酒池",
+          "actionType": "transform",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "肉林",
+      "spec": "skills/肉林",
+      "description": "锁定技:你对女性角色/女性角色对你使用【杀】时,目标需连续出两张闪才能抵消",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "崩坏",
+      "spec": "skills/崩坏",
+      "description": "锁定技:回合结束阶段,若你的体力不是全场最少的,须减1点体力或1点体力上限",
+      "locked": true,
+      "actions": [
+        {
+          "skillId": "崩坏",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "暴虐",
+      "spec": "skills/暴虐",
+      "description": "主公技:其他群雄角色造成伤害后,可判定,黑桃则回复1点体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "暴虐",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界酒池",
+      "spec": "skills/界酒池",
+      "description": "转化技:黑桃手牌当酒使用,无次数限制;使用酒杀造成伤害后本回合崩坏失效",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界酒池",
+          "actionType": "transform",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界崩坏",
+      "spec": "skills/界崩坏",
+      "description": "锁定技:回合结束阶段,若你的体力不是全场最少的,须减1点体力或1点体力上限;界酒池酒杀造成伤害后本回合失效",
+      "locked": true,
+      "actions": [
+        {
+          "skillId": "界崩坏",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界暴虐",
+      "spec": "skills/界暴虐",
+      "description": "主公技:其他群势力角色造成1点伤害后可判定,黑桃则回复1点体力并获得此判定牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界暴虐",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "完杀",
+      "spec": "skills/完杀",
+      "description": "锁定技:在你的回合,除你以外,只有处于濒死状态的角色才能使用【桃】",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "乱武",
+      "spec": "skills/乱武",
+      "description": "限定技:出牌阶段令所有其他角色依次对距离最近者出杀,无法如此做者失去1点体力",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "乱武",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "乱武",
+          "actionType": "respond",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "帷幕",
+      "spec": "skills/帷幕",
+      "description": "锁定技:你不能成为黑色锦囊的目标",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界帷幕",
+      "spec": "skills/界帷幕",
+      "description": "锁定技,你不能成为黑色锦囊牌的目标;你防止回合内受到的伤害并摸所防止伤害值两倍数量的牌",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界乱武",
+      "spec": "skills/界乱武",
+      "description": "限定技:出牌阶段令所有其他角色依次对距离最小者出杀,无法如此做者失去1点体力;结算后可视为使用一张无距离限制的【杀】",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界乱武",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界乱武",
+          "actionType": "respond",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界完杀",
+      "spec": "skills/界完杀",
+      "description": "锁定技,在你的回合内,只有你和处于濒死状态的角色才能使用【桃】;任意濒死结算中,除你和濒死者外其他角色的非锁定技失效",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "化身",
+      "spec": "skills/化身",
+      "description": "游戏开始时随机获得未登场武将牌作为化身牌(左慈2张/界左慈3张),亮出一张并获得其一个技能(限定/觉醒/主公技除外);回合开始或结束时可更改/替换/移去化身牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "化身",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "新生",
+      "spec": "skills/新生",
+      "description": "每当你受到 1 点伤害后,你可以获得一张新的化身牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "新生",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "悲歌",
+      "spec": "skills/悲歌",
+      "description": "一名角色受到杀伤害后,弃一张牌令其判定:♥回血/♦摸二/♣来源弃二/♠来源翻面",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "悲歌",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "断肠",
+      "spec": "skills/断肠",
+      "description": "杀死你的角色立即失去所有技能直到游戏结束(装备仍生效)",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界悲歌",
+      "spec": "skills/界悲歌",
+      "description": "受杀伤害后令其判定,可弃一张牌按花色执行;花色同获判定牌,点数同获弃置牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界悲歌",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界惴恐",
+      "spec": "skills/界惴恐",
+      "description": "其他角色的回合开始时,若你已受伤,你可以与其拼点:赢则其本回合不能对除其以外的角色使用牌;没赢则你获得其拼点牌,然后其视为对你使用一张杀",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界惴恐",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界求援",
+      "spec": "skills/界求援",
+      "description": "当你成为杀或伤害锦囊的目标时,可令另一名其他角色选一项:1.交给你一张同类型不同牌名的牌;2.成为此牌的额外目标",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界求援",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界义从",
+      "spec": "skills/界义从",
+      "description": "锁定技:你计算与其他角色的距离-1;若你的体力值不大于2,其他角色计算与你的距离+1",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界趫猛",
+      "spec": "skills/界趫猛",
+      "description": "当你使用【杀】对一名角色造成伤害后,你可以弃置其区域里的一张牌。若此牌为坐骑牌,你获得之",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界自守",
+      "spec": "skills/界自守",
+      "description": "摸牌阶段可多摸X张(X为全场势力数);若本回合对其他角色造成过伤害,结束阶段弃X张",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界自守",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界宗室",
+      "spec": "skills/界宗室",
+      "description": "锁定技:手牌上限+X(X为全场势力数);其他角色对你造成伤害时,防止此伤害改为令其摸一张牌,每种势力限一次",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界除疠",
+      "spec": "skills/界除疠",
+      "description": "出牌阶段限一次,选择任意名势力各不相同的其他角色,弃置你和这些角色的各一张牌,被弃置黑桃牌的角色各摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界除疠",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界耀武",
+      "spec": "skills/界耀武",
+      "description": "锁定技,当你受到伤害时,若造成伤害的牌为红色,来源摸一张牌;否则你摸一张牌",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界势斩",
+      "spec": "skills/界势斩",
+      "description": "出牌阶段限两次,令一名其他角色视为对你使用一张决斗",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界势斩",
+          "actionType": "use",
+          "prompt": "selectTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界利驭",
+      "spec": "skills/界利驭",
+      "description": "当你使用【杀】对其他角色造成伤害后,你可以获得其区域里的一张牌;获得的牌不为装备牌,其摸一张牌;为装备牌,你视为对由其指定的另一名角色使用一张【决斗】",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界利驭",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界雷击",
+      "spec": "skills/界雷击",
+      "description": "使用/打出【闪】或使用【闪电】时可判定;黑桃可对一名角色造成2点雷电伤害;梅花回复1点体力并可对一名角色造成1点雷电伤害",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界雷击",
+          "actionType": "respond",
+          "prompt": "choosePlayer",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界鬼道",
+      "spec": "skills/界鬼道",
+      "description": "判定牌生效前,你可以用一张黑色牌替换之,若为黑桃2~9,你摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界鬼道",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界黄天",
+      "spec": "skills/界黄天",
+      "description": "主公技:其他群势力角色可在出牌阶段将一张【闪】或黑桃手牌交给你",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界黄天",
+          "actionType": "use",
+          "prompt": "useCard",
+          "backend": false,
+          "backendOwners": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界灭计",
+      "spec": "skills/界灭计",
+      "description": "出牌阶段限一次:将一张锦囊牌置于牌堆顶,令一名有手牌的其他角色选择弃一张锦囊或依次弃两张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界灭计",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界灭计",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界绝策",
+      "spec": "skills/界绝策",
+      "description": "结束阶段:对一名手牌数小于等于你的其他角色造成1点伤害",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "界焚城",
+      "spec": "skills/界焚城",
+      "description": "限定技:选一名其他角色开始,所有其他角色依次弃比上家多的牌或受你造成的2点火焰伤害",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界焚城",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界焚城",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界矢北",
+      "spec": "skills/界矢北",
+      "description": "锁定技:游戏开始时获得3点护甲;每回合首次受到伤害后回1血,本回合再受到伤害后失1血",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界渐营",
+      "spec": "skills/界渐营",
+      "description": "出牌阶段用牌若与上一张花色或点数相同,可摸一张;每阶段限一次,可将一张牌当任意基本牌使用(若有上一张花色则继承)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界渐营",
+          "actionType": "transform:杀",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界渐营",
+          "actionType": "transform:闪",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界渐营",
+          "actionType": "transform:桃",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界渐营",
+          "actionType": "transform:酒",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界渐营",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界窃听",
+      "spec": "skills/界窃听",
+      "description": "其他角色的回合结束后,若其本回合未对其他角色造成伤害可选一项;若未使用过牌可选两项:1.夺其一张装备;2.摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界窃听",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界献州",
+      "spec": "skills/界献州",
+      "description": "限定技:出牌阶段将你装备区所有牌交给一名其他角色,其选择令你回复X点体力或对其攻击范围内至多X名角色各造成1点伤害(X为装备数)",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界献州",
+          "actionType": "use",
+          "prompt": "selectTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "界献州",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界智迟",
+      "spec": "skills/界智迟",
+      "description": "锁定技:回合外受到伤害后,本回合【杀】和普通锦囊牌对你无效",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界明策",
+      "spec": "skills/界明策",
+      "description": "出牌阶段限一次:交给一名其他角色一张杀或装备牌,其选择一项:①视为对你指定的另一名角色出杀(若造成伤害,执行另一项);②你与其各摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界明策",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界陷阵",
+      "spec": "skills/界陷阵",
+      "description": "出牌阶段限一次,与一名角色拼点:赢则本回合对其使用牌无距离和次数限制且无视防具,可多指定其为目标;没赢则本回合不能对其使用杀,且你的杀不计入手牌上限",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界陷阵",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "界禁酒",
+      "spec": "skills/界禁酒",
+      "description": "锁定技:你的【酒】视为点数K的【杀】;其他角色不能于你的回合使用【酒】",
+      "locked": true,
+      "actions": [
+        {
+          "skillId": "界禁酒",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "耀武",
+      "spec": "skills/耀武",
+      "description": "锁定技,当一名角色使用红色杀对你造成伤害时,其选择回复1点体力或摸一张牌",
+      "locked": true,
+      "actions": [
+        {
+          "skillId": "耀武",
+          "actionType": "respond",
+          "prompt": "chooseOption",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "庸肆",
+      "spec": "skills/庸肆",
+      "description": "锁定技,摸牌阶段你多摸X张牌;弃牌阶段开始时你弃置X张牌(X为全场势力数)",
+      "locked": true,
+      "actions": [
+        {
+          "skillId": "庸肆",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "伪帝",
+      "spec": "skills/伪帝",
+      "description": "锁定技,你视为拥有主公的主公技",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "明任",
+      "spec": "skills/明任",
+      "description": "游戏开始时摸两张牌并将一张手牌置为\"任\";结束阶段可用手牌替换\"任\"",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "明任",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "贞良",
+      "spec": "skills/贞良",
+      "description": "转换技。阳:出牌阶段限一次,选攻击范围内一名其他角色,弃一张与\"任\"同色的牌对其造成1点伤害。阴:回合外使用或打出的牌置入弃牌堆时,若与\"任\"同色,可令一名角色摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "贞良",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "贞良",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "雄乱",
+      "spec": "skills/雄乱",
+      "description": "限定技,出牌阶段,指定一名其他角色并废除你的判定区和装备区,本回合对其使用牌无距离和次数限制,其本回合不能使用和打出手牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "雄乱",
+          "actionType": "use",
+          "prompt": "selectTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "从谏",
+      "spec": "skills/从谏",
+      "description": "当你成为锦囊牌的目标时,若此牌的目标数大于1,你可以交给其中一名目标角色一张牌,然后摸一张牌,若你给出的是装备牌,改为摸两张牌",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "成略",
+      "spec": "skills/成略",
+      "description": "转换技,出牌阶段限一次。阳:摸一张牌并弃置两张手牌;阴:摸两张牌并弃置一张手牌。然后本阶段使用与弃置牌花色相同的牌无距离和次数限制",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "成略",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "成略",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "恃才",
+      "spec": "skills/恃才",
+      "description": "当你每回合首次使用一种类型的牌后,你可以将之置于牌堆顶,然后摸一张牌",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "恃才",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "寸目",
+      "spec": "skills/寸目",
+      "description": "锁定技:当你摸牌时,你改为从牌堆底摸牌",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "诸葛连弩",
+      "spec": "skills/诸葛连弩",
+      "description": "武器:出牌阶段使用【杀】无次数限制",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "青釭剑",
+      "spec": "skills/青釭剑",
+      "description": "武器:杀无视目标防具",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "寒冰剑",
+      "spec": "skills/寒冰剑",
+      "description": "武器:杀造成伤害时可改为依次弃目标2张牌",
+      "locked": true,
+      "actions": [
+        {
+          "skillId": "寒冰剑",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "雌雄双股剑",
+      "spec": "skills/雌雄双股剑",
+      "description": "武器:你使用杀指定异性角色为目标后,可令其弃1手牌或令你摸1牌",
+      "locked": true,
+      "actions": [
+        {
+          "skillId": "雌雄双股剑",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "id": "贯石斧",
+      "spec": "skills/贯石斧",
+      "description": "武器技:杀被闪抵消后,可弃两张牌令此杀依然造成伤害",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "贯石斧",
+          "actionType": "respond",
+          "prompt": "distribute",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "青龙偃月刀",
+      "spec": "skills/青龙偃月刀",
+      "description": "武器技:杀被闪抵消后,可对相同目标再使用一张杀",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "青龙偃月刀",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "丈八蛇矛",
+      "spec": "skills/丈八蛇矛",
+      "description": "可将两张手牌当杀使用",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "丈八蛇矛",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "方天画戟",
+      "spec": "skills/方天画戟",
+      "description": "武器:最后一张手牌为杀时可指定最多3个目标",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "麒麟弓",
+      "spec": "skills/麒麟弓",
+      "description": "武器:杀造成伤害时可弃目标1匹马",
+      "locked": true,
+      "actions": [
+        {
+          "skillId": "麒麟弓",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "古锭刀",
+      "spec": "skills/古锭刀",
+      "description": "锁定技,当你使用杀造成伤害时,若目标没有手牌,此伤害+1。",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "朱雀羽扇",
+      "spec": "skills/朱雀羽扇",
+      "description": "你可将一张普通杀当火杀使用或打出。",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "朱雀羽扇",
+          "actionType": "transform",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "朱雀羽扇",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "八卦阵",
+      "spec": "skills/八卦阵",
+      "description": "防具技:当你需要出闪时,可以判定,若为红色则视为出闪",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "八卦阵",
+          "actionType": "respond",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "仁王盾",
+      "spec": "skills/仁王盾",
+      "description": "防具:黑色杀对你无效",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "藤甲",
+      "spec": "skills/藤甲",
+      "description": "锁定技,南蛮入侵/万箭齐发/普通杀对你无效;火焰伤害+1",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "白银狮子",
+      "spec": "skills/白银狮子",
+      "description": "防具:每次受伤最多1点",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "赤兔",
+      "spec": "skills/马匹技能#赤兔",
+      "description": "进攻马:你与其他角色的距离-1",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "紫骍",
+      "spec": "skills/马匹技能#紫骍",
+      "description": "进攻马:你与其他角色的距离-1",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "大宛",
+      "spec": "skills/马匹技能#大宛",
+      "description": "进攻马:你与其他角色的距离-1",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "的卢",
+      "spec": "skills/马匹技能#的卢",
+      "description": "防御马:其他角色与你的距离+1",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "绝影",
+      "spec": "skills/马匹技能#绝影",
+      "description": "防御马:其他角色与你的距离+1",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "爪黄飞电",
+      "spec": "skills/马匹技能#爪黄飞电",
+      "description": "防御马:其他角色与你的距离+1",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "骅骝",
+      "spec": "skills/马匹技能#骅骝",
+      "description": "防御马:其他角色与你的距离+1",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "回合管理",
+      "spec": "skills/回合管理",
+      "description": "监听上家回合结束,自动开始自己的回合",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "装备通用",
+      "spec": "skills/装备通用",
+      "description": "装备到对应栏位",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "装备通用",
+          "actionType": "use",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "使用牌",
+      "spec": "skills/cards/use-card",
+      "description": "统一的卡牌使用入口",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "万箭齐发",
+          "actionType": "use",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "乐不思蜀",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "五谷丰登",
+          "actionType": "use",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "借刀杀人",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "兵粮寸断",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "决斗",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "南蛮入侵",
+          "actionType": "use",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "无中生有",
+          "actionType": "use",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "杀",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "桃",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "桃园结义",
+          "actionType": "use",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "火攻",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "过河拆桥",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "酒",
+          "actionType": "use",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "铁索连环",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "闪电",
+          "actionType": "use",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "顺手牵羊",
+          "actionType": "use",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "打出牌",
+      "spec": "skills/cards/play-card",
+      "description": "统一的卡牌打出入口",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "五谷丰登",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "借刀杀人",
+          "actionType": "respond",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "无懈可击",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "杀",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "桃",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "火攻",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "过河拆桥",
+          "actionType": "respond",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "酒",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "闪",
+          "actionType": "respond",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "顺手牵羊",
+          "actionType": "respond",
+          "prompt": "useCardAndTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "铁索连环",
+      "spec": "skills/铁索连环",
+      "description": "横置/重置一至两名角色;或重铸",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "铁索连环",
+          "actionType": "recast",
+          "prompt": "useCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "开局",
+      "spec": "skills/开局",
+      "description": "游戏开局:抽身份、选将、洗牌、发牌、启动第一回合",
+      "locked": false,
+      "actions": []
+    },
+    {
+      "id": "护甲",
+      "spec": "skills/护甲",
+      "description": "锁定技:受到【杀】造成的伤害时,若此牌为黑色,伤害 -1",
+      "locked": true,
+      "actions": []
+    },
+    {
+      "id": "界荐言",
+      "spec": "skills/界荐言",
+      "description": "出牌阶段限一次:声明一种牌的类别或颜色,连续亮出牌堆顶的牌直到亮出符合声明的牌,选择一名男性角色获得此牌,其余置入弃牌堆",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "界荐言",
+          "actionType": "use",
+          "prompt": "confirm",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "攻心",
+      "spec": "skills/攻心",
+      "description": "出牌阶段限一次,观看一名其他角色手牌,可展示其中一张♥牌,弃置之或将之置于牌堆顶",
+      "locked": false,
+      "actions": [
+        {
+          "skillId": "攻心",
+          "actionType": "use",
+          "prompt": "selectTarget",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        },
+        {
+          "skillId": "攻心",
+          "actionType": "respond",
+          "prompt": "pickProcessingCard",
+          "backend": true,
+          "backendOwners": [
+            0
+          ]
+        }
+      ]
+    }
+  ]
+}
