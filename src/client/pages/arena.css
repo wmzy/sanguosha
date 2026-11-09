@@ -1,0 +1,913 @@
+/* 观众牌桌沿用游戏画布缩放，所有尺寸均为 900px 设计高度下的逻辑尺寸。 */
+.arena-page {
+  --arena-gold: #c6a565;
+  --arena-ink: #e9ddc2;
+  width: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #0d1010;
+  color: var(--arena-ink);
+  font-family: 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+}
+.arena-page *,
+.arena-inspect * {
+  box-sizing: border-box;
+}
+.arena-page button,
+.arena-inspect button {
+  font: inherit;
+  cursor: pointer;
+}
+.arena-page button:focus-visible,
+.arena-page a:focus-visible,
+.arena-inspect button:focus-visible {
+  outline: 2px solid #f4d88c;
+  outline-offset: 3px;
+}
+.arena-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #171b1c;
+}
+.arena-topbar {
+  height: 66px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 28px;
+  z-index: 20;
+  border-bottom: 2px solid #715a35;
+  box-shadow: 0 4px 16px #0008;
+  background: linear-gradient(#282b28, #111514 85%);
+}
+.arena-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #e6c889;
+  font:
+    bold 24px 'KaiTi',
+    'STKaiti',
+    serif;
+  letter-spacing: 4px;
+  white-space: nowrap;
+}
+.arena-brand small {
+  display: block;
+  font:
+    9px 'Microsoft YaHei',
+    sans-serif;
+  letter-spacing: 5px;
+  color: #8f8c7d;
+  margin-top: 3px;
+}
+.arena-seal {
+  color: #eed6a7;
+  background: #772c23;
+  border: 1px solid #ba8250;
+  box-shadow:
+    inset 0 0 0 3px #331e1b,
+    0 2px 8px #000;
+  font:
+    30px 'KaiTi',
+    serif;
+  width: 40px;
+  height: 42px;
+  text-align: center;
+  line-height: 40px;
+  letter-spacing: 0;
+  transform: rotate(-4deg);
+}
+.arena-match-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+  min-width: 0;
+}
+.arena-match-heading strong {
+  font:
+    17px 'KaiTi',
+    'STKaiti',
+    serif;
+  letter-spacing: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arena-match-heading > span {
+  color: #a59e87;
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+.arena-tools {
+  display: flex;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.arena-tools button,
+.arena-dock header button {
+  border: 1px solid #6b593c;
+  border-radius: 2px;
+  color: #cbb98e;
+  background: linear-gradient(#323329, #20231f);
+  padding: 7px 12px;
+  font-size: 12px;
+  box-shadow: inset 0 0 0 1px #0c100b;
+}
+.arena-tools button:hover,
+.arena-tools button[aria-expanded='true'] {
+  color: #f8e6af;
+  border-color: #c6a565;
+  background: #46422d;
+}
+.arena-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: radial-gradient(ellipse at 50% 40%, #39403a, #171f20 75%);
+}
+.arena-table {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 50% 70% at 50% 45%, #3a4434a8, #152021c9 80%),
+    var(--arena-backdrop, none) center / cover;
+}
+.arena-table::before,
+.arena-lobby::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    repeating-linear-gradient(0deg, #d7d8b303 0 1px, transparent 1px 4px),
+    radial-gradient(ellipse at center, transparent 30%, #070b0dd9 100%);
+  pointer-events: none;
+}
+.arena-table-rim {
+  position: absolute;
+  inset: 14px;
+  border: 1px solid #ad91592c;
+  outline: 1px solid #ad91591a;
+  outline-offset: 6px;
+  clip-path: polygon(0 0, 12% 0, 12% 1px, 88% 1px, 88% 0, 100% 0, 100% 100%, 0 100%);
+  pointer-events: none;
+}
+.arena-table-watermark {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  color: #d4c18f0b;
+  font:
+    bold 100px 'KaiTi',
+    'STKaiti',
+    serif;
+  letter-spacing: 12px;
+  white-space: nowrap;
+  user-select: none;
+}
+.arena-table-watermark small {
+  display: block;
+  font-size: 15px;
+  letter-spacing: 10px;
+  text-align: center;
+}
+.arena-round {
+  position: absolute;
+  top: 25px;
+  left: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #aa9d7e;
+  font-size: 11px;
+}
+.arena-round > span {
+  border-left: 2px solid #a88e57;
+  padding-left: 7px;
+  letter-spacing: 3px;
+}
+.arena-round b {
+  color: #d9c89c;
+  font:
+    21px 'KaiTi',
+    serif;
+  margin-top: 3px;
+}
+.arena-round small {
+  color: #777f75;
+}
+.arena-center {
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  width: 360px;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+.arena-turn-banner {
+  padding: 12px 30px;
+  background: linear-gradient(90deg, transparent, #181a12bc 30% 70%, transparent);
+  border-image: linear-gradient(90deg, transparent, #ac8f51aa, transparent) 1;
+  border-width: 1px 0;
+  border-style: solid;
+}
+.arena-turn-banner > span {
+  display: block;
+  font-size: 11px;
+  color: #b5ad91;
+  letter-spacing: 7px;
+  margin-bottom: 6px;
+}
+.arena-turn-banner strong {
+  color: #e8ce8b;
+  font:
+    28px 'KaiTi',
+    'STKaiti',
+    serif;
+  letter-spacing: 5px;
+  text-shadow: 0 2px 6px #000;
+}
+.arena-center-cards {
+  min-height: 125px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+.arena-center-cards .arena-card-large {
+  width: 78px;
+  height: 112px;
+  flex-shrink: 0;
+}
+.arena-center-empty {
+  font:
+    15px 'KaiTi',
+    serif;
+  letter-spacing: 7px;
+  color: #91957b75;
+}
+.arena-piles {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  align-items: center;
+  color: #a49e86;
+  font-size: 11px;
+}
+.arena-piles b {
+  color: #e4d2a4;
+  font:
+    17px Georgia,
+    serif;
+  margin-left: 5px;
+}
+.arena-piles > i {
+  height: 15px;
+  width: 1px;
+  background: #8073497a;
+}
+.arena-deck {
+  position: relative;
+  width: 27px;
+  height: 37px;
+  transform: rotate(-8deg);
+  border: 1px solid #9f8a5b;
+  box-shadow:
+    2px 2px #aba18488,
+    4px 4px #181c18;
+}
+.arena-last-event {
+  margin: 12px 0 0;
+  color: #c2b79a;
+  font-size: 11px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.arena-seat {
+  position: absolute;
+  width: min(282px, 22%);
+  transform: translate(-50%, -50%);
+  padding: 0 8px 8px;
+  border: 1px solid #726349;
+  border-radius: 3px;
+  background: linear-gradient(120deg, #302f26f7, #161d1cf5 60%);
+  box-shadow:
+    0 8px 18px #0009,
+    inset 0 0 0 2px #111714,
+    inset 0 0 0 3px #c6a56513;
+}
+.arena-seat.is-active {
+  border-color: #e7bc62;
+  box-shadow:
+    0 0 0 1px #b88b3a,
+    0 0 28px #d6a64b35,
+    0 8px 18px #0009;
+}
+.arena-seat-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 25px;
+  font-size: 10px;
+  color: #c2b394;
+  white-space: nowrap;
+  gap: 5px;
+}
+.arena-seat-topline > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.arena-seat-topline > span:last-child {
+  font-size: 9px;
+  color: #8c9787;
+  flex-shrink: 0;
+}
+.is-active .arena-seat-topline > span:last-child {
+  color: #f7d17b;
+}
+.arena-seat-body {
+  display: flex;
+  gap: 9px;
+  height: 109px;
+}
+.arena-portrait {
+  padding: 0;
+  position: relative;
+  width: 86px;
+  height: 109px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid #ae9054;
+  background: radial-gradient(ellipse at 50% 25%, #8d7d66, #2d3837);
+  color: #fff4d7;
+}
+.arena-portrait img {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  object-position: center 15%;
+}
+.arena-portrait::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, #0007, transparent 45%),
+    linear-gradient(0deg, #0b0e0ce6, transparent 40%);
+  pointer-events: none;
+}
+.arena-faction {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 23px;
+  height: 25px;
+  background: #61513c;
+  color: #ead6ad;
+  font:
+    17px 'KaiTi',
+    serif;
+  line-height: 25px;
+  box-shadow: 1px 1px 4px #000;
+  border-bottom: 1px solid #ba9a62;
+}
+.faction-魏 .arena-faction {
+  background: #314c68;
+}
+.faction-蜀 .arena-faction {
+  background: #69502b;
+}
+.faction-吴 .arena-faction {
+  background: #71352d;
+}
+.faction-群 .arena-faction {
+  background: #59546b;
+}
+.arena-general-name {
+  position: absolute;
+  z-index: 2;
+  bottom: 8px;
+  left: 8px;
+  font:
+    bold 22px 'KaiTi',
+    'STKaiti',
+    serif;
+  writing-mode: vertical-rl;
+  letter-spacing: 2px;
+  text-shadow:
+    1px 2px 2px #000,
+    0 0 4px #000;
+}
+.arena-identity {
+  position: absolute;
+  z-index: 3;
+  top: 5px;
+  right: 5px;
+  writing-mode: vertical-rl;
+  background: linear-gradient(#36342b, #181b18);
+  border: 1px solid #9c8a63;
+  color: #bfb69e;
+  padding: 4px 3px;
+  font:
+    bold 14px 'KaiTi',
+    serif;
+  letter-spacing: 1px;
+  box-shadow: 0 2px 4px #0009;
+}
+.identity-主公 {
+  color: #ffe1a0;
+  background: linear-gradient(#a0462a, #5c211b);
+  border-color: #d5ad65;
+}
+.identity-忠臣 {
+  background: #294d64;
+  color: #d6edff;
+}
+.identity-反贼 {
+  background: #385b38;
+  color: #def1bc;
+}
+.identity-内奸 {
+  background: #594367;
+  color: #eedcff;
+}
+.arena-seat-info {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #796747 transparent;
+}
+.arena-hp {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin: 0 0 7px;
+}
+.arena-hp > span {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.arena-hp i {
+  display: block;
+  width: 10px;
+  height: 14px;
+  border-radius: 65% 35% 60% 40%;
+  border: 1px solid #65624b;
+  background: #080d0a;
+  transform: rotate(12deg);
+}
+.arena-hp i.filled {
+  background: radial-gradient(circle at 30% 28%, #e8eea4, #81a345 36%, #304e22 80%);
+  border-color: #b4bd78;
+  box-shadow: 0 1px 3px #000;
+}
+.arena-hp b {
+  font:
+    17px Georgia,
+    serif;
+  color: #d1d9a3;
+  white-space: nowrap;
+}
+.arena-hp small {
+  color: #777e68;
+  font-size: 11px;
+}
+.arena-skills {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  margin-bottom: 7px;
+}
+.arena-skills > span {
+  border: 1px solid #8e785049;
+  background: linear-gradient(#4b4532, #292b23);
+  padding: 2px 5px;
+  font:
+    12px 'KaiTi',
+    serif;
+  color: #d8c698;
+  border-radius: 2px;
+}
+.arena-equip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  color: #c8b58a;
+}
+.arena-equip > div {
+  background: linear-gradient(90deg, #75623c40, transparent);
+  border-bottom: 1px solid #b7a17026;
+  line-height: 17px;
+  white-space: nowrap;
+}
+.arena-equip > div > span {
+  margin-right: 6px;
+  font-size: 9px;
+  background: #79633d55;
+  padding: 2px 3px;
+  color: #c5b38a;
+}
+.arena-empty-equip {
+  color: #6e7568;
+  font:
+    11px 'KaiTi',
+    serif;
+  letter-spacing: 2px;
+  margin-top: 3px;
+}
+.arena-judges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 5px;
+}
+.arena-judges > span {
+  color: #d5ad84;
+  font-size: 9px;
+  border: 1px solid #876d474d;
+  padding: 1px 3px;
+}
+.arena-hand-label {
+  margin: 6px 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #8d947e;
+  font-size: 9px;
+}
+.arena-hand-label b {
+  color: #c9c19f;
+  font-family: Georgia, serif;
+  margin-left: 3px;
+}
+.arena-hand-label button {
+  border: 0;
+  background: none;
+  color: #9a987d;
+  font-size: 9px;
+  padding: 0;
+}
+.arena-hand-label button:hover {
+  color: #ffe0a0;
+}
+.arena-hand {
+  height: 74px;
+  display: flex;
+  align-items: start;
+  position: relative;
+  padding-right: 0;
+}
+.arena-card {
+  position: relative;
+  padding: 0;
+  display: block;
+  width: 58px;
+  height: 82px;
+  flex-shrink: 0;
+  border: 1px solid #bca475;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 1px 2px 4px #0008;
+  background: #ede0bc;
+  transition: transform 0.15s;
+}
+.arena-card > object {
+  pointer-events: none;
+}
+.arena-hand .arena-card {
+  width: 53px;
+  height: 74px;
+  margin-right: min(3px, calc((100% - 53px * var(--hand-count)) / max(1, var(--hand-count) - 1)));
+}
+.arena-hand .arena-card:last-child {
+  margin-right: 0;
+}
+.arena-hand .arena-card:hover {
+  transform: translateY(-14px) scale(1.15);
+  z-index: 10;
+  border-color: #ffe7a8;
+}
+.arena-no-hand {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 74px;
+  border: 1px dashed #8d876727;
+  font:
+    13px 'KaiTi',
+    serif;
+  letter-spacing: 5px;
+  color: #747b6b;
+}
+.arena-card-large {
+  width: 100px;
+  height: 144px;
+}
+.arena-seat.is-dead .arena-portrait img {
+  filter: grayscale(1) brightness(0.6);
+}
+.arena-seat.is-dead .arena-seat-info,
+.arena-seat.is-dead .arena-hand {
+  opacity: 0.65;
+}
+.arena-seat.is-dead {
+  border-color: #62604a;
+}
+.arena-dead-seal {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  right: 7px;
+  border: 2px solid #9c4a38;
+  color: #ce6b50;
+  font:
+    bold 19px 'KaiTi',
+    serif;
+  padding: 3px;
+  writing-mode: vertical-rl;
+  transform: rotate(12deg);
+  text-shadow: 0 1px 3px #000;
+  background: #130d0b6b;
+}
+.arena-footer {
+  flex-shrink: 0;
+  height: 30px;
+  border-top: 1px solid #514a35;
+  background: #101613;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 25px;
+  color: #848773;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.arena-footer i {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background: #91a06c;
+  border-radius: 50%;
+  margin-right: 7px;
+  box-shadow: 0 0 6px #91a06c77;
+}
+.arena-dock {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  right: 12px;
+  width: 330px;
+  background: linear-gradient(135deg, #2d3028fa, #121a17fc);
+  border: 1px solid #92794d;
+  box-shadow:
+    -12px 0 40px #0009,
+    inset 0 0 0 3px #0c130e;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+}
+.arena-dock > header {
+  padding: 12px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #78643e;
+}
+.arena-dock h2 {
+  margin: 0;
+  color: #d7bf85;
+  font:
+    21px 'KaiTi',
+    serif;
+  letter-spacing: 3px;
+}
+.arena-dock header button {
+  padding: 0 6px;
+  font-size: 20px;
+}
+.arena-dock-body {
+  overflow-y: auto;
+  padding: 8px 15px;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: #796747 transparent;
+}
+.arena-dock-body > a {
+  display: block;
+  text-decoration: none;
+  color: #d6c8a4;
+  padding: 13px 9px;
+  border-bottom: 1px solid #70644655;
+}
+.arena-dock-body > a.is-selected {
+  background: #b6995320;
+  border-left: 2px solid #c7a568;
+}
+.arena-dock-body strong {
+  display: block;
+  font-size: 13px;
+}
+.arena-dock-body small {
+  font-size: 10px;
+  color: #a89a78;
+}
+.arena-dock-body p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #b7b39e;
+  margin: 5px 0;
+}
+.arena-chat-line,
+.arena-log-line {
+  border-bottom: 1px solid #70644644;
+  padding: 10px 0;
+}
+.arena-chat-line b {
+  color: #dac18c;
+}
+.arena-log-line small {
+  color: #c3ad7c;
+}
+.arena-error {
+  position: absolute;
+  left: 50%;
+  top: 70px;
+  transform: translateX(-50%);
+  z-index: 40;
+  background: #682e26ee;
+  color: #f6d3b6;
+  border: 1px solid #b97c52;
+  padding: 8px 20px;
+  font-size: 12px;
+}
+.arena-inspect {
+  padding: 22px 26px;
+  width: min(900px, 90vw);
+  max-height: 85dvh;
+  color: #e5d6b5;
+  border: 1px solid #b2965e;
+  background: linear-gradient(130deg, #34372d, #121c18);
+  box-shadow:
+    0 20px 100px #000c,
+    inset 0 0 0 4px #111a13;
+  border-radius: 3px;
+  font-family: 'Microsoft YaHei', sans-serif;
+}
+.arena-inspect::backdrop {
+  background: #030806cc;
+  backdrop-filter: blur(5px);
+}
+.arena-inspect > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  border-bottom: 1px solid #857044;
+  margin-bottom: 22px;
+  padding-bottom: 15px;
+}
+.arena-inspect small {
+  font-size: 11px;
+  color: #a6a085;
+}
+.arena-inspect h2 {
+  margin: 8px 0 0;
+  font:
+    28px 'KaiTi',
+    serif;
+  letter-spacing: 4px;
+}
+.arena-inspect h2 span {
+  font-size: 14px;
+  border: 1px solid #947f54;
+  padding: 3px 7px;
+  margin-left: 12px;
+}
+.arena-inspect header button {
+  border: 0;
+  background: none;
+  color: #d5c79f;
+  font-size: 26px;
+}
+.arena-inspect-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.arena-inspect-note {
+  font-size: 11px;
+  color: #a29c85;
+  line-height: 1.9;
+  margin: 22px 0 0;
+}
+.arena-clean .arena-topbar {
+  opacity: 0.12;
+  transition: opacity 0.2s;
+}
+.arena-clean .arena-topbar:hover,
+.arena-clean .arena-topbar:focus-within {
+  opacity: 1;
+}
+.arena-clean .arena-footer {
+  visibility: hidden;
+}
+.arena-clean .arena-hand-label button {
+  visibility: hidden;
+}
+.arena-clean .arena-seat:hover .arena-hand-label button {
+  visibility: visible;
+}
+.arena-lobby {
+  position: relative;
+  isolation: isolate;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, #4d4c3055, #111a19 80%);
+}
+.arena-lobby-mark {
+  font:
+    bold 86px 'KaiTi',
+    serif;
+  color: #cbb783;
+  text-shadow: 0 5px 20px #0008;
+  letter-spacing: 14px;
+}
+.arena-lobby h1 {
+  font:
+    27px 'KaiTi',
+    serif;
+  letter-spacing: 5px;
+  margin: 15px 0 0;
+}
+.arena-lobby > p {
+  color: #92967d;
+  font-size: 12px;
+  margin: 16px 0 25px;
+}
+.arena-lobby-matches {
+  max-height: 370px;
+  width: 540px;
+  overflow-y: auto;
+}
+.arena-lobby-matches a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ded0a7;
+  text-decoration: none;
+  background: linear-gradient(90deg, #96824c18, #27322877);
+  border: 1px solid #8f7b484d;
+  padding: 14px 20px;
+  margin-bottom: 8px;
+}
+.arena-lobby-matches a:hover {
+  border-color: #c5a464;
+}
+.arena-lobby-matches small {
+  display: block;
+  color: #94977a;
+  font-size: 10px;
+  margin-top: 6px;
+}
+.arena-lobby-matches b {
+  font-size: 12px;
+  color: #b8a275;
+}
+@media (prefers-reduced-motion: reduce) {
+  .arena-page *,
+  .arena-inspect * {
+    transition: none !important;
+  }
+}
+@media (max-width: 600px) {
+  .arena-inspect {
+    padding: 16px;
+  }
+  .arena-inspect .arena-card-large {
+    width: 80px;
+    height: 115px;
+  }
+  .arena-inspect-cards {
+    gap: 8px;
+  }
+}

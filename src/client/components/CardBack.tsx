@@ -1,5 +1,5 @@
 // src/client/components/CardBack.tsx
-// 卡牌牌背渲染:优先显示牌背图片(card/back 或本地 cards-ai/back.png),无则渲染内联 SVG 牌背。
+// 卡牌牌背渲染:优先显示资源包图片(card/back),无则渲染内联 SVG 牌背。
 //
 // 与 CardFace 同模式:<object type="image/png" data={url}> 内放 SVG fallback,
 // 浏览器在图片加载失败(404/无文件)时自动渲染内部 SVG,纯 HTML 声明式回退。

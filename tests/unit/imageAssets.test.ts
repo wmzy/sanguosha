@@ -3,7 +3,7 @@
 // Task 5 后：这些 helper 委托 ResourceManager，测试需注入 manifest。
 
 import { describe, expect, it, beforeEach } from 'vitest';
-import { getCardImage, getCharacterImage, getEquipCardImage } from '../../src/client/assets/imageAssets';
+import { getCardImage, getCardArtImage, getCharacterImage, getEquipCardImage } from '../../src/client/assets/imageAssets';
 import { resolveSoundUrl } from '../../src/client/sounds/soundMap';
 import { resourceManager } from '../../src/client/resources';
 import type { PacksIndex } from '../../src/client/resources/types';
@@ -20,6 +20,8 @@ const testIndex: PacksIndex = {
         { id: 'card/杀-10-♠', type: 'image', file: 'card/杀-10-♠.jpg' },
         { id: 'card/杀-4-♥', type: 'image', file: 'card/杀-4-♥.jpg' },
         { id: 'card/闪-2-♥', type: 'image', file: 'card/闪-2-♥.jpg' },
+        { id: 'card/art/杀', type: 'image', file: 'image/card/slash.png' },
+        { id: 'card/art/火杀', type: 'image', file: 'image/card/fire_slash.png' },
         // equipment/trick 牌省略 file（默认 .png）
         { id: 'card/丈八蛇矛-Q-♠', type: 'image' },
         { id: 'card/赤兔-5-♥', type: 'image' },
@@ -95,6 +97,14 @@ describe('getCardImage', () => {
   it('returns null for registered card name but unregistered suit-rank combo', () => {
     // '杀' 在 NAME_TO_SUB 中（basic），但 card/杀-3-♣ 未在 manifest 注册
     expect(getCardImage({ name: '杀', suit: '♣', rank: '3' })).toBeNull();
+  });
+
+  it('通用图保留属性杀的牌面区分，并回退到已安装的普通牌面', () => {
+    expect(getCardArtImage('杀', '火焰')).toBe('/packs/base/image/card/fire_slash.png');
+    expect(getCardArtImage('杀', '雷电')).toBe('/packs/base/image/card/slash.png');
+    expect(getCardArtImage('无中生有')).toBeNull();
+    // 精确花色点数牌面仍有独立优先入口，不被通用图取代。
+    expect(getCardImage({ name: '杀', suit: '♠', rank: '10' })).toBe('/packs/base/card/杀-10-♠.jpg');
   });
 });
 
