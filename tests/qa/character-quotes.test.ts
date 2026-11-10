@@ -18,7 +18,7 @@ describe('武将经典台词文档归档 (docs/research/武将经典台词.md)',
 
   it('文档文件必须存在且非空', () => {
     expect(fs.existsSync(docPath)).toBe(true);
-    const content = fs.readFileSync(docPath, 'utf8');
+    const content = fs.readFileSync(docPath, 'utf8').replace(/\r\n/g, '\n');
     expect(content.length).toBeGreaterThan(1000);
   });
 
@@ -38,7 +38,7 @@ describe('武将经典台词文档归档 (docs/research/武将经典台词.md)',
   });
 
   it('文档目录与四大势力分区必须完整', () => {
-    const content = fs.readFileSync(docPath, 'utf8');
+    const content = fs.readFileSync(docPath, 'utf8').replace(/\r\n/g, '\n');
     expect(content).toContain('## 魏势力（43位）');
     expect(content).toContain('## 蜀势力（43位）');
     expect(content).toContain('## 吴势力（41位）');
@@ -46,7 +46,7 @@ describe('武将经典台词文档归档 (docs/research/武将经典台词.md)',
   });
 
   it('文档必须完整覆盖 165 名武将的独立小节与基础属性', () => {
-    const content = fs.readFileSync(docPath, 'utf8');
+    const content = fs.readFileSync(docPath, 'utf8').replace(/\r\n/g, '\n');
 
     for (const c of allCharacters) {
       // 必须有武将三级标题

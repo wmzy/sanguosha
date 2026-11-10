@@ -353,6 +353,9 @@
 .arena-target-line {
   animation: targetLineFlow 1s linear infinite;
 }
+.arena-target-line.is-chain {
+  animation: targetChainLineFlow 0.8s linear infinite;
+}
 @keyframes targetLineFlow {
   from {
     stroke-dashoffset: 5;
@@ -360,6 +363,177 @@
   to {
     stroke-dashoffset: 0;
   }
+}
+@keyframes targetChainLineFlow {
+  from {
+    stroke-dashoffset: 6;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.arena-target-self-ring {
+  animation: targetSelfRingPulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes targetSelfRingPulse {
+  from {
+    r: 4;
+    stroke-opacity: 0.5;
+  }
+  to {
+    r: 5.5;
+    stroke-opacity: 1;
+  }
+}
+
+/* ================= 铁索连环实体粗铁链覆层 (Task 2) ================= */
+.arena-iron-chain-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+  border-radius: 4px;
+}
+.arena-iron-chain-overlay.is-locked {
+  animation: ironChainLockIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes ironChainLockIn {
+  0% {
+    opacity: 0;
+    transform: scale(1.12);
+    filter: brightness(2.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+.arena-iron-chain-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.arena-iron-chain-pulse {
+  animation: ironChainFlow 1.6s linear infinite;
+}
+@keyframes ironChainFlow {
+  0% {
+    stroke-dashoffset: 20;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+.arena-chain-core-pulse {
+  animation: ironLockCorePulse 1.4s ease-in-out infinite alternate;
+}
+@keyframes ironLockCorePulse {
+  0% {
+    r: 2.8;
+    opacity: 0.75;
+  }
+  100% {
+    r: 3.6;
+    opacity: 1;
+  }
+}
+.arena-iron-chain-overlay.is-breaking .arena-chain-diagonal-1 {
+  animation: ironChainBreakD1 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  transform-origin: 30% 30%;
+}
+.arena-iron-chain-overlay.is-breaking .arena-chain-diagonal-2 {
+  animation: ironChainBreakD2 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  transform-origin: 70% 30%;
+}
+.arena-iron-chain-overlay.is-breaking .arena-chain-lock-center {
+  animation: ironLockBreak 0.55s ease-out forwards;
+}
+@keyframes ironChainBreakD1 {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+    filter: brightness(1);
+  }
+  30% {
+    transform: translate(-6px, -6px) rotate(-8deg);
+    filter: brightness(2.5);
+  }
+  100% {
+    transform: translate(-36px, -36px) rotate(-28deg);
+    opacity: 0;
+  }
+}
+@keyframes ironChainBreakD2 {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+    filter: brightness(1);
+  }
+  30% {
+    transform: translate(6px, -6px) rotate(8deg);
+    filter: brightness(2.5);
+  }
+  100% {
+    transform: translate(36px, -36px) rotate(28deg);
+    opacity: 0;
+  }
+}
+@keyframes ironLockBreak {
+  0% {
+    transform: translate(50px, 50px) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  35% {
+    transform: translate(50px, 50px) scale(1.6) rotate(45deg);
+    filter: brightness(3.5);
+  }
+  100% {
+    transform: translate(50px, 50px) scale(0.2) rotate(180deg);
+    opacity: 0;
+  }
+}
+.arena-spark-1 {
+  animation: sparkFly1 0.5s ease-out forwards;
+}
+.arena-spark-2 {
+  animation: sparkFly2 0.5s ease-out forwards;
+}
+.arena-spark-3 {
+  animation: sparkFly3 0.5s ease-out forwards;
+}
+.arena-spark-4 {
+  animation: sparkFly4 0.5s ease-out forwards;
+}
+@keyframes sparkFly1 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(-18px, -18px) scale(0); opacity: 0; }
+}
+@keyframes sparkFly2 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(18px, -18px) scale(0); opacity: 0; }
+}
+@keyframes sparkFly3 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(-18px, 18px) scale(0); opacity: 0; }
+}
+@keyframes sparkFly4 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(18px, 18px) scale(0); opacity: 0; }
+}
+.arena-portrait.is-chained {
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.45), inset 0 0 10px rgba(2, 132, 199, 0.35);
+  border-color: #38bdf8;
+}
+.arena-flying-card-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 35;
+  perspective: 1000px;
 }
 .arena-flying-card {
   position: absolute;
@@ -371,7 +545,8 @@
   border-radius: 4px;
   overflow: hidden;
   box-shadow: 0 0 25px rgba(244, 216, 140, 0.8), 0 8px 24px rgba(0, 0, 0, 0.7);
-  animation: arenaCardFlyIn 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, left, top, opacity;
+  animation: arenaCardFlyIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 @keyframes arenaCardFlyIn {
   0% {
@@ -387,11 +562,148 @@
     opacity: 1;
   }
   100% {
-    left: 50%;
-    top: 48%;
+    left: var(--fly-to-x, 50%);
+    top: var(--fly-to-y, 48%);
     transform: translate(-50%, -50%) scale(1) rotate(0deg);
     opacity: 1;
     box-shadow: 0 0 20px rgba(244, 216, 140, 0.6);
+  }
+}
+
+/* 主动出牌轨迹：从座次飞入中央处理区 */
+.arena-flying-card.arena-flying-play {
+  animation: arenaFlyPlay 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes arenaFlyPlay {
+  0% {
+    left: var(--fly-from-x, 50%);
+    top: var(--fly-from-y, 80%);
+    transform: translate(-50%, -50%) perspective(600px) rotateY(-20deg) rotateZ(-12deg) scale(0.65);
+    opacity: 0.3;
+    box-shadow: 0 0 15px rgba(244, 216, 140, 0.5);
+  }
+  50% {
+    transform: translate(-50%, -50%) perspective(600px) rotateY(10deg) rotateZ(6deg) scale(1.18);
+    box-shadow: 0 0 35px rgba(244, 216, 140, 0.95), 0 0 60px rgba(212, 169, 75, 0.6);
+    opacity: 1;
+  }
+  100% {
+    left: var(--fly-to-x, 50%);
+    top: var(--fly-to-y, 48%);
+    transform: translate(-50%, -50%) perspective(600px) rotateY(0deg) rotateZ(0deg) scale(1);
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(244, 216, 140, 0.7);
+  }
+}
+
+/* 响应出牌轨迹：快速破空闪现飞入中央处理区 */
+.arena-flying-card.arena-flying-respond {
+  border-color: #64b5f6;
+  animation: arenaFlyRespond 0.5s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+}
+@keyframes arenaFlyRespond {
+  0% {
+    left: var(--fly-from-x, 50%);
+    top: var(--fly-from-y, 20%);
+    transform: translate(-50%, -50%) scale(0.7) rotate(15deg);
+    opacity: 0.4;
+    box-shadow: 0 0 20px rgba(100, 180, 255, 0.8);
+  }
+  45% {
+    transform: translate(-50%, -50%) scale(1.15) rotate(-4deg);
+    opacity: 1;
+    box-shadow: 0 0 35px rgba(130, 200, 255, 0.9), 0 0 50px rgba(255, 230, 120, 0.7);
+  }
+  100% {
+    left: var(--fly-to-x, 50%);
+    top: var(--fly-to-y, 48%);
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(100, 180, 255, 0.7);
+  }
+}
+
+/* 摸牌轨迹：从中央牌堆飞入目标玩家座次 */
+.arena-flying-card.arena-flying-draw {
+  animation: arenaFlyDraw 0.55s cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+}
+@keyframes arenaFlyDraw {
+  0% {
+    left: var(--fly-from-x, 50%);
+    top: var(--fly-from-y, 50%);
+    transform: translate(-50%, -50%) scale(0.9) rotate(0deg);
+    opacity: 0.7;
+    box-shadow: 0 0 15px rgba(244, 216, 140, 0.6);
+  }
+  40% {
+    transform: translate(-50%, -50%) scale(1.12) rotate(-8deg);
+    opacity: 1;
+    box-shadow: 0 0 30px rgba(244, 216, 140, 0.9);
+  }
+  100% {
+    left: var(--fly-to-x, 50%);
+    top: var(--fly-to-y, 82%);
+    transform: translate(-50%, -50%) scale(0.75) rotate(0deg);
+    opacity: 0.9;
+    box-shadow: 0 0 15px rgba(244, 216, 140, 0.5);
+  }
+}
+
+/* 顺手牵羊轨迹：从受害方座次弧线掠过飞入发起方座次 */
+.arena-flying-card.arena-flying-snatch {
+  border-color: #ffd700;
+  animation: arenaFlySnatch 0.58s cubic-bezier(0.25, 1, 0.35, 1) forwards;
+}
+@keyframes arenaFlySnatch {
+  0% {
+    left: var(--fly-from-x, 50%);
+    top: var(--fly-from-y, 20%);
+    transform: translate(-50%, -50%) scale(0.75) rotate(-10deg);
+    opacity: 0.5;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+  }
+  45% {
+    transform: translate(-50%, -50%) scale(1.2) rotate(12deg);
+    opacity: 1;
+    box-shadow: 0 0 40px rgba(255, 215, 0, 0.95), 0 0 70px rgba(255, 180, 0, 0.5);
+  }
+  100% {
+    left: var(--fly-to-x, 50%);
+    top: var(--fly-to-y, 82%);
+    transform: translate(-50%, -50%) scale(0.8) rotate(0deg);
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.7);
+  }
+}
+
+/* 过河拆桥与弃牌轨迹：从座次飞向中央弃牌堆并伴随消隐碎裂光效 */
+.arena-flying-card.arena-flying-discard {
+  animation: arenaFlyDiscard 0.55s cubic-bezier(0.25, 0.9, 0.3, 1) forwards;
+}
+@keyframes arenaFlyDiscard {
+  0% {
+    left: var(--fly-from-x, 50%);
+    top: var(--fly-from-y, 20%);
+    transform: translate(-50%, -50%) scale(0.8) rotate(0deg);
+    opacity: 1;
+    box-shadow: 0 0 15px rgba(255, 120, 100, 0.5);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.05) rotate(18deg);
+    opacity: 0.9;
+    box-shadow: 0 0 25px rgba(255, 100, 80, 0.75);
+  }
+  85% {
+    opacity: 0.5;
+    filter: brightness(1.6) blur(1px);
+  }
+  100% {
+    left: var(--fly-to-x, 50%);
+    top: var(--fly-to-y, 50%);
+    transform: translate(-50%, -50%) scale(0.35) rotate(45deg);
+    opacity: 0;
+    filter: brightness(2) blur(4px);
+    box-shadow: none;
   }
 }
 .arena-portrait.is-hit {
@@ -506,6 +818,257 @@
     opacity: 0;
     transform: translateX(-50%) translateY(-10px) scale(0.95);
   }
+}
+
+/* ================= 电影级水墨黑金技能大特写 (Task 3) ================= */
+.arena-grand-skill-banner {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(880px, 92vw);
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 60;
+  animation: grandSkillBannerIn 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.grand-skill-shockwave {
+  position: absolute;
+  inset: -30px -40px;
+  width: calc(100% + 80px);
+  height: calc(100% + 60px);
+  pointer-events: none;
+  z-index: -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.grand-skill-ink-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.grand-shockwave-wave.grand-wave-1 {
+  transform-origin: center;
+  animation: grandWavePulse 1.8s ease-out infinite;
+}
+.grand-shockwave-wave.grand-wave-2 {
+  transform-origin: center;
+  animation: grandWavePulse 1.8s ease-out 0.2s infinite;
+}
+.grand-ink-particle {
+  animation: grandParticleFlash 1.4s ease-in-out infinite alternate;
+}
+.grand-skill-banner-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 98px;
+  padding: 0 40px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(8, 9, 8, 0.8) 15%,
+    rgba(22, 18, 13, 0.96) 35% 65%,
+    rgba(8, 9, 8, 0.8) 85%,
+    transparent 100%
+  );
+  border-top: 2px solid;
+  border-bottom: 2px solid;
+  border-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #c6a565 25%,
+    #ffd700 50%,
+    #c6a565 75%,
+    transparent 100%
+  ) 1;
+  box-shadow:
+    0 0 35px rgba(0, 0, 0, 0.95),
+    0 0 50px rgba(212, 169, 75, 0.4),
+    inset 0 0 30px rgba(0, 0, 0, 0.8);
+}
+.grand-skill-avatar-wrap {
+  position: relative;
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.grand-skill-gold-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 3px solid #ffd700;
+  box-shadow:
+    0 0 20px rgba(255, 215, 0, 0.85),
+    inset 0 0 14px rgba(255, 215, 0, 0.6),
+    0 4px 14px #000;
+  pointer-events: none;
+  animation: grandGoldRingRotate 8s linear infinite;
+}
+.grand-skill-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 15%;
+  border: 1px solid #7c6843;
+}
+.grand-skill-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #5b4a32, #1a1e1b);
+  color: #ffd88a;
+  font: bold 32px 'KaiTi', serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #7c6843;
+}
+.grand-skill-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  margin-left: 28px;
+  flex: 1;
+  min-width: 0;
+}
+.grand-skill-top-tag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+.grand-skill-badge {
+  font-size: 11px;
+  background: linear-gradient(135deg, #8a2418, #5a140d);
+  color: #ffd88a;
+  border: 1px solid #d4a94b;
+  border-radius: 2px;
+  padding: 1px 7px;
+  font-family: 'KaiTi', serif;
+  letter-spacing: 1px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+.grand-skill-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #dcd0b3;
+  font-family: 'KaiTi', 'STKaiti', serif;
+}
+.grand-skill-faction {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 11px;
+  border-radius: 2px;
+  background: #59546b;
+  color: #eedcff;
+}
+.grand-skill-faction.faction-魏 { background: #314c68; color: #d6edff; }
+.grand-skill-faction.faction-蜀 { background: #69502b; color: #ffe6a0; }
+.grand-skill-faction.faction-吴 { background: #71352d; color: #ffd6cc; }
+.grand-skill-faction.faction-群 { background: #59546b; color: #eedcff; }
+
+.grand-skill-character-name {
+  color: #f7e6c0;
+  font-size: 14px;
+  letter-spacing: 2px;
+}
+.grand-skill-title-wrap {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+}
+.grand-skill-name {
+  margin: 0;
+  font-family: 'STKaiti', 'KaiTi', 'LiSu', serif;
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: 6px;
+  background: linear-gradient(180deg, #fffcf0 0%, #ffe082 28%, #e6a838 68%, #8a5712 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 4px #000) drop-shadow(0 0 18px rgba(255, 215, 0, 0.85));
+  line-height: 1.1;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+}
+.grand-skill-meta-desc {
+  font-size: 12px;
+  color: #d4c4a1;
+  font-family: 'KaiTi', serif;
+  letter-spacing: 2px;
+  margin-top: 2px;
+  opacity: 0.85;
+}
+.grand-skill-aura-bar {
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #ffd700 30% 70%, transparent);
+  box-shadow: 0 0 10px #ffd700;
+  pointer-events: none;
+}
+@keyframes grandSkillBannerIn {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.72);
+    filter: brightness(2.6) contrast(1.2);
+  }
+  14% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.05);
+    filter: brightness(1.3);
+  }
+  24% {
+    transform: translate(-50%, -50%) scale(1);
+    filter: brightness(1);
+  }
+  76% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    filter: brightness(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.08) translateY(-14px);
+    filter: brightness(1.5) blur(3px);
+  }
+}
+@keyframes grandGoldRingRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes grandWavePulse {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.08);
+    opacity: 0;
+  }
+}
+@keyframes grandParticleFlash {
+  0% { opacity: 0.3; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1.4); }
 }
 .arena-seat-topline {
   display: flex;
@@ -705,6 +1268,7 @@
   margin-bottom: 6px;
 }
 .arena-equip-slot {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -718,6 +1282,11 @@
 .arena-equip-slot:hover {
   background: linear-gradient(90deg, #947e4e55, #2f383366);
   border-color: #c6a56588;
+}
+.arena-equip-slot.is-equip-triggered {
+  border-color: #ffd700aa;
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.22), rgba(58, 46, 21, 0.45));
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.45);
 }
 .arena-equip-tag {
   font-size: 9px;
@@ -742,6 +1311,79 @@
 }
 .arena-equip-card object {
   pointer-events: none;
+}
+.arena-equip-card.is-equip-triggered {
+  border-color: #ffd700 !important;
+  animation: equipGoldPulse 1.5s ease-out;
+  box-shadow:
+    0 0 16px rgba(255, 215, 0, 0.95),
+    0 0 32px rgba(244, 216, 140, 0.7),
+    inset 0 0 8px rgba(255, 215, 0, 0.8) !important;
+  z-index: 25;
+}
+.arena-equip-bubble {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(38, 30, 18, 0.97), rgba(14, 16, 15, 0.98));
+  border: 1px solid #ffd700;
+  box-shadow:
+    0 0 12px rgba(255, 215, 0, 0.75),
+    0 3px 10px rgba(0, 0, 0, 0.9);
+  color: #fff2b8;
+  font-family: 'KaiTi', 'STKaiti', serif;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 35;
+  animation: equipBubblePop 1.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+@keyframes equipGoldPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 5px rgba(255, 215, 0, 0.4);
+  }
+  25% {
+    transform: scale(1.18);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.95), 0 0 36px rgba(255, 230, 100, 0.75);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.8);
+  }
+  75% {
+    transform: scale(1.05);
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  }
+}
+@keyframes equipBubblePop {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px) scale(0.85);
+  }
+  16% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1.08);
+  }
+  26% {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  76% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px) scale(0.92);
+  }
 }
 .arena-equip-slot:hover .arena-equip-card {
   transform: scale(2.2);
@@ -1145,11 +1787,19 @@
 .arena-clean .arena-flying-card,
 .arena-clean .arena-targeting-svg,
 .arena-clean .arena-slash-blade,
-.arena-clean .arena-skill-toast {
+.arena-clean .arena-skill-toast,
+.arena-clean .arena-grand-skill-banner,
+.arena-clean .arena-equip-bubble {
   display: none !important;
 }
 .arena-clean .arena-seat.is-target-locked,
-.arena-clean .arena-seat.seat-target-pulse {
+.arena-clean .arena-seat.seat-target-pulse,
+.arena-clean .arena-equip-card.is-equip-triggered,
+.arena-clean .arena-equip-slot.is-equip-triggered {
+  animation: none !important;
+}
+.arena-clean .arena-iron-chain-pulse,
+.arena-clean .arena-chain-core-pulse {
   animation: none !important;
 }
 .arena-lobby {

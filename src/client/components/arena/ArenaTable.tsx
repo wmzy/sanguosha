@@ -11,6 +11,9 @@ import { resourceManager } from '../../resources';
 import { TargetPointerSvg } from './TargetPointerSvg';
 import { SlashBladeVfx } from './SlashBladeVfx';
 import { SkillToast } from './SkillToast';
+import { FlyingCardLayer } from './FlyingCardLayer';
+import { IronChainOverlay, isPlayerChained } from './IronChainOverlay';
+import { GrandSkillBanner, type GrandSkillItem } from './GrandSkillBanner';
 
 type Player = GameView['players'][number];
 
@@ -117,6 +120,137 @@ function detectSkillName(text: string): string | null {
   return null;
 }
 
+export const EQUIP_NAMES = [
+  '八卦阵', '仁王盾', '藤甲', '白银狮子',
+  '诸葛连弩', '青釭剑', '青龙偃月刀', '丈八蛇矛',
+  '贯石斧', '雌雄双股剑', '寒冰剑', '麒麟弓',
+  '朱雀羽扇', '古锭刀', '方天画戟',
+  '绝影', '的卢', '爪黄飞电', '骅骝',
+  '赤兔', '大宛', '紫骍',
+];
+
+export const EQUIP_SLOT_MAP: Record<string, '武器' | '防具' | '防御马' | '进攻马'> = {
+  八卦阵: '防具',
+  仁王盾: '防具',
+  藤甲: '防具',
+  白银狮子: '防具',
+  诸葛连弩: '武器',
+  青釭剑: '武器',
+  青龙偃月刀: '武器',
+  丈八蛇矛: '武器',
+  贯石斧: '武器',
+  雌雄双股剑: '武器',
+  寒冰剑: '武器',
+  麒麟弓: '武器',
+  朱雀羽扇: '武器',
+  古锭刀: '武器',
+  方天画戟: '武器',
+  绝影: '防御马',
+  的卢: '防御马',
+  爪黄飞电: '防御马',
+  骅骝: '防御马',
+  赤兔: '进攻马',
+  大宛: '进攻马',
+  紫骍: '进攻马',
+};
+
+export function formatEquipBadge(equipName: string, text: string): string {
+  if (text.includes(`【${equipName}】判定生效`)) return `【${equipName}】判定生效`;
+  if (text.includes(`【${equipName}】追杀`)) return `【${equipName}】追杀`;
+  if (text.includes(`【${equipName}】追击`)) return `【${equipName}】追击`;
+  if (text.includes(`【${equipName}】挡黑杀`)) return `【${equipName}】挡黑杀`;
+  if (text.includes(`【${equipName}】免普伤`)) return `【${equipName}】免普伤`;
+  if (text.includes(`【${equipName}】免除伤害`)) return `【${equipName}】免除伤害`;
+  if (text.includes(`【${equipName}】回血`)) return `【${equipName}】回血`;
+  if (text.includes(`【${equipName}】两张当杀`)) return `【${equipName}】两张当杀`;
+
+  if (equipName === '八卦阵') {
+    return '【八卦阵】判定生效';
+  }
+  if (equipName === '青龙偃月刀') {
+    return text.includes('追杀') ? '【青龙偃月刀】追杀' : '【青龙偃月刀】追击';
+  }
+  if (equipName === '藤甲') {
+    return text.includes('火') || text.includes('+1')
+      ? '【藤甲】火焰增伤'
+      : text.includes('免普伤')
+        ? '【藤甲】免普伤'
+        : '【藤甲】免除伤害';
+  }
+  if (equipName === '仁王盾') {
+    return '【仁王盾】挡黑杀';
+  }
+  if (equipName === '丈八蛇矛') {
+    return '【丈八蛇矛】两张当杀';
+  }
+  if (equipName === '白银狮子') {
+    return text.includes('回') || text.includes('体力') ? '【白银狮子】回血' : '【白银狮子】减伤';
+  }
+  if (equipName === '诸葛连弩') {
+    return '【诸葛连弩】连续出杀';
+  }
+  if (equipName === '贯石斧') {
+    return '【贯石斧】强命中';
+  }
+  if (equipName === '寒冰剑') {
+    return '【寒冰剑】防止伤害';
+  }
+  if (equipName === '青釭剑') {
+    return '【青釭剑】无视防具';
+  }
+  return `【${equipName}】生效`;
+}
+
+export function detectEquipTrigger(
+  logText: string,
+  view: GameView,
+  logPlayer: number,
+): { playerIndex: number; slot: string; badge: string; equipName: string } | null {
+  if (!logText) return null;
+
+  let matchedEquip: string | null = null;
+  for (const name of EQUIP_NAMES) {
+    if (logText.includes(`【${name}】`) || logText.includes(name)) {
+      matchedEquip = name;
+      break;
+    }
+  }
+
+  if (!matchedEquip) return null;
+
+  const defaultSlot = EQUIP_SLOT_MAP[matchedEquip] ?? '防具';
+  const badge = formatEquipBadge(matchedEquip, logText);
+
+  // 1. Check if logPlayer owns this equipment
+  if (logPlayer >= 0 && logPlayer < view.players.length) {
+    const p = view.players[logPlayer];
+    const equipId = p.equipment?.[defaultSlot];
+    const card = equipId ? view.cardMap[equipId] : null;
+    if (card?.name === matchedEquip || equipId === matchedEquip) {
+      return { playerIndex: logPlayer, slot: defaultSlot, badge, equipName: matchedEquip };
+    }
+  }
+
+  // 2. Search if another player currently has it equipped
+  const owner = view.players.find((p) => {
+    const eqId = p.equipment?.[defaultSlot];
+    if (!eqId) return false;
+    const card = view.cardMap[eqId];
+    return card?.name === matchedEquip || eqId === matchedEquip;
+  });
+
+  if (owner) {
+    return { playerIndex: owner.index, slot: defaultSlot, badge, equipName: matchedEquip };
+  }
+
+  // 3. Fallback: if logPlayer is valid, attribute to logPlayer
+  if (logPlayer >= 0 && logPlayer < view.players.length) {
+    return { playerIndex: logPlayer, slot: defaultSlot, badge, equipName: matchedEquip };
+  }
+
+  return null;
+}
+
 function extractTargeting(view: GameView): { source: number | null; targets: number[] } {
   // 1. 优先读取结算栈中的目标定义
   if (view.settlementStack?.length) {
@@ -131,7 +265,7 @@ function extractTargeting(view: GameView): { source: number | null; targets: num
       if (Array.isArray(rawTargets) && rawTargets.length > 0 && typeof from === 'number') {
         const valid = rawTargets.filter(
           (t): t is number =>
-            typeof t === 'number' && t >= 0 && t !== from && t < view.players.length,
+            typeof t === 'number' && t >= 0 && t < view.players.length,
         );
         if (valid.length > 0) return { source: from, targets: valid };
       }
@@ -148,30 +282,43 @@ function extractTargeting(view: GameView): { source: number | null; targets: num
         : typeof atom.player === 'number'
           ? atom.player
           : null;
-    if (
-      typeof target === 'number' &&
-      target >= 0 &&
-      typeof source === 'number' &&
-      source >= 0 &&
-      source !== target &&
-      target < view.players.length
-    ) {
-      return { source, targets: [target] };
+    const rawTargets =
+      (Array.isArray(atom.targets) ? (atom.targets as number[]) : null) ??
+      (typeof target === 'number' ? [target] : []);
+    const valid = rawTargets.filter(
+      (t): t is number => typeof t === 'number' && t >= 0 && t < view.players.length,
+    );
+    if (typeof source === 'number' && source >= 0 && valid.length > 0) {
+      return { source, targets: valid };
     }
   }
 
   // 3. 从最近出牌日志提取指向目标
   if (view.zones?.processing && view.zones.processing.length > 0 && view.log?.length > 0) {
     const lastLog = view.log.at(-1);
-    if (lastLog && lastLog.text.includes(' → ')) {
-      const targetPart = lastLog.text.split(' → ')[1];
-      const targetNames = targetPart ? targetPart.split('、').map((s) => s.trim()) : [];
+    if (
+      lastLog &&
+      (lastLog.text.includes(' → ') ||
+        lastLog.text.includes('目标为') ||
+        lastLog.text.includes('指定了'))
+    ) {
+      const targetPart = lastLog.text.includes(' → ')
+        ? lastLog.text.split(' → ')[1]
+        : lastLog.text.includes('目标为')
+          ? lastLog.text.split('目标为')[1]
+          : lastLog.text.split('指定了')[1];
+      const targetNames = targetPart
+        ? targetPart
+            .split(/[、,，\s]+/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
       const targets: number[] = [];
       for (const name of targetNames) {
         const found = view.players.find(
           (p) => p.name === name || `P${p.index}` === name || p.character === name,
         );
-        if (found && found.index !== lastLog.player) {
+        if (found && !targets.includes(found.index)) {
           targets.push(found.index);
         }
       }
@@ -222,6 +369,7 @@ function Seat({
   isTargetLocked,
   hasSlashHit,
   skillToast,
+  triggeredEquips,
   onInspect,
 }: {
   player: Player;
@@ -232,19 +380,21 @@ function Seat({
   isTargetLocked: boolean;
   hasSlashHit: boolean;
   skillToast?: { skillName: string; characterName: string };
+  triggeredEquips?: Map<string, string>;
   onInspect: () => void;
 }) {
   const portrait = getCharacterImage(player.character);
   const faction = player.faction ?? getCharacterMeta(player.character)?.faction ?? '群';
   const hand = player.hand ?? [];
   const identity = identityOf(player);
+  const isChained = Boolean(player.alive && isPlayerChained(player));
   const equipment = Object.entries(player.equipment).filter((entry): entry is [string, string] =>
     Boolean(entry[1]),
   );
 
   return (
     <article
-      className={`arena-seat ${!player.alive ? 'is-dead' : ''} ${active && player.alive ? 'is-active' : ''} ${isTargetingSource ? 'is-targeting-source' : ''} ${isTargetLocked ? 'is-target-locked seat-target-pulse' : ''}`}
+      className={`arena-seat ${!player.alive ? 'is-dead' : ''} ${active && player.alive ? 'is-active' : ''} ${isTargetingSource ? 'is-targeting-source' : ''} ${isTargetLocked ? 'is-target-locked seat-target-pulse' : ''} ${isChained ? 'is-seat-chained' : ''}`}
       style={{ left: `${position[0]}%`, top: `${position[1]}%` }}
       data-testid={`arena-player-${player.index}`}
     >
@@ -268,7 +418,7 @@ function Seat({
       </div>
       <div className="arena-seat-body">
         <button
-          className={`arena-portrait faction-${faction} ${hasSlashHit ? 'is-hit' : ''}`}
+          className={`arena-portrait faction-${faction} ${hasSlashHit ? 'is-hit' : ''} ${isChained ? 'is-chained' : ''}`}
           onClick={onInspect}
           aria-label={`查看${player.character}的手牌与状态`}
         >
@@ -282,6 +432,7 @@ function Seat({
             />
           )}
           {hasSlashHit && <SlashBladeVfx />}
+          <IronChainOverlay chained={isChained} />
           <span className="arena-faction">{faction}</span>
           <strong className="arena-general-name">{player.character || '未亮将'}</strong>
           <span
@@ -318,20 +469,31 @@ function Seat({
               equipment.map(([slot, id]) => {
                 const card = view.cardMap[id];
                 const cardName = card?.name ?? id;
+                const triggeredBadge = triggeredEquips?.get(slot);
+                const isEquipTriggered = Boolean(triggeredBadge);
                 return (
                   <div
                     key={slot}
-                    className="arena-equip-slot"
+                    className={`arena-equip-slot ${isEquipTriggered ? 'is-equip-triggered' : ''}`}
                     data-slot={slot}
                     data-testid={`arena-equip-slot-${slot}`}
                     title={`${slot}: ${cardName} ${card ? `${card.suit ?? ''}${card.rank ?? ''}` : ''}`}
                     onClick={onInspect}
                   >
+                    {isEquipTriggered && (
+                      <div
+                        className="arena-equip-bubble"
+                        data-testid="arena-equip-bubble"
+                        data-slot={slot}
+                      >
+                        {triggeredBadge}
+                      </div>
+                    )}
                     <span className="arena-equip-tag">
                       {slot === '进攻马' ? '−1' : slot === '防御马' ? '+1' : slot.slice(0, 1)}
                     </span>
                     <div
-                      className="arena-equip-card"
+                      className={`arena-equip-card ${isEquipTriggered ? 'is-equip-triggered' : ''}`}
                       data-testid={`arena-equip-card-${id}`}
                       aria-label={`${slot} ${cardName}`}
                     >
@@ -381,13 +543,6 @@ function Seat({
   );
 }
 
-interface FlyingCardItem {
-  id: string;
-  card: Card;
-  fromPos: [number, number];
-  key: string;
-}
-
 export function ArenaTable({
   view,
   manifest,
@@ -414,43 +569,7 @@ export function ArenaTable({
     }
   }, [inspectIndex]);
 
-  // 1. 出牌飞入动效状态管理
-  const [flyingCards, setFlyingCards] = useState<FlyingCardItem[]>([]);
-  const prevProcessingRef = useRef<string[]>(view.zones?.processing ?? []);
-
-  useEffect(() => {
-    const currentProcessing = view.zones?.processing ?? [];
-    const prev = prevProcessingRef.current;
-    const newCardIds = currentProcessing.filter((id) => !prev.includes(id));
-    prevProcessingRef.current = currentProcessing;
-
-    if (newCardIds.length > 0) {
-      const fromPlayer = view.currentPlayerIndex;
-      const fromPos = positions[view.players.length]?.[fromPlayer] ?? [50, 82];
-      const items: FlyingCardItem[] = newCardIds
-        .map((id) => {
-          const card = view.cardMap[id];
-          if (!card) return null;
-          return {
-            id,
-            card,
-            fromPos,
-            key: `${id}-${Date.now()}-${Math.random()}`,
-          };
-        })
-        .filter((item): item is FlyingCardItem => Boolean(item));
-
-      if (items.length > 0) {
-        setFlyingCards((f) => [...f, ...items]);
-        const timer = window.setTimeout(() => {
-          setFlyingCards((f) => f.filter((item) => !items.some((it) => it.key === item.key)));
-        }, 750);
-        return () => window.clearTimeout(timer);
-      }
-    }
-  }, [view.zones?.processing, view.currentPlayerIndex, view.players.length, view.cardMap]);
-
-  // 2. 受击刀光动效状态管理
+  // 1. 受击刀光动效状态管理
   const [slashHits, setSlashHits] = useState<Set<number>>(new Set());
   const prevHealthRef = useRef<Map<number, number>>(
     new Map(view.players.map((p) => [p.index, p.health])),
@@ -479,10 +598,17 @@ export function ArenaTable({
     }
   }, [view.players]);
 
-  // 3. 技能发动统一横幅状态管理
+  // 3. 技能发动统一横幅状态管理 (SkillToast + GrandSkillBanner)
   const [skillToasts, setSkillToasts] = useState<
     Map<number, { skillName: string; characterName: string }>
   >(new Map());
+  const [grandSkillQueue, setGrandSkillQueue] = useState<GrandSkillItem[]>([]);
+
+  // 5. 装备牌触发流光提示状态管理 (Equip Trigger Feedback)
+  const [triggeredEquips, setTriggeredEquips] = useState<
+    Map<string, { badge: string; slot: string; playerIndex: number }>
+  >(new Map());
+
   const prevLogLenRef = useRef<number>(view.log?.length ?? 0);
 
   useEffect(() => {
@@ -493,13 +619,31 @@ export function ArenaTable({
     if (currentLogs.length > prevLen) {
       const newEntries = currentLogs.slice(prevLen);
       const newToasts = new Map<number, { skillName: string; characterName: string }>();
+      const newGrandSkills: GrandSkillItem[] = [];
+      const newEquipTriggers = new Map<string, { badge: string; slot: string; playerIndex: number }>();
 
       for (const entry of newEntries) {
+        // 1. 装备牌触发检测
+        const equipTrigger = detectEquipTrigger(entry.text, view, entry.player);
+        if (equipTrigger) {
+          const key = `${equipTrigger.playerIndex}-${equipTrigger.slot}`;
+          newEquipTriggers.set(key, equipTrigger);
+        }
+
+        // 2. 武将技能发动检测
         const skillName = detectSkillName(entry.text);
         if (skillName && entry.player >= 0 && entry.player < view.players.length) {
+          const p = view.players[entry.player];
           const charName =
-            view.players[entry.player]?.character || view.players[entry.player]?.name || '武将';
+            p?.character || p?.name || '武将';
+          const faction = p?.faction ?? getCharacterMeta(p?.character)?.faction ?? '群';
           newToasts.set(entry.player, { skillName, characterName: charName });
+          newGrandSkills.push({
+            id: `grand-skill-${Date.now()}-${Math.random()}`,
+            skillName,
+            characterName: charName,
+            faction,
+          });
         }
       }
 
@@ -512,7 +656,7 @@ export function ArenaTable({
           return next;
         });
 
-        const timer = window.setTimeout(() => {
+        window.setTimeout(() => {
           setSkillToasts((prev) => {
             const next = new Map(prev);
             for (const pIdx of newToasts.keys()) {
@@ -521,7 +665,30 @@ export function ArenaTable({
             return next;
           });
         }, 1500);
-        return () => window.clearTimeout(timer);
+      }
+
+      if (newGrandSkills.length > 0) {
+        setGrandSkillQueue((prev) => [...prev, ...newGrandSkills]);
+      }
+
+      if (newEquipTriggers.size > 0) {
+        setTriggeredEquips((prev) => {
+          const next = new Map(prev);
+          for (const [k, v] of newEquipTriggers.entries()) {
+            next.set(k, v);
+          }
+          return next;
+        });
+
+        window.setTimeout(() => {
+          setTriggeredEquips((prev) => {
+            const next = new Map(prev);
+            for (const k of newEquipTriggers.keys()) {
+              next.delete(k);
+            }
+            return next;
+          });
+        }, 1500);
       }
     }
   }, [view.log, view.players]);
@@ -535,6 +702,15 @@ export function ArenaTable({
   const targetingTargetPositions = targeting.targets
     .map((t) => positions[view.players.length]?.[t])
     .filter((p): p is number[] => Boolean(p)) as [number, number][];
+
+  const isChainTargeting =
+    view.settlementStack?.some(
+      (f) =>
+        f.skillId === '铁索连环' ||
+        view.cardMap[f.params?.cardId as string]?.name === '铁索连环',
+    ) ||
+    view.zones?.processing?.some((id) => view.cardMap[id]?.name === '铁索连环') ||
+    Boolean(view.log?.at(-1)?.text.includes('铁索连环'));
 
   const processing = (view.zones?.processing ?? []).map((id) => view.cardMap[id]).filter(Boolean);
   const current = view.players.find((player) => player.index === view.currentPlayerIndex);
@@ -567,31 +743,20 @@ export function ArenaTable({
         <TargetPointerSvg
           sourcePos={targetingSourcePos as [number, number]}
           targetPositions={targetingTargetPositions}
+          variant={isChainTargeting ? 'chain' : 'default'}
         />
       )}
 
-      {/* 飞入中央处理区卡牌动效 */}
-      {flyingCards.map((fc) => (
-        <div
-          key={fc.key}
-          className="arena-flying-card"
-          data-testid="arena-flying-card"
-          style={
-            {
-              '--fly-from-x': `${fc.fromPos[0]}%`,
-              '--fly-from-y': `${fc.fromPos[1]}%`,
-            } as CSSProperties
-          }
-        >
-          <CardFace
-            name={fc.card.name}
-            suit={fc.card.suit}
-            rank={fc.card.rank}
-            damageType={fc.card.damageType}
-            size="large"
-          />
-        </div>
-      ))}
+      {/* 全息飞牌动效系统（摸牌、出牌、响应、顺拆与弃牌） */}
+      <FlyingCardLayer view={view} positions={positions} />
+
+      {/* 电影级水墨黑金技能大特写横幅 (Task 3) */}
+      <GrandSkillBanner
+        queue={grandSkillQueue}
+        onDismiss={(finished) => {
+          setGrandSkillQueue((prev) => prev.filter((item) => item.id !== finished.id));
+        }}
+      />
 
       <div className="arena-round">
         <span>身份场</span>
@@ -632,20 +797,29 @@ export function ArenaTable({
         </div>
         {view.log?.at(-1) && <p className="arena-last-event">{view.log.at(-1)?.text}</p>}
       </div>
-      {view.players.map((player, i) => (
-        <Seat
-          key={player.index}
-          player={player}
-          view={view}
-          position={positions[view.players.length]?.[i] ?? [50, 50]}
-          active={player.index === view.currentPlayerIndex && !done}
-          isTargetingSource={targeting.source === player.index}
-          isTargetLocked={targeting.targets.includes(player.index)}
-          hasSlashHit={slashHits.has(player.index)}
-          skillToast={skillToasts.get(player.index)}
-          onInspect={() => setInspectIndex(player.index)}
-        />
-      ))}
+      {view.players.map((player, i) => {
+        const playerEquipTriggers = new Map<string, string>();
+        for (const [, val] of triggeredEquips.entries()) {
+          if (val.playerIndex === player.index) {
+            playerEquipTriggers.set(val.slot, val.badge);
+          }
+        }
+        return (
+          <Seat
+            key={player.index}
+            player={player}
+            view={view}
+            position={positions[view.players.length]?.[i] ?? [50, 50]}
+            active={player.index === view.currentPlayerIndex && !done}
+            isTargetingSource={targeting.source === player.index}
+            isTargetLocked={targeting.targets.includes(player.index)}
+            hasSlashHit={slashHits.has(player.index)}
+            skillToast={skillToasts.get(player.index)}
+            triggeredEquips={playerEquipTriggers}
+            onInspect={() => setInspectIndex(player.index)}
+          />
+        );
+      })}
       <dialog
         ref={dialogRef}
         className="arena-inspect"
