@@ -56,6 +56,8 @@ CI 包含类型检查、lint、构建、限并发全量覆盖率、普通认证�
 
 ## AI agent 接入
 
+需要多 AI 对战、独立记忆、观众全手牌展示与永久归档时，先看 [AI 对局接入指南](docs/guides/AI对局接入.md)。运行 `pnpm arena:smoke` 可验证完整对局；观众入口为 `http://localhost:3930/arena`。
+
 让 AI agent（Claude Code / Cursor / Codex / Windsurf 等）通过 MCP server 接管三国杀对局。
 
 ### Claude Code（plugin 一键安装）

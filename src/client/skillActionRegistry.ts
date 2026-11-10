@@ -21,6 +21,7 @@ export interface SkillActionDef {
   transform?: (card: Card) => CardWrapper;
   /** 激活谓词(undefined = 用前端默认出牌激活条件) */
   activeWhen?: ActionActiveWhen;
+  availableToOthers?: boolean;
   /** respond action 服务的 pending requestType(如 '桃/求桃'),来自 defineAction opts */
   respondFor?: string;
 }
@@ -50,6 +51,7 @@ function makeFrontendAPI(skillId: string, ownerId: number): FrontendAPI {
         prompt: opts.prompt,
         transform: opts.transform,
         activeWhen: opts.activeWhen,
+        availableToOthers: opts.availableToOthers,
         respondFor: opts.respondFor,
       });
     },
@@ -85,7 +87,7 @@ export async function registerSkillActions(playerIndex: number, skillIds: string
 export function getActionsForPlayer(playerIndex: number): SkillActionDef[] {
   const result: SkillActionDef[] = [];
   for (const [, def] of registry) {
-    if (def.ownerId === playerIndex) {
+    if (def.ownerId === playerIndex || def.availableToOthers) {
       result.push(def);
     }
   }

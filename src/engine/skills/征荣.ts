@@ -32,6 +32,7 @@ const CONFIRMED_KEY = '征荣/confirmed';
 const TARGET_KEY = '征荣/目标';
 /** 荣标记 id 前缀(鸿举 共用)。 */
 export const RONG_PREFIX = '征荣/荣:';
+export const RONG_CARDS_KEY = '征荣/实体荣';
 
 /** 伤害锦囊牌(造成伤害的锦囊):南蛮入侵/万箭齐发/火攻/决斗 */
 const DAMAGE_TRICKS = new Set(['南蛮入侵', '万箭齐发', '火攻', '决斗']);
@@ -202,8 +203,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const newCardId = ctx.state.players[ownerId].hand[handLenBefore];
     if (!newCardId) return;
 
-    // 将该牌从手牌置入武将牌为"荣":owner 弃之(入弃牌堆 earmark)→ 加荣标记
-    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [newCardId] });
+    // 将该牌实体移入暂存区作为"荣",不入弃牌堆,避免重洗后仍能摸到它。
+    await applyAtom(ctx.state, {
+      type: '移出至暂存区', source: ownerId, target: ownerId, cardIds: [newCardId], varsKey: RONG_CARDS_KEY,
+    });
     await applyAtom(ctx.state, {
       type: '加标记',
       player: ownerId,

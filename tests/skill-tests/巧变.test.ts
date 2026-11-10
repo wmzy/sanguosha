@@ -15,6 +15,7 @@ import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
+import { getBeforeHooks } from '../../src/engine/core/skill';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -200,16 +201,17 @@ describe('巧变', () => {
   });
 
   // ─── 跳过出牌阶段:移动场上牌 ────────────────────
-  it('跳过出牌阶段:弃牌 + 把 P1 装备移到自己手牌', async () => {
+  it('跳过出牌阶段:弃牌 + 把 P1 装备移到自己空闲装备槽', async () => {
     const discard = makeCard('d1', '杀', '♠', '5');
-    const weapon = makeCard('w1', '诸葛连弩', '♣', 'A', '装备牌');
+    const weapon = { ...makeCard('w1', '仁王盾', '♣', 'A', '装备牌'), subtype: '防具' as const };
     const state: GameState = createGameState({
       players: [
         makePlayer({ index: 0, name: 'P0', hand: ['d1'], skills: ['巧变'] }),
         makePlayer({
           index: 1,
           name: 'P1',
-          equipment: { 武器: 'w1' },
+          equipment: { 防具: 'w1' },
+          skills: ['仁王盾'],
           character: '曹操',
         }),
       ],
@@ -241,10 +243,45 @@ describe('巧变', () => {
 
     // P1 装备被移走
     expect(harness.state.players[1].equipment).toEqual({});
-    // P0 获得 w1
-    expect(harness.state.players[0].hand).toContain('w1');
+    // P0 装备 w1,不进入手牌
+    expect(harness.state.players[0].equipment['防具']).toBe('w1');
+    expect(harness.state.players[0].hand).not.toContain('w1');
+    const hooks = getBeforeHooks(harness.state, '检测有效性');
+    expect(hooks.some((hook) => hook.skillId === '仁王盾' && hook.ownerId === 0)).toBe(true);
+    expect(hooks.some((hook) => hook.skillId === '仁王盾' && hook.ownerId === 1)).toBe(false);
     // P0 弃了 d1
     expect(harness.state.zones.discardPile).toContain('d1');
+  });
+
+  it('跳过出牌阶段:把 P1 判定区延时锦囊移到 P0 判定区', async () => {
+    const discard = makeCard('d1', '杀', '♠', '5');
+    const delayed = { ...makeCard('l1', '乐不思蜀', '♣', '6', '锦囊牌'), trickSubtype: '延时锦囊' as const };
+    const trick = { name: '乐不思蜀', source: 1, card: delayed };
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', hand: ['d1'], skills: ['巧变'] }),
+        { ...makePlayer({ index: 1, name: 'P1' }), pendingTricks: [trick] },
+      ],
+      cardMap: { d1: discard, l1: delayed },
+      zones: { deck: [], discardPile: ['l1'], processing: [] },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+    void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '出牌' });
+    await harness.waitForStable();
+    await P0.respond('巧变', { choice: true });
+    await P0.respond('巧变', { cardIds: ['d1'] });
+    await P0.respond('巧变', { target: 1 });
+    await P0.respond('巧变', { cardIds: ['l1'] });
+    await P0.respond('巧变', { target: 0 });
+
+    expect(harness.state.players[1].pendingTricks).toEqual([]);
+    expect(harness.state.players[0].pendingTricks).toEqual([trick]);
+    expect(harness.state.players[0].hand).not.toContain('l1');
+    expect(harness.state.zones.discardPile).toEqual(['l1', 'd1']);
   });
 
   // ─── 不发动:阶段正常进行 ────────────────────

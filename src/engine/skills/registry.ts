@@ -56,7 +56,24 @@ const DERIVED_SKILL_SPECS: Readonly<Record<string, string>> = {
   界荐言: 'skills/界荐言',
   // 勤学(界吕蒙)觉醒后获得
   攻心: 'skills/攻心',
+  清侧: 'skills/清侧',
+  怀柔: 'skills/怀柔',
+  思蜀: 'skills/思蜀',
+  缠怨: 'skills/缠怨',
 };
+
+/** 武将技 ID 集合:用于识别会被缠怨禁用的角色技能,不含装备技和系统入口。 */
+const CHARACTER_SKILL_IDS: ReadonlySet<string> = new Set([
+  ...(allCharacters as CharacterSource[]).flatMap((character) =>
+    character.skills.map((skill) => skill.name),
+  ),
+  ...Object.keys(DERIVED_SKILL_SPECS),
+]);
+
+/** 是否为武将技能(静态武将技能或运行时授予的衍生武将技能)。 */
+export function isCharacterSkillId(id: string): boolean {
+  return CHARACTER_SKILL_IDS.has(id);
+}
 
 /** path 缺省规则:技能名即模块文件名(skills/<name>.ts)。 */
 function defaultSpec(skillId: string): string {

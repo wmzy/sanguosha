@@ -174,7 +174,34 @@ describe('蛊惑/界蛊惑:声明编码进 actionType,客户端枚举出的 acti
       expect(result.accepted, '客户端枚举的 use:酒 必须被引擎接受').toBe(true);
     });
 
-    it(`${skill}:声明集合恰为 杀/桃/酒(闪只能走 dodge 响应路径)`, async () => {
+    it(`${skill}:普通锦囊 use:无中生有 可枚举并被引擎接受`, async () => {
+      const cardMap = {
+        trick: { ...mkCard('trick', '闪', '♦', '3'), name: '闪' },
+        deck1: mkCard('deck1', '杀', '♠', '2'),
+        deck2: mkCard('deck2', '桃', '♥', '8'),
+      };
+      const { state, actions } = await enumerateFor({
+        skill,
+        players: [
+          mkPlayer({ index: 0, name: skill === '蛊惑' ? '于吉' : '界于吉', hand: ['trick'], skills: [skill, '回合管理'] }),
+          mkPlayer({ index: 1, name: 'P1', hand: [], skills: [] }),
+        ],
+        cardMap,
+        seat: 0,
+      });
+      state.zones.deck = ['deck1', 'deck2'];
+      const action = actions.find((a) => a.message.actionType === 'use:无中生有');
+      expect(action, '必须声明任意手牌为无中生有').toBeDefined();
+      const result = await dispatch(state, {
+        ...action!.message,
+        params: { ...action!.message.params, cardId: 'trick' },
+        ownerId: 0,
+        baseSeq: state.seq,
+      });
+      expect(result.accepted).toBe(true);
+    });
+
+    it(`${skill}:声明包含基本牌和已实现普通锦囊(闪只能走 dodge 响应路径)`, async () => {
       const { state, actions } = await enumerateFor({
         skill,
         players: [
@@ -193,7 +220,11 @@ describe('蛊惑/界蛊惑:声明编码进 actionType,客户端枚举出的 acti
             .filter((t) => t.startsWith('use:')),
         ),
       ].sort();
-      expect(declared).toEqual(['use:杀', 'use:桃', 'use:酒']);
+      expect(declared).toEqual([
+        'use:万箭齐发', 'use:五谷丰登', 'use:决斗', 'use:南蛮入侵', 'use:无中生有',
+        'use:杀', 'use:桃', 'use:桃园结义', 'use:酒', 'use:火攻', 'use:过河拆桥',
+        'use:铁索连环', 'use:顺手牵羊',
+      ].sort());
       // 引擎侧不存在 use:闪(闪无主动效果)
       const { findActionEntry } = await import('../../src/engine/core/skill');
       expect(findActionEntry(state, skill, 0, 'use:闪')).toBeUndefined();

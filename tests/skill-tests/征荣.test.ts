@@ -110,13 +110,15 @@ describe('征荣', () => {
     P0.expectPending('请求回应'); // 征荣/选牌
     await P0.respond('征荣', { zone: 'hand', handIndex: 0 });
 
-    // 征荣结算完成:获得 P1 手牌 → 弃置入武将牌 → 加荣标记;
+    // 征荣结算完成:目标手牌进入荣暂存区并加荣标记,不进入弃牌堆;
     // 随后杀继续结算:P1 剩余手牌非闪 → 询问闪(silent)需 P1 放弃
     await harness.player('P1').pass();
 
     expect(rongCount(harness.state, 0)).toBe(1); // P0 有 1 张荣
     expect(harness.state.players[1].hand.length).toBe(1); // P1 被取走 1 张(剩 1)
-    expect(harness.state.players[0].hand.length).toBe(0); // 取到的牌已弃置为荣,不在手牌
+    expect(harness.state.players[0].hand.length).toBe(0); // 取到的牌已成为荣,不在手牌
+    expect(harness.state.players[0].vars['征荣/实体荣']).toEqual(expect.arrayContaining(['c2']));
+    expect(harness.state.zones.discardPile).not.toContain('c2');
     expect(harness.state.players[1].health).toBe(3); // 杀造成 1 伤害
   });
 
@@ -246,6 +248,7 @@ describe('鸿举', () => {
           makePlayer({ index: 1, name: 'P1' }),
         ],
         cardMap,
+        zones: { deck: [], discardPile: ['d1', 'd2', 'd3'], processing: [] },
         currentPlayerIndex: 0,
         phase: '准备',
         turn: { round: 1, phase: '准备', vars: {} },
@@ -256,8 +259,10 @@ describe('鸿举', () => {
     // 触发准备阶段:鸿举强制觉醒,弹换荣询问
     void applyAtom(harness.state, { type: '阶段开始', player: 0, phase: '准备' });
     await harness.waitForStable();
-    P0.expectPending('请求回应'); // 鸿举/换荣
-    // 选 2 张手牌替换等量(2)荣
+    P0.expectPending('请求回应'); // 鸿举/换出荣
+    await P0.respond('鸿举', { cardIds: ['d1', 'd2'] });
+    await harness.waitForStable();
+    P0.expectPending('请求回应'); // 鸿举/换入手牌
     await P0.respond('鸿举', { cardIds: ['h1', 'h2'] });
     await harness.waitForStable();
 
@@ -266,11 +271,14 @@ describe('鸿举', () => {
     expect(harness.state.players[0].health).toBe(3);
     expect(harness.state.players[0].skills).toContain('清侧');
     expect(harness.state.players[0].vars['鸿举/awakened']).toBe(true);
-    // 荣总数不变(3 旧 -2 移 +2 新 = 3)
+    // 替换的两张旧荣真实牌返还手牌；新荣真实牌离开手牌且不进弃牌堆。
     expect(rongCount(harness.state, 0)).toBe(3);
-    // 选中的 2 张手牌已弃置为荣,剩 h3 在手
-    expect(harness.state.players[0].hand).toEqual(['h3']);
-    expect(harness.state.zones.discardPile).toEqual(expect.arrayContaining(['h1', 'h2']));
+    expect(harness.state.players[0].hand).toEqual(expect.arrayContaining(['h3', 'd1', 'd2']));
+    expect(harness.state.players[0].hand).not.toContain('h1');
+    expect(harness.state.players[0].hand).not.toContain('h2');
+    expect(harness.state.zones.discardPile).not.toContain('h1');
+    expect(harness.state.zones.discardPile).not.toContain('h2');
+    expect(harness.state.players[0].vars['征荣/实体荣']).toEqual(expect.arrayContaining(['h1', 'h2']));
   });
 
   // 6. 荣<3 → 不觉醒

@@ -24,6 +24,7 @@
 
 import type { GameState } from '../types';
 import { setTurnUsage } from './turn-usage';
+import { extraCardTarget } from './extra-card-target';
 import { getSlashQuotaUsed, getSlashExtraUsed, slashQuotaUsedKey, slashExtraUsedKey, SLASH_QUOTA_USED_KEY as QUOTA_USED_VAR, SLASH_EXTRA_USED_KEY as EXTRA_USED_VAR, SLASH_USED_COUNT_KEY } from './vars-keys';
 
 /**
@@ -308,8 +309,11 @@ export function canSlash(
   state: GameState,
   player: number,
   cardId?: string,
+  targets?: readonly number[],
 ): boolean {
   if (isSlashBlocked(state, player)) return false;
+  const extra = extraCardTarget(state, player, '杀');
+  if (targets?.length && extra !== undefined && targets.every((target) => target === extra)) return true;
   if (cardId !== undefined && isSlashExempted(state, player, cardId)) return true;
   if (isSlashUnlimited(state, player)) return true;
   return slashQuotaUsed(state, player) < slashQuotaMax(state, player)

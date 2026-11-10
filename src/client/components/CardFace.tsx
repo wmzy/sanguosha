@@ -10,7 +10,7 @@
 
 import { css } from '@linaria/core';
 import { SUIT_COLOR } from './gameViewConstants';
-import { getCardImage } from '../assets/imageAssets';
+import { getCardImage, getCardArtImage } from '../assets/imageAssets';
 import { displayCardName } from '../utils/gameViewHelpers';
 
 export type CardFaceSize = 'normal' | 'large' | 'small';
@@ -38,6 +38,7 @@ export function CardFace({
   damageType?: string;
 }) {
   const url = getCardImage({ name, suit, rank });
+  const art = getCardArtImage(name, damageType);
   const color = SUIT_COLOR[suit ?? ''] ?? '#ccc';
   const sz = size;
   const display = displayCardName(name, damageType);
@@ -57,6 +58,13 @@ export function CardFace({
   );
 
   // 无 URL(转化卡/信息不全):直接 HTML 牌面,不包 <object>。
+  if (!url && art) return (
+    <div className={illustratedFace}>
+      <img src={art} alt={display} onError={(event) => { event.currentTarget.style.display = 'none'; }} />
+      <div className={artCorner} style={{ color: suit === '♥' || suit === '♦' ? '#a02720' : '#171a19' }}><b>{rank}</b><span>{suit}</span></div>
+      <span className={artAccessibleName}>{display}</span>
+    </div>
+  );
   if (!url) return fallback;
 
   return (
@@ -70,6 +78,34 @@ export function CardFace({
     </object>
   );
 }
+
+const illustratedFace = css`
+  position: absolute;
+  inset: 0;
+  background: #e9dfc5;
+  & > img { width: 100%; height: 100%; object-fit: fill; display: block; }
+`;
+const artCorner = css`
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font: bold 12px Georgia, serif;
+  line-height: 1.05;
+  text-shadow: 0 0 2px #f6edcd;
+  background: #ede2c6df;
+  border-radius: 2px;
+  padding: 1px;
+`;
+const artAccessibleName = css`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+`;
 
 // <object> 填满父容器,图片覆盖显示
 const cardObject = css`

@@ -334,7 +334,7 @@ export function usePlayInteraction(
   const activeDistribute = (() => {
     if (distributeMode) {
       const { skillId, actionType, prompt } = distributeMode;
-      const cardIds = resolveDistributeCardIds(prompt, perspectiveHand, perspectiveEquipment);
+      const cardIds = resolveDistributeCardIds(prompt, perspectiveHand, perspectiveEquipment, view.cardMap);
       const externalTargetSelection = (prompt.mode ?? 'allocate') === 'allocate';
       return { skillId, actionType, prompt, cardIds, externalTargetSelection };
     }
@@ -344,6 +344,7 @@ export function usePlayInteraction(
         pending.prompt,
         perspectiveHand,
         perspectiveEquipment,
+        view.cardMap,
       );
       return {
         skillId,

@@ -52,7 +52,7 @@ export interface CardFilter {
 export interface TargetFilter {
   min: number;
   max: number;
-  filter?: (view: GameView, target: number) => boolean;
+  filter?: (view: GameView, target: number, card?: Partial<Card>) => boolean;
   /** 权威的可序列化候选，优先于本地 filter；只包含公开座次。 */
   candidates?: number[];
   /** 每次使用必须包含的目标（例如借刀杀人指定的被杀角色）。 */
@@ -133,6 +133,8 @@ export interface DistributePrompt {
    *  - 'hand' 或缺省:当前视角手牌。
    *  - 'handAndEquip':手牌 + 装备区(制衡用)。 */
   source?: 'hand' | 'handAndEquip';
+  /** 动态来源中的可选牌约束；前端与AI共用同一过滤器。 */
+  filter?: (card: Card) => boolean;
   /** allocate 模式:每个目标最少/最多收几张。默认 1..99。 */
   minPerTarget?: number;
   maxPerTarget?: number;

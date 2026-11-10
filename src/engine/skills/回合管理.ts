@@ -38,6 +38,7 @@ function findNextAlive(state: { players: { alive: boolean }[] }, fromIndex: numb
  *    「回合开始时 / 回合结束时 / 回合结束后」技能。
  *    连续跳过所有背面朝上的玩家，直到遇到正面朝上的玩家；存活玩家数兜底保证终止。 */
 async function beginTurn(state: GameState, player: number): Promise<void> {
+  if (!state.players[player]?.alive) return;
   const aliveCount = state.players.filter((p) => p.alive).length;
   let cur = player;
   let guard = 0;
@@ -70,6 +71,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const { player, phase } = ctx.atom;
     // 只让本回合所属玩家实例处理,避免和其他玩家的实例重复
     if (player !== me) return;
+    // 角色死亡后切除，不再推进任何后续阶段或产生回合
+    if (!ctx.state.players[player]?.alive) return;
 
     const next = nextPhase(phase);
     if (!next) return;
@@ -133,7 +136,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (next === '出牌') {
       // 独立 run:该循环脱离当前 execute 链,由 run-tracker 记账(suspend/resume 平衡)。
       runDetached(ctx.state, async () => {
-        while (ctx.state.phase === '出牌' && ctx.state.currentPlayerIndex === player) {
+        while (
+          ctx.state.phase === '出牌' &&
+          ctx.state.currentPlayerIndex === player &&
+          ctx.state.players[player]?.alive
+        ) {
           await applyAtom(ctx.state, {
             type: '出牌窗口',
             player,
@@ -171,6 +178,32 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
   });
 
+  // ─── 角色死亡处理：切除死者状态，若正处于死者回合则立即收尾推进 ───
+  registerAfterHook(state, skill.id, ownerId, '系统处理牌', async (ctx) => {
+    if (ctx.atom.type !== '系统处理牌') return;
+    const deadPlayer = ctx.atom.player;
+    // 只由死者自己的回合管理实例执行清理，避免全场重复触发
+    if (deadPlayer !== me) return;
+
+    // 清除针对该死者的所有活跃 pending slot
+    for (const [key, slot] of ctx.state.pendingSlots) {
+      const target = (slot.atom as { target?: number })?.target;
+      if (target === deadPlayer) {
+        ctx.state.pendingSlots.delete(key);
+      }
+    }
+
+    // 若当前正在该死者的回合内，立即收尾并推进到下一存活玩家
+    if (ctx.state.currentPlayerIndex === deadPlayer) {
+      await applyAtom(ctx.state, { type: '清过期标记', player: deadPlayer });
+      await applyAtom(ctx.state, { type: '下一玩家' });
+      const turnEnded = await applyAtom(ctx.state, { type: '回合结束', player: deadPlayer });
+      if (turnEnded) {
+        await applyAtom(ctx.state, { type: '回合结束后', player: deadPlayer });
+      }
+    }
+  });
+
   // ─── 上家回合结束后 → 如果我是下一家,启动自己的回合 ───
   // 回合推进挂在 回合结束后 的 after-hook(而非 回合结束):回合结束后 是"已离开回合内"
   // 的最后时机,博图/连破等额外回合技能在其 before-hook cancel 本 atom 阻止正常推进;
@@ -179,6 +212,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (ctx.atom.type !== '回合结束后') return;
     const finishedIndex = ctx.atom.player;
     const state = ctx.state;
+
+    // 死者不启动回合
+    if (!state.players[me]?.alive) return;
 
     const nextIndex = findNextAlive(state, finishedIndex);
     // 不是我就跳过——只有轮到的玩家启动自己的回合
@@ -197,6 +233,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'end',
     (state: GameState, _params: Record<string, Json>) => {
+      if (!state.players[ownerId]?.alive) return '角色已阵亡';
       const myTurn = state.currentPlayerIndex === ownerId;
       const inActPhase = state.phase === '出牌' || state.phase === '弃牌';
       const free = !hasBlockingPending(state);

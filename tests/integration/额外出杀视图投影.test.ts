@@ -112,7 +112,7 @@ describe('额外出杀 / 无次数限制必须投影到 view', () => {
     expectViewAgreesWithEngine(state, 0);
   });
 
-  it('界陷阵:拼点赢后 view 侧出杀无次数限制(与引擎一致)', async () => {
+  it('界陷阵:只对拼点目标免次数,view仍提供出杀入口', async () => {
     const big = mkCard('c1', '杀', '♥', 'K');
     const small = mkCard('c2', '闪', '♠', '2');
     const state = createGameState({
@@ -133,9 +133,13 @@ describe('额外出杀 / 无次数限制必须投影到 view', () => {
     await harness.waitForStable();
 
     expect(state.turn.vars['陷阵/winTarget']).toBe(1);
-    expect(slashMax(state, 0)).toBe(Infinity);
+    expect(slashMax(state, 0)).toBe(1);
     await markOneSlashUsed(state, 0);
-    expectViewAgreesWithEngine(state, 0);
+    const view = buildView(state, 0);
+    expect(viewSlashMax(view, 0)).toBe(1);
+    expect(viewCanSlash(view, 0)).toBe(true);
+    expect(canSlash(state, 0, undefined, [1])).toBe(true);
+    expect(canSlash(state, 0, undefined, [0])).toBe(false);
   });
 
   it('界鞬出:非基本牌分支 +1 后 view 侧出杀上限与引擎一致', async () => {

@@ -15,6 +15,7 @@ const MultiplayerPage = lazy(() =>
   import('./pages/MultiplayerPage').then((m) => ({ default: m.MultiplayerPage })),
 );
 const ReplayPage = lazy(() => import('./pages/ReplayPage').then((m) => ({ default: m.ReplayPage })));
+const ArenaPage = lazy(() => import('./pages/ArenaPage').then((m) => ({ default: m.ArenaPage })));
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then((m) => ({ default: m.ProfilePage })));
 
 export function App() {
@@ -36,6 +37,8 @@ export function App() {
               <Route path="/debug" element={<RequireAuth><DebugPage /></RequireAuth>} />
               <Route path="/debug/:roomId" element={<RequireAuth><DebugPage /></RequireAuth>} />
               <Route path="/replay" element={<ReplayPage />} />
+              <Route path="/arena" element={<ArenaPage />} />
+              <Route path="/arena/:matchId" element={<ArenaPage />} />
               <Route path="/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -36,12 +36,14 @@ import type {
   Json,
   Skill,
   GameView,
+  EquipSlot,
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 import { createRng } from '../util/rng';
+import { hasSkillModule } from './registry';
 
 // ── requestType 常量(用于 请求回应 atom 的 requestType 字段) ──
 const CONFIRM_RT = '界巧变/confirm';
@@ -70,6 +72,27 @@ const BIAN_PREFIX = '界巧变/变:';
 const INIT_KEY = (ownerId: number) => `界巧变/init/${ownerId}`;
 
 const SKIPPABLE_PHASES = ['判定', '摸牌', '出牌', '弃牌'] as const;
+
+function equipmentSlot(state: GameState, cardId: string): EquipSlot | undefined {
+  const subtype = state.cardMap[cardId]?.subtype;
+  return ({ 武器: '武器', 防具: '防具', 进攻马: '进攻马', 防御马: '防御马', 宝物: '宝物' } as const)[subtype as '武器' | '防具' | '进攻马' | '防御马' | '宝物'];
+}
+
+function canMoveTo(state: GameState, srcPlayer: number, cardId: string, destPlayer: number): boolean {
+  if (srcPlayer === destPlayer) return false;
+  const card = state.cardMap[cardId];
+  const source = state.players[srcPlayer];
+  const target = state.players[destPlayer];
+  if (!card || !source || !target?.alive) return false;
+  const slot = equipmentSlot(state, cardId);
+  if (slot && (target.equipment[slot] || target.vars[`决堰/废除:${slot}`] || target.vars[`雄乱/废除:${slot}`])) return false;
+  if (card.trickSubtype === '延时锦囊' && (target.pendingTricks.some((entry) => entry.name === card.name) || target.vars['雄乱/废除:判定'])) return false;
+  return true;
+}
+
+function hasMoveDestination(state: GameState, srcPlayer: number, cardId: string): boolean {
+  return state.players.some((target) => canMoveTo(state, srcPlayer, cardId, target.index));
+}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -133,7 +156,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (st: GameState, _params: Record<string, Json>) => {
+    (st: GameState, params: Record<string, Json>) => {
       const slot = st.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as Record<string, unknown>;
@@ -149,6 +172,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
         MOVE_DEST_PLAYER_RT,
       ];
       if (!valid.includes(rt)) return '当前不是界巧变询问';
+      if (rt === MOVE_DEST_PLAYER_RT) {
+        const source = st.localVars[MOVE_SOURCE_PLAYER_KEY] as number | undefined;
+        const cardId = st.localVars[MOVE_SOURCE_CARD_KEY] as string | undefined;
+        const target = (params.targets as number[] | undefined)?.[0] ?? params.target;
+        if (typeof source !== 'number' || typeof cardId !== 'string' || typeof target !== 'number' || !canMoveTo(st, source, cardId, target)) {
+          return '该玩家没有对应的合法场区';
+        }
+      }
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
@@ -369,7 +400,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         } else if (phase === '出牌') {
           // 移动场上的一张牌
           const playersWithCards = ctx.state.players.filter(
-            (p) => p.alive && fieldCardIds(ctx.state, p.index).length > 0,
+            (p) => p.alive && fieldCardIds(ctx.state, p.index).some((id) => hasMoveDestination(ctx.state, p.index, id)),
           );
           if (playersWithCards.length > 0) {
             // 步骤 1:选源玩家
@@ -385,7 +416,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
                 max: 1,
                 filter: (_view: GameView, t: number) =>
                   ctx.state.players[t]?.alive === true &&
-                  fieldCardIds(ctx.state, t).length > 0,
+                  fieldCardIds(ctx.state, t).some((id) => hasMoveDestination(ctx.state, t, id)),
               },
               timeout: 15,
             });
@@ -394,8 +425,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
             if (typeof srcPlayer !== 'number') {
               // 无选择 → 跳过附加效果,但仍跳过出牌阶段(已扣资源)
             } else {
+              ctx.state.localVars[MOVE_SOURCE_PLAYER_KEY] = srcPlayer;
               // 步骤 2:选源牌
-              const srcCards = fieldCardIds(ctx.state, srcPlayer);
+              const srcCards = fieldCardIds(ctx.state, srcPlayer).filter((id) => hasMoveDestination(ctx.state, srcPlayer, id));
               delete ctx.state.localVars[MOVE_SOURCE_CARD_KEY];
               await applyAtom(ctx.state, {
                 type: '请求回应',
@@ -414,6 +446,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
               const srcCardId = ctx.state.localVars[MOVE_SOURCE_CARD_KEY] as string | undefined;
               delete ctx.state.localVars[MOVE_SOURCE_CARD_KEY];
               if (typeof srcCardId === 'string' && srcCards.includes(srcCardId)) {
+                ctx.state.localVars[MOVE_SOURCE_CARD_KEY] = srcCardId;
                 // 步骤 3:选目标玩家
                 delete ctx.state.localVars[MOVE_DEST_PLAYER_KEY];
                 await applyAtom(ctx.state, {
@@ -426,15 +459,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
                     min: 1,
                     max: 1,
                     filter: (_view: GameView, t: number) =>
-                      ctx.state.players[t]?.alive === true,
+                      canMoveTo(ctx.state, srcPlayer, srcCardId, t),
                   },
                   timeout: 15,
                 });
                 const destPlayer = ctx.state.localVars[MOVE_DEST_PLAYER_KEY] as number | undefined;
                 delete ctx.state.localVars[MOVE_DEST_PLAYER_KEY];
                 if (typeof destPlayer === 'number') {
-                  await moveFieldCard(ctx.state, srcPlayer, srcCardId, destPlayer);
+                  if (canMoveTo(ctx.state, srcPlayer, srcCardId, destPlayer)) {
+                    await moveFieldCard(ctx.state, srcPlayer, srcCardId, destPlayer);
+                  }
                 }
+                delete ctx.state.localVars[MOVE_SOURCE_PLAYER_KEY];
+                delete ctx.state.localVars[MOVE_SOURCE_CARD_KEY];
               }
             }
           }
@@ -473,9 +510,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
 /**
  * 把 srcPlayer 场上的 srcCardId 移动到 destPlayer 场上。
- * 自动按 srcCardId 所在区域 + 目标位置选择合适的转移方式:
- *   - 装备牌且目标装备槽空闲 → 直接移到目标装备区(通过 移动牌 + 装备 atom)
- *   - 否则统一移到目标手牌(包括判定区牌移回手牌)
+ * 按来源区域移动:手牌进入目标手牌、装备进入目标同类空装备栏、延时锦囊进入合法判定区。
  */
 async function moveFieldCard(
   state: GameState,
@@ -491,25 +526,34 @@ async function moveFieldCard(
 
   // 判定区牌:先从判定区移除,再以 获得方式给目标(此时不在 hand/equip,filter no-op)
   const judgeTrick = srcP.pendingTricks.find((t) => t.card.id === srcCardId);
-  if (judgeTrick) {
+  if (card.trickSubtype === '延时锦囊') {
+    if (judgeTrick) {
+      await applyAtom(state, { type: '移除延时锦囊', player: srcPlayer, trickName: judgeTrick.name });
+    } else {
+      await applyAtom(state, { type: '移动牌', cardId: srcCardId, from: { zone: '手牌', player: srcPlayer }, to: { zone: '弃牌堆' } });
+    }
     await applyAtom(state, {
-      type: '移除延时锦囊',
-      player: srcPlayer,
-      trickName: judgeTrick.name,
-    });
-    await applyAtom(state, {
-      type: '获得',
+      type: '添加延时锦囊',
       player: destPlayer,
-      cardId: srcCardId,
-      from: srcPlayer,
+      trick: judgeTrick ?? { name: card.name, source: srcPlayer, card },
     });
     return;
   }
 
-  // 装备牌:目标对应装备槽空闲 → 通过 移动牌(手牌区)转移到目标手牌(简化:
-  //   不直接换装备槽,因 装备 atom 会触发技能加载等副作用,且目标可能已有同槽装备)。
-  //   实际规则允许换装备,这里统一进目标手牌(规则 FAQ:任意合法位置,手牌是合法位置)。
-  // 手牌/装备 → 目标手牌(获得 atom 自动处理 hand/equip 的 filter)
+  const slot = equipmentSlot(state, srcCardId);
+  if (slot) {
+    const wasEquipped = Object.values(srcP.equipment).includes(srcCardId);
+    if (wasEquipped && card.name && hasSkillModule(card.name)) {
+      await applyAtom(state, { type: '移除技能', player: srcPlayer, skillId: card.name });
+    }
+    await applyAtom(state, { type: '获得', player: destPlayer, cardId: srcCardId, from: srcPlayer });
+    await applyAtom(state, { type: '装备', player: destPlayer, cardId: srcCardId });
+    if (card.name && hasSkillModule(card.name)) {
+      await applyAtom(state, { type: '添加技能', player: destPlayer, skillId: card.name });
+    }
+    return;
+  }
+  // 手牌进入目标手牌。
   await applyAtom(state, {
     type: '获得',
     player: destPlayer,

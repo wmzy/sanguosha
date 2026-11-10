@@ -1,5 +1,6 @@
 import type { Card, GameView, TargetFilter } from '../types';
-import { viewSlashTargetMax } from './action-active';
+import { viewSlashTargetMax, viewCanSlashTarget } from './action-active';
+import { viewExtraCardTarget } from './extra-card-target';
 
 /** 可跨 JSON 的选择契约。slots[i] 的候选只适用于 after 前缀，不是独立笛卡尔积。 */
 export interface TargetSelection {
@@ -8,9 +9,12 @@ export interface TargetSelection {
   required: number[];
   candidates: number[];
   slots?: Array<{ label: string; after: number[]; candidates: number[] }>;
+  /** 超过普通上限时，额外位置只能由该目标占用。 */
+  extraTarget?: number;
+  baseMax?: number;
 }
 
-type TargetCard = Pick<Card, 'name'> & Partial<Pick<Card, 'id' | 'damageType'>> & {
+type TargetCard = Pick<Card, 'name'> & Partial<Pick<Card, 'id' | 'damageType' | 'shadowOf'>> & {
   /** 这张牌是否就是「正在使用的牌」。技能代价牌(离间 弃一张牌、强袭 弃武器)为 false:
    *  只有真在用的【杀】才按杀的动态目标上限解释。缺省 = 按牌名判断。 */
   countsAsSlash?: boolean;
@@ -29,9 +33,10 @@ export function targetSelectionBounds(
   // 固定目标数技能(离间 min=max=2)的上限会被算成 1,客户端提交不出合法目标数。
   const usingCard = card?.countsAsSlash ?? true;
   const slashName = usingCard && card?.name === '杀';
+  const extra = usingCard && card ? viewExtraCardTarget(view, ownerId, card.name) : undefined;
   return {
     min: filter.min,
-    max: cardMax ?? (slashName ? viewSlashTargetMax(view, ownerId, card) : filter.max),
+    max: cardMax ?? ((slashName ? viewSlashTargetMax(view, ownerId, card) : filter.max) + (extra === undefined ? 0 : 1)),
   };
 }
 
@@ -50,10 +55,11 @@ export function targetCandidates(
   return view.players.filter((player) => {
     const target = player.index;
     if (!player.alive || selected.includes(target)) return false;
+    if (card?.name === '杀' && card.countsAsSlash !== false && !viewCanSlashTarget(view, ownerId, target)) return false;
     if (slot) return !slot.filter || slot.filter(view, target, { selected: [...selected] });
     if (target === ownerId && !filter.allowSelf) return false;
     if (candidates) return candidates.includes(target);
-    return !filter.filter || filter.filter(view, target);
+    return !filter.filter || filter.filter(view, target, card);
   }).map((player) => player.index);
 }
 
@@ -66,6 +72,8 @@ export function validateTargetSelection(
 ): boolean {
   const { min, max } = targetSelectionBounds(view, ownerId, filter, card);
   if (selected.length < min || selected.length > max) return false;
+  const extra = card && card.countsAsSlash !== false ? viewExtraCardTarget(view, ownerId, card.name) : undefined;
+  if (extra !== undefined && selected.length > max - 1 && !selected.includes(extra)) return false;
   if (filter.required?.some((target) => !selected.includes(target))) return false;
   return selected.every((target, index) =>
     targetCandidates(view, ownerId, filter, selected.slice(0, index), card).includes(target));
@@ -102,6 +110,11 @@ export function resolveTargetSelection(
     if (validateTargetSelection(view, ownerId, filter, selected, card)) targets = selected;
   }
   const contract: TargetSelection = { min, max, required, candidates };
+  const extra = card && card.countsAsSlash !== false ? viewExtraCardTarget(view, ownerId, card.name) : undefined;
+  if (extra !== undefined && !filter.slots?.length) {
+    contract.extraTarget = extra;
+    contract.baseMax = max - 1;
+  }
   if (filter.slots?.length && targets) {
     contract.slots = filter.slots.map((slot, index) => ({
       label: slot.label,
@@ -127,6 +140,9 @@ export function toggleTargetSelection(
   const { max } = targetSelectionBounds(view, ownerId, filter, card);
   const prefix = !filter.slots?.length && max === 1 ? [] : selected;
   if (prefix.length >= max || !targetCandidates(view, ownerId, filter, prefix, card).includes(target))
+    return [...selected];
+  const extra = card && card.countsAsSlash !== false ? viewExtraCardTarget(view, ownerId, card.name) : undefined;
+  if (extra !== undefined && prefix.length + 1 > max - 1 && ![...prefix, target].includes(extra))
     return [...selected];
   return [...prefix, target];
 }

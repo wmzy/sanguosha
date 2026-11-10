@@ -20,6 +20,9 @@ import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
+import { effectiveDistance } from '../../src/engine/rules/distance';
+import { applyAtom } from '../../src/engine/core/apply';
+import { pushFrame, popFrame, topFrame } from '../../src/engine/core/frame';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -346,6 +349,60 @@ describe('界酒诗', () => {
   });
 
   // ─── respond validate ─────────────────────────
+
+  it('背面朝上时,手持落英牌使用距离豁免', async () => {
+    const gained = makeCard('ly', '顺手牵羊', '♥', '3', '锦囊牌');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['界酒诗'], hand: ['ly'], tags: ['酒诗/翻面'] }),
+        makePlayer({ index: 1, name: 'P1', skills: [] }),
+        makePlayer({ index: 2, name: 'P2', skills: [] }),
+        makePlayer({ index: 3, name: 'P3', skills: [] }),
+      ],
+      cardMap: { ly: gained },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.players[0].vars['酒诗/落英牌'] = ['ly'];
+    await harness.setup(state);
+
+    expect(effectiveDistance(harness.state, 0, 2, 'ly')).toBe(1);
+    expect(effectiveDistance(harness.state, 0, 2)).toBe(2);
+    expect(effectiveDistance(harness.state, 0, 2, 'other')).toBe(2);
+  });
+
+  it('背面朝上使用落英牌时,杀闪与无懈窗口均不能响应', async () => {
+    const gained = makeCard('ly', '杀', '♠', '7');
+    const dodge = makeCard('d1', '闪', '♥', '2');
+    const nullification = makeCard('n1', '无懈可击', '♣', 'A', '锦囊牌');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['界酒诗'], hand: ['ly'], tags: ['酒诗/翻面'] }),
+        makePlayer({ index: 1, name: 'P1', skills: ['闪', '无懈可击'], hand: ['d1', 'n1'] }),
+      ],
+      cardMap: { ly: gained, d1: dodge, n1: nullification },
+      currentPlayerIndex: 0,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    state.players[0].vars['酒诗/落英牌'] = ['ly'];
+    await harness.setup(state);
+    await pushFrame(harness.state, '杀', 0, { cardId: 'ly' });
+    const frame = topFrame(harness.state)!;
+    (frame.params as Record<string, unknown>)['酒诗/落英增强'] = true;
+
+    await applyAtom(harness.state, { type: '询问闪', target: 1, source: 0 });
+    expect(harness.state.pendingSlots.size).toBe(0);
+    await applyAtom(harness.state, {
+      type: '请求回应',
+      requestType: '无懈可击',
+      target: 1,
+      prompt: { type: 'confirm', title: '无懈窗口' },
+    });
+    expect(harness.state.pendingSlots.size).toBe(0);
+    await popFrame(harness.state);
+  });
 
   it('respond:无 pending → 拒绝', async () => {
     const state: GameState = createGameState({

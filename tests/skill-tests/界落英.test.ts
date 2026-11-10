@@ -133,7 +133,7 @@ describe('界落英', () => {
       params: { choice: true },
     });
     await harness.waitForStable();
-    expect(state.localVars['落英/choice']).toBe(true);
+    expect(state.localVars['落英/selectedCards']).toEqual([]);
   });
 
   // ─── 端到端:弃置路径 ─────────────────────────
@@ -167,6 +167,33 @@ describe('界落英', () => {
     // P0 获得 c1
     expect(harness.state.players[0].hand).toContain('c1');
     expect(harness.state.zones.discardPile).not.toContain('c1');
+  });
+
+  it('端到端:两张梅花只选择其中一张获得', async () => {
+    const club1 = makeCard('c1', '杀', '♣', '7');
+    const club2 = makeCard('c2', '闪', '♣', '8');
+    const state: GameState = createGameState({
+      players: [
+        makePlayer({ index: 0, name: 'P0', skills: ['界落英'] }),
+        makePlayer({ index: 1, name: 'P1', hand: ['c1', 'c2'], skills: [] }),
+      ],
+      cardMap: { c1: club1, c2: club2 },
+      currentPlayerIndex: 1,
+      phase: '出牌',
+      turn: { round: 1, phase: '出牌', vars: {} },
+    });
+    await harness.setup(state);
+    const P0 = harness.player('P0');
+
+    void applyAtom(harness.state, { type: '弃置', player: 1, cardIds: ['c1', 'c2'] });
+    await harness.waitForStable();
+    P0.expectPending('请求回应');
+    await P0.respond('界落英', { cardIds: ['c2'] });
+    await harness.waitForStable();
+
+    expect(harness.state.players[0].hand).toEqual(['c2']);
+    expect(harness.state.zones.discardPile).toContain('c1');
+    expect(harness.state.zones.discardPile).not.toContain('c2');
   });
 
   it('端到端:其他玩家弃置 ♣牌 → 取消 → 牌留弃牌堆', async () => {

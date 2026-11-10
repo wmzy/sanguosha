@@ -564,10 +564,16 @@ describe('化身(界左慈)', () => {
     await ZUO.respond('化身', { option: '1' });
     await harness.waitForStable();
     harness.processAllEvents();
+    ZUO.expectPending('请求回应');
+    const removedCharacter = poolBefore[(litBefore + 1) % poolBefore.length];
+    await ZUO.respond('化身', { option: removedCharacter });
+    await harness.waitForStable();
+    harness.processAllEvents();
 
     // 池大小不变(3 - 1 + 1 = 3)
     const poolAfter = harness.state.players[0].vars['化身/牌池'] as string[];
     expect(poolAfter.length).toBe(3);
+    expect(poolAfter).not.toContain(removedCharacter);
     // 展示的武将牌仍然保留
     const litAfter = harness.state.players[0].vars['化身/亮出'] as number;
     expect(poolAfter[litAfter]).toBe(displayedCharBefore);
@@ -622,10 +628,20 @@ describe('化身(界左慈)', () => {
     await ZUO.respond('化身', { option: '2' });
     await harness.waitForStable();
     harness.processAllEvents();
+    ZUO.expectPending('请求回应');
+    const removedCharacters = poolBefore.filter((_, index) => index !== litBefore).slice(0, 2);
+    await ZUO.respond('化身', { option: removedCharacters[0] });
+    await harness.waitForStable();
+    harness.processAllEvents();
+    ZUO.expectPending('请求回应');
+    await ZUO.respond('化身', { option: removedCharacters[1] });
+    await harness.waitForStable();
+    harness.processAllEvents();
 
     // 池大小不变(3 - 2 + 2 = 3)
     const poolAfter = harness.state.players[0].vars['化身/牌池'] as string[];
     expect(poolAfter.length).toBe(3);
+    for (const removedCharacter of removedCharacters) expect(poolAfter).not.toContain(removedCharacter);
     // 展示的武将牌仍然保留
     const litAfter = harness.state.players[0].vars['化身/亮出'] as number;
     expect(poolAfter[litAfter]).toBe(displayedCharBefore);

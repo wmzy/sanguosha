@@ -11,6 +11,7 @@ import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
 import { slashUnlimitedKey } from '../rules/vars-keys';
+import { isSkillSuppressed } from '../core/skill-suppression';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '咆哮', description: '锁定技:出牌阶段使用【杀】无次数限制', isLocked: true };
@@ -19,7 +20,11 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
   // 后端权威:注册无限出杀提供者,返回 true → slashMax = ∞ → 可无限出杀。
-  const unregMax = registerSlashUnlimitedProvider(state, ownerId, () => true);
+  const unregMax = registerSlashUnlimitedProvider(
+    state,
+    ownerId,
+    (current, player) => !isSkillSuppressed(current, player, skill.id),
+  );
   // view 同步:咆哮是锁定技整局常驻,在拥有者每个出牌阶段开始时把 '杀/unlimited/咆哮'
   // 投影到 view.turnUsage(回合结束自动清空)。前端/MCP 客户端的 viewSlashMax 据此推断
   // 无限出杀;缺失则首次出杀后(usedCount=1 ≥ max 1)viewCanSlash 误判为 false,

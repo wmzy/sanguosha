@@ -18,6 +18,9 @@ import { reportBugResult, type ReportBugInput } from './feedbackHandler';
 import { getSkillDescriptionAsync } from '../engine/skills/lifecycle';
 import type { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
 import type { ClientMessage as EngineClientMessage } from '../engine/types';
+import { PLAYER_INSTRUCTIONS, type ArenaPlayerSession } from '../arena/player';
+import { resolveDecision } from '../arena/decision';
+import type { ArenaDecision } from '../arena/types';
 
 const PROTOCOL_VERSION = '2024-11-05';
 
@@ -110,10 +113,17 @@ export const PLAY_TOOL = {
     '首次调用前必须先用 createRoom / joinRoom / spectateRoom 启动；' +
     '启动后持续调用 play（不带 action = 纯等待 / 推进 lobby→playing）。' +
     '默认无限等待（不轮询）；可选 waitTimeoutMs 设等待上限。' +
-    'action 从上次返回的 availableActions 取一条。',
+    '优先从 observation.actions 用 actionId + decisionId 提交，附 memory 与 strategySummary 保存自己的记忆和简短策略说明；' +
+    'publicSpeech 用于公开发言。旧 action 参数仍可从 availableActions 取一条。',
   inputSchema: {
     type: 'object' as const,
     properties: {
+      actionId: { type: 'string', description: '从上次 observation.actions 选择的编号；与 action 二选一' },
+      decisionId: { type: 'string', description: '上次 observation.decisionId' },
+      params: { type: 'object', description: '可选：覆盖所选动作的目标、弃牌、top/bottom 等参数' },
+      memory: { type: 'string', description: '仅本玩家保存的持续记忆，不广播给其他玩家' },
+      strategySummary: { type: 'string', description: '本次简短策略说明，写入本玩家私有日志' },
+      publicSpeech: { type: 'string', description: '可选：发送给所有玩家的公开发言，最多30字' },
       action: {
         type: 'object',
         description: '要执行的操作（从上次返回的 availableActions 取）',
@@ -222,6 +232,7 @@ export interface SpectateRoomOpts {
 // ──────────────────────────────────────────────────────────────────────────
 
 export interface McpHandlerContext {
+  arena?: ArenaPlayerSession;
   hgc: HeadlessGameClient;
   /** 建房做房主（幂等：重复调用且角色相同为 no-op；角色不同抛错） */
   doCreateRoom: (opts: CreateRoomOpts) => Promise<void>;
@@ -355,7 +366,7 @@ interface StartupResult {
   phase: 'lobby' | 'playing' | 'ended';
 }
 
-function startupResult(hgc: HeadlessGameClient, role: 'host' | 'guest' | 'spectator'): StartupResult {
+function startupResult(hgc: HeadlessGameClient, role: 'host' | 'guest' | 'spectator', arena?: ArenaPlayerSession): StartupResult {
   const phase: StartupResult['phase'] =
     hgc.phase === 'ended' ? 'ended' : hgc.phase === 'playing' ? 'playing' : 'lobby';
   return {
@@ -365,6 +376,7 @@ function startupResult(hgc: HeadlessGameClient, role: 'host' | 'guest' | 'specta
     isHost: role === 'host',
     joinedAs: role,
     phase,
+    ...(arena ? { instructions: `${PLAYER_INSTRUCTIONS}\n你的风格：${arena.persona || '独立判断，合理争胜。'}`, memory: arena.memory } : {}),
   };
 }
 
@@ -430,11 +442,11 @@ export async function handleMcpRequest(
         // ── 启动工具 ──
         if (toolName === 'createRoom') {
           await ctx.doCreateRoom(parseCreateRoomOpts(params.arguments));
-          return okResponse(id, startupResult(ctx.hgc, 'host'));
+          return okResponse(id, startupResult(ctx.hgc, 'host', ctx.arena));
         }
         if (toolName === 'joinRoom') {
           await ctx.doJoinRoom(parseJoinRoomOpts(params.arguments));
-          return okResponse(id, startupResult(ctx.hgc, 'guest'));
+          return okResponse(id, startupResult(ctx.hgc, 'guest', ctx.arena));
         }
         if (toolName === 'spectateRoom') {
           await ctx.doSpectateRoom(parseSpectateRoomOpts(params.arguments));
@@ -444,7 +456,7 @@ export async function handleMcpRequest(
         // ── 只读辅助工具 ──
         if (toolName === 'getSnapshot') {
           const view = ctx.hgc.view ? projectView(ctx.hgc.view) : null;
-          return okResponse(id, { view });
+          return okResponse(id, { view, ...(ctx.arena ? { observation: await ctx.arena.observe(), memory: ctx.arena.memory } : {}) });
         }
         if (toolName === 'getSkillInfo') {
           const results = await getSkillInfoResult(params.arguments?.names);
@@ -481,20 +493,58 @@ export async function handleMcpRequest(
         }
         const args = asRecord(params.arguments);
         const action = normalizePlayAction(args['action']);
+        const observation = ctx.arena?.current;
+        const decision: ArenaDecision = {
+          actionId: optString(args, 'actionId') ?? 'legacy',
+          decisionId: optString(args, 'decisionId'),
+          params: args['params'] as ArenaDecision['params'],
+          memory: optString(args, 'memory'),
+          strategySummary: optString(args, 'strategySummary'),
+          publicSpeech: optString(args, 'publicSpeech'),
+        };
+        const message = decision.actionId !== 'legacy'
+          ? observation ? resolveDecision(observation, decision) : undefined
+          : action?.skillId ? { ...(action as EngineClientMessage), ownerId: action.ownerId ?? ctx.hgc.seatIndex } : undefined;
+        if (decision.actionId !== 'legacy' && !message) throw new Error('请先调用 play 或 getSnapshot 获取动作菜单');
+        const at = Date.now();
+        const stale = () => !!(ctx.arena && observation && !ctx.arena.isCurrent(observation));
+        const staleResponse = async () => {
+          if (ctx.arena && message) ctx.arena.record({
+            decisionId: observation!.decisionId, seq: observation!.seq, at, playerId: ctx.arena.playerId,
+            seat: ctx.hgc.seatIndex, decision, action: message, source: 'mcp', elapsedMs: Date.now() - at, result: 'stale',
+          });
+          return okResponse(id, { ...(await runPlay(ctx.hgc, { waitTimeoutMs: 500 })),
+            lastActionResult: 'rejected', staleDecision: true, recommendedAction: null,
+            observation: await ctx.arena!.observe(), memory: ctx.arena!.memory });
+        };
+        if (message && stale()) return staleResponse();
+        let speechError: string | undefined;
+        if (decision.publicSpeech?.trim()) {
+          try { await ctx.hgc.sendChat(decision.publicSpeech.trim().slice(0, 30)); }
+          catch (e) { speechError = e instanceof Error ? e.message : String(e); }
+        }
+        if (message && stale()) return staleResponse();
         const result = await runPlay(ctx.hgc, {
-          action: action?.skillId
-            ? {
-                message: {
-                  ...(action as EngineClientMessage),
-                  ownerId: action.ownerId ?? ctx.hgc.seatIndex,
-                },
-              }
-            : undefined,
+          action: message ? { message } : undefined,
           waitTimeoutMs: optNumber(args, 'waitTimeoutMs'),
           state: ctx.playState,
           lobbyAdvance: ctx.lobbyAdvance,
         });
-        return okResponse(id, result);
+        ctx.arena?.noteEvents(result.newLog);
+        if (ctx.arena && message) {
+          ctx.arena.record({
+            decisionId: observation?.decisionId ?? `${ctx.hgc.seatIndex}:${message.baseSeq}`,
+            seq: observation?.seq ?? message.baseSeq,
+            at, playerId: ctx.arena.playerId, seat: ctx.hgc.seatIndex,
+            decision, action: message, source: 'mcp', elapsedMs: Date.now() - at,
+            result: result.lastActionResult, error: speechError,
+          });
+        }
+        const nextObservation = ctx.arena ? await ctx.arena.observe() : undefined;
+        return okResponse(id, {
+          ...result,
+          ...(ctx.arena ? { recommendedAction: null, observation: nextObservation, memory: ctx.arena.memory } : {}),
+        });
       }
       default:
         return errorResponse(id, -32601, `method not found: ${req.method}`);

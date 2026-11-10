@@ -170,7 +170,7 @@ export async function runPlay(hgc: HeadlessGameClient, input: PlayInput): Promis
       // 兜底 deadline：默认 Infinity（Date.now() < Infinity 恒成立，永不触发），
       // 仅当调用方显式传 waitTimeoutMs 时生效，作为极端卡死的上限保护。
       if (Date.now() >= deadline) {
-        if (lastActionResult === 'accepted') lastActionResult = 'timeout';
+        // Reaching the observation wait limit after processing is not an action timeout.
         return settle();
       }
       setTimeout(tick, TICK_MS);

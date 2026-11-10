@@ -1,0 +1,42 @@
+{
+  "command": "pnpm test:all --reporter=json --outputFile=docs/qa/2026-11-09-skills-tests.json",
+  "success": true,
+  "files": 457,
+  "passedFiles": 457,
+  "failedFiles": 0,
+  "totalTests": 4137,
+  "passedTests": 4130,
+  "failedTests": 0,
+  "skippedTests": 7,
+  "skipped": [
+    {
+      "fullName": "选将流程集成 选将 pending 枚举出每个候选武将的 selectChar action，且 message shape 正确",
+      "status": "skipped"
+    },
+    {
+      "fullName": "选将流程集成 selectCharacter 发送 系统规则:选将 并被服务端接受",
+      "status": "skipped"
+    },
+    {
+      "fullName": "HeadlessGameClient 集成 createDebugRoom 后收到 room_joined（playerId/roomId 填充）",
+      "status": "skipped"
+    },
+    {
+      "fullName": "HeadlessGameClient 集成 phase 从 connecting 推进到 lobby",
+      "status": "skipped"
+    },
+    {
+      "fullName": "HeadlessGameClient 集成 已开局房间 sendReady → onError 收到明确错误",
+      "status": "skipped"
+    },
+    {
+      "fullName": "HeadlessGameClient 集成 connect() 加入已有房间后 phase 推进到 lobby",
+      "status": "skipped"
+    },
+    {
+      "fullName": "HeadlessGameClient 集成 playerId 含 # 时 connect 不串座（seatIndex 互不相同）",
+      "status": "skipped"
+    }
+  ],
+  "failures": []
+}

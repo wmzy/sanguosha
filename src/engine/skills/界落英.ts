@@ -11,9 +11,7 @@
 //     (判定牌在 frame.cards 末尾;若曹植获取,需从 frame.cards 拿走以防
 //      runJudgeFlow 收尾把它误移入弃牌堆——参考 屯田/天妒 的手法)
 //
-// 选择任意张:由于引擎 UI 限制(useCard cardFilter 仅呈现手牌),简化为"全得/全不得"
-//   的 confirm 询问。这偏离严格"任意张"语义,但满足"你可以获得"的触发选择;
-//   未触发的牌保持原位(弃置路径:已入弃牌堆;判定路径:由 runJudgeFlow 收尾入弃)。
+// 选择任意张:distribute/select 提供候选牌,允许选择其中 0..N 张。
 //
 // 关键点:
 //   - "其他角色": atom.player !== ownerId(判定/弃置的归属玩家不是曹植自己)
@@ -36,13 +34,20 @@ import {
   registerBeforeHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
+import { luoyingCardViewKey } from '../rules/vars-keys';
 
 const _SKILL_ID = '界落英';
 const DISPLAY_NAME = '落英';
 const CHOOSE_RT = '界落英/choose';
-const CHOICE_KEY = '落英/choice';
+const CHOICE_KEY = '落英/selectedCards';
 /** 回合外累计获得的"落英"牌数(供界酒诗翻回正面触发器读取)。在曹植回合开始时清零。 */
 const OUTSIDE_GAIN_COUNT_KEY = '落英/外得计数';
+const LIYING_CARD_IDS_KEY = '酒诗/落英牌';
+
+function liyingCardIds(state: GameState, ownerId: number): string[] {
+  const ids = state.players[ownerId]?.vars[LIYING_CARD_IDS_KEY];
+  return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [];
+}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -91,21 +96,25 @@ async function askAndGain(
     requestType: CHOOSE_RT,
     target: ownerId,
     prompt: {
-      type: 'confirm',
-      title: `落英:是否获得 ${clubCardIds.length} 张梅花牌?`,
-      confirmLabel: '获得',
-      cancelLabel: '不获得',
+      type: 'distribute',
+      mode: 'select',
+      title: `落英:选择获得 0 至 ${clubCardIds.length} 张梅花牌`,
+      cardIds: clubCardIds,
+      minTotal: 0,
+      maxTotal: clubCardIds.length,
     },
-    defaultChoice: false,
     timeout: 10,
   });
 
-  const want = state.localVars[CHOICE_KEY] === true;
+  const choice = state.localVars[CHOICE_KEY];
   delete state.localVars[CHOICE_KEY];
-  if (!want) return 0;
+  const selectedIds = Array.isArray(choice)
+    ? (choice as string[]).filter((id) => clubCardIds.includes(id))
+    : choice === true ? clubCardIds : [];
+  if (selectedIds.length === 0) return 0;
 
   let gained = 0;
-  for (const cardId of clubCardIds) {
+  for (const cardId of selectedIds) {
     // 卡可能在询问期间被其他技能移走(理论),再次校验仍在原区
     if (fromZone === '弃牌堆') {
       if (!state.zones.discardPile.includes(cardId)) continue;
@@ -125,6 +134,9 @@ async function askAndGain(
         to: { zone: '手牌', player: ownerId },
       });
     }
+    const tracked = liyingCardIds(state, ownerId);
+    state.players[ownerId].vars[LIYING_CARD_IDS_KEY] = [...new Set([...tracked, cardId])];
+    await applyAtom(state, { type: '回合用量', player: ownerId, key: luoyingCardViewKey(cardId), value: true });
     gained += 1;
   }
   return gained;
@@ -189,15 +201,27 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (s) => {
+    (s, params) => {
       const slot = s.pendingSlots.get(ownerId);
       if (slot?.atom.type !== '请求回应') return '当前不需要回应';
       const rt = (slot.atom as unknown as { requestType?: string }).requestType;
       if (rt !== CHOOSE_RT) return '当前不是落英选择';
+      const prompt = (slot.atom as unknown as { prompt?: { cardIds?: string[] } }).prompt;
+      if (Array.isArray(params.cardIds)) {
+        const candidates = prompt?.cardIds ?? [];
+        if (params.cardIds.some((id) => typeof id !== 'string' || !candidates.includes(id))) return '只能选择候选梅花牌';
+      } else if (typeof params.choice !== 'boolean') {
+        return '请选择要获得的梅花牌';
+      }
       return null;
     },
     async (s, params) => {
-      s.localVars[CHOICE_KEY] = params.choice === true;
+      if (Array.isArray(params.cardIds)) s.localVars[CHOICE_KEY] = params.cardIds;
+      else {
+        const slot = s.pendingSlots.get(ownerId);
+        const candidates = (slot?.atom as unknown as { prompt?: { cardIds?: string[] } } | undefined)?.prompt?.cardIds ?? [];
+        s.localVars[CHOICE_KEY] = params.choice === true ? candidates : [];
+      }
     },
   );
 
@@ -249,6 +273,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const self = ctx.state.players[ownerId];
       if (!self) return;
       delete self.vars[OUTSIDE_GAIN_COUNT_KEY];
+      for (const cardId of liyingCardIds(ctx.state, ownerId)) {
+        if (self.hand.includes(cardId)) {
+          await applyAtom(ctx.state, { type: '回合用量', player: ownerId, key: luoyingCardViewKey(cardId), value: true });
+        }
+      }
     },
   );
 
@@ -260,10 +289,8 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     label: DISPLAY_NAME,
     style: 'default',
     prompt: {
-      type: 'confirm',
-      title: '是否发动落英?',
-      confirmLabel: '获得',
-      cancelLabel: '不获得',
+      type: 'distribute',
+      title: '选择获得任意张梅花牌',
     },
   });
   return undefined;

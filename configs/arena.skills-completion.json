@@ -1,0 +1,13 @@
+{
+  "name": "现有武将技能补全普通AI对局验收",
+  "serverUrl": "http://127.0.0.1:3930",
+  "timeoutSec": 1,
+  "maxDurationMs": 180000,
+  "maxDecisions": 1500,
+  "charPool": "all",
+  "players": [
+    { "id": "skill-a", "name": "技能验收甲", "mode": "heuristic" },
+    { "id": "skill-b", "name": "技能验收乙", "mode": "heuristic" },
+    { "id": "skill-c", "name": "技能验收丙", "mode": "heuristic" }
+  ]
+}

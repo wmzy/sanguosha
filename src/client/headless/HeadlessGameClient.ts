@@ -588,7 +588,10 @@ export class HeadlessGameClient {
 
   needsAction(): boolean {
     const v = this._view;
-    if (!v?.pending) {
+    if (!v) return false;
+    const me = v.players[this._seatIndex];
+    if (me && !me.alive) return false;
+    if (!v.pending) {
       this._skippedBroadcastDeadline = null;
       return false;
     }
@@ -623,6 +626,8 @@ export class HeadlessGameClient {
   getAvailableActions(): AvailableAction[] {
     const v = this._view;
     if (!v) return [];
+    const me = v.players[this._seatIndex];
+    if (me && !me.alive) return [];
     // debug 模式:pending 可能属于其他座次,用 pending.target 作为操作座次
     const actionSeat = this._debugMode && v.pending && v.pending.target >= 0
       ? v.pending.target
@@ -817,6 +822,17 @@ export class HeadlessGameClient {
     // 通用回应（出闪/出杀/确认发动等）
     const info = resolvePendingRespond(pending, skillActions);
     if (info?.skillId) {
+      if (pending.prompt?.type === 'chooseSuit') {
+        for (const suit of ['♠', '♥', '♣', '♦']) {
+          out.push({
+            description: `选择花色 ${suit}`,
+            message: { skillId: info.skillId, actionType: 'respond', ownerId,
+              params: { suit }, baseSeq: 0 },
+            validTargets: [], category: 'respond',
+          });
+        }
+        return;
+      }
       // choosePlayer 类（突袭/激将/奋威 等）：用引擎注入的可序列化 candidates
       // （filter 跨进程序列化丢失，不能依赖）。单选逐候选生成独立 action；
       // 多选生成一个描述性 action，agent 需填 targets。
@@ -881,7 +897,7 @@ export class HeadlessGameClient {
             },
             validTargets,
             category: 'respond',
-            ...(min > 1 ? { minTarget: min } : {}),
+            ...(min !== 1 ? { minTarget: min } : {}),
             maxTarget: max,
           });
         }
@@ -919,18 +935,29 @@ export class HeadlessGameClient {
         const equip = (me?.equipment ?? {}) as Partial<Record<string, string>>;
         if (mode === 'select') {
           const requestType = (pending.atom as { requestType?: string }).requestType;
-          if (requestType === '观星/arrange') {
-            // 观星的 distribute 契约不是 cardIds，而是 { top, bottom }。默认「全留顶、
-            // 保持原顺序」：top[0]=最先摸到=牌堆顶，因此 top 是 observed 的逆序；
-            // 这样整理牌堆后顺序不变，是无需 LLM 补参的可执行动作。
+          if (
+            requestType === '观星/arrange' ||
+            requestType === '界观星/arrange' ||
+            requestType === '界恂恂/arrange'
+          ) {
+            // 观星系技能的契约是 { top, bottom }，top[0] 为最先摸到的牌。
+            // observed 按牌堆底到顶排列，因此逆序才是摸牌顺序。
             const observed = distPrompt.cardIds ?? [];
+            const topCount = requestType === '界恂恂/arrange'
+              ? Math.min(2, observed.length)
+              : observed.length;
+            const top = [...observed].reverse().slice(0, topCount);
+            const topSet = new Set(top);
+            const bottom = observed.filter((cardId) => !topSet.has(cardId));
             out.push({
-              description: `发动【${info.skillId}】（观星：全部留在牌堆顶，保持原顺序）`,
+              description: requestType === '界恂恂/arrange'
+                ? `发动【${info.skillId}】（恂恂：顶置 ${topCount} 张，其余置底）`
+                : `发动【${info.skillId}】（观星：全部留在牌堆顶，保持原顺序）`,
               message: {
                 skillId: info.skillId,
                 actionType: 'respond',
                 ownerId,
-                params: { top: [...observed].reverse(), bottom: [] },
+                params: { top, bottom },
                 baseSeq: 0,
               },
               validTargets: [],
@@ -941,7 +968,7 @@ export class HeadlessGameClient {
           // 候选可凑足下限时才生成 distribute（否则只 skip）；params.cardIds 留空由
           // agent/LLM 补全——与主动 distribute（enumerateDistributeActions 制衡）一致，
           // 避免对不同技能（神速②需装备、观星需排列）预填出非法 cardIds。
-          const candidateIds = resolveDistributeCardIds(distPrompt, me?.hand ?? [], equip);
+          const candidateIds = resolveDistributeCardIds(distPrompt, me?.hand ?? [], equip, view.cardMap);
           const minTotal = distPrompt.minTotal ?? 1;
           if (candidateIds.length >= minTotal) {
             out.push({
@@ -953,7 +980,7 @@ export class HeadlessGameClient {
                 actionType: 'respond',
                 ownerId,
                 // 预填可执行的下限选择，避免 agent 原样提交空 cardIds 被拒。
-                params: { cardIds: candidateIds.slice(0, Math.max(minTotal, 1)) },
+                params: { cardIds: candidateIds.slice(0, Math.min(distPrompt.maxTotal ?? Infinity, Math.max(minTotal, 1))) },
                 baseSeq: 0,
               },
               validTargets: [],

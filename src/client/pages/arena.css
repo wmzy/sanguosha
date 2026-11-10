@@ -1,0 +1,1935 @@
+/* 观众牌桌沿用游戏画布缩放，所有尺寸均为 900px 设计高度下的逻辑尺寸。 */
+.arena-page {
+  --arena-gold: #c6a565;
+  --arena-ink: #e9ddc2;
+  width: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #0d1010;
+  color: var(--arena-ink);
+  font-family: 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+}
+.arena-page *,
+.arena-inspect * {
+  box-sizing: border-box;
+}
+.arena-page button,
+.arena-inspect button {
+  font: inherit;
+  cursor: pointer;
+}
+.arena-page button:focus-visible,
+.arena-page a:focus-visible,
+.arena-inspect button:focus-visible {
+  outline: 2px solid #f4d88c;
+  outline-offset: 3px;
+}
+.arena-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #171b1c;
+}
+.arena-topbar {
+  height: 66px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 28px;
+  z-index: 20;
+  border-bottom: 2px solid #715a35;
+  box-shadow: 0 4px 16px #0008;
+  background: linear-gradient(#282b28, #111514 85%);
+}
+.arena-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #e6c889;
+  font:
+    bold 24px 'KaiTi',
+    'STKaiti',
+    serif;
+  letter-spacing: 4px;
+  white-space: nowrap;
+}
+.arena-brand small {
+  display: block;
+  font:
+    9px 'Microsoft YaHei',
+    sans-serif;
+  letter-spacing: 5px;
+  color: #8f8c7d;
+  margin-top: 3px;
+}
+.arena-seal {
+  color: #eed6a7;
+  background: #772c23;
+  border: 1px solid #ba8250;
+  box-shadow:
+    inset 0 0 0 3px #331e1b,
+    0 2px 8px #000;
+  font:
+    30px 'KaiTi',
+    serif;
+  width: 40px;
+  height: 42px;
+  text-align: center;
+  line-height: 40px;
+  letter-spacing: 0;
+  transform: rotate(-4deg);
+}
+.arena-match-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+  min-width: 0;
+}
+.arena-match-heading strong {
+  font:
+    17px 'KaiTi',
+    'STKaiti',
+    serif;
+  letter-spacing: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arena-match-heading > span {
+  color: #a59e87;
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+.arena-tools {
+  display: flex;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.arena-tools button,
+.arena-dock header button {
+  border: 1px solid #6b593c;
+  border-radius: 2px;
+  color: #cbb98e;
+  background: linear-gradient(#323329, #20231f);
+  padding: 7px 12px;
+  font-size: 12px;
+  box-shadow: inset 0 0 0 1px #0c100b;
+}
+.arena-tools button:hover,
+.arena-tools button[aria-expanded='true'] {
+  color: #f8e6af;
+  border-color: #c6a565;
+  background: #46422d;
+}
+.arena-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: radial-gradient(ellipse at 50% 40%, #39403a, #171f20 75%);
+}
+.arena-table {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 50% 70% at 50% 45%, #3a4434a8, #152021c9 80%),
+    var(--arena-backdrop, none) center / cover;
+}
+.arena-table::before,
+.arena-lobby::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    repeating-linear-gradient(0deg, #d7d8b303 0 1px, transparent 1px 4px),
+    radial-gradient(ellipse at center, transparent 30%, #070b0dd9 100%);
+  pointer-events: none;
+}
+.arena-table-rim {
+  position: absolute;
+  inset: 14px;
+  border: 1px solid #ad91592c;
+  outline: 1px solid #ad91591a;
+  outline-offset: 6px;
+  clip-path: polygon(0 0, 12% 0, 12% 1px, 88% 1px, 88% 0, 100% 0, 100% 100%, 0 100%);
+  pointer-events: none;
+}
+.arena-table-watermark {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  color: #d4c18f0b;
+  font:
+    bold 100px 'KaiTi',
+    'STKaiti',
+    serif;
+  letter-spacing: 12px;
+  white-space: nowrap;
+  user-select: none;
+}
+.arena-table-watermark small {
+  display: block;
+  font-size: 15px;
+  letter-spacing: 10px;
+  text-align: center;
+}
+.arena-round {
+  position: absolute;
+  top: 25px;
+  left: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #aa9d7e;
+  font-size: 11px;
+}
+.arena-round > span {
+  border-left: 2px solid #a88e57;
+  padding-left: 7px;
+  letter-spacing: 3px;
+}
+.arena-round b {
+  color: #d9c89c;
+  font:
+    21px 'KaiTi',
+    serif;
+  margin-top: 3px;
+}
+.arena-round small {
+  color: #777f75;
+}
+.arena-center {
+  position: absolute;
+  top: 48%;
+  left: 50%;
+  width: 360px;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+.arena-turn-banner {
+  padding: 12px 30px;
+  background: linear-gradient(90deg, transparent, #181a12bc 30% 70%, transparent);
+  border-image: linear-gradient(90deg, transparent, #ac8f51aa, transparent) 1;
+  border-width: 1px 0;
+  border-style: solid;
+}
+.arena-turn-banner > span {
+  display: block;
+  font-size: 11px;
+  color: #b5ad91;
+  letter-spacing: 7px;
+  margin-bottom: 6px;
+}
+.arena-turn-banner strong {
+  color: #e8ce8b;
+  font:
+    28px 'KaiTi',
+    'STKaiti',
+    serif;
+  letter-spacing: 5px;
+  text-shadow: 0 2px 6px #000;
+}
+.arena-center-cards {
+  min-height: 125px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+}
+.arena-center-cards .arena-card-large {
+  width: 78px;
+  height: 112px;
+  flex-shrink: 0;
+}
+.arena-center-empty {
+  font:
+    15px 'KaiTi',
+    serif;
+  letter-spacing: 7px;
+  color: #91957b75;
+}
+.arena-piles {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  align-items: center;
+  color: #a49e86;
+  font-size: 11px;
+}
+.arena-piles b {
+  color: #e4d2a4;
+  font:
+    17px Georgia,
+    serif;
+  margin-left: 5px;
+}
+.arena-piles > i {
+  height: 15px;
+  width: 1px;
+  background: #8073497a;
+}
+.arena-deck {
+  position: relative;
+  width: 27px;
+  height: 37px;
+  transform: rotate(-8deg);
+  border: 1px solid #9f8a5b;
+  box-shadow:
+    2px 2px #aba18488,
+    4px 4px #181c18;
+}
+.arena-last-event {
+  margin: 12px 0 0;
+  color: #c2b79a;
+  font-size: 11px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.arena-seat {
+  position: absolute;
+  width: min(282px, 22%);
+  transform: translate(-50%, -50%);
+  padding: 0 8px 8px;
+  border: 1px solid #726349;
+  border-radius: 3px;
+  background: linear-gradient(120deg, #302f26f7, #161d1cf5 60%);
+  box-shadow:
+    0 8px 18px #0009,
+    inset 0 0 0 2px #111714,
+    inset 0 0 0 3px #c6a56513;
+}
+.arena-seat.is-active {
+  border-color: #ffd700;
+  box-shadow:
+    0 0 0 2px #ffe57f,
+    0 0 28px rgba(255, 215, 0, 0.5),
+    0 8px 18px #0009;
+}
+.arena-seat.is-targeting-source {
+  border-color: #ffe082 !important;
+  box-shadow:
+    0 0 0 2px #fff8e1,
+    0 0 35px rgba(255, 224, 130, 0.8),
+    0 8px 20px #000c !important;
+  animation: casterSourceGlow 1.2s infinite alternate ease-in-out;
+}
+@keyframes casterSourceGlow {
+  0% {
+    box-shadow:
+      0 0 0 2px #ffe082,
+      0 0 20px rgba(255, 224, 130, 0.5),
+      0 8px 18px #0009;
+  }
+  100% {
+    box-shadow:
+      0 0 0 3px #fff8e1,
+      0 0 38px rgba(255, 224, 130, 0.95),
+      0 8px 22px #000c;
+  }
+}
+.arena-seat.is-target-locked,
+.arena-seat.seat-target-pulse {
+  border-color: #ff4757;
+  animation: seatTargetPulse 0.9s infinite alternate ease-in-out;
+}
+@keyframes seatTargetPulse {
+  0% {
+    border-color: #ff4757;
+    box-shadow:
+      0 0 0 1px #ff4757,
+      0 0 16px rgba(255, 71, 87, 0.5),
+      0 8px 18px #0009;
+  }
+  100% {
+    border-color: #ff6b81;
+    box-shadow:
+      0 0 0 3px #ff6b81,
+      0 0 32px rgba(255, 71, 87, 0.9),
+      0 8px 18px #0009;
+  }
+}
+.arena-targeting-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 22;
+}
+.arena-target-line {
+  animation: targetLineFlow 1s linear infinite;
+}
+.arena-target-line.is-chain {
+  animation: targetChainLineFlow 0.8s linear infinite;
+}
+.arena-target-arrowhead {
+  will-change: filter, opacity;
+  animation: arrowheadPulse 0.9s ease-in-out infinite alternate;
+}
+.arena-target-arrowhead.is-chain {
+  animation: chainArrowheadPulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes arrowheadPulse {
+  0% {
+    opacity: 0.85;
+    filter: drop-shadow(0 0 3px #ff4757);
+  }
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 8px #ff6b81);
+  }
+}
+@keyframes chainArrowheadPulse {
+  0% {
+    opacity: 0.85;
+    filter: drop-shadow(0 0 4px #0284c7);
+  }
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 10px #38bdf8);
+  }
+}
+.arena-target-reticle {
+  animation: targetReticleSpin 4s linear infinite;
+  transform-origin: center;
+}
+@keyframes targetReticleSpin {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 8;
+  }
+}
+@keyframes targetLineFlow {
+  from {
+    stroke-dashoffset: 5;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes targetChainLineFlow {
+  from {
+    stroke-dashoffset: 6;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.arena-target-self-ring {
+  animation: targetSelfRingPulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes targetSelfRingPulse {
+  from {
+    r: 4;
+    stroke-opacity: 0.5;
+  }
+  to {
+    r: 5.5;
+    stroke-opacity: 1;
+  }
+}
+
+/* ================= 铁索连环实体粗铁链覆层 (Task 2) ================= */
+.arena-iron-chain-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+  border-radius: 4px;
+}
+.arena-iron-chain-overlay.is-locked {
+  animation: ironChainLockIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes ironChainLockIn {
+  0% {
+    opacity: 0;
+    transform: scale(1.12);
+    filter: brightness(2.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+.arena-iron-chain-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.arena-iron-chain-pulse {
+  animation: ironChainFlow 1.6s linear infinite;
+}
+@keyframes ironChainFlow {
+  0% {
+    stroke-dashoffset: 20;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+.arena-chain-core-pulse {
+  animation: ironLockCorePulse 1.4s ease-in-out infinite alternate;
+}
+@keyframes ironLockCorePulse {
+  0% {
+    r: 2.8;
+    opacity: 0.75;
+  }
+  100% {
+    r: 3.6;
+    opacity: 1;
+  }
+}
+.arena-iron-chain-overlay.is-breaking .arena-chain-diagonal-1 {
+  animation: ironChainBreakD1 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  transform-origin: 30% 30%;
+}
+.arena-iron-chain-overlay.is-breaking .arena-chain-diagonal-2 {
+  animation: ironChainBreakD2 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  transform-origin: 70% 30%;
+}
+.arena-iron-chain-overlay.is-breaking .arena-chain-lock-center {
+  animation: ironLockBreak 0.55s ease-out forwards;
+}
+@keyframes ironChainBreakD1 {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+    filter: brightness(1);
+  }
+  30% {
+    transform: translate(-6px, -6px) rotate(-8deg);
+    filter: brightness(2.5);
+  }
+  100% {
+    transform: translate(-36px, -36px) rotate(-28deg);
+    opacity: 0;
+  }
+}
+@keyframes ironChainBreakD2 {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+    opacity: 1;
+    filter: brightness(1);
+  }
+  30% {
+    transform: translate(6px, -6px) rotate(8deg);
+    filter: brightness(2.5);
+  }
+  100% {
+    transform: translate(36px, -36px) rotate(28deg);
+    opacity: 0;
+  }
+}
+@keyframes ironLockBreak {
+  0% {
+    transform: translate(50px, 50px) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  35% {
+    transform: translate(50px, 50px) scale(1.6) rotate(45deg);
+    filter: brightness(3.5);
+  }
+  100% {
+    transform: translate(50px, 50px) scale(0.2) rotate(180deg);
+    opacity: 0;
+  }
+}
+.arena-spark-1 {
+  animation: sparkFly1 0.5s ease-out forwards;
+}
+.arena-spark-2 {
+  animation: sparkFly2 0.5s ease-out forwards;
+}
+.arena-spark-3 {
+  animation: sparkFly3 0.5s ease-out forwards;
+}
+.arena-spark-4 {
+  animation: sparkFly4 0.5s ease-out forwards;
+}
+@keyframes sparkFly1 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(-18px, -18px) scale(0); opacity: 0; }
+}
+@keyframes sparkFly2 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(18px, -18px) scale(0); opacity: 0; }
+}
+@keyframes sparkFly3 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(-18px, 18px) scale(0); opacity: 0; }
+}
+@keyframes sparkFly4 {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(18px, 18px) scale(0); opacity: 0; }
+}
+.arena-portrait.is-chained {
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.45), inset 0 0 10px rgba(2, 132, 199, 0.35);
+  border-color: #38bdf8;
+}
+.arena-flying-card-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 35;
+  perspective: 1000px;
+}
+.arena-flying-card {
+  position: absolute;
+  width: 78px;
+  height: 112px;
+  z-index: 28;
+  pointer-events: none;
+  border: 1px solid #e7bc62;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 0 25px rgba(244, 216, 140, 0.8), 0 8px 24px rgba(0, 0, 0, 0.7);
+  will-change: transform, left, top, opacity;
+  animation: arenaCardFlyIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes arenaCardFlyIn {
+  0% {
+    left: var(--fly-from-x, 50%);
+    top: var(--fly-from-y, 80%);
+    transform: translate(-50%, -50%) scale(0.65) rotate(-15deg);
+    opacity: 0.3;
+    box-shadow: 0 0 15px rgba(244, 216, 140, 0.5);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.18) rotate(6deg);
+    box-shadow: 0 0 35px rgba(244, 216, 140, 0.9), 0 0 60px rgba(212, 169, 75, 0.5);
+    opacity: 1;
+  }
+  100% {
+    left: var(--fly-to-x, 50%);
+    top: var(--fly-to-y, 48%);
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(244, 216, 140, 0.6);
+  }
+}
+
+/* 主动出牌轨迹：从座次飞入中央处理区 */
+.arena-flying-card.arena-flying-play {
+  animation: arenaFlyPlay 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes arenaFlyPlay {
+  0% {
+    left: var(--fly-from-x, 50%);
+    top: var(--fly-from-y, 80%);
+    transform: translate(-50%, -50%) perspective(600px) rotateY(-20deg) rotateZ(-12deg) scale(0.65);
+    opacity: 0.3;
+    box-shadow: 0 0 15px rgba(244, 216, 140, 0.5);
+  }
+  50% {
+    transform: translate(-50%, -50%) perspective(600px) rotateY(10deg) rotateZ(6deg) scale(1.18);
+    box-shadow: 0 0 35px rgba(244, 216, 140, 0.95), 0 0 60px rgba(212, 169, 75, 0.6);
+    opacity: 1;
+  }
+  100% {
+    left: var(--fly-to-x, 50%);
+    top: var(--fly-to-y, 48%);
+    transform: translate(-50%, -50%) perspective(600px) rotateY(0deg) rotateZ(0deg) scale(1);
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(244, 216, 140, 0.7);
+  }
+}
+
+/* 响应出牌轨迹：快速破空闪现飞入中央处理区 */
+.arena-flying-card.arena-flying-respond {
+  border-color: #64b5f6;
+  animation: arenaFlyRespond 0.5s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+}
+@keyframes arenaFlyRespond {
+  0% {
+    left: var(--fly-from-x, 50%);
+    top: var(--fly-from-y, 20%);
+    transform: translate(-50%, -50%) scale(0.7) rotate(15deg);
+    opacity: 0.4;
+    box-shadow: 0 0 20px rgba(100, 180, 255, 0.8);
+  }
+  45% {
+    transform: translate(-50%, -50%) scale(1.15) rotate(-4deg);
+    opacity: 1;
+    box-shadow: 0 0 35px rgba(130, 200, 255, 0.9), 0 0 50px rgba(255, 230, 120, 0.7);
+  }
+  100% {
+    left: var(--fly-to-x, 50%);
+    top: var(--fly-to-y, 48%);
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(100, 180, 255, 0.7);
+  }
+}
+
+/* 摸牌轨迹：从中央牌堆飞入目标玩家座次 */
+.arena-flying-card.arena-flying-draw {
+  animation: arenaFlyDraw 0.55s cubic-bezier(0.2, 0.8, 0.25, 1) forwards;
+}
+@keyframes arenaFlyDraw {
+  0% {
+    left: var(--fly-from-x, 50%);
+    top: var(--fly-from-y, 50%);
+    transform: translate(-50%, -50%) scale(0.9) rotate(0deg);
+    opacity: 0.7;
+    box-shadow: 0 0 15px rgba(244, 216, 140, 0.6);
+  }
+  40% {
+    transform: translate(-50%, -50%) scale(1.12) rotate(-8deg);
+    opacity: 1;
+    box-shadow: 0 0 30px rgba(244, 216, 140, 0.9);
+  }
+  100% {
+    left: var(--fly-to-x, 50%);
+    top: var(--fly-to-y, 82%);
+    transform: translate(-50%, -50%) scale(0.75) rotate(0deg);
+    opacity: 0.9;
+    box-shadow: 0 0 15px rgba(244, 216, 140, 0.5);
+  }
+}
+
+/* 顺手牵羊轨迹：从受害方座次弧线掠过飞入发起方座次 */
+.arena-flying-card.arena-flying-snatch {
+  border-color: #ffd700;
+  animation: arenaFlySnatch 0.58s cubic-bezier(0.25, 1, 0.35, 1) forwards;
+}
+@keyframes arenaFlySnatch {
+  0% {
+    left: var(--fly-from-x, 50%);
+    top: var(--fly-from-y, 20%);
+    transform: translate(-50%, -50%) scale(0.75) rotate(-10deg);
+    opacity: 0.5;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+  }
+  45% {
+    transform: translate(-50%, -50%) scale(1.2) rotate(12deg);
+    opacity: 1;
+    box-shadow: 0 0 40px rgba(255, 215, 0, 0.95), 0 0 70px rgba(255, 180, 0, 0.5);
+  }
+  100% {
+    left: var(--fly-to-x, 50%);
+    top: var(--fly-to-y, 82%);
+    transform: translate(-50%, -50%) scale(0.8) rotate(0deg);
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.7);
+  }
+}
+
+/* 过河拆桥与弃牌轨迹：从座次飞向中央弃牌堆并伴随消隐碎裂光效 */
+.arena-flying-card.arena-flying-discard {
+  animation: arenaFlyDiscard 0.55s cubic-bezier(0.25, 0.9, 0.3, 1) forwards;
+}
+@keyframes arenaFlyDiscard {
+  0% {
+    left: var(--fly-from-x, 50%);
+    top: var(--fly-from-y, 20%);
+    transform: translate(-50%, -50%) scale(0.8) rotate(0deg);
+    opacity: 1;
+    box-shadow: 0 0 15px rgba(255, 120, 100, 0.5);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.05) rotate(18deg);
+    opacity: 0.9;
+    box-shadow: 0 0 25px rgba(255, 100, 80, 0.75);
+  }
+  85% {
+    opacity: 0.5;
+    filter: brightness(1.6) blur(1px);
+  }
+  100% {
+    left: var(--fly-to-x, 50%);
+    top: var(--fly-to-y, 50%);
+    transform: translate(-50%, -50%) scale(0.35) rotate(45deg);
+    opacity: 0;
+    filter: brightness(2) blur(4px);
+    box-shadow: none;
+  }
+}
+.arena-portrait.is-hit {
+  animation: portraitHitShake 0.4s ease-out;
+}
+@keyframes portraitHitShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px) rotate(-2deg); }
+  40% { transform: translateX(5px) rotate(2deg); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+.arena-slash-blade {
+  position: absolute;
+  inset: -15px;
+  pointer-events: none;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: slashBladeFadeOut 0.8s ease-out forwards;
+}
+.arena-slash-svg {
+  width: 140%;
+  height: 140%;
+  overflow: visible;
+}
+.arena-slash-path {
+  transform-origin: center;
+  animation: slashBladeSweep 0.55s cubic-bezier(0.12, 0.9, 0.22, 1) forwards;
+}
+.arena-slash-core {
+  animation: slashBladeCoreGlow 0.55s ease-out forwards;
+}
+@keyframes slashBladeSweep {
+  0% {
+    opacity: 0;
+    transform: scale(0.25) rotate(-40deg) translate(-35px, 35px);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.15) rotate(0deg) translate(0, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.35) rotate(18deg) translate(25px, -25px);
+  }
+}
+@keyframes slashBladeCoreGlow {
+  0% { opacity: 0; }
+  25% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes slashBladeFadeOut {
+  0% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.arena-skill-toast {
+  position: absolute;
+  top: -36px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  z-index: 25;
+  pointer-events: none;
+  animation: skillToastPop 1.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.arena-skill-toast-inner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px;
+  background: linear-gradient(90deg, transparent, rgba(17, 21, 19, 0.96) 20% 80%, transparent);
+  border-image: linear-gradient(90deg, transparent, #c6a565, #ffd88a 50%, #c6a565, transparent) 1;
+  border-width: 1px 0;
+  border-style: solid;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 12px rgba(244, 216, 140, 0.35);
+}
+.arena-skill-toast-badge {
+  font-size: 10px;
+  background: #7a2b22;
+  color: #eed6a8;
+  padding: 1px 4px;
+  border-radius: 2px;
+  border: 1px solid #ba8250;
+  font-family: 'KaiTi', serif;
+}
+.arena-skill-toast-text {
+  color: #f7e7be;
+  font: bold 14px 'KaiTi', 'STKaiti', serif;
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px rgba(244, 216, 140, 0.6), 0 2px 4px #000;
+}
+@keyframes skillToastPop {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px) scale(0.9);
+  }
+  15% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1.05);
+  }
+  25% {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px) scale(0.95);
+  }
+}
+
+/* ================= 电影级水墨黑金技能大特写 (Task 3) ================= */
+.arena-grand-skill-banner {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(880px, 92vw);
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 60;
+  animation: grandSkillBannerIn 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.grand-skill-shockwave {
+  position: absolute;
+  inset: -30px -40px;
+  width: calc(100% + 80px);
+  height: calc(100% + 60px);
+  pointer-events: none;
+  z-index: -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.grand-skill-ink-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.grand-shockwave-wave.grand-wave-1 {
+  transform-origin: center;
+  animation: grandWavePulse 1.8s ease-out infinite;
+}
+.grand-shockwave-wave.grand-wave-2 {
+  transform-origin: center;
+  animation: grandWavePulse 1.8s ease-out 0.2s infinite;
+}
+.grand-ink-particle {
+  animation: grandParticleFlash 1.4s ease-in-out infinite alternate;
+}
+.grand-skill-banner-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 98px;
+  padding: 0 40px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(8, 9, 8, 0.8) 15%,
+    rgba(22, 18, 13, 0.96) 35% 65%,
+    rgba(8, 9, 8, 0.8) 85%,
+    transparent 100%
+  );
+  border-top: 2px solid;
+  border-bottom: 2px solid;
+  border-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #c6a565 25%,
+    #ffd700 50%,
+    #c6a565 75%,
+    transparent 100%
+  ) 1;
+  box-shadow:
+    0 0 35px rgba(0, 0, 0, 0.95),
+    0 0 50px rgba(212, 169, 75, 0.4),
+    inset 0 0 30px rgba(0, 0, 0, 0.8);
+}
+.grand-skill-avatar-wrap {
+  position: relative;
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.grand-skill-gold-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 3px solid #ffd700;
+  box-shadow:
+    0 0 20px rgba(255, 215, 0, 0.85),
+    inset 0 0 14px rgba(255, 215, 0, 0.6),
+    0 4px 14px #000;
+  pointer-events: none;
+  animation: grandGoldRingRotate 8s linear infinite;
+}
+.grand-skill-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 15%;
+  border: 1px solid #7c6843;
+}
+.grand-skill-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #5b4a32, #1a1e1b);
+  color: #ffd88a;
+  font: bold 32px 'KaiTi', serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #7c6843;
+}
+.grand-skill-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  margin-left: 28px;
+  flex: 1;
+  min-width: 0;
+}
+.grand-skill-top-tag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+.grand-skill-badge {
+  font-size: 11px;
+  background: linear-gradient(135deg, #8a2418, #5a140d);
+  color: #ffd88a;
+  border: 1px solid #d4a94b;
+  border-radius: 2px;
+  padding: 1px 7px;
+  font-family: 'KaiTi', serif;
+  letter-spacing: 1px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+.grand-skill-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #dcd0b3;
+  font-family: 'KaiTi', 'STKaiti', serif;
+}
+.grand-skill-faction {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 11px;
+  border-radius: 2px;
+  background: #59546b;
+  color: #eedcff;
+}
+.grand-skill-faction.faction-魏 { background: #314c68; color: #d6edff; }
+.grand-skill-faction.faction-蜀 { background: #69502b; color: #ffe6a0; }
+.grand-skill-faction.faction-吴 { background: #71352d; color: #ffd6cc; }
+.grand-skill-faction.faction-群 { background: #59546b; color: #eedcff; }
+
+.grand-skill-character-name {
+  color: #f7e6c0;
+  font-size: 14px;
+  letter-spacing: 2px;
+}
+.grand-skill-title-wrap {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+}
+.grand-skill-name {
+  margin: 0;
+  font-family: 'STKaiti', 'KaiTi', 'LiSu', serif;
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: 6px;
+  background: linear-gradient(180deg, #fffcf0 0%, #ffe082 28%, #e6a838 68%, #8a5712 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 4px #000) drop-shadow(0 0 18px rgba(255, 215, 0, 0.85));
+  line-height: 1.1;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+}
+.grand-skill-meta-desc {
+  font-size: 12px;
+  color: #d4c4a1;
+  font-family: 'KaiTi', serif;
+  letter-spacing: 2px;
+  margin-top: 2px;
+  opacity: 0.85;
+}
+.grand-skill-aura-bar {
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #ffd700 30% 70%, transparent);
+  box-shadow: 0 0 10px #ffd700;
+  pointer-events: none;
+}
+@keyframes grandSkillBannerIn {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.72);
+    filter: brightness(2.6) contrast(1.2);
+  }
+  14% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.05);
+    filter: brightness(1.3);
+  }
+  24% {
+    transform: translate(-50%, -50%) scale(1);
+    filter: brightness(1);
+  }
+  76% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    filter: brightness(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.08) translateY(-14px);
+    filter: brightness(1.5) blur(3px);
+  }
+}
+@keyframes grandGoldRingRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes grandWavePulse {
+  0% {
+    transform: scale(0.92);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.08);
+    opacity: 0;
+  }
+}
+@keyframes grandParticleFlash {
+  0% { opacity: 0.3; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1.4); }
+}
+.arena-seat-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 25px;
+  font-size: 10px;
+  color: #c2b394;
+  white-space: nowrap;
+  gap: 5px;
+}
+.arena-seat-topline > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.arena-seat-topline > span:last-child {
+  font-size: 9px;
+  color: #8c9787;
+  flex-shrink: 0;
+}
+.is-active .arena-seat-topline > span:last-child {
+  color: #f7d17b;
+}
+.arena-seat-body {
+  display: flex;
+  gap: 9px;
+  height: 109px;
+}
+.arena-portrait {
+  padding: 0;
+  position: relative;
+  width: 86px;
+  height: 109px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid #ae9054;
+  background: radial-gradient(ellipse at 50% 25%, #8d7d66, #2d3837);
+  color: #fff4d7;
+}
+.arena-portrait img {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  object-position: center 15%;
+}
+.arena-portrait::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, #0007, transparent 45%),
+    linear-gradient(0deg, #0b0e0ce6, transparent 40%);
+  pointer-events: none;
+}
+.arena-faction {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 23px;
+  height: 25px;
+  background: #61513c;
+  color: #ead6ad;
+  font:
+    17px 'KaiTi',
+    serif;
+  line-height: 25px;
+  box-shadow: 1px 1px 4px #000;
+  border-bottom: 1px solid #ba9a62;
+}
+.faction-魏 .arena-faction {
+  background: #314c68;
+}
+.faction-蜀 .arena-faction {
+  background: #69502b;
+}
+.faction-吴 .arena-faction {
+  background: #71352d;
+}
+.faction-群 .arena-faction {
+  background: #59546b;
+}
+.arena-general-name {
+  position: absolute;
+  z-index: 2;
+  bottom: 8px;
+  left: 8px;
+  font:
+    bold 22px 'KaiTi',
+    'STKaiti',
+    serif;
+  writing-mode: vertical-rl;
+  letter-spacing: 2px;
+  text-shadow:
+    1px 2px 2px #000,
+    0 0 4px #000;
+}
+.arena-identity {
+  position: absolute;
+  z-index: 3;
+  top: 5px;
+  right: 5px;
+  writing-mode: vertical-rl;
+  background: linear-gradient(#36342b, #181b18);
+  border: 1px solid #9c8a63;
+  color: #bfb69e;
+  padding: 4px 3px;
+  font:
+    bold 14px 'KaiTi',
+    serif;
+  letter-spacing: 1px;
+  box-shadow: 0 2px 4px #0009;
+}
+.identity-主公 {
+  color: #ffe1a0;
+  background: linear-gradient(#a0462a, #5c211b);
+  border-color: #d5ad65;
+}
+.identity-忠臣 {
+  background: #294d64;
+  color: #d6edff;
+}
+.identity-反贼 {
+  background: #385b38;
+  color: #def1bc;
+}
+.identity-内奸 {
+  background: #594367;
+  color: #eedcff;
+}
+.arena-seat-info {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #796747 transparent;
+}
+.arena-hp {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin: 0 0 7px;
+}
+.arena-hp > span {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.arena-hp i {
+  display: block;
+  width: 10px;
+  height: 14px;
+  border-radius: 65% 35% 60% 40%;
+  border: 1px solid #65624b;
+  background: #080d0a;
+  transform: rotate(12deg);
+}
+.arena-hp i.filled {
+  background: radial-gradient(circle at 30% 28%, #e8eea4, #81a345 36%, #304e22 80%);
+  border-color: #b4bd78;
+  box-shadow: 0 1px 3px #000;
+}
+.arena-hp b {
+  font:
+    17px Georgia,
+    serif;
+  color: #d1d9a3;
+  white-space: nowrap;
+}
+.arena-hp small {
+  color: #777e68;
+  font-size: 11px;
+}
+.arena-skills {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  margin-bottom: 7px;
+}
+.arena-skills > span {
+  border: 1px solid #8e785049;
+  background: linear-gradient(#4b4532, #292b23);
+  padding: 2px 5px;
+  font:
+    12px 'KaiTi',
+    serif;
+  color: #d8c698;
+  border-radius: 2px;
+}
+.arena-equip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.arena-equip-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(90deg, #75623c33, #1e242144);
+  border: 1px solid #b7a17033;
+  border-radius: 2px;
+  padding: 2px 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.arena-equip-slot:hover {
+  background: linear-gradient(90deg, #947e4e55, #2f383366);
+  border-color: #c6a56588;
+}
+.arena-equip-slot.is-equip-triggered {
+  border-color: #ffd700aa;
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.22), rgba(58, 46, 21, 0.45));
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.45);
+}
+.arena-equip-tag {
+  font-size: 9px;
+  background: #79633d66;
+  padding: 1px 4px;
+  color: #e5d2a8;
+  border-radius: 2px;
+  flex-shrink: 0;
+  font-family: 'KaiTi', serif;
+}
+.arena-equip-card {
+  position: relative;
+  width: 26px;
+  height: 35px;
+  flex-shrink: 0;
+  border: 1px solid #9c8553;
+  border-radius: 2px;
+  overflow: hidden;
+  background: #181d19;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s ease;
+}
+.arena-equip-card object {
+  pointer-events: none;
+}
+.arena-equip-card.is-equip-triggered {
+  border-color: #ffd700 !important;
+  animation: equipGoldPulse 1.5s ease-out;
+  box-shadow:
+    0 0 16px rgba(255, 215, 0, 0.95),
+    0 0 32px rgba(244, 216, 140, 0.7),
+    inset 0 0 8px rgba(255, 215, 0, 0.8) !important;
+  z-index: 25;
+}
+.arena-equip-bubble {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(38, 30, 18, 0.97), rgba(14, 16, 15, 0.98));
+  border: 1px solid #ffd700;
+  box-shadow:
+    0 0 12px rgba(255, 215, 0, 0.75),
+    0 3px 10px rgba(0, 0, 0, 0.9);
+  color: #fff2b8;
+  font-family: 'KaiTi', 'STKaiti', serif;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 35;
+  animation: equipBubblePop 1.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+@keyframes equipGoldPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 5px rgba(255, 215, 0, 0.4);
+  }
+  25% {
+    transform: scale(1.18);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.95), 0 0 36px rgba(255, 230, 100, 0.75);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.8);
+  }
+  75% {
+    transform: scale(1.05);
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  }
+}
+@keyframes equipBubblePop {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px) scale(0.85);
+  }
+  16% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1.08);
+  }
+  26% {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  76% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px) scale(0.92);
+  }
+}
+.arena-equip-slot:hover .arena-equip-card {
+  transform: scale(2.2);
+  transform-origin: left center;
+  z-index: 30;
+  border-color: #ffe6a0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.9), 0 0 8px rgba(244, 216, 140, 0.6);
+}
+.arena-equip-name {
+  font-size: 11px;
+  color: #e2d2ae;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.arena-empty-equip {
+  color: #6e7568;
+  font:
+    11px 'KaiTi',
+    serif;
+  letter-spacing: 2px;
+  margin-top: 3px;
+}
+.arena-judges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 5px;
+}
+.arena-judges > span {
+  color: #d5ad84;
+  font-size: 9px;
+  border: 1px solid #876d474d;
+  padding: 1px 3px;
+}
+.arena-hand-label {
+  margin: 6px 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #8d947e;
+  font-size: 9px;
+}
+.arena-hand-label b {
+  color: #c9c19f;
+  font-family: Georgia, serif;
+  margin-left: 3px;
+}
+.arena-hand-label button {
+  border: 0;
+  background: none;
+  color: #9a987d;
+  font-size: 9px;
+  padding: 0;
+}
+.arena-hand-label button:hover {
+  color: #ffe0a0;
+}
+.arena-hand {
+  height: 74px;
+  display: flex;
+  align-items: start;
+  position: relative;
+  padding-right: 0;
+}
+.arena-card {
+  position: relative;
+  padding: 0;
+  display: block;
+  width: 58px;
+  height: 82px;
+  flex-shrink: 0;
+  border: 1px solid #bca475;
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 1px 2px 4px #0008;
+  background: #ede0bc;
+  transition: transform 0.15s;
+}
+.arena-card > object {
+  pointer-events: none;
+}
+.arena-hand .arena-card {
+  width: 53px;
+  height: 74px;
+  margin-right: min(3px, calc((100% - 53px * var(--hand-count)) / max(1, var(--hand-count) - 1)));
+}
+.arena-hand .arena-card:last-child {
+  margin-right: 0;
+}
+.arena-hand .arena-card:hover {
+  transform: translateY(-14px) scale(1.15);
+  z-index: 10;
+  border-color: #ffe7a8;
+}
+.arena-no-hand {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 74px;
+  border: 1px dashed #8d876727;
+  font:
+    13px 'KaiTi',
+    serif;
+  letter-spacing: 5px;
+  color: #747b6b;
+}
+.arena-card-large {
+  width: 100px;
+  height: 144px;
+}
+.arena-seat.is-dead .arena-portrait img {
+  filter: grayscale(1) brightness(0.6);
+}
+.arena-seat.is-dead .arena-seat-info,
+.arena-seat.is-dead .arena-hand {
+  opacity: 0.65;
+}
+.arena-seat.is-dead {
+  border-color: #62604a;
+}
+.arena-dead-seal {
+  position: absolute;
+  z-index: 4;
+  top: 50%;
+  right: 7px;
+  border: 2px solid #9c4a38;
+  color: #ce6b50;
+  font:
+    bold 19px 'KaiTi',
+    serif;
+  padding: 3px;
+  writing-mode: vertical-rl;
+  transform: rotate(12deg);
+  text-shadow: 0 1px 3px #000;
+  background: #130d0b6b;
+}
+.arena-playback-bar {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 16px;
+  background: linear-gradient(180deg, #222923f5, #141b17f5);
+  border: 1px solid #7c6843;
+  border-radius: 4px;
+  box-shadow: 0 6px 20px #000000bb;
+  color: #dfd5bc;
+  font-size: 11px;
+  z-index: 15;
+  backdrop-filter: blur(4px);
+}
+.arena-playback-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.arena-playback-actions button {
+  padding: 4px 10px;
+  background: #2b352c;
+  border: 1px solid #6b5c3e;
+  border-radius: 3px;
+  color: #e5ddc5;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.arena-playback-actions button:hover {
+  background: #3e4d3f;
+  border-color: #d1b46a;
+  color: #fff;
+}
+.arena-play-btn {
+  background: #4a3818 !important;
+  border-color: #d4a94b !important;
+  color: #ffd88a !important;
+  font-weight: bold;
+}
+.arena-speed-btn {
+  color: #b5ba9c !important;
+  font-family: monospace;
+}
+.arena-scrubber {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 580px;
+}
+.arena-scrubber input[type='range'] {
+  flex: 1;
+  accent-color: #d4a94b;
+  cursor: pointer;
+  height: 4px;
+}
+.arena-scrubber-info {
+  white-space: nowrap;
+  font-size: 11px;
+  color: #b0ab94;
+}
+.arena-scrubber-info b {
+  color: #ffd88a;
+  font-family: Georgia, serif;
+}
+.arena-clean .arena-playback-bar {
+  display: none;
+}
+
+.arena-footer {
+  flex-shrink: 0;
+  height: 30px;
+  border-top: 1px solid #514a35;
+  background: #101613;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 25px;
+  color: #848773;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.arena-footer i {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  background: #91a06c;
+  border-radius: 50%;
+  margin-right: 7px;
+  box-shadow: 0 0 6px #91a06c77;
+}
+.arena-dock {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  right: 12px;
+  width: 330px;
+  background: linear-gradient(135deg, #2d3028fa, #121a17fc);
+  border: 1px solid #92794d;
+  box-shadow:
+    -12px 0 40px #0009,
+    inset 0 0 0 3px #0c130e;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+}
+.arena-dock > header {
+  padding: 12px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #78643e;
+}
+.arena-dock h2 {
+  margin: 0;
+  color: #d7bf85;
+  font:
+    21px 'KaiTi',
+    serif;
+  letter-spacing: 3px;
+}
+.arena-dock header button {
+  padding: 0 6px;
+  font-size: 20px;
+}
+.arena-dock-body {
+  overflow-y: auto;
+  padding: 8px 15px;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: #796747 transparent;
+}
+.arena-dock-body > a {
+  display: block;
+  text-decoration: none;
+  color: #d6c8a4;
+  padding: 13px 9px;
+  border-bottom: 1px solid #70644655;
+}
+.arena-dock-body > a.is-selected {
+  background: #b6995320;
+  border-left: 2px solid #c7a568;
+}
+.arena-dock-body strong {
+  display: block;
+  font-size: 13px;
+}
+.arena-dock-body small {
+  font-size: 10px;
+  color: #a89a78;
+}
+.arena-dock-body p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #b7b39e;
+  margin: 5px 0;
+}
+.arena-chat-line,
+.arena-log-line {
+  border-bottom: 1px solid #70644644;
+  padding: 10px 0;
+}
+.arena-chat-line b {
+  color: #dac18c;
+}
+.arena-log-line small {
+  color: #c3ad7c;
+}
+.arena-error {
+  position: absolute;
+  left: 50%;
+  top: 70px;
+  transform: translateX(-50%);
+  z-index: 40;
+  background: #682e26ee;
+  color: #f6d3b6;
+  border: 1px solid #b97c52;
+  padding: 8px 20px;
+  font-size: 12px;
+}
+.arena-inspect {
+  padding: 22px 26px;
+  width: min(900px, 90vw);
+  max-height: 85dvh;
+  color: #e5d6b5;
+  border: 1px solid #b2965e;
+  background: linear-gradient(130deg, #34372d, #121c18);
+  box-shadow:
+    0 20px 100px #000c,
+    inset 0 0 0 4px #111a13;
+  border-radius: 3px;
+  font-family: 'Microsoft YaHei', sans-serif;
+}
+.arena-inspect::backdrop {
+  background: #030806cc;
+  backdrop-filter: blur(5px);
+}
+.arena-inspect > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  border-bottom: 1px solid #857044;
+  margin-bottom: 22px;
+  padding-bottom: 15px;
+}
+.arena-inspect small {
+  font-size: 11px;
+  color: #a6a085;
+}
+.arena-inspect h2 {
+  margin: 8px 0 0;
+  font:
+    28px 'KaiTi',
+    serif;
+  letter-spacing: 4px;
+}
+.arena-inspect h2 span {
+  font-size: 14px;
+  border: 1px solid #947f54;
+  padding: 3px 7px;
+  margin-left: 12px;
+}
+.arena-inspect header button {
+  border: 0;
+  background: none;
+  color: #d5c79f;
+  font-size: 26px;
+}
+.arena-inspect-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.arena-inspect-note {
+  font-size: 11px;
+  color: #a29c85;
+  line-height: 1.9;
+  margin: 22px 0 0;
+}
+.arena-clean .arena-topbar {
+  opacity: 0.12;
+  transition: opacity 0.2s;
+}
+.arena-clean .arena-topbar:hover,
+.arena-clean .arena-topbar:focus-within {
+  opacity: 1;
+}
+.arena-clean .arena-footer {
+  visibility: hidden;
+}
+.arena-clean .arena-hand-label button {
+  visibility: hidden;
+}
+.arena-clean .arena-seat:hover .arena-hand-label button {
+  visibility: visible;
+}
+.arena-clean .arena-flying-card,
+.arena-clean .arena-targeting-svg,
+.arena-clean .arena-slash-blade,
+.arena-clean .arena-skill-toast,
+.arena-clean .arena-grand-skill-banner,
+.arena-clean .arena-equip-bubble {
+  display: none !important;
+}
+.arena-clean .arena-seat.is-target-locked,
+.arena-clean .arena-seat.seat-target-pulse,
+.arena-clean .arena-equip-card.is-equip-triggered,
+.arena-clean .arena-equip-slot.is-equip-triggered {
+  animation: none !important;
+}
+.arena-clean .arena-iron-chain-pulse,
+.arena-clean .arena-chain-core-pulse {
+  animation: none !important;
+}
+.arena-lobby {
+  position: relative;
+  isolation: isolate;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, #4d4c3055, #111a19 80%);
+}
+.arena-lobby-mark {
+  font:
+    bold 86px 'KaiTi',
+    serif;
+  color: #cbb783;
+  text-shadow: 0 5px 20px #0008;
+  letter-spacing: 14px;
+}
+.arena-lobby h1 {
+  font:
+    27px 'KaiTi',
+    serif;
+  letter-spacing: 5px;
+  margin: 15px 0 0;
+}
+.arena-lobby > p {
+  color: #92967d;
+  font-size: 12px;
+  margin: 16px 0 25px;
+}
+.arena-lobby-matches {
+  max-height: 370px;
+  width: 540px;
+  overflow-y: auto;
+}
+.arena-lobby-matches a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ded0a7;
+  text-decoration: none;
+  background: linear-gradient(90deg, #96824c18, #27322877);
+  border: 1px solid #8f7b484d;
+  padding: 14px 20px;
+  margin-bottom: 8px;
+}
+.arena-lobby-matches a:hover {
+  border-color: #c5a464;
+}
+.arena-lobby-matches small {
+  display: block;
+  color: #94977a;
+  font-size: 10px;
+  margin-top: 6px;
+}
+.arena-lobby-matches b {
+  font-size: 12px;
+  color: #b8a275;
+}
+@media (prefers-reduced-motion: reduce) {
+  .arena-page *,
+  .arena-inspect * {
+    transition: none !important;
+  }
+}
+@media (max-width: 600px) {
+  .arena-inspect {
+    padding: 16px;
+  }
+  .arena-inspect .arena-card-large {
+    width: 80px;
+    height: 115px;
+  }
+  .arena-inspect-cards {
+    gap: 8px;
+  }
+}

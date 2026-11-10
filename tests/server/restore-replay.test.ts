@@ -100,6 +100,34 @@ async function playThroughCharSelect(state: GameState, config: GameConfig): Prom
   for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
 }
 
+/** 出牌阶段开始时，思蜀新增的正常询问按不发动处理并记录 respond action。 */
+async function waitForPlayWindow(state: GameState): Promise<boolean> {
+  for (let i = 0; i < 300; i++) {
+    const playWindow = [...state.pendingSlots.values()].some(
+      (slot) => (slot.atom as { type?: string }).type === '出牌窗口',
+    );
+    if (playWindow) return true;
+
+    const prompt = [...state.pendingSlots.entries()].find(
+      ([, slot]) => (slot.atom as { requestType?: string }).requestType === '思蜀/发动',
+    );
+    if (prompt) {
+      const [ownerId] = prompt;
+      const result = await dispatch(state, {
+        skillId: '思蜀',
+        actionType: 'respond',
+        ownerId,
+        params: { choice: false },
+        baseSeq: state.seq,
+      });
+      await result.settle;
+      continue;
+    }
+    await sleep(10);
+  }
+  return false;
+}
+
 // ── session 层 harness(模拟服务端重启) ──
 function makeRoom(): Room {
   return {
@@ -217,8 +245,8 @@ describe('restore 重放交互式选将 actionLog', () => {
     if ([...state1.pendingSlots.values()].some((s) => (s.atom as { requestType?: string }).requestType === '界放权/trigger')) {
       void dispatch(state1, { skillId: '界放权', actionType: 'respond', ownerId: lordIdx, params: { choice: false }, baseSeq: state1.seq });
     }
-    // 等出牌窗口(界放权询问 respond 后,开局 execute resume 到出牌窗口)
-    for (let i = 0; i < 300 && ![...state1.pendingSlots.values()].some((s) => (s.atom as { type?: string }).type === '出牌窗口'); i++) await sleep(10);
+    // 等出牌窗口；若界若愚觉醒授予思蜀，则正常不发动并记录该 respond。
+    expect(await waitForPlayWindow(state1)).toBe(true);
     const playSlot = [...state1.pendingSlots.values()].find(
       (s) => (s.atom as { type?: string }).type === '出牌窗口',
     );
@@ -380,15 +408,7 @@ describe('restore 重放盲选 splice 与广播 skip', () => {
         baseSeq: state1.seq,
       });
     }
-    for (
-      let i = 0;
-      i < 300 &&
-      ![...state1.pendingSlots.values()].some(
-        (s) => (s.atom as { type?: string }).type === '出牌窗口',
-      );
-      i++
-    )
-      await sleep(10);
+    expect(await waitForPlayWindow(state1)).toBe(true);
     const attacker = lordIdx;
     const victim = (attacker + 1) % 4;
 
@@ -485,19 +505,6 @@ describe('restore 重放盲选 splice 与广播 skip', () => {
     expect(await waitForPlayWindow(state)).toBe(true);
     inject(state);
     await restore(state, config, [actionLog[useIdx - 1], ...actionLog.slice(useIdx)]);
-  }
-
-  async function waitForPlayWindow(state: GameState): Promise<boolean> {
-    for (let i = 0; i < 300; i++) {
-      if (
-        [...state.pendingSlots.values()].some(
-          (s) => (s.atom as { type?: string }).type === '出牌窗口',
-        )
-      )
-        return true;
-      await sleep(10);
-    }
-    return false;
   }
 
   it('顺手牵羊盲选+整理手牌:skip 记入日志,重放后偷到的牌与手牌序与原局一致(缺陷①②)', async () => {

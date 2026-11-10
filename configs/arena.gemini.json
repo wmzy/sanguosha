@@ -1,0 +1,17 @@
+{
+  "name": "Gemini 3.8 Flash 实战",
+  "timeoutSec": 45,
+  "decisionTimeoutMs": 30000,
+  "maxDurationMs": 300000,
+  "maxDecisions": 500,
+  "charPool": "standard",
+  "players": [
+    {
+      "id": "gemini",
+      "name": "Gemini3.8",
+      "mode": "api",
+      "api": { "protocol": "gemini", "model": "gemini-3.8-flash", "apiKeyEnv": "GEMINI_API_KEY", "maxOutputTokens": 1000 }
+    },
+    { "id": "baseline", "name": "基线玩家", "mode": "heuristic" }
+  ]
+}

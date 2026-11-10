@@ -150,7 +150,8 @@ export const fireAttackEffect: CardEffect = {
     type: 'useCardAndTarget',
     title: '火攻',
     cardFilter: { filter: (c: Card) => c.name === '火攻', min: 1, max: 1 },
-    targetFilter: { min: 1, max: 1, allowSelf: true },
+    targetFilter: { min: 1, max: 1, allowSelf: true,
+      filter: (view, target) => (view.players[target]?.handCount ?? 0) > 0 },
   },
   // respond 入口 UI：展示/弃牌窗口可选任意手牌（后端 validate 严格校验花色）
   respondPrompt: {

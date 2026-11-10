@@ -14,17 +14,20 @@
 //   - 觉醒技:整局一次,强制发动(条件满足即触发,不可不触发);换荣的张数由玩家选
 //   - 触发时机:文档「准备阶段」,挂在「阶段开始」phase='准备'
 //   - "等量":选 k 张手牌替换 k 张荣(1:1);可全换(k=荣数)或部分换,也可不换(k=0)
+//   - 荣实体牌存于征荣/实体荣暂存列表,不留在可重洗的弃牌堆。
 //   - "清侧"技能尚未实现:添加技能 atom 会把 '清侧' 加入 skills 列表;
 //     实例化由其 loader 决定(未注册则跳过,不影响觉醒其余效果)
 import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { RONG_PREFIX, rongCount } from './征荣';
+import { RONG_CARDS_KEY, RONG_PREFIX, rongCount } from './征荣';
 
 const AWAKENED_KEY = '鸿举/awakened';
-const REPLACE_RT = '鸿举/换荣';
-const REPLACE_KEY = '鸿举/换荣结果';
+const REPLACE_RONG_RT = '鸿举/换出荣';
+const REPLACE_HAND_RT = '鸿举/换入手牌';
+const REPLACE_RONG_KEY = '鸿举/换出荣结果';
+const REPLACE_HAND_KEY = '鸿举/换入牌结果';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -38,7 +41,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // respond:处理换荣的手牌选择(cardIds = 选中的手牌,可为空)
+  // respond:先选要换出的荣,再选等量手牌换入。
   registerAction(
     state,
     skill.id,
@@ -48,26 +51,38 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const slot = st.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as { type: string; requestType?: string };
-      if (atom.type !== '请求回应' || atom.requestType !== REPLACE_RT) {
+      if (atom.type !== '请求回应' || (atom.requestType !== REPLACE_RONG_RT && atom.requestType !== REPLACE_HAND_RT)) {
         return '当前不是鸿举换荣';
       }
       const cardIds = params.cardIds as string[] | undefined;
       if (Array.isArray(cardIds)) {
-        const hand = new Set(st.players[ownerId].hand);
         const seen = new Set<string>();
+        const marks = st.players[ownerId].marks.filter((m) => m.id.startsWith(RONG_PREFIX));
+        const rongIds = new Set(marks.map((m) => (m.payload as { cardId?: string } | undefined)?.cardId).filter((id): id is string => {
+          return typeof id === 'string' && (
+            (st.players[ownerId].vars[RONG_CARDS_KEY] as string[] | undefined)?.includes(id) === true ||
+            st.zones.discardPile.includes(id)
+          );
+        }));
+        const expected = atom.requestType === REPLACE_RONG_RT ? rongIds : new Set(st.players[ownerId].hand);
         for (const id of cardIds) {
           if (typeof id !== 'string') return 'cardId 必须为字符串';
-          if (!hand.has(id)) return '牌不在手牌中';
+          if (!expected.has(id)) return atom.requestType === REPLACE_RONG_RT ? '所选牌不是可替换的荣' : '牌不在手牌中';
           if (seen.has(id)) return '存在重复的牌';
           seen.add(id);
         }
-        const rc = st.players[ownerId].marks.filter((m) => m.id.startsWith(RONG_PREFIX)).length;
-        if (cardIds.length > rc) return '替换数量超过荣数';
+        if (atom.requestType === REPLACE_RONG_RT && cardIds.length > Math.min(st.players[ownerId].hand.length, rongIds.size)) return '替换数量超过可替换荣数';
+        if (atom.requestType === REPLACE_HAND_RT) {
+          const chosenRong = st.localVars[REPLACE_RONG_KEY] as string[] | undefined;
+          if (cardIds.length !== chosenRong?.length) return '换入手牌数量必须与换出荣相同';
+        }
       }
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      st.localVars[REPLACE_KEY] = params.cardIds ?? [];
+      const atom = st.pendingSlots.get(ownerId)?.atom as { requestType?: string } | undefined;
+      if (atom?.requestType === REPLACE_RONG_RT) st.localVars[REPLACE_RONG_KEY] = params.cardIds ?? [];
+      else st.localVars[REPLACE_HAND_KEY] = params.cardIds ?? [];
     },
   );
 
@@ -87,35 +102,67 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ctx.state.players[ownerId].vars[AWAKENED_KEY] = true;
 
     // 1. 用任意张手牌替换等量的荣(可选 0..min(hand, rc))
-    const maxReplace = Math.min(self.hand.length, rc);
+    const oldRong = self.marks.filter((m) => m.id.startsWith(RONG_PREFIX));
+    const availableRong = oldRong.map((m) => (m.payload as { cardId?: string } | undefined)?.cardId)
+      .filter((id): id is string => typeof id === 'string' && (
+        (self.vars[RONG_CARDS_KEY] as string[] | undefined)?.includes(id) === true ||
+        ctx.state.zones.discardPile.includes(id)
+      ));
+    const maxReplace = Math.min(self.hand.length, availableRong.length);
     if (maxReplace > 0) {
-      delete ctx.state.localVars[REPLACE_KEY];
+      delete ctx.state.localVars[REPLACE_RONG_KEY];
+      delete ctx.state.localVars[REPLACE_HAND_KEY];
       await applyAtom(ctx.state, {
         type: '请求回应',
-        requestType: REPLACE_RT,
+        requestType: REPLACE_RONG_RT,
         target: ownerId,
         prompt: {
           type: 'distribute',
           mode: 'select',
-          title: '鸿举:选择任意手牌替换等量的荣(可不选)',
-          source: 'hand',
+          title: '鸿举:选择要换回手牌的荣(可不选)',
+          cardIds: availableRong,
           minTotal: 0,
           maxTotal: maxReplace,
         },
         defaultChoice: [] as unknown as Json,
         timeout: 20,
       });
-      const selected = (ctx.state.localVars[REPLACE_KEY] as string[] | undefined) ?? [];
-      const k = Math.min(selected.length, rc);
-
-      // 移去 k 张旧荣标记(取前 k 个;荣等价,具体移哪张无所谓)
-      const oldRong = self.marks.filter((m) => m.id.startsWith(RONG_PREFIX));
-      for (let i = 0; i < k; i++) {
-        await applyAtom(ctx.state, { type: '去标记', player: ownerId, markId: oldRong[i].id });
+      const selectedOld = (ctx.state.localVars[REPLACE_RONG_KEY] as string[] | undefined) ?? [];
+      const k = Math.min(selectedOld.length, maxReplace);
+      let selectedNew: string[] = [];
+      if (k > 0) {
+        await applyAtom(ctx.state, {
+          type: '请求回应', requestType: REPLACE_HAND_RT, target: ownerId,
+          prompt: {
+            type: 'distribute', mode: 'select', title: '鸿举:选择等量手牌换入荣区', source: 'hand',
+            minTotal: k, maxTotal: k,
+          },
+          defaultChoice: self.hand.slice(0, k) as unknown as Json, timeout: 20,
+        });
+        selectedNew = (ctx.state.localVars[REPLACE_HAND_KEY] as string[] | undefined) ?? [];
       }
-      // 选中的 k 张手牌 → 弃置(入弃牌堆 earmark)→ 加为新荣标记
-      for (const cardId of selected.slice(0, k)) {
-        await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [cardId] });
+
+      // 移去 k 张旧荣标记,并将每张对应实体牌返还手牌。
+      for (const oldCardId of selectedOld.slice(0, k)) {
+        const oldMark = self.marks.find((m) => m.id.startsWith(RONG_PREFIX) && (m.payload as { cardId?: string } | undefined)?.cardId === oldCardId);
+        if (!oldMark) continue;
+        await applyAtom(ctx.state, { type: '去标记', player: ownerId, markId: oldMark.id });
+        if (oldCardId && (self.vars[RONG_CARDS_KEY] as string[] | undefined)?.includes(oldCardId)) {
+          await applyAtom(ctx.state, {
+            type: '移动暂存牌', player: ownerId, varsKey: RONG_CARDS_KEY, cardId: oldCardId, to: '手牌',
+          });
+        } else if (oldCardId && ctx.state.zones.discardPile.includes(oldCardId)) {
+          // 兼容旧荣标记:其真实牌曾被弃入弃牌堆。
+          await applyAtom(ctx.state, {
+            type: '移动牌', cardId: oldCardId, from: { zone: '弃牌堆' }, to: { zone: '手牌', player: ownerId },
+          });
+        }
+      }
+      // 选中的 k 张手牌移出标准牌区作为新荣,实体牌不进入弃牌堆。
+      for (const cardId of selectedNew.slice(0, k)) {
+        await applyAtom(ctx.state, {
+          type: '移出至暂存区', source: ownerId, target: ownerId, cardIds: [cardId], varsKey: RONG_CARDS_KEY,
+        });
         await applyAtom(ctx.state, {
           type: '加标记',
           player: ownerId,
@@ -126,6 +173,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           },
         });
       }
+      delete ctx.state.localVars[REPLACE_RONG_KEY];
+      delete ctx.state.localVars[REPLACE_HAND_KEY];
     }
 
     // 2. 减1点体力上限(设上限 clamp 体力:当前体力 ≤ 新上限则保持)

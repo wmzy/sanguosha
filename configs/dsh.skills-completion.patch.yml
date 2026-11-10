@@ -1,0 +1,12 @@
+- id: agent-default-model
+  config:
+    provider: quqi
+    model: claude-opus-5-5
+- id: rea-mcp
+  disabled: true
+- id: skill-filesystem
+  config:
+    includeDefaultRoots: false
+- id: agent-instructions
+  config:
+    maxBytes: 10000

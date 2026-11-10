@@ -1,6 +1,7 @@
-// 非锁定技失效扩展点——查询型提供者模式(与 slash-quota/hand-limit 同构)。
+// 技能失效扩展点——查询型提供者模式(与 slash-quota/hand-limit 同构)。
 //
-// "非锁定技失效"类效果(义绝/界铁骑/界完杀):令目标的非锁定技 hook 不触发。
+// "非锁定技失效"类效果(义绝/界铁骑/界完杀):令目标的非锁定技 hook 不触发；
+// 少数规则(如缠怨)可用 includeLocked 同时压制锁定技。
 // 引擎核心 index.applyAtom 在跑 before/after hooks 时,对每个 hook
 // 查询 isHookSuppressed:若任一 provider 返回 true 则跳过该 hook。
 //
@@ -36,9 +37,19 @@ export type SuppressionProvider = (
   skillId: string,
 ) => boolean;
 
+export interface SuppressionProviderOptions {
+  /** true 时连锁定技/装备技 hook 也失效；默认保持既有的仅失效非锁定技能语义。 */
+  includeLocked?: boolean;
+}
+
+interface RegisteredSuppressionProvider {
+  predicate: SuppressionProvider;
+  includeLocked: boolean;
+}
+
 interface SuppressionRegistry {
   /** 全局 provider 集合(不按 owner 桶化,原因见文件头注释) */
-  providers: Set<SuppressionProvider>;
+  providers: Set<RegisteredSuppressionProvider>;
 }
 
 const suppressionRegistries = new WeakMap<GameState, SuppressionRegistry>();
@@ -60,18 +71,20 @@ function getSuppressionRegistry(state: GameState): SuppressionRegistry {
 export function registerSuppressionProvider(
   state: GameState,
   provider: SuppressionProvider,
+  options: SuppressionProviderOptions = {},
 ): () => void {
   const reg = getSuppressionRegistry(state);
-  reg.providers.add(provider);
+  const registered = { predicate: provider, includeLocked: options.includeLocked === true };
+  reg.providers.add(registered);
   return () => {
-    reg.providers.delete(provider);
+    reg.providers.delete(registered);
   };
 }
 
 /**
  * 判定某 owner 的某技能 hook 是否被压制。
  *   - 系统级(ownerId===TARGET_SYSTEM)永不压制。
- *   - 锁定技/防具/武器(Skill.isLocked=true)永不压制——规则:锁定技不受"非锁定技失效"影响。
+ *   - 锁定技默认跳过常规 provider；注册时显式 includeLocked 才允许其判定。
  *   - 其余情况查 provider 集合,任一返回 true 即压制。
  * 无法解析技能模块时保守不压制(避免误吞未知技能)。
  */
@@ -80,13 +93,21 @@ export function isHookSuppressed(
   ownerId: number,
   skillId: string,
 ): boolean {
+  return isSkillSuppressed(state, ownerId, skillId);
+}
+
+/** 查询型规则提供者可共用的技能失效判定(包含锁定技时由注册选项控制)。 */
+export function isSkillSuppressed(
+  state: GameState,
+  ownerId: number,
+  skillId: string,
+): boolean {
   if (ownerId < 0) return false; // TARGET_SYSTEM / TARGET_BROADCAST
-  // 锁定技/防具/武器(isLocked=true)永不压制——从实例化时写入的元数据查。
-  // 替代旧 getCachedSkillModule 反射查询(消除 core→lifecycle 数据依赖)。
-  if (isSkillLocked(state, skillId)) return false;
-  const set = getSuppressionRegistry(state).providers;
-  for (const fn of set) {
-    if (fn(state, ownerId, skillId)) return true;
+  const providers = getSuppressionRegistry(state).providers;
+  const locked = isSkillLocked(state, skillId);
+  for (const provider of providers) {
+    if (locked && !provider.includeLocked) continue;
+    if (provider.predicate(state, ownerId, skillId)) return true;
   }
   return false;
 }

@@ -5,6 +5,7 @@ import { effectiveDistance, inAttackRange } from '../../rules/distance';
 import { canSlash } from '../../rules/slash-quota';
 import { validateUseCard } from '../../core/skill';
 import { getCardEffect } from '.';
+import { extraCardTarget } from '../../rules/extra-card-target';
 
 export function isCardBanned(state: GameState, ownerId: number, _cardName: string): boolean {
   const player = state.players[ownerId];
@@ -23,7 +24,8 @@ function checkUsageLimit(
 ): string | null {
   if (cardName === '杀') {
     const cardId = params.cardId as string | undefined;
-    if (!canSlash(state, ownerId, cardId)) return '出杀次数已达上限';
+    const targets = params.targets as number[] | undefined;
+    if (!canSlash(state, ownerId, cardId, targets)) return '出杀次数已达上限';
   }
   return null;
 }
@@ -136,6 +138,18 @@ export function validateCardUse(
 
   const effect = getCardEffect(cardName);
   if (!effect) return `${cardName} 尚未注册 CardEffect`;
+  const targets = Array.isArray(params.targets) ? params.targets as number[] : [];
+  const extra = extraCardTarget(state, ownerId, cardName);
+  const spec = effect.target;
+  if (spec.kind === 'self' && targets.length && (mode === 'forced' || extra !== undefined) &&
+    (!targets.includes(ownerId) || targets.some((target) => target !== ownerId && target !== extra) || targets.length > (extra === undefined ? 1 : 2)))
+    return '目标不合法';
+  const hasTargetSlots = effect.prompt.type === 'useCardAndTarget' && !!effect.prompt.targetFilter.slots?.length;
+  if (cardName !== '杀' && !hasTargetSlots && targets.length && 'max' in spec) {
+    const ordinary = targets.filter((target) => target !== extra);
+    if (ordinary.length > spec.max || targets.length > spec.max + (extra === undefined ? 0 : 1))
+      return `最多指定 ${spec.max} 个普通目标`;
+  }
   if (effect.target.kind !== 'self' && effect.target.kind !== 'effect') {
     const cardId = params.cardId as string | undefined;
     const legalTargets = findLegalTargets(state, ownerId, cardName, cardId);
@@ -143,6 +157,13 @@ export function validateCardUse(
   }
 
   if (effect.canUse) {
+    if (cardName !== '杀' && extra !== undefined && targets.includes(extra) && targets.length > 1) {
+      for (const target of targets) {
+        const error = effect.canUse(state, ownerId, { ...params, target, targets: [target] });
+        if (error) return error;
+      }
+      return null;
+    }
     const customErr = effect.canUse(state, ownerId, params);
     if (customErr) return customErr;
   }

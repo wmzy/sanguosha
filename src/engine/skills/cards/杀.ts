@@ -16,6 +16,7 @@ import { inAttackRange } from '../../rules/distance';
 import { viewCanAttack } from '../../rules/viewDistance';
 import { incSlashUsed, isSlashExempted } from '../../rules/slash-quota';
 import { slashTargetMax } from '../../rules/slash-target';
+import { extraCardTarget } from '../../rules/extra-card-target';
 import { defaultPlayActive, viewCanSlash } from '../../rules/action-active';
 import type { CardEffect, ResolveCtx } from '../../types';
 
@@ -29,6 +30,9 @@ function canUseSlash(
   params: Record<string, import('../../types').Json>,
 ): string | null {
   const cardId = params.cardId as string | undefined;
+  const lostTarget = state.turn.vars['陷阵/lostTarget'];
+  if (state.players[ownerId]?.skills.includes('界陷阵') && typeof lostTarget === 'number' &&
+    (params.targets as number[] | undefined)?.includes(lostTarget)) return '不能对拼点未赢的目标使用杀';
   // 攻击范围校验
   const targetsOk =
     Array.isArray(params.targets) &&
@@ -41,7 +45,9 @@ function canUseSlash(
   // 等通过 slashTargetMax 放宽。此前杀不限目标数,导致无方天画戟也能多目标。
   const targetsArr = Array.isArray(params.targets) ? (params.targets as number[]) : [];
   const maxTargets = slashTargetMax(state, ownerId, cardId);
-  if (targetsArr.length > maxTargets) return `最多指定 ${maxTargets} 个目标`;
+  const extra = extraCardTarget(state, ownerId, '杀');
+  if (targetsArr.filter((target) => target !== extra).length > maxTargets)
+    return `最多指定 ${maxTargets} 个普通目标`;
   return null;
 }
 
@@ -111,8 +117,8 @@ export const slashEffect: CardEffect = {
     targetFilter: {
       min: 1,
       max: 3,
-      filter: (view: GameView, t: number) =>
-        viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
+      filter: (view: GameView, t: number, card?: Partial<Card>) =>
+        viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t, card),
     },
   },
   respondPrompt: {

@@ -848,6 +848,15 @@ export class GameSession {
     return this.state;
   }
 
+  /** Explicit local arena export, including games stopped before a winner is decided. */
+  exportArenaReplay(): ReturnType<typeof buildReplayFile> {
+    if (!this.state) return null;
+    return buildReplayFile(this.state, this.replayBaseline, this.replayBaselineSeq, {
+      createdAt: Date.now(), playerCount: this.state.players.length,
+      characters: this.state.players.map((p) => p.character ?? ''), roomName: this.roomName,
+    });
+  }
+
   getDebugView(): GameView | null {
     if (!this.state) return null;
     return buildView(this.state, 0, this.debug);
@@ -862,6 +871,7 @@ export class GameSession {
 
   private persistAsync(): void {
     if (!this.state) return;
+    if (this.room.config.managedByArena) return;
     // 无在线玩家的房间(如启动恢复的僵尸房间)不持久化:
     // pending slot 定时器触发的自动操作会反复重写文件(每次更新 mtime),
     // 导致 restorePersistedRooms 的过期检查永远失效,房间删不掉。

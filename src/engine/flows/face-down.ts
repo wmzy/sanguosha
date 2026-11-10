@@ -25,25 +25,38 @@ export const CHAIN_MARK = 'chained';
 /** 传导防重入标记：传导过程中为 true，避免传导伤害递归触发本 hook。 */
 const CONDUCTING_VAR = '铁索连环/传导中';
 
-/** 翻面（翻成背面朝上）：加 `${source}/翻面` 标签 + 发「翻面后」时机标记。
- *  source 为技能名前缀（如 '放逐'、'悲歌'），与各技能既有的标签常量前缀一致。 */
+/** 设置背面朝上。重复设置不叠标签，也不重复发状态时机。 */
+export async function setFaceDown(
+  state: GameState,
+  player: number,
+  source: string,
+): Promise<void> {
+  if (isFaceDown(state, player)) return;
+  await applyAtom(state, { type: '加标签', player, tag: `${source}/翻面` });
+  await applyAtom(state, { type: '翻面后', player, faceDown: true });
+}
+
+/** 翻面一次：正面变背面、背面变正面，所有技能共用同一朝向状态。 */
 export async function flipFaceDown(
   state: GameState,
   player: number,
   source: string,
 ): Promise<void> {
-  await applyAtom(state, { type: '加标签', player, tag: `${source}/翻面` });
-  await applyAtom(state, { type: '翻面后', player, faceDown: true });
+  if (isFaceDown(state, player)) {
+    await flipFaceUpAll(state, player);
+  } else {
+    await setFaceDown(state, player, source);
+  }
 }
 
-/** 翻回正面：去 `${source}/翻面` 标签 + 发「翻面后」时机标记。 */
+/** 设置为正面：清除共享翻面状态，不保留其他技能的叠加标签。 */
 export async function flipFaceUp(
   state: GameState,
   player: number,
   source: string,
 ): Promise<void> {
-  await applyAtom(state, { type: '去标签', player, tag: `${source}/翻面` });
-  await applyAtom(state, { type: '翻面后', player, faceDown: false });
+  void source;
+  await flipFaceUpAll(state, player);
 }
 
 /** 设置横置状态（模块 E 横置时机编排）：设横置 后补发「横置后」时机标记。

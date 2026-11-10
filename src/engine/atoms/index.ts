@@ -54,6 +54,7 @@ import { 生效后 } from './生效后';
 import { 生效时 } from './生效时';
 import { 移出至暂存区 } from './移出至暂存区';
 import { 移动牌 } from './移动牌';
+import { 移动暂存牌 } from './移动暂存牌';
 import { 移除延时锦囊 } from './移除延时锦囊';
 import { 移除技能 } from './移除技能';
 import { 结算帧入栈 } from './结算帧入栈';
@@ -162,6 +163,7 @@ export const atomMap: Record<AtomName, AtomDefinition<any>> = {
   生效时,
   移出至暂存区,
   移动牌,
+  移动暂存牌,
   移除延时锦囊,
   移除技能,
   结算帧入栈,
