@@ -172,7 +172,9 @@ export async function runArena(config: ArenaConfig, options: { signal?: AbortSig
       session.record({ decisionId: observation.decisionId, seq: observation.seq, at, playerId: player.id,
         seat: observation.state.viewer, decision, action: submitted, source, elapsedMs: Date.now() - at,
         result: response.lastActionResult, error: [error, speechError].filter(Boolean).join('; ') || undefined, usage });
-      log(`[${player.name}] 决策 #${decisions + 1} (${source}, ${response.lastActionResult}): ${decision.strategySummary?.slice(0, 50) ?? ''}`);
+      const elapsedSec = ((Date.now() - at) / 1000).toFixed(1);
+      const tokenStr = usage ? `tokens: in=${usage.inputTokens ?? 0}, out=${usage.outputTokens ?? 0}` : '';
+      log(`[${player.name}] 决策 #${decisions + 1} (${source}, ${response.lastActionResult}, ${elapsedSec}s${tokenStr ? `, ${tokenStr}` : ''}): ${decision.strategySummary?.slice(0, 40) ?? ''}`);
       decisions++;
     }
   };
@@ -281,6 +283,42 @@ export async function runArena(config: ArenaConfig, options: { signal?: AbortSig
     observer?.disconnect();
     manifest.endedAt = Date.now();
     archive.write('manifest.json', manifest);
+
+    // 统计每位选手的耗时与 Token
+    const playerStats: Record<string, { name: string; decisions: number; modelDecisions: number; avgElapsedSec: number; totalInputTokens: number; totalOutputTokens: number; totalTokens: number }> = {};
+    log('\n=================== 对局选手耗时与 Token 统计 ===================');
+    for (const p of config.players) {
+      const decPath = resolve(archive.dir, `players/${p.id}/decisions.jsonl`);
+      if (existsSync(decPath)) {
+        try {
+          const lines = readFileSync(decPath, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
+          const totalElapsed = lines.reduce((sum, l) => sum + (typeof l.elapsedMs === 'number' ? l.elapsedMs : 0), 0);
+          const modelCount = lines.filter((l) => l.source === 'model').length;
+          const avgElapsedSec = lines.length ? Number((totalElapsed / lines.length / 1000).toFixed(2)) : 0;
+          let inTokens = 0;
+          let outTokens = 0;
+          for (const l of lines) {
+            if (l.usage) {
+              inTokens += l.usage.inputTokens ?? 0;
+              outTokens += l.usage.outputTokens ?? 0;
+            }
+          }
+          playerStats[p.id] = {
+            name: p.name,
+            decisions: lines.length,
+            modelDecisions: modelCount,
+            avgElapsedSec,
+            totalInputTokens: inTokens,
+            totalOutputTokens: outTokens,
+            totalTokens: inTokens + outTokens,
+          };
+          log(`【${p.name}】总决策: ${lines.length} (模型: ${modelCount}) | 平均耗时: ${avgElapsedSec}s | 输入Token: ${inTokens} | 输出Token: ${outTokens} | 总Token: ${inTokens + outTokens}`);
+        } catch {}
+      }
+    }
+    log('=================================================================\n');
+    archive.write('token-summary.json', playerStats);
+
     log(`${manifest.status}: ${archive.dir}`);
   }
   return manifest;

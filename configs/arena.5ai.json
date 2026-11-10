@@ -1,5 +1,5 @@
 {
-  "name": "五 AI 巅峰对决 (Haiku / Gemini 3.7 / Gemma 4 / DeepSeek v4.1 / GPT-6 Luna)",
+  "name": "五 AI 巅峰实战 (DeepSeek v4.1 / Gemini 3.7 / Gemini 3.8 / GLM 5.3 / Codex GPT-6 Luna)",
   "serverUrl": "http://localhost:3930",
   "timeoutSec": 60,
   "decisionTimeoutMs": 45000,
@@ -9,60 +9,64 @@
   "charPool": "standard",
   "players": [
     {
-      "id": "claude-haiku",
-      "name": "Claude-Haiku",
+      "id": "deepseek-v41",
+      "name": "DeepSeek-v4.1",
       "mode": "api",
-      "persona": "沉着冷静，注意隐蔽身份，注重手牌防御与节奏。",
+      "persona": "擅长全局布局与卡牌价值计算，注重攻守节奏，理性争胜。",
       "api": {
         "protocol": "openai-compatible",
-        "baseUrl": "http://127.0.0.1:8045/v1",
-        "model": "gemini-3.8-flash-high",
-        "apiKeyEnv": "ANTHROPIC_AUTH_TOKEN"
+        "baseUrl": "https://api.deepseek.com",
+        "model": "deepseek-flash",
+        "apiKeyEnv": "DEEPSEEK_API_KEY",
+        "reasoningEffort": "medium"
       }
     },
     {
       "id": "gemini-37",
       "name": "Gemini-3.7-Flash",
       "mode": "api",
-      "persona": "洞察全局，积极进攻，善于寻找击杀突破口。",
+      "persona": "敏锐洞察，善于抓住敌方防守漏洞展开凌厉攻势。",
       "api": {
         "protocol": "gemini",
         "model": "gemini-3.7-flash",
-        "apiKeyEnv": "GEMINI_API_KEY"
+        "apiKeyEnv": "GEMINI_API_KEY",
+        "reasoningEffort": "medium"
       }
     },
     {
-      "id": "gemma-4",
-      "name": "Gemma-4-31B",
+      "id": "gemini-38",
+      "name": "Gemini-3.8-Flash",
       "mode": "api",
-      "persona": "务实求稳，保持自身血量，配合盟友行动。",
+      "persona": "沉着稳健，注重手牌防御与关键时机的爆发。",
       "api": {
         "protocol": "gemini",
-        "model": "gemma-4-31b-it",
-        "apiKeyEnv": "GEMINI_API_KEY"
+        "model": "gemini-3.8-flash",
+        "apiKeyEnv": "GEMINI_API_KEY",
+        "reasoningEffort": "medium"
       }
     },
     {
-      "id": "deepseek-v41",
-      "name": "DeepSeek-v4.1",
+      "id": "glm-53",
+      "name": "GLM-5.3-Astra",
       "mode": "api",
-      "persona": "谋定后动，擅长计算牌序，愿意在适当时机发言。",
+      "persona": "博弈推演，善于研判身份并寻找多方平衡。",
       "api": {
         "protocol": "openai-compatible",
-        "baseUrl": "https://chickener.top/v1",
-        "model": "deepseek-v4.1-flash-1017",
-        "apiKeyEnv": "CHICKENER_API_KEY"
+        "baseUrl": "https://api.modelverse.cn/v1",
+        "model": "glm-5.3",
+        "apiKeyEnv": "ASTRAFLOW_API_KEY",
+        "reasoningEffort": "medium"
       }
     },
     {
       "id": "codex-gpt6",
       "name": "Codex-GPT6-Luna",
       "mode": "api",
-      "persona": "深度推理，精密把控距离与防具收益，关键轮次全力爆发。",
+      "persona": "中等推理深度，精密计算手牌距离与主公技配合，关键时刻全力制胜。",
       "api": {
         "protocol": "codex-cli",
         "model": "gpt-6-luna",
-        "reasoningEffort": "high"
+        "reasoningEffort": "medium"
       }
     }
   ]

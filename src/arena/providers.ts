@@ -2,6 +2,9 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import http from 'node:http';
+import https from 'node:https';
+import tls from 'node:tls';
 import type { ApiPlayerConfig, ArenaDecision, ModelMessage, ModelReply } from './types';
 
 const DEFAULT_GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
@@ -47,13 +50,86 @@ function safeErrorBody(body: string, apiKey: string): string {
 }
 
 async function postJson(url: string, apiKey: string, body: unknown, signal: AbortSignal | undefined, gemini: boolean) {
+  const proxyStr = process.env.https_proxy || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.HTTP_PROXY;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(gemini ? { 'x-goog-api-key': apiKey } : { Authorization: `Bearer ${apiKey}` }),
+  };
+  const bodyStr = JSON.stringify(body);
+
+  if (proxyStr && url.startsWith('https://')) {
+    const proxy = new URL(proxyStr);
+    const targetUrl = new URL(url);
+    const data = await new Promise<string>((resolve, reject) => {
+      const connectReq = http.request({
+        host: proxy.hostname,
+        port: proxy.port,
+        method: 'CONNECT',
+        path: `${targetUrl.hostname}:443`,
+      });
+      const onAbort = () => {
+        connectReq.destroy();
+        reject(new Error('Request aborted'));
+      };
+      if (signal) signal.addEventListener('abort', onAbort, { once: true });
+
+      connectReq.on('connect', (res, socket) => {
+        if (res.statusCode !== 200) {
+          socket.destroy();
+          return reject(new Error(`Proxy CONNECT failed with HTTP ${res.statusCode}`));
+        }
+        const tlsSocket = tls.connect({ socket, servername: targetUrl.hostname });
+        tlsSocket.on('secureConnect', () => {
+          const req = https.request(
+            {
+              host: targetUrl.hostname,
+              path: targetUrl.pathname + targetUrl.search,
+              method: 'POST',
+              headers: { ...headers, Host: targetUrl.hostname },
+              createConnection: () => tlsSocket,
+            },
+            (targetRes) => {
+              let resBody = '';
+              targetRes.on('data', (chunk) => {
+                resBody += chunk;
+              });
+              targetRes.on('end', () => {
+                if (signal) signal.removeEventListener('abort', onAbort);
+                if (targetRes.statusCode && (targetRes.statusCode < 200 || targetRes.statusCode >= 300)) {
+                  const safeBody = safeErrorBody(resBody, apiKey);
+                  return reject(new Error(`Model API request failed with HTTP ${targetRes.statusCode}${safeBody ? `: ${safeBody}` : ''}`));
+                }
+                resolve(resBody);
+              });
+            },
+          );
+          req.on('error', (err) => {
+            if (signal) signal.removeEventListener('abort', onAbort);
+            reject(err);
+          });
+          req.write(bodyStr);
+          req.end();
+        });
+        tlsSocket.on('error', (err) => {
+          if (signal) signal.removeEventListener('abort', onAbort);
+          reject(err);
+        });
+      });
+
+      connectReq.on('error', (err) => {
+        if (signal) signal.removeEventListener('abort', onAbort);
+        reject(err);
+      });
+      connectReq.end();
+    });
+
+    return JSON.parse(data);
+  }
+
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(gemini ? { 'x-goog-api-key': apiKey } : { Authorization: `Bearer ${apiKey}` }),
-    },
-    body: JSON.stringify(body),
+    headers,
+    body: bodyStr,
     signal,
   });
   if (!response.ok) {
@@ -96,6 +172,11 @@ export async function callModel(config: ApiPlayerConfig, messages: ModelMessage[
         '-',
       ], { shell: true });
 
+      const stdoutChunks: Buffer[] = [];
+      const stderrChunks: Buffer[] = [];
+      child.stdout?.on('data', (d) => { stdoutChunks.push(Buffer.from(d)); });
+      child.stderr?.on('data', (d) => { stderrChunks.push(Buffer.from(d)); });
+
       const onAbort = () => {
         child.kill();
         try { if (existsSync(tmpFile)) unlinkSync(tmpFile); } catch {}
@@ -117,7 +198,11 @@ export async function callModel(config: ApiPlayerConfig, messages: ModelMessage[
           }
           const content = readFileSync(tmpFile, 'utf8');
           try { unlinkSync(tmpFile); } catch {}
-          resolvePromise({ decision: parseModelDecision(content) });
+          const combined = Buffer.concat([...stdoutChunks, ...stderrChunks]).toString('utf8');
+          const tokenMatch = combined.match(/tokens used\s*([\d,]+)/i);
+          const totalTokens = tokenMatch ? parseInt(tokenMatch[1].replace(/,/g, ''), 10) : undefined;
+          const usage = totalTokens !== undefined ? { inputTokens: totalTokens, outputTokens: 0 } : undefined;
+          resolvePromise({ decision: parseModelDecision(content), usage });
         } catch (err) {
           rejectPromise(err);
         }
@@ -184,6 +269,7 @@ export async function callModel(config: ApiPlayerConfig, messages: ModelMessage[
       temperature: config.temperature ?? 0.6,
       maxOutputTokens: config.maxOutputTokens ?? 1500,
       ...(!isGemma ? { responseMimeType: 'application/json' } : {}),
+      ...(config.reasoningEffort === 'medium' ? { thinkingConfig: { thinkingBudget: 2048 } } : {}),
     },
   }, signal, true);
   const content = asText(payload.candidates?.[0]?.content?.parts);
