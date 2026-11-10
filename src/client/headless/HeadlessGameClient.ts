@@ -588,7 +588,10 @@ export class HeadlessGameClient {
 
   needsAction(): boolean {
     const v = this._view;
-    if (!v?.pending) {
+    if (!v) return false;
+    const me = v.players[this._seatIndex];
+    if (me && !me.alive) return false;
+    if (!v.pending) {
       this._skippedBroadcastDeadline = null;
       return false;
     }
@@ -623,6 +626,8 @@ export class HeadlessGameClient {
   getAvailableActions(): AvailableAction[] {
     const v = this._view;
     if (!v) return [];
+    const me = v.players[this._seatIndex];
+    if (me && !me.alive) return [];
     // debug 模式:pending 可能属于其他座次,用 pending.target 作为操作座次
     const actionSeat = this._debugMode && v.pending && v.pending.target >= 0
       ? v.pending.target

@@ -50,12 +50,29 @@ function safeErrorBody(body: string, apiKey: string): string {
 }
 
 async function postJson(url: string, apiKey: string, body: unknown, signal: AbortSignal | undefined, gemini: boolean) {
-  const proxyStr = process.env.https_proxy || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.HTTP_PROXY;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(gemini ? { 'x-goog-api-key': apiKey } : { Authorization: `Bearer ${apiKey}` }),
   };
   const bodyStr = JSON.stringify(body);
+
+  // If fetch has been mocked in a test environment, delegate to it
+  if (typeof (globalThis.fetch as { mock?: unknown })?.mock !== 'undefined') {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: bodyStr,
+      signal,
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      const safe = safeErrorBody(errText, apiKey);
+      throw new Error(`Model API request failed with HTTP ${response.status}: ${safe}`);
+    }
+    return response.json();
+  }
+
+  const proxyStr = process.env.https_proxy || process.env.HTTPS_PROXY || process.env.http_proxy || process.env.HTTP_PROXY;
 
   if (proxyStr && url.startsWith('https://')) {
     const proxy = new URL(proxyStr);

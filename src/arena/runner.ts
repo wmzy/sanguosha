@@ -104,9 +104,20 @@ export async function runArena(config: ArenaConfig, options: { signal?: AbortSig
     let previousSubmission = '';
     let repeated = 0;
     while (!stopped()) {
+      const seat = session.hgc.seatIndex;
+      const curView = session.hgc.view;
+      if (curView && seat >= 0 && seat < curView.players.length && !curView.players[seat]?.alive) {
+        log(`[${player.name}] 武将已阵亡，切出行动循环。`);
+        return;
+      }
+
       const result = await runPlay(session.hgc, { waitTimeoutMs: 500 });
       session.noteEvents(result.newLog);
       if (result.gameOver) return;
+      if (session.hgc.view?.players[session.hgc.seatIndex]?.alive === false) {
+        log(`[${player.name}] 武将已阵亡，切出行动循环。`);
+        return;
+      }
       if (!result.needsAction) continue;
       const observation = await session.observe();
       if (!observation?.actions.length) { await pause(60); continue; }

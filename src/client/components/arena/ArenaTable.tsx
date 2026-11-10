@@ -252,20 +252,34 @@ export function detectEquipTrigger(
 }
 
 function extractTargeting(view: GameView): { source: number | null; targets: number[] } {
+  // 判定阶段属于延时锦囊自身的结算，不绘制跨座次的攻击指向
+  if (view.phase === '判定') {
+    return { source: null, targets: [] };
+  }
+
   // 1. 优先读取结算栈中的目标定义
   if (view.settlementStack?.length) {
     for (let i = view.settlementStack.length - 1; i >= 0; i--) {
       const frame = view.settlementStack[i];
       if (!frame) continue;
+      // 排除延时锦囊在非出牌期的结算
+      if (['乐不思蜀', '兵粮寸断', '闪电'].includes(frame.skillId) && view.phase !== '出牌') {
+        continue;
+      }
       const from = frame.from;
+      // 阵亡玩家不能作为指向源
+      if (typeof from === 'number' && (!view.players[from] || !view.players[from].alive)) {
+        continue;
+      }
       const rawTargets =
         frame.params?.resolvedTargets ??
         frame.params?.targets ??
         (typeof frame.params?.target === 'number' ? [frame.params.target] : undefined);
       if (Array.isArray(rawTargets) && rawTargets.length > 0 && typeof from === 'number') {
+        // 目标必须是存活玩家
         const valid = rawTargets.filter(
           (t): t is number =>
-            typeof t === 'number' && t >= 0 && t < view.players.length,
+            typeof t === 'number' && t >= 0 && t < view.players.length && Boolean(view.players[t]?.alive),
         );
         if (valid.length > 0) return { source: from, targets: valid };
       }
@@ -282,14 +296,17 @@ function extractTargeting(view: GameView): { source: number | null; targets: num
         : typeof atom.player === 'number'
           ? atom.player
           : null;
-    const rawTargets =
-      (Array.isArray(atom.targets) ? (atom.targets as number[]) : null) ??
-      (typeof target === 'number' ? [target] : []);
-    const valid = rawTargets.filter(
-      (t): t is number => typeof t === 'number' && t >= 0 && t < view.players.length,
-    );
-    if (typeof source === 'number' && source >= 0 && valid.length > 0) {
-      return { source, targets: valid };
+    if (typeof source === 'number' && view.players[source]?.alive) {
+      const rawTargets =
+        (Array.isArray(atom.targets) ? (atom.targets as number[]) : null) ??
+        (typeof target === 'number' ? [target] : []);
+      const valid = rawTargets.filter(
+        (t): t is number =>
+          typeof t === 'number' && t >= 0 && t < view.players.length && Boolean(view.players[t]?.alive),
+      );
+      if (valid.length > 0) {
+        return { source, targets: valid };
+      }
     }
   }
 
@@ -298,6 +315,8 @@ function extractTargeting(view: GameView): { source: number | null; targets: num
     const lastLog = view.log.at(-1);
     if (
       lastLog &&
+      typeof lastLog.player === 'number' &&
+      view.players[lastLog.player]?.alive &&
       (lastLog.text.includes(' → ') ||
         lastLog.text.includes('目标为') ||
         lastLog.text.includes('指定了'))
@@ -316,7 +335,7 @@ function extractTargeting(view: GameView): { source: number | null; targets: num
       const targets: number[] = [];
       for (const name of targetNames) {
         const found = view.players.find(
-          (p) => p.name === name || `P${p.index}` === name || p.character === name,
+          (p) => (p.name === name || `P${p.index}` === name || p.character === name) && p.alive,
         );
         if (found && !targets.includes(found.index)) {
           targets.push(found.index);
@@ -394,7 +413,7 @@ function Seat({
 
   return (
     <article
-      className={`arena-seat ${!player.alive ? 'is-dead' : ''} ${active && player.alive ? 'is-active' : ''} ${isTargetingSource ? 'is-targeting-source' : ''} ${isTargetLocked ? 'is-target-locked seat-target-pulse' : ''} ${isChained ? 'is-seat-chained' : ''}`}
+      className={`arena-seat ${!player.alive ? 'is-dead' : ''} ${active && player.alive ? 'is-active' : ''} ${isTargetingSource && player.alive ? 'is-targeting-source' : ''} ${isTargetLocked && player.alive ? 'is-target-locked seat-target-pulse' : ''} ${isChained && player.alive ? 'is-seat-chained' : ''}`}
       style={{ left: `${position[0]}%`, top: `${position[1]}%` }}
       data-testid={`arena-player-${player.index}`}
     >
