@@ -254,6 +254,36 @@ describe('FlyingCardLayer 全息飞牌系统 (Task 1)', () => {
       expect(container.querySelector('[data-testid="arena-flying-card"]')).toBeNull();
       vi.useRealTimers();
     });
+
+    it('响应南蛮/决斗打出杀时，日志出现响应【杀】即刻从响应者座次飞出', () => {
+      vi.useFakeTimers();
+      const view1 = makeTestView({ log: [] });
+      const { container, rerender } = render(
+        <FlyingCardLayer view={view1} positions={arenaPositions} />
+      );
+
+      // 玩家1响应打出杀
+      const view2 = makeTestView({
+        log: [{ time: 150, player: 1, text: '响应【杀】(♠9)' }],
+      });
+      rerender(<FlyingCardLayer view={view2} positions={arenaPositions} />);
+
+      const flyingCards = container.querySelectorAll('[data-testid="arena-flying-card"]');
+      expect(flyingCards.length).toBeGreaterThan(0);
+      const shaFlying = Array.from(flyingCards).find((el) => el.textContent?.includes('杀'));
+      expect(shaFlying).toBeTruthy();
+      expect(shaFlying?.getAttribute('data-trajectory')).toBe('respond');
+      expect(shaFlying?.getAttribute('style')).toContain('--fly-from-x: 50%');
+      expect(shaFlying?.getAttribute('style')).toContain('--fly-from-y: 17%');
+      expect(shaFlying?.getAttribute('style')).toContain('--fly-to-x: 50%');
+      expect(shaFlying?.getAttribute('style')).toContain('--fly-to-y: 48%');
+
+      act(() => {
+        vi.advanceTimersByTime(800);
+      });
+      expect(container.querySelector('[data-testid="arena-flying-card"]')).toBeNull();
+      vi.useRealTimers();
+    });
   });
 
   describe('3. 顺手牵羊 (Snatch)', () => {
@@ -284,6 +314,34 @@ describe('FlyingCardLayer 全息飞牌系统 (Task 1)', () => {
       expect(flyingCard?.getAttribute('style')).toContain('--fly-to-x: 50%');
       expect(flyingCard?.getAttribute('style')).toContain('--fly-to-y: 82%');
       expect(flyingCard?.textContent).toContain('诸葛连弩');
+
+      act(() => {
+        vi.advanceTimersByTime(800);
+      });
+      expect(container.querySelector('[data-testid="arena-flying-card"]')).toBeNull();
+      vi.useRealTimers();
+    });
+
+    it('真实日志使用【顺手牵羊】→ 目标，卡牌从受害方座次飞入发起方座次', () => {
+      vi.useFakeTimers();
+      const view1 = makeTestView({ log: [] });
+      const { container, rerender } = render(
+        <FlyingCardLayer view={view1} positions={arenaPositions} />
+      );
+
+      // 玩家0对玩家1使用顺手牵羊
+      const view2 = makeTestView({
+        log: [{ time: 250, player: 0, text: '使用【顺手牵羊】(♦3) → 曹操' }],
+      });
+      rerender(<FlyingCardLayer view={view2} positions={arenaPositions} />);
+
+      const flyingCard = container.querySelector('[data-testid="arena-flying-card"]');
+      expect(flyingCard).toBeTruthy();
+      expect(flyingCard?.getAttribute('data-trajectory')).toBe('snatch');
+      expect(flyingCard?.getAttribute('style')).toContain('--fly-from-x: 50%');
+      expect(flyingCard?.getAttribute('style')).toContain('--fly-from-y: 17%');
+      expect(flyingCard?.getAttribute('style')).toContain('--fly-to-x: 50%');
+      expect(flyingCard?.getAttribute('style')).toContain('--fly-to-y: 82%');
 
       act(() => {
         vi.advanceTimersByTime(800);

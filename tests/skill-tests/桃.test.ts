@@ -112,11 +112,11 @@ describe('桃', () => {
     });
   });
 
-  it('use:出牌阶段对受伤的其他角色使用 → 目标 +1 血', async () => {
+  it('use:出牌阶段对其他角色使用桃 → 必须被拒绝（桃只能对自己使用）', async () => {
     const peach = makeCard('t1', '桃', '♥');
     const state: GameState = createGameState({
       players: [
-        makePlayer({ index: 0, name: 'P1', hand: ['t1'], skills: ['桃'], health: 4, maxHealth: 4 }),
+        makePlayer({ index: 0, name: 'P1', hand: ['t1'], skills: ['桃'], health: 3, maxHealth: 4 }),
         makePlayer({ index: 1, name: 'P2', skills: [], health: 2, maxHealth: 4 }),
       ],
       cardMap: { t1: peach },
@@ -127,13 +127,12 @@ describe('桃', () => {
     await harness.setup(state);
     const P1 = harness.player('P1');
 
-    await P1.useCardAndTarget('桃', 't1', [1]);
-
-    expect(harness.state.players[1].health).toBe(3);
-    expect(harness.state.zones.discardPile).toContain('t1');
-    // view 级断言
-    P1.processEvents();
-    P1.expectView((v) => expect(v.players[1].health).toBe(3));
+    await P1.expectRejected({
+      skillId: '桃',
+      actionType: 'use',
+      params: { cardId: 't1', targets: [1] },
+    });
+    expect(harness.state.players[1].health).toBe(2);
   });
 
   // ─── 负面:use ─────────────────────────────

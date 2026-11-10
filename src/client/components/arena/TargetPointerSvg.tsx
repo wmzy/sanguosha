@@ -74,6 +74,8 @@ export function TargetPointerSvg({
 
       {targetPositions.map((targetPos, idx) => {
         const isSelf = sourcePos[0] === targetPos[0] && sourcePos[1] === targetPos[1];
+        // 出牌方自身不绘制红圈，出牌方通过座次边框金光常亮标识
+        if (isSelf) return null;
 
         return (
           <g
@@ -81,48 +83,31 @@ export function TargetPointerSvg({
             data-testid={`arena-target-line-${idx}`}
             className="arena-target-line-group"
           >
-            {isSelf ? (
-              // 自身目标锁定光环
-              <circle
-                cx={targetPos[0]}
-                cy={targetPos[1]}
-                r="4.5"
-                stroke={isChain ? '#38bdf8' : '#ff4757'}
-                strokeWidth="0.8"
-                fill="none"
-                strokeDasharray="1 1"
-                className={`arena-target-self-ring ${isChain ? 'is-chain' : ''}`}
-                filter={isChain ? 'url(#arena-chain-line-glow)' : 'url(#arena-line-glow)'}
-              />
-            ) : (
-              <>
-                {/* 底部发光战术底线 */}
-                <line
-                  x1={sourcePos[0]}
-                  y1={sourcePos[1]}
-                  x2={targetPos[0]}
-                  y2={targetPos[1]}
-                  stroke={isChain ? '#0284c7' : '#ff4757'}
-                  strokeWidth="0.9"
-                  strokeOpacity="0.4"
-                  strokeLinecap="round"
-                />
-                {/* 动态流动虚线与战术箭头 */}
-                <line
-                  x1={sourcePos[0]}
-                  y1={sourcePos[1]}
-                  x2={targetPos[0]}
-                  y2={targetPos[1]}
-                  stroke={isChain ? '#38bdf8' : '#ff6b81'}
-                  strokeWidth="0.5"
-                  strokeDasharray="1.5 1"
-                  strokeLinecap="round"
-                  markerEnd={isChain ? 'url(#arena-chain-arrow)' : 'url(#arena-target-arrow)'}
-                  filter={isChain ? 'url(#arena-chain-line-glow)' : 'url(#arena-line-glow)'}
-                  className={`arena-target-line ${isChain ? 'is-chain' : ''}`}
-                />
-              </>
-            )}
+            {/* 底部发光战术底线 */}
+            <line
+              x1={sourcePos[0]}
+              y1={sourcePos[1]}
+              x2={targetPos[0]}
+              y2={targetPos[1]}
+              stroke={isChain ? '#0284c7' : '#ff4757'}
+              strokeWidth="0.9"
+              strokeOpacity="0.4"
+              strokeLinecap="round"
+            />
+            {/* 动态流动虚线与战术箭头 */}
+            <line
+              x1={sourcePos[0]}
+              y1={sourcePos[1]}
+              x2={targetPos[0]}
+              y2={targetPos[1]}
+              stroke={isChain ? '#38bdf8' : '#ff6b81'}
+              strokeWidth="0.5"
+              strokeDasharray="1.5 1"
+              strokeLinecap="round"
+              markerEnd={isChain ? 'url(#arena-chain-arrow)' : 'url(#arena-target-arrow)'}
+              filter={isChain ? 'url(#arena-chain-line-glow)' : 'url(#arena-line-glow)'}
+              className={`arena-target-line ${isChain ? 'is-chain' : ''}`}
+            />
           </g>
         );
       })}

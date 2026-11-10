@@ -308,18 +308,33 @@
     inset 0 0 0 3px #c6a56513;
 }
 .arena-seat.is-active {
-  border-color: #e7bc62;
+  border-color: #ffd700;
   box-shadow:
-    0 0 0 1px #b88b3a,
-    0 0 28px #d6a64b35,
+    0 0 0 2px #ffe57f,
+    0 0 28px rgba(255, 215, 0, 0.5),
     0 8px 18px #0009;
 }
 .arena-seat.is-targeting-source {
-  border-color: #ffd88a;
+  border-color: #ffe082 !important;
   box-shadow:
-    0 0 0 1px #f4d88c,
-    0 0 25px rgba(244, 216, 140, 0.45),
-    0 8px 18px #0009;
+    0 0 0 2px #fff8e1,
+    0 0 35px rgba(255, 224, 130, 0.8),
+    0 8px 20px #000c !important;
+  animation: casterSourceGlow 1.2s infinite alternate ease-in-out;
+}
+@keyframes casterSourceGlow {
+  0% {
+    box-shadow:
+      0 0 0 2px #ffe082,
+      0 0 20px rgba(255, 224, 130, 0.5),
+      0 8px 18px #0009;
+  }
+  100% {
+    box-shadow:
+      0 0 0 3px #fff8e1,
+      0 0 38px rgba(255, 224, 130, 0.95),
+      0 8px 22px #000c;
+  }
 }
 .arena-seat.is-target-locked,
 .arena-seat.seat-target-pulse {

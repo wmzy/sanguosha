@@ -1,14 +1,15 @@
 // 桃 CardEffect — 基本牌·桃的使用结算。
 //
 // resolve: 回复目标 1 点体力。
-// target.kind='wounded': 可对包括自己在内的已受伤角色使用。
+// target.kind='self': 出牌阶段只能对自己使用，且自身必须已受伤。
+// 濒死求桃时走 respond（请求回应 桃/求桃），允许对濒死角色使用。
 
 import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { defaultPlayActive } from '../../rules/action-active';
 import type { CardEffect, ResolveCtx } from '../../types';
 
-/** 桃的牌特有校验：目标必须已受伤 */
+/** 桃的牌特有校验：出牌阶段只能对自己使用，且自己必须已受伤 */
 function canUsePeach(
   state: import('../../types').GameState,
   ownerId: number,
@@ -17,10 +18,13 @@ function canUsePeach(
   const target =
     ((params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined) ??
     ownerId;
-  return state.players[target]?.alive === true &&
-    state.players[target]?.health < state.players[target]?.maxHealth
+  if (target !== ownerId) {
+    return '出牌阶段只能对自己使用桃';
+  }
+  return state.players[ownerId]?.alive === true &&
+    state.players[ownerId]?.health < state.players[ownerId]?.maxHealth
     ? null
-    : '桃只能对受伤角色使用';
+    : '桃只能在受伤时使用';
 }
 
 /** 桃的结算：回复目标 1 点体力 */
@@ -38,7 +42,7 @@ function peachActiveWhen(ctx: import('../../types').ActionContext): boolean {
 
 export const peachEffect: CardEffect = {
   timing: '出牌阶段',
-  target: { kind: 'wounded', min: 0, max: 1 },
+  target: { kind: 'self' },
   canUse: canUsePeach,
   resolve: resolvePeach,
   // respond:濒死求桃时出桃救援——移动牌到弃牌堆并置 localVars['求桃/已救']=true,
