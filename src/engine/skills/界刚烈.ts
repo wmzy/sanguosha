@@ -27,7 +27,6 @@ import { PICK_RESULT_KEY } from '../rules/vars-keys';
 
 const CONFIRM_REQUEST = '界刚烈/confirm';
 const PICK_REQUEST = '界刚烈/选牌';
-const JUDGE_COLOR_KEY = '界刚烈/judgeColor';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

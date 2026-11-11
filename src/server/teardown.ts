@@ -12,7 +12,7 @@ import { getRoom, leaveRoom, deleteRoom, setRoomStatus } from './room';
 import { deletePersistedRoom } from './persistence';
 import { deleteRoomFromDb } from './roomStore';
 import { deleteRoomHistory } from './gameHistory';
-import { createLogger } from './logger';
+import { createLogger, normalizeError } from './logger';
 
 const log = createLogger('teardown');
 
@@ -30,7 +30,7 @@ export async function destroyRoomCompletely(roomId: string): Promise<void> {
   const session = gameSessions.get(roomId);
   gameSessions.delete(roomId);
   void session?.destroy().catch((err) => {
-    const e = err instanceof Error ? err : new Error(String(err));
+    const e = normalizeError(err);
     log.error(`session.destroy failed for ${roomId}`, { error: e.stack ?? String(e) });
   });
 
@@ -55,7 +55,7 @@ export async function destroyRoomCompletely(roomId: string): Promise<void> {
   try {
     await deletePersistedRoom(roomId);
   } catch (err) {
-    const e = err instanceof Error ? err : new Error(String(err));
+    const e = normalizeError(err);
     log.error(`deletePersistedRoom failed for ${roomId}`, { error: e.stack ?? String(e) });
   }
 
@@ -63,7 +63,7 @@ export async function destroyRoomCompletely(roomId: string): Promise<void> {
   try {
     await deleteRoomFromDb(roomId);
   } catch (err) {
-    const e = err instanceof Error ? err : new Error(String(err));
+    const e = normalizeError(err);
     log.error(`deleteRoomFromDb failed for ${roomId}`, { error: e.stack ?? String(e) });
   }
 
@@ -71,7 +71,7 @@ export async function destroyRoomCompletely(roomId: string): Promise<void> {
   try {
     await deleteRoomHistory(roomId);
   } catch (err) {
-    const e = err instanceof Error ? err : new Error(String(err));
+    const e = normalizeError(err);
     log.error(`deleteRoomHistory failed for ${roomId}`, { error: e.stack ?? String(e) });
   }
 
@@ -104,7 +104,7 @@ export async function downgradeRoomToLobby(roomId: string): Promise<void> {
   const session = gameSessions.get(roomId);
   gameSessions.delete(roomId);
   void session?.destroy().catch((err) => {
-    const e = err instanceof Error ? err : new Error(String(err));
+    const e = normalizeError(err);
     log.error(`session.destroy failed for ${roomId}`, { error: e.stack ?? String(e) });
   });
 
@@ -115,7 +115,7 @@ export async function downgradeRoomToLobby(roomId: string): Promise<void> {
   try {
     await deletePersistedRoom(roomId);
   } catch (err) {
-    const e = err instanceof Error ? err : new Error(String(err));
+    const e = normalizeError(err);
     log.error(`deletePersistedRoom failed for ${roomId}`, { error: e.stack ?? String(e) });
   }
 

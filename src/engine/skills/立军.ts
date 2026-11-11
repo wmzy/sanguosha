@@ -24,8 +24,7 @@ import type { SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { registerSlashExtraProvider } from '../rules/slash-quota';
-import { slashExtraKey } from '../rules/vars-keys';
+import { registerSlashExtraProvider, projectSlashExtra } from '../rules/slash-quota';
 
 const ALLY_CONFIRM_RT = '立军/盟友确认'; // 问盟友:是否把杀交给主公
 const LORD_CONFIRM_RT = '立军/主公确认'; // 问主公:是否令其摸牌+杀次+1
@@ -185,12 +184,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       st.turn.vars[quotaKey(source)] = true;
       // 盟友的额外出杀次数须投影到 view:前端 viewSlashMax/无头枚举读
       // view.turnUsage['杀/extra/*'],缺失则盟友第 2 张杀在客户端不可用。
-      await applyAtom(st, {
-        type: '回合用量',
-        player: source,
-        key: slashExtraKey('立军'),
-        value: 1,
-      });
+      await projectSlashExtra(st, source, '立军', 1);
 
       await popFrame(st);
     }),

@@ -21,6 +21,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
+import { isAwakened, markAwakened } from '../rules/vars-keys';
 
 const AWAKENED_KEY = '凿险/awakened';
 const EXTRA_TURN_KEY = '凿险/extraTurn'; // localVars:本回合结束时应启动额外回合
@@ -67,7 +68,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.player !== ownerId) return;
 
     // 觉醒技:整局一次
-    if (ctx.state.players[ownerId]?.vars[AWAKENED_KEY]) return;
+    if (isAwakened(ctx.state.players[ownerId]?.vars, AWAKENED_KEY)) return;
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
 
@@ -76,7 +77,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (tianCount < 3) return;
 
     // 标记已觉醒(在读条件后立即设,防重入)
-    ctx.state.players[ownerId].vars[AWAKENED_KEY] = true;
+    markAwakened(ctx.state, ownerId, AWAKENED_KEY);
 
     // 1. 减1点体力上限(设上限 amount = maxHealth - 1;减至0则角色死亡)
     const newMax = self.maxHealth - 1;

@@ -14,6 +14,7 @@
 //   界小乔拥有界红颜时,黑桃手牌/装备也作为合法弃牌。
 import type { Card, FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { registerBeforeHook } from '../core/skill';
+import { peekTop } from '../core/deck';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -50,7 +51,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
       if (atom.player !== ownerId) return;
-      const topId = ctx.state.zones.deck[ctx.state.zones.deck.length - 1];
+      const topId = peekTop(ctx.state);
       if (!topId) return;
       const card: Card | undefined = ctx.state.cardMap[topId];
       if (!card) return;

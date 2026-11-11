@@ -23,7 +23,7 @@
 //   EX 与同点数的另一张牌共存(如 ♠2 有 雌雄双股剑、八卦阵 + EX 寒冰剑 共 3 张),
 //   故 (花色,点数) 在标准包内不唯一 —— 牌 id 须用牌名区分,不能仅靠花色点数。
 
-import type { Card, Suit, Rank, CardType, CardSubType, TrickSubType, DamageType } from '../types';
+import type { Card, Suit, Rank, CardType, CardSubType, TrickSubType, DamageType, GameState } from '../types';
 import { suitColor } from '../types';
 import type { Rng } from '../util/rng';
 import { 装备牌列表 } from '../data/card-defs/equipment';
@@ -306,4 +306,19 @@ export function drawCards(deck: Card[], count: number): { drawn: Card[]; remaini
 
 export function discardCards(discardPile: Card[], cards: Card[]): Card[] {
   return [...discardPile, ...cards];
+}
+
+// ─── zones.deck 顶牌访问(牌堆顶 = 末尾,见 引擎架构.md 方向约定) ────────
+// 与上方构造期 helper(操作 Card[])不同,这两个 helper 操作运行时牌堆 zones.deck
+// (string[] cardId)。所有「取/看牌堆顶」的调用点统一走此处,避免手写
+// `deck[deck.length - 1]` / `deck.pop()` 时方向写反(历史上判定/红颜 曾按 deck[0] 当顶出错)。
+
+/** 看牌堆顶(不移除)。空堆返回 undefined。 */
+export function peekTop(state: GameState): string | undefined {
+  return state.zones.deck[state.zones.deck.length - 1];
+}
+
+/** 从牌堆顶取走一张(pop 末尾,与「摸牌」同向)。空堆返回 undefined。 */
+export function drawFromTop(state: GameState): string | undefined {
+  return state.zones.deck.pop();
 }

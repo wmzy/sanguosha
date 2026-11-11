@@ -23,8 +23,8 @@
 // 无模块级全局状态泄漏(与 skill.ts 的 registries 同构)。
 
 import type { GameState } from '../types';
-import { setTurnUsage } from './turn-usage';
-import { getSlashQuotaUsed, getSlashExtraUsed, slashQuotaUsedKey, slashExtraUsedKey, SLASH_QUOTA_USED_KEY as QUOTA_USED_VAR, SLASH_EXTRA_USED_KEY as EXTRA_USED_VAR, SLASH_USED_COUNT_KEY } from './vars-keys';
+import { setTurnUsage, projectTurnUsage } from './turn-usage';
+import { getSlashQuotaUsed, getSlashExtraUsed, slashQuotaUsedKey, slashExtraUsedKey, slashExtraKey, slashUnlimitedKey, slashBlockedKey, SLASH_QUOTA_USED_KEY as QUOTA_USED_VAR, SLASH_EXTRA_USED_KEY as EXTRA_USED_VAR, SLASH_USED_COUNT_KEY } from './vars-keys';
 
 /**
  * view 侧"已出杀次数"投影 key(由「回合用量」atom 同步到 view.turnUsage)。
@@ -336,4 +336,43 @@ export async function incSlashUsed(state: GameState, player = state.currentPlaye
       ...(player === state.currentPlayerIndex ? [{ scope: 'turn' as const, key: EXTRA_USED_VAR, value }] : []),
     ]);
   }
+}
+
+// ─── view 投影 helper(杀/* 前缀键族单点) ────────────────────
+//
+// 技能放宽出杀限制时,engine 侧真相由 provider(blocker/exemptor 等)承载,
+// view 侧必须同步投影到 turnUsage 的 '杀/<族>/<来源>' 前缀键——前端 viewSlashMax/
+// viewCanSlash 与无头枚举按前缀聚合;漏投影 = 引擎放行但客户端发不出动作。
+// 各技能原先手写完整的「回合用量」atom 字面量,统一收敛到此处,
+// 来源字符串(= 技能名)即 key 的唯一登记点。
+
+/** 投影「本回合额外出杀次数 +extra」到 view.turnUsage['杀/extra/<来源>']。
+ *  前端 viewSlashMax 按 '杀/extra/' 前缀求和推断上限(天义/界将驰/决堰/奇谋/界鞬出/立军/诈降 等)。 */
+export async function projectSlashExtra(
+  state: GameState,
+  player: number,
+  source: string,
+  extra: number,
+): Promise<void> {
+  await projectTurnUsage(state, player, slashExtraKey(source), extra);
+}
+
+/** 投影「本回合无限出杀」到 view.turnUsage['杀/unlimited/<来源>']。
+ *  前端 viewSlashMax 按 '杀/unlimited/' 前缀任一真值判定 ∞(咆哮/界咆哮/界父魂/雄乱/成略 等)。 */
+export async function projectSlashUnlimited(
+  state: GameState,
+  player: number,
+  source: string,
+): Promise<void> {
+  await projectTurnUsage(state, player, slashUnlimitedKey(source), true);
+}
+
+/** 投影「本回合禁止出杀」到 view.turnUsage['杀/blocked/<来源>']。
+ *  前端 viewCanSlash 按 '杀/blocked/' 前缀任一真值判定禁杀(界将驰 选项① 等)。 */
+export async function projectSlashBlocked(
+  state: GameState,
+  player: number,
+  source: string,
+): Promise<void> {
+  await projectTurnUsage(state, player, slashBlockedKey(source), true);
 }

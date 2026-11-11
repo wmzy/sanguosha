@@ -9,7 +9,7 @@
 // 只收敛 key 字符串本身,不改 value 类型/语义。
 // 局部 key(仅单文件读写)不收入此文件,避免过度收敛。
 
-import type { Json } from '../types';
+import type { GameState, Json } from '../types';
 
 // ── value 类型(跨技能 key 的契约值类型) ─────────────────────
 
@@ -106,36 +106,60 @@ export function usedThisTurnKey(skillName: string): string {
   return skillName + USED_THIS_TURN_SUFFIX;
 }
 
+// ── turn 作用域具名 view 投影键:单一声明点 ──────────────────
+//
+// 具名键原先三处登记(技能文件别名 + 本文件常量 + TURN_SCOPED_VIEW_KEYS 数组),
+// 漏一处即 view-projection desync。统一为 defineTurnScopedViewKey 单点声明:
+// 声明即注册(自动收进 TURN_SCOPED_VIEW_KEYS),技能文件只 import 常量,不再自带字符串。
+
+/** turn 作用域 view 投影键声明(state 权威 key + view 投影 key)。 */
+export interface TurnScopedViewKey {
+  /** state 侧权威 key(turn.vars / player.vars,「回合用量」atom 的 authority 写入)。 */
+  readonly stateKey: string;
+  /** view 侧投影 key(view.turnUsage,「回合用量」atom 同步;buildView 按镜像重建)。 */
+  readonly viewKey: string;
+}
+
+const turnScopedViewKeys: string[] = [];
+
+/** 声明一个 `{技能}/{属性}` 命名空间的回合内 view 投影键,并自动收进 TURN_SCOPED_VIEW_KEYS。
+ *  stateKey/viewKey 当前恒同字符串(同一 key 两侧使用);分开返回以便未来分叉。 */
+export function defineTurnScopedViewKey(skill: string, attr: string): TurnScopedViewKey {
+  const key = `${skill}/${attr}`;
+  if (!turnScopedViewKeys.includes(key)) turnScopedViewKeys.push(key);
+  return { stateKey: key, viewKey: key };
+}
+
 /** 拼点赢后本回合对其用牌无距离限制(值=目标座次)。写:界陷阵(WIN_VAR 别名);读:viewDistance。 */
-export const XIANZHEN_WIN_TARGET_VIEW_KEY = '陷阵/winTarget';
+export const XIANZHEN_WIN_TARGET_VIEW_KEY = defineTurnScopedViewKey('陷阵', 'winTarget').viewKey;
 /** 本回合弃置牌花色数组(同花色牌无距离/次数限制,前端宽松放行)。写:成略(SUITS_VAR 别名);读:viewDistance。 */
-export const CHENGLUE_SUITS_VIEW_KEY = '成略/suits';
+export const CHENGLUE_SUITS_VIEW_KEY = defineTurnScopedViewKey('成略', 'suits').viewKey;
 /** 选项②激活:杀无距离限制。写:界将驰(CHOICE2_VAR 别名);读:viewDistance。 */
-export const JIANGCHI_CHOICE2_VIEW_KEY = '将驰/choice2';
+export const JIANGCHI_CHOICE2_VIEW_KEY = defineTurnScopedViewKey('将驰', 'choice2').viewKey;
 /** 弃牌后本回合攻击范围无限。写:界弓骑(ACTIVE_VAR 别名);读:viewDistance。 */
-export const GONGQI_ACTIVE_VIEW_KEY = '界弓骑/active';
+export const GONGQI_ACTIVE_VIEW_KEY = defineTurnScopedViewKey('界弓骑', 'active').viewKey;
 /** 额外出牌阶段获得的杀无距离限制。写:界当先(NORANGE_ACTIVE_KEY 别名);读:viewDistance。 */
-export const DANGXIAN_NO_RANGE_VIEW_KEY = '当先/noRangeActive';
+export const DANGXIAN_NO_RANGE_VIEW_KEY = defineTurnScopedViewKey('当先', 'noRangeActive').viewKey;
 /** 拼点赢后本回合攻击范围无限(值=发起者座次)。写:天义;读:viewDistance。 */
-export const TIANYI_WIN_VIEW_KEY = '天义/win';
+export const TIANYI_WIN_VIEW_KEY = defineTurnScopedViewKey('天义', 'win').viewKey;
 /** 本回合使用牌无距离限制(值=true)。写:决堰(坐骑栏);读:viewDistance。 */
-export const JUEYAN_MOUNT_VIEW_KEY = '决堰/本回合:坐骑';
+export const JUEYAN_MOUNT_VIEW_KEY = defineTurnScopedViewKey('决堰', '本回合:坐骑').viewKey;
 /** 本回合首张牌无距离限制(值=true;首张牌用出后置 false)。写:往烈;读:viewDistance。 */
-export const WANGLIE_FIRST_VIEW_KEY = '往烈/首张可用';
+export const WANGLIE_FIRST_VIEW_KEY = defineTurnScopedViewKey('往烈', '首张可用').viewKey;
 /** 本回合对其使用牌无距离限制(值=目标座次)。写:雄乱;读:viewDistance。 */
-export const XIONGLUAN_TARGET_VIEW_KEY = '雄乱/目标';
+export const XIONGLUAN_TARGET_VIEW_KEY = defineTurnScopedViewKey('雄乱', '目标').viewKey;
 /** 拼点判定牌颜色(红/黑;异色手牌当【决斗】的门控)。写:双雄(COLOR_KEY 别名);读:双雄 activeWhen/cardFilter, buildView。 */
-export const SHUANGXIONG_COLOR_VIEW_KEY = '双雄/color';
+export const SHUANGXIONG_COLOR_VIEW_KEY = defineTurnScopedViewKey('双雄', 'color').viewKey;
 /** 摸牌阶段弃置牌颜色(红/黑;异色手牌当【决斗】的门控)。写:界双雄(COLOR_KEY 别名);读:界双雄 activeWhen/cardFilter, buildView。 */
-export const JIESHUANGXIONG_COLOR_VIEW_KEY = '界双雄/color';
+export const JIESHUANGXIONG_COLOR_VIEW_KEY = defineTurnScopedViewKey('界双雄', 'color').viewKey;
 /** 转换技当前态(阳/阴;阴态走被动 hook,阳态出牌阶段限一次)。写:审时(STATE_VIEW_KEY 别名,含回合开始重同步);读:审时 activeWhen, buildView。 */
-export const SHENSHI_STATE_VIEW_KEY = '审时/态';
+export const SHENSHI_STATE_VIEW_KEY = defineTurnScopedViewKey('审时', '态').viewKey;
 /** 转换技当前态(阳/阴;决定本回合摸弃张数选项)。写:成略(STATE_VIEW_KEY 别名,含回合开始重同步);读:成略 activeWhen, buildView。 */
-export const CHENGLUE_STATE_VIEW_KEY = '成略/态';
+export const CHENGLUE_STATE_VIEW_KEY = defineTurnScopedViewKey('成略', '态').viewKey;
 /** 额外出牌阶段激活(布尔;'end' 动作 activeWhen 据此区分额外/正常出牌阶段)。写:界当先(EXTRA_PHASE_TU 别名);读:界当先 end action activeWhen, buildView。 */
-export const DANGXIAN_EXTRA_PHASE_VIEW_KEY = '当先/extraPhase';
+export const DANGXIAN_EXTRA_PHASE_VIEW_KEY = defineTurnScopedViewKey('当先', 'extraPhase').viewKey;
 /** 转换技当前态(阳/阴;决定被动方向:阳=各摸一张+禁对方用牌,阴=获得其一张牌+己方禁用)。写:拒战(STATE_VIEW_KEY 别名);读:拒战 activeWhen, buildView。 */
-export const JUZHAN_STATE_VIEW_KEY = '拒战/态';
+export const JUZHAN_STATE_VIEW_KEY = defineTurnScopedViewKey('拒战', '态').viewKey;
 
 /** 回合用量 atom 在 turn.vars 中的按玩家镜像 key。 */
 export function viewMirrorKey(player: number, key: string): string {
@@ -148,24 +172,9 @@ export function viewMirrorKey(player: number, key: string): string {
  *  镜像按玩家座次存储(而非仅当前回合玩家),以覆盖被借刀/挑衅/激将等强制用牌在他人回合
  *  触发的回合用量；「回合结束」清空整个 turn.vars,所有镜像随之清理。
  *  限一次标记等只有显式通过「回合用量」atom 投影才会进入 view.turnUsage,
- *  不再从 player.vars 自动捞取内部状态。 */
-export const TURN_SCOPED_VIEW_KEYS: readonly string[] = [
-  XIANZHEN_WIN_TARGET_VIEW_KEY,
-  CHENGLUE_SUITS_VIEW_KEY,
-  JIANGCHI_CHOICE2_VIEW_KEY,
-  GONGQI_ACTIVE_VIEW_KEY,
-  DANGXIAN_NO_RANGE_VIEW_KEY,
-  TIANYI_WIN_VIEW_KEY,
-  JUEYAN_MOUNT_VIEW_KEY,
-  WANGLIE_FIRST_VIEW_KEY,
-  XIONGLUAN_TARGET_VIEW_KEY,
-  SHUANGXIONG_COLOR_VIEW_KEY,
-  JIESHUANGXIONG_COLOR_VIEW_KEY,
-  SHENSHI_STATE_VIEW_KEY,
-  CHENGLUE_STATE_VIEW_KEY,
-  DANGXIAN_EXTRA_PHASE_VIEW_KEY,
-  JUZHAN_STATE_VIEW_KEY,
-];
+ *  不再从 player.vars 自动捞取内部状态。
+ *  清单由上方 defineTurnScopedViewKey 声明时自动收集(单一声明点,勿手工维护)。 */
+export const TURN_SCOPED_VIEW_KEYS: readonly string[] = turnScopedViewKeys;
 
 // ── helpers:带后缀/前缀的拼接 key ──────────────────────────
 
@@ -238,6 +247,21 @@ export function getHandLimitBonus(turnVars: Record<string, Json> | undefined, pl
 /** 魂姿/awakened(整局一次,boolean)。 */
 export function getHunziAwakened(vars: Record<string, Json> | undefined): boolean | undefined {
   return asBoolean(vars?.[HUNZI_AWAKENED_KEY]);
+}
+
+// ── 觉醒技防重入(player.vars 的 `<技能名>/awakened` 标记,整局一次) ──────
+// 各觉醒技(志继/勤学/魂姿/凿险/潜心/破势/鸿举 等)共用模式:
+//   hook 入口读标记,已置位则早退;触发条件满足后立即置 true(在读条件后设,
+//   防同回合多时机重入——如 界志继 准备/结束两阶段)。
+
+/** 觉醒标记是否已置位(已觉醒 → 调用方应直接返回)。 */
+export function isAwakened(vars: Record<string, Json> | undefined, awakenedKey: string): boolean {
+  return !!vars?.[awakenedKey];
+}
+
+/** 置位觉醒标记(触发条件满足后调用,防重入;整局一次)。 */
+export function markAwakened(state: GameState, ownerId: number, awakenedKey: string): void {
+  state.players[ownerId].vars[awakenedKey] = true;
 }
 /** 化身/牌池(string[],默认 [])。 */
 export function getHuashenPool(vars: Record<string, Json> | undefined): string[] | undefined {

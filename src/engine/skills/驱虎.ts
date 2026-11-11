@@ -14,20 +14,10 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
-import { runRankCompareFlow } from '../flows/rank';
+import { askRankCardAndCompare } from '../flows/rank';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
-
-/** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
-function rankValue(rank: string): number {
-  if (rank === 'A') return 1;
-  if (rank === 'J') return 11;
-  if (rank === 'Q') return 12;
-  if (rank === 'K') return 13;
-  const n = parseInt(rank, 10);
-  return Number.isFinite(n) ? n : 0;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -74,51 +64,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       await pushFrame(state, '驱虎', from, { ...params });
 
-      const initiatorCard = state.cardMap[initiatorCardId];
-      const initiatorValue = initiatorCard ? rankValue(initiatorCard.rank) : 0;
-
-      // 1) 询问目标出拼点牌。拼点牌暂不移入处理区——由 runRankCompareFlow 的
-      //    拼点扣置 统一同时扣置(面朝下),对齐 rankcompare.md。
-      delete state.localVars['驱虎/targetCard'];
-      await applyAtom(state, {
-        type: '请求回应',
+      // 1)+2) 询问目标出拼点牌并比点(扣置→亮出→后→弃牌堆;目标未出牌走弃权兜底
+      //    ——清理发起方拼点牌、按发起方默认胜出,与正常拼点赢的结算一致),
+      //    封装于 flows/rank.ts。
+      const win = await askRankCardAndCompare(state, from, target, initiatorCardId, {
         requestType: '驱虎/拼点',
-        target,
-        prompt: {
-          type: 'useCard',
-          title: `驱虎:与 ${state.players[from].name} 拼点,请出一张手牌`,
-          cardFilter: { filter: () => true, min: 1, max: 1 },
-        },
+        answerKey: '驱虎/targetCard',
+        title: `驱虎:与 ${state.players[from].name} 拼点,请出一张手牌`,
         timeout: 30,
       });
-
-      const targetCardId = state.localVars['驱虎/targetCard'] as string | undefined;
-      delete state.localVars['驱虎/targetCard'];
-
-      // 2) 拼点两步化(扣置→亮出→后→弃牌堆)。目标未出牌(超时)走兜底。
-      let win: boolean;
-      if (targetCardId && state.players[target].hand.includes(targetCardId)) {
-        const result = await runRankCompareFlow(
-          state,
-          from,
-          target,
-          initiatorCardId,
-          targetCardId,
-        );
-        win = result === '赢';
-      } else {
-        // 目标未出牌(超时):无有效拼点牌,runRankCompareFlow 无法执行(需要 targetCard 在手)。
-        // 清理发起方拼点牌(手牌→弃牌堆),按发起方默认胜出处理(保留旧行为)。
-        // 理由:拼点规则中一方未出牌视为弃权,按发起方默认胜出(若发起方点数>0);
-        // 这样走"赢"分支让发起方选伤害目标,与正常拼点赢的结算一致。
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: initiatorCardId,
-          from: { zone: '手牌', player: from },
-          to: { zone: '弃牌堆' },
-        });
-        win = initiatorValue > 0;
-      }
 
       // 3) 结算输赢
       if (win) {

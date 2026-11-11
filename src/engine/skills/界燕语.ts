@@ -36,6 +36,7 @@ import {
   hasBlockingPending,
 } from '../core/skill';
 import { getGender } from '../data/character-meta';
+import { setPlayerVarUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界燕语';
@@ -70,8 +71,7 @@ async function addLostSha(state: GameState, ownerId: number, n: number): Promise
   const self = state.players[ownerId];
   if (!self) return;
   const cur = getLostSha(state, ownerId);
-  self.vars[LOST_SHA_KEY] = cur + n;
-  await applyAtom(state, { type: '回合用量', player: ownerId, key: LOST_SHA_KEY, value: cur + n });
+  await setPlayerVarUsage(state, ownerId, LOST_SHA_KEY, cur + n);
 }
 
 /** 是否处于 owner 的出牌阶段(用于增计数 hooks 的门控) */
@@ -162,8 +162,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (atom.player !== ownerId) return;
     const self = ctx.state.players[ownerId];
     if (!self) return;
-    self.vars[LOST_SHA_KEY] = 0;
-    await applyAtom(ctx.state, { type: '回合用量', player: ownerId, key: LOST_SHA_KEY, value: 0 });
+    await setPlayerVarUsage(ctx.state, ownerId, LOST_SHA_KEY, 0);
   });
 
   // ── 移动牌 after-hook:owner 手牌中的【杀】移出 → lostSha +1 ──

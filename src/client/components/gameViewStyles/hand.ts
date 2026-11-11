@@ -1,6 +1,12 @@
 // 手牌区样式:手牌列表/卡牌变体(选中/禁用/可回应/转化/distribute) + 翻牌动效 + 卡牌通用文案。
 
 import { css } from '@linaria/core';
+import {
+  eventCardMetaFade,
+  goldCandidateColors,
+  greenSelectedColors,
+  handCardMetaFade,
+} from './tokens';
 
 // ─── Hand cards ───
 export const handHeader = css`
@@ -147,7 +153,7 @@ export const eventCardArt = css`
   object-position: center top;
   z-index: 0;
 `;
-// 文字内容层:底部渐变蒙版
+// 文字内容层:底部渐变蒙版(与手牌文字层共用结构,tokens.bottomFadeGradient 生成)
 export const eventCardMeta = css`
   position: absolute;
   left: 0;
@@ -158,12 +164,7 @@ export const eventCardMeta = css`
   flex-direction: column;
   align-items: center;
   padding: 16px 12px 8px;
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.85) 0%,
-    rgba(0, 0, 0, 0.55) 60%,
-    rgba(0, 0, 0, 0) 100%
-  );
+  background: ${eventCardMetaFade};
 `;
 export const eventCardName = css`
   font-size: 16px;
@@ -274,7 +275,7 @@ export const handCardArt = css`
   object-position: center top;
   z-index: 0;
 `;
-// 手牌文字层:底部渐变蒙版覆盖,不撑高卡牌
+// 手牌文字层:底部渐变蒙版覆盖,不撑高卡牌(与翻牌卡文字层共用结构,tokens.bottomFadeGradient 生成)
 export const handCardMeta = css`
   position: absolute;
   left: 0;
@@ -285,12 +286,7 @@ export const handCardMeta = css`
   flex-direction: column;
   gap: 1px;
   padding: 14px 4px 6px;
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.82) 0%,
-    rgba(0, 0, 0, 0.55) 60%,
-    rgba(0, 0, 0, 0) 100%
-  );
+  background: ${handCardMetaFade};
 `;
 export const handCardSelected = css`
   border: 2px solid #3498db;
@@ -348,20 +344,21 @@ export const handCardPlayable = css`
   box-shadow: -1px 2px 6px rgba(0, 0, 0, 0.3), 0 0 5px rgba(255, 255, 255, 0.1);
 `;
 // useCard 类回应:已选中牌(待点「打出」出牌)绿色加粗高亮,区别于金色「可回应」
+// (色系 tokens.greenSelectedColors,与装备已选/分配选中同源;光晕/背景挡位最强)
 export const handCardRespondSelected = css`
-  border: 3px solid #2ecc71;
-  box-shadow: 0 0 14px rgba(46, 204, 113, 0.6);
-  background: rgba(46, 204, 113, 0.22);
+  border: 3px solid ${greenSelectedColors.border};
+  box-shadow: 0 0 14px rgba(${greenSelectedColors.rgb}, 0.6);
+  background: rgba(${greenSelectedColors.rgb}, 0.22);
   margin-bottom: 8px;
 `;
-// 转化模式:匹配卡牌用金色高亮表示可作为“转化后的牌”点选
+// 转化模式:匹配卡牌用金色高亮表示可作为“转化后的牌”点选(色系 tokens.goldCandidateColors)
 export const handCardTransform = css`
-  border: 2px solid #f1c40f;
-  box-shadow: 0 0 10px rgba(241, 196, 15, 0.5);
-  background: rgba(241, 196, 15, 0.08);
+  border: 2px solid ${goldCandidateColors.border};
+  box-shadow: 0 0 10px rgba(${goldCandidateColors.rgb}, 0.5);
+  background: rgba(${goldCandidateColors.rgb}, 0.08);
   cursor: pointer;
   &:hover {
-    background: rgba(241, 196, 15, 0.18);
+    background: rgba(${goldCandidateColors.rgb}, 0.18);
   }
 `;
 // 转化模式:不匹配卡牌变灰、不可点
@@ -370,19 +367,20 @@ export const handCardTransformDisabled = css`
   cursor: not-allowed;
 `;
 // distribute(仁德/制衡/遗计):候选可分配牌金色高亮
+// (与装备 equipDistCandidate 同色系 tokens.goldCandidateColors,仅边框声明/hover 挡位随卡型)
 export const handCardDistributeCandidate = css`
-  border: 2px solid #f1c40f;
-  box-shadow: 0 0 10px rgba(241, 196, 15, 0.4);
+  border: 2px solid ${goldCandidateColors.border};
+  box-shadow: 0 0 10px ${goldCandidateColors.glow};
   cursor: pointer;
   &:hover {
-    background: rgba(241, 196, 15, 0.15);
+    background: rgba(${goldCandidateColors.rgb}, 0.15);
   }
 `;
-// distribute:已选中牌(待分配/待提交)绿色加粗边框
+// distribute:已选中牌(待分配/待提交)绿色加粗边框(色系 tokens.greenSelectedColors)
 export const handCardDistributeSelected = css`
-  border: 2px solid #2ecc71;
-  box-shadow: 0 0 12px rgba(46, 204, 113, 0.5);
-  background: rgba(46, 204, 113, 0.15);
+  border: 2px solid ${greenSelectedColors.border};
+  box-shadow: 0 0 12px rgba(${greenSelectedColors.rgb}, 0.5);
+  background: rgba(${greenSelectedColors.rgb}, 0.15);
   margin-bottom: 8px;
 `;
 // distribute:已分配给目标(allocate 模式)半透明、不可再点
@@ -430,12 +428,12 @@ export const distExternalWrap = css`
   gap: 4px;
   margin: 4px 0 4px;
   padding: 6px 8px;
-  border: 1px dashed rgba(241, 196, 15, 0.3);
+  border: 1px dashed rgba(${goldCandidateColors.rgb}, 0.3);
   border-radius: 6px;
-  background: rgba(241, 196, 15, 0.04);
+  background: rgba(${goldCandidateColors.rgb}, 0.04);
 `;
 export const distExternalLabel = css`
-  color: #f1c40f;
+  color: ${goldCandidateColors.border};
   font-size: 12px;
   font-weight: bold;
   letter-spacing: 0.5px;

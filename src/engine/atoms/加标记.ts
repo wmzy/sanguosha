@@ -1,6 +1,7 @@
 // src/engine/atoms/加标记.ts
 // 加标记:为玩家添加一个 Mark
 import type { AtomDefinition, Mark, ViewEventSplit, ViewEvent } from '../types';
+import { mergeDistanceVars, type DistanceVarsDelta } from './distance-vars';
 
 export const 加标记: AtomDefinition<{
   player: number;
@@ -35,15 +36,7 @@ export const 加标记: AtomDefinition<{
     const mark = event.mark as Mark | undefined;
     if (mark) view.players[pi].marks.push(mark);
     // 距离修正 view 同步(技能如屯田加田时携带)
-    const dv = event.distanceVars as
-      | { attackMod?: number; defenseMod?: number; attackRange?: number }
-      | undefined;
-    if (dv) {
-      view.players[pi].distanceVars = {
-        ...view.players[pi].distanceVars,
-        ...dv,
-      };
-    }
+    mergeDistanceVars(view.players[pi], event.distanceVars as DistanceVarsDelta | undefined);
   },
 };
 

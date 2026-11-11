@@ -17,7 +17,7 @@ function responseCardFilter(atom: {
 }): ((card: Card) => boolean) | null {
   if (atom.mandatory === true) return null;
   // prompt 在类型上可缺省(旧构造路径):无 prompt = 无卡牌过滤,按 normal 询问。
-  if (!atom.prompt || atom.prompt.type !== 'useCard') return null;
+  if (atom.prompt?.type !== 'useCard') return null;
   const filter = atom.prompt.cardFilter?.filter;
   return typeof filter === 'function' ? filter : null;
 }

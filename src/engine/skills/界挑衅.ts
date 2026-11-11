@@ -22,6 +22,7 @@ import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
 import { defaultPlayActive } from '../rules/action-active';
+import { setPlayerVarUsage } from '../rules/turn-usage';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';
@@ -159,15 +160,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const from = ownerId;
       const target = params.target as number;
 
-      // 计数 +1(同步设 vars + 回合用量 atom 投影 view,防 dispatch 重入)
+      // 计数 +1(setPlayerVarUsage 同步设 vars + 回合用量 atom 投影 view,防 dispatch 重入)
       const nextCount = usesThisTurn(state, from) + 1;
-      state.players[from].vars[COUNT_KEY] = nextCount;
-      await applyAtom(state, {
-        type: '回合用量',
-        player: from,
-        key: COUNT_KEY,
-        value: nextCount,
-      });
+      await setPlayerVarUsage(state, from, COUNT_KEY, nextCount);
 
       await pushFrame(state, SKILL_ID, from, { ...params });
 

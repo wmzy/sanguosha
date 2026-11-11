@@ -46,8 +46,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { registerSlashExtraProvider } from '../rules/slash-quota';
-import { slashExtraKey } from '../rules/vars-keys';
+import { registerSlashExtraProvider, projectSlashExtra } from '../rules/slash-quota';
 
 const TAG = '界鞬出/禁闪';
 const CONFIRM = '界鞬出/confirmed';
@@ -135,12 +134,7 @@ async function askTargetToDiscard(
     state.turn.vars[QUOTA_BONUS] = cur + 1;
     // 额外出杀次数须投影到 view:前端 viewSlashMax/无头枚举读 view.turnUsage['杀/extra/*'],
     // 缺失则 +1 后第 2 张杀在客户端不可用(引擎放行但发不出动作)。
-    await applyAtom(state, {
-      type: '回合用量',
-      player: ownerId,
-      key: slashExtraKey('界鞬出'),
-      value: cur + 1,
-    });
+    await projectSlashExtra(state, ownerId, '界鞬出', cur + 1);
   }
 }
 

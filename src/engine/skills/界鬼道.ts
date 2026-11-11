@@ -1,30 +1,18 @@
 // 界鬼道(界张角·被动触发,OL 界限突破官方逐字):
 //   当一张判定牌生效前,你可以用一张黑色牌替换之,若此黑色牌为黑桃2~9,你摸一张牌。
 //
-// 界限突破(相对标鬼道 src/engine/skills/鬼道.ts):
-//   标鬼道:用一张黑色牌替换判定牌。
-//   界鬼道:同上,**且若替换牌为黑桃2~9,额外摸一张牌**。
-//
-// 其余机制(registerJudgeModifier / respond action / replaceJudgeCard 改判)与标版一致。
+// 界限突破(相对标鬼道 src/engine/skills/鬼道.ts):机制(registerJudgeModifier /
+// respond action / replaceJudgeCard 改判)与标版一致,复用其 createJudgeReplaceSkill
+// 工厂,仅注入差异参数:
+//   1. 文案前缀 '界鬼道'(询问/报错文案),并附 '(黑桃2~9摸一张)' 提示后缀;
+//      requestType/localVars 键独立('界鬼道/…',与标版键隔离);
+//   2. 替换牌为黑桃2~9 → 额外摸一张牌(onReplaced)。
 //
 // 命名:文件名/loader key/character skill name 均为 '界鬼道';
 //   内部 Skill.name = '鬼道'(OL 官方技能名,玩家可见)。
-import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply'
-import { frameCards } from '../core/frame';
-import { registerAction, registerJudgeModifier } from '../core/skill';
-import { replaceJudgeCard } from '../flows/judge';
-
-const _SKILL_ID = '界鬼道';
-const DISPLAY_NAME = '鬼道';
-const REPLACE_RT = '界鬼道/replace';
-const REPLACE_CARD_KEY = '界鬼道/replaceCard';
-
-/** 判断一张牌是否为黑色(♠或♣) */
-function isBlackCard(state: GameState, cardId: string): boolean {
-  const card = state.cardMap[cardId];
-  return !!card && card.color === '黑';
-}
+import type { Card } from '../types';
+import { applyAtom } from '../core/apply';
+import { createJudgeReplaceSkill, type JudgeReplaceOptions } from './鬼道';
 
 /** 判断一张牌的点数是否为 2~9 */
 function isRank2to9(rank: string): boolean {
@@ -46,115 +34,22 @@ function isSpade2to9(card: Card | undefined): boolean {
   return !!card && card.suit === '♠' && isRank2to9(card.rank);
 }
 
-export function createSkill(id: string, ownerId: number): Skill {
-  return {
-    id,
-    ownerId,
-    name: DISPLAY_NAME,
-    description: '判定牌生效前,你可以用一张黑色牌替换之,若为黑桃2~9,你摸一张牌',
-  };
-}
-
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
-
-  // ─── respond:界张角选替换牌(或拒绝) ──────────────────────
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as unknown as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== REPLACE_RT) return '当前不是界鬼道询问';
-      // 选择替换:cardId 必须是黑色手牌;拒绝则无额外要求
-      // 浏览器/Headless 客户端对 useCard 型 pending 只发 {cardId}(无 choice),
-      // 故 cardId 出现即视为发动意图;{choice:false}/{} 仍视为不发动。
-      if (params.choice === true || params.confirmed === true || typeof params.cardId === 'string') {
-        const cardId = params.cardId as string | undefined;
-        if (typeof cardId !== 'string') return '请选择一张替换牌';
-        if (!st.players[ownerId].hand.includes(cardId)) return '替换牌不在手牌中';
-        if (!isBlackCard(st, cardId)) return '界鬼道只能用黑色牌替换';
-      }
-      return null;
-    },
-    async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const use =
-        params.choice === true || params.confirmed === true || typeof params.cardId === 'string';
-      if (!use) {
-        st.localVars[REPLACE_CARD_KEY] = null;
-        return;
-      }
-      st.localVars[REPLACE_CARD_KEY] = params.cardId ?? null;
-    },
-  );
-
-  // ─── 判定改判钩子:翻开判定牌后询问是否用黑色牌替换 ────────────
-  registerJudgeModifier(state, skill.id, ownerId, async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.type !== '判定牌生效前') return;
-
-    const me = ctx.state.players[ownerId];
-    if (!me?.alive) return;
-    // 仅当有黑色手牌时才询问
-    if (!me.hand.some((id) => isBlackCard(ctx.state, id))) return;
-
-    // 当前判定牌(frameCards 顶)
-    const cards = frameCards(ctx.state);
-    if (cards.length === 0) return;
-
-    // 询问是否替换
-    delete ctx.state.localVars[REPLACE_CARD_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: REPLACE_RT,
-      target: ownerId,
-      prompt: {
-        type: 'useCard',
-        title: '界鬼道:是否打出一张黑色牌代替判定牌?(黑桃2~9摸一张)',
-        cardFilter: { filter: (c) => c.color === '黑', min: 1, max: 1 },
-      },
-      defaultChoice: false,
-      timeout: 15,
-    });
-
-    const replaceCardId = ctx.state.localVars[REPLACE_CARD_KEY] as string | null | undefined;
-    delete ctx.state.localVars[REPLACE_CARD_KEY];
-    if (!replaceCardId) return; // 不替换
-
-    // 二次校验:替换牌仍须在手中且为黑色
-    if (!me.hand.includes(replaceCardId)) return;
-    if (!isBlackCard(ctx.state, replaceCardId)) return;
-
-    const replaceCard = ctx.state.cardMap[replaceCardId];
-
-    // 交换判定牌:原判定牌 → 弃牌堆,替换牌 → 处理区(帧顶)。
-    // 两步都走「移动牌」atom —— 直接 mutate frameCards 会漏掉「替换牌离手(handCount)」
-    // 与「原判定牌入弃牌堆(discardPileCount)」的视图投影,客户端会一直显示司马懿手里还有那张牌。
-    await replaceJudgeCard(ctx.state, ownerId, replaceCardId);
-
-    // ── 界限突破新增:替换牌为黑桃2~9 → 摸一张牌 ──────────────
-    if (isSpade2to9(replaceCard)) {
-      await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
+const OPTIONS: JudgeReplaceOptions = {
+  name: '鬼道',
+  description: '判定牌生效前,你可以用一张黑色牌替换之,若为黑桃2~9,你摸一张牌',
+  replaceRequestType: '界鬼道/replace',
+  replaceCardKey: '界鬼道/replaceCard',
+  promptName: '界鬼道',
+  colorFilter: (c) => c.color === '黑',
+  hint: '(黑桃2~9摸一张)',
+  onReplaced: async (state, ownerId, replaceCardId) => {
+    // 界限突破新增:替换牌为黑桃2~9 → 摸一张牌
+    if (isSpade2to9(state.cardMap[replaceCardId])) {
+      await applyAtom(state, { type: '摸牌', player: ownerId, count: 1 });
     }
-  });
+  },
+};
 
-  return () => {};
-}
-
-export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
-    label: DISPLAY_NAME,
-    style: 'primary',
-    prompt: {
-      type: 'useCard',
-      title: '界鬼道:选择一张黑色牌代替判定牌(黑桃2~9摸一张)',
-      cardFilter: { filter: (c) => c.color === '黑', min: 1, max: 1 },
-    },
-  });
-}
+export const { createSkill, onInit, onMount } = createJudgeReplaceSkill(OPTIONS);
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

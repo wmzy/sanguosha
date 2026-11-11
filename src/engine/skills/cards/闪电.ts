@@ -10,26 +10,10 @@ import { TARGET_SYSTEM } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { runJudgeFlow } from '../../flows/judge';
 import { runDamageFlow } from '../../flows/damage';
+import { isSpade2to9 } from '../../flows/rank';
 import type { CardEffect, ResolveCtx } from '../../types';
 
 const TRICK_NAME = '闪电';
-
-/** 判定结果是否触发：黑桃 2~9 */
-function isLightningHit(card: Card): boolean {
-  if (card.suit !== '♠') return false;
-  const rank = card.rank;
-  const n =
-    rank === 'A'
-      ? 1
-      : rank === 'J'
-        ? 11
-        : rank === 'Q'
-          ? 12
-          : rank === 'K'
-            ? 13
-            : parseInt(rank, 10);
-  return n >= 2 && n <= 9;
-}
 
 /** 找逆时针下一位判定区没有闪电的存活玩家（从 current 起环形搜索） */
 function findNextRecipient(state: GameState, current: number): number | null {
@@ -88,7 +72,7 @@ async function resolveLightning(ctx: ResolveCtx): Promise<void> {
       type: '锦囊牌',
     };
 
-  if (judgeCard && isLightningHit(judgeCard)) {
+  if (isSpade2to9(judgeCard)) {
     // 黑桃 2-9：受到 3 点无来源雷电伤害 + 移除闪电（进弃牌堆）
     await runDamageFlow(state, TARGET_SYSTEM, target, 3, undefined, '雷电');
     await applyAtom(state, { type: '移除延时锦囊', player: target, trickName: TRICK_NAME });

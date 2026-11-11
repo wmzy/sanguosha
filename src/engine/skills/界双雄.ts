@@ -54,6 +54,7 @@ import {
   hasBlockingPending,
 } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
+import { setTurnVarUsage } from '../rules/turn-usage';
 import { JIESHUANGXIONG_COLOR_VIEW_KEY } from '../rules/vars-keys';
 import type { SkillModule } from '../types';
 
@@ -202,14 +203,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
     // 记录弃置牌颜色(后端 transform validate 读)
     const color = card.color;
-    ctx.state.turn.vars[COLOR_KEY] = color;
     // 投影到 view.turnUsage,供前端 activeWhen 读取
-    await applyAtom(ctx.state, {
-      type: '回合用量',
-      player: ownerId,
-      key: COLOR_KEY,
-      value: color,
-    });
+    await setTurnVarUsage(ctx.state, ownerId, COLOR_KEY, color);
   });
 
   // ── 造成伤害 after-hook:target=ownerId 且 amount>0 → 记伤害牌 id ──

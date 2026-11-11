@@ -1,13 +1,11 @@
 // server/room.ts
 import type { ConnectionSink } from './connection';
+import { broadcastToRoom } from './connection';
 import type { RoomInfo, RoomConfig, ServerMessage } from './protocol';
 import { DEFAULT_ROOM_CONFIG, normalizeRoomConfig } from './protocol';
 import { createRng } from '../engine/util/rng';
 import { register } from './lifecycles';
-import { createLogger } from './logger';
 import { verifyPassword } from './auth/password';
-
-const log = createLogger('room');
 
 export interface Room {
   id: string;
@@ -208,6 +206,44 @@ function clearSpectatorMembership(room: Room, playerId: string): void {
   room.pendingViewRequests.delete(playerId);
 }
 
+/** 座位分配：优先占用 preferSeat（调用方已校验有效且为空），否则首个空座；
+ *  seats 已满但容量未满（异常状态，如 seats 数组比 maxPlayers 短）时追加座位兜底，
+ *  保证 players 中的成员始终有座（与 joinRoom/joinDebugRoom 原实现一致）。
+ *  返回分配的座位下标。 */
+function assignSeat(room: Room, playerId: string, preferSeat?: number): number {
+  const seat = preferSeat ?? room.seats.indexOf(null);
+  if (seat >= 0) {
+    room.seats[seat] = playerId;
+    return seat;
+  }
+  room.seats.push(playerId);
+  return room.seats.length - 1;
+}
+
+/** 座位表→游戏座次映射（占座序号遍历）：遍历权威座位表 seats、跳过空洞（null），
+ *  第 ordinal 个非空座位映射到游戏座次 (ordinal + offset) % count。
+ *  必须遍历 seats 而非 players 连接序：换座（moveSeat/seat-swap）只改 seats 不改
+ *  Map 插入序，按连接序映射会让玩家拿到他人座次的私有视图，ownerId 校验随之错位。
+ *  占座序号 ordinal 而非物理下标：座位表可能有空洞（等待中玩家离开只清空座位
+ *  不压缩 seats），空洞后最高占座下标 ≥ count 时物理下标对 count 同余 → 两座位
+ *  映射同一座次互相覆盖、另一座次无人控制（reconnect.test.ts 空洞碰撞回归）。
+ *  ordinal ≥ count 的条目（防御性场景：占座数多于引擎玩家数）由调用方决定取舍。 */
+export function occupiedSeatEntries(
+  room: Room,
+  count: number,
+  offset: number,
+): Array<{ playerId: string; ordinal: number; seat: number }> {
+  const entries: Array<{ playerId: string; ordinal: number; seat: number }> = [];
+  let ordinal = 0; // 占座序号：第 ordinal 个非空座位（空洞不计入）
+  for (let i = 0; i < room.seats.length; i++) {
+    const pid = room.seats[i];
+    if (pid === null) continue;
+    entries.push({ playerId: pid, ordinal, seat: (ordinal + offset) % count });
+    ordinal++;
+  }
+  return entries;
+}
+
 export function joinRoom(
   roomId: string,
   playerId: string,
@@ -243,13 +279,7 @@ export function joinRoom(
   // 重新入会成为正式成员，撤销可能残留的断线宽限条目
   room.recentlyLeft.delete(playerId);
   // 分配首个空座位
-  const emptySeat = room.seats.indexOf(null);
-  if (emptySeat >= 0) {
-    room.seats[emptySeat] = playerId;
-  } else {
-    // seats 已满但 occupiedSeatCount 未满（异常状态）: 追加座位
-    room.seats.push(playerId);
-  }
+  assignSeat(room, playerId);
   return room;
 }
 
@@ -320,12 +350,7 @@ export function joinDebugRoom(
     return { room, replacedPlayerId };
   }
   // 分配首个空座位
-  const emptySeat = room.seats.indexOf(null);
-  if (emptySeat >= 0) {
-    room.seats[emptySeat] = playerId;
-  } else {
-    room.seats.push(playerId);
-  }
+  assignSeat(room, playerId);
   return { room, replacedPlayerId };
 }
 
@@ -397,9 +422,7 @@ export function kickPlayer(
   if (isPlayer) {
     removePlayerMembership(room, targetPlayerId);
   } else {
-    room.spectators.delete(targetPlayerId);
-    room.viewGrants.delete(targetPlayerId);
-    room.pendingViewRequests.delete(targetPlayerId);
+    clearSpectatorMembership(room, targetPlayerId);
   }
   room.playerNames.delete(targetPlayerId);
 
@@ -580,27 +603,13 @@ export function getRecentLeaveGrace(
 }
 
 export function broadcastMessage(room: Room, message: ServerMessage, excludeId?: string): void {
-  for (const [id, sink] of room.players) {
-    if (id !== excludeId) {
-      try {
-        sink.send(message);
-      } catch (err) {
-        const e = err instanceof Error ? err : new Error(String(err));
-        log.error(`ws.send failed for player ${id}`, { error: e.stack ?? String(e) });
-      }
-    }
-  }
   // 旁观者也接收广播消息（room_state/game_started/gameOver 等）
-  for (const [id, sink] of room.spectators) {
-    if (id !== excludeId) {
-      try {
-        sink.send(message);
-      } catch (err) {
-        const e = err instanceof Error ? err : new Error(String(err));
-        log.error(`ws.send failed for spectator ${id}`, { error: e.stack ?? String(e) });
-      }
-    }
-  }
+  broadcastToRoom(
+    room,
+    message,
+    (id, role) => `ws.send failed for ${role === 'player' ? 'player' : 'spectator'} ${id}`,
+    excludeId,
+  );
 }
 
 // session 活跃检查器:由 app.ts 注册(避免 room.ts 直接依赖 app.ts 的 gameSessions)。
@@ -777,9 +786,7 @@ export function removeSpectator(
 ): Room | null {
   const room = roomList.get(roomId);
   if (!room) return null;
-  room.spectators.delete(spectatorId);
-  room.viewGrants.delete(spectatorId);
-  room.pendingViewRequests.delete(spectatorId);
+  clearSpectatorMembership(room, spectatorId);
   // 仍在座位上(身份互斥的另一半不存在,防御性判断)则保留;否则彻底清除
   if (!room.seats.includes(spectatorId)) {
     room.playerNames.delete(spectatorId);
@@ -826,8 +833,7 @@ export function switchRole(
     clearSpectatorMembership(room, playerId);
     room.players.set(playerId, sink);
     // 占据指定座位（或首个空座位）
-    const emptySeat = seat ?? room.seats.indexOf(null);
-    if (emptySeat >= 0) room.seats[emptySeat] = playerId;
+    assignSeat(room, playerId, seat);
     return { room, success: true };
   }
 }

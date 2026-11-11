@@ -5,7 +5,7 @@ import { eventsForViewer } from '../../src/engine/view/events-for-viewer';
 import { getPendingDeadline } from '../../src/engine/view/buildView';
 import { applyServerMessage } from '../../src/client/headless/viewMaintainer';
 import { SHORT_DELAY_MS } from '../../src/engine/core/card-response-availability';
-import { createGameState, type ActionPrompt, type GameState, type GameView } from '../../src/engine/types';
+import { createGameState, type ActionPrompt, type GameState } from '../../src/engine/types';
 import { assertViewConsistency, SkillTestHarness, waitForStable } from '../engine-harness';
 import '../../src/engine/atoms';
 
@@ -157,7 +157,7 @@ describe('pending: production JSON/reconnect contract', () => {
       const view = harness.player(1).processedView;
       expect(view.pending?.mandatory).toBe(true);
       expect(() => assertViewConsistency({ ...view, pending: { ...view.pending!, mandatory: false } }, state, 1)).toThrow('mandatory');
-      const wrong = json(view) as GameView;
+      const wrong = json(view);
       wrong.pending!.prompt = { ...wrong.pending!.prompt, candidates: [] } as ActionPrompt;
       expect(() => assertViewConsistency(wrong, state, 1)).toThrow('candidates');
     } finally { await closePending(state); await waiting; }

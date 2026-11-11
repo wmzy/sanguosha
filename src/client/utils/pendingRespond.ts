@@ -19,6 +19,36 @@ export function getPendingRequestType(pending: PendingView): string {
   return typeof v === 'string' ? v : '';
 }
 
+/** requestType 首段('R/...' | 'R_...' → 'R';'R' → 'R')。
+ *  '/'(杀/respondKill、桃/求桃)与 '_'(过河拆桥_选牌)都是「技能/牌名 + 修饰」分隔符,
+ *  取首段即得请求的牌名或发起技能 id。原散落各处的 `reqType.search(/[/_]/)` 切分统一走此。 */
+export function requestTypeFirstSegment(reqType: string): string {
+  const sep = reqType.search(/[/_]/);
+  return sep >= 0 ? reqType.slice(0, sep) : reqType;
+}
+
+/** pending 请求的牌名(转化技回应方向的判据;浏览器 usePlayInteraction 与无头
+ *  availableActions 同一判据,原先两处逐字重复):
+ *  - 询问X → X(询问杀/询问闪)
+ *  - 请求回应 'R/...' → R(杀/respondKill、无懈可击、闪、桃/求桃…)
+ *  pending 不属于该座次(target !== seatIndex 且 target >= 0)或非这两类 atom → null。
+ *  广播型(target<0,如无懈可击)对所有存活座次开放,返回请求牌名。 */
+export function getPendingRequestedName(
+  pending: PendingView | null,
+  seatIndex: number,
+): string | null {
+  if (!pending) return null;
+  if (pending.target !== seatIndex && pending.target >= 0) return null;
+  const atomType = pending.atom?.type ?? '';
+  if (atomType.startsWith('询问')) return atomType.slice(2) || null;
+  if (atomType === '请求回应') {
+    const reqType = getPendingRequestType(pending);
+    if (!reqType) return null;
+    return requestTypeFirstSegment(reqType) || null;
+  }
+  return null;
+}
+
 /** 构造广播型 pending 的去重 key("<atomType>:<requestType>:t=<target>:c=<cancelTarget>")。
  *  用于 markBroadcastSkipped / skippedBroadcast 判重,避免同一 pending 重复弹窗。
  *
@@ -138,8 +168,7 @@ export function resolvePendingRespond(
   } else if (atomType === '请求回应') {
     if (!reqType) return null;
     // 'R/Y' → R 是 skillId;'R' → R 是 skillId;'R_盲选' → R 是 skillId
-    const sepIdx = reqType.search(/[/_]/);
-    skillId = sepIdx >= 0 ? reqType.slice(0, sepIdx) : reqType || null;
+    skillId = requestTypeFirstSegment(reqType) || null;
   }
   if (!skillId) return null;
 

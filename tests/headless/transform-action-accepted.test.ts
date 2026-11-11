@@ -167,6 +167,35 @@ describe('客户端枚举的转化技 action 引擎可接受(影子 id 约定)',
     expect(result.accepted, '客户端枚举的界父魂转化必须被引擎接受').toBe(true);
   });
 
+  // 回归:无头 combosOk 此前只枚举手牌对(availableActions 的 matchingCards = me.hand.filter),
+  // 而引擎 界父魂 的 validate 接受 手牌∪装备区 原料(cardInOwnZone)——手牌不足 minCards
+  // 时(1 手牌 + 1 装备)整类漏枚举;浏览器 transformComboOk 却支持装备区原料,两侧漂移。
+  // 修复:transformMaterialPool 在手牌匹配数 < minCards 时并入装备区匹配牌。
+  it('界父魂:手牌不足时装备区原料参与枚举且被引擎接受', async () => {
+    const handCard = mkCard('h1', '闪', '♥', '5');
+    const equipCard: Card = { ...mkCard('e1', '八卦阵', '♠', '2'), type: '装备牌' };
+    const p0 = mkPlayer(0, 'P0', ['h1'], ['界父魂', '杀', '回合管理']);
+    p0.equipment = { 武器: undefined, 防具: 'e1', 防御马: undefined, 进攻马: undefined };
+    const { state, actions } = await enumerateTransforms({
+      players: [p0, mkPlayer(1, 'P1', [], [])],
+      cardMap: { h1: handCard, e1: equipCard },
+      seat: 0,
+    });
+
+    const transform = actions.find((a) => a.message.preceding?.[0]?.skillId === '界父魂');
+    expect(transform, '手牌1张+装备1张时应枚举出手牌+装备区原料的界父魂转化').toBeDefined();
+    expect(transform!.message.params.cardId).toBe('h1#e1#界父魂');
+    expect(transform!.message.preceding?.[0]?.params.cardIds).toEqual(['h1', 'e1']);
+
+    const result = await dispatch(state, {
+      ...transform!.message,
+      params: { ...transform!.message.params, targets: [1] },
+      ownerId: 0,
+      baseSeq: state.seq,
+    });
+    expect(result.accepted, '手牌+装备区原料的界父魂转化必须被引擎接受').toBe(true);
+  });
+
   // 回归:多卡转化的产出牌由 transform 回调决定(乱击/界乱击 = 万箭齐发,非杀)。
   // 客户端枚举若硬编码主 action 为 杀.use,引擎 validate 读影子卡名(万箭齐发)恒拒
   // 「不是杀」→ 乱击/界乱击在无头/AI 客户端整类不可用。

@@ -33,8 +33,9 @@ import {
   registerBeforeHook,
   hasBlockingPending,
 } from '../core/skill';
-import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
-import { slashUnlimitedKey, XIONGLUAN_TARGET_VIEW_KEY } from '../rules/vars-keys';
+import { registerSlashUnlimitedProvider, projectSlashUnlimited } from '../rules/slash-quota';
+import { projectTurnUsage } from '../rules/turn-usage';
+import { XIONGLUAN_TARGET_VIEW_KEY } from '../rules/vars-keys';
 import { registerDistanceExemptor } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
 import type { SkillModule } from '../types';
@@ -159,20 +160,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         // ②「对其使用杀无次数限制」须投影到 view:前端 activeWhen(viewCanSlash)与
         // 无头/AI 枚举都读 view.turnUsage['杀/unlimited/*'],缺失则出过 1 张杀后
         // 按钮/动作消失,引擎虽放行但客户端发不出第 2 张杀。
-        await applyAtom(st, {
-          type: '回合用量',
-          player: ownerId,
-          key: slashUnlimitedKey('雄乱'),
-          value: true,
-        });
+        await projectSlashUnlimited(st, ownerId, '雄乱');
         // ①「对其使用牌无距离限制」同样须投影:前端 viewEffectiveDistance/viewCanAttack
         // 据此放开距离,否则超出范围的目标在 UI 中置灰、选不中。
-        await applyAtom(st, {
-          type: '回合用量',
-          player: ownerId,
-          key: TARGET_VAR,
-          value: target,
-        });
+        await projectTurnUsage(st, ownerId, TARGET_VAR, target);
       } finally {
         await popFrame(st);
       }

@@ -45,7 +45,7 @@ import type {
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
-import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
+import { registerSlashUnlimitedProvider, projectSlashUnlimited } from '../rules/slash-quota';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
 import { DISTANCE_ATTACK_RANGE_KEY, slashUnlimitedKey } from '../rules/vars-keys';
@@ -266,12 +266,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!isSlash) return;
       if (isGranted(ctx.state, ownerId)) return; // 已标记,避免重复投影
       ctx.state.turn.vars[GRANT_VAR] = ownerId;
-      await applyAtom(ctx.state, {
-        type: '回合用量',
-        player: ownerId,
-        key: slashUnlimitedKey('父魂'),
-        value: true,
-      });
+      await projectSlashUnlimited(ctx.state, ownerId, '父魂');
     },
   );
 

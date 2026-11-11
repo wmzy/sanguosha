@@ -8,6 +8,7 @@
 import { memo } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
+import { hpBeadPalette } from './gameViewStyles/tokens';
 import type { GameView, Json } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { isActiveAction, isFreePlayWindow, skillActionVariants } from '../utils/gameViewHelpers';
@@ -133,12 +134,9 @@ export function PlayerCardLargeImpl({
   // 剩余体力(满珠)在下方;满珠颜色按剩余比例分色:>50% 绿 / >25% 黄 / ≤25% 红(濒危警示)。
   const lostCount = Math.max(0, p.maxHealth - p.health);
   const hpRatio = p.maxHealth > 0 ? p.health / p.maxHealth : 1;
-  const hpBeadFullCls =
-    hpRatio > 0.5
-      ? styles.playerCardHpBeadFull
-      : hpRatio > 0.25
-        ? styles.playerCardHpBeadFullMid
-        : styles.playerCardHpBeadFullLow;
+  // 满珠色档(与 data-hue 同判据):playerCardHpBeadFull 单类 + --bead-* 内联变量注入
+  const hpHue = hpRatio > 0.5 ? 'green' : hpRatio > 0.25 ? 'yellow' : 'red';
+  const hpBeadFullVars = hpBeadPalette[hpHue];
   // 身份小方章(左缘竖带顶部):主公金/忠臣蓝/反贼红/内奸紫
   const identityBadgeClass =
     identity === '主公'
@@ -177,10 +175,10 @@ export function PlayerCardLargeImpl({
         {Array.from({ length: p.maxHealth }, (_, i) => (
           <span
             key={i}
-            className={i < lostCount ? styles.playerCardHpBeadEmpty : hpBeadFullCls}
+            className={i < lostCount ? styles.playerCardHpBeadEmpty : styles.playerCardHpBeadFull}
             data-full={i < lostCount ? undefined : 'true'}
-            data-hue={i < lostCount ? undefined : hpRatio > 0.5 ? 'green' : hpRatio > 0.25 ? 'yellow' : 'red'}
-            style={{ width: beadW, height: beadH }}
+            data-hue={i < lostCount ? undefined : hpHue}
+            style={{ width: beadW, height: beadH, ...(i < lostCount ? undefined : hpBeadFullVars) }}
           />
         ))}
       </div>

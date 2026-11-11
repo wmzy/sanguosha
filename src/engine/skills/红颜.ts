@@ -14,6 +14,7 @@
 //   黑桃手牌是否合法,不依赖本文件。本文件负责判定牌的花色转换。
 import type { Card, FrontendAPI, HookResult, Skill } from '../types';
 import { registerBeforeHook } from '../core/skill';
+import { peekTop } from '../core/deck';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -38,7 +39,7 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
       const atom = ctx.atom;
       // 仅小乔自己的判定:判定牌归小乔所有,红颜才生效
       if (atom.player !== ownerId) return;
-      const topId = ctx.state.zones.deck[ctx.state.zones.deck.length - 1];
+      const topId = peekTop(ctx.state);
       if (!topId) return;
       const card: Card | undefined = ctx.state.cardMap[topId];
       if (!card) return;

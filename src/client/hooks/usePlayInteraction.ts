@@ -24,16 +24,23 @@ import type {
   TargetFilter,
 } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
-import { getPendingRequestType, type PendingRespondInfo } from '../utils/pendingRespond';
+import {
+  getPendingRequestedName,
+  type PendingRespondInfo,
+} from '../utils/pendingRespond';
 
 import {
   buildPlayParams,
+  buildShadowCardId,
+  comboSatisfied,
   derivePlayRules,
   findUseActionForCard,
   findAltActionsForCard,
   isActiveAction,
   isFreePlayWindow,
+  producedNameOf,
   resolveDistributeCardIds,
+  resolveOwnCard,
   extractCardFilter,
 } from '../utils/gameViewHelpers';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
@@ -266,19 +273,9 @@ export function usePlayInteraction(
 
   // 回应窗口请求的牌名:询问X → X(询问杀/询问闪);请求回应 'R/...' → R(杀/respondKill、
   // 无懈可击、闪、桃/求桃…)。转化技(武圣/丈八蛇矛/龙胆/倾国/看破)在该窗口下可"当 R 打出"。
-  const pendingAtom = pending?.atom as { type?: string; requestType?: string } | undefined;
-  const pendingRequestedName = (() => {
-    if (!isMyAwaiting || !pending) return null;
-    const t = pendingAtom?.type ?? '';
-    if (t.startsWith('询问')) return t.slice(2) || null;
-    if (t === '请求回应') {
-      const rt = getPendingRequestType(pending);
-      if (!rt) return null;
-      const sep = rt.search(/[/_]/);
-      return (sep >= 0 ? rt.slice(0, sep) : rt) || null;
-    }
-    return null;
-  })();
+  // 解析与无头 availableActions 共享 getPendingRequestedName(原两处逐字重复);
+  // 此处仅叠加浏览器侧闸门:仅本视角被询问(isMyAwaiting)时生效。
+  const pendingRequestedName = isMyAwaiting ? getPendingRequestedName(pending, perspectiveIdx) : null;
 
   /** 转化技回应上下文:当前 pending 请求的牌名与转化后的牌名一致 → 转化牌走 R.respond 路径。
    *  覆盖 杀(武圣/丈八蛇矛/龙胆/界龙胆:南蛮/决斗/激将)、闪(倾国/龙胆:被杀指定)、
@@ -460,6 +457,7 @@ export function usePlayInteraction(
 
   // 转化方向 = 当前选中牌的产出牌名(而非进入模式时手牌里第一张匹配牌的产出名)。
   // 未选牌时回退到进入模式时的样本名(仅用于按钮文案占位)。
+  // 方向求值与无头枚举共享 producedNameOf;原料解析(手牌∪装备区)共享 resolveOwnCard。
   const transformWrapperName = (() => {
     if (!transformMode) return null;
     const ids =
@@ -469,11 +467,9 @@ export function usePlayInteraction(
           ? [selectedCardId]
           : [];
     if (ids.length === 0 || !transformMode.transform) return transformMode.wrapperName;
-    const card =
-      perspectiveHand.find((c) => c.id === ids[0]) ??
-      (Object.values(perspectiveEquipment).includes(ids[0]) ? view.cardMap[ids[0]] : undefined);
+    const card = resolveOwnCard(perspectiveHand, perspectiveEquipment, view.cardMap, ids[0]);
     if (!card || !transformMode.cardFilter(card)) return transformMode.wrapperName;
-    return transformMode.transform(card).name;
+    return producedNameOf(transformMode.transform, card);
   })();
 
   const selectedUseAction = (() => {
@@ -685,7 +681,6 @@ export function usePlayInteraction(
       perspectiveIdx,
       view,
       selectedTargetFilter,
-      selectedUseAction,
       selectedTarget,
       playRules,
       selectedMultiTargets,
@@ -971,22 +966,15 @@ export function usePlayInteraction(
 
   /** 多卡转化的组合约束校验(乱击/界乱击:两张同花色)。
    *  选中牌先查手牌,再查自己装备区(cardMap)——界父魂 的多卡转化原料含装备区。
-   *  缺 comboFilter 时恒真(丈八蛇矛/界父魂 任意两张)。 */
+   *  缺 comboFilter 时恒真(丈八蛇矛/界父魂 任意两张)。
+   *  判据与无头枚举共享 comboSatisfied + resolveOwnCard(原两处各自实现)。 */
   const transformComboOk = useCallback(
-    (ids: string[]): boolean => {
-      const filter = transformMode?.comboFilter;
-      if (!filter || ids.length === 0) return true;
-      const equipIds = new Set(Object.values(perspectiveEquipment).filter(Boolean));
-      const cards: Card[] = [];
-      for (const id of ids) {
-        const card =
-          perspectiveHand.find((c) => c.id === id) ??
-          (equipIds.has(id) ? view.cardMap[id] : undefined);
-        if (!card) return false;
-        cards.push(card);
-      }
-      return filter(cards);
-    },
+    (ids: string[]): boolean =>
+      comboSatisfied(
+        transformMode?.comboFilter,
+        (id) => resolveOwnCard(perspectiveHand, perspectiveEquipment, view.cardMap, id),
+        ids,
+      ),
     [transformMode, perspectiveHand, perspectiveEquipment, view.cardMap],
   );
 
@@ -1002,7 +990,7 @@ export function usePlayInteraction(
           const ids = transformMode.selectedCardIds;
           if (ids.length < transformMode.minCards || ids.length > transformMode.maxCards) return;
           if (!transformComboOk(ids)) return; // 组合约束(同花色)不满足 → 不提交
-          const shadowCardId = `${ids.join('#')}#${transformMode.skillId}`;
+          const shadowCardId = buildShadowCardId(ids, transformMode.skillId);
           send(transformWrapperName, 'respond', { cardId: shadowCardId }, [
             {
               skillId: transformMode.skillId,
@@ -1018,7 +1006,7 @@ export function usePlayInteraction(
         if (!selectedCardId) return;
         const targetCard = perspectiveHand.find((c) => c.id === selectedCardId);
         if (!targetCard) return;
-        const shadowCardId = `${selectedCardId}#${transformMode.skillId}`;
+        const shadowCardId = buildShadowCardId(selectedCardId, transformMode.skillId);
         send(transformWrapperName, 'respond', { cardId: shadowCardId }, [
           {
             skillId: transformMode.skillId,
@@ -1049,7 +1037,7 @@ export function usePlayInteraction(
         const ids = transformMode.selectedCardIds;
         if (ids.length < transformMode.minCards || ids.length > transformMode.maxCards) return;
         if (!transformComboOk(ids)) return; // 组合约束(同花色)不满足 → 不提交
-        const shadowCardId = `${ids.join('#')}#${transformMode.skillId}`;
+        const shadowCardId = buildShadowCardId(ids, transformMode.skillId);
         const mainParams: Record<string, Json> = { cardId: shadowCardId };
         if (playRules?.selfTarget) mainParams.targets = [perspectiveIdx];
         else if (needsManualTarget) mainParams.targets = [idx];
@@ -1064,7 +1052,7 @@ export function usePlayInteraction(
         if (!selectedCardId) return;
         const targetCard = perspectiveHand.find((c) => c.id === selectedCardId);
         if (!targetCard) return;
-        const shadowCardId = `${selectedCardId}#${transformMode.skillId}`;
+        const shadowCardId = buildShadowCardId(selectedCardId, transformMode.skillId);
         const mainParams: Record<string, Json> = { cardId: shadowCardId };
         if (playRules?.selfTarget) mainParams.targets = [perspectiveIdx];
         else if (needsManualTarget) mainParams.targets = [idx];

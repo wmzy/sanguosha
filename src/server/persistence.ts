@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import type { ActionLogEntry, GameState } from '../engine/types';
 import { RealClock } from '../engine/core/clock';
 import { register as registerLifecycle } from './lifecycles';
-import { createLogger } from './logger';
+import { createLogger, normalizeError } from './logger';
 // 函数级循环依赖(persistence→eventJournal→snapshot→persistence):所有交叉引用均在
 // 函数体内调用,模块求值期无访问,ESM 下安全。详见 eventJournal.ts 头部注释。
 import { removeEventJournal } from './eventJournal';
@@ -91,7 +91,7 @@ async function writeNow(roomId: string, wrapper: PersistedWrapper): Promise<void
     } catch {
       // 临时文件清理失败不覆盖原始写入错误
     }
-    const e = err instanceof Error ? err : new Error(String(err));
+    const e = normalizeError(err);
     log.error(`save failed for room ${roomId}`, { error: e.stack ?? String(e) });
     throw e;
   }
@@ -106,7 +106,7 @@ async function readWrapperFromDisk(roomId: string): Promise<PersistedWrapper | n
     return parsed;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    const e = err instanceof Error ? err : new Error(String(err));
+    const e = normalizeError(err);
     log.error(`read failed for room ${roomId}`, { error: e.stack ?? String(e) });
     throw e;
   }
@@ -118,7 +118,7 @@ async function deleteFile(roomId: string): Promise<void> {
     await unlink(path);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
-    const e = err instanceof Error ? err : new Error(String(err));
+    const e = normalizeError(err);
     log.error(`delete failed for room ${roomId}`, { error: e.stack ?? String(e) });
     throw e;
   }

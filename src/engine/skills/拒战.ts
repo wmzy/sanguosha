@@ -39,12 +39,12 @@ import { registerAction, registerAfterHook, registerBeforeHook } from '../core/s
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY, JUZHAN_STATE_VIEW_KEY } from '../rules/vars-keys';
+import { projectTurnUsage } from '../rules/turn-usage';
 
 const SKILL_ID = '拒战';
-/** 转换态 state key(跨回合持久,无 /usedThisTurn 后缀)。 */
-const STATE_KEY = '拒战/态';
-/** 转换态 view 同步 key(经 回合用量 atom 投影 turnUsage;注册进 TURN_SCOPED_VIEW_KEYS 供重连重建)。 */
-const STATE_VIEW_KEY = JUZHAN_STATE_VIEW_KEY;
+/** 转换态 key(state:player.vars 跨回合持久,无 /usedThisTurn 后缀;view:经 回合用量 atom 投影 turnUsage)。
+ *  单一声明点在 vars-keys(defineTurnScopedViewKey),此处只 import,不再自带字符串。 */
+const STATE_KEY = JUZHAN_STATE_VIEW_KEY;
 /** turn.vars key:本回合禁制对(随「回合结束」atom 自动清空)。 */
 const FORBIDDEN_VAR = '拒战/禁对';
 
@@ -62,12 +62,7 @@ function getState(state: GameState, ownerId: number): '阳' | '阴' {
 }
 
 async function syncStateView(state: GameState, ownerId: number): Promise<void> {
-  await applyAtom(state, {
-    type: '回合用量',
-    player: ownerId,
-    key: STATE_VIEW_KEY,
-    value: getState(state, ownerId),
-  });
+  await projectTurnUsage(state, ownerId, STATE_KEY, getState(state, ownerId));
 }
 
 function isForbidden(state: GameState, from: number, to: number): boolean {

@@ -29,12 +29,11 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
-import { registerSlashExtraProvider } from '../rules/slash-quota';
+import { registerSlashExtraProvider, projectSlashExtra } from '../rules/slash-quota';
 import { defaultPlayActive } from '../rules/action-active';
 import {
   DISTANCE_ATTACK_MOD_KEY as ATTACK_KEY,
   getDistanceAttackMod,
-  slashExtraKey,
 } from '../rules/vars-keys';
 
 /** 限定技已用标记(player.vars,整局一次,无自动清理后缀) */
@@ -132,12 +131,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
           // 6) 本回合使用【杀】限制次数 +X:turn.vars 驱动 provider + view 投影
           st.turn.vars[EXTRA_KEY] = x;
-          await applyAtom(st, {
-            type: '回合用量',
-            player: ownerId,
-            key: slashExtraKey('奇谋'),
-            value: x,
-          });
+          await projectSlashExtra(st, ownerId, '奇谋', x);
         } finally {
           await popFrame(st);
         }

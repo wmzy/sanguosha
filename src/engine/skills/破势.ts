@@ -25,6 +25,7 @@ import { getHealthValue } from '../types';
 import type { EquipSlot } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
+import { isAwakened, markAwakened } from '../rules/vars-keys';
 import { ABOLISH_PREFIX } from './决堰';
 import type { SkillModule } from '../types';
 
@@ -58,7 +59,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
     if (atom.phase !== '准备') return;
-    if (ctx.state.players[ownerId]?.vars[AWAKENED_KEY]) return; // 整局一次
+    if (isAwakened(ctx.state.players[ownerId]?.vars, AWAKENED_KEY)) return; // 整局一次
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
 
@@ -68,7 +69,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!abolished && !healthIsOne) return;
 
     // 标记已觉醒(读完条件立即设,防重入)
-    ctx.state.players[ownerId].vars[AWAKENED_KEY] = true;
+    markAwakened(ctx.state, ownerId, AWAKENED_KEY);
 
     // 1. 减少1点体力上限(设上限 clamp 体力:若体力 > 新上限则降至新上限)
     await applyAtom(ctx.state, {

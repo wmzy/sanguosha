@@ -28,6 +28,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import { getCardEffect } from './cards';
+import { TRANSFORM_ACTION_PREFIX } from '../util/declaredActionType';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界渐营';
@@ -46,11 +47,6 @@ const CONFIRMED_KEY = `${SKILL_ID}/confirmed`;
 
 /** 渐营第二段允许声明的目标牌名(基本牌) */
 const ALLOWED_NAMES: ReadonlySet<string> = new Set(['杀', '闪', '桃', '酒']);
-
-/** 第二段 transform 的 actionType 前缀:一个声明牌名一个 action(`transform:杀`…)。
- *  客户端(浏览器技能按钮 / 无头枚举)无法凭空提供 params.outputName —— 把「声明」编码进
- *  actionType 后,声明由用户点哪个按钮决定,preceding 与主 action 自然一一对应。 */
-const TRANSFORM_ACTION_PREFIX = 'transform:';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

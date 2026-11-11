@@ -1,6 +1,12 @@
 // 操作栏 + 技能/装备按钮 + 装备区纵向列 + 角色大卡样式。
 
 import { css } from '@linaria/core';
+import {
+  goldCandidateColors,
+  greenSelectedColors,
+  hpBeadPalette,
+  playerCardBottomFade,
+} from './tokens';
 
 // ─── Action bar(中央操作台内) ───
 export const actionBar = css`
@@ -119,23 +125,24 @@ export const equipSkillActive = css`
     background: rgba(243, 156, 18, 0.34);
   }
 `;
-// 装备卡片:distribute 候选态(金色边框,可点击选中)
+// 装备卡片:distribute 候选态(金色边框,可点击选中;与手牌 handCardDistributeCandidate
+// 同色系 tokens.goldCandidateColors,仅背景/光晕挡位按装备卡尺寸微调)
 export const equipDistCandidate = css`
   cursor: pointer;
-  border-color: #f1c40f;
-  background: rgba(241, 196, 15, 0.14);
-  box-shadow: 0 0 8px rgba(241, 196, 15, 0.4);
+  border-color: ${goldCandidateColors.border};
+  background: rgba(${goldCandidateColors.rgb}, 0.14);
+  box-shadow: 0 0 8px ${goldCandidateColors.glow};
   &:hover {
-    background: rgba(241, 196, 15, 0.24);
+    background: rgba(${goldCandidateColors.rgb}, 0.24);
   }
 `;
-// 装备卡片:已选中态(向右偏移 + 绿色高亮,与手牌选中一致)
+// 装备卡片:已选中态(向右偏移 + 绿色高亮,与手牌选中一致;色系 tokens.greenSelectedColors)
 export const equipSelected = css`
   transform: translateX(8px);
-  border-color: #2ecc71;
-  color: #2ecc71;
-  background: rgba(46, 204, 113, 0.16);
-  box-shadow: 0 0 10px rgba(46, 204, 113, 0.55);
+  border-color: ${greenSelectedColors.border};
+  color: ${greenSelectedColors.border};
+  background: rgba(${greenSelectedColors.rgb}, 0.16);
+  box-shadow: 0 0 10px rgba(${greenSelectedColors.rgb}, 0.55);
 `;
 // 装备卡片:可发动技能徽标(靠右)
 export const equipSkillBadge = css`
@@ -415,43 +422,25 @@ export const playerCardHpBeadCol = css`
   align-items: center;
   pointer-events: none;
 `;
+// 满珠水滴珠(单类):三档分色经 --bead-c1/--bead-c2/--bead-border/--bead-glow CSS 变量
+// 注入(缺省=绿档),色值统一来自 tokens.hpBeadPalette——剩余体力 >50% 绿 / >25% 黄 /
+// ≤25% 红(濒危警示),由 PlayerCardLarge/PlayerSeatView(座位卡)按剩余比例内联选择,
+// 大卡与座位卡共用同一套珠色(此前两文件各镜像三份色值类)。
 export const playerCardHpBeadFull = css`
   box-sizing: border-box;
   flex-shrink: 0;
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
-  background: linear-gradient(135deg, #7ec850 8%, #3e8f2e 92%);
-  border: 1px solid rgba(46, 94, 28, 0.9);
+  background: linear-gradient(
+    135deg,
+    var(--bead-c1, ${hpBeadPalette.green['--bead-c1']}) 8%,
+    var(--bead-c2, ${hpBeadPalette.green['--bead-c2']}) 92%
+  );
+  border: 1px solid var(--bead-border, ${hpBeadPalette.green['--bead-border']});
   box-shadow:
     inset 0 2px 2px rgba(255, 255, 255, 0.35),
     inset 0 -1px 2px rgba(0, 0, 0, 0.25),
-    0 0 6px rgba(126, 200, 80, 0.45);
-`;
-// 满珠分色(色值镜像座位卡 seatHpBeadFullMid/FullLow):剩余体力 >50% 绿(上面的默认款)/
-// >25% 黄 / ≤25% 红(濒危警示),由 PlayerCardLarge 按剩余比例选择
-export const playerCardHpBeadFullMid = css`
-  box-sizing: border-box;
-  flex-shrink: 0;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
-  background: linear-gradient(135deg, #e8c84a 8%, #b8862a 92%);
-  border: 1px solid rgba(122, 88, 20, 0.9);
-  box-shadow:
-    inset 0 2px 2px rgba(255, 255, 255, 0.35),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.25),
-    0 0 6px rgba(232, 200, 74, 0.45);
-`;
-export const playerCardHpBeadFullLow = css`
-  box-sizing: border-box;
-  flex-shrink: 0;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
-  background: linear-gradient(135deg, #e85d4a 8%, #a8281a 92%);
-  border: 1px solid rgba(122, 30, 20, 0.9);
-  box-shadow:
-    inset 0 2px 2px rgba(255, 255, 255, 0.35),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.25),
-    0 0 6px rgba(232, 93, 74, 0.5);
+    0 0 6px var(--bead-glow, ${hpBeadPalette.green['--bead-glow']});
 `;
 export const playerCardHpBeadEmpty = css`
   box-sizing: border-box;
@@ -515,7 +504,8 @@ export const playerCardContent = css`
   overflow: hidden;
   border-radius: 5px;
 `;
-// 卡底部紧凑区:技能按钮排 + 判定行 + 手牌角标(官方为暗色小牌叠放);左让开竖带
+// 卡底部紧凑区:技能按钮排 + 判定行 + 手牌角标(官方为暗色小牌叠放);左让开竖带;
+// 底部暖黑渐隐蒙版与手牌/翻牌卡文字层共用同一结构(tokens.bottomFadeGradient 生成)
 export const playerCardBottom = css`
   margin-top: auto;
   margin-left: 30px;
@@ -523,12 +513,7 @@ export const playerCardBottom = css`
   display: flex;
   flex-direction: column;
   gap: 3px;
-  background: linear-gradient(
-    to top,
-    rgba(10, 8, 5, 0.9) 0%,
-    rgba(10, 8, 5, 0.78) 72%,
-    rgba(10, 8, 5, 0) 100%
-  );
+  background: ${playerCardBottomFade};
 `;
 export const playerCardSkillRow = css`
   display: flex;

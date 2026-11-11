@@ -8,12 +8,15 @@ import type {
   ActionContext,
   ActionPrompt,
   Card,
+  CardWrapper,
   GameView,
   Json,
   DistributePrompt,
   TargetFilter,
 } from '../../engine/types';
 import { getCardEffect } from '../../engine/skills/cards';
+import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../../engine/data/card-defs';
+import { TRANSFORM_ACTION_PREFIX } from '../../engine/util/declaredActionType';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { defaultPlayActive } from '../../engine/rules/action-active';
 import { validateTargetSelection } from '../../engine/rules/target-selection';
@@ -81,7 +84,7 @@ const NON_ALT_ACTION_TYPES = new Set(['respond', 'transform', 'distribute']);
 
 /** actionType 是否属于"有独立交互入口、不作 altAction"的类型(集合 + transform: 前缀族)。 */
 function isNonAltActionType(actionType: string): boolean {
-  return NON_ALT_ACTION_TYPES.has(actionType) || actionType.startsWith('transform:');
+  return NON_ALT_ACTION_TYPES.has(actionType) || actionType.startsWith(TRANSFORM_ACTION_PREFIX);
 }
 
 /**
@@ -103,6 +106,131 @@ export function findAltActionsForCard(
     const filter = extractCardFilter(a.prompt);
     return filter ? filter(card) : false;
   });
+}
+
+// ─── 转化技(transform)共享判据:影子 id / 原料解析 / 组合约束 / 方向与产出牌门 ───
+
+/** 转化技影子卡 id:`${选中牌 id 以 # 连接}#${skillId}`(与引擎转化 execute 的 shadowIdOf 同约定)。
+ *  浏览器 usePlayInteraction 与无头 availableActions 构造主 action 的 cardId 必须用同一拼接,
+ *  否则主 action 读不到 cardMap[影子 id] → validate 恒失败,该转化技整类不可用。 */
+export function buildShadowCardId(ids: string | string[], skillId: string): string {
+  const joined = Array.isArray(ids) ? ids.join('#') : ids;
+  return `${joined}#${skillId}`;
+}
+
+/** 手牌 ∪ 自己装备区 的 id → Card 解析(界父魂/界武圣/奇袭 的转化原料含装备区牌)。 */
+export function resolveOwnCard(
+  hand: Card[] | undefined | null,
+  equipment: Partial<Record<string, string | null>> | undefined,
+  cardMap: GameView['cardMap'],
+  id: string,
+): Card | undefined {
+  const inHand = hand?.find((c) => c.id === id);
+  if (inHand) return inHand;
+  const inEquip = Object.values(equipment ?? {}).some((equipId) => equipId === id);
+  return inEquip ? cardMap[id] : undefined;
+}
+
+/** 多卡转化的组合约束校验(乱击/界乱击:两张同花色)。浏览器(提交前拦截)与
+ *  无头(枚举过滤)同一判据:缺 comboFilter 时恒真(丈八蛇矛/界父魂 任意两张);
+ *  某张 id 解析不到 Card(不在手牌∪装备区)时恒假。
+ *  @param comboFilter prompt.cardFilter.comboFilter(「两张牌之间」的约束,单卡 filter 表达不了)
+ *  @param resolveCard 原料牌解析(手牌 ∪ 自己装备区) */
+export function comboSatisfied(
+  comboFilter: ((cards: Card[]) => boolean) | undefined,
+  resolveCard: (id: string) => Card | undefined,
+  ids: string[],
+): boolean {
+  if (!comboFilter || ids.length === 0) return true;
+  const cards: Card[] = [];
+  for (const id of ids) {
+    const card = resolveCard(id);
+    if (!card) return false;
+    cards.push(card);
+  }
+  return comboFilter(cards);
+}
+
+/** 转化方向求值:按一张具体原料牌求产出牌名(transform 回调)。
+ *  多向转化技(龙胆 杀↔闪 / 界龙胆 杀/闪/酒/桃)的方向必须跟随**当前选中的牌**,
+ *  按进入模式时的样本牌钉死方向会让另一方向的主 action 不存在(按钮消失)或方向不符(引擎拒)。 */
+export function producedNameOf(
+  transform: (card: Card) => CardWrapper,
+  card: Card,
+): string {
+  return transform(card).name;
+}
+
+/** 产出牌的真实 CardDef(type/subtype),供转化动作查找同源 use action。
+ *  不能沿用原料牌的 type:装备原料(青釭剑)+普通牌在丈八组合中若沿用
+ *  type='装备牌',会先匹配「装备通用」而不是产出杀的 action,生成缺 targets 的坏动作。 */
+const CARD_DEFS_BY_NAME = new Map(
+  [...基本牌列表, ...锦囊牌列表, ...装备牌列表].map((def) => [def.name, def]),
+);
+
+/** 把原料牌包装成产出牌(名 + 真实 type/subtype),供 findUseActionForCard 匹配同源 use action。 */
+export function asProducedCard(source: Card, outputName: string): Card {
+  const def = CARD_DEFS_BY_NAME.get(outputName);
+  return {
+    ...source,
+    name: outputName,
+    ...(def ? { type: def.type, subtype: def.subtype } : {}),
+  };
+}
+
+/** 从 use action 的 prompt 取 targetFilter(useCardAndTarget/selectTarget 才有)。 */
+export function getTargetFilter(prompt: ActionPrompt): TargetFilter | null {
+  if (prompt.type === 'useCardAndTarget' || prompt.type === 'selectTarget') {
+    return prompt.targetFilter;
+  }
+  return null;
+}
+
+/** useCardAndTarget 的 selfTarget 标志(桃/酒自动以自己为目标)。 */
+export function getSelfTarget(prompt: ActionPrompt): boolean {
+  return prompt.type === 'useCardAndTarget' ? !!prompt.selfTarget : false;
+}
+
+/** 转化动作「产出牌门」+ 目标语义解析结果。produced 为 undefined 表示产出牌
+ *  无注册 use action(回退 transform 自身的 targetFilter/rules)。 */
+export interface ProducedTransformGate {
+  /** 产出牌名(由 transform 回调按原料牌求值) */
+  wrapperName: string;
+  /** 产出牌自己的 use action(findUseActionForCard 按产出牌匹配) */
+  produced: SkillActionDef | undefined;
+  /** 目标语义:产出牌 use action 的 targetFilter,无时回退 transform 自身的 */
+  targetFilter: TargetFilter | null;
+  /** 目标规则:由产出牌 use action 派生,无时回退 transform 自身的 */
+  rules: PlayRules;
+}
+
+/** 转化技「产出牌门」与目标语义解析(浏览器提交门与无头枚举门的共享判据):
+ *  - 产出牌无主动 use 入口(闪/无懈可击 timing='生效前')或其 use action 未激活
+ *    (桃 需已受伤)→ 返回 null(必拒动作:浏览器不得提交,无头不枚举);
+ *  - 目标语义取**产出牌自己的 use action**(酒无目标 / 桃 selfTarget / 杀 攻击范围),
+ *    而非 transform action 自身的 targetFilter(那是为原料牌方向设计的)。
+ *  无头枚举的单卡/多卡分支原先各自复制一份此判据,现合并于此。 */
+export function resolveProducedAction(
+  skillActions: SkillActionDef[],
+  action: SkillActionDef,
+  sourceCard: Card,
+  ctx: ActionContext,
+): ProducedTransformGate | null {
+  const transform = action.transform;
+  if (!transform) return null;
+  const wrapperName = producedNameOf(transform, sourceCard);
+  if (!hasUseEntry({ name: wrapperName })) return null;
+  const produced = findUseActionForCard(
+    skillActions,
+    asProducedCard(sourceCard, wrapperName),
+  );
+  if (produced && !isActiveAction(produced, ctx)) return null;
+  const fallbackFilter = getTargetFilter(action.prompt);
+  const targetFilter = produced ? getTargetFilter(produced.prompt) : fallbackFilter;
+  const rules = produced
+    ? derivePlayRules(targetFilter, getSelfTarget(produced.prompt))
+    : derivePlayRules(fallbackFilter, getSelfTarget(action.prompt));
+  return { wrapperName, produced, targetFilter, rules };
 }
 
 // ─── params 构造 ───

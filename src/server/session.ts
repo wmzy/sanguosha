@@ -28,8 +28,9 @@ import {
 
 import type { ServerMessage, DeadlineInfo } from './protocol';
 import type { Room } from './room';
-import { createLogger } from './logger';
-import { setRoomStatus } from './room';
+import { createLogger, normalizeError } from './logger';
+import { setRoomStatus, occupiedSeatEntries } from './room';
+import { sendSafe, broadcastToRoom } from './connection';
 import { saveRoom, deletePersistedRoom } from './persistence';
 import { appendEventJournal, resetEventJournal } from './eventJournal';
 import { appendGameHistory, buildHistoryEntry, buildReplayFile } from './gameHistory';
@@ -143,16 +144,13 @@ export class GameSession {
    *  fallbackNames: 恢复路径传入旧 state 的玩家名(游戏座次序),按游戏座次 g 取值。 */
   private seatDisplayNames(count: number, offset: number, fallbackNames?: string[]): string[] {
     const out: string[] = new Array(count).fill('');
-    let k = 0; // 占座序号:第 k 个非空座位(空洞不计入)
-    for (let i = 0; i < this.room.seats.length && k < count; i++) {
-      const pid = this.room.seats[i];
-      if (pid === null) continue;
-      const g = (k + offset) % count;
-      const fromRoom = this.room.playerNames.get(pid);
-      // fallbackNames 是游戏座次序(state.players.map(p=>p.name)),必须按游戏座次 g
-      // 取值;按物理下标 i 取会在 offset≠0/有空洞时把别人的旧名写到本座次上。
-      out[g] = fromRoom ?? fallbackNames?.[g] ?? '';
-      k++;
+    for (const { playerId, ordinal, seat } of occupiedSeatEntries(this.room, count, offset)) {
+      // 占座数超过 count(防御):超出部分不覆盖已填槽位(与旧实现的 k<count 截断一致)
+      if (ordinal >= count) break;
+      const fromRoom = this.room.playerNames.get(playerId);
+      // fallbackNames 是游戏座次序(state.players.map(p=>p.name)),必须按游戏座次 seat
+      // 取值;按物理下标取会在 offset≠0/有空洞时把别人的旧名写到本座次上。
+      out[seat] = fromRoom ?? fallbackNames?.[seat] ?? '';
     }
     return out;
   }
@@ -197,12 +195,8 @@ export class GameSession {
     // 占座序号映射(与 startGame 同款):座位表有空洞(等待中离开只清空不压缩)时,
     // 物理下标 i 对 n 同余会碰撞覆盖;用第 k 个非空座位计数,保证映射互不相同。
     const n = this.state.players.length;
-    let k = 0; // 占座序号:第 k 个非空座位(空洞不计入)
-    for (let i = 0; i < this.room.seats.length; i++) {
-      const pid = this.room.seats[i];
-      if (pid === null) continue;
-      this.playerNames.set(pid, (k + offset) % n);
-      k++;
+    for (const { playerId, seat } of occupiedSeatEntries(this.room, n, offset)) {
+      this.playerNames.set(playerId, seat);
     }
     // 恢复局也记录历史:基线取恢复时刻的视图(若选将已完成则立即捕获;否则等
     // onStateChange 在选将完成后捕获)。startedAt 用恢复时刻近似。
@@ -263,7 +257,7 @@ export class GameSession {
         // 由 maybeCaptureReplayBaseline 在选将完成后的 onStateChange 中捕获
       })
       .catch((err) => {
-        const e = err instanceof Error ? err : new Error(String(err));
+        const e = normalizeError(err);
         this.logger.error('bootstrap error', { error: e.stack ?? String(e) });
       });
 
@@ -292,12 +286,8 @@ export class GameSession {
       // 到同一座次互相覆盖(handleAction 静默丢弃被顶者的操作),另一座次无人控制。
       const n = state.players.length;
       const offset = state.seatRotation ?? 0;
-      let k = 0; // 占座序号:第 k 个非空座位(空洞不计入)
-      for (let i = 0; i < this.room.seats.length; i++) {
-        const pid = this.room.seats[i];
-        if (pid === null) continue;
-        this.playerNames.set(pid, (k + offset) % n);
-        k++;
+      for (const { playerId, seat } of occupiedSeatEntries(this.room, n, offset)) {
+        this.playerNames.set(playerId, seat);
       }
     }
 
@@ -355,7 +345,7 @@ export class GameSession {
     // dispatch 返回 DispatchResult:{ accepted, settle }。settle 供重放用,正常对局忽略。
     // state 变更的广播/持久化/结束检查由 onStateChange 回调驱动(见 attachStateListener)。
     const result = await dispatch(this.state, action).catch((err) => {
-      const e = err instanceof Error ? err : new Error(String(err));
+      const e = normalizeError(err);
       this.logger.error('dispatch error', { error: e.stack ?? String(e) });
       return { accepted: false, settle: Promise.resolve<Error | undefined>(undefined) } as const;
     });
@@ -463,11 +453,11 @@ export class GameSession {
           : null;
       entry.hasReplay = replay !== null;
       void appendGameHistory(this.room.id, entry, replay).catch((err) => {
-        const e = err instanceof Error ? err : new Error(String(err));
+        const e = normalizeError(err);
         this.logger.error('记录对局历史失败', { error: e.stack ?? String(e) });
       });
     } catch (err) {
-      const e = err instanceof Error ? err : new Error(String(err));
+      const e = normalizeError(err);
       this.logger.error('组装对局历史失败', { error: e.stack ?? String(e) });
     }
   }
@@ -496,7 +486,7 @@ export class GameSession {
     this.room.readyPlayers.clear();
     // 清除旧持久化数据,避免重启时恢复到已结束的局面
     void deletePersistedRoom(this.room.id).catch((err) => {
-      const e = err instanceof Error ? err : new Error(String(err));
+      const e = normalizeError(err);
       this.logger.error('resetToLobby: deletePersistedRoom failed', {
         error: e.stack ?? String(e),
       });
@@ -753,7 +743,7 @@ export class GameSession {
     this.broadcast({ type: 'gameOver', winner: '无人' });
     // 必须 destroy 以清理 idle timer，否则定时器会通过 onStateChange 自循环
     void this.destroy().catch((err) => {
-      const e = err instanceof Error ? err : new Error(String(err));
+      const e = normalizeError(err);
       this.logger.error('destroy after disconnect failed', { error: e.stack ?? String(e) });
     });
   }
@@ -848,11 +838,6 @@ export class GameSession {
     return this.state;
   }
 
-  getDebugView(): GameView | null {
-    if (!this.state) return null;
-    return buildView(this.state, 0, this.debug);
-  }
-
   private clearGraceTimer(): void {
     if (this.graceTimer !== null) {
       clearTimeout(this.graceTimer);
@@ -879,7 +864,7 @@ export class GameSession {
       state,
       this.actionLog,
     ).catch((err) => {
-      const e = err instanceof Error ? err : new Error(String(err));
+      const e = normalizeError(err);
       this.logger.error('saveRoom failed', { error: e.stack ?? String(e) });
     });
   }
@@ -913,31 +898,12 @@ export class GameSession {
   private sendToPlayer(playerId: string, message: ServerMessage): void {
     const sink = this.room.players.get(playerId) ?? this.room.spectators.get(playerId);
     if (!sink) return;
-    try {
-      sink.send(message);
-    } catch (err) {
-      const e = err instanceof Error ? err : new Error(String(err));
-      this.logger.error(`sendToPlayer failed for ${playerId}`, { error: e.stack ?? String(e) });
-    }
+    sendSafe(sink, message, `sendToPlayer failed for ${playerId}`);
   }
 
   private broadcast(message: ServerMessage): void {
-    for (const [, sink] of this.room.players) {
-      try {
-        sink.send(message);
-      } catch (err) {
-        const e = err instanceof Error ? err : new Error(String(err));
-        this.logger.error('broadcast send failed', { error: e.stack ?? String(e) });
-      }
-    }
-    // 旁观者也接收广播
-    for (const [, sink] of this.room.spectators) {
-      try {
-        sink.send(message);
-      } catch (err) {
-        const e = err instanceof Error ? err : new Error(String(err));
-        this.logger.error('broadcast send to spectator failed', { error: e.stack ?? String(e) });
-      }
-    }
+    broadcastToRoom(this.room, message, (_id, role) =>
+      role === 'player' ? 'broadcast send failed' : 'broadcast send to spectator failed',
+    );
   }
 }

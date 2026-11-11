@@ -20,6 +20,7 @@ import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { defaultPlayActive } from '../rules/action-active';
+import { setPlayerVarUsage } from '../rules/turn-usage';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
 
@@ -98,21 +99,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const target = params.target as number;
       const cost = params.cost as 'hp' | 'discard';
 
-      // 计数 +1(同步设 vars + 回合用量 atom 投影 view,防 dispatch 重入)。
+      // 计数 +1(setPlayerVarUsage 同步设 vars + 回合用量 atom 投影 view,防 dispatch 重入)。
       // 必须在第一个 await 之前设置,以防 dispatch 重入(见制衡.ts 注释)。
       const nextCount = usesThisTurn(st, from) + 1;
-      st.players[from].vars[COUNT_KEY] = nextCount;
-      await applyAtom(st, { type: '回合用量', player: from, key: COUNT_KEY, value: nextCount });
+      await setPlayerVarUsage(st, from, COUNT_KEY, nextCount);
 
       // 目标去重:记录本次指定的目标(同步设 vars + 回合用量 atom 投影 view)
       const nextTargets = [...usedTargets(st, from), target];
-      st.players[from].vars[TARGETS_KEY] = nextTargets;
-      await applyAtom(st, {
-        type: '回合用量',
-        player: from,
-        key: TARGETS_KEY,
-        value: nextTargets as unknown as Json,
-      });
+      await setPlayerVarUsage(st, from, TARGETS_KEY, nextTargets);
 
       await pushFrame(st, SKILL_ID, from, { ...params });
 

@@ -3,7 +3,7 @@
 // 通过 applyRestRoutes(app) 注册到主 app 实例(与原先直接 app.get/post 行为完全一致,
 // 主 app 上的 cors/requestLogger/rateLimit/errorHandler 中间件照常生效)。
 
-import type { Hono, Context } from 'hono';
+import type { Hono } from 'hono';
 import {
   createRoom,
   createDebugRoom,
@@ -39,8 +39,14 @@ import {
 } from './room';
 import { destroyRoomCompletely } from './teardown';
 import { hashPassword } from './auth/password';
-import { getSessionUser, extractSessionToken } from './auth/guard';
-import type { PublicUser } from './auth/store';
+import {
+  getSessionUser,
+  requireUser,
+  resolveRoomActorId,
+  resolveRestPlayerId,
+  resolveApprover,
+  resolvePlayerIdFromBodyOrQuery,
+} from './auth/guard';
 import {
   createSnapshot,
   patchSnapshotDescription,
@@ -101,14 +107,6 @@ function broadcastRoomState(room: Room): void {
 /** 创建 null sink（REST 入口无活跃连接时占位）。 */
 function nullSink(): ConnectionSink {
   return { send: () => {}, close: () => {}, isAlive: false };
-}
-
-/** 非调试房间会话身份守卫:解析登录用户,未登录返回 null(调用方回 401)。
- *  调试房间与房间列表/详情保持开放(浏览大厅无需登录)。 */
-async function requireUser(c: Parameters<typeof getSessionUser>[0]): Promise<PublicUser | null> {
-  // 无任何凭据时短路,避免空 token 走 DB 查询
-  if (!extractSessionToken(c)) return null;
-  return getSessionUser(c);
 }
 
 /** 将所有 REST 路由注册到指定 app 实例。 */
@@ -353,37 +351,7 @@ export function applyRestRoutes(app: Hono): void {
   // POST /api/rooms/:id/ready — 玩家准备
   // 非调试房间:身份取会话 userId(body.playerId 忽略)。否则任何人可伪造他人准备,
   // 或塞入垃圾 id 使 allReady 的 size 相等判断永假 → 房间永远无法开局。
-  const resolveRestPlayerId = async (
-    c: Parameters<typeof getSessionUser>[0],
-    roomId: string,
-    bodyPlayerId: string,
-  ): Promise<{ playerId: string } | { error: string; status: 400 | 401 }> => {
-    const room = getRoom(roomId);
-    if (room && !room.isDebug) {
-      const user = await requireUser(c);
-      if (!user) return { error: '请先登录', status: 401 };
-      return { playerId: user.id };
-    }
-    if (!bodyPlayerId) return { error: '缺少 playerId', status: 400 };
-    return { playerId: bodyPlayerId };
-  };
-
-  /** 审批者(批准/拒绝/撤销旁观者查看申请)必须是本房玩家。
-   *  非调试房间按会话 userId 校验 players 成员资格;调试房保持游客模型。 */
-  const resolveApprover = async (
-    c: Parameters<typeof getSessionUser>[0],
-    roomId: string,
-  ): Promise<{ playerId: string } | { error: string; status: 401 | 403 }> => {
-    const room = getRoom(roomId);
-    if (room && !room.isDebug) {
-      const user = await requireUser(c);
-      if (!user) return { error: '请先登录', status: 401 };
-      if (!room.players.has(user.id)) return { error: '仅房间内玩家可操作', status: 403 };
-      return { playerId: user.id };
-    }
-    return { playerId: '' };
-  };
-
+  // (身份解析见 auth/guard.ts 的 resolveRestPlayerId/resolveApprover。)
   app.post('/api/rooms/:id/ready', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -437,12 +405,13 @@ export function applyRestRoutes(app: Hono): void {
 
     // 非 debug 房间:身份取会话 userId(body.playerId 可伪造 hostId 绕过下方校验,
     // 强行在未全员准备时开局);调试房间任意座次可触发。
-    let playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
-    if (!room.isDebug) {
-      const user = await requireUser(c);
-      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
-      playerId = user.id;
-    }
+    const actor = await resolveRoomActorId(
+      c,
+      !room.isDebug,
+      typeof raw.playerId === 'string' ? raw.playerId : '',
+    );
+    if ('authFailed' in actor) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+    const playerId = actor.playerId;
 
     // debug 房间任意座次可触发;普通房间仅房主
     if (!room.isDebug && room.hostId !== playerId) {
@@ -508,11 +477,9 @@ export function applyRestRoutes(app: Hono): void {
     if (!session) return c.json({ error: '游戏会话不存在' }, 404);
 
     const room = getRoom(roomId);
-    if (room && !room.isDebug) {
-      const user = await requireUser(c);
-      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
-      playerId = user.id;
-    }
+    const actor = await resolveRoomActorId(c, !!room && !room.isDebug, playerId);
+    if ('authFailed' in actor) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+    playerId = actor.playerId;
 
     // session.handleAction 内部处理 reject（通过 SSE 推 actionRejected）
     await session.handleAction(playerId, action as never);
@@ -533,11 +500,9 @@ export function applyRestRoutes(app: Hono): void {
     if (!session) return c.json({ error: '游戏会话不存在' }, 404);
 
     const room = getRoom(roomId);
-    if (room && !room.isDebug) {
-      const user = await requireUser(c);
-      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
-      playerId = user.id;
-    }
+    const actor = await resolveRoomActorId(c, !!room && !room.isDebug, playerId);
+    if ('authFailed' in actor) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+    playerId = actor.playerId;
 
     const accepted = session.handleReorderHand(playerId, order);
     if (!accepted) {
@@ -557,16 +522,14 @@ export function applyRestRoutes(app: Hono): void {
 
     // 身份解析:非调试房间一律取会话 userId(body.playerId 忽略,防冒充他人发言);
     // 调试房保持游客模型(query/body.playerId)。
-    let playerId: string;
-    if (!room.isDebug) {
-      const user = await requireUser(c);
-      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
-      playerId = user.id;
-    } else {
-      const q = typeof raw.playerId === 'string' ? raw.playerId : '';
-      if (!q) return c.json({ error: '缺少 playerId' }, 400);
-      playerId = q;
-    }
+    const actor = await resolveRoomActorId(
+      c,
+      !room.isDebug,
+      typeof raw.playerId === 'string' ? raw.playerId : '',
+    );
+    if ('authFailed' in actor) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+    const playerId = actor.playerId;
+    if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
     if (!room.players.has(playerId)) return c.json({ error: '不在房间中' }, 403);
 
     const result = addChatMessage(roomId, playerId, text);
@@ -607,13 +570,15 @@ export function applyRestRoutes(app: Hono): void {
   app.post('/api/rooms/:id/leave', async (c) => {
     const roomId = c.req.param('id');
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    let playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
-    // 非调试房间:登录用户只能离开自己的座位(忽略伪造的 playerId)
-    if (!getRoom(roomId)?.isDebug) {
-      const user = await requireUser(c);
-      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
-      playerId = user.id;
-    }
+    // 非调试房间:登录用户只能离开自己的座位(忽略伪造的 playerId)。
+    // 房间不存在时同样要求登录(getRoom()?.isDebug 对 null 房为 undefined → 鉴权)。
+    const actor = await resolveRoomActorId(
+      c,
+      getRoom(roomId)?.isDebug !== true,
+      typeof raw.playerId === 'string' ? raw.playerId : '',
+    );
+    if ('authFailed' in actor) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+    const playerId = actor.playerId;
     if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
 
     const roomBefore = getRoom(roomId);
@@ -642,16 +607,14 @@ export function applyRestRoutes(app: Hono): void {
     if (!targetPlayerId) return c.json({ error: '缺少参数' }, 400);
 
     // 非调试房间:房主身份由会话决定(登录用户 id 必须 === room.hostId)
-    let playerId: string;
     const room0 = getRoom(roomId);
-    if (room0 && !room0.isDebug) {
-      const user = await requireUser(c);
-      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
-      playerId = user.id;
-    } else {
-      playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
-      if (!playerId) return c.json({ error: '缺少参数' }, 400);
-    }
+    const actor = await resolveRoomActorId(
+      c,
+      !!room0 && !room0.isDebug,
+      typeof raw.playerId === 'string' ? raw.playerId : '',
+    );
+    if ('authFailed' in actor) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+    const playerId = actor.playerId;
     if (!playerId || !targetPlayerId) return c.json({ error: '缺少参数' }, 400);
 
     const result = kickPlayer(roomId, playerId, targetPlayerId);
@@ -710,14 +673,13 @@ export function applyRestRoutes(app: Hono): void {
 
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     // 非调试房间:房主身份由会话决定
-    let playerId: string;
-    if (!room.isDebug) {
-      const user = await requireUser(c);
-      if (!user) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
-      playerId = user.id;
-    } else {
-      playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
-    }
+    const actor = await resolveRoomActorId(
+      c,
+      !room.isDebug,
+      typeof raw.playerId === 'string' ? raw.playerId : '',
+    );
+    if ('authFailed' in actor) return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+    const playerId = actor.playerId;
     if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
     if (room.hostId !== playerId) return c.json({ error: '只有房主可以修改密码' }, 403);
     if (room.status !== '等待中') {
@@ -1015,23 +977,7 @@ export function applyRestRoutes(app: Hono): void {
   });
 
   // ── 对局历史路由 ──
-
-  /** 解析房主身份:非调试房优先会话(登录用户 id),否则 ?playerId= 查询参数或 body。 */
-  async function resolvePlayerIdFromBodyOrQuery(c: Context, room: Room | null): Promise<string | null> {
-    if (room && !room.isDebug) {
-      const user = await requireUser(c);
-      return user ? user.id : null;
-    }
-    const q = c.req.query('playerId');
-    if (q) return q;
-    try {
-      const raw = await c.req.json<Record<string, unknown>>();
-      if (raw && typeof raw.playerId === 'string') return raw.playerId;
-    } catch {
-      /* DELETE 无 body 是合法情况 */
-    }
-    return null;
-  }
+  // (房主身份解析见 auth/guard.ts 的 resolvePlayerIdFromBodyOrQuery。)
 
   // GET /api/rooms/:id/history — 对局结果列表(最新在前,不含录像数据)
   // 对局结果含各成员 userId、身份局身份与胜负:非调试房间仅本房成员可读

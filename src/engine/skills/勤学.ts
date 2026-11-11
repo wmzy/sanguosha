@@ -14,6 +14,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { isAwakened, markAwakened } from '../rules/vars-keys';
 
 const CHOOSE_RT = '勤学/choose';
 const CHOICE_KEY = '勤学/choice';
@@ -59,14 +60,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.player !== ownerId) return;
     if (atom.phase !== '准备' && atom.phase !== '回合结束') return;
     // 觉醒技:整局一次
-    if (ctx.state.players[ownerId]?.vars[AWAKENED_KEY]) return;
+    if (isAwakened(ctx.state.players[ownerId]?.vars, AWAKENED_KEY)) return;
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
     // 触发条件:手牌数 - 体力值 >= 2(无人数分支,OL 现行版)
     if (self.hand.length - getHealthValue(self) < 2) return;
 
     // 标记已觉醒(在读条件后立即设,防重入)
-    ctx.state.players[ownerId].vars[AWAKENED_KEY] = true;
+    markAwakened(ctx.state, ownerId, AWAKENED_KEY);
 
     // 1. 减1点体力上限(设上限 amount = maxHealth - 1;减至0则角色死亡)
     const newMax = self.maxHealth - 1;

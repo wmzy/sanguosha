@@ -39,6 +39,7 @@ import { defaultPlayActive } from '../rules/action-active';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import { registerSlashExemptor } from '../rules/slash-quota';
+import { setPlayerVarUsage, projectTurnUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY, GONGQI_ACTIVE_VIEW_KEY, SLASH_EXEMPT_SUIT_KEY } from '../rules/vars-keys';
 
@@ -141,16 +142,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const self = st.players[from];
       const discardedCard = st.cardMap[cardId];
 
-      // 计数 +1(同步设 vars,防 dispatch 重入)。后缀 /usedThisTurn → 回合结束自动清空。
+      // 计数 +1(setPlayerVarUsage 同步设 vars,防 dispatch 重入)。后缀 /usedThisTurn → 回合结束自动清空。
       // 必须同步投影 view.turnUsage,否则 activeWhen(读 turnUsage[USED_KEY])无法在
       // 发动后禁用按钮——玩家点击被后端 validate 拒绝(view-projection desync)。
-      st.players[from].vars[USED_KEY] = true;
-      await applyAtom(st, {
-        type: '回合用量',
-        player: from,
-        key: USED_KEY,
-        value: true,
-      });
+      await setPlayerVarUsage(st, from, USED_KEY, true);
 
       await pushFrame(st, SKILL_ID, from, { ...params });
 
@@ -159,21 +154,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       // 2. 攻击范围无限 + 同花色杀无次数限制(本回合)。即便弃的牌花色为空(无色合卡),
       //    仍设 ACTIVE_VAR(范围无限对所有杀生效);SUIT_VAR 仅在花色非空时设。
+      //    state 存座次(from),view 投影布尔 true(值不同,故不走 setTurnVarUsage)。
       st.turn.vars[ACTIVE_VAR] = from;
-      await applyAtom(st, {
-        type: '回合用量',
-        player: from,
-        key: ACTIVE_VAR,
-        value: true,
-      });
+      await projectTurnUsage(st, from, ACTIVE_VAR, true);
       if (discardedCard?.suit) {
         st.turn.vars[SUIT_VAR] = discardedCard.suit;
-        await applyAtom(st, {
-          type: '回合用量',
-          player: from,
-          key: SLASH_EXEMPT_SUIT_KEY,
-          value: discardedCard.suit,
-        });
+        await projectTurnUsage(st, from, SLASH_EXEMPT_SUIT_KEY, discardedCard.suit);
       }
 
       // 3. 若弃置的牌为装备牌,可弃一名其他角色一张牌

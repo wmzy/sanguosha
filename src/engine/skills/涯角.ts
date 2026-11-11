@@ -20,6 +20,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { peekTop } from '../core/deck';
 import { inAttackRange } from '../rules/distance';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
@@ -126,7 +127,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!ctx.state.localVars[CONFIRMED_KEY]) return;
 
     // ── 第二步:展示牌堆顶牌(广播身份给所有人) ──
-    const topCardId = deck[deck.length - 1];
+    const topCardId = peekTop(ctx.state);
+    if (!topCardId) return; // 询问期间牌堆被取空:无法展示,不发动
     await applyAtom(ctx.state, { type: '展示', player: ownerId, cardId: topCardId });
 
     // ── 第三步:比较类别 ──

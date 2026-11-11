@@ -35,10 +35,11 @@ import {
   registerAfterHook,
 } from '../core/skill';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerSlashExtraProvider } from '../rules/slash-quota';
+import { registerSlashExtraProvider, projectSlashExtra } from '../rules/slash-quota';
 import { registerDistanceExemptor } from '../rules/distance';
+import { setTurnVarUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
-import { handLimitBonusKey, getHandLimitBonus, slashExtraKey, JUEYAN_MOUNT_VIEW_KEY } from '../rules/vars-keys';
+import { handLimitBonusKey, getHandLimitBonus, JUEYAN_MOUNT_VIEW_KEY } from '../rules/vars-keys';
 
 const SKILL_NAME = '决堰';
 
@@ -143,7 +144,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         // 杀限制次数+3(本回合):slashExtraProvider 读此标记
         st.turn.vars[TURN_WEAPON] = true;
         // 投影 view.turnUsage,供前端 viewSlashMax 推断
-        await applyAtom(st, { type: '回合用量', player: ownerId, key: slashExtraKey('决堰'), value: 3 });
+        await projectSlashExtra(st, ownerId, '决堰', 3);
       } else if (group === '防具') {
         // 摸三张牌
         await applyAtom(st, { type: '摸牌', player: ownerId, count: 3 });
@@ -152,11 +153,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const cur = getHandLimitBonus(st.turn.vars, ownerId) ?? 0;
         st.turn.vars[bonusKey] = cur + 3;
       } else if (group === '坐骑') {
-        // 使用牌无距离限制(本回合):distanceExemptor 读此标记
-        st.turn.vars[TURN_MOUNT] = true;
+        // 使用牌无距离限制(本回合):distanceExemptor 读此标记。
         // 「使用牌无距离限制」须投影到 view:前端 viewEffectiveDistance/viewCanAttack
         // 据此放开距离,否则超出范围的目标在 UI 中置灰、选不中。
-        await applyAtom(st, { type: '回合用量', player: ownerId, key: TURN_MOUNT, value: true });
+        await setTurnVarUsage(st, ownerId, TURN_MOUNT, true);
       } else if (group === '宝物') {
         // 获得"集智"(本回合):回合结束由 after-hook 移除
         await applyAtom(st, { type: '添加技能', player: ownerId, skillId: '集智' });

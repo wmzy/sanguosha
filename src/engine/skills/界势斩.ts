@@ -25,9 +25,9 @@
 // 命名:文件名/loader key/character skill name 均为 '界势斩';
 //   内部 Skill.name = '势斩'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
+import { setPlayerVarUsage } from '../rules/turn-usage';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
@@ -79,11 +79,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const from = ownerId;
       const target = params.target as number;
 
-      // 计数 +1(同步设 vars + 回合用量 atom 投影 view,防 dispatch 重入)。
+      // 计数 +1(setPlayerVarUsage 同步设 vars + 回合用量 atom 投影 view,防 dispatch 重入)。
       // 必须在第一个 await 之前设置,以防 dispatch 重入(见制衡.ts 注释)。
       const nextCount = usesThisTurn(st, from) + 1;
-      st.players[from].vars[COUNT_KEY] = nextCount;
-      await applyAtom(st, { type: '回合用量', player: from, key: COUNT_KEY, value: nextCount });
+      await setPlayerVarUsage(st, from, COUNT_KEY, nextCount);
 
       await pushFrame(st, SKILL_ID, from, { ...params });
 

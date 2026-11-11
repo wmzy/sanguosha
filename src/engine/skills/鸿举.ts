@@ -19,6 +19,7 @@
 import type { AtomAfterContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { isAwakened, markAwakened } from '../rules/vars-keys';
 import type { SkillModule } from '../types';
 import { RONG_PREFIX, rongCount } from './征荣';
 
@@ -76,7 +77,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.type !== '阶段开始') return;
     if (atom.player !== ownerId) return;
     if (atom.phase !== '准备') return;
-    if (ctx.state.players[ownerId]?.vars[AWAKENED_KEY]) return; // 整局一次
+    if (isAwakened(ctx.state.players[ownerId]?.vars, AWAKENED_KEY)) return; // 整局一次
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
 
@@ -84,7 +85,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (rc < 3) return;
 
     // 标记已觉醒(读完条件立即设,防重入)
-    ctx.state.players[ownerId].vars[AWAKENED_KEY] = true;
+    markAwakened(ctx.state, ownerId, AWAKENED_KEY);
 
     // 1. 用任意张手牌替换等量的荣(可选 0..min(hand, rc))
     const maxReplace = Math.min(self.hand.length, rc);

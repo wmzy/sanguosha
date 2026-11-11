@@ -2,6 +2,7 @@
 // 添加技能:为玩家添加 skillId(实际 registerAction/onInit 由 skill-loader 监听此 atom 触发)
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { 马匹距离修正表 } from '../data/card-defs/equipment';
+import { mergeDistanceVars, type DistanceVarsDelta } from './distance-vars';
 
 export const 添加技能: AtomDefinition<{ player: number; skillId: string }> = {
   type: '添加技能',
@@ -37,15 +38,7 @@ export const 添加技能: AtomDefinition<{ player: number; skillId: string }> =
       view.players[pi].skills.push(skillId);
     }
     // 马匹技能:同步 distanceVars(攻击马=attackMod,防御马=defenseMod)
-    const mountVars = event.mountDistanceVars as
-      | { attackMod?: number; defenseMod?: number }
-      | undefined;
-    if (mountVars) {
-      view.players[pi].distanceVars = {
-        ...view.players[pi].distanceVars,
-        ...mountVars,
-      };
-    }
+    mergeDistanceVars(view.players[pi], event.mountDistanceVars as DistanceVarsDelta | undefined);
   },
 };
 

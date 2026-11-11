@@ -21,7 +21,7 @@ import { appendFile, mkdir, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { AppliedAtomEntry } from '../engine/types';
 import { serializeAtomHistory } from './snapshot';
-import { createLogger } from './logger';
+import { createLogger, normalizeError } from './logger';
 import { register as registerLifecycle } from './lifecycles';
 
 const log = createLogger('eventJournal');
@@ -54,7 +54,7 @@ function journalPath(roomId: string): string | null {
 function enqueue(roomId: string, op: () => Promise<void>): Promise<void> {
   const prev = chains.get(roomId) ?? Promise.resolve();
   const next = prev.then(op, op).catch((err) => {
-    const e = err instanceof Error ? err : new Error(String(err));
+    const e = normalizeError(err);
     log.error(`journal io failed for room ${roomId}`, { error: e.stack ?? String(e) });
   });
   chains.set(roomId, next);

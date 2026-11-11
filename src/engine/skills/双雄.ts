@@ -40,6 +40,7 @@ import {
 } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 import { defaultPlayActive } from '../rules/action-active';
+import { setTurnVarUsage } from '../rules/turn-usage';
 import { SHUANGXIONG_COLOR_VIEW_KEY } from '../rules/vars-keys';
 
 const CONFIRM_RT = '双雄/confirm';
@@ -147,14 +148,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
     // 记录本回合决斗异色(后端 transform validate 读)
     const judgeColor = judgeCard.color;
-    ctx.state.turn.vars[COLOR_KEY] = judgeColor;
     // 同步到 view 侧(经「回合用量」atom),供前端 activeWhen/cardFilter 读取
-    await applyAtom(ctx.state, {
-      type: '回合用量',
-      player: ownerId,
-      key: COLOR_KEY,
-      value: judgeColor,
-    });
+    await setTurnVarUsage(ctx.state, ownerId, COLOR_KEY, judgeColor);
 
     // 获得判定牌(处理区→手牌);拿走后判定 atom 的 afterHooks 清理为 no-op
     await applyAtom(ctx.state, {

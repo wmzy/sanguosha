@@ -1,5 +1,11 @@
 // server/logger.ts — 轻量级结构化日志
 
+/** thrown 值归一化为 Error:非 Error 值(字符串/对象等)包装为 new Error(String(err)),
+ *  供 catch 块统一取 stack/message。 */
+export function normalizeError(err: unknown): Error {
+  return err instanceof Error ? err : new Error(String(err));
+}
+
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const LEVEL_PRIORITY: Record<LogLevel, number> = {

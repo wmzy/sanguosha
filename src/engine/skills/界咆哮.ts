@@ -12,8 +12,7 @@
 import type { Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
-import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
-import { slashUnlimitedKey } from '../rules/vars-keys';
+import { registerSlashUnlimitedProvider, projectSlashUnlimited } from '../rules/slash-quota';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -39,12 +38,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '出牌') return;
     if (atom.player !== ownerId) return;
-    await applyAtom(ctx.state, {
-      type: '回合用量',
-      player: ownerId,
-      key: slashUnlimitedKey('界咆哮'),
-      value: true,
-    });
+    await projectSlashUnlimited(ctx.state, ownerId, '界咆哮');
   });
 
   // 杀被闪抵消后摸一张牌(无次数限制,每次被闪都摸)。

@@ -20,6 +20,7 @@
 //
 // 注意:牌堆顶 = zones.deck 末尾元素,与「摸牌」语义一致(slice(-n)/pop)。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
+import { drawFromTop, peekTop } from '../core/deck';
 
 export const 置创牌: AtomDefinition<{
   player: number;
@@ -35,8 +36,8 @@ export const 置创牌: AtomDefinition<{
   apply(state, atom) {
     const player = state.players[atom.player];
     const { varsKey, resultKey } = atom;
-    // 弹出牌堆顶
-    const cardId = state.zones.deck.pop()!;
+    // 弹出牌堆顶(validate 已保证非空)
+    const cardId = drawFromTop(state)!;
     const card = state.cardMap[cardId];
     const rank = card?.rank;
     // 创牌列表(键名由调用方指定)
@@ -58,7 +59,7 @@ export const 置创牌: AtomDefinition<{
     // ⚠ toViewEvents 在 apply 之前调用(state 尚未变更),须从 pre-apply state 独立计算:
     //   牌堆顶 = deck 末尾(apply 尚未 pop);重复判定对已有创牌列表(apply 尚未追加)
     const { varsKey } = atom;
-    const cardId = state.zones.deck[state.zones.deck.length - 1];
+    const cardId = peekTop(state);
     const card = cardId ? state.cardMap[cardId] : undefined;
     const exist = (state.players[atom.player].vars[varsKey] as string[] | undefined) ?? [];
     const rank = card?.rank;

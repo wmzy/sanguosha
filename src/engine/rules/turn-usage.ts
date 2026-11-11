@@ -49,3 +49,49 @@ export function setTurnUsage(
 ): Promise<void> {
   return setTurnUsages(state, player, [{ key, value, authority }]);
 }
+
+// ── 技能侧「state 真相 + view 投影」单点 helper ──────────────
+//
+// 各技能原先手写两类样板,均须与 key 字符串逐字节一致,漏一侧即 desync:
+//   1. 纯投影:await applyAtom(state, { type: '回合用量', player, key, value })
+//      (state 真相由调用方维护,常为不同 key 的私有 vars——如 奇谋 的 provider 标记)
+//   2. 成对写入:vars[key] = value; await applyAtom(同 key 同 value)
+// 下列 helper 把两类样板的 atom 形状收敛到本模块;与既有调用点时序逐字节一致
+// (完整等待 atom 管线,不走 setTurnUsages 的 fire-and-forget)。
+
+/** 纯 view 投影(无 state 权威写入):经「回合用量」atom 把 key/value 同步到
+ *  view.turnUsage 与 turn.vars 镜像。state 真相由调用方自行维护。 */
+export async function projectTurnUsage(
+  state: GameState,
+  player: number,
+  key: string,
+  value: Json,
+): Promise<void> {
+  await applyAtom(state, { type: '回合用量', player, key, value });
+}
+
+/** state 真相 + view 投影一步提交(player.vars 权威,同 key 同值)。
+ *  替代 `vars[key]=value; await applyAtom(回合用量)` 成对手写
+ *  (强袭/界强袭/界挑衅 限次计数、界燕语 lostSha 等回合内标记)。 */
+export async function setPlayerVarUsage(
+  state: GameState,
+  player: number,
+  key: string,
+  value: Json,
+): Promise<void> {
+  state.players[player].vars[key] = value;
+  await applyAtom(state, { type: '回合用量', player, key, value });
+}
+
+/** state 真相 + view 投影一步提交(turn.vars 权威,同 key 同值)。
+ *  双雄/界双雄 颜色、决堰 坐骑距离豁免、界当先 无距离杀等具名键。
+ *  注意:state 值与 view 值不同(如存座次 vs 投影 true)的场合不可用,走 projectTurnUsage。 */
+export async function setTurnVarUsage(
+  state: GameState,
+  player: number,
+  key: string,
+  value: Json,
+): Promise<void> {
+  state.turn.vars[key] = value;
+  await applyAtom(state, { type: '回合用量', player, key, value });
+}

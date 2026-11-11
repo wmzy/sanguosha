@@ -26,6 +26,7 @@
 import type { FrontendAPI, GameState, Json, Skill, Card } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame, frameCards } from '../core/frame';
+import { peekTop } from '../core/deck';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { getGender } from '../data/character-meta';
 import { defaultPlayActive } from '../rules/action-active';
@@ -210,7 +211,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const revealed: string[] = [];
         let matchId: string | undefined;
         while (st.zones.deck.length > 0) {
-          const topId = st.zones.deck[st.zones.deck.length - 1];
+          const topId = peekTop(st);
+          if (!topId) break; // 循环中途牌堆耗尽(理论兜底):停止翻牌
           // 翻到处理区(产生 ViewEvent)
           await applyAtom(st, {
             type: '移动牌',

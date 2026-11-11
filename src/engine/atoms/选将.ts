@@ -142,7 +142,7 @@ export const 初始化洗牌: AtomDefinition<{
 };
 
 // ── 发牌 ──────────────────────────────────────────────
-// 从牌堆顶给每个玩家发 handSize 张牌
+// 连片发牌:从牌堆「开头」依次切 handSize 张给每个玩家
 
 export const 发牌: AtomDefinition<{
   type: '发牌';
@@ -156,6 +156,8 @@ export const 发牌: AtomDefinition<{
   },
   apply(state, atom) {
     const { handSize } = atom;
+    // ⚠ 发牌自牌堆底(deck 开头连片切出),与「摸牌」取顶(末尾)方向相反;
+    //   改动取牌方向会破坏 seeded 确定性(相同 seed 发到手里的牌全部变化),禁止调整。
     let cursor = 0;
     for (const p of state.players) {
       const drawn = state.zones.deck.slice(cursor, cursor + handSize);

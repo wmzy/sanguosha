@@ -50,13 +50,14 @@ import {
   registerDistanceExemptor,
 } from '../rules/distance';
 import type { SkillModule } from '../types';
-import { CHENGLUE_STATE_VIEW_KEY, CHENGLUE_SUITS_VIEW_KEY, slashUnlimitedKey } from '../rules/vars-keys';
+import { CHENGLUE_STATE_VIEW_KEY, CHENGLUE_SUITS_VIEW_KEY } from '../rules/vars-keys';
+import { projectTurnUsage, setTurnVarUsage } from '../rules/turn-usage';
+import { projectSlashUnlimited } from '../rules/slash-quota';
 
 const SKILL_ID = '成略';
-/** 转换态 state key(跨回合持久,无 /usedThisTurn 后缀)。 */
-const STATE_KEY = '成略/态';
-/** 转换态 view 同步 key(经 回合用量 atom 投影 turnUsage)。 */
-const STATE_VIEW_KEY = CHENGLUE_STATE_VIEW_KEY;
+/** 转换态 key(state:player.vars 跨回合持久;view:经 回合用量 atom 投影 turnUsage)。
+ *  单一声明点在 vars-keys(defineTurnScopedViewKey),此处只 import,不再自带字符串。 */
+const STATE_KEY = CHENGLUE_STATE_VIEW_KEY;
 /** turn.vars key:本回合成略弃置牌的花色数组(string[]),驱动三个豁免器。 */
 const SUITS_VAR = CHENGLUE_SUITS_VIEW_KEY;
 
@@ -72,12 +73,7 @@ function getState(state: GameState, ownerId: number): '阳' | '阴' {
 }
 
 async function syncStateView(state: GameState, ownerId: number): Promise<void> {
-  await applyAtom(state, {
-    type: '回合用量',
-    player: ownerId,
-    key: STATE_VIEW_KEY,
-    value: getState(state, ownerId),
-  });
+  await projectTurnUsage(state, ownerId, STATE_KEY, getState(state, ownerId));
 }
 
 /** 判断 cardId 的花色是否在本回合成略弃置牌花色集合中。 */
@@ -239,24 +235,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           ),
         );
         if (suits.length > 0) {
-          st.turn.vars[SUITS_VAR] = suits;
           // 投影到 view.turnUsage:
           //  - '成略/suits':供 viewDistance 放宽目标距离(同花色牌无距离限制)
           //  - '杀/unlimited/成略':供 viewSlashMax 放宽出杀次数(同花色杀无次数限制)
           // 前端均宽松放行(无法感知选中卡花色);后端 SlashExemptor/AttackRangeExemptor/
           // DistanceExemptor 按 cardId 花色严格校验(仅同花色放行)。
-          await applyAtom(st, {
-            type: '回合用量',
-            player: from,
-            key: SUITS_VAR,
-            value: suits,
-          });
-          await applyAtom(st, {
-            type: '回合用量',
-            player: from,
-            key: slashUnlimitedKey('成略'),
-            value: true,
-          });
+          await setTurnVarUsage(st, from, SUITS_VAR, suits);
+          await projectSlashUnlimited(st, from, '成略');
         }
       }
 
@@ -297,7 +282,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       // 阳 需至少 1 张手牌(摸1弃2)
       const p = ctx.view.players[ctx.perspectiveIdx];
       if (!p) return false;
-      const isYin = p.turnUsage?.[STATE_VIEW_KEY] === '阴';
+      const isYin = p.turnUsage?.[STATE_KEY] === '阴';
       if (!isYin && (p.handCount ?? 0) < 1) return false;
       return defaultPlayActive(ctx);
     },

@@ -32,13 +32,13 @@ import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { SHENSHI_STATE_VIEW_KEY } from '../rules/vars-keys';
+import { projectTurnUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '审时';
-/** 转换态 state key(跨回合持久,无 /usedThisTurn 后缀)。 */
-const STATE_KEY = '审时/态';
-/** 转换态 view 同步 key(经 回合用量 atom 投影 turnUsage)。 */
-const STATE_VIEW_KEY = SHENSHI_STATE_VIEW_KEY;
+/** 转换态 key(state:player.vars 跨回合持久;view:经 回合用量 atom 投影 turnUsage)。
+ *  单一声明点在 vars-keys(defineTurnScopedViewKey),此处只 import,不再自带字符串。 */
+const STATE_KEY = SHENSHI_STATE_VIEW_KEY;
 
 const YIN_CONFIRM_RT = '审时/阴/confirm';
 const YIN_GIVE_RT = '审时/阴/give';
@@ -58,12 +58,7 @@ function getState(state: GameState, ownerId: number): '阳' | '阴' {
 }
 
 async function syncStateView(state: GameState, ownerId: number): Promise<void> {
-  await applyAtom(state, {
-    type: '回合用量',
-    player: ownerId,
-    key: STATE_VIEW_KEY,
-    value: getState(state, ownerId),
-  });
+  await projectTurnUsage(state, ownerId, STATE_KEY, getState(state, ownerId));
 }
 
 /** 手牌数最多的其他存活角色候选 */
@@ -390,7 +385,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       const p = ctx.view.players[ctx.perspectiveIdx];
       if (!p) return false;
       // 仅阳状态可发动(读 turnUsage;回合开始已重新同步)
-      if (p.turnUsage?.[STATE_VIEW_KEY] === '阴') return false;
+      if (p.turnUsage?.[STATE_KEY] === '阴') return false;
       // 需有手牌
       if ((p.handCount ?? 0) === 0) return false;
       // 需存在其他存活角色

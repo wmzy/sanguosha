@@ -26,6 +26,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerDistanceExemptor } from '../rules/distance';
 import { WANGLIE_FIRST_VIEW_KEY } from '../rules/vars-keys';
+import { projectTurnUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
 
 /** turn.vars:本回合首张牌是否已使用(首张牌无距离限制的开关)。 */
@@ -110,12 +111,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (atom.phase !== '出牌') return;
     if (atom.player !== ownerId) return;
     if (ctx.state.turn.vars[FIRST_USED_VAR]) return;
-    await applyAtom(ctx.state, {
-      type: '回合用量',
-      player: ownerId,
-      key: FIRST_VIEW_VAR,
-      value: true,
-    });
+    await projectTurnUsage(ctx.state, ownerId, FIRST_VIEW_VAR, true);
   });
 
   // ─── 使用时 after-hook:首张牌标记 + 询问是否发动不可响应 ───
@@ -128,12 +124,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
     // ① 标记首张牌已用(所有牌类型均计数)+ 同步 view:首张牌用出后无距离限制失效
     ctx.state.turn.vars[FIRST_USED_VAR] = true;
-    await applyAtom(ctx.state, {
-      type: '回合用量',
-      player: ownerId,
-      key: FIRST_VIEW_VAR,
-      value: false,
-    });
+    await projectTurnUsage(ctx.state, ownerId, FIRST_VIEW_VAR, false);
 
     // ② 仅基本牌/普通锦囊可发动不可响应
     const card = ctx.state.cardMap[atom.cardId];

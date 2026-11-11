@@ -4,6 +4,7 @@
 //   动态距离修正按能(如 界义从:体力变化触发防御修正 ±)在去标记时也需要同步 view,
 //   故此处复用 distanceVars 通道。apply 不触碰 vars(state 侧由技能维护),仅 view 增量同步。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { mergeDistanceVars, type DistanceVarsDelta } from './distance-vars';
 
 export const 去标记: AtomDefinition<{
   player: number;
@@ -43,15 +44,7 @@ export const 去标记: AtomDefinition<{
       view.players[pi].marks = view.players[pi].marks.filter((m) => m.id !== markId);
     }
     // 距离修正 view 同步(技能如 界义从 切换低血防御时携带)
-    const dv = event.distanceVars as
-      | { attackMod?: number; defenseMod?: number; attackRange?: number }
-      | undefined;
-    if (dv) {
-      view.players[pi].distanceVars = {
-        ...view.players[pi].distanceVars,
-        ...dv,
-      };
-    }
+    mergeDistanceVars(view.players[pi], event.distanceVars as DistanceVarsDelta | undefined);
   },
 };
 

@@ -10,6 +10,7 @@
 import type { Card, SettlementFrame } from '../../types';
 import { applyAtom } from '../../core/apply'
 import { frameCards } from '../../core/frame';
+import { peekTop } from '../../core/deck';
 import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 从使用者开始,按逆时针旋转的所有存活玩家 */
@@ -93,7 +94,8 @@ async function resolveBountifulHarvest(ctx: ResolveCtx): Promise<void> {
     for (let i = 0; i < cardCount; i++) {
       if (state.zones.deck.length === 0) break;
       // 牌堆顶 = deck 末尾(与 摸牌/判定 一致):逐张取顶牌亮出
-      const topId = state.zones.deck[state.zones.deck.length - 1];
+      const topId = peekTop(state);
+      if (!topId) break;
       await applyAtom(state, {
         type: '移动牌',
         cardId: topId,

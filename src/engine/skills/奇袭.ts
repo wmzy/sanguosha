@@ -16,7 +16,7 @@
 // 因此无论原牌来自手牌还是装备区,最终都进入弃牌堆(满足"使用后原牌进入弃牌堆")。
 // 奇袭出过河拆桥可被无懈可击抵消——由 过河拆桥.use 自身的 询问无懈可击 流程保证,
 // 与转化来源无关。
-import type { Card, FrontendAPI, GameState, Json, Skill, EquipSlot, GameView } from '../types';
+import type { Card, FrontendAPI, GameState, Json, Skill, EquipSlot } from '../types';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { applyAtom } from '../core/apply';
 import { defaultPlayActive } from '../rules/action-active';

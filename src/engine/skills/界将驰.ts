@@ -47,7 +47,9 @@ import { registerSlashQuotaProvider, registerSlashBlocker } from '../rules/slash
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import type { SkillModule } from '../types';
-import { getHandLimitBonus, JIANGCHI_CHOICE2_VIEW_KEY, slashBlockedKey, slashExtraKey } from '../rules/vars-keys';
+import { getHandLimitBonus, JIANGCHI_CHOICE2_VIEW_KEY } from '../rules/vars-keys';
+import { projectSlashExtra, projectSlashBlocked } from '../rules/slash-quota';
+import { projectTurnUsage } from '../rules/turn-usage';
 
 const _SKILL_ID = '界将驰';
 const DISPLAY_NAME = '将驰';
@@ -233,12 +235,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       ctx.state.turn.vars[CHOICE1_VAR] = ownerId;
       // 投影到 view.turnUsage:用 viewCanSlash 约定的 '杀/blocked/' 前缀,供前端/MCP 客户端
       // 推断禁杀(杀从 availableActions 隐藏)。后端 blocker 读 turn.vars[CHOICE1_VAR],不受影响。
-      await applyAtom(ctx.state, {
-        type: '回合用量',
-        player: ownerId,
-        key: slashBlockedKey('界将驰'),
-        value: true,
-      });
+      await projectSlashBlocked(ctx.state, ownerId, '界将驰');
       return;
     }
 
@@ -270,18 +267,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ctx.state.turn.vars[CHOICE2_VAR] = ownerId;
     // 投影到 view.turnUsage:'将驰/choice2' 供 viewDistance 推断杀无距离;
     // '杀/extra/界将驰'=1 供 viewSlashMax 推断上限 +1(额定 1 + 额外 1 = 2)。
-    await applyAtom(ctx.state, {
-      type: '回合用量',
-      player: ownerId,
-      key: CHOICE2_VAR,
-      value: true,
-    });
-    await applyAtom(ctx.state, {
-      type: '回合用量',
-      player: ownerId,
-      key: slashExtraKey('界将驰'),
-      value: 1,
-    });
+    await projectTurnUsage(ctx.state, ownerId, CHOICE2_VAR, true);
+    await projectSlashExtra(ctx.state, ownerId, '界将驰', 1);
   });
 
   return () => {

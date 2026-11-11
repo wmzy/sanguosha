@@ -67,6 +67,7 @@ import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { usedThisTurnKey } from '../rules/vars-keys';
 import { viewCanAttack } from '../rules/viewDistance';
 import { viewCanSlash } from '../rules/action-active';
+import { USE_ACTION_PREFIX } from '../util/declaredActionType';
 
 const SKILL_ID = '界蛊惑';
 const DISPLAY_NAME = '蛊惑'; // OL 官方技能名(不带"界"前缀)
@@ -86,12 +87,6 @@ const RESCUED_VAR = '求桃/已救';
 /** use 主动使用可声明的牌(有主动效果);闪仅经 dodge 响应路径打出。 */
 const ACTIVE_DECLARATIONS = ['杀', '桃', '酒'] as const;
 type ActiveDeclaration = (typeof ACTIVE_DECLARATIONS)[number];
-
-/** 主动使用 action 的 actionType 前缀:一个声明牌名一个 action(`use:杀` / `use:桃` / `use:酒`)。
- *  客户端(浏览器技能按钮 / 无头枚举)无法凭空提供 `params.declaredName` —— 把「声明」
- *  编码进 actionType 后,声明由用户点哪个按钮决定,前后端一一对应。
- *  (与 界渐营/界矫诏 的 `transform:<牌名>` 同款约定。) */
-const USE_ACTION_PREFIX = 'use:';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

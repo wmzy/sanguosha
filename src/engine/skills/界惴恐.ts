@@ -39,7 +39,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { runRankCompareFlow } from '../flows/rank';
+import { askRankCard, runRankCompareFlow } from '../flows/rank';
 import { runUseFlow } from './cards/use-card';
 import {
   registerAction,
@@ -234,43 +234,27 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         // confirm 后再次校验(target 可能在此期间失去手牌)
         if (target.hand.length === 0) return;
 
-        // 2) owner 选拼点牌
-        delete st.localVars[OWNER_CARD_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
+        // 2) owner 选拼点牌(询问封装于 flows/rank.askRankCard)
+        const ownerCardId = await askRankCard(st, {
           requestType: OWNER_CARD_RT,
+          answerKey: OWNER_CARD_KEY,
           target: ownerId,
-          prompt: {
-            type: 'useCard',
-            title: '惴恐:选择一张拼点牌',
-            cardFilter: { filter: () => true, min: 1, max: 1 },
-          },
+          title: '惴恐:选择一张拼点牌',
           timeout: 20,
         });
-        const ownerCardId = st.localVars[OWNER_CARD_KEY] as string | undefined;
-        delete st.localVars[OWNER_CARD_KEY];
-        if (!ownerCardId || !self.hand.includes(ownerCardId)) return;
+        if (!ownerCardId) return;
 
-        // 3) 目标选拼点牌(超时兜底 hand[0])
-        delete st.localVars[TARGET_CARD_KEY];
-        const fallback = target.hand[0];
-        await applyAtom(st, {
-          type: '请求回应',
+        // 3) 目标选拼点牌(超时兜底 hand[0],由 askRankCard 的 fallbackCard 落实:
+        //    回应牌无效时回落目标第一张手牌,兜底仍无效返回 undefined)
+        const targetCardId = await askRankCard(st, {
           requestType: TARGET_CARD_RT,
+          answerKey: TARGET_CARD_KEY,
           target: turnPlayer,
-          prompt: {
-            type: 'useCard',
-            title: `惴恐:与 ${self.name} 拼点,请出一张手牌`,
-            cardFilter: { filter: () => true, min: 1, max: 1 },
-          },
+          title: `惴恐:与 ${self.name} 拼点,请出一张手牌`,
           timeout: 20,
+          fallbackCard: target.hand[0],
         });
-        let targetCardId = st.localVars[TARGET_CARD_KEY] as string | undefined;
-        delete st.localVars[TARGET_CARD_KEY];
-        if (!targetCardId || !target.hand.includes(targetCardId)) {
-          targetCardId = fallback; // 超时兜底
-        }
-        if (!targetCardId || !target.hand.includes(targetCardId)) return;
+        if (!targetCardId) return;
 
         // 4) 拼点两步化(扣置→亮出→后→弃牌堆)。两张拼点牌由 runRankCompareFlow
         //    的 拼点扣置 统一同时扣置(面朝下),不再预先移入处理区。

@@ -31,7 +31,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { performYinghunPrepare } from './英魂';
-import { HUNZI_AWAKENED_KEY as AWAKENED_KEY, getHunziAwakened } from '../rules/vars-keys';
+import { HUNZI_AWAKENED_KEY as AWAKENED_KEY, getHunziAwakened, markAwakened } from '../rules/vars-keys';
 
 // 觉醒标记:沿用标版键名 '魂姿/awakened',供复用的标 制霸/界制霸 读取觉醒状态。
 // 觉醒当回合结束阶段收益标记:准备阶段觉醒成功后置 true,结束阶段消费后清空。
@@ -61,7 +61,7 @@ async function awaken(state: GameState, ownerId: number): Promise<void> {
   if (self.health > 1) return;
 
   // 标记已觉醒(在读条件后立即设,防重入)
-  state.players[ownerId].vars[AWAKENED_KEY] = true;
+  markAwakened(state, ownerId, AWAKENED_KEY);
   // 标记本回合结束阶段需执行收益(由结束阶段 after-hook 消费)
   state.players[ownerId].vars[END_BONUS_KEY] = true;
 

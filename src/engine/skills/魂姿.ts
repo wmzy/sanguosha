@@ -21,7 +21,7 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { performYinghunPrepare } from './英魂';
-import { HUNZI_AWAKENED_KEY as AWAKENED_KEY, getHunziAwakened } from '../rules/vars-keys';
+import { HUNZI_AWAKENED_KEY as AWAKENED_KEY, getHunziAwakened, markAwakened } from '../rules/vars-keys';
 
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -50,7 +50,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (self.health !== 1) return;
 
     // 标记已觉醒(在读条件后立即设,防重入)
-    ctx.state.players[ownerId].vars[AWAKENED_KEY] = true;
+    markAwakened(ctx.state, ownerId, AWAKENED_KEY);
 
     // 1. 减1点体力上限(设上限 clamp 体力:当前1 ≤ 新上限,体力保持1)
     await applyAtom(ctx.state, {

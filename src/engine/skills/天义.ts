@@ -20,23 +20,13 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { runRankCompareFlow } from '../flows/rank';
+import { askRankCardAndCompare, registerRankCardRespond } from '../flows/rank';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import { registerSlashExtraProvider, registerSlashBlocker } from '../rules/slash-quota';
 import { registerSlashTargetProvider } from '../rules/slash-target';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import { slashExtraKey, slashTargetKey, slashBlockedKey, TIANYI_WIN_VIEW_KEY } from '../rules/vars-keys';
-
-/** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
-function rankValue(rank: string): number {
-  if (rank === 'A') return 1;
-  if (rank === 'J') return 11;
-  if (rank === 'Q') return 12;
-  if (rank === 'K') return 13;
-  const n = parseInt(rank, 10);
-  return Number.isFinite(n) ? n : 0;
-}
 
 const TARGET_CARD_KEY = '天义/targetCard';
 const PD_RT = '天义/拼点';
@@ -118,42 +108,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       await pushFrame(st, '天义', from, { ...params });
 
-      const initiatorCard = st.cardMap[initiatorCardId];
-      const initiatorValue = initiatorCard ? rankValue(initiatorCard.rank) : 0;
-
-      // 1) 询问目标出拼点牌。拼点牌暂不移入处理区——由 runRankCompareFlow 的
-      //    拼点扣置 统一同时扣置(面朝下),对齐 rankcompare.md。
-      delete st.localVars[TARGET_CARD_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
+      // 1)+2) 询问目标出拼点牌并比点(扣置→亮出→后→弃牌堆;目标未出牌走弃权兜底),
+      //    封装于 flows/rank.ts。
+      const win = await askRankCardAndCompare(st, from, target, initiatorCardId, {
         requestType: PD_RT,
-        target,
-        prompt: {
-          type: 'useCard',
-          title: `天义:与 ${st.players[from].name} 拼点,请出一张手牌`,
-          cardFilter: { filter: () => true, min: 1, max: 1 },
-        },
+        answerKey: TARGET_CARD_KEY,
+        title: `天义:与 ${st.players[from].name} 拼点,请出一张手牌`,
         timeout: 30,
       });
-
-      const targetCardId = st.localVars[TARGET_CARD_KEY] as string | undefined;
-      delete st.localVars[TARGET_CARD_KEY];
-
-      // 2) 拼点两步化(扣置→亮出→后→弃牌堆)。目标未出牌(超时)走兜底。
-      let win: boolean;
-      if (targetCardId && st.players[target].hand.includes(targetCardId)) {
-        const result = await runRankCompareFlow(st, from, target, initiatorCardId, targetCardId);
-        win = result === '赢';
-      } else {
-        // 目标未出牌(超时):清理发起方拼点牌(手牌→弃牌堆),按发起方默认胜出(保留旧行为)。
-        await applyAtom(st, {
-          type: '移动牌',
-          cardId: initiatorCardId,
-          from: { zone: '手牌', player: from },
-          to: { zone: '弃牌堆' },
-        });
-        win = initiatorValue > 0;
-      }
 
       // 3) 结算输赢:发起方点数严格大于目标 = 赢;否则(输或平)没赢
       if (win) {
@@ -177,37 +139,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ─── respond action:为所有玩家注册 ────────────────────────
   // 目标(其他玩家)需要 respond 选拼点牌。默认 respond 只注册在 owner(太史慈)上,
-  // 目标无法 dispatch,故此处为每个玩家注册。validate 严格检查 pending requestType,
-  // 非天义 pending 一律拒绝(无副作用)。
-  for (const p of state.players) {
-    const pid = p.index;
-    registerAction(
-      state,
-      skill.id,
-      pid,
-      'respond',
-      (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(pid);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as unknown as Record<string, unknown>;
-        if (atom.type !== '请求回应') return '当前不需要回应';
-        const reqType = atom.requestType as string;
-        if (reqType !== PD_RT) return '当前不是天义回应';
-        if ((atom.target as number) !== pid) return '不是问你的';
-        const cardId = params.cardId as string;
-        if (typeof cardId !== 'string') return '请选择一张拼点牌';
-        if (!st.players[pid].hand.includes(cardId)) return '拼点牌不在手牌中';
-        return null;
-      },
-      async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        const slot = st.pendingSlots.get(pid);
-        if (!slot) return;
-        const atom = slot.atom as unknown as Record<string, unknown>;
-        if (atom.type !== '请求回应' || (atom.requestType as string) !== PD_RT) return;
-        st.localVars[TARGET_CARD_KEY] = params.cardId;
-      },
-    );
-  }
+  // 目标无法 dispatch,故为每个玩家注册(封装于 flows/rank.registerRankCardRespond,
+  // validate 严格检查 pending requestType,非天义 pending 一律拒绝)。
+  registerRankCardRespond(state, skill.id, {
+    requestType: PD_RT,
+    answerKey: TARGET_CARD_KEY,
+    mismatchError: '当前不是天义回应',
+  });
 
   // actions/hooks 随 state-bound 注册表自动清理;provider/blocker 是模块级集合,需显式卸载。
   return () => {

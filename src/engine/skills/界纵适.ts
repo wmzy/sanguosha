@@ -29,6 +29,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { getCardValue } from '../flows/rank';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界纵适';
@@ -38,16 +39,6 @@ const DISPLAY_NAME = '纵适';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
 /** localVars key:存 confirm 结果(true/false)。 */
 const CONFIRM_KEY = `${SKILL_ID}/confirmed`;
-
-/** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13(与 天义/驱虎/烈刃 等一致)。 */
-function rankValue(rank: string): number {
-  if (rank === 'A') return 1;
-  if (rank === 'J') return 11;
-  if (rank === 'Q') return 12;
-  if (rank === 'K') return 13;
-  const n = parseInt(rank, 10);
-  return Number.isFinite(n) ? n : 0;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -105,8 +96,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const targetCard: Card | undefined = ctx.state.cardMap[atom.targetCard];
     if (!initiatorCard || !targetCard) return;
 
-    const initiatorValue = rankValue(initiatorCard.rank);
-    const targetValue = rankValue(targetCard.rank);
+    const initiatorValue = getCardValue(initiatorCard);
+    const targetValue = getCardValue(targetCard);
 
     // owner 视角的点数 / 牌 id
     const ownerValue = isInitiator ? initiatorValue : targetValue;

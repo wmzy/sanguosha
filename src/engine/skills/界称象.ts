@@ -27,6 +27,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { getCardValue } from '../flows/rank';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界称象';
@@ -42,17 +43,6 @@ const BONUS_KEY = '称象/bonus';
 const BASE_REVEAL = 4;
 /** 点数上限 */
 const RANK_LIMIT = 13;
-
-/** A/J/Q/K → 1/11/12/13;数字直接 parse;其他 → 0(忽略,实际不会发生) */
-function rankValue(rank: string | undefined): number {
-  if (!rank) return 0;
-  if (rank === 'A') return 1;
-  if (rank === 'J') return 11;
-  if (rank === 'Q') return 12;
-  if (rank === 'K') return 13;
-  const n = parseInt(rank, 10);
-  return Number.isFinite(n) ? n : 0;
-}
 
 /** 计算玩家当前亮出加成(默认 0) */
 function currentBonus(state: GameState, ownerId: number): number {
@@ -100,7 +90,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (!candidateSet.has(cid)) return '牌不在亮出范围内';
           if (seen.has(cid)) return '存在重复的牌';
           seen.add(cid);
-          sum += rankValue(st.cardMap[cid]?.rank);
+          sum += getCardValue(st.cardMap[cid]);
         }
         if (sum > RANK_LIMIT) return `获得牌点数和(${sum})超过13`;
       }
@@ -192,7 +182,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 计算选中牌点数和(用于 =13 判定)
       let sum = 0;
       for (const cid of chosen) {
-        sum += rankValue(ctx.state.cardMap[cid]?.rank);
+        sum += getCardValue(ctx.state.cardMap[cid]);
       }
 
       // 重排牌堆:被选中的牌置于牌堆顶(顶=deck 末尾),未被选中的牌保持原相对顺序

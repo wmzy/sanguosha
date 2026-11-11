@@ -31,6 +31,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { createRng } from '../util/rng';
+import { getCardValue } from '../flows/rank';
 import type { SkillModule } from '../types';
 
 const TIAN_YI_PD_RT = '天义/拼点'; // 天义询问目标出拼点牌的 requestType
@@ -39,16 +40,6 @@ const FORCE_CONFIRM_RT = '酣战/随机拼点';
 const FORCE_KEY = '酣战/forceConfirmed';
 const GAIN_CONFIRM_RT = '酣战/获杀';
 const GAIN_KEY = '酣战/gainConfirmed';
-
-/** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
-function rankValue(rank: string): number {
-  if (rank === 'A') return 1;
-  if (rank === 'J') return 11;
-  if (rank === 'Q') return 12;
-  if (rank === 'K') return 13;
-  const n = parseInt(rank, 10);
-  return Number.isFinite(n) ? n : 0;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -152,7 +143,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     for (const id of [atom.initiatorCard, atom.targetCard]) {
       if (!id) continue;
       const card: Card | undefined = st.cardMap[id];
-      if (card?.name === '杀') candidates.push({ id, value: rankValue(card.rank) });
+      if (card?.name === '杀') candidates.push({ id, value: getCardValue(card) });
     }
     if (candidates.length === 0) return; // 无杀 → 无可获
 

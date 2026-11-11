@@ -11,10 +11,10 @@ import type { ConnectionSink } from './connection';
 import { getRoom, removeSpectator, leaveRoom } from './room';
 import { broadcastMessage } from './room';
 import { getChatHistory, buildRoomState, ensureSeatOnReconnect, getRecentLeaveGrace } from './room';
-import { getSessionUser, extractSessionToken } from './auth/guard';
+import { resolveSessionIdentity } from './auth/guard';
 import { gameSessions, playerRoomMap } from './registry';
 import { generatePlayerId } from './utils';
-import { createLogger } from './logger';
+import { createLogger, normalizeError } from './logger';
 
 const log = createLogger('sse');
 
@@ -59,7 +59,7 @@ export class SseSink implements ConnectionSink {
       data,
       ...(id ? { id } : {}),
     }).catch((err) => {
-      const e = err instanceof Error ? err : new Error(String(err));
+      const e = normalizeError(err);
       log.error('SSE writeSSE failed', { error: e.stack ?? String(e) });
     });
   }
@@ -114,15 +114,18 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
   let playerId: string;
   let displayName: string | null = null;
   if (!room.isDebug) {
-    if (!extractSessionToken(c)) {
-      return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+    const identity = await resolveSessionIdentity(c);
+    if ('reason' in identity) {
+      return c.json(
+        {
+          error: identity.reason === 'invalid_token' ? '登录已过期，请重新登录' : '请先登录',
+          code: 'AUTH_REQUIRED',
+        },
+        401,
+      );
     }
-    const user = await getSessionUser(c);
-    if (!user) {
-      return c.json({ error: '登录已过期，请重新登录', code: 'AUTH_REQUIRED' }, 401);
-    }
-    playerId = user.id;
-    displayName = user.displayName;
+    playerId = identity.user.id;
+    displayName = identity.user.displayName;
   } else {
     playerId = queryPlayerId ?? generatePlayerId();
   }
@@ -303,7 +306,7 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
       });
     }
     } catch (err) {
-      const e = err instanceof Error ? err : new Error(String(err));
+      const e = normalizeError(err);
       log.error('SSE handler error', { error: e.stack ?? String(e) });
     }
   });

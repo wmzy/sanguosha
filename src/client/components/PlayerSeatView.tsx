@@ -18,6 +18,8 @@ import {
   EQUIPMENT_SKILL_NAMES,
   EQUIP_SLOT_ICON,
 } from './gameViewConstants';
+import * as styles from './gameViewStyles';
+import { hpBeadPalette } from './gameViewStyles/tokens';
 import { getCharacterMeta, LORD_SKILLS } from '../../engine/data/character-meta';
 import { getCharacterImage } from '../assets/imageAssets';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
@@ -160,8 +162,10 @@ function PlayerSeatViewImpl({
   // 满珠颜色按剩余体力比例分色:>50% 绿 / >25% 黄 / ≤25% 红(濒危警示)。
   const lostCount = Math.max(0, player.maxHealth - player.health);
   const hpRatio = player.maxHealth > 0 ? player.health / player.maxHealth : 1;
-  const hpBeadFullCls =
-    hpRatio > 0.5 ? seatHpBeadFull : hpRatio > 0.25 ? seatHpBeadFullMid : seatHpBeadFullLow;
+  // 满珠色档(与 data-hue 同判据):与大卡共用 gameViewStyles 的 playerCardHpBeadFull
+  // 单类 + tokens.hpBeadPalette 的 --bead-* 内联变量注入
+  const hpHue = hpRatio > 0.5 ? 'green' : hpRatio > 0.25 ? 'yellow' : 'red';
+  const hpBeadFullVars = hpBeadPalette[hpHue];
 
   return (
     <div
@@ -290,10 +294,10 @@ function PlayerSeatViewImpl({
           {Array.from({ length: player.maxHealth }, (_, i) => (
             <span
               key={i}
-              className={i < lostCount ? seatHpBeadEmpty : hpBeadFullCls}
+              className={i < lostCount ? styles.playerCardHpBeadEmpty : styles.playerCardHpBeadFull}
               data-full={i < lostCount ? undefined : 'true'}
-              data-hue={i < lostCount ? undefined : hpRatio > 0.5 ? 'green' : hpRatio > 0.25 ? 'yellow' : 'red'}
-              style={{ width: beadW, height: beadH }}
+              data-hue={i < lostCount ? undefined : hpHue}
+              style={{ width: beadW, height: beadH, ...(i < lostCount ? undefined : hpBeadFullVars) }}
             />
           ))}
         </div>
@@ -817,8 +821,9 @@ const seatDeadStamp = css`
     white-space: nowrap;
   }
 `;
-// 右缘体力珠列:垂直排列,骑在卡右边框上(right: -5px = 半珠宽);
-// 满珠绿渐变水滴(内高光+微光晕),空珠透明底 #444 边。尺寸由内联按 maxHealth 缩放
+// 右缘体力珠列:垂直排列,骑在卡右边框上(right: -5px = 半珠宽);z-index 与大卡珠列分层。
+// 满珠/空珠珠体样式与大卡共用 gameViewStyles 的 playerCardHpBeadFull/playerCardHpBeadEmpty
+// (分色经 --bead-* 内联变量注入,色值 tokens.hpBeadPalette);尺寸由内联按 maxHealth 缩放。
 const seatHpBeadCol = css`
   position: absolute;
   right: -5px;
@@ -829,52 +834,6 @@ const seatHpBeadCol = css`
   flex-direction: column;
   align-items: center;
   pointer-events: none;
-`;
-// 满珠分色:剩余体力 >50% 绿 / >25% 黄 / ≤25% 红(濒危警示)
-const seatHpBeadFull = css`
-  box-sizing: border-box;
-  flex-shrink: 0;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
-  background: linear-gradient(135deg, #7ec850 8%, #3e8f2e 92%);
-  border: 1px solid rgba(46, 94, 28, 0.9);
-  box-shadow:
-    inset 0 2px 2px rgba(255, 255, 255, 0.35),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.25),
-    0 0 6px rgba(126, 200, 80, 0.45);
-`;
-const seatHpBeadFullMid = css`
-  box-sizing: border-box;
-  flex-shrink: 0;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
-  background: linear-gradient(135deg, #e8c84a 8%, #b8862a 92%);
-  border: 1px solid rgba(122, 88, 20, 0.9);
-  box-shadow:
-    inset 0 2px 2px rgba(255, 255, 255, 0.35),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.25),
-    0 0 6px rgba(232, 200, 74, 0.45);
-`;
-const seatHpBeadFullLow = css`
-  box-sizing: border-box;
-  flex-shrink: 0;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
-  background: linear-gradient(135deg, #e85d4a 8%, #a8281a 92%);
-  border: 1px solid rgba(122, 30, 20, 0.9);
-  box-shadow:
-    inset 0 2px 2px rgba(255, 255, 255, 0.35),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.25),
-    0 0 6px rgba(232, 93, 74, 0.5);
-`;
-const seatHpBeadEmpty = css`
-  box-sizing: border-box;
-  flex-shrink: 0;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
-  background: rgba(0, 0, 0, 0.22);
-  border: 1px solid #444;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55);
 `;
 // 卡下小标签行容器
 const seatLabelCol = css`

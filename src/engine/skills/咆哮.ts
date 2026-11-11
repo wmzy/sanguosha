@@ -7,10 +7,8 @@
 // 与诸葛连弩的区别:诸葛连弩是装备技能(装备/换装/弃装时实例化/销毁),
 //   咆哮是武将锁定技(开局即生效,整局常驻)。机制本身完全相同。
 import type { Skill, GameState } from '../types';
-import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
-import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
-import { slashUnlimitedKey } from '../rules/vars-keys';
+import { registerSlashUnlimitedProvider, projectSlashUnlimited } from '../rules/slash-quota';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '咆哮', description: '锁定技:出牌阶段使用【杀】无次数限制', isLocked: true };
@@ -29,12 +27,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (atom.type !== '阶段开始') return;
     if (atom.phase !== '出牌') return;
     if (atom.player !== ownerId) return;
-    await applyAtom(ctx.state, {
-      type: '回合用量',
-      player: ownerId,
-      key: slashUnlimitedKey('咆哮'),
-      value: true,
-    });
+    await projectSlashUnlimited(ctx.state, ownerId, '咆哮');
   });
   return () => {
     unregMax();

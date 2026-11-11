@@ -20,7 +20,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { runRankCompareFlow } from '../flows/rank';
+import { askRankCard, runRankCompareOrForfeit } from '../flows/rank';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { createRng } from '../util/rng';
 
@@ -30,16 +30,6 @@ const OWNER_PD_RT = '烈刃/选牌';
 const OWNER_CARD_KEY = '烈刃/ownerCard';
 const VICTIM_PD_RT = '烈刃/拼点';
 const VICTIM_CARD_KEY = '烈刃/victimCard';
-
-/** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
-function rankValue(rank: string): number {
-  if (rank === 'A') return 1;
-  if (rank === 'J') return 11;
-  if (rank === 'Q') return 12;
-  if (rank === 'K') return 13;
-  const n = parseInt(rank, 10);
-  return Number.isFinite(n) ? n : 0;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -150,65 +140,39 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (ctx.state.players[ownerId].hand.length === 0) return;
     if (ctx.state.players[victim].hand.length === 0) return;
 
-    // 2a. owner 选拼点牌
-    delete ctx.state.localVars[OWNER_CARD_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
+    // 2a. owner 选拼点牌(询问封装于 flows/rank.askRankCard)
+    const ownerCardId = await askRankCard(ctx.state, {
       requestType: OWNER_PD_RT,
+      answerKey: OWNER_CARD_KEY,
       target: ownerId,
-      prompt: {
-        type: 'useCard',
-        title: '烈刃:请选择一张拼点牌',
-        cardFilter: { filter: () => true, min: 1, max: 1 },
-      },
+      title: '烈刃:请选择一张拼点牌',
       timeout: 30,
     });
-    const ownerCardId = ctx.state.localVars[OWNER_CARD_KEY] as string | undefined;
-    if (!ownerCardId || !ctx.state.players[ownerId].hand.includes(ownerCardId)) return;
+    if (!ownerCardId) return;
 
-    // 2b. 受害者 选拼点牌
-    delete ctx.state.localVars[VICTIM_CARD_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
+    // 2b. 受害者 选拼点牌(询问封装于 flows/rank.askRankCard)
+    const victimCardId = await askRankCard(ctx.state, {
       requestType: VICTIM_PD_RT,
+      answerKey: VICTIM_CARD_KEY,
       target: victim,
-      prompt: {
-        type: 'useCard',
-        title: `烈刃:与 ${ctx.state.players[ownerId].name} 拼点,请出一张手牌`,
-        cardFilter: { filter: () => true, min: 1, max: 1 },
-      },
+      title: `烈刃:与 ${ctx.state.players[ownerId].name} 拼点,请出一张手牌`,
       timeout: 30,
     });
-    const victimCardId = ctx.state.localVars[VICTIM_CARD_KEY] as string | undefined;
-    delete ctx.state.localVars[VICTIM_CARD_KEY];
 
     // 2c-f. 拼点两步化(扣置→亮出→后→弃牌堆):runRankCompareFlow 内部由
     //   拼点扣置 统一同时扣置两张牌(面朝下),不再预先移入处理区。
+    //   结算帧入栈位置须保持在询问与比点之间,故拆用 askRankCard + runRankCompareOrForfeit。
     await pushFrame(ctx.state, '烈刃', ownerId, { victim });
-    const ownerCard = ctx.state.cardMap[ownerCardId];
-    const ownerValue = ownerCard ? rankValue(ownerCard.rank) : 0;
 
-    // 受害者拼点牌(若出了)——拼点两步化。未出牌(超时)走兜底。
-    let win: boolean;
-    if (victimCardId && ctx.state.players[victim].hand.includes(victimCardId)) {
-      const result = await runRankCompareFlow(
-        ctx.state,
-        ownerId,
-        victim,
-        ownerCardId,
-        victimCardId,
-      );
-      win = result === '赢';
-    } else {
-      // 受害者未出牌(超时):清理 owner 拼点牌(手牌→弃牌堆),按 owner 默认胜出(保留旧行为)。
-      await applyAtom(ctx.state, {
-        type: '移动牌',
-        cardId: ownerCardId,
-        from: { zone: '手牌', player: ownerId },
-        to: { zone: '弃牌堆' },
-      });
-      win = ownerValue > 0;
-    }
+    // 受害者拼点牌(若出了)——拼点两步化。未出牌(超时)走弃权兜底
+    // (清理 owner 拼点牌,按 owner 默认胜出),封装于 flows/rank.runRankCompareOrForfeit。
+    const win = await runRankCompareOrForfeit(
+      ctx.state,
+      ownerId,
+      victim,
+      ownerCardId,
+      victimCardId,
+    );
 
     await popFrame(ctx.state);
 

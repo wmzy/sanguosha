@@ -22,6 +22,7 @@ import type {
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
+import { peekTop } from '../core/deck';
 import { registerAction, registerBeforeHook } from '../core/skill';
 
 const TRIGGER_RT = '再起/trigger';
@@ -100,7 +101,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (ctx.state.localVars[TRIGGERED_KEY] !== true) return; // 不发动 → 默认摸牌
       const shownCardIds: string[] = [];
       for (let i = 0; i < x; i++) {
-        const topCardId = ctx.state.zones.deck[ctx.state.zones.deck.length - 1];
+        const topCardId = peekTop(ctx.state);
         if (!topCardId) break;
         // 移到处理区(展示)
         await applyAtom(ctx.state, {

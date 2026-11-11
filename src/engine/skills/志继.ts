@@ -16,6 +16,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { isAwakened, markAwakened } from '../rules/vars-keys';
 
 const CHOOSE_RT = '志继/choose';
 const CHOICE_KEY = '志继/choice';
@@ -60,14 +61,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.phase !== '准备') return;
     if (atom.player !== ownerId) return;
     // 觉醒技:整局一次
-    if (ctx.state.players[ownerId]?.vars[AWAKENED_KEY]) return;
+    if (isAwakened(ctx.state.players[ownerId]?.vars, AWAKENED_KEY)) return;
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
     // 触发条件:无手牌
     if (self.hand.length > 0) return;
 
     // 标记已觉醒(在读条件后立即设,防重入)
-    ctx.state.players[ownerId].vars[AWAKENED_KEY] = true;
+    markAwakened(ctx.state, ownerId, AWAKENED_KEY);
 
     // 1. 二选一(强制)
     delete ctx.state.localVars[CHOICE_KEY];

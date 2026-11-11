@@ -35,10 +35,9 @@ import { registerAction, registerAfterHook, hasBlockingPending } from '../core/s
 import { REN_MARK_ID, getRenColor } from './明任';
 
 const SKILL_ID = '贞良';
-/** 转换态 state key(跨回合持久,无 /usedThisTurn 后缀)。 */
+/** 转换态 key(state:player.vars 跨回合持久;view:经 回合用量 atom 投影 turnUsage)。
+ *  同一字符串两侧使用,单一字面量防漂移。 */
 const STATE_KEY = '贞良/态';
-/** 转换态 view 同步 key(经 回合用量 atom 投影 turnUsage)。 */
-const STATE_VIEW_KEY = '贞良/态';
 
 const YIN_CONFIRM_RT = '贞良/阴/confirm';
 const YIN_TARGET_RT = '贞良/阴/选目标';
@@ -57,7 +56,7 @@ async function syncStateView(state: GameState, ownerId: number): Promise<void> {
   await applyAtom(state, {
     type: '回合用量',
     player: ownerId,
-    key: STATE_VIEW_KEY,
+    key: STATE_KEY,
     value: getState(state, ownerId),
   });
 }
@@ -306,7 +305,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       const p = ctx.view.players[ctx.perspectiveIdx];
       if (!p) return false;
       // 仅阳状态可发动(读 turnUsage;回合开始已重新同步)
-      if (p.turnUsage?.[STATE_VIEW_KEY] === '阴') return false;
+      if (p.turnUsage?.[STATE_KEY] === '阴') return false;
       // 本回合未用过
       if (p.turnUsage?.['贞良/usedThisTurn']) return false;
       // 须有任

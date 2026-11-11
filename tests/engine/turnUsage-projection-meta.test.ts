@@ -127,13 +127,24 @@ describe('turnUsage 投影 key 静态契约', () => {
   );
   const registryPrefixes = [varsKeys.SLASH_UNLIMITED_PREFIX, varsKeys.SLASH_EXTRA_PREFIX, varsKeys.SLASH_BLOCKED_PREFIX, varsKeys.SLASH_TARGET_PREFIX];
 
-  /** 提取全部 applyAtom('回合用量') 写入点的 key 表达式 */
-  function collectWriters(): { file: string; expr: string }[] {
-    const hits: { file: string; expr: string }[] = [];
+  /** 提取全部「回合用量」写入点的 key 表达式。
+   *  两种形态(2026-11 view 投影单点收敛后并存):
+   *  - atom 形态:applyAtom({ type: '回合用量', ..., key: <expr> })
+   *  - helper 形态:rules/turn-usage.ts 的 projectTurnUsage/setPlayerVarUsage/
+   *    setTurnVarUsage(第 3 参 = key 表达式)与 rules/slash-quota.ts 的
+   *    projectSlash{Extra,Unlimited,Blocked}(第 3 参 = 来源技能名字面量,
+   *    经 slashXxxKey 工厂拼进 '杀/<族>/<来源>' 前缀键)。 */
+  type WriterKind = 'atom' | 'helper' | 'slashHelper';
+  function collectWriters(): { file: string; expr: string; kind: WriterKind }[] {
+    const hits: { file: string; expr: string; kind: WriterKind }[] = [];
     const re = /type:\s*'回合用量'[\s\S]{0,300}?key:\s*([A-Za-z_$][\w$]*\([^)]*\)|`[^`]*`|'[^']*'|[A-Za-z_$][\w$]*)/g;
+    const helperRe = /\b(projectTurnUsage|setPlayerVarUsage|setTurnVarUsage)\(\s*[\w.]+\s*,\s*\w+\s*,\s*([A-Za-z_$][\w$]*\([^)]*\)|`[^`]*`|'[^']*'|[A-Za-z_$][\w$]*)/g;
+    const slashHelperRe = /\b(projectSlashExtra|projectSlashUnlimited|projectSlashBlocked)\(\s*[\w.]+\s*,\s*\w+\s*,\s*('[^']*'|[A-Za-z_$][\w$]*)/g;
     for (const f of files) {
       const src = readFileSync(f, 'utf8');
-      for (const m of src.matchAll(re)) hits.push({ file: f.replace(`${ENGINE_ROOT  }/`, ''), expr: m[1] });
+      for (const m of src.matchAll(re)) hits.push({ file: f.replace(`${ENGINE_ROOT}/`, ''), expr: m[1], kind: 'atom' });
+      for (const m of src.matchAll(helperRe)) hits.push({ file: f.replace(`${ENGINE_ROOT}/`, ''), expr: m[2], kind: 'helper' });
+      for (const m of src.matchAll(slashHelperRe)) hits.push({ file: f.replace(`${ENGINE_ROOT}/`, ''), expr: m[2], kind: 'slashHelper' });
     }
     return hits;
   }
@@ -151,7 +162,13 @@ describe('turnUsage 投影 key 静态契约', () => {
     const writers = collectWriters();
     expect(writers.length).toBeGreaterThan(30); // 防提取正则失效后空转通过
     const violations: string[] = [];
-    for (const { file, expr } of writers) {
+    for (const { file, expr, kind } of writers) {
+      // 杀/* 前缀族 helper:第 3 参是来源技能名(经 slash-quota 内 slashXxxKey 工厂拼接),
+      // 必须是无 '/' 的字面量技能名——工厂保证了前缀命名空间。
+      if (kind === 'slashHelper') {
+        if (!/^'[^'/]+'$/.test(expr)) violations.push(`${file}: projectSlash* 来源必须是技能名字面量, got ${expr}`);
+        continue;
+      }
       // atom/类型声明文件自身的 key: atom.key / key: string 形态,非技能写入点
       // rules/turn-usage.ts 是「回合用量」的通用发射器:它的 key 是 string 形参,
       // 真实 key 由调用方以注册表工厂/技能名模板给出(下方调用点仍逐条校验)。

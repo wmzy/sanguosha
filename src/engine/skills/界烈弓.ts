@@ -37,16 +37,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerAttackRangeExemptor, effectiveDistance } from '../rules/distance';
-
-/** 杀点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
-function rankValue(rank: string): number {
-  if (rank === 'A') return 1;
-  if (rank === 'J') return 11;
-  if (rank === 'Q') return 12;
-  if (rank === 'K') return 13;
-  const n = parseInt(rank, 10);
-  return Number.isFinite(n) ? n : 0;
-}
+import { getCardValue } from '../flows/rank';
 
 const TAG_BLOCK = '界烈弓/禁闪';
 const TAG_BONUS = '界烈弓/加伤';
@@ -76,7 +67,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!cardId) return false;
       const card = st.cardMap[cardId];
       if (!card) return false;
-      const rank = rankValue(card.rank);
+      const rank = getCardValue(card);
       if (rank <= 0) return false;
       return effectiveDistance(st, from, to) <= rank;
     },

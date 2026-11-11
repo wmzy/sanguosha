@@ -41,6 +41,7 @@ import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import { DANGXIAN_EXTRA_PHASE_VIEW_KEY, DANGXIAN_NO_RANGE_VIEW_KEY } from '../rules/vars-keys';
+import { setTurnVarUsage, projectTurnUsage } from '../rules/turn-usage';
 import { createRng } from '../util/rng';
 
 const DISPLAY_NAME = '当先';
@@ -157,12 +158,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ctx.state.turn.vars[DMG_IN_PHASE_KEY] = 0;
     delete ctx.state.turn.vars[EXITING_KEY];
     // 同步投影到 view.turnUsage:前端 'end' action activeWhen 据此判断是否处于额外阶段
-    await applyAtom(ctx.state, {
-      type: '回合用量',
-      player: ownerId,
-      key: EXTRA_PHASE_TU,
-      value: true,
-    });
+    await projectTurnUsage(ctx.state, ownerId, EXTRA_PHASE_TU, true);
 
     // 2) 进入出牌阶段(触发相关 before/after hook)
     await applyAtom(ctx.state, { type: '阶段开始', player: ownerId, phase: '出牌' });
@@ -225,13 +221,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         ctx.state.turn.vars[NORANGE_KILL_KEY] = killCardId;
         // 同步投影到 view.turnUsage,供前端 viewCanAttack 宽松放行超距目标
         // (前端无法感知具体 cardId,故宽松放行所有目标;后端豁免器按 cardId 严格校验)
-        ctx.state.turn.vars[NORANGE_ACTIVE_KEY] = true;
-        await applyAtom(ctx.state, {
-          type: '回合用量',
-          player: ownerId,
-          key: NORANGE_ACTIVE_KEY,
-          value: true,
-        });
+        await setTurnVarUsage(ctx.state, ownerId, NORANGE_ACTIVE_KEY, true);
       }
     }
 
@@ -259,20 +249,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 若无距离杀未被使用(仍在手牌),需同步清除前端 viewCanAttack 投影,
     // 否则投影会泄漏到后续正常出牌阶段/回合(前端误放行超距目标)。
     if (ctx.state.turn.vars[NORANGE_ACTIVE_KEY] !== undefined) {
-      await applyAtom(ctx.state, {
-        type: '回合用量',
-        player: ownerId,
-        key: NORANGE_ACTIVE_KEY,
-        value: false,
-      });
+      await projectTurnUsage(ctx.state, ownerId, NORANGE_ACTIVE_KEY, false);
     }
     // 同步清除额外出牌阶段前端投影(否则 'end' 按钮会在后续正常出牌阶段误显示)
-    await applyAtom(ctx.state, {
-      type: '回合用量',
-      player: ownerId,
-      key: EXTRA_PHASE_TU,
-      value: false,
-    });
+    await projectTurnUsage(ctx.state, ownerId, EXTRA_PHASE_TU, false);
     delete ctx.state.turn.vars[ACTIVE_KEY];
     delete ctx.state.turn.vars[DMG_IN_PHASE_KEY];
     delete ctx.state.turn.vars[EXITING_KEY];
@@ -300,12 +280,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     delete ctx.state.turn.vars[NORANGE_KILL_KEY];
     // 同步清除前端 viewCanAttack 投影,避免额外出牌阶段后续其他杀被前端误放行
     delete ctx.state.turn.vars[NORANGE_ACTIVE_KEY];
-    await applyAtom(ctx.state, {
-      type: '回合用量',
-      player: ownerId,
-      key: NORANGE_ACTIVE_KEY,
-      value: false,
-    });
+    await projectTurnUsage(ctx.state, ownerId, NORANGE_ACTIVE_KEY, false);
   });
 
   // ── 超时拦截:end-turn 链(阶段结束→清过期标记→下一玩家→回合结束)在额外阶段无效 ──

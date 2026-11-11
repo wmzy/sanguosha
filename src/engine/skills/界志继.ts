@@ -20,6 +20,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { isAwakened, markAwakened } from '../rules/vars-keys';
 
 const CHOOSE_RT = '界志继/choose';
 const CHOICE_KEY = '志继/choice';
@@ -37,14 +38,14 @@ export function createSkill(id: string, ownerId: number): Skill {
 /** 界志继觉醒主逻辑。 */
 async function awaken(state: GameState, ownerId: number): Promise<void> {
   // 觉醒技:整局一次
-  if (state.players[ownerId]?.vars[AWAKENED_KEY]) return;
+  if (isAwakened(state.players[ownerId]?.vars, AWAKENED_KEY)) return;
   const self = state.players[ownerId];
   if (!self?.alive) return;
   // 触发条件:无手牌
   if (self.hand.length > 0) return;
 
   // 标记已觉醒(在读条件后立即设,防重入)
-  state.players[ownerId].vars[AWAKENED_KEY] = true;
+  markAwakened(state, ownerId, AWAKENED_KEY);
 
   // 1. 二选一(强制)
   delete state.localVars[CHOICE_KEY];

@@ -37,6 +37,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { getHunziAwakened } from '../rules/vars-keys';
+import { askRankCard, getCardValue } from '../flows/rank';
 
 
 // respond requestTypes(孙策回应)
@@ -48,16 +49,6 @@ const TAKE_RT = '制霸/take'; // 是否获得双方拼点牌(confirm)
 const REFUSE_KEY = '制霸/refuseResult'; // true=接受, false=拒绝
 const LORD_CARD_KEY = '制霸/lordCardId';
 const TAKE_KEY = '制霸/takeResult';
-
-/** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
-function rankValue(rank: string): number {
-  if (rank === 'A') return 1;
-  if (rank === 'J') return 11;
-  if (rank === 'Q') return 12;
-  if (rank === 'K') return 13;
-  const n = parseInt(rank, 10);
-  return Number.isFinite(n) ? n : 0;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -146,21 +137,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             to: { zone: '处理区' },
           });
 
-          // 2) 询问孙策选拼点牌
-          delete st.localVars[LORD_CARD_KEY];
-          await applyAtom(st, {
-            type: '请求回应',
+          // 2) 询问孙策选拼点牌(询问封装于 flows/rank.askRankCard;
+          //    比点走本文件的 移动牌 流转,不用 runRankCompareFlow)
+          const lordCardId = await askRankCard(st, {
             requestType: LORD_CARD_RT,
+            answerKey: LORD_CARD_KEY,
             target: ownerId,
-            prompt: {
-              type: 'useCard',
-              title: `制霸:与 ${st.players[allyIdx].name} 拼点,请出一张手牌`,
-              cardFilter: { filter: () => true, min: 1, max: 1 },
-            },
+            title: `制霸:与 ${st.players[allyIdx].name} 拼点,请出一张手牌`,
             timeout: 30,
           });
-          const lordCardId = st.localVars[LORD_CARD_KEY] as string | undefined;
-          if (!lordCardId || !st.players[ownerId].hand.includes(lordCardId)) {
+          if (!lordCardId) {
             // 孙策未出牌(超时等):两张牌进弃牌堆,盟友视为赢(无事)
             await applyAtom(st, {
               type: '移动牌',
@@ -180,8 +166,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           });
 
           // 3) 比点:盟友严格大于孙策 = 盟友赢;否则盟友没赢
-          const allyValue = rankValue(st.cardMap[allyCardId]?.rank ?? '');
-          const lordValue = rankValue(st.cardMap[lordCardId]?.rank ?? '');
+          const allyValue = getCardValue(st.cardMap[allyCardId]);
+          const lordValue = getCardValue(st.cardMap[lordCardId]);
           const allyWon = allyValue > lordValue;
 
           if (allyWon) {

@@ -35,6 +35,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { getHunziAwakened } from '../rules/vars-keys';
+import { askRankCard, getCardValue } from '../flows/rank';
 import { isLordOwner } from '../rules/action-active';
 
 const SKILL_ID = '界制霸';
@@ -53,16 +54,6 @@ const TAKE_RT = `${SKILL_ID}/take`; // 孙策是否获得两张拼点牌(confirm
 const REFUSE_KEY = `${SKILL_ID}/refuseResult`; // true=接受, false=拒绝
 const RESP_CARD_KEY = `${SKILL_ID}/respCardId`;
 const TAKE_KEY = `${SKILL_ID}/takeResult`;
-
-/** 拼点牌点数:A=1, 2-10=面值, J=11, Q=12, K=13 */
-function rankValue(rank: string): number {
-  if (rank === 'A') return 1;
-  if (rank === 'J') return 11;
-  if (rank === 'Q') return 12;
-  if (rank === 'K') return 13;
-  const n = parseInt(rank, 10);
-  return Number.isFinite(n) ? n : 0;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -144,21 +135,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             to: { zone: '处理区' },
           });
 
-          // 2) 询问孙策选拼点牌
-          delete st.localVars[RESP_CARD_KEY];
-          await applyAtom(st, {
-            type: '请求回应',
+          // 2) 询问孙策选拼点牌(询问封装于 flows/rank.askRankCard;
+          //    比点走本文件的 移动牌 流转,不用 runRankCompareFlow)
+          const lordCardId = await askRankCard(st, {
             requestType: RESP_CARD_RT,
+            answerKey: RESP_CARD_KEY,
             target: ownerId,
-            prompt: {
-              type: 'useCard',
-              title: `制霸:与 ${st.players[allyIdx].name} 拼点,请出一张手牌`,
-              cardFilter: { filter: () => true, min: 1, max: 1 },
-            },
+            title: `制霸:与 ${st.players[allyIdx].name} 拼点,请出一张手牌`,
             timeout: 30,
           });
-          const lordCardId = st.localVars[RESP_CARD_KEY] as string | undefined;
-          if (!lordCardId || !st.players[ownerId].hand.includes(lordCardId)) {
+          if (!lordCardId) {
             await applyAtom(st, {
               type: '移动牌',
               cardId: allyCardId,
@@ -176,8 +162,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           });
 
           // 3) 比点:发起方(盟友)严格大于孙策 = 盟友赢
-          const allyValue = rankValue(st.cardMap[allyCardId]?.rank ?? '');
-          const lordValue = rankValue(st.cardMap[lordCardId]?.rank ?? '');
+          const allyValue = getCardValue(st.cardMap[allyCardId]);
+          const lordValue = getCardValue(st.cardMap[lordCardId]);
           const initiatorWon = allyValue > lordValue;
 
           await resolveAfterCompare(st, ownerId, allyCardId, lordCardId, initiatorWon);
@@ -236,21 +222,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           to: { zone: '处理区' },
         });
 
-        // 2) 询问目标选拼点牌
-        delete st.localVars[RESP_CARD_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
+        // 2) 询问目标选拼点牌(询问封装于 flows/rank.askRankCard)
+        const targetCardId = await askRankCard(st, {
           requestType: RESP_CARD_RT,
+          answerKey: RESP_CARD_KEY,
           target: targetIdx,
-          prompt: {
-            type: 'useCard',
-            title: `制霸:${st.players[ownerId].name} 与你拼点,请出一张手牌`,
-            cardFilter: { filter: () => true, min: 1, max: 1 },
-          },
+          title: `制霸:${st.players[ownerId].name} 与你拼点,请出一张手牌`,
           timeout: 30,
         });
-        const targetCardId = st.localVars[RESP_CARD_KEY] as string | undefined;
-        if (!targetCardId || !st.players[targetIdx].hand.includes(targetCardId)) {
+        if (!targetCardId) {
           // 目标未出牌:孙策拼点牌进弃牌堆,无事
           await applyAtom(st, {
             type: '移动牌',
@@ -269,8 +249,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         });
 
         // 3) 比点:发起方(孙策)严格大于目标 = 孙策赢
-        const lordValue = rankValue(st.cardMap[lordCardId]?.rank ?? '');
-        const targetValue = rankValue(st.cardMap[targetCardId]?.rank ?? '');
+        const lordValue = getCardValue(st.cardMap[lordCardId]);
+        const targetValue = getCardValue(st.cardMap[targetCardId]);
         const initiatorWon = lordValue > targetValue;
 
         await resolveAfterCompare(st, ownerId, lordCardId, targetCardId, initiatorWon);

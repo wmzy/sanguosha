@@ -20,6 +20,7 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
+import { isAwakened, markAwakened } from '../rules/vars-keys';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界潜心';
@@ -48,12 +49,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const self = ctx.state.players[ownerId];
     if (!self?.alive) return;
     // 觉醒技:整局一次
-    if (self.vars[AWAKENED_KEY]) return;
+    if (isAwakened(self.vars, AWAKENED_KEY)) return;
     // 触发条件:已受伤(当前体力 < 体力上限)
     if (self.health >= self.maxHealth) return;
 
     // 标记已觉醒(在读条件后立即设,防重入)
-    ctx.state.players[ownerId].vars[AWAKENED_KEY] = true;
+    markAwakened(ctx.state, ownerId, AWAKENED_KEY);
 
     // 1. 减少1点体力上限(设上限 amount = maxHealth - 1;减至0则角色死亡)
     const newMax = self.maxHealth - 1;
