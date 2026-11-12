@@ -93,7 +93,6 @@ export interface PlayerStateDiff {
   hand?: AiViewSnapshot['players'][number]['hand'];
   equipment?: AiViewSnapshot['players'][number]['equipment'];
   skills?: string[];
-  faction?: string;
   identity?: string;
   /** 标记(横置/连环等)变化。 */
   marks?: Array<{ id: string; scope: number }>;
@@ -110,6 +109,25 @@ function jsonEq(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+/** 逐字段比较表(顺序 = diff 对象字段写入序):标量用 !==,容器字段标记 deep 走 jsonEq。
+ *  faction 不在表内:projectView 不投影 faction,diff 端永远无值可比。 */
+const PLAYER_DIFF_KEYS: ReadonlyArray<{
+  key: Exclude<keyof PlayerStateDiff, 'index'>;
+  deep?: boolean;
+}> = [
+  { key: 'name' },
+  { key: 'character' },
+  { key: 'health' },
+  { key: 'maxHealth' },
+  { key: 'alive' },
+  { key: 'handCount' },
+  { key: 'hand', deep: true },
+  { key: 'equipment', deep: true },
+  { key: 'skills', deep: true },
+  { key: 'marks', deep: true },
+  { key: 'identity' },
+];
+
 /** 比较单个玩家，返回变化字段。prev 为 undefined 时返回全量。 */
 function diffPlayer(
   prev: AiViewSnapshot['players'][number] | undefined,
@@ -118,18 +136,15 @@ function diffPlayer(
   if (!prev) return { ...curr };
   const d: PlayerStateDiff = { index: curr.index };
   let changed = false;
-  if (prev.name !== curr.name) { d.name = curr.name; changed = true; }
-  if (prev.character !== curr.character) { d.character = curr.character; changed = true; }
-  if (prev.health !== curr.health) { d.health = curr.health; changed = true; }
-  if (prev.maxHealth !== curr.maxHealth) { d.maxHealth = curr.maxHealth; changed = true; }
-  if (prev.alive !== curr.alive) { d.alive = curr.alive; changed = true; }
-  if (prev.handCount !== curr.handCount) { d.handCount = curr.handCount; changed = true; }
-  if (!jsonEq(prev.hand, curr.hand)) { d.hand = curr.hand; changed = true; }
-  if (!jsonEq(prev.equipment, curr.equipment)) { d.equipment = curr.equipment; changed = true; }
-  if (!jsonEq(prev.skills, curr.skills)) { d.skills = curr.skills; changed = true; }
-  if (!jsonEq(prev.marks, curr.marks)) { d.marks = curr.marks; changed = true; }
-  if (prev.faction !== curr.faction) { d.faction = curr.faction; changed = true; }
-  if (prev.identity !== curr.identity) { d.identity = curr.identity; changed = true; }
+  for (const { key, deep } of PLAYER_DIFF_KEYS) {
+    const prevValue = prev[key];
+    const currValue = curr[key];
+    const same = deep ? jsonEq(prevValue, currValue) : prevValue === currValue;
+    if (!same) {
+      (d as unknown as Record<string, unknown>)[key] = currValue;
+      changed = true;
+    }
+  }
   return changed ? d : null;
 }
 

@@ -23,6 +23,7 @@ import { applyAtom } from '../core/apply';
 import { frameCards } from '../core/frame';
 import { registerAction, registerJudgeModifier } from '../core/skill';
 import { replaceJudgeCard } from '../flows/judge';
+import { requireRequestType } from '../util/skillRuntime';
 
 /** 判定替换技(鬼道族)差异参数 */
 export interface JudgeReplaceOptions {
@@ -68,12 +69,10 @@ export function createJudgeReplaceSkill(opts: JudgeReplaceOptions) {
         ownerId,
         'respond',
         (st: GameState, params: Record<string, Json>): string | null => {
-          const slot = st.pendingSlots.get(ownerId);
-          if (!slot) return '当前不需要回应';
-          const atom = slot.atom as unknown as Record<string, unknown>;
-          if (atom['type'] !== '请求回应') return '当前不需要回应';
-          if (atom['requestType'] !== opts.replaceRequestType)
-            return `当前不是${opts.promptName}询问`;
+          const check = requireRequestType(st, ownerId, [opts.replaceRequestType], {
+            mismatchError: `当前不是${opts.promptName}询问`,
+          });
+          if (check.error) return check.error;
           // 选择替换:cardId 必须是符合条件的黑色手牌;拒绝则无额外要求
           // 浏览器/Headless 客户端对 useCard 型 pending 只发 {cardId}(无 choice),
           // 故 cardId 出现即视为发动意图;{choice:false}/{} 仍视为不发动。

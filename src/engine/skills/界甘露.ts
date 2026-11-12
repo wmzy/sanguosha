@@ -42,6 +42,7 @@ import {
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_NAME = '界甘露';
 const DISPLAY_NAME = '甘露';
@@ -251,12 +252,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== TARGET_RT && rt !== DISCARD_RT) return '当前不是甘露询问';
+      const check = requireRequestType(st, ownerId, [TARGET_RT, DISCARD_RT], {
+        mismatchError: '当前不是甘露询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
 
       if (rt === TARGET_RT) {
         const targets = params.targets;
@@ -283,8 +283,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const cardIds = params.cardIds;
         if (!Array.isArray(cardIds)) return 'cardIds required';
         const self = st.players[ownerId];
-        const min = (slot.atom as unknown as { prompt?: { cardFilter?: { min?: number } } }).prompt
-          ?.cardFilter?.min ?? 0;
+        const min =
+          (st.pendingSlots.get(ownerId)!.atom as unknown as {
+            prompt?: { cardFilter?: { min?: number } };
+          }).prompt?.cardFilter?.min ?? 0;
         if (cardIds.length !== min) return `需要弃 ${min} 张牌`;
         if (new Set(cardIds).size !== cardIds.length) return '不能选择重复的牌';
         for (const cid of cardIds) {

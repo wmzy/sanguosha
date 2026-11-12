@@ -27,6 +27,7 @@ import { applyAtom } from '../core/apply'
 import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 const DISCARD_RT = '悲歌/discard';
 const DISCARD_CARD_KEY = '悲歌/discardCard';
@@ -52,10 +53,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== DISCARD_RT) return '当前不是悲歌询问';
+      const check = requireRequestType(st, ownerId, [DISCARD_RT], {
+        mismatchError: '当前不是悲歌询问',
+      });
+      if (check.error) return check.error;
       const cardId = params.cardId as string | undefined;
       if (typeof cardId !== 'string') return '请选择一张手牌弃置';
       if (!st.players[ownerId].hand.includes(cardId)) return '牌不在手牌中';

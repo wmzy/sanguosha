@@ -38,6 +38,7 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { handLimitBonusKey, getHandLimitBonus } from '../rules/vars-keys';
+import { currentRequestType } from '../util/skillRuntime';
 
 /** 非延时锦囊牌名集合 */
 const NON_DELAY_TRICKS = new Set([
@@ -55,13 +56,6 @@ const NON_DELAY_TRICKS = new Set([
 
 const CONFIRM_REQUEST = '界集智/confirm'; // 是否摸一张牌
 const DISCARD_REQUEST = '界集智/discard'; // 是否弃置基本牌令本回合手牌上限+1
-
-/** 读取当前 pending 的 requestType(类型安全) */
-function currentRequestType(state: GameState, ownerId: number): string | undefined {
-  const slot = state.pendingSlots.get(ownerId);
-  if (!slot) return undefined;
-  return (slot.atom as unknown as Record<string, unknown>).requestType as string | undefined;
-}
 
 /** 判定打出牌是否为「转化牌」(单卡 shadowOf 或多卡 '#' 拼接 id) */
 function isTransformedCard(card: { shadowOf?: string; id: string }): boolean {

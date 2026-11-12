@@ -27,6 +27,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { getQizhiCount } from '../rules/vars-keys';
+import { currentRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '进趋';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -42,13 +43,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     name: SKILL_ID,
     description: '结束阶段可摸两张牌,然后将手牌弃至X张(X为本回合发动奇制的次数)',
   };
-}
-
-/** 当前 pending 的 requestType(类型安全读取) */
-function currentRequestType(state: GameState, ownerId: number): string | undefined {
-  const slot = state.pendingSlots.get(ownerId);
-  if (!slot) return undefined;
-  return (slot.atom as unknown as { requestType?: string }).requestType;
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

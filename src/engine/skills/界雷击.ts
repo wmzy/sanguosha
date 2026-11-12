@@ -29,6 +29,7 @@ import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { isCancelled } from '../core/frame';
+import { requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界雷击';
 const DISPLAY_NAME = '雷击';
@@ -140,11 +141,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as unknown as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
+      const check = requireRequestType(st, ownerId, [JUDGE_RT, TARGET_RT], {
+        mismatchError: '当前不是界雷击询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
 
       if (rt === JUDGE_RT) {
         // yes/no:confirmed true/false 均合法
@@ -159,7 +160,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         }
         return null;
       }
-      return '当前不是界雷击询问';
+      return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const slot = st.pendingSlots.get(ownerId);

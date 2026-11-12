@@ -40,7 +40,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { askRankCard, runRankCompareFlow } from '../flows/rank';
-import { runUseFlow } from './cards/use-card';
+import { runVirtualSlash } from '../util/skillRuntime';
 import {
   registerAction,
   registerAfterHook,
@@ -77,25 +77,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '其他角色的回合开始时,若你已受伤,你可以与其拼点:赢则其本回合不能对除其以外的角色使用牌;没赢则你获得其拼点牌,然后其视为对你使用一张杀',
   };
-}
-
-/** 虚拟杀结算(参考界仁德/界诛害):source → target,无实体卡,不计入出杀次数。 */
-async function virtualKill(state: GameState, source: number, target: number): Promise<void> {
-  if (!state.players[target]?.alive) return;
-  const cardId = `${SKILL_ID}:杀:${source}:${target}:${state.seq}`;
-  // 虚拟杀无实体,但结算流程中 atoms/toViewEvents 需要 cardMap[id] 存在
-  state.cardMap[cardId] = {
-    id: cardId,
-    name: '杀',
-    suit: '',
-    color: '无色',
-    rank: 'A',
-    type: '基本牌',
-  };
-  // 虚拟杀不计入出杀次数(无 onSettle 计费)
-  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
-  // 清理虚拟杀卡(无实体,不入弃牌堆)
-  delete state.cardMap[cardId];
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
@@ -292,7 +273,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             });
           }
           // 其视为对 owner 使用一张杀(牌已被取走不影响虚拟杀结算)
-          await virtualKill(st, turnPlayer, ownerId);
+          await runVirtualSlash(st, turnPlayer, ownerId, { prefix: SKILL_ID });
         }
       },
     ),

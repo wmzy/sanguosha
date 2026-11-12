@@ -38,6 +38,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerAttackRangeExemptor, effectiveDistance } from '../rules/distance';
 import { getCardValue } from '../flows/rank';
+import { requireRequestType } from '../util/skillRuntime';
 
 const TAG_BLOCK = '界烈弓/禁闪';
 const TAG_BONUS = '界烈弓/加伤';
@@ -80,12 +81,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不是请求回应';
-      if (atom.requestType !== '界烈弓/confirm') return '当前不是界烈弓确认';
-      return null;
+      return requireRequestType(st, ownerId, ['界烈弓/confirm'], {
+        wrongTypeError: '当前不是请求回应',
+        mismatchError: '当前不是界烈弓确认',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
       st.localVars[CONFIRM] = params.choice === true || params.confirmed === true;

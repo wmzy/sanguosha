@@ -29,6 +29,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { QIZHI_COUNT_KEY as COUNT_VAR, PICK_RESULT_KEY, getQizhiCount } from '../rules/vars-keys';
+import { currentRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '奇制';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -59,13 +60,6 @@ function hasValidTargets(state: GameState, ownerId: number): boolean {
   return state.players.some(
     (p) => p.alive && p.index !== ownerId && hasDiscardableCards(p),
   );
-}
-
-/** 当前 pending 的 requestType(类型安全读取) */
-function currentRequestType(state: GameState, ownerId: number): string | undefined {
-  const slot = state.pendingSlots.get(ownerId);
-  if (!slot) return undefined;
-  return (slot.atom as unknown as { requestType?: string }).requestType;
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

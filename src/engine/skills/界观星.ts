@@ -22,6 +22,7 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 /** localVars 键:准备阶段全置底 → 结束阶段再次发动(一次性) */
 const ALL_BOTTOM_FLAG = '界观星/全置底';
@@ -146,13 +147,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (state, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (slot.atom as unknown as Record<string, unknown>).requestType as string;
-      if (requestType !== '界观星/confirm' && requestType !== '界观星/arrange') {
-        return '当前不是界观星询问';
-      }
-      if (requestType === '界观星/arrange') {
+      const check = requireRequestType(state, ownerId, ['界观星/confirm', '界观星/arrange'], {
+        mismatchError: '当前不是界观星询问',
+      });
+      if (check.error) return check.error;
+      if (check.requestType === '界观星/arrange') {
         // arrange 必须提供 top/bottom 划分
         if (!Array.isArray(params.top) || !Array.isArray(params.bottom)) {
           return '界观星:需要 top/bottom 划分';

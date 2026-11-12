@@ -22,6 +22,7 @@ import { applyAtom } from '../core/apply';
 import { runUseFlow } from './cards/use-card';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界诛害';
 const DISPLAY_NAME = '诛害';
@@ -87,11 +88,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== TRIGGER_RT && rt !== PICK_RT) return '当前不是诛害询问';
+      const check = requireRequestType(st, ownerId, [TRIGGER_RT, PICK_RT], {
+        mismatchError: '当前不是诛害询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === PICK_RT) {
         const cardId = params.cardId as string | undefined;
         if (typeof cardId !== 'string') return '需要选择一张杀';

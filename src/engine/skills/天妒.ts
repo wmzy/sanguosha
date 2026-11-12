@@ -8,6 +8,7 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { currentJudgeCardId } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 const CHOOSE_RT = '天妒/choose';
 const CHOICE_KEY = '天妒/choice';
@@ -30,13 +31,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (s) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== CHOOSE_RT) return '当前不是天妒选择';
-      return null;
-    },
+    (s): string | null =>
+      requireRequestType(s, ownerId, [CHOOSE_RT], {
+        mismatchError: '当前不是天妒选择',
+      }).error,
     async (s, params) => {
       s.localVars[CHOICE_KEY] = params.choice === true;
     },

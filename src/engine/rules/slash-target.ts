@@ -13,6 +13,7 @@
 // 注册表为 state-bound(WeakMap 外挂在 GameState 上),随 state 自动隔离与 GC。
 
 import type { GameState } from '../types';
+import { createProviderRegistry } from './provider-registry';
 
 /**
  * 杀目标数提供者:返回该来源允许的【杀】最大目标数。
@@ -25,21 +26,9 @@ export type SlashTargetProvider = (
   cardId: string | undefined,
 ) => number;
 
-interface SlashTargetRegistry {
-  /** player 索引 → 该玩家当前注册的目标数提供者集合 */
-  targetProviders: Map<number, Set<SlashTargetProvider>>;
-}
+// ─── state-bound 注册表(WeakMap 外挂,随 state 自动隔离/GC,样板见 rules/provider-registry.ts) ───
 
-const slashTargetRegistries = new WeakMap<GameState, SlashTargetRegistry>();
-
-function getSlashTargetRegistry(state: GameState): SlashTargetRegistry {
-  let reg = slashTargetRegistries.get(state);
-  if (!reg) {
-    reg = { targetProviders: new Map() };
-    slashTargetRegistries.set(state, reg);
-  }
-  return reg;
-}
+const targetRegistry = createProviderRegistry<SlashTargetProvider>();
 
 /**
  * 注册一个杀目标数提供者(技能 onInit 时调用,与 registerAction 同构)。
@@ -51,20 +40,7 @@ export function registerSlashTargetProvider(
   ownerId: number,
   provider: SlashTargetProvider,
 ): () => void {
-  const map = getSlashTargetRegistry(state).targetProviders;
-  let set = map.get(ownerId);
-  if (!set) {
-    set = new Set();
-    map.set(ownerId, set);
-  }
-  set.add(provider);
-  return () => {
-    const s = map.get(ownerId);
-    if (s) {
-      s.delete(provider);
-      if (s.size === 0) map.delete(ownerId);
-    }
-  };
+  return targetRegistry.register(state, ownerId, provider);
 }
 
 /**
@@ -78,12 +54,10 @@ export function slashTargetMax(
   player: number,
   cardId?: string,
 ): number {
-  const set = getSlashTargetRegistry(state).targetProviders.get(player);
-  if (!set || set.size === 0) return 1;
   let max = 1;
-  for (const provider of set) {
+  targetRegistry.forEachOf(state, player, (provider) => {
     const v = provider(state, player, cardId);
     if (v > max) max = v;
-  }
+  });
   return max;
 }

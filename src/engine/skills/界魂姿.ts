@@ -32,6 +32,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { performYinghunPrepare } from './英魂';
 import { HUNZI_AWAKENED_KEY as AWAKENED_KEY, getHunziAwakened, markAwakened } from '../rules/vars-keys';
+import { requireRequestType } from '../util/skillRuntime';
 
 // 觉醒标记:沿用标版键名 '魂姿/awakened',供复用的标 制霸/界制霸 读取觉醒状态。
 // 觉醒当回合结束阶段收益标记:准备阶段觉醒成功后置 true,结束阶段消费后清空。
@@ -133,12 +134,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== CHOOSE_RT) return '当前不是魂姿选择';
-      return null;
+      return requireRequestType(st, ownerId, [CHOOSE_RT], {
+        mismatchError: '当前不是魂姿选择',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
       // choice=true → 摸两张牌;choice=false → 回复1点体力

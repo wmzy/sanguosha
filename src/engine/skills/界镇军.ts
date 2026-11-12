@@ -41,6 +41,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界镇军';
 const DISPLAY_NAME = '镇军';
@@ -111,20 +112,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (
-        rt !== RT_ASK_USE &&
-        rt !== RT_ASK_TARGET &&
-        rt !== RT_ASK_CARDS &&
-        rt !== RT_ASK_OPTION &&
-        rt !== RT_ASK_OWN
-      ) {
-        return '当前不是界镇军回应';
-      }
+      const check = requireRequestType(
+        st,
+        ownerId,
+        [RT_ASK_USE, RT_ASK_TARGET, RT_ASK_CARDS, RT_ASK_OPTION, RT_ASK_OWN],
+        { mismatchError: '当前不是界镇军回应' },
+      );
+      if (check.error) return check.error;
+      const rt = check.requestType;
 
       if (rt === RT_ASK_USE) {
         // choice=true/false

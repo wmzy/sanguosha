@@ -16,6 +16,7 @@ import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -41,14 +42,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (state, _params) => {
-      if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (
-        state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>
-      ).requestType as string;
-      if (requestType !== '洛神/confirm' && requestType !== '洛神/continue') {
-        return '当前不是洛神询问';
-      }
-      return null;
+      return requireRequestType(state, ownerId, ['洛神/confirm', '洛神/continue'], {
+        mismatchError: '当前不是洛神询问',
+      }).error;
     },
     async (state, params) => {
       // 两个询问共用 confirmed 标记:发动 confirm + 继续 continue

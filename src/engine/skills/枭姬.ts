@@ -19,6 +19,7 @@ import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -65,12 +66,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (state, _params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是枭姬窗口';
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType !== '枭姬/confirm') return '当前不是枭姬窗口';
-      return null;
+      return requireRequestType(state, ownerId, ['枭姬/confirm'], {
+        wrongTypeError: '当前不是枭姬窗口',
+        mismatchError: '当前不是枭姬窗口',
+      }).error;
     },
     async (state, params) => {
       state.localVars['枭姬/confirmed'] = params.choice === true || params.confirmed === true;

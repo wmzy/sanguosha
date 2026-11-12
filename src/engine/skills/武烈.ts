@@ -34,6 +34,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const USED_KEY = '武烈/used';
 const CONFIRM_RT = '武烈/confirm';
@@ -64,12 +65,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== CONFIRM_RT && rt !== HP_RT && rt !== CHOOSE_RT) return '当前不是武烈询问';
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, HP_RT, CHOOSE_RT], {
+        mismatchError: '当前不是武烈询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === HP_RT) {
         // chooseOption 前端提交 { option: 'N' };兼容直接传数字 hpCount 的调用方
         const raw = typeof params.option === 'string' ? Number(params.option) : params.hpCount;

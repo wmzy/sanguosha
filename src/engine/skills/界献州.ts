@@ -34,6 +34,7 @@ import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive } from '../rules/action-active';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界献州';
 const DISPLAY_NAME = '献州';
@@ -209,12 +210,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       seatId,
       'respond',
       (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as Record<string, unknown>;
-        if (atom['type'] !== '请求回应') return '当前不需要回应';
-        const rt = atom['requestType'] as string;
-        if (rt !== OPTION_RT && rt !== TARGETS_RT) return '当前不是献州询问';
+        const check = requireRequestType(st, seatId, [OPTION_RT, TARGETS_RT], {
+          mismatchError: '当前不是献州询问',
+        });
+        if (check.error) return check.error;
+        const rt = check.requestType;
         if (rt === OPTION_RT) {
           // confirm:接受 choice/confirmed 布尔
           return null;

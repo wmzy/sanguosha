@@ -42,6 +42,7 @@ import { skipPhase } from '../rules/skip-phase';
 import { defaultPlayActive } from '../rules/action-active';
 import { setTurnVarUsage } from '../rules/turn-usage';
 import { SHUANGXIONG_COLOR_VIEW_KEY } from '../rules/vars-keys';
+import { requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_RT = '双雄/confirm';
 const TRIGGERED_KEY = '双雄/triggered';
@@ -71,13 +72,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     'respond',
-    (s: GameState, _params: Record<string, Json>) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== CONFIRM_RT) return '当前不是双雄询问';
-      return null;
-    },
+    (s: GameState, _params: Record<string, Json>): string | null =>
+      requireRequestType(s, ownerId, [CONFIRM_RT], {
+        mismatchError: '当前不是双雄询问',
+      }).error,
     async (s: GameState, params: Record<string, Json>) => {
       const slot = s.pendingSlots.get(ownerId);
       const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;

@@ -43,6 +43,7 @@ import { registerAttackRangeExemptor } from '../rules/distance';
 import { DANGXIAN_EXTRA_PHASE_VIEW_KEY, DANGXIAN_NO_RANGE_VIEW_KEY } from '../rules/vars-keys';
 import { setTurnVarUsage, projectTurnUsage } from '../rules/turn-usage';
 import { createRng } from '../util/rng';
+import { requireRequestType } from '../util/skillRuntime';
 
 const DISPLAY_NAME = '当先';
 
@@ -92,13 +93,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不需要回应';
-      const rt = atom.requestType;
-      if (rt !== CONFIRM_RT && rt !== SOURCE_RT) return '当前不是当先询问';
-      return null;
+      return requireRequestType(st, ownerId, [CONFIRM_RT, SOURCE_RT], {
+        mismatchError: '当前不是当先询问',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const slot = st.pendingSlots.get(ownerId);

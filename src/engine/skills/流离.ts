@@ -8,6 +8,7 @@ import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
+import { requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -27,16 +28,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (state, _params) => {
-      if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (
-        state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>
-      ).requestType as string;
-      if (
-        requestType !== '流离/confirm' &&
-        requestType !== '流离/chooseTarget' &&
-        requestType !== '流离/pickDiscard'
-      )
-        return '当前不是流离回应';
+      const check = requireRequestType(
+        state,
+        ownerId,
+        ['流离/confirm', '流离/chooseTarget', '流离/pickDiscard'],
+        { mismatchError: '当前不是流离回应' },
+      );
+      if (check.error) return check.error;
+      const requestType = check.requestType;
       if (requestType === '流离/chooseTarget') {
         // 服务端兜底:candidates 仅约束前端展示,恶意提交仍须权威校验(与 prompt.filter 同源)。
         // 杀来源由 hook 存入 localVars(pending atom 本身无 source 字段)

@@ -14,6 +14,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 const CHOOSE_RT = '崩坏/choose';
 const CHOICE_KEY = '崩坏/choice'; // 'maxHealth' | 'health'
@@ -37,13 +38,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (s: GameState, _params: Record<string, Json>) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== CHOOSE_RT) return '当前不是崩坏选择';
-      return null;
-    },
+    (s: GameState, _params: Record<string, Json>): string | null =>
+      requireRequestType(s, ownerId, [CHOOSE_RT], {
+        mismatchError: '当前不是崩坏选择',
+      }).error,
     async (s: GameState, params: Record<string, Json>) => {
       // choice=true → 减体力上限;choice=false(或超时)→ 减体力
       s.localVars[CHOICE_KEY] = params.choice === true ? 'maxHealth' : 'health';

@@ -42,6 +42,7 @@ import { runDamageFlow } from '../flows/damage';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界焚城';
 const DISPLAY_NAME = '焚城';
@@ -220,11 +221,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         seat,
         'respond',
         (st: GameState, params: Record<string, Json>): string | null => {
-          const slot = st.pendingSlots.get(seat);
-          if (!slot) return '当前不需要回应';
-          const atom = slot.atom as { type?: string; requestType?: string };
-          if (atom['type'] !== '请求回应') return '当前不需要回应';
-          const rt = atom['requestType'];
+          const check = requireRequestType(st, seat, [START_RT, CONFIRM_RT, DISCARD_RT], {
+            mismatchError: '当前不是焚城询问',
+          });
+          if (check.error) return check.error;
+          const rt = check.requestType;
           if (rt === START_RT) {
             const targets = params.targets as number[] | undefined;
             if (!Array.isArray(targets) || targets.length !== 1) return '请选择一名起点';
@@ -248,7 +249,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             }
             return null;
           }
-          return '当前不是焚城询问';
+          return null;
         },
         async (st: GameState, params: Record<string, Json>): Promise<void> => {
           const slot = st.pendingSlots.get(seat);

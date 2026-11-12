@@ -30,6 +30,7 @@ import { defaultPlayActive } from '../rules/action-active';
 import { getCardEffect } from './cards';
 import { TRANSFORM_ACTION_PREFIX } from '../util/declaredActionType';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界渐营';
 const DISPLAY_NAME = '渐营';
@@ -106,12 +107,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== CONFIRM_RT) return '当前不是渐营询问';
-      return null;
+      return requireRequestType(st, ownerId, [CONFIRM_RT], {
+        mismatchError: '当前不是渐营询问',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;

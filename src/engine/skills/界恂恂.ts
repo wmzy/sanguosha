@@ -21,6 +21,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界恂恂';
@@ -53,19 +54,18 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as unknown as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== CONFIRM_RT && rt !== ARRANGE_RT) return '当前不是恂恂询问';
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, ARRANGE_RT], {
+        mismatchError: '当前不是恂恂询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
 
       if (rt === ARRANGE_RT) {
         // arrange 必须提供 top/bottom 划分,且为观察范围的无重复完整划分
         if (!Array.isArray(params.top) || !Array.isArray(params.bottom)) {
           return '恂恂:需要 top/bottom 划分';
         }
-        const arrangeAtom = atom as { prompt?: { cardIds?: string[] } };
+        const arrangeAtom = st.pendingSlots.get(ownerId)!.atom as { prompt?: { cardIds?: string[] } };
         const observed: string[] = arrangeAtom.prompt?.cardIds ?? [];
         const observedSet = new Set(observed);
         const top = params.top as string[];

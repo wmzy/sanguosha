@@ -155,6 +155,25 @@ export class GameSession {
     return out;
   }
 
+  /** 局间簿记重置：丢弃上一局录像基线并把事件裁剪水位归零。
+   *  三处「新一局」路径的公共子集：startGame / restoreState 走 beginNewRound，
+   *  resetToLobby 单独调用（回大厅不切 epoch、不重开 journal，
+   *  baselineSent/lastSentDeadline/lastBroadcastSeq 等会话簿记由其自行重置）。 */
+  private resetRoundBookkeeping(): void {
+    this.replayBaseline = [];
+    this.replayBaselineSeq = 0;
+    this.trimmedFloorSeq = 0;
+  }
+
+  /** 新一局起点：切换局标识 epoch（gameStartedAt）+ 重开事件 journal + 局间簿记重置。
+   *  startGame（正常开局）与 restoreState（重启恢复，restoreState 只在新建 session 上
+   *  调用，replayBaseline 本为空，重置为幂等）共用。 */
+  private beginNewRound(): void {
+    this.gameStartedAt = Date.now();
+    this.resetRoundBookkeeping();
+    resetEventJournal(this.room.id);
+  }
+
   /** 用持久化数据恢复:create(config) → bootstrap → 重放 actionLog,确定性重建完整 state。
    *  config 从 state(rngSeed/playerCount)+ 全局 CHARACTERS 重构。 */
   async restoreState(state: GameState, actionLog: ActionLogEntry[] = []): Promise<void> {
@@ -200,10 +219,8 @@ export class GameSession {
     }
     // 恢复局也记录历史:基线取恢复时刻的视图(若选将已完成则立即捕获;否则等
     // onStateChange 在选将完成后捕获)。startedAt 用恢复时刻近似。
-    this.gameStartedAt = Date.now();
     // 恢复 = 新一局起点(epoch 变化):journal 重新开始,裁剪水位归零
-    this.trimmedFloorSeq = 0;
-    resetEventJournal(this.room.id);
+    this.beginNewRound();
     this.maybeCaptureReplayBaseline();
   }
 
@@ -240,12 +257,8 @@ export class GameSession {
     setRoomStatus(this.room.id, '进行中');
     // bootstrap 可能因选将 pending 而挂起(fire-and-forget dispatch)
     // 不 await — 让 startGame 立即返回,客户端收到选将 pending 后响应
-    this.gameStartedAt = Date.now();
-    this.replayBaseline = [];
-    this.replayBaselineSeq = 0;
-    // 新一局(epoch 变化):journal 重新开始,裁剪水位归零
-    this.trimmedFloorSeq = 0;
-    resetEventJournal(this.room.id);
+    // 新一局(epoch 变化):局标识切换,journal 重新开始,裁剪水位归零
+    this.beginNewRound();
     const bootstrapState = this.state;
     void Promise.resolve()
       .then(() => bootstrap(bootstrapState, config))
@@ -475,11 +488,8 @@ export class GameSession {
     this.baselineSent.clear();
     this.lastSentDeadline.clear();
     this.lastBroadcastSeq = 0;
-    // 丢弃上一局的录像基线(下一局 startGame 重新捕获)
-    this.replayBaseline = [];
-    this.replayBaselineSeq = 0;
-    // 裁剪水位归零(下一局 startGame 也会重置;此处先复位避免残留影响判空)
-    this.trimmedFloorSeq = 0;
+    // 丢弃上一局的录像基线并归零裁剪水位(下一局 startGame 也会重置;此处先复位避免残留影响判空)
+    this.resetRoundBookkeeping();
     // 重新生成 seed,新一局随机序列不同
     this.sessionSeed = Date.now();
     setRoomStatus(this.room.id, '等待中');
@@ -598,13 +608,20 @@ export class GameSession {
     this.trimmedFloorSeq = floor;
   }
 
+  /** 向单个连接发送 initialView 全量快照作为 baseline，并刷新其 deadline 缓存。
+   *  baselineSent 标记的维护时机各调用方不同（广播路径发送后立即标记、
+   *  重连路径在差量分支之外统一标记、整理手牌不标记），由调用方自理。 */
+  private sendBaseline(connId: string, viewer: number, state: GameState): void {
+    const view = buildView(state, viewer);
+    this.sendToPlayer(connId, { type: 'initialView', state: view, lastSeq: state.seq });
+    this.lastSentDeadline.set(connId, this.deadlineKey(this.effectiveDeadline(state, viewer)));
+  }
+
   /** 向单个连接（玩家或旁观者）发送 baseline + 增量事件。 */
   private sendViewToConn(connId: string, viewer: number, state: GameState): void {
     if (!this.baselineSent.has(connId)) {
-      const view = buildView(state, viewer);
-      this.sendToPlayer(connId, { type: 'initialView', state: view, lastSeq: state.seq });
+      this.sendBaseline(connId, viewer, state);
       this.baselineSent.add(connId);
-      this.lastSentDeadline.set(connId, this.deadlineKey(this.effectiveDeadline(state, viewer)));
     }
     this.sendEventEnvelopes(connId, viewer, state, eventsForViewer(state, viewer, this.lastBroadcastSeq));
   }
@@ -647,10 +664,7 @@ export class GameSession {
     if (!this.state) return;
     const viewer = this.playerNames.get(playerId);
     if (viewer === undefined || viewer < 0 || viewer >= this.state.players.length) return;
-    const state = this.state;
-    const view = buildView(state, viewer);
-    this.sendToPlayer(playerId, { type: 'initialView', state: view, lastSeq: state.seq });
-    this.lastSentDeadline.set(playerId, this.deadlineKey(this.effectiveDeadline(state, viewer)));
+    this.sendBaseline(playerId, viewer, this.state);
   }
 
   /** 旁观者连接 SSE：若游戏进行中则发送 initialView(或小差量补发)。 */
@@ -662,12 +676,7 @@ export class GameSession {
     if (this.canServeDifferential(lastSeq)) {
       this.sendEventEnvelopes(spectatorId, viewer, state, eventsForViewer(state, viewer, lastSeq));
     } else {
-      const view = buildView(state, viewer);
-      this.sendToPlayer(spectatorId, { type: 'initialView', state: view, lastSeq: state.seq });
-      this.lastSentDeadline.set(
-        spectatorId,
-        this.deadlineKey(this.effectiveDeadline(state, viewer)),
-      );
+      this.sendBaseline(spectatorId, viewer, state);
     }
     this.baselineSent.add(spectatorId);
   }

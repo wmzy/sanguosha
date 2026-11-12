@@ -27,7 +27,6 @@
 //   - 装备自带技能加载:applyAtom(装备) 不会自动加载技能——需要手动 添加技能,
 //     与「装备通用」一致(装备通用 是 use action 的实现,绕过它直接 applyAtom(装备) 时需手动管理)。
 import type {
-  EquipSlot,
   FrontendAPI,
   GameState,
   Json,
@@ -38,6 +37,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
+import { slotOf } from '../util/skillRuntime';
 
 const _SKILL_ID = '界直言';
 const DISPLAY_NAME = '直言';
@@ -61,24 +61,6 @@ function findNextAlive(state: { players: { alive: boolean }[] }, fromIndex: numb
 function isUpstreamOf(state: GameState, candidate: number, target: number): boolean {
   if (candidate === target) return false;
   return findNextAlive(state, candidate) === target;
-}
-
-/** 装备牌 subtype → 装备栏位(与 装备 atom 的 inferSlot 一致) */
-function slotOf(card: { subtype?: string } | undefined): EquipSlot | null {
-  switch (card?.subtype) {
-    case '武器':
-      return '武器';
-    case '防具':
-      return '防具';
-    case '进攻马':
-      return '进攻马';
-    case '防御马':
-      return '防御马';
-    case '宝物':
-      return '宝物';
-    default:
-      return null;
-  }
 }
 
 export function createSkill(id: string, ownerId: number): Skill {

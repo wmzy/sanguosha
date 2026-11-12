@@ -14,6 +14,7 @@ import { registerBeforeHook } from '../../core/skill';
 import { defaultPlayActive } from '../../rules/action-active';
 import type { CardEffect, ResolveCtx } from '../../types';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../../rules/once-per-turn';
+import { requireRequestType } from '../../util/skillRuntime';
 import type { HookResult } from '../../types';
 
 /** 注册酒的全局「造成伤害」before-hook（消费增伤标记）。
@@ -84,11 +85,10 @@ export const wineEffect: CardEffect = {
   // respond:濒死时酒当桃用——移动牌到弃牌堆并置 localVars['求桃/已救']=true。
   respond: {
     validate: (state, ownerId, params) => {
-      if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (
-        state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>
-      ).requestType as string;
-      if (requestType !== '桃/求桃') return '当前不是求桃';
+      const check = requireRequestType(state, ownerId, ['桃/求桃'], {
+        mismatchError: '当前不是求桃',
+      });
+      if (check.error) return check.error;
       const cardId = params.cardId as string | undefined;
       if (!cardId) return 'cardId required';
       const self = state.players[ownerId];

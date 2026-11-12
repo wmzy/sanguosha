@@ -29,6 +29,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
+import { requireRequestType } from '../util/skillRuntime';
 
 /** 是否为普通杀(damageType 为空或 '普通',即非火杀/雷杀) */
 function isNormalSlash(
@@ -138,14 +139,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       skill.id,
       ownerId,
       'respond',
-      (st: GameState, _params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(ownerId);
-        if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-        if ((slot.atom as { requestType?: string }).requestType !== CONFIRM_REQUEST) {
-          return '当前不是朱雀羽扇询问';
-        }
-        return null;
-      },
+      (st: GameState, _params: Record<string, Json>): string | null =>
+        requireRequestType(st, ownerId, [CONFIRM_REQUEST], {
+          mismatchError: '当前不是朱雀羽扇询问',
+        }).error,
       async (st: GameState, params: Record<string, Json>) => {
         st.localVars[CONFIRMED_VAR] = params.choice === true;
       },

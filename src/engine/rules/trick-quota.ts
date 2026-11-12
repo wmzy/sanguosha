@@ -9,6 +9,7 @@
 // 不预写状态——技能只需在 onInit 注册一次,谓词内动态读 turn.vars 判定当前是否生效。
 
 import type { GameState } from '../types';
+import { createProviderRegistry } from './provider-registry';
 
 /**
  * 普通锦囊牌阻断器:返回 true 表示该玩家本回合被禁止使用普通锦囊牌。
@@ -16,47 +17,24 @@ import type { GameState } from '../types';
  */
 export type TrickBlocker = (state: GameState, player: number) => boolean;
 
-interface TrickRegistry {
-  /** key=`${ownerId}:${id}`,id 为自增序号,保证多次注册不冲突。 */
-  blockers: Map<string, TrickBlocker>;
-}
+// ─── state-bound 注册表(WeakMap 外挂,随 state 自动隔离/GC,样板见 rules/provider-registry.ts) ───
 
-const trickRegistries = new WeakMap<GameState, TrickRegistry>();
-
-function getTrickRegistry(state: GameState): TrickRegistry {
-  let r = trickRegistries.get(state);
-  if (!r) {
-    r = { blockers: new Map() };
-    trickRegistries.set(state, r);
-  }
-  return r;
-}
-
-let nextBlockerId = 0;
+const trickBlockerRegistry = createProviderRegistry<TrickBlocker>();
 
 /**
  * 注册一个普通锦囊牌阻断器(技能 onInit 时调用,与 registerSlashBlocker 同构)。
  * 返回取消注册函数——必须并入 onInit 返回的 unload,在卸载技能实例时自动清理。
+ * ownerId 仅用于注册表生命周期管理;查询(isTrickBlocked)遍历所有阻断器。
  */
 export function registerTrickBlocker(
   state: GameState,
   ownerId: number,
   blocker: TrickBlocker,
 ): () => void {
-  const id = ++nextBlockerId;
-  const key = `${ownerId}:${id}`;
-  getTrickRegistry(state).blockers.set(key, blocker);
-  return () => {
-    getTrickRegistry(state).blockers.delete(key);
-  };
+  return trickBlockerRegistry.register(state, ownerId, blocker);
 }
 
 /** 该玩家本回合是否被阻断使用普通锦囊牌(任一阻断器返回 true 即阻断)。 */
 export function isTrickBlocked(state: GameState, player: number): boolean {
-  const reg = trickRegistries.get(state);
-  if (!reg) return false;
-  for (const blocker of reg.blockers.values()) {
-    if (blocker(state, player)) return true;
-  }
-  return false;
+  return trickBlockerRegistry.someAll(state, (blocker) => blocker(state, player));
 }

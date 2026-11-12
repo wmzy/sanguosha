@@ -30,6 +30,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { getCardValue } from '../flows/rank';
+import { requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界纵适';
@@ -59,14 +60,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     'respond',
-    (st: GameState, _params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as unknown as Record<string, unknown>;
-      if (atom.type !== '请求回应') return '当前不需要回应';
-      if ((atom.requestType as string) !== CONFIRM_RT) return '当前不是纵适回应';
-      return null;
-    },
+    (st: GameState, _params: Record<string, Json>): string | null =>
+      requireRequestType(st, ownerId, [CONFIRM_RT], {
+        mismatchError: '当前不是纵适回应',
+      }).error,
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const slot = st.pendingSlots.get(ownerId);
       if (!slot) return;

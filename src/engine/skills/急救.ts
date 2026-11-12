@@ -15,6 +15,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, declareAlternativeResponse } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -45,9 +46,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       if ((slot.atom as { target?: number }).target !== ownerId) return '不是问你的';
-      if (slot.atom.type !== '请求回应') return '当前不是求桃';
-      const requestType = (slot.atom as unknown as Record<string, unknown>).requestType as string;
-      if (requestType !== '桃/求桃') return '当前不是求桃';
+      const check = requireRequestType(state, ownerId, ['桃/求桃'], {
+        wrongTypeError: '当前不是求桃',
+        mismatchError: '当前不是求桃',
+      });
+      if (check.error) return check.error;
       // 牌校验:必须是手中的红色牌
       const cardId = params.cardId as string | undefined;
       if (!cardId) return 'cardId required';

@@ -28,7 +28,8 @@ import { registerAction, hasBlockingPending } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { canSlash } from '../rules/slash-quota';
 import { usedThisTurn } from '../rules/once-per-turn';
-import { runUseFlow, chargeOnSettle } from './cards/use-card';
+import { runUseFlow } from './cards/use-card';
+import { runVirtualSlash, requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 // localVars keys(界刘备视为使用基本牌流程)
@@ -48,41 +49,12 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 创建一张虚拟卡(无实体,仅用于结算流程的 cardId 引用) */
-function makeVirtualCard(kind: '杀' | '桃' | '酒', source: number, target: number, seq: number): string {
-  return `仁德:${kind}:${source}:${target}:${seq}`;
-}
-
-/**
- * 执行一次"视为出杀"的完整结算（runUseFlow virtual 模式）。
- * 不消耗手牌；走完整时机 atom 序列（选择目标时/使用时/指定目标/成为目标/...），
- * 保证激昂/集智/界求援等技能事件一致。计入出杀次数：virtual+charge 下 runUseFlow 的
- * onSettle 回调(由 chargeOnSettle 传入)触发 杀.onSettle→incSlashUsed（与下方第 284 行内联注释一致）。
- */
-async function virtualKill(state: GameState, source: number, target: number): Promise<void> {
-  if (!state.players[target]?.alive) return;
-  const cardId = makeVirtualCard('杀', source, target, state.seq);
-  state.cardMap[cardId] = {
-    id: cardId,
-    name: '杀',
-    suit: '',
-    color: '无色',
-    rank: 'A',
-    type: '基本牌',
-  };
-  await runUseFlow(state, source, cardId, [target], '杀', {
-    virtual: true,
-    onSettle: chargeOnSettle(state, source, cardId),
-  });
-  delete state.cardMap[cardId];
-}
-
 /** 视为使用一张【桃】:走 runUseFlow virtual（resolve=回复体力） */
 async function virtualPeach(state: GameState, source: number, target: number): Promise<void> {
   const t = state.players[target];
   if (!t?.alive) return;
   if (t.health >= t.maxHealth) return;
-  const cardId = makeVirtualCard('桃', source, target, state.seq);
+  const cardId = `仁德:桃:${source}:${target}:${state.seq}`;
   state.cardMap[cardId] = { id: cardId, name: '桃', suit: '', color: '无色', rank: 'A', type: '基本牌' };
   await runUseFlow(state, source, cardId, [target], '桃', { virtual: true });
   delete state.cardMap[cardId];
@@ -90,7 +62,7 @@ async function virtualPeach(state: GameState, source: number, target: number): P
 
 /** 视为使用一张【酒】:走 runUseFlow virtual（resolve=加增伤标记） */
 async function virtualWine(state: GameState, source: number): Promise<void> {
-  const cardId = makeVirtualCard('酒', source, source, state.seq);
+  const cardId = `仁德:酒:${source}:${source}:${state.seq}`;
   state.cardMap[cardId] = { id: cardId, name: '酒', suit: '', color: '无色', rank: 'A', type: '基本牌' };
   await runUseFlow(state, source, cardId, [source], '酒', { virtual: true });
   delete state.cardMap[cardId];
@@ -287,8 +259,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             const slashTarget = state.localVars[BASIC_TARGET_VAR] as number | undefined;
             delete state.localVars[BASIC_TARGET_VAR];
             if (typeof slashTarget === 'number' && state.players[slashTarget]?.alive) {
-              await virtualKill(state, from, slashTarget);
-              // 出杀次数累加已由 virtualKill 内 chargeOnSettle 的 onSettle 负责
+              // 出杀次数累加已由 runVirtualSlash 的 charge 计费负责
+              await runVirtualSlash(state, from, slashTarget, { prefix: '仁德', charge: true });
             }
           }
         } else if (choice === '桃') {
@@ -339,15 +311,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     'respond',
-    (s: GameState) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType ?? '';
-      if (rt !== CHOICE_RT && rt !== TARGET_RT) {
-        return '当前不是仁德询问';
-      }
-      return null;
-    },
+    (s: GameState): string | null =>
+      requireRequestType(s, ownerId, [CHOICE_RT, TARGET_RT], {
+        mismatchError: '当前不是仁德询问',
+      }).error,
     async (s: GameState, params: Record<string, Json>) => {
       const slot = s.pendingSlots.get(ownerId);
       const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType ?? '';

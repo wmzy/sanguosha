@@ -118,6 +118,51 @@ export async function checkRoomPassword(
   return verifyPassword(password, room.passwordHash);
 }
 
+/** 房间构造参数(普通房/调试房共用工厂)。 */
+interface RoomInit {
+  name: string;
+  maxPlayers: number;
+  hostId: string | null;
+  players?: Map<string, ConnectionSink>;
+  config?: RoomConfig;
+  roomType: 'normal' | 'quick';
+  isDebug?: boolean;
+  passwordHash?: string | null;
+  playerNames?: Map<string, string>;
+}
+
+/** 房间工厂:生成 id、初始化全部成员结构并注册进 roomList(不触发持久化通知,
+ *  由调用方按需调用 roomChangeHandler)。房主(hostId 非 null)占 0 号座。 */
+function makeRoom(init: RoomInit): Room {
+  const id = generateRoomId();
+  const seats: (string | null)[] = Array(clampPlayers(init.maxPlayers)).fill(null);
+  if (init.hostId !== null) seats[0] = init.hostId;
+  const room: Room = {
+    id,
+    name: init.name,
+    players: init.players ?? new Map(),
+    maxPlayers: clampPlayers(init.maxPlayers),
+    status: '等待中',
+    hostId: init.hostId,
+    readyPlayers: new Set(),
+    roomType: init.roomType,
+    ...(init.isDebug ? { isDebug: true } : {}),
+    config: init.config ?? { ...DEFAULT_ROOM_CONFIG, name: init.name },
+    spectators: new Map(),
+    viewGrants: new Map(),
+    pendingViewRequests: new Map(),
+    chatUsage: new Map(),
+    chatHistory: [],
+    seats,
+    pendingSeatSwaps: new Map(),
+    recentlyLeft: new Map(),
+    passwordHash: init.passwordHash ?? null,
+    playerNames: init.playerNames ?? new Map(),
+  };
+  roomList.set(id, room);
+  return room;
+}
+
 /** 创建普通房间:需要 host 玩家立刻加入。
  *  roomType: 'normal'=持久化到 DB, 不自动销毁不自动换主; 'quick'=纯内存(默认)。 */
 export function createRoom(
@@ -130,31 +175,16 @@ export function createRoom(
   passwordHash: string | null = null,
   hostName?: string | null,
 ): Room {
-  const id = generateRoomId();
-  const seats: (string | null)[] = Array(clampPlayers(maxPlayers)).fill(null);
-  seats[0] = hostId;
-  const room: Room = {
-    id,
+  const room = makeRoom({
     name,
-    players: new Map([[hostId, sink]]),
-    maxPlayers: clampPlayers(maxPlayers),
-    status: '等待中',
+    maxPlayers,
     hostId,
-    readyPlayers: new Set(),
+    players: new Map([[hostId, sink]]),
+    config,
     roomType,
-    config: config ?? { ...DEFAULT_ROOM_CONFIG, name },
-    spectators: new Map(),
-    viewGrants: new Map(),
-    pendingViewRequests: new Map(),
-    chatUsage: new Map(),
-    chatHistory: [],
-    seats,
-    pendingSeatSwaps: new Map(),
-    recentlyLeft: new Map(),
     passwordHash,
     playerNames: hostName ? new Map([[hostId, hostName]]) : new Map(),
-  };
-  roomList.set(id, room);
+  });
   roomChangeHandler?.(room, 'create');
   return room;
 }
@@ -162,31 +192,12 @@ export function createRoom(
 /** 创建调试房间:无人加入、无 host。后续由玩家调用 joinDebugRoom 进入。
  *  不立即开局——进入「配置+准备」阶段,所有座次就绪后由 start_game 触发。 */
 export function createDebugRoom(name: string, maxPlayers: number, config?: RoomConfig): Room {
-  const id = generateRoomId();
-  const room: Room = {
-    id,
-    name,
-    players: new Map(),
-    maxPlayers: clampPlayers(maxPlayers),
-    status: '等待中',
-    hostId: null,
-    readyPlayers: new Set(),
-    roomType: 'quick',
-    isDebug: true,
-    config: config ?? { ...DEFAULT_ROOM_CONFIG, name },
-    spectators: new Map(),
-    viewGrants: new Map(),
-    pendingViewRequests: new Map(),
-    chatUsage: new Map(),
-    chatHistory: [],
-    seats: Array(clampPlayers(maxPlayers)).fill(null),
-    pendingSeatSwaps: new Map(),
-    recentlyLeft: new Map(),
-    passwordHash: null,
-    playerNames: new Map(),
-  };
-  roomList.set(id, room);
-  return room;
+  return makeRoom({ name, maxPlayers, hostId: null, config, roomType: 'quick', isDebug: true });
+}
+
+/** 是否本房成员(占座玩家或旁观者);log/chat/history 等读取守卫共用。 */
+export function isRoomMember(room: Room, playerId: string): boolean {
+  return room.players.has(playerId) || room.spectators.has(playerId);
 }
 
 /** 已占用的座位数（权威的"当前玩家数"，与客户端 playerCount 一致）。

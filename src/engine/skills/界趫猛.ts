@@ -31,6 +31,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { spliceHandOrderEntry } from '../flows/pick-card-panel';
+import { requireRequestType } from '../util/skillRuntime';
 
 /** 是否发动趫猛的 requestType */
 const CONFIRM_REQUEST = '界趫猛/confirm';
@@ -115,12 +116,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不需要回应';
-      const rt = atom.requestType;
-      if (rt !== CONFIRM_REQUEST && rt !== PICK_REQUEST) return '当前不是趫猛询问';
+      const check = requireRequestType(st, ownerId, [CONFIRM_REQUEST, PICK_REQUEST], {
+        mismatchError: '当前不是趫猛询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       // 选牌阶段的参数校验
       if (rt === PICK_REQUEST) {
         const zone = params.zone;

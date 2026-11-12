@@ -53,6 +53,7 @@ import type { SkillModule } from '../types';
 import { CHENGLUE_STATE_VIEW_KEY, CHENGLUE_SUITS_VIEW_KEY } from '../rules/vars-keys';
 import { projectTurnUsage, setTurnVarUsage } from '../rules/turn-usage';
 import { projectSlashUnlimited } from '../rules/slash-quota';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '成略';
 /** 转换态 key(state:player.vars 跨回合持久;view:经 回合用量 atom 投影 turnUsage)。
@@ -127,11 +128,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== DISCARD_RT) return '当前不是成略弃牌';
+      const check = requireRequestType(st, ownerId, [DISCARD_RT], {
+        mismatchError: '当前不是成略弃牌',
+      });
+      if (check.error) return check.error;
       const ids = params.cardIds as string[] | undefined;
       if (!Array.isArray(ids) || ids.length === 0) return '请选择要弃置的手牌';
       const expected = st.localVars[DISCARD_COUNT_KEY] as number | undefined;

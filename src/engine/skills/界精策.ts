@@ -40,6 +40,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { handLimitBonusKey } from '../rules/vars-keys';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界精策';
 const DISPLAY_NAME = '精策';
@@ -127,13 +128,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (st, _params) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (slot.atom as unknown as Record<string, unknown>).requestType as string;
-      if (requestType !== CONFIRM_REQUEST) return '当前不是精策确认';
-      return null;
-    },
+    (st, _params) =>
+      requireRequestType(st, ownerId, [CONFIRM_REQUEST], {
+        mismatchError: '当前不是精策确认',
+      }).error,
     async (st, params) => {
       st.localVars[CONFIRMED_VAR] = params.choice === true || params.confirmed === true;
     },

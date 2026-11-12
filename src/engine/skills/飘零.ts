@@ -24,6 +24,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { currentRequestType } from '../util/skillRuntime';
 
 const CONFIRM_RT = '飘零/confirm';
 const GIVE_RT = '飘零/give';
@@ -33,12 +34,6 @@ const CONFIRMED_KEY = '飘零/confirmed';
 const GIVE_KEY = '飘零/give';
 const TARGET_KEY = '飘零/target';
 const DISCARD_KEY = '飘零/discardCardId';
-
-function currentRequestType(state: GameState, ownerId: number): string | undefined {
-  const slot = state.pendingSlots.get(ownerId);
-  if (!slot) return undefined;
-  return (slot.atom as unknown as Record<string, unknown>).requestType as string | undefined;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

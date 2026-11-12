@@ -13,16 +13,17 @@
 //     逼杀统一走 runUseFlow(damageType 由 cardMap 自动传导)。
 //   - 主循环结束后,若贾诩仍存活且有出杀次数剩余(canSlash),发起 choosePlayer 询问:
 //     目标为任意存活其他角色(targetFilter 不校验距离 → 无距离限制)。
-//     贾诩选目标 → 走 virtualKill(虚拟杀结算,模型参考 界仁德.virtualKill);
+//     贾诩选目标 → 走 runVirtualSlash(共享虚拟杀结算,util/skillRuntime);
 //     贾诩 pass / 超时 → 不视为使用杀。
-//   - 视为使用杀占出杀次数(由 virtualKill 内 chargeOnSettle 的 onSettle 负责)。
+//   - 视为使用杀占出杀次数(由 runVirtualSlash 的 charge 计费负责)。
 //
 // 命名:文件名/loader key/character skill name 均为 '界乱武';内部 Skill.name='乱武'。
 import type { Card, FrontendAPI, GameState, GameView, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
-import { runUseFlow, chargeOnSettle } from './cards/use-card';
+import { runUseFlow } from './cards/use-card';
+import { runVirtualSlash } from '../util/skillRuntime';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';
 import { canSlash } from '../rules/slash-quota';
@@ -66,30 +67,6 @@ function nearestOthers(state: GameState, p: number): number[] {
     if (d === min) result.push(i);
   }
   return result;
-}
-
-/**
- * 执行一次"视为出杀"的完整结算(无实体牌)。模型参考 界仁德.virtualKill。
- * 无距离限制(调用方已选择目标,不再校验距离)。
- */
-async function virtualKill(state: GameState, source: number, target: number): Promise<void> {
-  if (!state.players[target]?.alive) return;
-  const cardId = `界乱武:杀:${source}:${target}:${state.seq}`;
-  // 直接写 cardMap:虚拟杀无实体,但结算流程中 atoms/toViewEvents 需要 cardMap[id] 存在
-  state.cardMap[cardId] = {
-    id: cardId,
-    name: '杀',
-    suit: '',
-    color: '无色',
-    rank: 'A',
-    type: '基本牌',
-  };
-
-  await runUseFlow(state, source, cardId, [target], '杀', {
-    virtual: true,
-    onSettle: chargeOnSettle(state, source, cardId),
-  });
-  delete state.cardMap[cardId];
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
@@ -187,8 +164,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
               const finalTarget = st.localVars[FINAL_TARGET_VAR] as number | undefined;
               delete st.localVars[FINAL_TARGET_VAR];
               if (typeof finalTarget === 'number' && st.players[finalTarget]?.alive) {
-                await virtualKill(st, from, finalTarget);
-                // 出杀次数累加已由 virtualKill 内 chargeOnSettle 的 onSettle 负责
+                // 出杀次数累加已由 runVirtualSlash 的 charge 计费负责
+                await runVirtualSlash(st, from, finalTarget, { prefix: '界乱武', charge: true });
               }
             }
           }

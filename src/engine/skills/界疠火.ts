@@ -41,6 +41,7 @@ import {
 } from '../core/skill';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
 import { registerSlashTargetProvider } from '../rules/slash-target';
+import { requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界疠火';
 const DISPLAY_NAME = '疠火';
@@ -146,10 +147,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (s, params) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== COST_RT) return '当前不是疠火代价选择';
+      const check = requireRequestType(s, ownerId, [COST_RT], {
+        mismatchError: '当前不是疠火代价选择',
+      });
+      if (check.error) return check.error;
       const cardId = params.cardId as string | undefined;
       if (typeof cardId !== 'string') return 'cardId required';
       const self = s.players[ownerId];

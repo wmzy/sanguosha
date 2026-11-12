@@ -44,29 +44,12 @@ import { registerAction, hasBlockingPending } from '../core/skill';
 import { getGender } from '../data/character-meta';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
+import { slotOf } from '../util/skillRuntime';
 
 const SKILL_NAME = '界结姻';
 const USED_KEY = `${SKILL_NAME}/usedThisTurn`;
 
 const EQUIP_SLOTS: EquipSlot[] = ['武器', '防具', '进攻马', '防御马', '宝物'];
-
-/** 装备牌 subtype → 装备栏位 */
-function slotOf(card: { subtype?: string } | undefined): EquipSlot | null {
-  switch (card?.subtype) {
-    case '武器':
-      return '武器';
-    case '防具':
-      return '防具';
-    case '进攻马':
-      return '进攻马';
-    case '防御马':
-      return '防御马';
-    case '宝物':
-      return '宝物';
-    default:
-      return null;
-  }
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

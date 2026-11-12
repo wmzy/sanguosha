@@ -17,6 +17,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 const BONUS_TAG = '裸衣/bonus';
 const CONFIRM_REQUEST = '裸衣/confirm';
@@ -40,12 +41,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== CONFIRM_REQUEST) return '当前不是裸衣确认';
-      return null;
+      return requireRequestType(st, ownerId, [CONFIRM_REQUEST], {
+        mismatchError: '当前不是裸衣确认',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
       st.localVars['裸衣/confirmed'] = params.choice === true || params.confirmed === true;

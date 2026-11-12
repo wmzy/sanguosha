@@ -23,6 +23,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { inAttackRange } from '../rules/distance';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { createRng } from '../util/rng';
+import { requireRequestType } from '../util/skillRuntime';
 
 const CHOOSE_RT = '掣政/选目标';
 const CHOOSE_KEY = '掣政/所选目标';
@@ -162,11 +163,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是掣政窗口';
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType !== CHOOSE_RT) return '当前不是掣政窗口';
+      const check = requireRequestType(st, ownerId, [CHOOSE_RT], {
+        wrongTypeError: '当前不是掣政窗口',
+        mismatchError: '当前不是掣政窗口',
+      });
+      if (check.error) return check.error;
       const t =
         (params.targets as number[] | undefined)?.[0] ??
         (typeof params.target === 'number' ? params.target : undefined);

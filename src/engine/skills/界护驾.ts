@@ -30,6 +30,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, declareAlternativeResponse } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 // localVars keys(标护驾主技路径)
 const DODGE_PLAYED_VAR = '界护驾/闪出';
@@ -205,11 +206,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       pid,
       'respond',
       (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(pid);
-        if (!slot) return '当前不需要回应';
-        const a = slot.atom as Record<string, unknown>;
-        if (a['type'] !== '请求回应') return '当前不需要回应';
-        const requestType = a['requestType'] as string;
+        const check = requireRequestType(st, pid, ['界护驾/出闪', REQUEST_TYPE], {
+          mismatchError: '当前不是界护驾询问',
+        });
+        if (check.error) return check.error;
+        const requestType = check.requestType;
         if (requestType === '界护驾/出闪') {
           // 护驾代出闪:有 cardId 必须是手牌中的闪
           const cardId = params.cardId as string | undefined;

@@ -26,6 +26,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { getHealthValue } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const OPTION_RT = '溃诛/选择'; // chooseOption:摸牌/伤害/不发动
 const DRAW_RT = '溃诛/摸牌选目标'; // choosePlayer:1..X 名角色
@@ -164,10 +165,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是溃诛窗口';
-      const atom = slot.atom as { requestType?: string };
+      const check = requireRequestType(
+        st,
+        ownerId,
+        [OPTION_RT, DRAW_RT, DAMAGE_RT],
+        { wrongTypeError: '当前不是溃诛窗口', mismatchError: '当前不是溃诛窗口' },
+      );
+      if (check.error) return check.error;
+      const atom = st.pendingSlots.get(ownerId)!.atom as { requestType?: string };
       const X = (st.localVars[X_KEY] as number | undefined) ?? 0;
 
       if (atom.requestType === OPTION_RT) {
@@ -203,7 +208,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (sum !== X) return `所选角色体力值之和(${sum})须等于 ${X}`;
         return null;
       }
-      return '当前不是溃诛窗口';
+      return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const slot = st.pendingSlots.get(ownerId)!;

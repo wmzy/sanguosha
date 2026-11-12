@@ -25,6 +25,7 @@ import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { registerSlashExtraProvider, projectSlashExtra } from '../rules/slash-quota';
+import { requireRequestType } from '../util/skillRuntime';
 
 const ALLY_CONFIRM_RT = '立军/盟友确认'; // 问盟友:是否把杀交给主公
 const LORD_CONFIRM_RT = '立军/主公确认'; // 问主公:是否令其摸牌+杀次+1
@@ -199,12 +200,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       seatId,
       'respond',
       (st: GameState, _params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return '当前不需要回应';
-        if (slot.atom.type !== '请求回应') return '当前不是立军窗口';
-        const rt = (slot.atom as { requestType?: string }).requestType;
-        if (rt !== ALLY_CONFIRM_RT && rt !== LORD_CONFIRM_RT) return '当前不是立军窗口';
-        return null; // confirm:确认/取消都接受
+        return requireRequestType(st, seatId, [ALLY_CONFIRM_RT, LORD_CONFIRM_RT], {
+          wrongTypeError: '当前不是立军窗口',
+          mismatchError: '当前不是立军窗口',
+        }).error; // confirm:确认/取消都接受
       },
       async (st: GameState, params: Record<string, Json>): Promise<void> => {
         const slot = st.pendingSlots.get(seatId)!;

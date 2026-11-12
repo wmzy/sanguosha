@@ -26,7 +26,15 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
-import { runUseFlow, chargeOnSettle } from './cards/use-card';
+import { runVirtualSlash } from '../util/skillRuntime';
+import {
+  FLIP_TAG,
+  SKIP_MO_TAG,
+  SKIP_PLAY_TAG,
+  registerShensuFlipTurnHooks,
+  registerShensuTagSkipHook,
+  shensuPhaseEntry,
+} from './神速';
 
 // 请求类型(requestType)——保持 神速/ 前缀(界版键名约定)
 const OPT1_RT = '界神速/opt1'; // 选项1 confirm
@@ -35,12 +43,8 @@ const OPT3_RT = '界神速/opt3'; // 选项3 confirm
 const TARGET_RT = '界神速/target'; // 虚拟杀目标
 const EQUIP_RT = '界神速/equip'; // 选项2 选弃装备
 
-// 标签
-const SKIP_MO_TAG = '神速/跳过摸牌';
-const SKIP_PLAY_TAG = '神速/跳过出牌';
+// 标签(与标版共用的 '神速/' 前缀标签从 ./神速 import;此为界版独有)
 const SKIP_DISCARD_TAG = '神速/跳过弃牌';
-const FLIP_TAG = '神速/翻面'; // 翻面标签(下一回合被消费,跳过整回合)
-const SKIP_FLAG = '神速/skipAll'; // 翻面生效时跳过整回合的标志(localVars)
 
 // localVars 键
 const CONFIRMED_KEY = '神速/confirmed';
@@ -60,34 +64,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '选择至多三项:①跳过判定+摸牌;②弃装备+跳过出牌;③翻面+跳过弃牌。每项视为出杀',
   };
-}
-
-/** 创建一张虚拟杀卡(无实体,仅用于结算流程的 cardId 引用) */
-function makeVirtualKillCard(source: number, target: number, seq: number): string {
-  return `界神速:杀:${source}:${target}:${seq}`;
-}
-
-/**
- * 执行一次"视为出杀"的完整结算(runUseFlow virtual + chargeOnSettle:指定目标→成为目标→检测有效性→询问闪→伤害/抵消)。
- * 不消耗手牌、计入出杀次数(由 chargeOnSettle 的 onSettle 计数);无距离限制。同标版 virtualKill。
- */
-async function virtualKill(state: GameState, source: number, target: number): Promise<void> {
-  if (!state.players[target]?.alive) return;
-  const cardId = makeVirtualKillCard(source, target, state.seq);
-  state.cardMap[cardId] = {
-    id: cardId,
-    name: '杀',
-    suit: '',
-    color: '无色',
-    rank: 'A',
-    type: '基本牌',
-  };
-
-  await runUseFlow(state, source, cardId, [target], '杀', {
-    virtual: true,
-    onSettle: chargeOnSettle(state, source, cardId),
-  });
-  delete state.cardMap[cardId];
 }
 
 /** 取玩家装备区的所有 cardId */
@@ -172,18 +148,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     '阶段开始',
     async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== '判定') return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
-      const self = ctx.state.players[ownerId];
-      if (!self?.alive) return;
-      if (self.vars[USED_KEY]) return;
-
-      // 无其他存活角色 → 神速无意义
-      const hasOtherAlive = ctx.state.players.some((p, i) => i !== ownerId && p.alive);
-      if (!hasOtherAlive) return;
+      const entry = shensuPhaseEntry(ctx, ownerId, '判定', USED_KEY);
+      if (!entry) return;
+      const { atom, self } = entry;
 
       // ── 逐项询问 ──────────────────────────────────
       // 选项1:跳过判定+摸牌
@@ -260,7 +227,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           const target = await askKillTarget(ctx.state, ownerId, '界神速①');
           if (typeof target === 'number' && ctx.state.players[target]?.alive) {
             await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_MO_TAG });
-            await virtualKill(ctx.state, ownerId, target);
+            await runVirtualSlash(ctx.state, ownerId, target, { prefix: '界神速', charge: true });
             opt1Settled = true;
           }
         }
@@ -290,7 +257,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
             if (typeof target === 'number' && ctx.state.players[target]?.alive) {
               await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_PLAY_TAG });
               await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [equipCardIdRaw], voluntary: true });
-              await virtualKill(ctx.state, ownerId, target);
+              await runVirtualSlash(ctx.state, ownerId, target, { prefix: '界神速', charge: true });
             }
           }
           // 无效选择/无目标 → 选项2未生效(不弃牌、不跳过出牌、不虚拟杀)
@@ -303,7 +270,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (typeof target === 'number' && ctx.state.players[target]?.alive) {
             await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_DISCARD_TAG });
             await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: FLIP_TAG });
-            await virtualKill(ctx.state, ownerId, target);
+            await runVirtualSlash(ctx.state, ownerId, target, { prefix: '界神速', charge: true });
           }
         }
       } finally {
@@ -319,112 +286,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 跳过摸牌阶段:有标签 → skip(同兵粮寸断) ──────────────────
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '阶段开始',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== '摸牌') return;
-      const self = ctx.state.players[ownerId];
-      if (!self?.tags.includes(SKIP_MO_TAG)) return;
-      return skipPhase(ctx.state, atom, SKIP_MO_TAG);
-    },
-  );
+  registerShensuTagSkipHook(state, skill.id, ownerId, '摸牌', SKIP_MO_TAG);
 
   // ── 跳过出牌阶段:有标签 → skip(同乐不思蜀) ──────────────────
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '阶段开始',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== '出牌') return;
-      const self = ctx.state.players[ownerId];
-      if (!self?.tags.includes(SKIP_PLAY_TAG)) return;
-      return skipPhase(ctx.state, atom, SKIP_PLAY_TAG);
-    },
-  );
+  registerShensuTagSkipHook(state, skill.id, ownerId, '出牌', SKIP_PLAY_TAG);
 
   // ── 跳过弃牌阶段:有标签 → skip ────────────────────
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '阶段开始',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== '弃牌') return;
-      const self = ctx.state.players[ownerId];
-      if (!self?.tags.includes(SKIP_DISCARD_TAG)) return;
-      return skipPhase(ctx.state, atom, SKIP_DISCARD_TAG);
-    },
-  );
+  registerShensuTagSkipHook(state, skill.id, ownerId, '弃牌', SKIP_DISCARD_TAG);
 
-  // ── 翻面:下一回合跳过(机制同据守/放逐) ────────────────────
-  // 检测翻面标签 → 移除标签 + 设 skipAll 标志 + cancel(不进入准备阶段)
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '阶段开始',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      const self = ctx.state.players[ownerId];
-
-      // 入口:准备阶段开始 + 翻面标签 → 启动跳过
-      if (atom.phase === '准备' && self?.tags.includes(FLIP_TAG)) {
-        await applyAtom(ctx.state, { type: '去标签', player: ownerId, tag: FLIP_TAG });
-        ctx.state.localVars[SKIP_FLAG] = ownerId;
-        return { kind: 'cancel' };
-      }
-
-      // skipAll 标志存在时,取消所有其他阶段(防止 phase-end after-hook 推进产生副作用)
-      if (ctx.state.localVars[SKIP_FLAG] === ownerId) {
-        return { kind: 'cancel' };
-      }
-    },
-  );
-
-  // ── 翻面:阶段结束(准备) before-hook,主动推进回合 ────────
-  // skipAll 标志存在时:清除标志 + 亲自执行 end-turn 序列把回合交给下家。
-  // (与据守一致:cancel 阶段结束原子以防 phase-end after-hook 推进产生幻影阶段链)
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '阶段结束',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段结束') return;
-      if (atom.player !== ownerId) return;
-      if (ctx.state.localVars[SKIP_FLAG] !== ownerId) return;
-
-      // 清除 skipAll 标志(后续不再 skip)
-      delete ctx.state.localVars[SKIP_FLAG];
-
-      // 亲自执行 end-turn 序列:清过期标记 → 下一玩家 → 回合结束 → 回合结束后
-      // (回合推进 beginTurn 挂在 回合结束后 的 after-hook,故须发出否则下一家不启动)
-      await applyAtom(ctx.state, { type: '清过期标记', player: ownerId });
-      await applyAtom(ctx.state, { type: '下一玩家' });
-      const turnEnded = await applyAtom(ctx.state, { type: '回合结束', player: ownerId });
-      if (turnEnded) {
-        await applyAtom(ctx.state, { type: '回合结束后', player: ownerId });
-      }
-
-      return { kind: 'cancel' };
-    },
-  );
+  // ── 翻面:下一回合跳过整回合(机制同据守/放逐) ────────────────
+  registerShensuFlipTurnHooks(state, skill.id, ownerId);
 
   return () => {};
 }

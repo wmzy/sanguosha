@@ -9,6 +9,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 // 内部 requestType/localVars 键名保持原前缀「遗计/」,不改为「界遗计/」
@@ -38,13 +39,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as unknown as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== CONFIRM_RT && rt !== GIVE_RT) return '当前不是遗计询问';
-      if (rt === CONFIRM_RT) return null; // confirm:任意 choice 均可(含放弃)
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, GIVE_RT], {
+        mismatchError: '当前不是遗计询问',
+      });
+      if (check.error) return check.error;
+      if (check.requestType === CONFIRM_RT) return null; // confirm:任意 choice 均可(含放弃)
 
       // giveCard(distribute/allocate):校验 allocation
       // 至多 2 名其他角色 + 共计至多 2 张手牌 + 每目标至少 1 张 + 牌均在手 + 无重复

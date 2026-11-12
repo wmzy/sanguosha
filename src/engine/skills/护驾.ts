@@ -26,6 +26,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, declareAlternativeResponse } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -122,11 +123,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       pid,
       'respond',
       (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(pid);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as Record<string, unknown>;
-        if (atom['type'] !== '请求回应') return '当前不需要回应';
-        if (atom['requestType'] !== '护驾/出闪') return '当前不是护驾询问';
+        const check = requireRequestType(st, pid, ['护驾/出闪'], {
+          mismatchError: '当前不是护驾询问',
+        });
+        if (check.error) return check.error;
         const cardId = params.cardId as string | undefined;
         if (cardId) {
           if (!st.players[pid].hand.includes(cardId)) return '牌不在手牌中';

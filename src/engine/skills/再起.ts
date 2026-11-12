@@ -24,6 +24,7 @@ import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
 import { peekTop } from '../core/deck';
 import { registerAction, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 const TRIGGER_RT = '再起/trigger';
 const TRIGGERED_KEY = '再起/triggered';
@@ -46,13 +47,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (s: GameState, _params: Record<string, Json>) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== TRIGGER_RT) return '当前不是再起回应';
-      return null;
-    },
+    (s: GameState, _params: Record<string, Json>): string | null =>
+      requireRequestType(s, ownerId, [TRIGGER_RT], {
+        mismatchError: '当前不是再起回应',
+      }).error,
     async (s: GameState, params: Record<string, Json>) => {
       s.localVars[TRIGGERED_KEY] = params.choice === true || params.confirmed === true;
     },

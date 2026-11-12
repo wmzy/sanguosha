@@ -115,7 +115,6 @@ export interface AiViewSnapshot {
     /** 玩家标记(横置/连环等)。横置状态以 'chained' 标记代表,
      *  AI 据此判断铁索连环应横置还是重置(toggle)。 */
     marks: Array<{ id: string; scope: number }>;
-    faction?: string;
     identity?: string;
   }>;
   pending: {

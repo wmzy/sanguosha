@@ -29,6 +29,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界窃听';
 const DISPLAY_NAME = '窃听';
@@ -170,13 +171,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as Record<string, unknown>).requestType as string;
-      if (rt !== TRIGGER_RT && rt !== STEAL_OR_DRAW_RT && rt !== PICK_EQUIP_RT) {
-        return '当前不是窃听询问';
-      }
+      const check = requireRequestType(
+        st,
+        ownerId,
+        [TRIGGER_RT, STEAL_OR_DRAW_RT, PICK_EQUIP_RT],
+        { mismatchError: '当前不是窃听询问' },
+      );
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === PICK_EQUIP_RT) {
         // 选 target 装备:zone='equipment' + cardId
         if (params.zone !== 'equipment') return '需要选装备';

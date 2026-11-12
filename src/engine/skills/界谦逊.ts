@@ -30,6 +30,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_RT = '界谦逊/trigger';
 const CONFIRMED_KEY = '界谦逊/confirmed';
@@ -123,12 +124,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不是请求回应';
-      if (atom.requestType !== CONFIRM_RT) return '当前不是谦逊确认';
-      return null;
+      return requireRequestType(st, ownerId, [CONFIRM_RT], {
+        wrongTypeError: '当前不是请求回应',
+        mismatchError: '当前不是谦逊确认',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
       st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;

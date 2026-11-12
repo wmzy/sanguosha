@@ -21,7 +21,7 @@
 //     · killTarget:选项 1 中被杀的目标(任意其他存活角色,允许是 owner 自己——"另一名角色")
 //   - target 选项询问(2 段 confirm,因 ActionPrompt 无 3 选项枚举,与界将驰一致):
 //     · CONFIRM_RT:是否执行选项 1(出杀)?confirm=执行①,cancel/超时=执行②
-//   - 选项 1(出杀):A 视为对 killTarget 使用一张【杀】(virtualKill,无实体牌)
+//   - 选项 1(出杀):A 视为对 killTarget 使用一张【杀】(runVirtualSlash,无实体牌)
 //     · 若 killTarget 受到伤害(对比受伤前后体力)→ 追加执行选项 2(双方各摸 1)
 //   - 选项 2(摸牌):owner 与 target 各摸一张牌
 //
@@ -37,7 +37,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { runUseFlow } from './cards/use-card';
+import { runVirtualSlash } from '../util/skillRuntime';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../rules/once-per-turn';
@@ -68,43 +68,6 @@ function isSlashCard(card: Card | undefined): boolean {
 /** 判定一张卡是否为装备牌 */
 function isEquipmentCard(card: Card | undefined): boolean {
   return !!card && card.type === '装备牌';
-}
-
-/** 创建一张虚拟杀卡 id(无实体,仅用于结算流程的 cardId 引用) */
-function makeVirtualSlashId(source: number, target: number, seq: number): string {
-  return `明策:杀:${source}:${target}:${seq}`;
-}
-
-/**
- * 执行一次"视为出杀"的完整结算(指定目标→成为目标→检测有效性→询问闪→伤害/抵消)。
- * 不消耗手牌;模型参考 界仁德.virtualKill / 界乱武.virtualKill。
- *
- * @returns 是否对 target 造成了伤害(用于界明策选项 1 命中后追加执行选项 2)
- */
-async function virtualKill(
-  state: GameState,
-  source: number,
-  target: number,
-): Promise<boolean> {
-  if (!state.players[target]?.alive) return false;
-  const targetHealthBefore = state.players[target].health;
-  const cardId = makeVirtualSlashId(source, target, state.seq);
-  // 虚拟杀无实体,但结算流程中 atoms/toViewEvents 需要 cardMap[id] 存在
-  state.cardMap[cardId] = {
-    id: cardId,
-    name: '杀',
-    suit: '',
-    color: '无色',
-    rank: 'A',
-    type: '基本牌',
-  };
-
-  // 虚拟杀不计入出杀次数(无 onSettle 计费)
-  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
-  // 清理虚拟杀卡(无实体,不入弃牌堆)
-  delete state.cardMap[cardId];
-  // 通过体力差判定是否真的造成伤害(防具/反馈/奸雄等可能改伤)
-  return state.players[target].health < targetHealthBefore;
 }
 
 /** 选项 2:owner 与 target 各摸一张牌 */
@@ -218,7 +181,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
           if (choseSlash) {
             // 选项 ①:target 视为对 killTarget 使用一张杀
-            const dealtDamage = await virtualKill(st, target, killTarget);
+            const dealtDamage = await runVirtualSlash(st, target, killTarget, { prefix: '明策' });
             // 若造成伤害,执行另一项(选项②:双方各摸 1)
             if (dealtDamage) {
               await drawBoth(st, from, target);

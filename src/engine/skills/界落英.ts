@@ -36,6 +36,7 @@ import {
   registerBeforeHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界落英';
 const DISPLAY_NAME = '落英';
@@ -189,13 +190,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (s) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== CHOOSE_RT) return '当前不是落英选择';
-      return null;
-    },
+    (s): string | null =>
+      requireRequestType(s, ownerId, [CHOOSE_RT], {
+        mismatchError: '当前不是落英选择',
+      }).error,
     async (s, params) => {
       s.localVars[CHOICE_KEY] = params.choice === true;
     },

@@ -1,5 +1,24 @@
 // src/engine/atoms/移动牌.ts
-import type { AtomDefinition, ZoneLoc, ViewEventSplit, ViewEvent, Card } from '../types';
+import type {
+  AtomDefinition,
+  ZoneLoc,
+  ViewEventSplit,
+  ViewEvent,
+  Card,
+  GameView,
+} from '../types';
+
+/** 从 view 中指定玩家的手牌移除一张:handCount-1(下限 0)+ 按 cardId 精确过滤 hand。
+ *  必须用 cardId 精确移除单张,不能用 name/suit/rank 过滤——
+ *  标准牌堆中同名同花色同点数的牌有多张(如 杀♠7 有 4 张),
+ *  按 name/suit/rank 会误删所有重复牌,导致 hand.length < handCount。
+ *  cardId 为空(falsy)时只减计数、不动 hand(与原各调用点守卫一致)。 */
+function removeCardFromHand(view: GameView, pi: number, cardId: string | undefined): void {
+  view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
+  if (cardId && view.players[pi].hand) {
+    view.players[pi].hand = view.players[pi].hand.filter((c: Card) => c.id !== cardId);
+  }
+}
 
 export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: ZoneLoc }> = {
   type: '移动牌',
@@ -157,24 +176,12 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     if (pi < 0) return;
     switch (event.type) {
       case '弃牌': {
-        view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
-        if (view.players[pi].hand && event.cardId) {
-          const cardId = event.cardId as string;
-          // 用 cardId 精确移除单张,不能用 name/suit/rank 过滤——
-          // 标准牌堆中同名同花色同点数的牌有多张(如 杀♠7 有 4 张),
-          // 按 name/suit/rank 会误删所有重复牌,导致 hand.length < handCount。
-          view.players[pi].hand = view.players[pi].hand.filter((c: Card) => c.id !== cardId);
-        }
+        removeCardFromHand(view, pi, event.cardId as string);
         if (view.zones) view.zones.discardPileCount += 1;
         break;
       }
       case '打出': {
-        view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
-        if (view.players[pi].hand && event.cardId) {
-          const cardId = event.cardId as string;
-          // 同上:用 cardId 精确移除,避免重复牌误删。
-          view.players[pi].hand = view.players[pi].hand.filter((c: Card) => c.id !== cardId);
-        }
+        removeCardFromHand(view, pi, event.cardId as string);
         if (view.zones && event.cardId) {
           view.zones.processing.push(event.cardId as string);
           const f = view.settlementStack[view.settlementStack.length - 1];
@@ -200,12 +207,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
         if (from?.zone === '手牌' && from?.player !== undefined) {
           const fromPi = view.players.findIndex((p) => p.index === from.player);
           if (fromPi >= 0) {
-            view.players[fromPi].handCount = Math.max(0, view.players[fromPi].handCount - 1);
-            if (view.players[fromPi].hand) {
-              view.players[fromPi].hand = view.players[fromPi].hand.filter(
-                (c: Card) => c.id !== cardId,
-              );
-            }
+            removeCardFromHand(view, fromPi, cardId);
           }
         }
         if (to?.zone === '手牌' && to?.player !== undefined) {

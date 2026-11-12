@@ -11,6 +11,7 @@
 
 import type { GameState } from '../types';
 import { getHealthValue } from '../types';
+import { createProviderRegistry } from './provider-registry';
 import { getHandLimitBonus } from './vars-keys';
 
 /**
@@ -19,23 +20,9 @@ import { getHandLimitBonus } from './vars-keys';
  */
 export type HandLimitProvider = (state: GameState, player: number) => number | undefined;
 
-// ─── state-bound 注册表(WeakMap 外挂,随 state 自动隔离/GC) ───
+// ─── state-bound 注册表(WeakMap 外挂,随 state 自动隔离/GC,样板见 rules/provider-registry.ts) ───
 
-interface HandLimitRegistry {
-  /** player 索引 → 该玩家当前注册的覆盖提供者集合 */
-  providers: Map<number, Set<HandLimitProvider>>;
-}
-
-const handLimitRegistries = new WeakMap<GameState, HandLimitRegistry>();
-
-function getHandLimitRegistry(state: GameState): HandLimitRegistry {
-  let reg = handLimitRegistries.get(state);
-  if (!reg) {
-    reg = { providers: new Map() };
-    handLimitRegistries.set(state, reg);
-  }
-  return reg;
-}
+const handLimitRegistry = createProviderRegistry<HandLimitProvider>();
 
 /**
  * 注册一个手牌上限覆盖提供者(技能 onInit 时调用,与 registerAction/registerSlashQuotaProvider 同构)。
@@ -47,20 +34,7 @@ export function registerHandLimitProvider(
   ownerId: number,
   provider: HandLimitProvider,
 ): () => void {
-  const reg = getHandLimitRegistry(state);
-  let set = reg.providers.get(ownerId);
-  if (!set) {
-    set = new Set();
-    reg.providers.set(ownerId, set);
-  }
-  set.add(provider);
-  return () => {
-    const s = reg.providers.get(ownerId);
-    if (s) {
-      s.delete(provider);
-      if (s.size === 0) reg.providers.delete(ownerId);
-    }
-  };
+  return handLimitRegistry.register(state, ownerId, provider);
 }
 
 /**
@@ -72,15 +46,12 @@ export function registerHandLimitProvider(
  * 确保界英姿等"手牌上限=体力上限"的锁定技在所有读取点一致生效。
  */
 export function handLimit(state: GameState, player: number): number {
-  const set = getHandLimitRegistry(state).providers.get(player);
-  if (set && set.size > 0) {
-    let maxOverride = -Infinity;
-    for (const fn of set) {
-      const v = fn(state, player);
-      if (typeof v === 'number' && v > maxOverride) maxOverride = v;
-    }
-    if (maxOverride !== -Infinity) return maxOverride;
-  }
+  let maxOverride = -Infinity;
+  handLimitRegistry.forEachOf(state, player, (fn) => {
+    const v = fn(state, player);
+    if (typeof v === 'number' && v > maxOverride) maxOverride = v;
+  });
+  if (maxOverride !== -Infinity) return maxOverride;
   const bonus = getHandLimitBonus(state.turn.vars, player) ?? 0;
   // 手牌上限基于「体力值」（封底为 0），非原始「体力」（可负）。
   return getHealthValue(state.players[player]) + bonus;

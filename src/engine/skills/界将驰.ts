@@ -50,6 +50,7 @@ import type { SkillModule } from '../types';
 import { getHandLimitBonus, JIANGCHI_CHOICE2_VIEW_KEY } from '../rules/vars-keys';
 import { projectSlashExtra, projectSlashBlocked } from '../rules/slash-quota';
 import { projectTurnUsage } from '../rules/turn-usage';
+import { currentRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界将驰';
 const DISPLAY_NAME = '将驰';
@@ -81,12 +82,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '摸牌阶段结束时选择一项:①摸一张牌,本回合杀次数-1且杀不计入手牌上限;②重铸一张牌,本回合杀次数+1且杀无距离限制',
   };
-}
-
-/** 当前 pending 的 requestType(类型安全读取) */
-function currentRequestType(state: GameState, ownerId: number): string | undefined {
-  const slot = state.pendingSlots.get(ownerId);
-  return (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

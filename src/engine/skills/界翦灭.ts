@@ -36,6 +36,7 @@ import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rule
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界翦灭';
 const DISPLAY_NAME = '翦灭';
@@ -179,14 +180,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       pid,
       'respond',
       (st: GameState, _params: Record<string, Json>) => {
-        const slot = st.pendingSlots.get(pid);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as { type?: string; requestType?: string };
-        if (atom.type !== '请求回应') return '当前不需要回应';
-        if (atom.requestType !== OWNER_COLOR_RT && atom.requestType !== TARGET_COLOR_RT) {
-          return '当前不是翦灭选色';
-        }
-        return null;
+        return requireRequestType(st, pid, [OWNER_COLOR_RT, TARGET_COLOR_RT], {
+          mismatchError: '当前不是翦灭选色',
+        }).error;
       },
       async (st: GameState, params: Record<string, Json>) => {
         const slot = st.pendingSlots.get(pid);

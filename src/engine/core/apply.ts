@@ -104,6 +104,74 @@ export async function runJudgeModifiers(state: GameState): Promise<void> {
   }
 }
 
+/** 等待型 atom 的挂起与收尾(def.pending 必存在):创建 PendingSlot(单 target)或多个
+ *  slot(并行选将多 target)并 await 全部 resolve,之后按序跑 afterApply → 技能 after
+ *  hooks → def.afterHooks。在 atomHistory.push 之后调用;closeStack 与不变量检查由
+ *  applyAtom 统一收尾。 */
+async function awaitPendingResolution(
+  state: GameState,
+  atom: Atom,
+  def: AtomDefinition,
+): Promise<void> {
+  const pending = def.pending!;
+  // 等待型 atom:创建 PendingSlot(单 target) 或多个 slot(并行选将多 target)。
+  // parallelSplit 声明在 atom 定义上,引擎不再硬编码 type 偏序。
+  let targets: number[];
+  let slotAtoms: Atom[];
+  const splits = def.parallelSplit?.(atom);
+  if (splits && splits.length > 0) {
+    // 并行型:拆出多个 slotAtom,各自类型不同(如 请求回应/选将询问),用各自的 def
+    targets = splits.map((s) => s.target);
+    slotAtoms = splits.map((s) => s.slotAtom);
+  } else {
+    // 单 target:原样
+    targets = [extractPendingTarget(atom)];
+    slotAtoms = [atom];
+  }
+
+  // 卡牌回应型 atom 的响应可用性预检(skip/silent/normal)。
+  //   skip   —— target 手牌为 0:不创建任何 slot、无延时,Promise.all([]) 立即继续。
+  //             父流程(如杀的结算)看到处理区无响应牌 → 正常结算。
+  //   silent —— target 有手牌但无匹配牌:创建短延时 slot(silentDelayMs,不走 timeoutSec),
+  //             target 不被询问(toViewEvents/applyView 给 target 观察型 pending)。
+  //   null   —— 正常询问。
+  // 预检在 apply→emit event→after hooks 之后、创建 slot 之前,与 toViewEvents 看到同一份 state。
+  const pre = pending.preResolve?.(state, atom) ?? null;
+  const isSkip = pre === 'skip';
+  const silentDelayMs =
+    !isSkip && pre && typeof pre === 'object' ? pre.delayMs : undefined;
+
+  if (isSkip) {
+    // 不创建 slot:仍需广播已 emit 的 event(skip 模式 applyView 不设置 pending)。
+    notifyStateChange(state);
+  } else {
+    const slotPromises: Promise<void>[] = [];
+    // 并行 slot 共用一个挂起组:全部创建后当前执行链转入 suspended,
+    // 最后一个 slot resolve 时同步恢复 active(见 run-tracker.ts)。
+    const group = createSlotGroup(state, slotAtoms.length);
+    for (let i = 0; i < slotAtoms.length; i++) {
+      const slotAtom = slotAtoms[i];
+      const slotTarget = targets[i];
+      // 每个 slot 用自己 atom type 对应的 def(并行选将→选将询问)
+      const slotDef = slotAtom.type !== atom.type ? getAtomDef(slotAtom.type) : def;
+      slotPromises.push(
+        createAndAwaitSlot(state, slotAtom, slotDef, slotTarget, group, silentDelayMs),
+      );
+    }
+    group.suspend();
+    await Promise.all(slotPromises);
+  }
+
+  // 等待型 atom:技能 after hooks 和 def.afterHooks 都在 pending resolve 之后跑
+  // ——这样贯石斧/青龙偃月刀等技能能在看到 P2 出完闪/不出后再做决策。
+  if (def.afterApply) await def.afterApply(state, atom);
+  await runAfterHooks(state, atom);
+
+  if (def.afterHooks) {
+    def.afterHooks(state, atom);
+  }
+}
+
 /**
  * 应用一个 atom:走完整 pipeline(before hooks → validate → apply → emit event → after hooks → pending)。
  * 等待型 atom 的 Promise 会挂起直到回应/超时。
@@ -118,153 +186,102 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
     if (index >= 0) state.atomStack.splice(index, 1);
   };
   try {
-
-  // before 阶段:折叠(folding)语义。hooks 按多角色结算顺序(逆时针,系统级排最后)依次跑,
-  // 每个 hook 可 pass/modify/cancel。modify 叠加(藤甲-1 后白银狮子看到减过的值);
-  // cancel 终止(仁王盾/检测有效性 cancel 后后续 hook 不跑,atom 不进入 validate/apply/after)。
-  let current = atom;
-  let cancelled = false;
-  const hooks = sortHooksCounterclockwise(getBeforeHooks(state, atom.type), state);
-  for (const h of hooks) {
-    // 界铁骑:目标本回合非锁定技失效 → 跳过非锁定技 hook
-    if (isHookSuppressed(state, h.ownerId, h.skillId)) continue;
-    const frame = topFrame(state) ?? emptyFrame();
-    const beforeCtx: AtomBeforeContext = {
-      state,
-      atom: current,
-      ownerId: h.ownerId,
-      frame,
-      params: frame.params,
-    };
-    const result = await h.handler(beforeCtx);
-    if (result === undefined) continue; // void = pass(向后兼容)
-    if (result.kind === 'cancel') {
-      cancelled = true;
-      break;
+    // before 阶段:折叠(folding)语义。hooks 按多角色结算顺序(逆时针,系统级排最后)依次跑,
+    // 每个 hook 可 pass/modify/cancel。modify 叠加(藤甲-1 后白银狮子看到减过的值);
+    // cancel 终止(仁王盾/检测有效性 cancel 后后续 hook 不跑,atom 不进入 validate/apply/after)。
+    // ⚠ 折叠循环必须留在 applyAtom 函数体内:抽出为 helper 会让 `await helper(...)`
+    //    在空 hooks 时也无条件让出微任务,破坏「无 hooks → validate/apply/atomHistory/
+    //    pendingSlot 全部同步落盘」的时序契约(tests/headless/lord-skill-gate 的
+    //    `void applyAtom` + 立即 buildView 依赖它;markOncePerTurn 的 fire-and-forget
+    //    投影 atom 同理)。hook 的 `await h.handler` 只在真正有 hook 时才挂起。
+    let current = atom;
+    let cancelled = false;
+    const hooks = sortHooksCounterclockwise(getBeforeHooks(state, atom.type), state);
+    for (const h of hooks) {
+      // 界铁骑:目标本回合非锁定技失效 → 跳过非锁定技 hook
+      if (isHookSuppressed(state, h.ownerId, h.skillId)) continue;
+      const frame = topFrame(state) ?? emptyFrame();
+      const beforeCtx: AtomBeforeContext = {
+        state,
+        atom: current,
+        ownerId: h.ownerId,
+        frame,
+        params: frame.params,
+      };
+      const result = await h.handler(beforeCtx);
+      if (result === undefined) continue; // void = pass(向后兼容)
+      if (result.kind === 'cancel') {
+        cancelled = true;
+        break;
+      }
+      if (result.kind === 'modify') {
+        current = result.atom;
+      } // 后续 hook + validate + apply 用新值
     }
-    if (result.kind === 'modify') {
-      current = result.atom;
-    } // 后续 hook + validate + apply 用新值
-  }
 
     if (cancelled) {
-    closeStack();
-    // cancel 非静默:推 notify 事件让前端感知(技能可据此显示"伤害被取消"/"目标无效")
-    pushNotify(state, { skillId: '', eventType: 'atomCancelled', data: { atomType: atom.type } });
-    notifyStateChange(state);
-    return false; // 被 before hook cancel(如仁王盾:目标无效)
-  }
-
-  const def = getAtomDef(current.type);
-  const error = def.validate(state, current);
-  if (error !== null) {
-    closeStack();
-    throw new Error(`applyAtom validate 失败: ${current.type} → ${error}`);
-  }
-
-  // toViewEvents 必须在 apply 之前调用——此时 state 尚未变更
-  const viewEvents = resolveViewEvents(state, current);
-
-  applyAtomImpl(state, current);
-
-  // seq 在每次 push atomHistory 前递增:一次 dispatch 内可能有多个 applyAtom
-  // (如 respond → 分配武将 → 并行选将),它们必须有各自唯一的 seq,
-  // 否则 broadcastNewState 的水位过滤会跳过同 seq 的后续事件(选将 bug 根因)。
-  state.seq += 1;
-  state.atomHistory.push({
-    kind: 'atom',
-    seq: state.seq,
-    timestamp: state.clock.now() - state.startedAt,
-    atom: current,
-    viewEvents: viewEvents!,
-  });
-
-  if (def.pending) {
-    // 等待型 atom:创建 PendingSlot(单 target) 或多个 slot(并行选将多 target)。
-    // parallelSplit 声明在 atom 定义上,引擎不再硬编码 type 偏序。
-    let targets: number[];
-    let slotAtoms: Atom[];
-    const splits = def.parallelSplit?.(current);
-    if (splits && splits.length > 0) {
-      // 并行型:拆出多个 slotAtom,各自类型不同(如 请求回应/选将询问),用各自的 def
-      targets = splits.map((s) => s.target);
-      slotAtoms = splits.map((s) => s.slotAtom);
-    } else {
-      // 单 target:原样
-      targets = [extractPendingTarget(current)];
-      slotAtoms = [current];
-    }
-
-    // 卡牌回应型 atom 的响应可用性预检(skip/silent/normal)。
-    //   skip   —— target 手牌为 0:不创建任何 slot、无延时,Promise.all([]) 立即继续。
-    //             父流程(如杀的结算)看到处理区无响应牌 → 正常结算。
-    //   silent —— target 有手牌但无匹配牌:创建短延时 slot(silentDelayMs,不走 timeoutSec),
-    //             target 不被询问(toViewEvents/applyView 给 target 观察型 pending)。
-    //   null   —— 正常询问。
-    // 预检在 apply→emit event→after hooks 之后、创建 slot 之前,与 toViewEvents 看到同一份 state。
-    const pre = def.pending.preResolve?.(state, current) ?? null;
-    const isSkip = pre === 'skip';
-    const silentDelayMs =
-      !isSkip && pre && typeof pre === 'object' ? pre.delayMs : undefined;
-
-    if (isSkip) {
-      // 不创建 slot:仍需广播已 emit 的 event(skip 模式 applyView 不设置 pending)。
+      closeStack();
+      // cancel 非静默:推 notify 事件让前端感知(技能可据此显示"伤害被取消"/"目标无效")
+      pushNotify(state, { skillId: '', eventType: 'atomCancelled', data: { atomType: atom.type } });
       notifyStateChange(state);
-    } else {
-      const slotPromises: Promise<void>[] = [];
-      // 并行 slot 共用一个挂起组:全部创建后当前执行链转入 suspended,
-      // 最后一个 slot resolve 时同步恢复 active(见 run-tracker.ts)。
-      const group = createSlotGroup(state, slotAtoms.length);
-      for (let i = 0; i < slotAtoms.length; i++) {
-        const slotAtom = slotAtoms[i];
-        const slotTarget = targets[i];
-        // 每个 slot 用自己 atom type 对应的 def(并行选将→选将询问)
-        const slotDef = slotAtom.type !== current.type ? getAtomDef(slotAtom.type) : def;
-        slotPromises.push(
-          createAndAwaitSlot(state, slotAtom, slotDef, slotTarget, group, silentDelayMs),
-        );
-      }
-      group.suspend();
-      await Promise.all(slotPromises);
+      return false; // 被 before hook cancel(如仁王盾:目标无效)
     }
 
-    // 等待型 atom:技能 after hooks 和 def.afterHooks 都在 pending resolve 之后跑
-    // ——这样贯石斧/青龙偃月刀等技能能在看到 P2 出完闪/不出后再做决策。
+    const def = getAtomDef(current.type);
+    const error = def.validate(state, current);
+    if (error !== null) {
+      closeStack();
+      throw new Error(`applyAtom validate 失败: ${current.type} → ${error}`);
+    }
+
+    // toViewEvents 必须在 apply 之前调用——此时 state 尚未变更
+    const viewEvents = resolveViewEvents(state, current);
+
+    applyAtomImpl(state, current);
+
+    // seq 在每次 push atomHistory 前递增:一次 dispatch 内可能有多个 applyAtom
+    // (如 respond → 分配武将 → 并行选将),它们必须有各自唯一的 seq,
+    // 否则 broadcastNewState 的水位过滤会跳过同 seq 的后续事件(选将 bug 根因)。
+    state.seq += 1;
+    state.atomHistory.push({
+      kind: 'atom',
+      seq: state.seq,
+      timestamp: state.clock.now() - state.startedAt,
+      atom: current,
+      viewEvents: viewEvents!,
+    });
+
+    if (def.pending) {
+      await awaitPendingResolution(state, current, def);
+
+      closeStack();
+      // 正常完成路径(等待型 atom):受 state.assertInvariants 开关保护,护栏牌重复 bug。
+      // cancel/validate 失败路径不检查(状态已回滚)。
+      if (state.assertInvariants) assertCardInvariants(state);
+      return true;
+    }
+
+    // 非等待型 atom:push 后立即广播。必须在 after hooks 之前——after hooks 内
+    // 嵌套的 applyAtom 会各自广播并推进 seq,若此处延后到 after hooks 之后才广播,
+    // 当前 atom(seq 较小)会被 broadcastNewState 的水位过滤(sinceSeq)吞掉。
+    // (等待型 atom 不在此广播——其 notifyStateChange 由 createAndAwaitSlot 在
+    // pendingSlots.set 之后触发,确保 buildView.pending 已含候选将等 slot 数据。)
+    notifyStateChange(state);
+    // afterApply:apply+广播之后、技能 after hooks 之前的「就地改写」阶段。
+    // 典型:判定 atom 在此触发改判钩子(鬼才/鬼道),改判完成后消费方 after hook 读到的即为最终牌。
     if (def.afterApply) await def.afterApply(state, current);
+    // 非等待型 atom:技能 after hooks 立即跑(原顺序)
     await runAfterHooks(state, current);
 
+    // atom 自身的后处理(在技能 after hooks 之后):如判定牌从处理区移入弃牌堆
     if (def.afterHooks) {
       def.afterHooks(state, current);
     }
 
     closeStack();
-    // 正常完成路径(等待型 atom):受 state.assertInvariants 开关保护,护栏牌重复 bug。
-    // cancel/validate 失败路径不检查(状态已回滚)。
+    // 正常完成路径(非等待型 atom):受 state.assertInvariants 开关保护,护栏「同一张牌出现在多个区」的重复 bug。
     if (state.assertInvariants) assertCardInvariants(state);
     return true;
-  }
-
-  // 非等待型 atom:push 后立即广播。必须在 after hooks 之前——after hooks 内
-  // 嵌套的 applyAtom 会各自广播并推进 seq,若此处延后到 after hooks 之后才广播,
-  // 当前 atom(seq 较小)会被 broadcastNewState 的水位过滤(sinceSeq)吞掉。
-  // (等待型 atom 不在此广播——其 notifyStateChange 由 createAndAwaitSlot 在
-  // pendingSlots.set 之后触发,确保 buildView.pending 已含候选将等 slot 数据。)
-  notifyStateChange(state);
-  // afterApply:apply+广播之后、技能 after hooks 之前的「就地改写」阶段。
-  // 典型:判定 atom 在此触发改判钩子(鬼才/鬼道),改判完成后消费方 after hook 读到的即为最终牌。
-  if (def.afterApply) await def.afterApply(state, current);
-  // 非等待型 atom:技能 after hooks 立即跑(原顺序)
-  await runAfterHooks(state, current);
-
-  // atom 自身的后处理(在技能 after hooks 之后):如判定牌从处理区移入弃牌堆
-  if (def.afterHooks) {
-    def.afterHooks(state, current);
-  }
-
-  closeStack();
-  // 正常完成路径(非等待型 atom):受 state.assertInvariants 开关保护,护栏「同一张牌出现在多个区」的重复 bug。
-  if (state.assertInvariants) assertCardInvariants(state);
-  return true;
   } finally {
     closeStack();
   }

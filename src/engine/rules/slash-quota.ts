@@ -23,6 +23,7 @@
 // 无模块级全局状态泄漏(与 skill.ts 的 registries 同构)。
 
 import type { GameState } from '../types';
+import { createProviderRegistry } from './provider-registry';
 import { setTurnUsage, projectTurnUsage } from './turn-usage';
 import { getSlashQuotaUsed, getSlashExtraUsed, slashQuotaUsedKey, slashExtraUsedKey, slashExtraKey, slashUnlimitedKey, slashBlockedKey, SLASH_QUOTA_USED_KEY as QUOTA_USED_VAR, SLASH_EXTRA_USED_KEY as EXTRA_USED_VAR, SLASH_USED_COUNT_KEY } from './vars-keys';
 
@@ -70,68 +71,13 @@ export type SlashExemptor = (
   cardId: string | undefined,
 ) => boolean;
 
-/**
- * @deprecated 历史别名。旧语义为"叠加型加成"(base 1 + Σ);模块 K 拆分后统一改用
- * registerSlashQuotaProvider(额定/覆盖) / registerSlashExtraProvider(额外/叠加) /
- * registerSlashUnlimitedProvider(无限)。本别名现路由到额定提供者(max 语义)。
- * 旧调用方若依赖"叠加"语义,应迁移到 registerSlashExtraProvider。
- */
-export type SlashMaxProvider = SlashQuotaProvider;
+// ─── state-bound 注册表(WeakMap 外挂,随 state 自动隔离/GC,样板见 rules/provider-registry.ts) ───
 
-// ─── state-bound 注册表(WeakMap 外挂,随 state 自动隔离/GC) ───
-
-interface SlashRegistry {
-  /** player 索引 → 该玩家当前注册的额定上限提供者集合 */
-  quotaProviders: Map<number, Set<SlashQuotaProvider>>;
-  /** player 索引 → 该玩家当前注册的额外次数提供者集合 */
-  extraProviders: Map<number, Set<SlashExtraProvider>>;
-  /** player 索引 → 该玩家当前注册的无限出杀提供者集合 */
-  unlimitedProviders: Map<number, Set<SlashUnlimitedProvider>>;
-  /** player 索引 → 该玩家当前注册的阻断器集合 */
-  blockers: Map<number, Set<SlashBlocker>>;
-  /** player 索引 → 该玩家当前注册的豁免器集合 */
-  exemptors: Map<number, Set<SlashExemptor>>;
-}
-
-const slashRegistries = new WeakMap<GameState, SlashRegistry>();
-
-function getSlashRegistry(state: GameState): SlashRegistry {
-  let reg = slashRegistries.get(state);
-  if (!reg) {
-    reg = {
-      quotaProviders: new Map(),
-      extraProviders: new Map(),
-      unlimitedProviders: new Map(),
-      blockers: new Map(),
-      exemptors: new Map(),
-    };
-    slashRegistries.set(state, reg);
-  }
-  return reg;
-}
-
-/** 通用注册:把 provider 加入 owner 桶,返回取消注册函数。 */
-function addToRegistry<T>(
-  reg: SlashRegistry,
-  bucket: keyof Pick<SlashRegistry, 'quotaProviders' | 'extraProviders' | 'unlimitedProviders' | 'blockers' | 'exemptors'>,
-  ownerId: number,
-  provider: T,
-): () => void {
-  const map = reg[bucket] as Map<number, Set<T>>;
-  let set = map.get(ownerId);
-  if (!set) {
-    set = new Set();
-    map.set(ownerId, set);
-  }
-  set.add(provider);
-  return () => {
-    const s = map.get(ownerId);
-    if (s) {
-      s.delete(provider);
-      if (s.size === 0) map.delete(ownerId);
-    }
-  };
-}
+const quotaRegistry = createProviderRegistry<SlashQuotaProvider>();
+const extraRegistry = createProviderRegistry<SlashExtraProvider>();
+const unlimitedRegistry = createProviderRegistry<SlashUnlimitedProvider>();
+const blockerRegistry = createProviderRegistry<SlashBlocker>();
+const exemptorRegistry = createProviderRegistry<SlashExemptor>();
 
 /**
  * 注册一个额定上限提供者(技能 onInit 时调用,与 registerAction 同构)。
@@ -143,7 +89,7 @@ export function registerSlashQuotaProvider(
   ownerId: number,
   provider: SlashQuotaProvider,
 ): () => void {
-  return addToRegistry(getSlashRegistry(state), 'quotaProviders', ownerId, provider);
+  return quotaRegistry.register(state, ownerId, provider);
 }
 
 /**
@@ -155,7 +101,7 @@ export function registerSlashExtraProvider(
   ownerId: number,
   provider: SlashExtraProvider,
 ): () => void {
-  return addToRegistry(getSlashRegistry(state), 'extraProviders', ownerId, provider);
+  return extraRegistry.register(state, ownerId, provider);
 }
 
 /**
@@ -167,19 +113,7 @@ export function registerSlashUnlimitedProvider(
   ownerId: number,
   provider: SlashUnlimitedProvider,
 ): () => void {
-  return addToRegistry(getSlashRegistry(state), 'unlimitedProviders', ownerId, provider);
-}
-
-/**
- * @deprecated 改用 registerSlashQuotaProvider / registerSlashExtraProvider /
- * registerSlashUnlimitedProvider。本函数路由到额定提供者(max 语义)。
- */
-export function registerSlashMaxProvider(
-  state: GameState,
-  ownerId: number,
-  provider: SlashMaxProvider,
-): () => void {
-  return registerSlashQuotaProvider(state, ownerId, provider);
+  return unlimitedRegistry.register(state, ownerId, provider);
 }
 
 /**
@@ -187,13 +121,10 @@ export function registerSlashMaxProvider(
  */
 export function slashQuotaMax(state: GameState, player: number): number {
   let max = 1; // 基础额定上限
-  const set = getSlashRegistry(state).quotaProviders.get(player);
-  if (set) {
-    for (const fn of set) {
-      const v = fn(state, player);
-      if (v > max) max = v;
-    }
-  }
+  quotaRegistry.forEachOf(state, player, (fn) => {
+    const v = fn(state, player);
+    if (v > max) max = v;
+  });
   return max;
 }
 
@@ -202,23 +133,15 @@ export function slashQuotaMax(state: GameState, player: number): number {
  */
 export function slashExtraMax(state: GameState, player: number): number {
   let sum = 0;
-  const set = getSlashRegistry(state).extraProviders.get(player);
-  if (set) {
-    for (const fn of set) {
-      sum += fn(state, player);
-    }
-  }
+  extraRegistry.forEachOf(state, player, (fn) => {
+    sum += fn(state, player);
+  });
   return sum;
 }
 
 /** 该玩家本回合是否出杀无上限(任一无限提供者返回 true)。 */
 export function isSlashUnlimited(state: GameState, player: number): boolean {
-  const set = getSlashRegistry(state).unlimitedProviders.get(player);
-  if (!set) return false;
-  for (const fn of set) {
-    if (fn(state, player)) return true;
-  }
-  return false;
+  return unlimitedRegistry.someOf(state, player, (fn) => fn(state, player));
 }
 
 /**
@@ -258,17 +181,12 @@ export function registerSlashBlocker(
   ownerId: number,
   blocker: SlashBlocker,
 ): () => void {
-  return addToRegistry(getSlashRegistry(state), 'blockers', ownerId, blocker);
+  return blockerRegistry.register(state, ownerId, blocker);
 }
 
 /** 该玩家本回合是否被阻断出杀(任一阻断器返回 true 即阻断) */
 export function isSlashBlocked(state: GameState, player: number): boolean {
-  const set = getSlashRegistry(state).blockers.get(player);
-  if (!set) return false;
-  for (const fn of set) {
-    if (fn(state, player)) return true;
-  }
-  return false;
+  return blockerRegistry.someOf(state, player, (fn) => fn(state, player));
 }
 
 /**
@@ -280,7 +198,7 @@ export function registerSlashExemptor(
   ownerId: number,
   exemptor: SlashExemptor,
 ): () => void {
-  return addToRegistry(getSlashRegistry(state), 'exemptors', ownerId, exemptor);
+  return exemptorRegistry.register(state, ownerId, exemptor);
 }
 
 /** 该玩家当前使用的这张【杀】是否豁免出杀次数(任一豁免器返回 true 即豁免)。
@@ -291,12 +209,7 @@ export function isSlashExempted(
   cardId: string | undefined,
 ): boolean {
   if (cardId === undefined) return false;
-  const set = getSlashRegistry(state).exemptors.get(player);
-  if (!set) return false;
-  for (const fn of set) {
-    if (fn(state, player, cardId)) return true;
-  }
-  return false;
+  return exemptorRegistry.someOf(state, player, (fn) => fn(state, player, cardId));
 }
 
 /** 当前玩家是否还能出杀(未被阻断 且 额定/额外次数至少一层未达上限)。

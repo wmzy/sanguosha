@@ -13,6 +13,7 @@
 //   >  discard 弃牌 =50  >  skip 兜底 =30  >  无目标/满血无意义 =5-10
 import type { AiViewSnapshot, AvailableAction } from '../client/headless/types';
 import type { Card, EquipSlot } from '../engine/types';
+import { STRONG_CHARACTERS } from '../engine/data/character-strength';
 
 /** 单动作评分结果。 */
 export interface ScoredAction {
@@ -307,164 +308,199 @@ function scoreSkip(view: AiViewSnapshot, _action: AvailableAction): ScoredAction
 // ────────────────────────────────────────────────────────────────
 // play 类（主动出牌）
 // ────────────────────────────────────────────────────────────────
+/** 「指定目标」锦囊三段式评分：无合法目标→5 / 目标全为盟友(或身份不明)→18 /
+ *  否则交 hit(enemies) 细化。顺手牵羊/过河拆桥不含第一段
+ *  (无合法目标与全盟友同走 18 分)，经 requireValidTarget: false 关闭。 */
+function scoreTargetedPlay(
+  view: AiViewSnapshot,
+  action: AvailableAction,
+  cardName: string,
+  hit: (enemies: AiViewSnapshot['players'][number][]) => ScoredAction,
+  opts: { requireValidTarget?: boolean } = {},
+): ScoredAction {
+  if (opts.requireValidTarget !== false && action.validTargets.length === 0) {
+    return { score: 5, reason: `【${cardName}】无合法目标` };
+  }
+  const enemies = enemyTargets(view, action);
+  if (enemies.length === 0) {
+    return { score: 18, reason: `【${cardName}】合法目标均为盟友/身份不明` };
+  }
+  return hit(enemies);
+}
+
+/** play 类单牌评分函数：按牌名注册于 PLAY_SCORERS 表。 */
+type PlayScorer = (
+  view: AiViewSnapshot,
+  action: AvailableAction,
+  cardName: string,
+) => ScoredAction;
+
+/** 桃：满血不出；残血保命 */
+function scorePeachPlay(view: AiViewSnapshot): ScoredAction {
+  const me = selfOf(view);
+  const hp = me?.health ?? 0;
+  const max = me?.maxHealth ?? 0;
+  if (hp >= max) return { score: 10, reason: '满血，无需出【桃】' };
+  if (hp <= 1) return { score: 88, reason: '残血，出【桃】回血保命' };
+  return { score: 55, reason: '不满血，出【桃】回血' };
+}
+
+/** 杀：射程内（validTargets 已过滤射程/存活）有目标 */
+function scoreSlashPlay(view: AiViewSnapshot, action: AvailableAction): ScoredAction {
+  const me = selfOf(view);
+  if (action.validTargets.length === 0) {
+    return { score: 5, reason: '【杀】无合法目标（射程外/无敌人）' };
+  }
+  const myId = me?.identity;
+  const enemies = enemyTargets(view, action);
+
+  // 没有敌方目标（全是盟友或身份不明）
+  if (enemies.length === 0) {
+    return { score: 8, reason: '【杀】无敌方目标（合法目标均为盟友/身份不明）' };
+  }
+
+  // 内奸特殊：优先攻击当前血量最高的存活玩家（平衡局势）
+  if (myId === '内奸') {
+    const maxHp = Math.max(...enemies.map((p) => p.health));
+    const prime = enemies.find((p) => p.health === maxHp)!;
+    if (prime.health <= 1) {
+      return { score: 85, reason: `【杀】攻击残血 ${prime.name}(${prime.health}血，可击杀)` };
+    }
+    return { score: 72, reason: `【杀】内奸平衡局势，攻击高血 ${prime.name}(${prime.health}血)` };
+  }
+
+  // 反贼优先攻击主公
+  if (myId === '反贼') {
+    const lord = enemies.find((p) => p.identity === '主公');
+    if (lord) {
+      if (lord.health <= 1) {
+        return { score: 90, reason: `【杀】攻击残血主公 ${lord.name}(${lord.health}血，可击杀)` };
+      }
+      return { score: 82, reason: `【杀】反贼优先攻击主公 ${lord.name}(${lord.health}血)` };
+    }
+  }
+
+  // 通用：选血量最低的敌人
+  const minHp = Math.min(...enemies.map((p) => p.health));
+  const prime = enemies.find((p) => p.health === minHp)!;
+  if (prime.health <= 1) {
+    return { score: 85, reason: `【杀】攻击残血 ${prime.name}(${prime.health}血，可击杀)` };
+  }
+  if (prime.health <= 2) {
+    return { score: 78, reason: `【杀】攻击低血 ${prime.name}(${prime.health}血)` };
+  }
+  return { score: 72, reason: `【杀】攻击目标(${enemies.length}个敌方)` };
+}
+
+/** 顺手牵羊 / 过河拆桥：目标有牌且为敌方才值得（无合法目标与全盟友同走 18 分） */
+function scoreSnatchPlay(
+  view: AiViewSnapshot,
+  action: AvailableAction,
+  cardName: string,
+): ScoredAction {
+  return scoreTargetedPlay(
+    view,
+    action,
+    cardName,
+    (enemies) => {
+      const hasCards = enemies.some(
+        (p) => p.handCount > 0 || Object.keys(p.equipment ?? {}).length > 0,
+      );
+      if (!hasCards) return { score: 8, reason: `${cardName}目标无牌可取` };
+      return { score: 75, reason: `【${cardName}】夺取敌方目标牌` };
+    },
+    { requireValidTarget: false },
+  );
+}
+
+/** 南蛮入侵 / 万箭齐发：AOE，注意是否伤队友 */
+function scoreAoePlay(
+  view: AiViewSnapshot,
+  _action: AvailableAction,
+  cardName: string,
+): ScoredAction {
+  const myId = selfOf(view)?.identity;
+  const allies = view.players.filter(
+    (p) => p.alive && p.index !== view.viewer && isAlly(myId, p.identity),
+  ).length;
+  if (allies > 0) {
+    return {
+      score: Math.max(20, 68 - allies * 15),
+      reason: `【${cardName}】会伤害${allies}名盟友，降分`,
+    };
+  }
+  return { score: 68, reason: `【${cardName}】群体伤害（无盟友受波及）` };
+}
+
+/** 桃园结义：有人受伤才收益 */
+function scorePeachGardenPlay(view: AiViewSnapshot): ScoredAction {
+  const wounded = view.players.some((p) => p.alive && p.health < p.maxHealth);
+  return wounded
+    ? { score: 65, reason: '【桃园结义】群体回血' }
+    : { score: 20, reason: '无人受伤，【桃园结义】收益低' };
+}
+
+/** 乐不思蜀 / 兵粮寸断：延时控场锦囊 */
+function scoreDelayedControlPlay(
+  view: AiViewSnapshot,
+  action: AvailableAction,
+  cardName: string,
+): ScoredAction {
+  return scoreTargetedPlay(view, action, cardName, () => ({
+    score: 73,
+    reason: `【${cardName}】控场敌方目标`,
+  }));
+}
+
+/** play 类评分表：牌名 → 评分函数（表驱动）。决斗/借刀杀人/火攻等指定目标
+ *  锦囊共用 scoreTargetedPlay 三段式；装备牌与未知名牌走 scorePlay 兜底分支。 */
+const PLAY_SCORERS: Record<string, PlayScorer> = {
+  桃: scorePeachPlay,
+  // 酒：出牌阶段用作杀+1或自救（自救走 respond 分支，这里仅 buff）
+  酒: () => ({ score: 35, reason: '出【酒】（杀+1伤害或留作自救）' }),
+  杀: scoreSlashPlay,
+  顺手牵羊: scoreSnatchPlay,
+  过河拆桥: scoreSnatchPlay,
+  // 无中生有：稳定摸2张
+  无中生有: () => ({ score: 80, reason: '【无中生有】摸2张牌（稳定过牌）' }),
+  决斗: (view, action, cardName) =>
+    scoreTargetedPlay(view, action, cardName, () => ({
+      score: 70,
+      reason: `【${cardName}】敌方目标（注意己方杀数）`,
+    })),
+  南蛮入侵: scoreAoePlay,
+  万箭齐发: scoreAoePlay,
+  借刀杀人: (view, action, cardName) =>
+    scoreTargetedPlay(view, action, cardName, () => ({
+      score: 72,
+      reason: `【${cardName}】夺取/借武器`,
+    })),
+  桃园结义: scorePeachGardenPlay,
+  // 五谷丰登：双方都受益，中性
+  五谷丰登: () => ({ score: 50, reason: '【五谷丰登】（双方都受益）' }),
+  乐不思蜀: scoreDelayedControlPlay,
+  兵粮寸断: scoreDelayedControlPlay,
+  // 闪电：高风险延时锦囊（视局势）
+  闪电: () => ({ score: 35, reason: '【闪电】高风险延时锦囊（视局势）' }),
+  // 铁索连环（视局势）
+  铁索连环: () => ({ score: 55, reason: '【铁索连环】（视局势）' }),
+  火攻: (view, action, cardName) =>
+    scoreTargetedPlay(view, action, cardName, () => ({
+      score: 65,
+      reason: `【${cardName}】敌方目标`,
+    })),
+};
+
 function scorePlay(view: AiViewSnapshot, action: AvailableAction): ScoredAction {
   const { id, name } = actionCard(action);
   const card = findCardInHand(view, id);
   const cardName = card?.name ?? name ?? '';
-  const me = selfOf(view);
-
-  // 桃：满血不出；残血保命
-  if (cardName === '桃') {
-    const hp = me?.health ?? 0;
-    const max = me?.maxHealth ?? 0;
-    if (hp >= max) return { score: 10, reason: '满血，无需出【桃】' };
-    if (hp <= 1) return { score: 88, reason: '残血，出【桃】回血保命' };
-    return { score: 55, reason: '不满血，出【桃】回血' };
-  }
-
-  // 酒：出牌阶段用作杀+1或自救（自救走 respond 分支，这里仅 buff）
-  if (cardName === '酒') {
-    return { score: 35, reason: '出【酒】（杀+1伤害或留作自救）' };
-  }
-
-  // 杀：射程内（validTargets 已过滤射程/存活）有目标
-  if (cardName === '杀') {
-    if (action.validTargets.length === 0) {
-      return { score: 5, reason: '【杀】无合法目标（射程外/无敌人）' };
-    }
-    const myId = me?.identity;
-    const enemies = enemyTargets(view, action);
-
-    // 没有敌方目标（全是盟友或身份不明）
-    if (enemies.length === 0) {
-      return { score: 8, reason: '【杀】无敌方目标（合法目标均为盟友/身份不明）' };
-    }
-
-    // 内奸特殊：优先攻击当前血量最高的存活玩家（平衡局势）
-    if (myId === '内奸') {
-      const maxHp = Math.max(...enemies.map((p) => p.health));
-      const prime = enemies.find((p) => p.health === maxHp)!;
-      if (prime.health <= 1) {
-        return { score: 85, reason: `【杀】攻击残血 ${prime.name}(${prime.health}血，可击杀)` };
-      }
-      return { score: 72, reason: `【杀】内奸平衡局势，攻击高血 ${prime.name}(${prime.health}血)` };
-    }
-
-    // 反贼优先攻击主公
-    if (myId === '反贼') {
-      const lord = enemies.find((p) => p.identity === '主公');
-      if (lord) {
-        if (lord.health <= 1) {
-          return { score: 90, reason: `【杀】攻击残血主公 ${lord.name}(${lord.health}血，可击杀)` };
-        }
-        return { score: 82, reason: `【杀】反贼优先攻击主公 ${lord.name}(${lord.health}血)` };
-      }
-    }
-
-    // 通用：选血量最低的敌人
-    const minHp = Math.min(...enemies.map((p) => p.health));
-    const prime = enemies.find((p) => p.health === minHp)!;
-    if (prime.health <= 1) {
-      return { score: 85, reason: `【杀】攻击残血 ${prime.name}(${prime.health}血，可击杀)` };
-    }
-    if (prime.health <= 2) {
-      return { score: 78, reason: `【杀】攻击低血 ${prime.name}(${prime.health}血)` };
-    }
-    return { score: 72, reason: `【杀】攻击目标(${enemies.length}个敌方)` };
-  }
-
-  // 顺手牵羊 / 过河拆桥：目标有牌且为敌方才值得
-  if (cardName === '顺手牵羊' || cardName === '过河拆桥') {
-    const enemies = enemyTargets(view, action);
-    if (enemies.length === 0) {
-      return { score: 18, reason: `【${cardName}】合法目标均为盟友/身份不明` };
-    }
-    const hasCards = enemies.some(
-      (p) => p.handCount > 0 || Object.keys(p.equipment ?? {}).length > 0,
-    );
-    if (!hasCards) return { score: 8, reason: `${cardName}目标无牌可取` };
-    return { score: 75, reason: `【${cardName}】夺取敌方目标牌` };
-  }
-
-  // 无中生有：稳定摸2张
-  if (cardName === '无中生有') {
-    return { score: 80, reason: '【无中生有】摸2张牌（稳定过牌）' };
-  }
-
-  // 决斗
-  if (cardName === '决斗') {
-    if (action.validTargets.length === 0) return { score: 5, reason: '【决斗】无合法目标' };
-    if (enemyTargets(view, action).length === 0) {
-      return { score: 18, reason: '【决斗】合法目标均为盟友/身份不明' };
-    }
-    return { score: 70, reason: '【决斗】敌方目标（注意己方杀数）' };
-  }
-
-  // AOE：注意是否伤队友
-  if (cardName === '南蛮入侵' || cardName === '万箭齐发') {
-    const myId = me?.identity;
-    const allies = view.players.filter(
-      (p) => p.alive && p.index !== view.viewer && isAlly(myId, p.identity),
-    ).length;
-    if (allies > 0) {
-      return {
-        score: Math.max(20, 68 - allies * 15),
-        reason: `【${cardName}】会伤害${allies}名盟友，降分`,
-      };
-    }
-    return { score: 68, reason: `【${cardName}】群体伤害（无盟友受波及）` };
-  }
-
-  // 借刀杀人
-  if (cardName === '借刀杀人') {
-    if (action.validTargets.length === 0) return { score: 5, reason: '【借刀杀人】无合法目标' };
-    if (enemyTargets(view, action).length === 0) {
-      return { score: 18, reason: '【借刀杀人】合法目标均为盟友/身份不明' };
-    }
-    return { score: 72, reason: '【借刀杀人】夺取/借武器' };
-  }
-
-  // 桃园结义：有人受伤才收益
-  if (cardName === '桃园结义') {
-    const wounded = view.players.some((p) => p.alive && p.health < p.maxHealth);
-    return wounded
-      ? { score: 65, reason: '【桃园结义】群体回血' }
-      : { score: 20, reason: '无人受伤，【桃园结义】收益低' };
-  }
-
-  // 五谷丰登：双方都受益，中性
-  if (cardName === '五谷丰登') {
-    return { score: 50, reason: '【五谷丰登】（双方都受益）' };
-  }
-
-  // 延时控场锦囊
-  if (cardName === '乐不思蜀' || cardName === '兵粮寸断') {
-    if (action.validTargets.length === 0) return { score: 5, reason: `【${cardName}】无合法目标` };
-    if (enemyTargets(view, action).length === 0) {
-      return { score: 18, reason: `【${cardName}】合法目标均为盟友/身份不明` };
-    }
-    return { score: 73, reason: `【${cardName}】控场敌方目标` };
-  }
-  if (cardName === '闪电') {
-    return { score: 35, reason: '【闪电】高风险延时锦囊（视局势）' };
-  }
-
-  // 铁索连环
-  if (cardName === '铁索连环') {
-    return { score: 55, reason: '【铁索连环】（视局势）' };
-  }
-
-  // 火攻
-  if (cardName === '火攻') {
-    if (action.validTargets.length === 0) return { score: 5, reason: '【火攻】无合法目标' };
-    if (enemyTargets(view, action).length === 0) {
-      return { score: 18, reason: '【火攻】合法目标均为盟友/身份不明' };
-    }
-    return { score: 65, reason: '【火攻】敌方目标' };
-  }
+  const scorer = PLAY_SCORERS[cardName];
+  if (scorer) return scorer(view, action, cardName);
 
   // 装备牌：空槽 + 手牌不紧缺时优先装
   if (card?.type === '装备牌') {
+    const me = selfOf(view);
     const slot = (card.subtype ?? undefined) as EquipSlot | undefined;
     const occupied = slot ? !!(me?.equipment?.[slot]) : false;
     if (occupied) {
@@ -584,26 +620,7 @@ function scoreDiscard(view: AiViewSnapshot, action: AvailableAction): ScoredActi
 // ────────────────────────────────────────────────────────────────
 // selectChar 类（选将）
 // ────────────────────────────────────────────────────────────────
-// 偏好武将表（技能强度高的常见主力，可按需扩展）。
-const STRONG_CHARACTERS = new Set([
-  '诸葛亮',
-  '司马懿',
-  '曹操',
-  '刘备',
-  '孙权',
-  '貂蝉',
-  '甄姬',
-  '郭嘉',
-  '陆逊',
-  '黄月英',
-  '孙尚香',
-  '张角',
-  '华佗',
-  '吕布',
-  '夏侯渊',
-  '张飞',
-  '许褚',
-]);
+// 偏好武将表(STRONG_CHARACTERS)移至 engine/data/character-strength.ts。
 
 function scoreSelectChar(view: AiViewSnapshot, action: AvailableAction): ScoredAction {
   const params = action.message.params as Record<string, unknown>;

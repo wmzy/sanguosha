@@ -7,6 +7,7 @@
 import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '麒麟弓', description: '武器:杀造成伤害时可弃目标1匹马', isLocked: true };
@@ -21,13 +22,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (state, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是麒麟弓窗口';
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType !== '麒麟弓/confirm') return '当前不是麒麟弓窗口';
+      return requireRequestType(state, ownerId, ['麒麟弓/confirm'], {
+        wrongTypeError: '当前不是麒麟弓窗口',
+        mismatchError: '当前不是麒麟弓窗口',
+      }).error;
       void params;
-      return null;
     },
     async (state, params) => {
       state.localVars['麒麟弓/confirmed'] = params.choice === true || params.confirmed === true;

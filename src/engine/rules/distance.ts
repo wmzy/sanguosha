@@ -7,6 +7,7 @@
 // 注册表为 state-bound(WeakMap 外挂),随 state 自动隔离/GC,与 slash-quota/hand-limit 同构。
 
 import type { GameState } from '../types';
+import { createProviderRegistry } from './provider-registry';
 import { getDistanceAttackMod, getDistanceDefenseMod, getDistanceAttackRange } from './vars-keys';
 
 /**
@@ -99,23 +100,10 @@ export type DistanceExemptor = (
   cardId?: string,
 ) => boolean;
 
-interface DistanceRegistry {
-  /** player 索引 → 该玩家注册的【杀】攻击范围豁免器集合 */
-  exemptors: Map<number, Set<AttackRangeExemptor>>;
-  /** player 索引 → 该玩家注册的通用距离豁免器集合 */
-  distanceExemptors: Map<number, Set<DistanceExemptor>>;
-}
+// ─── 豁免器注册表(state-bound,样板见 rules/provider-registry.ts) ───
 
-const distanceRegistries = new WeakMap<GameState, DistanceRegistry>();
-
-function getDistanceRegistry(state: GameState): DistanceRegistry {
-  let reg = distanceRegistries.get(state);
-  if (!reg) {
-    reg = { exemptors: new Map(), distanceExemptors: new Map() };
-    distanceRegistries.set(state, reg);
-  }
-  return reg;
-}
+const attackRangeExemptorRegistry = createProviderRegistry<AttackRangeExemptor>();
+const distanceExemptorRegistry = createProviderRegistry<DistanceExemptor>();
 
 /**
  * 注册一个攻击范围豁免器(技能 onInit 时调用)。
@@ -126,20 +114,7 @@ export function registerAttackRangeExemptor(
   ownerId: number,
   exemptor: AttackRangeExemptor,
 ): () => void {
-  const reg = getDistanceRegistry(state);
-  let set = reg.exemptors.get(ownerId);
-  if (!set) {
-    set = new Set();
-    reg.exemptors.set(ownerId, set);
-  }
-  set.add(exemptor);
-  return () => {
-    const s = reg.exemptors.get(ownerId);
-    if (s) {
-      s.delete(exemptor);
-      if (s.size === 0) reg.exemptors.delete(ownerId);
-    }
-  };
+  return attackRangeExemptorRegistry.register(state, ownerId, exemptor);
 }
 
 /** 该 from→to 的此张【杀】是否被任一豁免器放行(任一返回 true 即放行)。 */
@@ -149,12 +124,7 @@ export function isAttackRangeExempted(
   to: number,
   cardId: string | undefined,
 ): boolean {
-  const set = getDistanceRegistry(state).exemptors.get(from);
-  if (!set) return false;
-  for (const fn of set) {
-    if (fn(state, from, to, cardId)) return true;
-  }
-  return false;
+  return attackRangeExemptorRegistry.someOf(state, from, (fn) => fn(state, from, to, cardId));
 }
 
 /**
@@ -166,29 +136,11 @@ export function registerDistanceExemptor(
   ownerId: number,
   exemptor: DistanceExemptor,
 ): () => void {
-  const reg = getDistanceRegistry(state);
-  let set = reg.distanceExemptors.get(ownerId);
-  if (!set) {
-    set = new Set();
-    reg.distanceExemptors.set(ownerId, set);
-  }
-  set.add(exemptor);
-  return () => {
-    const s = reg.distanceExemptors.get(ownerId);
-    if (s) {
-      s.delete(exemptor);
-      if (s.size === 0) reg.distanceExemptors.delete(ownerId);
-    }
-  };
+  return distanceExemptorRegistry.register(state, ownerId, exemptor);
 }
 
 /** 该 from→to 是否被任一通用距离豁免器放行(任一返回 true 即视为距离 1)。
  *  cardId 可选:已知当前使用牌时传入,供 per-card 距离豁免(成略:同花色牌无距离)。 */
 export function isDistanceExempted(state: GameState, from: number, to: number, cardId?: string): boolean {
-  const set = getDistanceRegistry(state).distanceExemptors.get(from);
-  if (!set) return false;
-  for (const fn of set) {
-    if (fn(state, from, to, cardId)) return true;
-  }
-  return false;
+  return distanceExemptorRegistry.someOf(state, from, (fn) => fn(state, from, to, cardId));
 }

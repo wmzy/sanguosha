@@ -32,6 +32,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_RT = '放逐/confirm';
 const TARGET_RT = '放逐/target';
@@ -59,13 +60,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== CONFIRM_RT && rt !== TARGET_RT) return '当前不是放逐询问';
-      return null;
+      return requireRequestType(st, ownerId, [CONFIRM_RT, TARGET_RT], {
+        mismatchError: '当前不是放逐询问',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
       const slot = st.pendingSlots.get(ownerId);

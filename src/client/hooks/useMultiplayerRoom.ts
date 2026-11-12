@@ -16,8 +16,7 @@ import { createLogger } from '../utils/logger';
 import { apiFetch } from '../api/client';
 import { useAuth } from './useAuth';
 import { isRoomNotFound } from '../utils/roomErrors';
-import { useEventPlayback } from './useEventPlayback';
-import { appendIngestedEvents } from '../utils/appendIngestedEvents';
+import { useHgcPlayback, normalizeHgcError } from './useHgcPlayback';
 
 const log = createLogger('useMultiplayerRoom');
 
@@ -202,19 +201,18 @@ export function useMultiplayerRoom(
 
   const hgcRef = useRef<HeadlessGameClient | null>(null);
 
-  // 事件播放队列:把后端 event 消息按 seq 入队,逐个暴露给 GameViewComponent 中央动效。
-  // 用 ref 在 onMessage 闭包中取最新 playback,避免闭包竞态。
+  // 事件播放队列 + 出牌历史(与 useDebugMultiConnection 共用簿记,见 useHgcPlayback)。
   // 旁观者用 compact 模式：不补播历史动效，始终展示最新事件（AI 对局节奏快）。
-  const playback = useEventPlayback({ compact: hgcIsSpectator });
-  const playbackRef = useRef(playback);
-  useEffect(() => {
-    playbackRef.current = playback;
-  }, [playback]);
-  /** 出牌历史:由 onView.newEvents 驱动(与播放队列解耦) */
-  const [ingestedEvents, setIngestedEvents] = useState<
-    import('./useEventPlayback').QueuedEvent[]
-  >([]);
-  const historySeqRef = useRef(0);
+  const {
+    playbackRef,
+    ingestedEvents,
+    ingestEvents,
+    enqueueEvent,
+    resetPlayback,
+    currentEvent,
+    pendingCount,
+    skipEvents,
+  } = useHgcPlayback({ compact: hgcIsSpectator });
 
   const serverUrl = window.location.origin;
 
@@ -239,12 +237,8 @@ export function useMultiplayerRoom(
       onView: (v, newEvents) => {
         if (hgcRef.current !== hgc) return;
         setView(v);
-        // 出牌历史:追加批次(不可替换——WS 连发时 React 会合并 setState 丢掉中间的打出)
-        if (newEvents.length > 0) {
-          setIngestedEvents((prev) =>
-            appendIngestedEvents(prev, newEvents, () => ++historySeqRef.current),
-          );
-        }
+        // 出牌历史:追加批次(与播放队列解耦,空批次自动跳过)
+        ingestEvents(newEvents);
         // 旁观者始终留在 spectating stage，不因 viewer>=0 跳转
         if (v.viewer >= 0 && !hgc.isSpectator) setStage('playing');
       },
@@ -261,7 +255,7 @@ export function useMultiplayerRoom(
         if (hgcRef.current !== hgc) return;
         // 操作类失败（ready/start/chat/config 等服务端 4xx）——显示错误提示。
         // WS 断连走 onReconnectStateChange，不会进入这里。
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = normalizeHgcError(err);
         log.error('room op failed', { error: msg });
         showError(msg);
       },
@@ -301,17 +295,15 @@ export function useMultiplayerRoom(
         if (msg.type === 'game_reset') {
           setGameOver(null);
           setView(null);
-          
+
           setStage('waiting');
           setChatMessages([]);
-          setIngestedEvents([]);
-          historySeqRef.current = 0;
-          playbackRef.current.reset(0);
+          resetPlayback();
           setDisconnectedSeats(new Set());
         }
         if (msg.type === 'event' && msg.view) {
           // 事件播放:他人出牌/判定翻牌等中央动效(供 GameViewComponent 中央展示)
-          playbackRef.current.enqueue([{ seq: msg.seq, event: msg.view }]);
+          enqueueEvent(msg.seq, msg.view);
         }
         if (msg.type === 'error') {
           showError(msg.message);
@@ -385,7 +377,7 @@ export function useMultiplayerRoom(
         })
         .catch((err) => {
           if (hgcRef.current !== hgc) return;
-          const msg = err instanceof Error ? err.message : String(err);
+          const msg = normalizeHgcError(err);
           log.error('createRoom failed', { error: msg });
           clearErrorTimer();
           setError(msg);
@@ -401,7 +393,7 @@ export function useMultiplayerRoom(
       hgc.joinRoom(command.roomId, undefined, command.password).catch((err) => {
         if (hgcRef.current !== hgc) return;
         const status = (err as { status?: number })?.status;
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = normalizeHgcError(err);
         log.error('joinRoom failed', { status, error: msg });
         // 有密码房间且未携带/密码错误 → 弹密码输入框,确认后带密码重试。
         // autoJoin(URL 直达)与手动 join 都走此路径;仅 403(密码错误)触发,
@@ -433,7 +425,7 @@ export function useMultiplayerRoom(
       hgc.joinAsSpectator(command.roomId, undefined, command.password).catch((err) => {
         if (hgcRef.current !== hgc) return;
         const status = (err as { status?: number })?.status;
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = normalizeHgcError(err);
         log.error('joinAsSpectator failed', { status, error: msg });
         if (status === 403) {
           setPasswordPrompt({ roomId: command.roomId, mode: 'spectate', error: command.password ? '密码错误，请重试' : null });
@@ -731,9 +723,9 @@ export function useMultiplayerRoom(
     disconnectedSeats,
     reconnectAttempt,
     cancelReconnect,
-    currentEvent: playback.current,
+    currentEvent,
     ingestedEvents,
-    pendingCount: playback.pendingCount,
-    skipEvents: playback.skipAll,
+    pendingCount,
+    skipEvents,
   };
 }

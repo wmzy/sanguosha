@@ -40,6 +40,7 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY, JUZHAN_STATE_VIEW_KEY } from '../rules/vars-keys';
 import { projectTurnUsage } from '../rules/turn-usage';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '拒战';
 /** 转换态 key(state:player.vars 跨回合持久,无 /usedThisTurn 后缀;view:经 回合用量 atom 投影 turnUsage)。
@@ -104,11 +105,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不需要回应';
-      const rt = atom.requestType;
+      const check = requireRequestType(
+        st,
+        ownerId,
+        [YANG_CONFIRM_RT, YIN_CONFIRM_RT, YIN_PICK_RT],
+        { mismatchError: '当前不是拒战回应' },
+      );
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === YANG_CONFIRM_RT || rt === YIN_CONFIRM_RT) {
         return null; // confirm:接受 choice/confirmed 布尔
       }
@@ -124,7 +128,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
         return null;
       }
-      return '当前不是拒战回应';
+      return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const slot = st.pendingSlots.get(ownerId);

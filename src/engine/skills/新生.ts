@@ -27,6 +27,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
 import { createRng } from '../util/rng';
 import { HUASHEN_POOL_KEY as POOL_KEY, getHuashenPool } from '../rules/vars-keys';
+import { requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '新生/confirm';
 const CHOICE_KEY = '新生/choice';
@@ -76,11 +77,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== CONFIRM_REQUEST) return '当前不是新生询问';
+      const check = requireRequestType(st, ownerId, [CONFIRM_REQUEST], {
+        mismatchError: '当前不是新生询问',
+      });
+      if (check.error) return check.error;
       if (typeof params.choice !== 'boolean') return '需要 choice(布尔)';
       return null;
     },

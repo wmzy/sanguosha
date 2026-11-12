@@ -61,47 +61,39 @@ interface CharSelectOverlayProps {
   overlaySlot?: ReactNode;
 }
 
-/**
- * 选将遮罩。
- * - 自维护 `selectedCharIdx`(候选高亮态),pending/target 变化时重置;
- * - 势力色 / 体力上限通过 `getCharacterMeta` prop 注入,不依赖硬编码 CHAR_POOL。
- */
-export function CharSelectOverlay({
-  candidates,
-  charSelectTarget,
-  isSelfSelecting,
-  isLord,
-  viewer,
-  viewerIdentity,
-  deadline,
-  totalMs,
-  onSelect,
-  getCharacterMeta,
-  overlaySlot,
-}: CharSelectOverlayProps) {
-  useSkillDescReady(); // 技能模块加载后重渲染,确保候选武将技能描述 title 命中
-  const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
-  // 已提交锁定态:点「确认选择」后记录选中的武将名,锁定候选区与按钮,
-  // 直到引擎广播新 view(选将 slot resolve → pending 切换 → 本组件卸载或重置)。
-  // 此前遮罩仍在渲染,必须禁止重复点击其他武将 + 再次提交。
-  const [submittedChar, setSubmittedChar] = useState<string | null>(null);
-  // 多版本组 hover 展开态:记录当前 hover 的组 baseId,null 表示无展开。
-  const [hoveredGroupBaseId, setHoveredGroupBaseId] = useState<string | null>(null);
-  // 势力筛选:仅影响候选展示,不参与提交逻辑;'全部' 表示不过滤。
+/** useCharSelectFilter 的返回状态:筛选控件值 + 分组过滤后的可见候选组 */
+interface CharSelectFilterState {
+  /** 势力 chips 选项:主五项 + 候选中实际出现的其他势力动态补充 */
+  factionOptions: string[];
+  factionFilter: string;
+  setFactionFilter: (f: string) => void;
+  searchText: string;
+  setSearchText: (t: string) => void;
+  /** 按 baseId 分组并应用势力/搜索过滤后的候选组 */
+  visibleGroups: CharSelectOverlayCandidate[][];
+}
+
+/** 选将候选的分组 + 势力/名称筛选状态。
+ *  - 按 baseId 分组:同一武将的标/界/SP 版本归为一组;
+ *  - 势力 chips 选项:固定主五项 + 候选中实际出现的其他势力(如 '神')动态补充,
+ *    避免硬编码遗漏冷门势力。势力缺失时回退 '群',与卡片渲染的回退口径一致;
+ *  - 筛选 + 搜索叠加(AND),仅作用于展示:
+ *    · 势力按组首版本的 meta 判定(同组多版本的势力视为一致);
+ *    · 搜索匹配组内任一版本名或 baseId(如「甄姬」可命中「界甄姬」组);
+ *  - pending/target 变化时重置过滤条件,避免上一轮的条件遮住新一轮候选。 */
+function useCharSelectFilter(
+  candidates: CharSelectOverlayCandidate[],
+  getCharacterMeta: (name: string) => CharacterMeta | undefined,
+  isSelfSelecting: boolean,
+  charSelectTarget: number,
+): CharSelectFilterState {
   const [factionFilter, setFactionFilter] = useState('全部');
   // 名称搜索关键字:仅做名称子串匹配(不做拼音转换,避免引入拼音表依赖)。
   const [searchText, setSearchText] = useState('');
-  // pending/target 变化时清空选中态与锁定态(新选将窗口开启);
-  // 筛选/搜索态一并重置,避免上一轮的过滤条件遮住新一轮候选。
   useEffect(() => {
-    setSelectedCharName(null);
-    setSubmittedChar(null);
-    setHoveredGroupBaseId(null);
     setFactionFilter('全部');
     setSearchText('');
   }, [isSelfSelecting, charSelectTarget]);
-
-  const viewerColor = viewerIdentity ? IDENTITY_COLORS[viewerIdentity] || '#888' : null;
 
   // 按 baseId 分组候选武将:同一武将的标/界/SP 版本归为一组
   const groups: CharSelectOverlayCandidate[][] = (() => {
@@ -130,9 +122,6 @@ export function CharSelectOverlay({
     return [...base, ...extra];
   })();
 
-  // 筛选 + 搜索叠加(AND),仅作用于展示:
-  // - 势力按组首版本的 meta 判定(同组多版本的势力视为一致);
-  // - 搜索匹配组内任一版本名或 baseId(如「甄姬」可命中「界甄姬」组)。
   const visibleGroups = groups.filter((versions) => {
     const faction = getCharacterMeta(versions[0].name)?.faction ?? '群';
     if (factionFilter !== '全部' && faction !== factionFilter) return false;
@@ -147,70 +136,133 @@ export function CharSelectOverlay({
     return true;
   });
 
-  /** 渲染单张候选卡(单版本 / 多版本组展开态共用):
-   *  竖版立绘填满 + 左上势力印章 + 右上体力点 + 左缘竖排名 + 底部技能 chips。 */
-  const renderCard = (
-    ch: CharSelectOverlayCandidate,
-    isSelected: boolean,
-    isLockedOut: boolean,
-    isSubmittedPick: boolean,
-    onClick: () => void,
-  ) => {
-    const meta = getCharacterMeta(ch.name);
-    const faction = meta?.faction ?? '群';
-    const maxHealth = meta?.maxHealth ?? 4;
-    const charImg = getCharacterImage(ch.name);
-    return (
-      <div
-        key={ch.name}
-        className={cx(
-          candidateCard,
-          (isSelected || isSubmittedPick) && candidateCardSelected,
-          isLockedOut && candidateCardLockedOut,
-          submittedChar !== null && candidateCardFrozen,
-        )}
-        style={{ '--faction-color': FACTION_BG[faction] || '#333' } as React.CSSProperties}
-        onClick={onClick}
-        data-char-card
-      >
-        {charImg && (
-          <img
-            className={candidatePortraitImg}
-            src={charImg}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-        )}
-        {/* 左上势力印章:势力色底 + 金边金字 */}
-        <div className={factionSeal}>{faction}</div>
-        {/* 右上体力点:数量 = 体力上限 */}
-        <div className={hpDots}>
-          {Array.from({ length: maxHealth }, (_, j) => (
-            <div key={j} className={hpDot} />
-          ))}
-        </div>
-        {/* 左缘竖排武将名:黑条渐变衬底 + 描边白字 */}
-        <div className={candidateName}>{ch.name}</div>
-        {/* 底部技能 chips(hover 出描述,SkillTag 承担) */}
-        <div className={candidateMeta}>
-          {ch.skills.map((s) => (
-            <SkillTag
-              key={s}
-              name={displaySkillName(s)}
-              description={getSkillDescription(s)}
-              className={skillChip}
-            >
-              {displaySkillName(s)}
-            </SkillTag>
-          ))}
-        </div>
+  return { factionOptions, factionFilter, setFactionFilter, searchText, setSearchText, visibleGroups };
+}
+
+/** 单张候选卡(单版本 / 多版本组展开态共用)的 props */
+interface CharCandidateCardProps {
+  ch: CharSelectOverlayCandidate;
+  getCharacterMeta: (name: string) => CharacterMeta | undefined;
+  isSelected: boolean;
+  /** 已提交后其余卡灰化降透明 */
+  isLockedOut: boolean;
+  /** 该卡即已提交的选将(保持金框 + ▼) */
+  isSubmittedPick: boolean;
+  /** 已提交锁定态(禁止再选) */
+  isFrozen: boolean;
+  onClick: () => void;
+}
+
+/** 单张候选武将卡(单版本 / 多版本组展开态共用):
+ *  竖版立绘填满 + 左上势力印章 + 右上体力点 + 左缘竖排名 + 底部技能 chips。 */
+function CharCandidateCard({
+  ch,
+  getCharacterMeta,
+  isSelected,
+  isLockedOut,
+  isSubmittedPick,
+  isFrozen,
+  onClick,
+}: CharCandidateCardProps) {
+  const meta = getCharacterMeta(ch.name);
+  const faction = meta?.faction ?? '群';
+  const maxHealth = meta?.maxHealth ?? 4;
+  const charImg = getCharacterImage(ch.name);
+  return (
+    <div
+      className={cx(
+        candidateCard,
+        (isSelected || isSubmittedPick) && candidateCardSelected,
+        isLockedOut && candidateCardLockedOut,
+        isFrozen && candidateCardFrozen,
+      )}
+      style={{ '--faction-color': FACTION_BG[faction] || '#333' } as React.CSSProperties}
+      onClick={onClick}
+      data-char-card
+    >
+      {charImg && (
+        <img
+          className={candidatePortraitImg}
+          src={charImg}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      )}
+      {/* 左上势力印章:势力色底 + 金边金字 */}
+      <div className={factionSeal}>{faction}</div>
+      {/* 右上体力点:数量 = 体力上限 */}
+      <div className={hpDots}>
+        {Array.from({ length: maxHealth }, (_, j) => (
+          <div key={j} className={hpDot} />
+        ))}
       </div>
-    );
-  };
+      {/* 左缘竖排武将名:黑条渐变衬底 + 描边白字 */}
+      <div className={candidateName}>{ch.name}</div>
+      {/* 底部技能 chips(hover 出描述,SkillTag 承担) */}
+      <div className={candidateMeta}>
+        {ch.skills.map((s) => (
+          <SkillTag
+            key={s}
+            name={displaySkillName(s)}
+            description={getSkillDescription(s)}
+            className={skillChip}
+          >
+            {displaySkillName(s)}
+          </SkillTag>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 选将遮罩。
+ * - 自维护 `selectedCharIdx`(候选高亮态),pending/target 变化时重置;
+ * - 势力色 / 体力上限通过 `getCharacterMeta` prop 注入,不依赖硬编码 CHAR_POOL。
+ */
+export function CharSelectOverlay({
+  candidates,
+  charSelectTarget,
+  isSelfSelecting,
+  isLord,
+  viewer,
+  viewerIdentity,
+  deadline,
+  totalMs,
+  onSelect,
+  getCharacterMeta,
+  overlaySlot,
+}: CharSelectOverlayProps) {
+  useSkillDescReady(); // 技能模块加载后重渲染,确保候选武将技能描述 title 命中
+  const [selectedCharName, setSelectedCharName] = useState<string | null>(null);
+  // 已提交锁定态:点「确认选择」后记录选中的武将名,锁定候选区与按钮,
+  // 直到引擎广播新 view(选将 slot resolve → pending 切换 → 本组件卸载或重置)。
+  // 此前遮罩仍在渲染,必须禁止重复点击其他武将 + 再次提交。
+  const [submittedChar, setSubmittedChar] = useState<string | null>(null);
+  // 多版本组 hover 展开态:记录当前 hover 的组 baseId,null 表示无展开。
+  const [hoveredGroupBaseId, setHoveredGroupBaseId] = useState<string | null>(null);
+  // 候选分组 + 势力/名称筛选(仅影响展示,不参与提交逻辑)
+  const {
+    factionOptions,
+    factionFilter,
+    setFactionFilter,
+    searchText,
+    setSearchText,
+    visibleGroups,
+  } = useCharSelectFilter(candidates, getCharacterMeta, isSelfSelecting, charSelectTarget);
+  // pending/target 变化时清空选中态与锁定态(新选将窗口开启;
+  // 筛选/搜索态由 useCharSelectFilter 按同一依赖自行重置)。
+  useEffect(() => {
+    setSelectedCharName(null);
+    setSubmittedChar(null);
+    setHoveredGroupBaseId(null);
+  }, [isSelfSelecting, charSelectTarget]);
+
+  const viewerColor = viewerIdentity ? IDENTITY_COLORS[viewerIdentity] || '#888' : null;
 
   return (
     <div className={overlayRoot} data-char-select-overlay>
@@ -292,18 +344,21 @@ export function CharSelectOverlay({
                       className={candidateGroupExpanded}
                       onMouseLeave={() => setHoveredGroupBaseId(null)}
                     >
-                      {versions.map((ch) =>
-                        renderCard(
-                          ch,
-                          selectedCharName === ch.name,
-                          submittedChar !== null && submittedChar !== ch.name,
-                          submittedChar === ch.name,
-                          () => {
+                      {versions.map((ch) => (
+                        <CharCandidateCard
+                          key={ch.name}
+                          ch={ch}
+                          getCharacterMeta={getCharacterMeta}
+                          isSelected={selectedCharName === ch.name}
+                          isLockedOut={submittedChar !== null && submittedChar !== ch.name}
+                          isSubmittedPick={submittedChar === ch.name}
+                          isFrozen={submittedChar !== null}
+                          onClick={() => {
                             if (submittedChar !== null) return;
                             setSelectedCharName(ch.name);
-                          },
-                        ),
-                      )}
+                          }}
+                        />
+                      ))}
                     </div>
                   );
                 }
@@ -370,15 +425,20 @@ export function CharSelectOverlay({
 
                 // 单版本:正常候选卡
                 const ch = versions[0];
-                return renderCard(
-                  ch,
-                  selectedCharName === ch.name,
-                  submittedChar !== null && submittedChar !== ch.name,
-                  submittedChar === ch.name,
-                  () => {
-                    if (submittedChar !== null) return;
-                    setSelectedCharName(ch.name);
-                  },
+                return (
+                  <CharCandidateCard
+                    key={ch.name}
+                    ch={ch}
+                    getCharacterMeta={getCharacterMeta}
+                    isSelected={selectedCharName === ch.name}
+                    isLockedOut={submittedChar !== null && submittedChar !== ch.name}
+                    isSubmittedPick={submittedChar === ch.name}
+                    isFrozen={submittedChar !== null}
+                    onClick={() => {
+                      if (submittedChar !== null) return;
+                      setSelectedCharName(ch.name);
+                    }}
+                  />
                 );
               })}
               </div>

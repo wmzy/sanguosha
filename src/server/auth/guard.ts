@@ -1,7 +1,7 @@
 // src/server/auth/guard.ts — 会话身份守卫。
 // 从请求解析登录用户:Cookie(浏览器)/ Authorization: Bearer(程序化客户端)/
 // ?sgs_token=(SSE EventSource 无法带自定义头时的查询参数通道)。
-// 供 rest.ts/sse.ts 对非调试房间强制登录使用;调试房间保持开放(开发工具)。
+// 供 routes/*/sse.ts 对非调试房间强制登录使用;调试房间保持开放(开发工具)。
 import type { Context } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { getUserByToken, type PublicUser } from './store';
@@ -52,37 +52,30 @@ export async function requireUser(c: Context): Promise<PublicUser | null> {
   return 'user' in identity ? identity.user : null;
 }
 
-/** REST 操作者身份解析(非调试房取会话 userId,调试房回退 bodyPlayerId)。
- *  requireAuth 由调用方按各路由原有语义传入(通常 `!!room && !room.isDebug`;
- *  leave 路由对不存在的房间也要求登录,传 `getRoom(id)?.isDebug !== true`)。
- *  未登录返回 authFailed(调用方回 401);bodyPlayerId 为空串不在本处校验,
- *  由调用方按原路由各自的 400 文案兜底。 */
-export async function resolveRoomActorId(
-  c: Context,
-  requireAuth: boolean,
-  bodyPlayerId: string,
-): Promise<{ playerId: string } | { authFailed: true }> {
-  if (!requireAuth) return { playerId: bodyPlayerId };
-  const user = await requireUser(c);
-  return user ? { playerId: user.id } : { authFailed: true };
-}
+/** REST 操作者身份解析结果:error 区分「需登录」与「回退身份缺失」,
+ *  由调用方(或 routes/helpers 的适配器)按各自路由家族映射 401/400 响应。 */
+export type RoomActorResolution =
+  | { playerId: string; error?: undefined }
+  | { playerId?: undefined; error: 'unauthenticated' | 'missing_player_id' };
 
-/** REST playerId 解析(ready/config/换座族路由共用)。
- *  非调试房间:身份取会话 userId(body.playerId 忽略)。否则任何人可伪造他人准备,
- *  或塞入垃圾 id 使 allReady 的 size 相等判断永假 → 房间永远无法开局。
- *  调试房/房间不存在时取 bodyPlayerId(缺失 400)。 */
-export async function resolveRestPlayerId(
+/** REST 操作者身份解析(原 resolveRoomActorId/resolveRestPlayerId 合并)。
+ *  requireAuth: 非调试房语义(通常 `!!room && !room.isDebug`;leave 路由对不存在
+ *  的房间也要求登录,传 `getRoom(id)?.isDebug !== true`)——强制取会话 userId,
+ *  未登录返回 unauthenticated;否则回退 bodyPlayerId(调试房游客模型)。
+ *  rejectMissingBodyId: 回退身份为空串时立即返回 missing_player_id
+ *  (ready/config/换座族——否则任何人可伪造他人准备,或塞入垃圾 id 使 allReady
+ *  的 size 相等判断永假 → 房间永远无法开局);缺省时原样返回空串,
+ *  由调用方按各自 400 文案兜底(start/action/leave 族)。 */
+export async function resolveRoomActor(
   c: Context,
-  roomId: string,
+  options: { requireAuth: boolean; rejectMissingBodyId?: boolean },
   bodyPlayerId: string,
-): Promise<{ playerId: string } | { error: string; status: 400 | 401 }> {
-  const room = getRoom(roomId);
-  if (room && !room.isDebug) {
+): Promise<RoomActorResolution> {
+  if (options.requireAuth) {
     const user = await requireUser(c);
-    if (!user) return { error: '请先登录', status: 401 };
-    return { playerId: user.id };
+    return user ? { playerId: user.id } : { error: 'unauthenticated' };
   }
-  if (!bodyPlayerId) return { error: '缺少 playerId', status: 400 };
+  if (!bodyPlayerId && options.rejectMissingBodyId) return { error: 'missing_player_id' };
   return { playerId: bodyPlayerId };
 }
 

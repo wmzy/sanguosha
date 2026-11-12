@@ -37,6 +37,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界灭计';
 const DISPLAY_NAME = '灭计';
@@ -237,11 +238,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         seat,
         'respond',
         (st: GameState, params: Record<string, Json>): string | null => {
-          const slot = st.pendingSlots.get(seat);
-          if (!slot) return '当前不需要回应';
-          const atom = slot.atom as { type?: string; requestType?: string };
-          if (atom['type'] !== '请求回应') return '当前不需要回应';
-          const rt = atom['requestType'];
+          const check = requireRequestType(st, seat, [CHOOSE_RT, PICK_TRICK_RT, PICK_ONE_RT], {
+            mismatchError: '当前不是灭计询问',
+          });
+          if (check.error) return check.error;
+          const rt = check.requestType;
           if (rt === CHOOSE_RT) return null; // confirm:任意 params 均接受
           if (rt === PICK_TRICK_RT || rt === PICK_ONE_RT) {
             // 强制型弃牌走多牌选择 UI,提交 cardIds(数组);兼容单 cardId
@@ -256,7 +257,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             }
             return null;
           }
-          return '当前不是灭计询问';
+          return null;
         },
         async (st: GameState, params: Record<string, Json>): Promise<void> => {
           const slot = st.pendingSlots.get(seat);

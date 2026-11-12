@@ -22,6 +22,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { isAwakened, markAwakened } from '../rules/vars-keys';
 import type { SkillModule } from '../types';
 import { RONG_PREFIX, rongCount } from './征荣';
+import { requireRequestType } from '../util/skillRuntime';
 
 const AWAKENED_KEY = '鸿举/awakened';
 const REPLACE_RT = '鸿举/换荣';
@@ -46,12 +47,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type: string; requestType?: string };
-      if (atom.type !== '请求回应' || atom.requestType !== REPLACE_RT) {
-        return '当前不是鸿举换荣';
-      }
+      const check = requireRequestType(st, ownerId, [REPLACE_RT], {
+        wrongTypeError: '当前不是鸿举换荣',
+        mismatchError: '当前不是鸿举换荣',
+      });
+      if (check.error) return check.error;
       const cardIds = params.cardIds as string[] | undefined;
       if (Array.isArray(cardIds)) {
         const hand = new Set(st.players[ownerId].hand);

@@ -33,6 +33,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { flipFaceDown, flipFaceUp, isFaceDown, performSkipTurn } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 const DISPLAY_NAME = '伏枥';
 
@@ -81,12 +82,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不需要回应';
-      if (atom.requestType !== CONFIRM_RT) return '当前不是伏枥询问';
-      return null;
+      return requireRequestType(st, ownerId, [CONFIRM_RT], {
+        mismatchError: '当前不是伏枥询问',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;

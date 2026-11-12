@@ -15,6 +15,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { isAwakened, markAwakened } from '../rules/vars-keys';
+import { requireRequestType } from '../util/skillRuntime';
 
 const CHOOSE_RT = '勤学/choose';
 const CHOICE_KEY = '勤学/choice';
@@ -40,12 +41,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== CHOOSE_RT) return '当前不是勤学选择';
-      return null;
+      return requireRequestType(st, ownerId, [CHOOSE_RT], {
+        mismatchError: '当前不是勤学选择',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
       // choice=true → 摸两张牌;choice=false → 回复1点体力

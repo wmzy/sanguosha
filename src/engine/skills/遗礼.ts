@@ -19,6 +19,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { addJu, juCount, removeJu } from './怀橘';
 import type { SkillModule } from '../types';
+import { currentRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '遗礼';
 
@@ -39,13 +40,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '出牌阶段开始时,你可以失去1点体力或移除1枚橘,然后令一名其他角色获得1枚橘',
   };
-}
-
-/** 当前 pending 的 requestType(类型安全读取) */
-function currentRequestType(state: GameState, ownerId: number): string | undefined {
-  const slot = state.pendingSlots.get(ownerId);
-  if (!slot) return undefined;
-  return (slot.atom as unknown as { requestType?: string }).requestType;
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

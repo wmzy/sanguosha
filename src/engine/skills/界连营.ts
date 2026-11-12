@@ -33,6 +33,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 const TRIGGER_RT = '界连营/trigger';
 const SELECT_RT = '界连营/select';
@@ -133,13 +134,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不是请求回应';
-      if (atom.requestType !== TRIGGER_RT && atom.requestType !== SELECT_RT)
-        return '当前不是界连营回应';
-      return null;
+      return requireRequestType(st, ownerId, [TRIGGER_RT, SELECT_RT], {
+        wrongTypeError: '当前不是请求回应',
+        mismatchError: '当前不是界连营回应',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
       const slot = st.pendingSlots.get(ownerId);

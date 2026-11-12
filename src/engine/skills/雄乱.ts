@@ -39,6 +39,7 @@ import { XIONGLUAN_TARGET_VIEW_KEY } from '../rules/vars-keys';
 import { registerDistanceExemptor } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
 import type { SkillModule } from '../types';
+import { slotOf } from '../util/skillRuntime';
 
 const SKILL_NAME = '雄乱';
 
@@ -53,20 +54,6 @@ const JUDGE_ABOLISHED = `${ABOLISH_PREFIX}判定`;
 
 /** 全部装备槽(废除装备区时逐槽处理) */
 const ALL_EQUIP_SLOTS: EquipSlot[] = ['武器', '防具', '进攻马', '防御马', '宝物'];
-
-/** 从 card.subtype 推断装备槽位(镜像 谦节.ts / 决堰.ts) */
-function inferEquipSlot(subtype: string | undefined): EquipSlot | null {
-  switch (subtype) {
-    case '武器':
-    case '防具':
-    case '进攻马':
-    case '防御马':
-    case '宝物':
-      return subtype;
-    default:
-      return null;
-  }
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -254,7 +241,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (typeof atom.player !== 'number' || atom.player !== ownerId) return;
       const card = ctx.state.cardMap[atom.cardId ?? ''];
       if (!card) return;
-      const slot = inferEquipSlot(card.subtype);
+      const slot = slotOf(card);
       if (!slot) return;
       if (ctx.state.players[ownerId]?.vars[ABOLISH_PREFIX + slot]) {
         return { kind: 'cancel' };

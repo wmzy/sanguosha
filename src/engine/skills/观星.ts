@@ -20,6 +20,7 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -40,13 +41,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (state, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (slot.atom as unknown as Record<string, unknown>).requestType as string;
-      if (requestType !== '观星/confirm' && requestType !== '观星/arrange') {
-        return '当前不是观星询问';
-      }
-      if (requestType === '观星/arrange') {
+      const check = requireRequestType(state, ownerId, ['观星/confirm', '观星/arrange'], {
+        mismatchError: '当前不是观星询问',
+      });
+      if (check.error) return check.error;
+      if (check.requestType === '观星/arrange') {
         // arrange 必须提供 top/bottom 划分
         if (!Array.isArray(params.top) || !Array.isArray(params.bottom)) {
           return '观星:需要 top/bottom 划分';

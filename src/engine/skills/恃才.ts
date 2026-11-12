@@ -29,6 +29,7 @@ import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '恃才';
 /** turn.vars:本回合已占用的牌类型(string[])。 */
@@ -77,12 +78,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== CONFIRM_RT) return '当前不是恃才询问';
-      return null;
+      return requireRequestType(st, ownerId, [CONFIRM_RT], {
+        mismatchError: '当前不是恃才询问',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;

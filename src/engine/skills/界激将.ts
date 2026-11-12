@@ -14,31 +14,26 @@
 //     (使用/打出/替你使用),其可令主公摸1张(每回合限一次,选择权在该蜀角色)。
 //
 // 实现要点:
-//   - 主动技 'use' 部分:镜像标激将机制(useCardAndTarget '界激将/出杀' + runUseFlow(none)),
+//   - 主动技 use/respond 两分支与 onMount 复用标版共享实现(见 激将.ts 的
+//     registerJijiangUseAction / registerJijiangRespondActions / mountJijiangActions),
 //     ownerId===0(主公固定0号位)门槛不变;damageType 由 cardMap 自动传导(火杀/雷杀不丢)。
-//   - 新增 after-hook(指定目标):蜀角色 source 回合外用杀指定目标 → 询问是否令主公摸1。
-//     · "使用/替你使用杀" 均会触发 指定目标 atom(杀 use 流程必经),覆盖主路径。
-//     · "打出杀"(南蛮入侵/决斗 被询问杀后把杀移入处理区)不走指定目标,故另挂
-//       询问杀 after-hook:atom.target(打出方)为蜀角色且回合外且确实打出杀 → 触发摸牌。
+//   - 界版真增量 = 回合外摸牌双 hook(本文件):
+//     · 指定目标 after-hook:蜀角色 source 回合外用杀指定目标 → 询问是否令主公摸1。
+//       "使用/替你使用杀" 均会触发 指定目标 atom(杀 use 流程必经),覆盖主路径。
+//     · 询问杀 after-hook:"打出杀"(南蛮入侵/决斗 被询问杀后把杀移入处理区)不走
+//       指定目标,故另挂:atom.target(打出方)为蜀角色且回合外且确实打出杀 → 触发摸牌。
 //     · "每回合限一次":用 state.turn.vars[PER_TURN_VAR](两条 hook 共享,同一回合只摸一次)。
-//   - 跨座次 respond 注册(镜像标激将):全座次注册,按 pending 内容三分支:
-//     · 询问杀(主公 seat):响应型代打出(杀/respondKill 逐个询问,杀留处理区);
-//     · 界激将/出杀(蜀角色 seat):主动型代使用(选杀+指定 killTarget → capture);
-//     · 界激将/drawChoice(蜀角色 seat):被动触发(是否令主公摸1)。
-//   - 独立界版文件,注册键 '界激将'(与标激将键隔离,不修改标激将)。
-import type { FrontendAPI, GameState, GameView, Json, Skill } from '../types';
+//   - respond 第三分支(被动型 drawChoice)经 RESPOND_OPTIONS 的 extraRequestTypes 注入共享注册。
+import type { FrontendAPI, GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
-import { popFrame, pushFrame, frameCards } from '../core/frame';
-import { runUseFlow } from './cards/use-card';
+import { frameCards } from '../core/frame';
+import { registerAfterHook, declareAlternativeResponse } from '../core/skill';
 import {
-  registerAction,
-  registerAfterHook,
-  hasBlockingPending,
-  declareAlternativeResponse,
-} from '../core/skill';
-import { inAttackRange } from '../rules/distance';
-import { defaultPlayActive, isLordOwner } from '../rules/action-active';
-import type { SkillModule } from '../types';
+  registerJijiangUseAction,
+  registerJijiangRespondActions,
+  mountJijiangActions,
+  type JijiangRespondOptions,
+} from './激将';
 
 // localVars keys(界激将新增被动触发)
 const REQUEST_TYPE = '界激将/drawChoice';
@@ -62,6 +57,44 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
+/** 两条回合外摸牌 hook 共用的收尾:标记限一次(含 回合用量 投影) → 询问触发蜀角色 → 确认则主公摸 1。 */
+async function offerLordDraw(
+  state: GameState,
+  ownerId: number,
+  triggerIdx: number,
+  lordName: string,
+): Promise<void> {
+  // 标记本回合已触发(同步写 turn.vars 防止 hook 重入;turn.vars 由回合结束自动清空)
+  state.turn.vars[PER_TURN_VAR] = true;
+  await applyAtom(state, {
+    type: '回合用量',
+    player: ownerId,
+    key: PER_TURN_VAR,
+    value: true,
+  });
+
+  // 询问蜀角色是否令主公摸1张(描述"可以"=可选;选择权在该蜀角色)
+  delete state.localVars[CONFIRMED_VAR];
+  await applyAtom(state, {
+    type: '请求回应',
+    requestType: REQUEST_TYPE,
+    target: triggerIdx,
+    prompt: {
+      type: 'confirm',
+      title: `界激将:是否令${lordName}摸一张牌?`,
+      confirmLabel: '令主公摸牌',
+      cancelLabel: '不发动',
+    },
+    defaultChoice: false,
+    timeout: 30,
+  });
+
+  if (state.localVars[CONFIRMED_VAR] === true) {
+    // 蜀角色选择发动 → 主公(刘备)摸 1 张
+    await applyAtom(state, { type: '摸牌', player: ownerId, count: 1 });
+  }
+}
+
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
   const offs: Array<() => void> = [];
@@ -69,93 +102,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── use:主动激将(沿用标激将机制) ──
   offs.push(
-    registerAction(
-      state,
-      skill.id,
-      ownerId,
-      'use',
-      (state: GameState, params: Record<string, Json>) => {
-        // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 主公身份 + 目标合法
-        const myTurn = state.currentPlayerIndex === ownerId;
-        const inActPhase = state.phase === '出牌';
-        const free = !hasBlockingPending(state);
-        const self = state.players[ownerId];
-        const selfAlive = self.alive === true;
-        // 主公技:仅主公位(座次 0)可用
-        const isLord = ownerId === 0;
-        // 目标合法:不是自己 + 存活 + 蜀势力
-        const targetIdx = params.target as number | undefined;
-        const targetExists = typeof targetIdx === 'number' && !!state.players[targetIdx];
-        const target = targetExists ? state.players[targetIdx] : null;
-        const targetNotSelf = targetIdx !== ownerId;
-        const targetAlive = target?.alive === true;
-        const targetShu = target?.faction === '蜀';
-        // killTarget 校验:可选,若提供则需存活且≠target
-        const killTargetIdx = params.killTarget as number | undefined;
-        const killTargetValid =
-          killTargetIdx === undefined ||
-          (state.players[killTargetIdx]?.alive === true && killTargetIdx !== targetIdx);
-        const ok =
-          myTurn &&
-          inActPhase &&
-          free &&
-          selfAlive &&
-          isLord &&
-          targetExists &&
-          targetNotSelf &&
-          targetAlive &&
-          targetShu &&
-          killTargetValid;
-        return ok ? null : '现在不能使用界激将';
-      },
-      async (state: GameState, params: Record<string, Json>) => {
-        const from = ownerId;
-        const target = params.target as number;
-        const killTarget = params.killTarget as number | undefined;
-        await pushFrame(state, '界激将', from, { ...params });
-
-        // 存 killTarget 供 respond(出杀分支)权威校验必含目标;结算后清理
-        if (typeof killTarget === 'number') {
-          state.localVars[USE_KILL_TARGET_VAR] = killTarget;
-        }
-
-        // 请求回应:蜀角色选一张杀 + 指定目标(固定=killTarget),经 界激将/出杀 respond
-        const killTargetName =
-          typeof killTarget === 'number' ? (state.players[killTarget]?.name ?? '?') : '?';
-        await applyAtom(state, {
-          type: '请求回应',
-          requestType: USE_REQUEST_TYPE,
-          target,
-          prompt: {
-            type: 'useCardAndTarget',
-            title: `界激将:对 ${killTargetName} 使用一张杀`,
-            cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
-            targetFilter: {
-              min: 1,
-              max: 1,
-              filter: (_v, t: number) =>
-                typeof killTarget === 'number' ? t === killTarget : t !== target,
-            },
-          },
-          timeout: 15,
-        });
-
-        const choice = state.localVars[USE_CHOICE_VAR] as
-          | { cardId: string; targets: number[] }
-          | undefined;
-        delete state.localVars[USE_CHOICE_VAR];
-        delete state.localVars[USE_KILL_TARGET_VAR];
-
-        // 官方:出杀 → 走完整杀结算(runUseFlow→杀.resolveSlash),
-        //      damageType 由 cardMap 自动传导(火杀/雷杀不再丢);
-        //      不出杀无效果(同标激将)。界激将的摸牌仅由被动触发 hook 负责,
-        //      不在主动激将拒绝时摸牌(否则主公可反复激将刷牌)。
-        if (choice?.cardId && Array.isArray(choice.targets) && choice.targets.length > 0) {
-          await runUseFlow(state, target, choice.cardId, choice.targets, '杀');
-        }
-        await popFrame(state);
-      },
-    ),
+    registerJijiangUseAction(state, skill, {
+      displayName: '界激将',
+      requestType: USE_REQUEST_TYPE,
+      choiceVar: USE_CHOICE_VAR,
+      killTargetVar: USE_KILL_TARGET_VAR,
+      useError: '现在不能使用界激将',
+    }),
   );
 
   // ── 指定目标 after hook:蜀角色回合外用杀 → 询问是否令主公摸1张 ──
@@ -184,35 +137,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 每回合限一次(本回合已触发过则跳过)
       if (ctx.state.turn.vars[PER_TURN_VAR] === true) return;
 
-      // 标记本回合已触发(同步写 turn.vars 防止 hook 重入;turn.vars 由回合结束自动清空)
-      ctx.state.turn.vars[PER_TURN_VAR] = true;
-      await applyAtom(ctx.state, {
-        type: '回合用量',
-        player: ownerId,
-        key: PER_TURN_VAR,
-        value: true,
-      });
-
-      // 询问蜀角色是否令主公摸1张(描述"可以"=可选;选择权在该蜀角色)
-      delete ctx.state.localVars[CONFIRMED_VAR];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: REQUEST_TYPE,
-        target: sourceIdx,
-        prompt: {
-          type: 'confirm',
-          title: `界激将:是否令${lord.name}摸一张牌?`,
-          confirmLabel: '令主公摸牌',
-          cancelLabel: '不发动',
-        },
-        defaultChoice: false,
-        timeout: 30,
-      });
-
-      if (ctx.state.localVars[CONFIRMED_VAR] === true) {
-        // 蜀角色选择发动 → 主公(刘备)摸 1 张
-        await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
-      }
+      await offerLordDraw(ctx.state, ownerId, sourceIdx, lord.name);
     }),
   );
 
@@ -258,161 +183,34 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 每回合限一次(与「指定目标」hook 共享 PER_TURN_VAR)
       if (ctx.state.turn.vars[PER_TURN_VAR] === true) return;
 
-      ctx.state.turn.vars[PER_TURN_VAR] = true;
-      await applyAtom(ctx.state, {
-        type: '回合用量',
-        player: ownerId,
-        key: PER_TURN_VAR,
-        value: true,
-      });
-
-      delete ctx.state.localVars[CONFIRMED_VAR];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: REQUEST_TYPE,
-        target: triggerIdx,
-        prompt: {
-          type: 'confirm',
-          title: `界激将:是否令${lord.name}摸一张牌?`,
-          confirmLabel: '令主公摸牌',
-          cancelLabel: '不发动',
-        },
-        defaultChoice: false,
-        timeout: 30,
-      });
-
-      if (ctx.state.localVars[CONFIRMED_VAR] === true) {
-        await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
-      }
+      await offerLordDraw(ctx.state, ownerId, triggerIdx, lord.name);
     }),
   );
 
   // ── respond:注册到全座次,按 pending 内容分支 ────────────────
-  //   atom.type==='询问杀'(主公 seat):响应型激将——逐个请求蜀角色代打出杀
-  //     (代打出:杀牌进处理区供调用方(决斗/南蛮)检查,复用 杀/respondKill)
-  //   atom.requestType==='界激将/出杀'(蜀角色 seat):主动激将——选杀+指定 killTarget(代使用)
-  //     (代使用:走 runUseFlow 完整杀结算,damageType 自动传导)
-  //   atom.requestType==='界激将/drawChoice'(蜀角色 seat):被动触发——是否令主公摸1张
+  //   atom.type==='询问杀'(主公 seat):响应型代打出(杀/respondKill 逐个询问,杀留处理区);
+  //   atom.requestType==='界激将/出杀'(蜀角色 seat):主动型代使用(选杀+指定 killTarget → capture);
+  //   atom.requestType==='界激将/drawChoice'(蜀角色 seat):被动触发(是否令主公摸1)。
   //   一个座次仅能有一个 respond action(registerAction 按座次去重),故合并到同一注册。
-  for (const pl of state.players) {
-    const seat = pl.index;
-    offs.push(
-      registerAction(
-        state,
-        skill.id,
-        seat,
-        'respond',
-        (st: GameState, params: Record<string, Json>): string | null => {
-          const slot = st.pendingSlots.get(seat);
-          if (!slot) return '当前不需要回应';
-          const atom = slot.atom as { type: string; requestType?: string };
-
-          // ── 响应型(代打出):主公被询问杀 → 逐个请求蜀角色出杀 ──
-          if (atom.type === '询问杀') {
-            const self = st.players[seat];
-            if (!self?.alive) return '玩家不存在或已死亡';
-            // 主公技:仅主公位可用
-            if (seat !== 0) return '仅主公可用';
-            // 必须有其他蜀势力存活角色(有手牌)
-            const hasShuAllies = st.players.some(
-              (p) => p.alive && p.index !== seat && p.faction === '蜀' && p.hand.length > 0,
-            );
-            if (!hasShuAllies) return '没有可出杀的蜀势力角色';
-            return null;
-          }
-
-          // ── 主动型(代使用):蜀角色选杀 + 指定 killTarget ──
-          if (atom.requestType === USE_REQUEST_TYPE) {
-            const cardId = params.cardId as string | undefined;
-            const targets = params.targets as number[] | undefined;
-            if (typeof cardId !== 'string') return '请选择一张杀';
-            if (!Array.isArray(targets) || targets.length === 0) return '请选择目标';
-            const self = st.players[seat];
-            if (!self?.hand.includes(cardId)) return '牌不在手牌中';
-            if (st.cardMap[cardId]?.name !== '杀') return '只能使用杀';
-            // 必含主公指定的 killTarget(权威,前端 targetFilter 仅提示)
-            const killTarget = st.localVars[USE_KILL_TARGET_VAR] as number | undefined;
-            if (typeof killTarget === 'number' && !targets.includes(killTarget))
-              return '必须包含激将指定的目标';
-            // 每个目标须在蜀角色攻击范围内(镜像 杀.canUse 距离校验)
-            for (const t of targets) {
-              if (!inAttackRange(st, seat, t, cardId)) return '目标不在攻击范围内';
-            }
-            return null;
-          }
-
-          // ── 被动型(drawChoice):蜀角色是否令主公摸1张 ──
-          if (atom.requestType === REQUEST_TYPE) {
-            return null;
-          }
-
-          return '当前不是界激将询问';
-        },
-        async (st: GameState, params: Record<string, Json>): Promise<void> => {
-          const slot = st.pendingSlots.get(seat);
-          const atom = slot?.atom as { type: string; requestType?: string } | undefined;
-
-          // ── 响应型(代打出):逐个请求蜀角色出杀,第一个出杀即止 ──
-          if (atom?.type === '询问杀') {
-            // 按座次顺序逐个询问蜀势力角色
-            const numPlayers = st.players.length;
-            for (let offset = 1; offset < numPlayers; offset++) {
-              // 逆时针 = 座次递减
-              const allyIdx = (seat - offset + numPlayers) % numPlayers;
-              const ally = st.players[allyIdx];
-              if (!ally?.alive) continue;
-              if (ally.faction !== '蜀') continue;
-              if (ally.hand.length === 0) continue;
-
-              // 询问该蜀势力角色是否打出杀(复用 '杀/respondKill' requestType,
-              // 蜀角色通过自身 '杀' 技能 respond 把杀牌移入处理区,视为主公打出)
-              await applyAtom(st, {
-                type: '请求回应',
-                requestType: '杀/respondKill',
-                target: allyIdx,
-                prompt: {
-                  type: 'useCard',
-                  title: `界激将:主公(${st.players[seat]?.name ?? `P${seat}`})需要杀,是否打出一张杀?`,
-                  cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
-                },
-                timeout: 15,
-              });
-
-              // 检查处理区:有杀 = 已出,激将结束(杀牌留在处理区供调用方检查)
-              const killCardId = frameCards(st).find((id) => {
-                const c = st.cardMap[id];
-                return c?.name === '杀';
-              });
-              if (killCardId) {
-                // 记录替打的蜀角色,供 询问杀 after-hook 判定"替你打出"触发(OL:
-                // "替你使用或打出杀时"含代打出)。询问杀 atom.target=主公,故 hook 无法
-                // 从 atom 直接得知代打者,经此 localVars 传递。
-                st.localVars[SUBSTITUTE_PLAYER_VAR] = allyIdx;
-                return;
-              }
-              // 该角色拒绝/无杀,继续询问下一个
-            }
-            // 全部拒绝:处理区无杀,execute 结束,主公承受原结算
-            return;
-          }
-
-          // ── 主动型(代使用):记录蜀角色的出杀选择 ──
-          if (atom?.requestType === USE_REQUEST_TYPE) {
-            st.localVars[USE_CHOICE_VAR] = {
-              cardId: params.cardId as string,
-              targets: params.targets as number[],
-            };
-            return;
-          }
-
-          // ── 被动型(drawChoice):记录是否令主公摸牌 ──
-          if (atom?.requestType === REQUEST_TYPE) {
-            st.localVars[CONFIRMED_VAR] = params.choice === true || params.confirmed === true;
-          }
-        },
-      ),
-    );
-  }
+  const respondOptions: JijiangRespondOptions = {
+    displayName: '界激将',
+    useRequestType: USE_REQUEST_TYPE,
+    useChoiceVar: USE_CHOICE_VAR,
+    killTargetVar: USE_KILL_TARGET_VAR,
+    respondError: '当前不是界激将询问',
+    // 代打出 execute:处理区出现杀后记录替打蜀角色(供 询问杀 after-hook 判定"替你打出"触发。
+    // OL:"替你使用或打出杀时"含代打出。询问杀 atom.target=主公,故 hook 无法从 atom 直接
+    // 得知代打者,经此 localVars 传递)
+    onSubstituteKill: (st, allyIdx) => {
+      st.localVars[SUBSTITUTE_PLAYER_VAR] = allyIdx;
+    },
+    extraRequestTypes: [REQUEST_TYPE],
+    // 被动型(drawChoice):记录是否令主公摸牌
+    onExtraRequest: (st, _seat, _requestType, params) => {
+      st.localVars[CONFIRMED_VAR] = params.choice === true || params.confirmed === true;
+    },
+  };
+  offs.push(...registerJijiangRespondActions(state, skill, respondOptions));
 
   return () => {
     for (const off of offs) off();
@@ -420,50 +218,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  return mountJijiangActions(skill, api, {
     label: '界激将',
-    style: 'primary',
-    prompt: {
-      type: 'choosePlayer',
-      title: '界激将：选择一名蜀势力角色出杀',
-      min: 1,
-      max: 1,
-      // 其他蜀势力角色(与后端 validate 同源);缺 filter 时枚举出自己/非蜀角色 → 提交恒拒
-      filter: (view: GameView, t: number) =>
-        t !== skill.ownerId && view.players[t]?.alive === true && view.players[t]?.faction === '蜀',
-    },
-    // 门槛与后端 validate 同源(isActiveAction 是 replace 语义,activeWhen 必须整体
-    // 重述默认出牌门槛,不能只判主公位):
-    //   defaultPlayActive = 自己回合 + 出牌阶段 + 无阻塞 pending(validate 的 myTurn/inActPhase/free)
-    //   isLordOwner      = 主公位 ownerId===0(validate 的主公技门槛)
-    // 只判主公位会放行别人回合/阻塞询问中的枚举 → 提交恒拒「仅主公可用」。
-    activeWhen: (ctx) => defaultPlayActive(ctx) && isLordOwner(skill.ownerId),
+    useTitle: '界激将：选择一名蜀势力角色出杀',
+    respondTitle: '界激将:令蜀势力角色替你打出杀?',
+    useRequestType: USE_REQUEST_TYPE,
+    extraRequestTypes: [REQUEST_TYPE],
   });
-  // respond:响应型激将(被询问杀时激活) / 主动型(蜀角色被请求出杀) / 被动型(是否令主公摸牌)
-  api.defineAction('respond', {
-    label: '界激将',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '界激将:令蜀势力角色替你打出杀?',
-      confirmLabel: '激将',
-      cancelLabel: '不发动',
-    },
-    activeWhen: (ctx) => {
-      const slot = ctx.view.pending;
-      if (!slot) return false;
-      if (slot.target !== ctx.perspectiveIdx) return false;
-      const atom = slot.atom as { type: string; requestType?: string };
-      // 响应型(代打出):主公被询问杀
-      if (atom.type === '询问杀') return true;
-      // 主动型(代使用):蜀角色被请求 界激将/出杀
-      if (atom.requestType === USE_REQUEST_TYPE) return true;
-      // 被动型:蜀角色被请求是否令主公摸牌
-      if (atom.requestType === REQUEST_TYPE) return true;
-      return false;
-    },
-  });
-  return () => {};
 }
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };

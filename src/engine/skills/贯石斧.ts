@@ -9,6 +9,7 @@ import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { isCancelled, setFrameCancelled } from '../core/frame';
+import { requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -28,13 +29,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (state, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (slot.atom as unknown as Record<string, unknown>).requestType as string;
-      if (requestType !== '贯石斧/select') {
-        return '当前不是贯石斧询问';
-      }
+      const check = requireRequestType(state, ownerId, ['贯石斧/select'], {
+        mismatchError: '当前不是贯石斧询问',
+      });
+      if (check.error) return check.error;
       const cardIds = params.cardIds;
       if (!Array.isArray(cardIds) || cardIds.length !== 2) return '需要选择 2 张牌';
       const self = state.players[ownerId];

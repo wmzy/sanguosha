@@ -38,6 +38,7 @@ import {
 import { getGender } from '../data/character-meta';
 import { setPlayerVarUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
+import { currentRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界燕语';
 const DISPLAY_NAME = '燕语';
@@ -88,12 +89,6 @@ function isMaleAlive(state: GameState, target: number): boolean {
 
 function hasMaleAlive(state: GameState): boolean {
   return state.players.some((p) => p.alive && getGender(p.character) === '男');
-}
-
-function currentRequestType(state: GameState, ownerId: number): string | undefined {
-  const slot = state.pendingSlots.get(ownerId);
-  if (!slot) return undefined;
-  return (slot.atom as unknown as Record<string, unknown>).requestType as string | undefined;
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

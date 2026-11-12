@@ -34,6 +34,7 @@ import {
   registerBeforeHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
+import { currentRequestType } from '../util/skillRuntime';
 
 const DISPLAY_NAME = '自守';
 
@@ -69,13 +70,6 @@ function countFactions(state: GameState): number {
     if (p.faction) factions.add(p.faction);
   }
   return factions.size;
-}
-
-/** 当前 pending 的 requestType(类型安全读取) */
-function currentRequestType(state: GameState, ownerId: number): string | undefined {
-  const slot = state.pendingSlots.get(ownerId);
-  if (!slot) return undefined;
-  return (slot.atom as unknown as { requestType?: string }).requestType;
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

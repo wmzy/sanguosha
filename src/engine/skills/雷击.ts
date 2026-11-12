@@ -22,6 +22,7 @@ import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { isCancelled } from '../core/frame';
+import { requireRequestType } from '../util/skillRuntime';
 
 const CHOOSE_RT = '雷击/chooseTarget';
 const TARGET_KEY = '雷击/target';
@@ -45,11 +46,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as unknown as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== CHOOSE_RT) return '当前不是雷击选择';
+      const check = requireRequestType(st, ownerId, [CHOOSE_RT], {
+        mismatchError: '当前不是雷击选择',
+      });
+      if (check.error) return check.error;
       // 选择目标时校验:存活的「其他角色」(雷击判定目标不可为自己)
       const target = params.target;
       if (typeof target === 'number') {

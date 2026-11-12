@@ -18,6 +18,7 @@ import { askRankCardAndCompare } from '../flows/rank';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
+import { requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -133,11 +134,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       pid,
       'respond',
       (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(pid);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as unknown as Record<string, unknown>;
-        if (atom.type !== '请求回应') return '当前不需要回应';
-        const reqType = atom.requestType as string;
+        const check = requireRequestType(st, pid, ['驱虎/拼点', '驱虎/选目标'], {
+          mismatchError: '当前不是驱虎回应',
+        });
+        if (check.error) return check.error;
+        const reqType = check.requestType;
         if (reqType === '驱虎/拼点') {
           // 目标出拼点牌:校验 cardId 在手牌中
           const cardId = params.cardId as string;

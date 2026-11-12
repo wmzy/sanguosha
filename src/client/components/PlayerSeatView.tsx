@@ -23,46 +23,9 @@ import { hpBeadPalette } from './gameViewStyles/tokens';
 import { getCharacterMeta, LORD_SKILLS } from '../../engine/data/character-meta';
 import { getCharacterImage } from '../assets/imageAssets';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
-import { displaySkillName } from '../utils/skillDisplay';
+import { displaySkillName, groupDisplayMarks } from '../utils/skillDisplay';
 
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
-
-/** 把引擎原始 mark 集合聚合为玩家可读徽章。
- *  mark id 约定 `技能名/属性:N`(N=state.seq 计数后缀):计数型标记
- *  (界血裔/裔:17、界血裔/裔:18 …)合并为「血裔·裔 ×2」一条;无命名空间前缀
- *  的 id 原样展示。payload 只进 tooltip,不再把 JSON 塞到座位面板上。 */
-function groupDisplayMarks(marks: PlayerSeatProps['player']['marks']) {
-  const groups = new Map<
-    string,
-    { labelBase: string; titleBase: string; count: number; payloads: string[] }
-  >();
-  for (const m of marks) {
-    // 'chained' 已由卡边框铁链光泽 + ⛓ 徽章代表,这里不重复显示
-    if (m.id === 'chained') continue;
-    const slash = m.id.indexOf('/');
-    const skill = slash > 0 ? m.id.slice(0, slash) : '';
-    const attr = (slash > 0 ? m.id.slice(slash + 1) : m.id).split(':')[0] || m.id;
-    const key = skill ? `${skill}/${attr}` : attr;
-    let g = groups.get(key);
-    if (!g) {
-      const skillLabel = skill ? displaySkillName(skill) : '';
-      g = {
-        labelBase: skillLabel ? `${skillLabel}·${attr}` : attr,
-        titleBase: key,
-        count: 0,
-        payloads: [],
-      };
-      groups.set(key, g);
-    }
-    g.count += 1;
-    if (m.payload !== undefined && m.payload !== null) g.payloads.push(JSON.stringify(m.payload));
-  }
-  return [...groups.entries()].map(([key, g]) => ({
-    key,
-    label: g.count > 1 ? `${g.labelBase} ×${g.count}` : g.labelBase,
-    title: g.payloads.length > 0 ? `${g.titleBase}（${g.payloads.join('、')}）` : g.titleBase,
-  }));
-}
 
 export interface PlayerSeatProps {
   player: GameView['players'][number];
@@ -100,6 +63,321 @@ export interface PlayerSeatProps {
   seatDistance?: number | null;
   /** 选目标阶段:该座次不可选的原因(hover title,如「距离 3，超出攻击范围 1」) */
   untargetableReason?: string | null;
+}
+
+/** 卡上方名牌:横向暗条(宽=卡宽)。左:身份小方章 + 座号 + 玩家名,右:徽章组(我/回合/⛓/离线)。 */
+interface SeatNamePlateProps {
+  player: PlayerSeatProps['player'];
+  index: number;
+  /** 身份是否展示(父组件按 hideIdentity/视角/主公/死亡 汇总算好) */
+  showIdentity: boolean;
+  isCurrentPlayer: boolean;
+  isPerspective: boolean;
+  isChained: boolean;
+  isDisconnected: boolean;
+}
+
+function SeatNamePlate({
+  player,
+  index,
+  showIdentity,
+  isCurrentPlayer,
+  isPerspective,
+  isChained,
+  isDisconnected,
+}: SeatNamePlateProps) {
+  const identity = player.identity;
+  return (
+    <div className={cx(seatNamePlate, isCurrentPlayer && seatNamePlateActive)}>
+      {showIdentity && identity ? (
+        <span
+          className={cx(
+            seatIdentityStamp,
+            identity === '主公'
+              ? seatIdentityLord
+              : identity === '忠臣'
+                ? seatIdentityLoyalist
+                : identity === '反贼'
+                  ? seatIdentityRebel
+                  : identity === '内奸'
+                    ? seatIdentityRenegade
+                    : seatIdentityHidden,
+          )}
+        >
+          {identity}
+        </span>
+      ) : (
+        !showIdentity &&
+        player.identityHidden !== false && <span className={cx(seatIdentityStamp, seatIdentityHidden)}>暗</span>
+      )}
+      <span className={seatIndexBadge}>#{index + 1}</span>
+      <span className={seatName}>{player.name.slice(0, 6)}</span>
+      <div className={seatBadgeGroup}>
+        {isPerspective && <span className={youBadge}>我</span>}
+        {isCurrentPlayer && <span className={turnBadge}>回合</span>}
+        {isChained && (
+          <span className={chainBadge} title="横置·铁索连环">
+            ⛓
+          </span>
+        )}
+        {isDisconnected && (
+          <span className={offlineBadge} title="该玩家已断线,等待重连">
+            离线
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** 竖版立绘卡本体:包裹层(体力珠列/漂浮数字锚点) + 卡面(立绘/左缘竖带/角标/死亡印章) + 状态类。 */
+interface SeatCardBodyProps {
+  player: PlayerSeatProps['player'];
+  displayChar: PlayerSeatProps['player']['character'];
+  charImg: string | null;
+  faction: string;
+  factionColor: string;
+  isCurrentPlayer: boolean;
+  isPerspective: boolean;
+  isDead: boolean;
+  isClickable: boolean;
+  isChained: boolean;
+  /** 该座次已被选为目标(selectedTargetNames 命中) */
+  isTargeted: boolean;
+  isTurnGlow: boolean;
+  isDamaged: boolean;
+  isHealed: boolean;
+  needsTarget: boolean;
+  seatDistance: number | null;
+  untargetableReason: string | null;
+  hpChange?: HpChangeNumber;
+}
+
+function SeatCardBody({
+  player,
+  displayChar,
+  charImg,
+  faction,
+  factionColor,
+  isCurrentPlayer,
+  isPerspective,
+  isDead,
+  isClickable,
+  isChained,
+  isTargeted,
+  isTurnGlow,
+  isDamaged,
+  isHealed,
+  needsTarget,
+  seatDistance,
+  untargetableReason,
+  hpChange,
+}: SeatCardBodyProps) {
+  // onerror 时清除 src 隐藏 <img>,让卡牌保留文字回退;
+  // 避免每张座位卡挂独立的 state hook(座次很多,会拖慢重渲染)
+  const handleImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    e.currentTarget.style.display = 'none';
+  };
+  // 体力珠动态缩放:珠体基础 10×14px + 间距 3px,整列布局高度 = 17N−3(N=maxHealth);
+  // 卡高 200px,仅 N ≥ 12(17×12−3=201>200)才会溢出卡面,此时按 6/maxHealth 等比缩小
+  // 珠体与间距,使珠列完整排在卡右缘内;N ≤ 11 沿用原值(董卓 8 血/主公+1 后 9 血不再无谓缩小)。
+  const hpScale = player.maxHealth >= 12 ? 6 / player.maxHealth : 1;
+  const beadW = `${10 * hpScale}px`;
+  const beadH = `${14 * hpScale}px`;
+  const hpGap = `${3 * hpScale}px`;
+  // 珠列方向:损失的体力(空珠)在上方,剩余体力(满珠)在下方。
+  // 满珠颜色按剩余体力比例分色:>50% 绿 / >25% 黄 / ≤25% 红(濒危警示)。
+  const lostCount = Math.max(0, player.maxHealth - player.health);
+  const hpRatio = player.maxHealth > 0 ? player.health / player.maxHealth : 1;
+  // 满珠色档(与 data-hue 同判据):与大卡共用 gameViewStyles 的 playerCardHpBeadFull
+  // 单类 + tokens.hpBeadPalette 的 --bead-* 内联变量注入
+  const hpHue = hpRatio > 0.5 ? 'green' : hpRatio > 0.25 ? 'yellow' : 'red';
+  const hpBeadFullVars = hpBeadPalette[hpHue];
+
+  return (
+    // 卡本体包裹层:relative 锚点,承载骑右边的体力珠列与漂浮数字(不被卡本体 overflow 裁剪)
+    <div className={cx(seatCardWrap, isDamaged && seatDamageOverlay, isHealed && seatHealOverlay)}>
+      {/* 卡本体:竖版立绘填满 + 细金铜描边 + 外圈深色,状态类全部挂在此层 */}
+      <div
+        className={cx(
+          seatCard,
+          isCurrentPlayer && seatCardActive,
+          isPerspective && seatCardPerspective,
+          isDead && seatCardDead,
+          isClickable && seatCardClickable,
+          isChained && seatCardChained,
+          isTargeted && seatCardTargeted,
+          isTurnGlow && turnGlowing,
+        )}
+      >
+        {/* 武将立绘:object-fit cover 填满卡面;无素材/404 时回退势力色背景 */}
+        <div className={cx(seatCharImgWrap, !charImg && seatCharImgWrapEmpty, isChained && seatCharImgChained)} aria-hidden>
+          {charImg && (
+            <img
+              className={cx(seatCharImg, isDead && seatCharImgDead)}
+              src={charImg}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              onError={handleImgError}
+            />
+          )}
+        </div>
+        {/* 卡内左缘竖带:顶部势力印章 + 中间竖排武将名 + 底部体力数字 */}
+        <div className={seatSideBand}>
+          <span className={seatFactionStamp} style={{ background: factionColor }}>
+            {faction}
+          </span>
+          <span className={seatCharName}>{displayChar || '未知'}</span>
+          <span className={cx(seatHpNumber, isDamaged && hpFlash, isHealed && hpHealFlash)}>
+            {player.health}
+          </span>
+        </div>
+        {/* 手牌数角标:卡内右下角小暗章(title 保留完整手牌信息) */}
+        <span className={seatHandBadge} title={`手牌: ${player.handCount}`}>
+          🂠 {player.handCount}
+        </span>
+        {/* 选目标阶段距离角标:卡内左下角「距N」(仅 needsTarget 时上层传入) */}
+        {needsTarget && seatDistance != null && (
+          <span
+            className={seatDistanceBadge}
+            title={`与你的距离: ${seatDistance}${untargetableReason ? `（${untargetableReason}）` : ''}`}
+          >
+            距 {seatDistance}
+          </span>
+        )}
+        {/* 死亡印章:身份+阵亡 两行红字大印(立绘同时 grayscale),对齐官方「反贼/阵亡」印 */}
+        {isDead && (
+          <span className={seatDeadStamp} aria-hidden>
+            {player.identity ? (
+              <>
+                <i>{player.identity}</i>
+                <i>阵亡</i>
+              </>
+            ) : (
+              '亡'
+            )}
+          </span>
+        )}
+      </div>
+      {/* 右缘体力珠列:垂直排列,骑在卡右边框上;空珠(已损失)在上,满珠在下按余量分色 */}
+      <div className={seatHpBeadCol} style={{ gap: hpGap }} aria-hidden data-hp-beads>
+        {Array.from({ length: player.maxHealth }, (_, i) => (
+          <span
+            key={i}
+            className={i < lostCount ? styles.playerCardHpBeadEmpty : styles.playerCardHpBeadFull}
+            data-full={i < lostCount ? undefined : 'true'}
+            data-hue={i < lostCount ? undefined : hpHue}
+            style={{ width: beadW, height: beadH, ...(i < lostCount ? undefined : hpBeadFullVars) }}
+          />
+        ))}
+      </div>
+      {/* 体力变化漂浮数字:伤害「-N」红 / 回血「+N」绿,上浮渐隐(动画状态由 useAnimationState 定时清除) */}
+      {hpChange && (
+        <span
+          key={`hpnum-${hpChange.version}`}
+          className={cx(hpFloatNumber, hpChange.kind === 'heal' ? hpFloatHeal : hpFloatDamage)}
+          aria-hidden
+        >
+          {hpChange.kind === 'heal' ? `+${hpChange.amount}` : `-${hpChange.amount}`}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** 卡下小标签行:装备 / 判定 / 技能 chips / 标记(每行独立、紧凑)。 */
+function SeatLabelRows({ player, view }: { player: PlayerSeatProps['player']; view: GameView }) {
+  return (
+    <div className={seatLabelCol}>
+      {/* 装备行:暗条 chip + 图标 + 牌名 + 花色点数 */}
+      {Object.keys(player.equipment).length > 0 && (
+        <div className={equipRow}>
+          {Object.entries(player.equipment).map(([slot, cardId]) => {
+            const card = view.cardMap[cardId];
+            const icon = EQUIP_SLOT_ICON[slot as EquipSlot] ?? '💎';
+            const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
+            return (
+              <span
+                key={slot}
+                title={
+                  card
+                    ? `${card.name}（${slot}）${card.description ? `\n${card.description}` : ''}`
+                    : String(cardId)
+                }
+              >
+                {icon}
+                {card?.name ?? cardId}
+                {card && (
+                  <span style={{ color: suitColor }}>
+                    {card.rank}
+                    {card.suit}
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      )}
+      {/* 判定区(延时锦囊):紫边 chip */}
+      {(() => {
+        const ids = player.pendingTricks ?? [];
+        if (ids.length === 0) return null;
+        return (
+          <div className={judgeRow}>
+            <span className={judgeRowLabel}>判定:</span>
+            {ids.map((cardId: string) => {
+              const card = view.cardMap[cardId];
+              const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
+              const desc = card?.description ?? '';
+              return (
+                <span
+                  key={cardId}
+                  className={judgeTag}
+                  style={{ '--suit-color': suitColor } as React.CSSProperties}
+                  title={desc || card?.name || cardId}
+                >
+                  {card?.name ?? cardId}
+                  {card ? ` ${card.suit}${card.rank}` : ''}
+                </span>
+              );
+            })}
+          </div>
+        );
+      })()}
+      {/* 技能 chips:暗底金字小圆角 */}
+      {(() => {
+        const isLordSeat = player.identity === '主公';
+        const seatVisibleSkills = player.skills
+          .filter((s) => !DEFAULT_SKILLS.has(s))
+          .filter((s) => !EQUIPMENT_SKILL_NAMES.has(s))
+          .filter((s) => isLordSeat || !LORD_SKILLS.has(s));
+        if (seatVisibleSkills.length === 0) return null;
+        return (
+          <div className={skillRow}>
+            {seatVisibleSkills.map((s) => (
+              // 描述按原 id(s)查询;展示名去前导"界"
+              <SkillTag key={s} name={displaySkillName(s)} description={getSkillDescription(s)} className={skillTag} />
+            ))}
+          </div>
+        );
+      })()}
+      {/* 标记行:原始 id(`技能名/属性:N`)聚合为「属性 ×N」徽章,明细进 tooltip */}
+      {(() => {
+        const badges = groupDisplayMarks(player.marks);
+        if (badges.length === 0) return null;
+        return (
+          <div className={markRow}>
+            {badges.map((b) => (
+              <span key={b.key} className={markTag} title={b.title}>
+                {b.label}
+              </span>
+            ))}
+          </div>
+        );
+      })()}
+    </div>
+  );
 }
 
 function PlayerSeatViewImpl({
@@ -140,32 +418,11 @@ function PlayerSeatViewImpl({
   const faction = charInfo?.faction ?? '群';
   const factionColor = FACTION_BG[faction] ?? '#8e44ad';
   const charImg = displayChar ? getCharacterImage(displayChar) : null;
-  // onerror 时清除 src 隐藏 <img>,让卡牌保留文字回退;
-  // 避免每张座位卡挂独立的 state hook(座次很多,会拖慢重渲染)
-  const handleImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    e.currentTarget.style.display = 'none';
-  };
 
-  // 身份
-  const identity = player.identity;
+  // 身份(debug 模式非视角/非主公/未死亡时隐藏,显示「暗」章)
   const showIdentity =
-    identity && (!hideIdentity || isPerspective || identity === '主公' || !player.alive);
-
-  // 体力珠动态缩放:珠体基础 10×14px + 间距 3px,整列布局高度 = 17N−3(N=maxHealth);
-  // 卡高 200px,仅 N ≥ 12(17×12−3=201>200)才会溢出卡面,此时按 6/maxHealth 等比缩小
-  // 珠体与间距,使珠列完整排在卡右缘内;N ≤ 11 沿用原值(董卓 8 血/主公+1 后 9 血不再无谓缩小)。
-  const hpScale = player.maxHealth >= 12 ? 6 / player.maxHealth : 1;
-  const beadW = `${10 * hpScale}px`;
-  const beadH = `${14 * hpScale}px`;
-  const hpGap = `${3 * hpScale}px`;
-  // 珠列方向:损失的体力(空珠)在上方,剩余体力(满珠)在下方。
-  // 满珠颜色按剩余体力比例分色:>50% 绿 / >25% 黄 / ≤25% 红(濒危警示)。
-  const lostCount = Math.max(0, player.maxHealth - player.health);
-  const hpRatio = player.maxHealth > 0 ? player.health / player.maxHealth : 1;
-  // 满珠色档(与 data-hue 同判据):与大卡共用 gameViewStyles 的 playerCardHpBeadFull
-  // 单类 + tokens.hpBeadPalette 的 --bead-* 内联变量注入
-  const hpHue = hpRatio > 0.5 ? 'green' : hpRatio > 0.25 ? 'yellow' : 'red';
-  const hpBeadFullVars = hpBeadPalette[hpHue];
+    !!player.identity &&
+    (!hideIdentity || isPerspective || player.identity === '主公' || !player.alive);
 
   return (
     <div
@@ -184,227 +441,42 @@ function PlayerSeatViewImpl({
       // 选目标阶段不可选时给出原因(原生 title):距离不足/不可选自己/阵亡等
       title={isUntargetable && untargetableReason ? `不可选择：${untargetableReason}` : undefined}
     >
-      {/* 卡上方名牌:横向暗条(宽=卡宽)。左:身份小方章 + 座号 + 玩家名,右:徽章组(我/回合/⛓/离线) */}
-      <div className={cx(seatNamePlate, isCurrentPlayer && seatNamePlateActive)}>
-        {showIdentity && identity ? (
-          <span
-            className={cx(
-              seatIdentityStamp,
-              identity === '主公'
-                ? seatIdentityLord
-                : identity === '忠臣'
-                  ? seatIdentityLoyalist
-                  : identity === '反贼'
-                    ? seatIdentityRebel
-                    : identity === '内奸'
-                      ? seatIdentityRenegade
-                      : seatIdentityHidden,
-            )}
-          >
-            {identity}
-          </span>
-        ) : (
-          !showIdentity &&
-          player.identityHidden !== false && <span className={cx(seatIdentityStamp, seatIdentityHidden)}>暗</span>
-        )}
-        <span className={seatIndexBadge}>#{index + 1}</span>
-        <span className={seatName}>{player.name.slice(0, 6)}</span>
-        <div className={seatBadgeGroup}>
-          {isPerspective && <span className={youBadge}>我</span>}
-          {isCurrentPlayer && <span className={turnBadge}>回合</span>}
-          {isChained && (
-            <span className={chainBadge} title="横置·铁索连环">
-              ⛓
-            </span>
-          )}
-          {isDisconnected && (
-            <span className={offlineBadge} title="该玩家已断线,等待重连">
-              离线
-            </span>
-          )}
-        </div>
-      </div>
-      {/* 卡本体包裹层:relative 锚点,承载骑右边的体力珠列与漂浮数字(不被卡本体 overflow 裁剪) */}
-      <div className={cx(seatCardWrap, isDamaged && seatDamageOverlay, isHealed && seatHealOverlay)}>
-        {/* 卡本体:竖版立绘填满 + 细金铜描边 + 外圈深色,状态类全部挂在此层 */}
-        <div
-          className={cx(
-            seatCard,
-            isCurrentPlayer && seatCardActive,
-            isPerspective && seatCardPerspective,
-            isDead && seatCardDead,
-            isClickable && seatCardClickable,
-            isChained && seatCardChained,
-            selectedTargetNames.includes(player.name) && seatCardTargeted,
-            isTurnGlow && turnGlowing,
-          )}
-        >
-          {/* 武将立绘:object-fit cover 填满卡面;无素材/404 时回退势力色背景 */}
-          <div className={cx(seatCharImgWrap, !charImg && seatCharImgWrapEmpty, isChained && seatCharImgChained)} aria-hidden>
-            {charImg && (
-              <img
-                className={cx(seatCharImg, isDead && seatCharImgDead)}
-                src={charImg}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                onError={handleImgError}
-              />
-            )}
-          </div>
-          {/* 卡内左缘竖带:顶部势力印章 + 中间竖排武将名 + 底部体力数字 */}
-          <div className={seatSideBand}>
-            <span className={seatFactionStamp} style={{ background: factionColor }}>
-              {faction}
-            </span>
-            <span className={seatCharName}>{displayChar || '未知'}</span>
-            <span className={cx(seatHpNumber, isDamaged && hpFlash, isHealed && hpHealFlash)}>
-              {player.health}
-            </span>
-          </div>
-          {/* 手牌数角标:卡内右下角小暗章(title 保留完整手牌信息) */}
-          <span className={seatHandBadge} title={`手牌: ${player.handCount}`}>
-            🂠 {player.handCount}
-          </span>
-          {/* 选目标阶段距离角标:卡内左下角「距N」(仅 needsTarget 时上层传入) */}
-          {needsTarget && seatDistance != null && (
-            <span
-              className={seatDistanceBadge}
-              title={`与你的距离: ${seatDistance}${untargetableReason ? `（${untargetableReason}）` : ''}`}
-            >
-              距 {seatDistance}
-            </span>
-          )}
-          {/* 死亡印章:身份+阵亡 两行红字大印(立绘同时 grayscale),对齐官方「反贼/阵亡」印 */}
-          {isDead && (
-            <span className={seatDeadStamp} aria-hidden>
-              {player.identity ? (
-                <>
-                  <i>{player.identity}</i>
-                  <i>阵亡</i>
-                </>
-              ) : (
-                '亡'
-              )}
-            </span>
-          )}
-        </div>
-        {/* 右缘体力珠列:垂直排列,骑在卡右边框上;空珠(已损失)在上,满珠在下按余量分色 */}
-        <div className={seatHpBeadCol} style={{ gap: hpGap }} aria-hidden data-hp-beads>
-          {Array.from({ length: player.maxHealth }, (_, i) => (
-            <span
-              key={i}
-              className={i < lostCount ? styles.playerCardHpBeadEmpty : styles.playerCardHpBeadFull}
-              data-full={i < lostCount ? undefined : 'true'}
-              data-hue={i < lostCount ? undefined : hpHue}
-              style={{ width: beadW, height: beadH, ...(i < lostCount ? undefined : hpBeadFullVars) }}
-            />
-          ))}
-        </div>
-        {/* 体力变化漂浮数字:伤害「-N」红 / 回血「+N」绿,上浮渐隐(动画状态由 useAnimationState 定时清除) */}
-        {hpChange && (
-          <span
-            key={`hpnum-${hpChange.version}`}
-            className={cx(hpFloatNumber, hpChange.kind === 'heal' ? hpFloatHeal : hpFloatDamage)}
-            aria-hidden
-          >
-            {hpChange.kind === 'heal' ? `+${hpChange.amount}` : `-${hpChange.amount}`}
-          </span>
-        )}
-      </div>
-      {/* 卡下小标签行:装备 / 判定 / 技能 chips / 标记(每行独立、紧凑) */}
-      <div className={seatLabelCol}>
-        {/* 装备行:暗条 chip + 图标 + 牌名 + 花色点数 */}
-        {Object.keys(player.equipment).length > 0 && (
-          <div className={equipRow}>
-            {Object.entries(player.equipment).map(([slot, cardId]) => {
-              const card = view.cardMap[cardId];
-              const icon = EQUIP_SLOT_ICON[slot as EquipSlot] ?? '💎';
-              const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
-              return (
-                <span
-                  key={slot}
-                  title={
-                    card
-                      ? `${card.name}（${slot}）${card.description ? `\n${card.description}` : ''}`
-                      : String(cardId)
-                  }
-                >
-                  {icon}
-                  {card?.name ?? cardId}
-                  {card && (
-                    <span style={{ color: suitColor }}>
-                      {card.rank}
-                      {card.suit}
-                    </span>
-                  )}
-                </span>
-              );
-            })}
-          </div>
-        )}
-        {/* 判定区(延时锦囊):紫边 chip */}
-        {(() => {
-          const ids = player.pendingTricks ?? [];
-          if (ids.length === 0) return null;
-          return (
-            <div className={judgeRow}>
-              <span className={judgeRowLabel}>判定:</span>
-              {ids.map((cardId: string) => {
-                const card = view.cardMap[cardId];
-                const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
-                const desc = card?.description ?? '';
-                return (
-                  <span
-                    key={cardId}
-                    className={judgeTag}
-                    style={{ '--suit-color': suitColor } as React.CSSProperties}
-                    title={desc || card?.name || cardId}
-                  >
-                    {card?.name ?? cardId}
-                    {card ? ` ${card.suit}${card.rank}` : ''}
-                  </span>
-                );
-              })}
-            </div>
-          );
-        })()}
-        {/* 技能 chips:暗底金字小圆角 */}
-        {(() => {
-          const isLordSeat = player.identity === '主公';
-          const seatVisibleSkills = player.skills
-            .filter((s) => !DEFAULT_SKILLS.has(s))
-            .filter((s) => !EQUIPMENT_SKILL_NAMES.has(s))
-            .filter((s) => isLordSeat || !LORD_SKILLS.has(s));
-          if (seatVisibleSkills.length === 0) return null;
-          return (
-            <div className={skillRow}>
-              {seatVisibleSkills.map((s) => (
-                // 描述按原 id(s)查询;展示名去前导"界"
-                <SkillTag key={s} name={displaySkillName(s)} description={getSkillDescription(s)} className={skillTag} />
-              ))}
-            </div>
-          );
-        })()}
-        {/* 标记行:原始 id(`技能名/属性:N`)聚合为「属性 ×N」徽章,明细进 tooltip */}
-        {(() => {
-          const badges = groupDisplayMarks(player.marks);
-          if (badges.length === 0) return null;
-          return (
-            <div className={markRow}>
-              {badges.map((b) => (
-                <span key={b.key} className={markTag} title={b.title}>
-                  {b.label}
-                </span>
-              ))}
-            </div>
-          );
-        })()}
-      </div>
+      {/* 卡上方名牌:身份章 + 座号 + 玩家名 + 徽章组(我/回合/⛓/离线) */}
+      <SeatNamePlate
+        player={player}
+        index={index}
+        showIdentity={showIdentity}
+        isCurrentPlayer={isCurrentPlayer}
+        isPerspective={isPerspective}
+        isChained={isChained}
+        isDisconnected={isDisconnected}
+      />
+      {/* 竖版立绘卡本体 + 右缘体力珠列 + 漂浮数字 */}
+      <SeatCardBody
+        player={player}
+        displayChar={displayChar}
+        charImg={charImg}
+        faction={faction}
+        factionColor={factionColor}
+        isCurrentPlayer={isCurrentPlayer}
+        isPerspective={isPerspective}
+        isDead={isDead}
+        isClickable={isClickable}
+        isChained={isChained}
+        isTargeted={selectedTargetNames.includes(player.name)}
+        isTurnGlow={isTurnGlow}
+        isDamaged={isDamaged}
+        isHealed={isHealed}
+        needsTarget={needsTarget}
+        seatDistance={seatDistance}
+        untargetableReason={untargetableReason}
+        hpChange={hpChange}
+      />
+      {/* 卡下小标签行:装备 / 判定 / 技能 chips / 标记 */}
+      <SeatLabelRows player={player} view={view} />
     </div>
   );
 }
-
 /**
  * React.memo 自定义比较器:
  * WebSocket view 更新会创建全新的 view/player 对象引用,默认浅比较无法拦截。

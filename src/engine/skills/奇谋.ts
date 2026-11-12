@@ -35,6 +35,7 @@ import {
   DISTANCE_ATTACK_MOD_KEY as ATTACK_KEY,
   getDistanceAttackMod,
 } from '../rules/vars-keys';
+import { requireRequestType } from '../util/skillRuntime';
 
 /** 限定技已用标记(player.vars,整局一次,无自动清理后缀) */
 const USED_KEY = '奇谋/used';
@@ -147,10 +148,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       ownerId,
       'respond',
       (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(ownerId);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as { type?: string; requestType?: string };
-        if (atom.type !== '请求回应' || atom.requestType !== X_REQUEST) return '当前不是奇谋询问';
+        const check = requireRequestType(st, ownerId, [X_REQUEST], {
+          wrongTypeError: '当前不是奇谋询问',
+          mismatchError: '当前不是奇谋询问',
+        });
+        if (check.error) return check.error;
         const hp = st.players[ownerId]?.health ?? 0;
         const n = Number(params.option);
         if (!Number.isInteger(n) || n < 1 || n > hp) return `请选择 1-${hp} 之间的整数`;

@@ -17,6 +17,7 @@ import { registerAction, registerBeforeHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 import { addJu, juCount } from './怀橘';
 import type { SkillModule } from '../types';
+import { currentRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '整论';
 
@@ -30,13 +31,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     name: SKILL_ID,
     description: '若你没有橘,你可以跳过摸牌阶段并获得1枚橘',
   };
-}
-
-/** 当前 pending 的 requestType(类型安全读取) */
-function currentRequestType(state: GameState, ownerId: number): string | undefined {
-  const slot = state.pendingSlots.get(ownerId);
-  if (!slot) return undefined;
-  return (slot.atom as unknown as { requestType?: string }).requestType;
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

@@ -32,6 +32,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { currentRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界献图';
 const DISPLAY_NAME = '献图';
@@ -62,12 +63,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '其他角色出牌阶段开始时,你可以摸至多两张牌,然后交给其等量牌;此阶段结束时若其造成伤害小于你以此法交给其的牌数,你失去1点体力',
   };
-}
-
-function currentRequestType(st: GameState, ownerId: number): string | undefined {
-  const slot = st.pendingSlots.get(ownerId);
-  if (!slot) return undefined;
-  return (slot.atom as { requestType?: string }).requestType;
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

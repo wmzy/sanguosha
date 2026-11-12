@@ -25,6 +25,7 @@ import {
   registerAfterHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_RT = '好施/confirm'; // 鲁肃:是否发动好施
 const CHOOSE_TARGET_RT = '好施/target'; // 鲁肃:并列时选目标
@@ -54,15 +55,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== CONFIRM_RT && rt !== CHOOSE_TARGET_RT && rt !== GIVE_RT) {
-        return '当前不是好施询问';
-      }
-      return null;
+      return requireRequestType(st, ownerId, [CONFIRM_RT, CHOOSE_TARGET_RT, GIVE_RT], {
+        mismatchError: '当前不是好施询问',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const slot = st.pendingSlots.get(ownerId);

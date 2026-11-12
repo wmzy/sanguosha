@@ -41,6 +41,7 @@ import {
 } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界酒诗';
 const DISPLAY_NAME = '酒诗';
@@ -132,19 +133,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (s: GameState, _params: Record<string, Json>) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (
-        rt !== USE_RT_CONFIRM &&
-        rt !== DAMAGE_FLIP_RT &&
-        rt !== FLIP_BACK_RT
-      ) {
-        return '当前不是酒诗询问';
-      }
-      return null;
-    },
+    (s: GameState, _params: Record<string, Json>): string | null =>
+      requireRequestType(s, ownerId, [USE_RT_CONFIRM, DAMAGE_FLIP_RT, FLIP_BACK_RT], {
+        mismatchError: '当前不是酒诗询问',
+      }).error,
     async (s: GameState, params: Record<string, Json>) => {
       const slot = s.pendingSlots.get(ownerId);
       const rt = (slot?.atom as unknown as { requestType?: string }).requestType;

@@ -30,6 +30,7 @@ import type { GameState, HookResult, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 /** 界救援问询的 requestType(隔离 respond 路由) */
 const REQUEST_TYPE = '界救援/choose';
@@ -114,12 +115,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       pid,
       'respond',
       (st: GameState, _params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(pid);
-        if (!slot) return '当前不需要回应';
-        const a = slot.atom as Record<string, unknown>;
-        if (a['type'] !== '请求回应') return '当前不需要回应';
-        if (a['requestType'] !== REQUEST_TYPE) return '当前不是界救援询问';
-        return null;
+        return requireRequestType(st, pid, [REQUEST_TYPE], {
+          mismatchError: '当前不是界救援询问',
+        }).error;
       },
       async (st: GameState, params: Record<string, Json>): Promise<void> => {
         st.localVars[CONFIRMED_VAR] = params.choice === true || params.confirmed === true;

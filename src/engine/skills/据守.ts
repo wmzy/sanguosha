@@ -19,34 +19,17 @@
 //   - 无手牌时跳过弃置/装备步骤(规则要求弃一张手牌,无手牌则免)。
 //
 // 注:界曹仁的界据守(独立文件)仍保留"翻面+跳过下一回合"机制,与本标版规则不同。
-import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { hasSkillModule } from './registry';
+import { slotOf } from '../util/skillRuntime';
 
 const USED_KEY = '据守/usedThisTurn';
 const DISCARD_RT = '据守/弃牌';
 const DISCARD_CHOICE_KEY = '据守/discardChoice';
-
-/** 装备牌 subtype → 装备栏位(与 装备 atom 的 inferSlot 一致) */
-function slotOf(card: { subtype?: string } | undefined): EquipSlot | null {
-  switch (card?.subtype) {
-    case '武器':
-      return '武器';
-    case '防具':
-      return '防具';
-    case '进攻马':
-      return '进攻马';
-    case '防御马':
-      return '防御马';
-    case '宝物':
-      return '宝物';
-    default:
-      return null;
-  }
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

@@ -14,6 +14,7 @@ import type { Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -32,14 +33,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (state, _params) => {
-      if (state.pendingSlots.get(ownerId)?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (
-        state.pendingSlots.get(ownerId)!.atom as unknown as Record<string, unknown>
-      ).requestType as string;
-      if (requestType !== '八卦阵/confirm') return '当前不是八卦阵确认';
-      return null;
-    },
+    (state, _params): string | null =>
+      requireRequestType(state, ownerId, ['八卦阵/confirm'], {
+        mismatchError: '当前不是八卦阵确认',
+      }).error,
     async (state, params) => {
       state.localVars['八卦阵/confirmed'] = params.choice === true || params.confirmed === true;
     },

@@ -34,6 +34,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import type { SkillModule } from '../types';
 import { getHandLimitBonus } from '../rules/vars-keys';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界血裔';
 const DISPLAY_NAME = '血裔';
@@ -181,12 +182,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不是血裔询问';
-      if (atom.requestType !== USE_RT) return '当前不是血裔询问';
-      return null;
+      return requireRequestType(st, ownerId, [USE_RT], {
+        wrongTypeError: '当前不是血裔询问',
+        mismatchError: '当前不是血裔询问',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       // 前端 confirm prompt 提交 { choice: true/false }(见 AwaitingPrompt.tsx)。

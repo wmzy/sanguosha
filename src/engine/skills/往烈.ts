@@ -28,6 +28,7 @@ import { registerDistanceExemptor } from '../rules/distance';
 import { WANGLIE_FIRST_VIEW_KEY } from '../rules/vars-keys';
 import { projectTurnUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 /** turn.vars:本回合首张牌是否已使用(首张牌无距离限制的开关)。 */
 const FIRST_USED_VAR = '往烈/首张已用';
@@ -90,13 +91,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== CHOOSE_RT) return '当前不是往烈选择';
-      return null;
-    },
+    (st: GameState, _params: Record<string, Json>): string | null =>
+      requireRequestType(st, ownerId, [CHOOSE_RT], {
+        mismatchError: '当前不是往烈选择',
+      }).error,
     async (st: GameState, params: Record<string, Json>) => {
       st.localVars[CHOICE_KEY] = params.choice === true;
     },

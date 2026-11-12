@@ -28,6 +28,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 /** owner.vars key:箜声牌 cardId 列表(由 箜声.ts 维护,良姻只读) */
 const KONGSHENG_KEY = '箜声/牌';
@@ -264,10 +265,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       seatId,
       'respond',
       (st: GameState, params: Record<string, Json>) => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return '当前不需要回应';
-        if (slot.atom.type !== '请求回应') return '当前不需要回应';
-        const rt = (slot.atom as { requestType?: string }).requestType;
+        const check = requireRequestType(
+          st,
+          seatId,
+          [CONFIRM_RT, MODE_RT, TARGET_RT, HEAL_RT, DISCARD_RT],
+          { mismatchError: '当前不是良姻询问' },
+        );
+        if (check.error) return check.error;
+        const rt = check.requestType;
         if (rt === CONFIRM_RT || rt === MODE_RT) {
           return null;
         }
@@ -288,7 +293,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           if (new Set(cardIds).size !== cardIds.length) return 'cardIds 含重复牌';
           return null;
         }
-        return '当前不是良姻询问';
+        return null;
       },
       async (st: GameState, params: Record<string, Json>) => {
         const slot = st.pendingSlots.get(seatId);

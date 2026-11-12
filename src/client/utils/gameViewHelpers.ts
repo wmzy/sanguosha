@@ -131,6 +131,32 @@ export function resolveOwnCard(
   return inEquip ? cardMap[id] : undefined;
 }
 
+/** 自己装备区的牌(id → cardMap 解析,可选过滤)。转化原料(界武圣/界父魂)与
+ *  代价牌(强袭·弃武器)的装备区解析统一走此函数,不再各自手写
+ *  `Object.values(equipment).filter(string).map(cardMap)`。 */
+export function ownEquipCards(
+  equipment: Partial<Record<string, string | null>> | undefined,
+  cardMap: GameView['cardMap'],
+  filter?: (c: Card) => boolean,
+): Card[] {
+  const equipIds = Object.values(equipment ?? {}).filter((id): id is string => typeof id === 'string');
+  return equipIds
+    .map((id) => cardMap[id])
+    .filter((c): c is Card => !!c && (!filter || filter(c)));
+}
+
+/** 自己的可用原料/代价牌:手牌匹配牌在前、装备区匹配牌在后(界父魂/界武圣/奇袭 的
+ *  转化原料与 强袭·弃武器 的代价牌都含装备区)。三处消费同一判据:无头
+ *  transformMaterialPool/costCardsOf 与浏览器 fillVariantCostCard。 */
+export function ownMaterialCards(
+  me: GameView['players'][number],
+  view: GameView,
+  filter: (c: Card) => boolean,
+): Card[] {
+  const hand = (me.hand ?? []).filter(filter);
+  return [...hand, ...ownEquipCards(me.equipment, view.cardMap, filter)];
+}
+
 /** 多卡转化的组合约束校验(乱击/界乱击:两张同花色)。浏览器(提交前拦截)与
  *  无头(枚举过滤)同一判据:缺 comboFilter 时恒真(丈八蛇矛/界父魂 任意两张);
  *  某张 id 解析不到 Card(不在手牌∪装备区)时恒假。
@@ -403,6 +429,44 @@ export function skillActionVariants(action: SkillActionDef): Array<{
     }));
   }
   return [{ label: '', params: {} }];
+}
+
+/** 主动技提交变体的完整展开:变体列表(skillActionVariants) × 变体声明的代价牌
+ *  (手牌∪装备区匹配,ownMaterialCards)。三处消费同一份声明:浏览器按钮
+ *  (skillActionVariants)、无头枚举(enumeratePromptActions 的 变体×代价牌×目标
+ *  三重循环)、提交时补 cardId(fillVariantCostCard 的 equip 兜底)。
+ *  无 cardFilter 的变体 costCards 为空数组(无代价牌)。 */
+export function expandActionVariants(
+  action: SkillActionDef,
+  me: GameView['players'][number],
+  view: GameView,
+): Array<{
+  label: string;
+  params: Record<string, Json>;
+  cardFilter?: (card: Card) => boolean;
+  /** 按钮 tooltip 用的补充说明(chooseOption 的选项效果文案) */
+  description?: string;
+  /** 变体声明的代价牌(强袭·弃武器);无 cardFilter 时为空数组 */
+  costCards: Card[];
+}> {
+  return skillActionVariants(action).map((v) => ({
+    ...v,
+    costCards: v.cardFilter ? ownMaterialCards(me, view, v.cardFilter) : [],
+  }));
+}
+
+/** choosePlayer 候选解析:优先投影层下发的 candidates(filter 无法跨进程序列化,
+ *  candidates 为权威),否则按 filter 过滤存活玩家。三处消费:无头
+ *  enumeratePromptActions/appendRespondActions 的候选列表、浏览器 isTargetable
+ *  的逐座位可选性判断。 */
+export function choosePlayerCandidates(
+  view: GameView,
+  prompt: { candidates?: number[]; filter?: (view: GameView, target: number) => boolean },
+): number[] {
+  if (prompt.candidates) return prompt.candidates;
+  return view.players
+    .filter((p) => p.alive && (!prompt.filter || prompt.filter(view, p.index)))
+    .map((p) => p.index);
 }
 
 // ─── 出牌操作按钮可见性 ───

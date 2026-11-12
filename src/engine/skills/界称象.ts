@@ -28,6 +28,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { getCardValue } from '../flows/rank';
+import { requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界称象';
@@ -70,17 +71,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as unknown as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== '界称象/confirm' && rt !== '界称象/select') return '当前不是称象询问';
+      const check = requireRequestType(st, ownerId, ['界称象/confirm', '界称象/select'], {
+        mismatchError: '当前不是称象询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
 
       if (rt === '界称象/select') {
         // 校验:所选 cardIds 必须是亮出牌(prompt.cardIds 静态列表)的子集,
         // 且点数和 ≤ 13(称象硬约束)
-        const selectAtom = atom as { prompt?: { cardIds?: string[] } };
+        const selectAtom = st.pendingSlots.get(ownerId)!.atom as { prompt?: { cardIds?: string[] } };
         const candidateIds: string[] = selectAtom.prompt?.cardIds ?? [];
         const candidateSet = new Set(candidateIds);
         const chosen = (params.cardIds as string[] | undefined) ?? [];

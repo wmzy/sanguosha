@@ -10,6 +10,7 @@ import { viewEffectiveDistance } from '../../rules/viewDistance';
 import { runPickTargetCardPanel } from '../../flows/pick-card-panel';
 import type { CardEffect, ResolveCtx } from '../../types';
 import { PICK_RESULT_KEY } from '../../rules/vars-keys';
+import { requireRequestType } from '../../util/skillRuntime';
 
 function canUseSnatch(
   state: import('../../types').GameState,
@@ -56,11 +57,11 @@ export const snatchEffect: CardEffect = {
   // 原逻辑来自 src/engine/skills/顺手牵羊.ts 的 respond registerAction。
   respond: {
     validate: (state, ownerId, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是选牌窗口';
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType !== '顺手牵羊_选牌') return '当前不是选牌窗口';
+      const check = requireRequestType(state, ownerId, ['顺手牵羊_选牌'], {
+        wrongTypeError: '当前不是选牌窗口',
+        mismatchError: '当前不是选牌窗口',
+      });
+      if (check.error) return check.error;
       const zone = params.zone;
       if (zone === 'equipment' || zone === 'judge') {
         if (typeof params.cardId !== 'string') return 'cardId required';

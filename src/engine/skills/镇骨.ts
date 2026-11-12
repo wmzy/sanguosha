@@ -29,6 +29,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { currentRequestType } from '../util/skillRuntime';
 
 const SKILL_NAME = '镇骨';
 
@@ -57,12 +58,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '结束阶段,你可以选择一名其他角色,本回合结束时和其下回合结束时,其将手牌调整至与你手牌数相同(至多摸至五张)',
   };
-}
-
-/** 读取当前 pending 的 requestType(类型安全) */
-function currentRequestType(state: GameState, seat: number): string | undefined {
-  const slot = state.pendingSlots.get(seat);
-  return (slot?.atom as { requestType?: string } | undefined)?.requestType;
 }
 
 /**

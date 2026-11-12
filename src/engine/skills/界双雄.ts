@@ -57,6 +57,7 @@ import { defaultPlayActive } from '../rules/action-active';
 import { setTurnVarUsage } from '../rules/turn-usage';
 import { JIESHUANGXIONG_COLOR_VIEW_KEY } from '../rules/vars-keys';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界双雄';
 const DISPLAY_NAME = '双雄';
@@ -101,12 +102,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== ACTIVATE_RT && rt !== PICK_RT) return '当前不是双雄询问';
+      const check = requireRequestType(st, ownerId, [ACTIVATE_RT, PICK_RT], {
+        mismatchError: '当前不是双雄询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       // PICK_RT:必须提供合法手牌 cardId
       if (rt === PICK_RT) {
         const cardId = params.cardId as string | undefined;

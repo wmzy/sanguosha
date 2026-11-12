@@ -12,6 +12,7 @@ import { applyAtom } from '../../core/apply'
 import { frameCards } from '../../core/frame';
 import { peekTop } from '../../core/deck';
 import type { CardEffect, ResolveCtx } from '../../types';
+import { requireRequestType } from '../../util/skillRuntime';
 
 /** 从使用者开始,按逆时针旋转的所有存活玩家 */
 function alivePlayersFrom(state: import('../../types').GameState, from: number): number[] {
@@ -161,11 +162,11 @@ export const bountifulHarvestEffect: CardEffect = {
   // 原逻辑来自 src/engine/skills/五谷丰登.ts 的 respond registerAction。
   respond: {
     validate: (state, ownerId, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是五谷丰登选牌窗口';
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType !== '五谷丰登/select') return '当前不是五谷丰登选牌窗口';
+      const check = requireRequestType(state, ownerId, ['五谷丰登/select'], {
+        wrongTypeError: '当前不是五谷丰登选牌窗口',
+        mismatchError: '当前不是五谷丰登选牌窗口',
+      });
+      if (check.error) return check.error;
       const cardId = params.cardId as string | undefined;
       if (!cardId) return 'cardId required';
       // 候选严格限定为亮出的牌:排除五谷丰登本身(使用中的锦囊)与已被选走的牌。

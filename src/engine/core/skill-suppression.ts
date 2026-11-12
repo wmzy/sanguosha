@@ -23,6 +23,7 @@
 //   判定是否命中。数量极少(全局几个技能),遍历成本可忽略。
 
 import type { GameState } from '../types';
+import { createProviderRegistry } from '../rules/provider-registry';
 import { isSkillLocked } from './skill';
 
 /**
@@ -36,21 +37,10 @@ export type SuppressionProvider = (
   skillId: string,
 ) => boolean;
 
-interface SuppressionRegistry {
-  /** 全局 provider 集合(不按 owner 桶化,原因见文件头注释) */
-  providers: Set<SuppressionProvider>;
-}
+// ─── state-bound 注册表(WeakMap 外挂,样板见 rules/provider-registry.ts) ───
+// provider 注册到全局桶(ownerId=undefined,不按 owner 分桶,原因见文件头注释)。
 
-const suppressionRegistries = new WeakMap<GameState, SuppressionRegistry>();
-
-function getSuppressionRegistry(state: GameState): SuppressionRegistry {
-  let reg = suppressionRegistries.get(state);
-  if (!reg) {
-    reg = { providers: new Set() };
-    suppressionRegistries.set(state, reg);
-  }
-  return reg;
-}
+const suppressionRegistry = createProviderRegistry<SuppressionProvider>();
 
 /**
  * 注册一个非锁定技失效判定器(技能 onInit 时调用,与 registerSlashBlocker 同构)。
@@ -61,11 +51,7 @@ export function registerSuppressionProvider(
   state: GameState,
   provider: SuppressionProvider,
 ): () => void {
-  const reg = getSuppressionRegistry(state);
-  reg.providers.add(provider);
-  return () => {
-    reg.providers.delete(provider);
-  };
+  return suppressionRegistry.register(state, undefined, provider);
 }
 
 /**
@@ -84,9 +70,5 @@ export function isHookSuppressed(
   // 锁定技/防具/武器(isLocked=true)永不压制——从实例化时写入的元数据查。
   // 替代旧 getCachedSkillModule 反射查询(消除 core→lifecycle 数据依赖)。
   if (isSkillLocked(state, skillId)) return false;
-  const set = getSuppressionRegistry(state).providers;
-  for (const fn of set) {
-    if (fn(state, ownerId, skillId)) return true;
-  }
-  return false;
+  return suppressionRegistry.someAll(state, (fn) => fn(state, ownerId, skillId));
 }

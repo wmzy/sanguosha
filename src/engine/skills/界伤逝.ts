@@ -42,6 +42,7 @@ import { applyAtom } from '../core/apply';
 import { getCardEffect } from '../skills/cards';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_RT = '界伤逝/confirm';
 const CONFIRM_KEY = '伤逝/confirmed';
@@ -107,12 +108,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不需要回应';
-      if (atom.requestType !== CONFIRM_RT) return '当前不是伤逝确认';
-      return null;
+      return requireRequestType(st, ownerId, [CONFIRM_RT], {
+        mismatchError: '当前不是伤逝确认',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
       st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;

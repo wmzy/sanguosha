@@ -13,32 +13,15 @@
 //     替换会触发目标"失去装备"相关技能(如枭姬),这是预期行为。
 //   - 无次数限制。
 //   - 装备到目标的 装备 atom player=目标,不会触发任何"自己使用装备"的被动(本技能也无此被动)。
-import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
+import { slotOf } from '../util/skillRuntime';
 
 const SKILL_NAME = '界直谏';
-
-/** 装备牌 subtype → 装备栏位(与 装备 atom 的 inferSlot 一致) */
-function slotOf(card: { subtype?: string } | undefined): EquipSlot | null {
-  switch (card?.subtype) {
-    case '武器':
-      return '武器';
-    case '防具':
-      return '防具';
-    case '进攻马':
-      return '进攻马';
-    case '防御马':
-      return '防御马';
-    case '宝物':
-      return '宝物';
-    default:
-      return null;
-  }
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

@@ -73,24 +73,6 @@ function fieldCardIds(state: GameState, player: number): string[] {
   return [...hand, ...equip, ...judge];
 }
 
-/** 装备牌 subtype → 装备栏位 */
-function _slotOf(card: { subtype?: string } | undefined): EquipSlot | null {
-  switch (card?.subtype) {
-    case '武器':
-      return '武器';
-    case '防具':
-      return '防具';
-    case '进攻马':
-      return '进攻马';
-    case '防御马':
-      return '防御马';
-    case '宝物':
-      return '宝物';
-    default:
-      return null;
-  }
-}
-
 /**
  * 把 srcPlayer 场上的 srcCardId 移动到 destPlayer 场上(与巧变 moveFieldCard 一致)。
  * 判定区牌:先移除延时锦囊,再获得。

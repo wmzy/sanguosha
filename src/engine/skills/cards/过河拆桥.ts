@@ -7,6 +7,7 @@ import type { Card } from '../../types';
 import { runPickTargetCardPanel } from '../../flows/pick-card-panel';
 import type { CardEffect, ResolveCtx } from '../../types';
 import { PICK_RESULT_KEY } from '../../rules/vars-keys';
+import { requireRequestType } from '../../util/skillRuntime';
 
 /** 过河拆桥牌特有校验：目标有牌、非自己 */
 function canUseDismantle(
@@ -52,17 +53,17 @@ export const dismantleEffect: CardEffect = {
   // 原逻辑来自 src/engine/skills/过河拆桥.ts 的 respond registerAction。
   respond: {
     validate: (state, ownerId, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是选牌窗口';
-      const atom = slot.atom as {
-        requestType?: string;
+      const check = requireRequestType(state, ownerId, ['过河拆桥_选牌'], {
+        wrongTypeError: '当前不是选牌窗口',
+        mismatchError: '当前不是选牌窗口',
+      });
+      if (check.error) return check.error;
+      const atom = state.pendingSlots.get(ownerId)!.atom as {
         prompt?: {
           target?: number;
           equipment?: Array<{ slot: string; cardId: string }>;
         };
       };
-      if (atom.requestType !== '过河拆桥_选牌') return '当前不是选牌窗口';
       const zone = params.zone;
       if (zone === 'equipment' || zone === 'judge') {
         if (typeof params.cardId !== 'string') return 'cardId required';

@@ -24,7 +24,7 @@
 //       4b) 成为额外目标:虚拟杀(source → 该角色)。
 //
 //   - "成为额外目标"实现:用虚拟杀完整结算(指定目标→成为目标→检测有效性→询问闪→伤害/抵消)。
-//     镜像界仁德/界诛害的 virtualKill;不修改 杀 skill 文件。
+//     镜像界仁德/界诛害的虚拟杀结算(util/skillRuntime.runVirtualSlash);不修改 杀 skill 文件。
 //     AOE/火攻情形下"额外目标"语义弱化(AOE 已全员命中),虚拟杀仍能给该角色一次额外杀。
 //
 // 命名:文件名/loader key/character skill name = '界求援'(避标版冲突);
@@ -38,7 +38,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
-import { runUseFlow } from './cards/use-card';
+import { runVirtualSlash } from '../util/skillRuntime';
 import {
   registerAction,
   registerAfterHook,
@@ -83,23 +83,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '当你成为杀或伤害锦囊的目标时,可令另一名其他角色选一项:1.交给你一张同类型不同牌名的牌;2.成为此牌的额外目标',
   };
-}
-
-/** 虚拟杀结算(参考界仁德/界诛害):source → target,无实体卡,不计入出杀次数。 */
-async function virtualKill(state: GameState, source: number, target: number): Promise<void> {
-  if (!state.players[target]?.alive) return;
-  const cardId = `${SKILL_ID}:杀:${source}:${target}:${state.seq}`;
-  state.cardMap[cardId] = {
-    id: cardId,
-    name: '杀',
-    suit: '',
-    color: '无色',
-    rank: 'A',
-    type: '基本牌',
-  };
-  // forced 模式:不计入出杀次数(虚拟杀,无 onSettle)
-  await runUseFlow(state, source, cardId, [target], '杀', { virtual: true });
-  delete state.cardMap[cardId];
 }
 
 /**
@@ -191,7 +174,7 @@ async function runQiuYuan(
     });
     if (matching.length === 0) {
       // 无符合牌:自动转为 4b(成为额外目标)
-      await virtualKill(state, source, helperIdx);
+      await runVirtualSlash(state, source, helperIdx, { prefix: SKILL_ID });
       return;
     }
     delete state.localVars[CARD_KEY];
@@ -223,7 +206,7 @@ async function runQiuYuan(
     });
   } else {
     // 4b) 成为额外目标:虚拟杀(source → helper)
-    await virtualKill(state, source, helperIdx);
+    await runVirtualSlash(state, source, helperIdx, { prefix: SKILL_ID });
   }
 }
 

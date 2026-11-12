@@ -30,6 +30,7 @@ import { applyAtom } from '../core/apply';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界绝策';
 const DISPLAY_NAME = '绝策';
@@ -58,11 +59,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, CHOOSE_RT], {
+        mismatchError: '当前不是绝策询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === CONFIRM_RT) return null; // confirm:任意 params 均接受
       if (rt === CHOOSE_RT) {
         const targets = params.targets as number[] | undefined;
@@ -76,7 +77,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (tp.hand.length > self.hand.length) return '目标手牌数须小于等于你';
         return null;
       }
-      return '当前不是绝策询问';
+      return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const slot = st.pendingSlots.get(ownerId);

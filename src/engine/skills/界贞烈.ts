@@ -52,6 +52,7 @@ import { registerAction, registerAfterHook, registerBeforeHook } from '../core/s
 import { isDelayedTrick } from '../data/card-meta';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY, mijiPendingKey } from '../rules/vars-keys';
+import { requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界贞烈';
 const DISPLAY_NAME = '贞烈';
@@ -214,10 +215,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as { requestType?: string }).requestType;
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, CHOOSE_RT, PICK_RT], {
+        mismatchError: '当前不是贞烈回应',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === CONFIRM_RT || rt === CHOOSE_RT) {
         // confirm:接受 choice/confirmed 布尔
         return null;
@@ -234,7 +236,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
         return null;
       }
-      return '当前不是贞烈回应';
+      return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const slot = st.pendingSlots.get(ownerId);

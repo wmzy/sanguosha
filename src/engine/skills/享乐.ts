@@ -18,6 +18,7 @@
 import type { FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 /** 是否基本牌(杀/闪/桃) */
 function isBasicCard(state: GameState, cardId: string): boolean {
@@ -47,11 +48,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       pid,
       'respond',
       (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(pid);
-        if (!slot) return '当前不需要回应';
-        if (slot.atom.type !== '请求回应') return '当前不需要回应';
-        const reqType = (slot.atom as { requestType?: string }).requestType;
-        if (reqType !== '享乐/discard') return '当前不是享乐回应';
+        const check = requireRequestType(st, pid, ['享乐/discard'], {
+          mismatchError: '当前不是享乐回应',
+        });
+        if (check.error) return check.error;
         const cardId = params.cardId as string | undefined;
         if (typeof cardId !== 'string') return '请选择一张基本牌';
         if (!st.players[pid].hand.includes(cardId)) return '牌不在手牌中';

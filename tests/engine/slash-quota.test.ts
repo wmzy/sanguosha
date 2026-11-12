@@ -8,7 +8,7 @@
 //   5. 消耗优先扣额定(quota 满后扣 extra)
 //   6. 连弩式无限:canSlash 恒真
 //   7. 卸载提供者:slashMax 回落
-//   8. 向后兼容:registerSlashMaxProvider 路由到额定;SLASH_USED_VAR 仍为 view 投影 key
+//   8. 向后兼容:SLASH_USED_VAR 仍为 view 投影 key
 import { describe, it, expect } from 'vitest';
 import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
@@ -16,7 +16,6 @@ import {
   registerSlashQuotaProvider,
   registerSlashExtraProvider,
   registerSlashUnlimitedProvider,
-  registerSlashMaxProvider,
   slashQuotaMax,
   slashExtraMax,
   isSlashUnlimited,
@@ -295,22 +294,6 @@ describe('模块 K:杀次数三层计数模型', () => {
   describe('向后兼容', () => {
     it('SLASH_USED_VAR 仍导出为 view 投影 key("杀/usedCount")', () => {
       expect(SLASH_USED_VAR).toBe('杀/usedCount');
-    });
-
-    it('registerSlashMaxProvider(已废弃)路由到额定提供者(max 语义)', () => {
-      const s = makeState();
-      // 返回 2 作为额定 → max(基础1, 2) = 2(非旧叠加语义 1+2=3)
-      registerSlashMaxProvider(s, 0, () => 2);
-      expect(slashQuotaMax(s, 0)).toBe(2);
-      expect(slashMax(s, 0)).toBe(2);
-    });
-
-    it('registerSlashMaxProvider 返回的取消函数可卸载', () => {
-      const s = makeState();
-      const unload = registerSlashMaxProvider(s, 0, () => 2);
-      expect(slashMax(s, 0)).toBe(2);
-      unload();
-      expect(slashMax(s, 0)).toBe(1);
     });
   });
 });

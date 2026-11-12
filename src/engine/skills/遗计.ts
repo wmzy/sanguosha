@@ -15,6 +15,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const DISTRIBUTE_RT = '遗计/distribute';
 const ALLOC_KEY = '遗计/allocation';
@@ -40,12 +41,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type: string; requestType?: string };
-      if (atom.type !== '请求回应' || atom.requestType !== DISTRIBUTE_RT) {
-        return '当前不是遗计分配';
-      }
+      const check = requireRequestType(st, ownerId, [DISTRIBUTE_RT], {
+        wrongTypeError: '当前不是遗计分配',
+        mismatchError: '当前不是遗计分配',
+      });
+      if (check.error) return check.error;
       const allocation = params.allocation as Allocation | undefined;
       if (Array.isArray(allocation) && allocation.length > 0) {
         const deck = st.zones.deck;

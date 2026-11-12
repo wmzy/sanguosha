@@ -20,7 +20,6 @@
 //   - 箜声牌每回合在结束阶段全部处理(非装备获得、装备使用),不跨回合持久。
 //   - requestType 前缀必须等于技能 id('箜声'):前端 resolvePendingRespond 按前缀路由。
 import type {
-  EquipSlot,
   FrontendAPI,
   GameState,
   Json,
@@ -30,6 +29,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
+import { slotOf } from '../util/skillRuntime';
 
 /** owner.vars key:箜声牌 cardId 列表(与良姻共享) */
 const KONGSHENG_KEY = '箜声/牌';
@@ -45,24 +45,6 @@ const TARGET_KEY = '箜声/target';
 /** 读取 owner 的箜声牌列表 */
 function kongshengCards(state: GameState, player: number): string[] {
   return (state.players[player].vars[KONGSHENG_KEY] as string[] | undefined) ?? [];
-}
-
-/** 装备牌 subtype → 装备栏位(与 装备 atom 的 inferSlot 一致) */
-function slotOf(card: { subtype?: string } | undefined): EquipSlot | null {
-  switch (card?.subtype) {
-    case '武器':
-      return '武器';
-    case '防具':
-      return '防具';
-    case '进攻马':
-      return '进攻马';
-    case '防御马':
-      return '防御马';
-    case '宝物':
-      return '宝物';
-    default:
-      return null;
-  }
 }
 
 export function createSkill(id: string, ownerId: number): Skill {

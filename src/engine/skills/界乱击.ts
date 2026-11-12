@@ -39,6 +39,7 @@ import { registerAction, hasBlockingPending } from '../core/skill';
 import { applyAtom } from '../core/apply';
 import { runUseFlow, chargeOnSettle } from './cards/use-card';
 import { defaultPlayActive } from '../rules/action-active';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界乱击';
 const DISPLAY_NAME = '乱击';
@@ -204,11 +205,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (state: GameState, params: Record<string, Json>) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不是界乱击询问';
-      if (atom.requestType !== SKIP_TARGET_RT) return '当前不是界乱击询问';
+      const check = requireRequestType(state, ownerId, [SKIP_TARGET_RT], {
+        wrongTypeError: '当前不是界乱击询问',
+        mismatchError: '当前不是界乱击询问',
+      });
+      if (check.error) return check.error;
       // choosePlayer 契约:单选发 {target,targets:[t]};「不选择」发 {targets:[]}。
       // params.target:未选(undefined/null)=不排除;选了 = 座次号
       const target =

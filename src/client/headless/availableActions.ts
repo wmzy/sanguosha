@@ -25,6 +25,10 @@ import {
   buildShadowCardId,
   comboSatisfied,
   resolveDistributeCardIds,
+  ownMaterialCards,
+  expandActionVariants,
+  choosePlayerCandidates,
+  isFreePlayWindow,
   type PlayRules,
 } from '../utils/gameViewHelpers';
 import {
@@ -68,6 +72,74 @@ function targetBounds(
   };
 }
 
+/** skip 兜底动作(广播无懈/不出/不发动等)的共享 message 字面量。 */
+function skipMessage(ownerId: number): EngineClientMessage {
+  return { skillId: '__skip', actionType: 'skip', ownerId, params: {}, baseSeq: 0 };
+}
+
+/** 杀类目标数上限(出牌/转化三处共用):仅【杀】且需目标时求 viewSlashTargetMax,
+ *  其余牌 undefined。出牌路径传真实牌(火杀带 damageType,界疠火按之放宽);
+ *  转化路径传 `{ name: 产出牌名 }`——转化杀非火杀,不传 damageType(界疠火仅对火杀生效)。 */
+function slashTargetMaxOf(
+  view: GameView,
+  seatIndex: number,
+  card: { name: string; damageType?: string },
+  rules: PlayRules,
+): number | undefined {
+  return card.name === '杀' && rules.needsTarget && !rules.selfTarget
+    ? viewSlashTargetMax(view, seatIndex, card)
+    : undefined;
+}
+
+/** 出牌/替代出法共用的示例 params:无目标牌完整;有目标牌(非槽位)只给 cardId,
+ *  targets 留给 agent 补全;构造失败(需目标未选等)回退 `{ cardId }`。
+ *  此前 enumeratePlayActions 与 enumerateAltActions 各手写一份逐字重复的三元。 */
+function samplePlayParams(
+  view: GameView,
+  seatIndex: number,
+  card: Card,
+  rules: PlayRules,
+): Record<string, Json> {
+  const built = buildPlayParams(view.players, seatIndex, card, rules, null, null);
+  return rules.needsTarget && !rules.hasSlots && !rules.selfTarget
+    ? { cardId: card.id }
+    : (built ?? { cardId: card.id });
+}
+
+/** 出牌/替代出法共享的单卡 action 骨架(两枚举分支原为镜像手写):
+ *  目标规则派生 → 合法目标计算 → 需要目标但无合法目标(如距离不够)跳过 → 示例 message。
+ *  返回 null 表示该(牌,action)组合不可出。 */
+function buildCardPlaySkeleton(
+  view: GameView,
+  seatIndex: number,
+  action: SkillActionDef,
+  card: Card,
+): {
+  message: EngineClientMessage;
+  validTargets: number[];
+  bounds: { minTarget?: number; maxTarget?: number };
+  rules: PlayRules;
+} | null {
+  const targetFilter = getTargetFilter(action.prompt);
+  const rules = derivePlayRules(targetFilter, getSelfTarget(action.prompt));
+  // 算合法目标（allowSelf 时含自己）
+  const validTargets = computeValidTargets(view, seatIndex, targetFilter, rules);
+  // 需要目标但无合法目标(如距离不够),跳过此牌
+  if (rules.needsTarget && !rules.selfTarget && validTargets.length === 0) return null;
+  return {
+    message: {
+      skillId: action.skillId,
+      actionType: action.actionType,
+      ownerId: seatIndex,
+      params: samplePlayParams(view, seatIndex, card, rules),
+      baseSeq: 0,
+    },
+    validTargets,
+    bounds: targetBounds(targetFilter, rules),
+    rules,
+  };
+}
+
 /** 出牌阶段枚举主动可出的牌。 */
 function enumeratePlayActions(
   view: GameView,
@@ -82,43 +154,22 @@ function enumeratePlayActions(
     const action = findUseActionForCard(skillActions, card);
     if (!action) continue;
     if (!isActiveAction(action, ctx)) continue;
-    const targetFilter = getTargetFilter(action.prompt);
-    const rules = derivePlayRules(targetFilter, getSelfTarget(action.prompt));
-    // 算合法目标（allowSelf 时含自己）
-    const validTargets = computeValidTargets(view, seatIndex, targetFilter, rules);
-    // 需要目标但无合法目标(如距离不够),跳过此牌
-    if (rules.needsTarget && !rules.selfTarget && validTargets.length === 0) continue;
-    // 构造示例 message：无目标牌直接完整；有目标牌 targets 待 agent 补全
-    const sampleParams = rules.selfTarget
-      ? buildPlayParams(view.players, seatIndex, card, rules, null, null)
-      : rules.needsTarget && !rules.hasSlots
-        ? { cardId: card.id }
-        : buildPlayParams(view.players, seatIndex, card, rules, null, null);
-    const message: EngineClientMessage = {
-      skillId: action.skillId,
-      actionType: 'use',
-      ownerId: seatIndex,
-      params: sampleParams ?? { cardId: card.id },
-      baseSeq: 0,
-    };
+    const skeleton = buildCardPlaySkeleton(view, seatIndex, action, card);
+    if (!skeleton) continue;
     const cardDesc = `${card.suit}${card.rank}`;
     // 杀受方天画戟(最后一张手牌)/天义/界疠火放宽目标数上限;其余牌默认 1。
-    const slashMax =
-      card.name === '杀' && rules.needsTarget && !rules.selfTarget
-        ? viewSlashTargetMax(view, seatIndex, card)
-        : undefined;
-    const bounds = targetBounds(targetFilter, rules);
+    const slashMax = slashTargetMaxOf(view, seatIndex, card, skeleton.rules);
     result.push({
       description:
-        rules.needsTarget && !rules.selfTarget
+        skeleton.rules.needsTarget && !skeleton.rules.selfTarget
           ? slashMax && slashMax > 1
             ? `使用【${card.name}】(${cardDesc}) 选择目标(最多${slashMax}个)`
             : `使用【${card.name}】(${cardDesc}) 选择目标`
           : `使用【${card.name}】(${cardDesc})`,
-      message,
-      validTargets,
+      message: skeleton.message,
+      validTargets: skeleton.validTargets,
       category: 'play',
-      ...bounds,
+      ...skeleton.bounds,
       ...(slashMax !== undefined ? { maxTarget: slashMax } : {}),
     });
   }
@@ -141,14 +192,110 @@ function transformMaterialPool(
 ): Card[] {
   const hand = (me.hand ?? []).filter(filter);
   if (hand.length >= minCards) return hand;
-  const equipIds = Object.values(me.equipment ?? {}).filter(
-    (id): id is string => typeof id === 'string',
-  );
-  const equips = equipIds
-    .map((id) => view.cardMap[id])
-    .filter((c): c is Card => !!c)
-    .filter(filter);
-  return [...hand, ...equips];
+  return ownMaterialCards(me, view, filter);
+}
+
+/** 转化·回应路径(被要求打出某牌):产出牌名由 transform 回调按首张原料求值,
+ *  = pending 请求牌名时才可用;主 action = <产出牌名>.respond,无目标。
+ *  多卡转化此前整段缺少回应路径 → 丈八蛇矛/界父魂 在南蛮入侵/决斗 的询问杀窗口里
+ *  拿不到任何动作(浏览器 handleTransformPlay 有 respond 分支,只有无头/AI 客户端
+ *  整类不可用)。 */
+function buildTransformRespondAction(
+  action: SkillActionDef,
+  materials: Card[],
+  seatIndex: number,
+  requestedName: string,
+): AvailableAction | null {
+  const transform = action.transform;
+  if (!transform) return null;
+  const wrapperName = producedNameOf(transform, materials[0]);
+  if (wrapperName !== requestedName) return null; // 产出牌名 = 请求牌名时可用
+  const ids = materials.map((c) => c.id);
+  // 影子卡 id 契约:`${选中牌 id 以 # 连接}#${skillId}`(与引擎 shadowIdOf 同约定)
+  const shadowCardId = buildShadowCardId(ids, action.skillId);
+  const desc = materials.map((c) => `${c.suit}${c.rank}`).join('+');
+  return {
+    description: `${action.skillId}转化【${wrapperName}】(${desc})打出`,
+    message: {
+      skillId: wrapperName,
+      actionType: 'respond',
+      ownerId: seatIndex,
+      params: { cardId: shadowCardId },
+      preceding: [
+        {
+          skillId: action.skillId,
+          actionType: action.actionType,
+          params: materials.length > 1 ? { cardIds: ids } : { cardId: ids[0] },
+        },
+      ],
+      baseSeq: 0,
+    },
+    validTargets: [],
+    category: 'transform',
+  };
+}
+
+/** 转化·出牌路径(单卡/多卡两分支原手写的同管线合并):
+ *  resolveProducedAction → computeValidTargets → 空目标跳过 → slashMax →
+ *  selfTarget 预填 targets=[自己] → 影子 id → 构造主 action。
+ *  - 产出牌名由 transform 回调**逐组合的首张原料**求值:丈八蛇矛 → 杀、乱击 → 万箭齐发;
+ *    多向转化技(产出牌名随组合变化)不能只按 matchingCards[0] 取一次,硬编码 '杀'
+ *    会让非杀产出的主 action 恒为 杀.use,引擎读影子卡名 validate 恒拒「不是杀」。
+ *  - 产出牌门 + 目标语义(resolveProducedAction):产出牌无主动 use 入口(闪/无懈可击
+ *    timing='生效前')或其 use action 未激活(桃 需已受伤)→ null 不枚举;目标语义取
+ *    **产出牌自己的 use action**(酒无目标 / 桃 selfTarget / 杀 攻击范围),而非
+ *    transform action 自身的 targetFilter(那是为出杀方向设计的)。
+ *  - 转化杀同样受目标数上限约束(默认1;方天画戟看手牌数,天义拼点赢放宽到2)。
+ *    转化杀非火杀,不传 damageType(界疠火仅对火杀生效)。 */
+function buildTransformUseAction(
+  view: GameView,
+  seatIndex: number,
+  skillActions: SkillActionDef[],
+  ctx: ActionContext,
+  action: SkillActionDef,
+  materials: Card[],
+): AvailableAction | null {
+  const gate = resolveProducedAction(skillActions, action, materials[0], ctx);
+  if (!gate) return null;
+  const { wrapperName, targetFilter: cardTargetFilter, rules: cardRules } = gate;
+  // 算合法目标（allowSelf 时含自己，与 enumeratePlayActions 同模式）
+  const validTargets = computeValidTargets(view, seatIndex, cardTargetFilter, cardRules);
+  // 需要目标但无合法目标(如距离不够)→ 跳过该组合
+  if (cardRules.needsTarget && !cardRules.selfTarget && validTargets.length === 0) return null;
+  const ids = materials.map((c) => c.id);
+  // 影子卡 id 契约:`${选中牌 id 以 # 连接}#${skillId}`(与引擎 shadowIdOf 同约定)
+  const shadowCardId = buildShadowCardId(ids, action.skillId);
+  const desc = materials.map((c) => `${c.suit}${c.rank}`).join('+');
+  const bounds = targetBounds(cardTargetFilter, cardRules);
+  const slashMax = slashTargetMaxOf(view, seatIndex, { name: wrapperName }, cardRules);
+  // selfTarget 产出牌(桃/酒):与 buildPlayParams 同源预填 targets=[自己]
+  const mainParams: EngineClientMessage['params'] = cardRules.selfTarget
+    ? { cardId: shadowCardId, targets: [seatIndex] }
+    : { cardId: shadowCardId };
+  return {
+    description:
+      wrapperName === '杀' && slashMax && slashMax > 1
+        ? `${action.skillId}转化【${wrapperName}】(${desc}) (最多${slashMax}目标)`
+        : `${action.skillId}转化【${wrapperName}】(${desc})`,
+    message: {
+      skillId: wrapperName,
+      actionType: 'use',
+      ownerId: seatIndex,
+      params: mainParams,
+      preceding: [
+        {
+          skillId: action.skillId,
+          actionType: action.actionType,
+          params: materials.length > 1 ? { cardIds: ids } : { cardId: ids[0] },
+        },
+      ],
+      baseSeq: 0,
+    },
+    validTargets,
+    category: 'transform',
+    ...bounds,
+    ...(slashMax !== undefined ? { maxTarget: slashMax } : {}),
+  };
 }
 
 /**
@@ -157,6 +304,7 @@ function transformMaterialPool(
  * 提交格式:主 action(杀.use) + preceding(transform)。
  * - 单卡转化(武圣,min=1):每张匹配牌一个 action,cardId 为影子 id `${原id}#skillId`。
  * - 多卡转化(丈八蛇矛,min>=2):组合数大,只生成描述性 action 提示 agent。
+ * 单卡/多卡共用 buildTransformUseAction(出牌)/buildTransformRespondAction(回应)管线。
  */
 function enumerateTransformActions(
   view: GameView,
@@ -174,8 +322,8 @@ function enumerateTransformActions(
   // 此前只认 杀(询问杀 / 请求回应 杀/respondKill)→ 倾国(黑牌当闪)/龙胆(杀当闪)/
   // 看破(黑牌当无懈)在各自的回应窗口里拿不到任何动作,只能 skip。
   // 请求牌名解析与浏览器 usePlayInteraction 共享 getPendingRequestedName(原两处逐字重复)。
-  const pendingRequestedName = getPendingRequestedName(view.pending ?? null, seatIndex);
-  const isRespondCtx = pendingRequestedName !== null;
+  // 非 null 即回应上下文(主 action 走 <请求牌名>.respond);null 为出牌路径(走 use)。
+  const requestedName = getPendingRequestedName(view.pending ?? null, seatIndex);
 
   for (const action of skillActions) {
     // 转化能力由 `transform` 回调标记(与浏览器 PlayerCardLarge 同判据),而非 actionType:
@@ -194,14 +342,16 @@ function enumerateTransformActions(
         : null;
     if (!cardFilter) continue;
     const minCards = cardFilter.min ?? 1;
+    // 原料池与单卡分支同源(手牌∪装备区,手牌不足时并入装备区)——界武圣/奇袭
+    // 的装备区红/黑牌此前被整类漏枚举(引擎 validate 接受装备区原料)。
+    const matchingCards = transformMaterialPool(me, view, filter, minCards);
 
     if (minCards > 1) {
-      // 多卡转化(丈八蛇矛/乱击/界乱击):为每对匹配手牌生成一个具体 action,
+      // 多卡转化(丈八蛇矛/乱击/界乱击):为每对匹配牌生成一个具体 action,
       // 主 action params.cardId = 影子 id(`${id1}#${id2}#skillId`),
       // preceding transform 携带 cardIds=[id1,id2];agent 仅需补 targets。
       // (回归 yrjQ7X:旧实现只生成 params={} 的描述性 action + 空 validTargets,
       //  agent 无法构造合法 preceding/影子 cardId → 丈八蛇矛完全不可用。)
-      const matchingCards = transformMaterialPool(me, view, filter, minCards);
       // 组合约束(乱击/界乱击:两张牌同花色)。单卡 filter 表达不了「两张牌之间」的约束,
       // 缺了它客户端会枚举出引擎必拒的组合 —— AI 的 pickBestAction 是确定性的,
       // 反复挑中同一非法组合就永久空转(扫描实测 378 个组合里大量被拒)。
@@ -211,190 +361,28 @@ function enumerateTransformActions(
       const combosOk = (c1: Card, c2: Card): boolean =>
         comboSatisfied(comboFilter, (id) => materialById.get(id), [c1.id, c2.id]);
 
-      // 回应路径(被询问杀 / 请求回应 杀/respondKill):两张牌当【杀】打出,无目标,
-      // 主 action = 杀.respond。与单卡分支同构——旧实现整段缺少回应路径,多卡分支
-      // 无条件发 use → 引擎 validate 拒「不是你的回合」,丈八蛇矛/界父魂 在
-      // 南蛮入侵/决斗 的询问杀窗口里拿不到任何动作(浏览器 handleTransformPlay 有
-      // respond 分支,只有无头/AI 客户端整类不可用)。
-      if (isRespondCtx) {
-        for (let i = 0; i < matchingCards.length; i++) {
-          for (let j = i + 1; j < matchingCards.length; j++) {
-            const c1 = matchingCards[i];
-            const c2 = matchingCards[j];
-            if (!combosOk(c1, c2)) continue;
-            const wrapperName = producedNameOf(action.transform, c1);
-            if (wrapperName !== pendingRequestedName) continue; // 产出牌名 = 请求牌名时可用
-            const shadowCardId = buildShadowCardId([c1.id, c2.id], action.skillId);
-            const desc = `${c1.suit}${c1.rank}+${c2.suit}${c2.rank}`;
-            result.push({
-              description: `${action.skillId}转化【${wrapperName}】(${desc})打出`,
-              message: {
-                skillId: wrapperName,
-                actionType: 'respond',
-                ownerId: seatIndex,
-                params: { cardId: shadowCardId },
-                preceding: [
-                  {
-                    skillId: action.skillId,
-                    actionType: action.actionType,
-                    params: { cardIds: [c1.id, c2.id] },
-                  },
-                ],
-                baseSeq: 0,
-              },
-              validTargets: [],
-              category: 'transform',
-            });
-          }
-        }
-        continue;
-      }
-
       for (let i = 0; i < matchingCards.length; i++) {
         for (let j = i + 1; j < matchingCards.length; j++) {
           const c1 = matchingCards[i];
           const c2 = matchingCards[j];
           if (!combosOk(c1, c2)) continue;
-          // 产出牌名由 transform 回调**逐组合**求值(与单卡分支同判据):丈八蛇矛 → 杀,
-          // 乱击/界乱击 → 万箭齐发;多向转化技(产出牌名随组合变化)不能只按
-          // matchingCards[0] 取一次。硬编码 '杀' 会让非杀产出的主 action 恒为 杀.use,
-          // 引擎读影子卡名 validate 恒拒「不是杀」→ 该转化技整类不可用。
-          // 产出牌门 + 目标语义(与单卡分支共享 resolveProducedAction,原两处自复制):
-          // 产出牌无主动 use 入口/未激活 → null 不枚举;目标语义取产出牌自己的 use action。
-          const gate = resolveProducedAction(skillActions, action, c1, ctx);
-          if (!gate) continue;
-          const { wrapperName, targetFilter: cardTargetFilter, rules: cardRules } = gate;
-          const validTargets = computeValidTargets(view, seatIndex, cardTargetFilter, cardRules);
-          // 需要目标但无合法目标(如距离不够)→ 跳过该组合
-          if (cardRules.needsTarget && !cardRules.selfTarget && validTargets.length === 0) continue;
-          const shadowCardId = buildShadowCardId([c1.id, c2.id], action.skillId);
-          const desc = `${c1.suit}${c1.rank}+${c2.suit}${c2.rank}`;
-          const bounds = targetBounds(cardTargetFilter, cardRules);
-          const slashMax =
-            wrapperName === '杀' && cardRules.needsTarget && !cardRules.selfTarget
-              ? viewSlashTargetMax(view, seatIndex, { name: '杀' })
-              : undefined;
-          // selfTarget 产出牌(桃/酒):与单卡分支/ buildPlayParams 同源预填 targets=[自己]
-          const mainParams: EngineClientMessage['params'] = cardRules.selfTarget
-            ? { cardId: shadowCardId, targets: [seatIndex] }
-            : { cardId: shadowCardId };
-          result.push({
-            description:
-              wrapperName === '杀' && slashMax && slashMax > 1
-                ? `${action.skillId}转化【${wrapperName}】(${desc}) (最多${slashMax}目标)`
-                : `${action.skillId}转化【${wrapperName}】(${desc})`,
-            message: {
-              skillId: wrapperName,
-              actionType: 'use',
-              ownerId: seatIndex,
-              params: mainParams,
-              preceding: [
-                {
-                  skillId: action.skillId,
-                  actionType: action.actionType,
-                  params: { cardIds: [c1.id, c2.id] },
-                },
-              ],
-              baseSeq: 0,
-            },
-            validTargets,
-            category: 'transform',
-            ...bounds,
-            ...(slashMax !== undefined ? { maxTarget: slashMax } : {}),
-          });
+          const built =
+            requestedName !== null
+              ? buildTransformRespondAction(action, [c1, c2], seatIndex, requestedName)
+              : buildTransformUseAction(view, seatIndex, skillActions, ctx, action, [c1, c2]);
+          if (built) result.push(built);
         }
       }
       continue;
     }
 
     // 单卡转化(武圣/龙胆/界武圣/奇袭):每张匹配牌生成一个 action。
-    // 原料池与多卡分支同源(手牌∪装备区,手牌不足时并入装备区)——界武圣/奇袭
-    // 的装备区红/黑牌此前被整类漏枚举(引擎 validate 接受装备区原料)。
-    const matchingCards = transformMaterialPool(me, view, filter, minCards);
-
-    // 回应路径:转化后按请求牌名打出,无目标,主 action=<请求牌名>.respond
-    if (isRespondCtx) {
-      for (const card of matchingCards) {
-        const wrapperName = producedNameOf(action.transform, card);
-        if (wrapperName !== pendingRequestedName) continue; // 仅转化后牌名 = 请求牌名时可用
-        const shadowCardId = buildShadowCardId(card.id, action.skillId);
-        const cardDesc = `${card.suit}${card.rank}`;
-        result.push({
-          description: `${action.skillId}转化【${wrapperName}】(${cardDesc})打出`,
-          message: {
-            skillId: wrapperName,
-            actionType: 'respond',
-            ownerId: seatIndex,
-            params: { cardId: shadowCardId },
-            preceding: [
-              {
-                skillId: action.skillId,
-                actionType: action.actionType,
-                params: { cardId: card.id },
-              },
-            ],
-            baseSeq: 0,
-          },
-          validTargets: [],
-          category: 'transform',
-        });
-      }
-      continue;
-    }
-
     for (const card of matchingCards) {
-      const shadowCardId = buildShadowCardId(card.id, action.skillId);
-
-      // 目标语义由**产出牌自己的 use action** 决定(与出牌分支同源),而非 transform action 的
-      // targetFilter(那是为出杀方向设计的)。界龙胆 四向转化:酒→桃 产出【桃】(selfTarget,
-      // 自动以自己为目标)、桃→酒 产出【酒】(无目标牌);沿用 transform 的「其他角色」目标
-      // 会枚举出引擎必拒的动作(「只能对自己使用酒」/「桃只能对受伤角色使用」)。
-      // 产出牌门 + 目标语义与多卡分支共享 resolveProducedAction:产出牌无主动 use 入口
-      // (闪/无懈可击 timing='生效前')或其 use action 未激活(桃 需已受伤)→ 不枚举必拒动作;
-      // 产出牌无 use action(闪/无懈 等回应牌)时回退到 transform 自身规则。
-      const gate = resolveProducedAction(skillActions, action, card, ctx);
-      if (!gate) continue;
-      const { wrapperName, targetFilter: cardTargetFilter, rules: cardRules } = gate;
-
-      // 算合法目标（allowSelf 时含自己，与 enumeratePlayActions 同模式）
-      const validTargets = computeValidTargets(view, seatIndex, cardTargetFilter, cardRules);
-      // 需要目标但无合法目标(如距离不够),跳过此牌
-      if (cardRules.needsTarget && !cardRules.selfTarget && validTargets.length === 0) continue;
-
-      const cardDesc = `${card.suit}${card.rank}`;
-      // 转化杀同样受目标数上限约束(默认1;方天画戟看手牌数,天义拼点赢放宽到2)。
-      // 转化杀非火杀,不传 damageType(界疠火仅对火杀生效)。
-      const slashMax =
-        wrapperName === '杀' && cardRules.needsTarget && !cardRules.selfTarget
-          ? viewSlashTargetMax(view, seatIndex, { name: '杀' })
-          : undefined;
-      // selfTarget 产出牌(桃/酒):与 buildPlayParams 同源预填 targets=[自己]
-      const mainParams: EngineClientMessage['params'] = cardRules.selfTarget
-        ? { cardId: shadowCardId, targets: [seatIndex] }
-        : { cardId: shadowCardId };
-      result.push({
-        description:
-          wrapperName === '杀' && slashMax && slashMax > 1
-            ? `${action.skillId}转化【${wrapperName}】(${cardDesc}) (最多${slashMax}目标)`
-            : `${action.skillId}转化【${wrapperName}】(${cardDesc})`,
-        message: {
-          skillId: wrapperName,
-          actionType: 'use',
-          ownerId: seatIndex,
-          params: mainParams,
-          preceding: [
-            {
-              skillId: action.skillId,
-              actionType: action.actionType,
-              params: { cardId: card.id },
-            },
-          ],
-          baseSeq: 0,
-        },
-        validTargets,
-        category: 'transform',
-        ...(slashMax !== undefined ? { maxTarget: slashMax } : {}),
-      });
+      const built =
+        requestedName !== null
+          ? buildTransformRespondAction(action, [card], seatIndex, requestedName)
+          : buildTransformUseAction(view, seatIndex, skillActions, ctx, action, [card]);
+      if (built) result.push(built);
     }
   }
   return result;
@@ -484,36 +472,22 @@ function enumerateAltActions(
     const alts = findAltActionsForCard(skillActions, card, primary);
     for (const action of alts) {
       if (!isActiveAction(action, ctx)) continue;
-      const targetFilter = getTargetFilter(action.prompt);
-      const rules = derivePlayRules(targetFilter, getSelfTarget(action.prompt));
       // 替代出法也要按自身 prompt 派生目标规则(与主出牌分支同源):
       // 义绝/界断粮 等 useCardAndTarget 型替代出法需要目标,旧实现固定
       // validTargets=[] 且 params 只有 cardId → AI 提交缺目标,引擎恒拒
       // 「需要选择目标」,整类替代出法在无头/AI 客户端不可用。
-      const validTargets = computeValidTargets(view, seatIndex, targetFilter, rules);
-      if (rules.needsTarget && !rules.selfTarget && validTargets.length === 0) continue;
+      const skeleton = buildCardPlaySkeleton(view, seatIndex, action, card);
+      if (!skeleton) continue;
       const cardDesc = `${card.suit}${card.rank}`;
-      const sampleParams = rules.selfTarget
-        ? buildPlayParams(view.players, seatIndex, card, rules, null, null)
-        : rules.needsTarget && !rules.hasSlots
-          ? { cardId: card.id }
-          : buildPlayParams(view.players, seatIndex, card, rules, null, null);
-      const bounds = targetBounds(targetFilter, rules);
       result.push({
         description:
-          bounds.minTarget && bounds.minTarget > 1
-            ? `${action.label}(${cardDesc}) 选择目标(需 ${bounds.minTarget} 个)`
+          skeleton.bounds.minTarget && skeleton.bounds.minTarget > 1
+            ? `${action.label}(${cardDesc}) 选择目标(需 ${skeleton.bounds.minTarget} 个)`
             : `${action.label}(${cardDesc})`,
-        message: {
-          skillId: action.skillId,
-          actionType: action.actionType,
-          ownerId: seatIndex,
-          params: sampleParams ?? { cardId: card.id },
-          baseSeq: 0,
-        },
-        validTargets,
+        message: skeleton.message,
+        validTargets: skeleton.validTargets,
         category: 'play',
-        ...bounds,
+        ...skeleton.bounds,
       });
     }
   }
@@ -593,11 +567,7 @@ function enumeratePromptActions(
     //   selectTarget 用 targetFilter.filter(本地函数引用可用)。
     let validTargets: number[];
     if (prompt.type === 'choosePlayer') {
-      validTargets =
-        prompt.candidates ??
-        view.players
-          .filter((p) => p.alive && (!prompt.filter || prompt.filter(view, p.index)))
-          .map((p) => p.index);
+      validTargets = choosePlayerCandidates(view, prompt);
     } else {
       const filter = prompt.targetFilter.filter;
       validTargets = view.players
@@ -607,25 +577,10 @@ function enumeratePromptActions(
     if (validTargets.length === 0) continue;
 
     // paramVariants(强袭代价 等):每个变体一个 action;缺省单个无额外参数的变体。
-    // 多选分支(min>1)同样要展开,否则丢必填 cost/cardId(见下)。
-    const variants =
-      prompt.type === 'selectTarget' && prompt.paramVariants?.length
-        ? prompt.paramVariants
-        : [{ label: '', params: {} as Record<string, Json> }];
     // 变体声明的代价牌(强袭·弃武器):按「每个候选牌 × 每个合法目标」展开并预填 cardId,
     // 否则 agent 提交缺 cardId 被引擎恒拒「弃武器需要 cardId」(浏览器侧同源:选中武器牌后提交)。
-    const equipIds = new Set(
-      Object.values(me.equipment ?? {}).filter((id): id is string => typeof id === 'string'),
-    );
-    const costCardsOf = (variant: (typeof variants)[number]): Array<Card | undefined> =>
-      variant.cardFilter
-        ? [
-            ...(me.hand ?? []).filter((c) => variant.cardFilter!(c)),
-            ...[...equipIds]
-              .map((id) => view.cardMap[id])
-              .filter((c): c is Card => !!c && variant.cardFilter!(c)),
-          ]
-        : [undefined];
+    // 变体列表 + 代价牌(手牌∪装备区)展开与浏览器共享 expandActionVariants。
+    const variants = expandActionVariants(action, me, view);
 
     // 多目标技能(selectTarget.targetFilter.min>1 或 choosePlayer.min>1,如「两名男性角色」类):
     // 逐目标展开的 action 每个只带 1 个目标 → 引擎 validate 必拒「目标数不足」
@@ -648,7 +603,7 @@ function enumeratePromptActions(
             : multiMin;
       for (const variant of variants) {
         const suffix = variant.label ? `(${variant.label})` : '';
-        const costCards = costCardsOf(variant);
+        const costCards: Array<Card | undefined> = variant.cardFilter ? variant.costCards : [undefined];
         if (variant.cardFilter && costCards.length === 0) continue; // 无代价牌 → 该变体不可用
         for (const costCard of costCards) {
           const cardSuffix = costCard ? `(${costCard.suit}${costCard.rank})` : '';
@@ -677,7 +632,7 @@ function enumeratePromptActions(
       const targetName = view.players[t]?.name ?? `P${t}`;
       for (const variant of variants) {
         const suffix = variant.label ? `(${variant.label})` : '';
-        const costCards = costCardsOf(variant);
+        const costCards: Array<Card | undefined> = variant.cardFilter ? variant.costCards : [undefined];
         if (variant.cardFilter && costCards.length === 0) continue; // 无代价牌 → 该变体不可用
         for (const costCard of costCards) {
           const cardSuffix = costCard ? `(${costCard.suit}${costCard.rank})` : '';
@@ -718,11 +673,14 @@ export function enumerateAvailableActions(
     ...enumerateDistributeActions(view, seatIndex, skillActions),
     ...enumeratePromptActions(view, seatIndex, skillActions),
   ];
-  // 出牌阶段:当前玩家可主动结束回合(无阻塞 pending 时)
+  // 出牌阶段:当前玩家可主动结束回合(无阻塞 pending 时)——与 GameView 结束回合按钮
+  // (canShowEndTurnButton)同一判据 isFreePlayWindow。
   if (
-    view.currentPlayerIndex === seatIndex &&
-    view.phase === '出牌' &&
-    (!view.pending || view.pending.isBlocking === false)
+    isFreePlayWindow({
+      isMyTurn: view.currentPlayerIndex === seatIndex,
+      phase: view.phase,
+      pending: view.pending,
+    })
   ) {
     actions.push({
       description: '结束出牌阶段',
@@ -835,13 +793,7 @@ export function appendRespondActions(
     if (pending.target < 0) {
       out.push({
         description: '跳过（不打出无懈可击）',
-        message: {
-          skillId: '__skip',
-          actionType: 'skip',
-          ownerId,
-          params: {},
-          baseSeq: 0,
-        },
+        message: skipMessage(ownerId),
         validTargets: [],
         category: 'skip',
       });
@@ -980,18 +932,7 @@ export function appendRespondActions(
       // 多选生成一个描述性 action，agent 需填 targets。
       if (pending.prompt?.type === 'choosePlayer') {
         const choosePrompt = pending.prompt;
-        const filter = choosePrompt.filter;
-        const validTargets: number[] =
-          choosePrompt.candidates ??
-          (() => {
-              const arr: number[] = [];
-              for (const p of view.players) {
-                if (!p.alive) continue;
-                if (filter && !filter(view, p.index)) continue;
-                arr.push(p.index);
-              }
-              return arr;
-            })();
+        const validTargets: number[] = choosePlayerCandidates(view, choosePrompt);
         const max = choosePrompt.max ?? 1;
         const min = choosePrompt.min ?? 1;
         if (max <= 1) {
@@ -1138,13 +1079,7 @@ export function appendRespondActions(
         if (pending.target >= 0 && pending.mandatory !== true) {
           out.push({
             description: `不发动【${info.skillId}】`,
-            message: {
-              skillId: '__skip',
-              actionType: 'skip',
-              ownerId,
-              params: {},
-              baseSeq: 0,
-            },
+            message: skipMessage(ownerId),
             validTargets: [],
             category: 'skip',
           });
@@ -1202,13 +1137,7 @@ export function appendRespondActions(
         if (pending.target >= 0) {
           out.push({
             description: candidates.length === 0 ? `无牌可出，跳过` : `不出【${info.skillId}】`,
-            message: {
-              skillId: '__skip',
-              actionType: 'skip',
-              ownerId,
-              params: {},
-              baseSeq: 0,
-            },
+            message: skipMessage(ownerId),
             validTargets: [],
             category: 'skip',
           });
@@ -1270,13 +1199,7 @@ export function appendRespondActions(
         if (pending.target >= 0) {
           out.push({
             description: candidates.length === 0 ? `无牌可出，跳过` : `不出【${info.skillId}】`,
-            message: {
-              skillId: '__skip',
-              actionType: 'skip',
-              ownerId,
-              params: {},
-              baseSeq: 0,
-            },
+            message: skipMessage(ownerId),
             validTargets: [],
             category: 'skip',
           });

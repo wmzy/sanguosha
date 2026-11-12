@@ -9,6 +9,7 @@ import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { runDamageFlow } from '../../flows/damage';
 import type { CardEffect, ResolveCtx } from '../../types';
+import { requireRequestType } from '../../util/skillRuntime';
 
 /** 火攻的结算：展示手牌 → 弃同花色 → 火焰伤害 */
 async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
@@ -114,12 +115,12 @@ export const fireAttackEffect: CardEffect = {
   // 原逻辑来自 src/engine/skills/火攻.ts 的 respond registerAction。
   respond: {
     validate: (state, ownerId, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是火攻窗口';
-      const reqType = (slot.atom as { requestType?: string }).requestType;
-      if (reqType !== '火攻/展示' && reqType !== '火攻/弃牌')
-        return '当前不是火攻窗口';
+      const check = requireRequestType(state, ownerId, ['火攻/展示', '火攻/弃牌'], {
+        wrongTypeError: '当前不是火攻窗口',
+        mismatchError: '当前不是火攻窗口',
+      });
+      if (check.error) return check.error;
+      const reqType = check.requestType;
       const cardId = params.cardId as string;
       if (typeof cardId !== 'string') return 'cardId required';
       const self = state.players[ownerId];

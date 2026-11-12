@@ -11,37 +11,20 @@
 //   - 弃置/装备交互:use execute 内嵌 请求回应(requestType='据守/弃牌'),
 //     玩家选一张手牌 → 若为装备牌则装备(含旧装备替换),否则弃置。
 //   - 内部标签/localVars/requestType 键名保持原前缀 '据守/xxx'(不改为 '界据守/xxx')。
-import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { hasSkillModule } from './registry';
+import { slotOf } from '../util/skillRuntime';
 
 const SKIP_TAG = '据守/翻面';
 const SKIP_FLAG = '据守/skipAll';
 const USED_KEY = '据守/usedThisTurn';
 const DISCARD_RT = '界据守/弃牌';
 const DISCARD_CHOICE_KEY = '据守/discardChoice';
-
-/** 装备牌 subtype → 装备栏位(与 装备 atom 的 inferSlot 一致) */
-function slotOf(card: { subtype?: string } | undefined): EquipSlot | null {
-  switch (card?.subtype) {
-    case '武器':
-      return '武器';
-    case '防具':
-      return '防具';
-    case '进攻马':
-      return '进攻马';
-    case '防御马':
-      return '防御马';
-    case '宝物':
-      return '宝物';
-    default:
-      return null;
-  }
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

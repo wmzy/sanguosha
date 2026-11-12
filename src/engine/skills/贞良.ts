@@ -33,6 +33,7 @@ import { defaultPlayActive } from '../rules/action-active';
 import { viewCanAttack } from '../rules/viewDistance';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { REN_MARK_ID, getRenColor } from './明任';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '贞良';
 /** 转换态 key(state:player.vars 跨回合持久;view:经 回合用量 atom 投影 turnUsage)。
@@ -92,11 +93,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不需要回应';
-      const rt = atom.requestType;
+      const check = requireRequestType(st, ownerId, [YIN_CONFIRM_RT, YIN_TARGET_RT], {
+        mismatchError: '当前不是贞良回应',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === YIN_CONFIRM_RT) {
         return null; // confirm:接受 choice/confirmed
       }
@@ -108,7 +109,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (!st.players[t]?.alive) return '目标不合法';
         return null;
       }
-      return '当前不是贞良回应';
+      return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const slot = st.pendingSlots.get(ownerId);

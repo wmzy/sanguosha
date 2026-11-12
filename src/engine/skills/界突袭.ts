@@ -30,6 +30,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { createRng } from '../util/rng';
+import { requireRequestType } from '../util/skillRuntime';
 
 const TRIGGER_RT = '界突袭/trigger';
 const SELECT_RT = '界突袭/select';
@@ -54,13 +55,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (s) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== TRIGGER_RT && rt !== SELECT_RT) return '当前不是突袭回应';
-      return null;
-    },
+    (s): string | null =>
+      requireRequestType(s, ownerId, [TRIGGER_RT, SELECT_RT], {
+        mismatchError: '当前不是突袭回应',
+      }).error,
     async (s, params) => {
       const slot = s.pendingSlots.get(ownerId);
       const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;

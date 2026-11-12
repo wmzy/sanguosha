@@ -24,6 +24,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { getDistanceAttackRange } from '../rules/vars-keys';
+import { requireRequestType } from '../util/skillRuntime';
 
 const TAG = '烈弓/禁闪';
 const CONFIRM = '烈弓/confirmed';
@@ -48,12 +49,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (state, _params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不是请求回应';
-      if (atom.requestType !== '烈弓/confirm') return '当前不是烈弓确认';
-      return null;
+      return requireRequestType(state, ownerId, ['烈弓/confirm'], {
+        wrongTypeError: '当前不是请求回应',
+        mismatchError: '当前不是烈弓确认',
+      }).error;
     },
     async (state, params) => {
       state.localVars[CONFIRM] = params.choice === true || params.confirmed === true;

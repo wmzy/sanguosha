@@ -20,6 +20,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';
+import { requireRequestType } from '../util/skillRuntime';
 
 /** 是否发动狂骨的 requestType */
 const CONFIRM_REQUEST = '狂骨/confirm';
@@ -50,13 +51,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== CONFIRM_REQUEST && rt !== CHOOSE_REQUEST) return '当前不是狂骨询问';
-      return null;
+      return requireRequestType(st, ownerId, [CONFIRM_REQUEST, CHOOSE_REQUEST], {
+        mismatchError: '当前不是狂骨询问',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
       const slot = st.pendingSlots.get(ownerId);

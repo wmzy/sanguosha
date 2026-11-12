@@ -19,6 +19,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { obtainJudgeZoneCard } from '../core/judge-zone';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_RT = '行殇/confirm';
 const CONFIRMED_KEY = '行殇/confirmed';
@@ -42,12 +43,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== CONFIRM_RT) return '当前不是行殇确认';
-      return null;
+      return requireRequestType(st, ownerId, [CONFIRM_RT], {
+        mismatchError: '当前不是行殇确认',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
       st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;

@@ -19,6 +19,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const TARGET_RT = '缔盟/target'; // 鲁肃:选两名目标
 const DISCARD_RT = '缔盟/discard'; // 鲁肃:选弃牌
@@ -154,13 +155,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== TARGET_RT && rt !== DISCARD_RT) return '当前不是缔盟询问';
-      return null;
+      return requireRequestType(st, ownerId, [TARGET_RT, DISCARD_RT], {
+        mismatchError: '当前不是缔盟询问',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const slot = st.pendingSlots.get(ownerId);

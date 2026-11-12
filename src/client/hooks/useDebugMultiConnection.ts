@@ -13,7 +13,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { HeadlessGameClient } from '../headless/HeadlessGameClient';
 import type { ClientPhase } from '../headless/types';
-import { useEventPlayback } from './useEventPlayback';
+import { useHgcPlayback, normalizeHgcError } from './useHgcPlayback';
 import { useMarkCharSelectSubmitted, useClearSubmittedCharSelects } from './useSubmittedCharSelect';
 import { createLogger } from '../utils/logger';
 import { logWsMessage, logUserAction } from '../utils/debugTelemetry';
@@ -22,7 +22,6 @@ import { isRoomNotFound } from '../utils/roomErrors';
 import type { GameView } from '../../engine/types';
 import type { ServerMessage, ClientMessage } from '../../server/protocol';
 import type { ActionMsg } from '../types';
-import { appendIngestedEvents } from '../utils/appendIngestedEvents';
 
 const log = createLogger('useDebugMultiConnection');
 
@@ -109,16 +108,16 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
   /** 游戏结束结果(winner=胜方座次号字符串,或 '无人')。收到 gameOver 消息后设置。 */
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
   const [seatPlayerIds, setSeatPlayerIds] = useState<Map<number, string>>(new Map());
-  const playback = useEventPlayback();
-  const playbackRef = useRef(playback);
-  useEffect(() => {
-    playbackRef.current = playback;
-  }, [playback]);
-  /** 出牌历史:由 onView.newEvents 驱动(与播放队列解耦,使用时立即入条) */
-  const [ingestedEvents, setIngestedEvents] = useState<
-    import('./useEventPlayback').QueuedEvent[]
-  >([]);
-  const historySeqRef = useRef(0);
+  // 事件播放队列 + 出牌历史(与 useMultiplayerRoom 共用簿记,见 useHgcPlayback)。
+  const {
+    playbackRef,
+    ingestedEvents,
+    ingestEvents,
+    enqueueEvent,
+    currentEvent,
+    pendingCount,
+    skipEvents,
+  } = useHgcPlayback();
   const perspectiveRef = useRef(perspective);
   useEffect(() => {
     perspectiveRef.current = perspective;
@@ -191,11 +190,9 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
             next.set(view.viewer, view);
             return next;
           });
-          // 出牌历史:追加批次(不可替换——WS 连发时 React 会合并 setState 丢掉中间的打出)
-          if (newEvents.length > 0 && view.viewer === perspectiveRef.current) {
-            setIngestedEvents((prev) =>
-              appendIngestedEvents(prev, newEvents, () => ++historySeqRef.current),
-            );
+          // 出牌历史:仅当前视角的批次入条(与播放队列解耦,空批次自动跳过)
+          if (view.viewer === perspectiveRef.current) {
+            ingestEvents(newEvents);
           }
           if (!firstViewFiredRef.current && view.viewer === 0) {
             firstViewFiredRef.current = true;
@@ -278,9 +275,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
           if (cancelled) return;
           const message = isRoomNotFound(err)
             ? '房间已不存在或已关闭'
-            : err instanceof Error
-              ? err.message
-              : String(err);
+            : normalizeHgcError(err);
           log.error('connect failed', { roomId, viewer: viewerIndex, error: message });
           // 多座次并发失败只上报一次(其余座次多为同一原因)
           if (connectErrorFiredRef.current) return;
@@ -410,7 +405,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
           const seat = clientsRef.current.get(viewerIndex)?.seatIndex ?? viewerIndex;
           // event playback / 出牌历史:仅当前视角连接的事件入队,避免 N 座次重复入队
           if (msg.view && seat === perspectiveRef.current) {
-            playbackRef.current.enqueue([{ seq: msg.seq, event: msg.view }]);
+            enqueueEvent(msg.seq, msg.view);
           }
           break;
         }
@@ -418,7 +413,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
           break;
       }
     },
-    [clearSubmitted],
+    [clearSubmitted, enqueueEvent],
   );
 
   /** 发送 action：走 ownerId 对应 viewer 的连接 */
@@ -538,10 +533,10 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
 
   return {
     views,
-    currentEvent: playback.current,
+    currentEvent,
     ingestedEvents,
-    pendingCount: playback.pendingCount,
-    skipEvents: playback.skipAll,
+    pendingCount,
+    skipEvents,
     sendAction,
     reorderHand,
     disconnectAll,

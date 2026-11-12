@@ -11,6 +11,9 @@
 //      实现一致。
 //   3. 结算效果:黑桃 → 回复1点体力 **并获得此判定牌**(标版仅回复体力)。
 //
+// 实现复用标版(暴虐.ts 导出的共享逻辑):respond 注册、「造成伤害后」守卫+确认询问。
+//   本文件只保留界版差异:CONFIRM_RT 前缀、amount===1 谓词、询问标题、黑桃获得判定牌。
+//
 // 关键时序(获得判定牌):
 //   - 判定 atom 的 def.afterHooks 直接 mutate state.zones.discardPile.push(judgeCard)
 //     (不经过 移动牌 atom,故无法用 移动牌 after-hook 拦截)。
@@ -20,11 +23,8 @@
 //     (处理区→手牌),会导致状态与视图不一致:state 中弃牌堆未增加,但 view 已 +1。
 //   - 解决:不在 判定 上挂 after-hook,而是在 造成伤害 after-hook 内 await 判定
 //     完成后(此时 def.afterHooks 已执行,判定牌已在 discardPile 末尾,视图一致),
-//     再通过 移动牌 atom(弃牌堆→手牌)拿走。移动牌的 applyView 会同时减 discardPileCount
+//     再通过 移动牌 atom(弃牌堆→手牌)拿走。移动牌 的 applyView 会同时减 discardPileCount
 //     和加 handCount,保持视图一致。
-//
-// 模式 A(被动触发):单个 after hook on '造成伤害后'。
-//   造成 1 点伤害 → 询问董卓是否判定 → 判定 → 若黑桃 → 回复 + 移动牌(弃牌堆→手牌)
 //
 // 关键点:
 //   - 仅主公董卓可用(identity==='主公');非主公时 hook 注册但不触发
@@ -33,13 +33,13 @@
 //   - "1点伤害":atom.amount === 1(字面解读)
 //   - 黑桃 = ♠
 //   - 获得判定牌:在 await applyAtom(判定) 完成后,从 discardPile 末尾拿
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
+import { askTyrannyJudgeAfterDamage, registerTyrannyConfirmRespond } from './暴虐';
 
 const CONFIRM_RT = '界暴虐/confirm';
-const CONFIRMED_KEY = '暴虐/confirmed';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -54,62 +54,21 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // ── respond:董卓回应是否发动暴虐判定 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (s: GameState, _params: Record<string, Json>) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== CONFIRM_RT) return '当前不是暴虐确认';
-      return null;
-    },
-    async (s: GameState, params: Record<string, Json>) => {
-      s.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  // ── respond:董卓回应是否发动暴虐判定(标/界共用注册) ──
+  registerTyrannyConfirmRespond(state, skill.id, ownerId, CONFIRM_RT);
 
   // ── 造成伤害 after:其他群雄角色造成 1 点伤害 → 询问 → 判定 → 黑桃则回复+获牌 ──
   registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
-    const atom = ctx.atom;
-
-    // 仅主公董卓可用
-    const self = ctx.state.players[ownerId];
-    if (!self?.alive) return;
-    if (self.identity !== '主公') return;
-
     // 界版限定:造成 **1 点** 伤害后(字面解读)
-    if (atom.amount !== 1) return;
-
-    const sourceIdx = atom.source;
-    if (typeof sourceIdx !== 'number') return;
-    if (sourceIdx === ownerId) return; // 自己造成的伤害不触发
-    if (sourceIdx < 0) return; // 系统伤害(闪电等)不触发
-
-    const source = ctx.state.players[sourceIdx];
-    if (!source?.alive) return;
-    if (source.faction !== '群') return; // 仅群雄角色
-
-    // 询问是否判定
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `暴虐:${source.name} 造成 1 点伤害,是否进行判定?(黑桃回复1点体力并获得判定牌)`,
-        confirmLabel: '判定',
-        cancelLabel: '不判定',
-      },
-      defaultChoice: false,
-      timeout: 10,
-    });
-
-    if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+    const confirmed = await askTyrannyJudgeAfterDamage(
+      ctx,
+      ownerId,
+      CONFIRM_RT,
+      (sourceName) =>
+        `暴虐:${sourceName} 造成 1 点伤害,是否进行判定?(黑桃回复1点体力并获得判定牌)`,
+      ctx.atom.amount === 1,
+    );
+    if (!confirmed) return;
 
     const judgeCardId = await runJudgeFlow(ctx.state, ownerId, '暴虐');
     if (!judgeCardId) return;

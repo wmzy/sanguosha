@@ -26,6 +26,7 @@ import type {
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_RT = '英魂/confirm'; // 孙坚:是否发动
 const TARGET_RT = '英魂/target'; // 孙坚:选目标
@@ -190,20 +191,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       seatId,
       'respond',
       (st: GameState, _params: Record<string, Json>) => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as Record<string, unknown>;
-        if (atom['type'] !== '请求回应') return '当前不需要回应';
-        const rt = atom['requestType'] as string;
-        if (
-          rt !== CONFIRM_RT &&
-          rt !== TARGET_RT &&
-          rt !== OPTION_RT &&
-          rt !== DISCARD_RT
-        ) {
-          return '当前不是英魂询问';
-        }
-        return null;
+        return requireRequestType(st, seatId, [CONFIRM_RT, TARGET_RT, OPTION_RT, DISCARD_RT], {
+          mismatchError: '当前不是英魂询问',
+        }).error;
       },
       async (st: GameState, params: Record<string, Json>) => {
         const slot = st.pendingSlots.get(seatId);

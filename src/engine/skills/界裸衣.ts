@@ -29,6 +29,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
+import { requireRequestType } from '../util/skillRuntime';
 
 const BONUS_TAG = '界裸衣/bonus';
 /** 询问①:是否发动界裸衣(亮牌+增伤) */
@@ -69,13 +70,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'];
-      if (rt !== ACTIVATE_RT && rt !== SKIP_RT) return '当前不是界裸衣询问';
-      return null;
+      return requireRequestType(st, ownerId, [ACTIVATE_RT, SKIP_RT], {
+        mismatchError: '当前不是界裸衣询问',
+      }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
       const slot = st.pendingSlots.get(ownerId);

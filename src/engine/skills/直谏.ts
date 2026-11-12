@@ -12,30 +12,13 @@
 //     装备通用的 装备+添加技能 序列(目标=target)。
 //   - 不得替换原装备:validate 检查目标对应 slot 为空。
 //   - 无次数限制。
-import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
-
-/** 装备牌 subtype → 装备栏位(与 装备 atom 的 inferSlot 一致) */
-function slotOf(card: { subtype?: string } | undefined): EquipSlot | null {
-  switch (card?.subtype) {
-    case '武器':
-      return '武器';
-    case '防具':
-      return '防具';
-    case '进攻马':
-      return '进攻马';
-    case '防御马':
-      return '防御马';
-    case '宝物':
-      return '宝物';
-    default:
-      return null;
-  }
-}
+import { slotOf } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

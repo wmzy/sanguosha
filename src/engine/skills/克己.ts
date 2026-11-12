@@ -20,6 +20,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 /** turn.vars key:本回合是否使用/打出过杀(移动牌 after 写,阶段开始 before 读)。
  *  随「回合结束」atom 的 state.turn.vars = {} 自动清空。 */
@@ -47,13 +48,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (state, _params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (slot.atom as unknown as Record<string, unknown>).requestType as string;
-      if (requestType !== CONFIRM_REQUEST) return '当前不是克己确认';
-      return null;
-    },
+    (state, _params) =>
+      requireRequestType(state, ownerId, [CONFIRM_REQUEST], {
+        mismatchError: '当前不是克己确认',
+      }).error,
     async (state, params) => {
       state.localVars[CONFIRMED_VAR] = params.choice === true || params.confirmed === true;
     },

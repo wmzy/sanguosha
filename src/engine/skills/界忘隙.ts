@@ -26,6 +26,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界忘隙';
@@ -55,16 +56,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as unknown as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== CONFIRM_RT && rt !== PICK_RT) return '当前不是忘隙询问';
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, PICK_RT], {
+        mismatchError: '当前不是忘隙询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
 
       if (rt === PICK_RT) {
         // 校验:cardIds 必须是 1 张且在候选范围(prompt.cardIds 刚摸到的 2 张)
-        const pickAtom = atom as { prompt?: { cardIds?: string[] } };
+        const pickAtom = st.pendingSlots.get(ownerId)!.atom as { prompt?: { cardIds?: string[] } };
         const candidates: string[] = pickAtom.prompt?.cardIds ?? [];
         const candidateSet = new Set(candidates);
         const chosen = (params.cardIds as string[] | undefined) ?? [];

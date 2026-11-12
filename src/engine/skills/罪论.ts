@@ -23,6 +23,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { currentRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '罪论';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -48,13 +49,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '结束阶段可观看牌堆顶三张牌,获得其中X张(X为满足项数:本回合造成过伤害/未弃置过牌/手牌数全场最少),余牌任意顺序置牌堆顶;均不满足则自己与一名其他角色各失去1点体力',
   };
-}
-
-/** 当前 pending 的 requestType(类型安全读取) */
-function currentRequestType(state: GameState, ownerId: number): string | undefined {
-  const slot = state.pendingSlots.get(ownerId);
-  if (!slot) return undefined;
-  return (slot.atom as unknown as { requestType?: string }).requestType;
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

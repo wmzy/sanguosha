@@ -31,6 +31,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { spliceHandOrderEntry } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY as PICK_KEY } from '../rules/vars-keys';
+import { requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_NAME = '界补益';
 const DISPLAY_NAME = '补益';
@@ -82,15 +83,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== CONFIRM_RT && rt !== PICK_RT) return '当前不是补益询问';
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, PICK_RT], {
+        mismatchError: '当前不是补益询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
 
       if (rt === PICK_RT) {
-        const pickAtom = atom as {
+        const pickAtom = st.pendingSlots.get(ownerId)!.atom as {
           prompt?: { target?: number };
         };
         // PICK 下 atom.target 是选牌者(ownerId),被选牌玩家在 prompt.target 中

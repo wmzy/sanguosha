@@ -298,16 +298,6 @@ export function shuffle(deck: Card[], rng: Rng): Card[] {
   return result;
 }
 
-export function drawCards(deck: Card[], count: number): { drawn: Card[]; remaining: Card[] } {
-  const drawn = deck.slice(0, count);
-  const remaining = deck.slice(count);
-  return { drawn, remaining };
-}
-
-export function discardCards(discardPile: Card[], cards: Card[]): Card[] {
-  return [...discardPile, ...cards];
-}
-
 // ─── zones.deck 顶牌访问(牌堆顶 = 末尾,见 引擎架构.md 方向约定) ────────
 // 与上方构造期 helper(操作 Card[])不同,这两个 helper 操作运行时牌堆 zones.deck
 // (string[] cardId)。所有「取/看牌堆顶」的调用点统一走此处,避免手写

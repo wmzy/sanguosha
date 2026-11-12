@@ -19,6 +19,10 @@
 //     在 runJudgeFlow 收尾把它移入弃牌堆之前)
 //   - 非红桃时:经「收取判定牌」atom 把判定牌收作"田"(移出处理区、记入 marks,视图同步
 //     投影),再加田标记。runJudgeFlow 收尾按 id 找不到该牌即为 no-op。
+//
+// 标/界共享:respond 注册、「判定牌生效后」hook、询问+判定核心、回合外失去牌 hook
+//   (获得/移动牌/给予)均由本文件导出,界屯田.ts 导入复用;两版真实差异只有
+//   ①询问 requestType 前缀(屯田/confirm ↔ 界屯田/confirm)②询问标题③弃置路径触发条件。
 import type {
   AtomAfterContext,
   FrontendAPI,
@@ -59,13 +63,18 @@ function syncDistanceMod(state: GameState, player: number): void {
   }
 }
 
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
+// ── 标/界屯田共享(界屯田.ts 导入复用) ─────────────────────────
 
-  // ── respond:邓艾回应是否发动屯田 ──
+/** respond 动作:邓艾回应是否发动屯田(confirmRt 区分标/界询问来源) */
+export function registerTunTianConfirmRespond(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  confirmRt: string,
+): void {
   registerAction(
     state,
-    skill.id,
+    skillId,
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>) => {
@@ -73,21 +82,29 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== CONFIRM_RT) return '当前不是屯田确认';
+      if (atom['requestType'] !== confirmRt) return '当前不是屯田确认';
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
       st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
     },
   );
+}
 
-  // ── 判定牌生效后 hook:在 runJudgeFlow 收尾(将判定牌移入弃牌堆)之前运行 ──
-  //   捕获花色,非红桃时经「收取判定牌」atom 收走判定牌(作为田)+ 加标记 + 更新距离修正
-  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
+/**
+ * 「判定牌生效后」hook:在 runJudgeFlow 收尾(将判定牌移入弃牌堆)之前运行。
+ * 捕获花色,非红桃时经「收取判定牌」atom 收走判定牌(作为田)+ 加标记 + 更新距离修正。
+ */
+export function registerTianJudgeAfterHook(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+): void {
+  registerAfterHook(state, skillId, ownerId, '判定牌生效后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.player !== ownerId) return;
     if (atom.judgeType !== '屯田') return;
-    // 必须由 maybeTriggerTunTian 预设 CONFIRMED_KEY(玩家已选择发动)
+    // 必须由 askAndJudgeTunTian 预设 CONFIRMED_KEY(玩家已选择发动)
     if (!ctx.state.localVars[CONFIRMED_KEY]) return;
 
     const judgeCardId = currentJudgeCardId(ctx.state);
@@ -123,49 +140,78 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 后端 vars 同步(effectiveDistance 读取)
     syncDistanceMod(ctx.state, ownerId);
   });
+}
 
-  // ── 通用触发:回合外失去牌时,询问发动 + 判定 ──
-  //   判定后的拿牌/加田在「判定牌生效后」时机钩子内完成(此时判定牌仍在 frame.cards)
-  async function maybeTriggerTunTian(ctx: AtomAfterContext, lossAtomType: string): Promise<void> {
-    // 必须非自己回合
-    if (ctx.state.currentPlayerIndex === ownerId) return;
-    const self = ctx.state.players[ownerId];
-    if (!self?.alive) return;
-    // 牌堆空:无法判定,跳过
-    if (ctx.state.zones.deck.length === 0) return;
+/**
+ * 屯田触发核心:询问发动 + 判定(判定后的拿牌/加田在「判定牌生效后」hook 内完成,
+ * 此时判定牌仍在 frame.cards)。不做回合判定 —— 标版仅回合外调用,
+ * 界版回合内弃置杀路径也调用。
+ */
+export async function askAndJudgeTunTian(
+  ctx: AtomAfterContext,
+  ownerId: number,
+  confirmRt: string,
+  title: string,
+): Promise<void> {
+  const self = ctx.state.players[ownerId];
+  if (!self?.alive) return;
+  // 牌堆空:无法判定,跳过
+  if (ctx.state.zones.deck.length === 0) return;
 
-    // 询问是否发动
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `是否发动屯田?(回合外因${lossAtomType}失去牌,判定可能获得田)`,
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
-      defaultChoice: false,
-      timeout: 10,
-    });
-    if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+  // 询问是否发动
+  delete ctx.state.localVars[CONFIRMED_KEY];
+  await applyAtom(ctx.state, {
+    type: '请求回应',
+    requestType: confirmRt,
+    target: ownerId,
+    prompt: {
+      type: 'confirm',
+      title,
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
+    },
+    defaultChoice: false,
+    timeout: 10,
+  });
+  if (!ctx.state.localVars[CONFIRMED_KEY]) return;
 
-    // 判定(判定 after hook 会读取 CONFIRMED_KEY 并完成拿牌/加田)
-    await runJudgeFlow(ctx.state, ownerId, '屯田');
-  }
+  // 判定(判定 after hook 会读取 CONFIRMED_KEY 并完成拿牌/加田)
+  await runJudgeFlow(ctx.state, ownerId, '屯田');
+}
 
+/** 回合外触发(标版行为):必须非自己回合才询问 + 判定 */
+export async function triggerTunTianOutOfTurn(
+  ctx: AtomAfterContext,
+  ownerId: number,
+  confirmRt: string,
+  title: string,
+): Promise<void> {
+  if (ctx.state.currentPlayerIndex === ownerId) return;
+  await askAndJudgeTunTian(ctx, ownerId, confirmRt, title);
+}
+
+/**
+ * 注册「回合外失去牌」三条路径的 after hook(获得/移动牌/给予)。
+ * 弃置路径标/界行为不同(界版回合内弃杀也触发),由各文件自行注册。
+ */
+export function registerTunTianLossHooks(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  confirmRt: string,
+  titleFor: (lossAtomType: string) => string,
+): void {
   // ── 获得 after:有人从邓艾处获得牌(被顺/被借/反馈等) ──
-  registerAfterHook(state, skill.id, ownerId, '获得', async (ctx) => {
+  registerAfterHook(state, skillId, ownerId, '获得', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '获得') return;
     if (atom.from !== ownerId) return; // 来自邓艾的牌才算"失去"
     if (atom.player === ownerId) return; // 自己获得自己不算失去
-    await maybeTriggerTunTian(ctx, '获得');
+    await triggerTunTianOutOfTurn(ctx, ownerId, confirmRt, titleFor('获得'));
   });
 
   // ── 移动牌 after:邓艾的牌被移走(过河拆桥/拼点/打出等) ──
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
+  registerAfterHook(state, skillId, ownerId, '移动牌', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '移动牌') return;
     // from 是邓艾的手牌区
@@ -173,26 +219,42 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (atom.from.player !== ownerId) return;
     // 移到自己手牌不算失去(理论上 from===to 同一玩家不可能)
     if (atom.to.zone === '手牌' && atom.to.player === ownerId) return;
-    await maybeTriggerTunTian(ctx, '移动牌');
+    await triggerTunTianOutOfTurn(ctx, ownerId, confirmRt, titleFor('移动牌'));
   });
 
   // ── 给予 after:邓艾给他人牌(求援/好施等给予路径,回合外失去牌) ──
   //   给予 atom(手牌→手牌)是「失去牌」的独立路径(连营亦挂此 hook)。
   //   与 获得/移动牌/弃置 互不重叠(给予.afterApply 只发 移动到目标区域后,不发这三者)。
-  registerAfterHook(state, skill.id, ownerId, '给予', async (ctx) => {
+  registerAfterHook(state, skillId, ownerId, '给予', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '给予') return;
     if (atom.from !== ownerId) return; // 邓艾给出的牌才算"失去"
     if (atom.to === ownerId) return; // 给自己不算失去
-    await maybeTriggerTunTian(ctx, '给予');
+    await triggerTunTianOutOfTurn(ctx, ownerId, confirmRt, titleFor('给予'));
   });
+}
+
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+  const title = (lossAtomType: string) =>
+    `是否发动屯田?(回合外因${lossAtomType}失去牌,判定可能获得田)`;
+
+  // ── respond:邓艾回应是否发动屯田 ──
+  registerTunTianConfirmRespond(state, skill.id, ownerId, CONFIRM_RT);
+
+  // ── 判定牌生效后 hook(标/界共用) ──
+  registerTianJudgeAfterHook(state, skill.id, ownerId);
+
+  // ── 回合外失去牌路径(获得/移动牌/给予):询问发动 + 判定 ──
+  //   判定后的拿牌/加田在「判定牌生效后」时机钩子内完成(此时判定牌仍在 frame.cards)
+  registerTunTianLossHooks(state, skill.id, ownerId, CONFIRM_RT, title);
 
   // ── 弃置 after:邓艾被弃牌(借刀杀人等回合外弃置路径) ──
   registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {
     const atom = ctx.atom;
     if (atom.type !== '弃置') return;
     if (atom.player !== ownerId) return;
-    await maybeTriggerTunTian(ctx, '弃置');
+    await triggerTunTianOutOfTurn(ctx, ownerId, CONFIRM_RT, title('弃置'));
   });
 
   return () => {};

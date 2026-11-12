@@ -22,6 +22,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界纵玄';
 const DISPLAY_NAME = '纵玄';
@@ -203,19 +204,21 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是纵玄窗口';
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType === CONFIRM_RT || atom.requestType === AGAIN_RT) {
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, AGAIN_RT, PICK_RT], {
+        wrongTypeError: '当前不是纵玄窗口',
+        mismatchError: '当前不是纵玄窗口',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
+      if (rt === CONFIRM_RT || rt === AGAIN_RT) {
         return null;
       }
-      if (atom.requestType === PICK_RT) {
+      if (rt === PICK_RT) {
         const cardId = params.cardId;
         if (typeof cardId !== 'string') return '需要选择一张牌';
         return null;
       }
-      return '当前不是纵玄窗口';
+      return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
       const slot = st.pendingSlots.get(ownerId);

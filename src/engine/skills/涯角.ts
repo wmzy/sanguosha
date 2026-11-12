@@ -24,6 +24,7 @@ import { peekTop } from '../core/deck';
 import { inAttackRange } from '../rules/distance';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { currentRequestType } from '../util/skillRuntime';
 
 /** localVars keys */
 const CONFIRMED_KEY = '涯角/confirmed';
@@ -33,13 +34,6 @@ const TARGET_KEY = '涯角/target';
 const CONFIRM_RT = '涯角/confirm';
 const TARGET_RT = '涯角/target';
 const DISCARD_RT = '涯角/discard';
-
-/** 读取当前 pending 的 requestType(类型安全) */
-function currentRequestType(state: GameState, ownerId: number): string | undefined {
-  const slot = state.pendingSlots.get(ownerId);
-  if (!slot) return undefined;
-  return (slot.atom as unknown as Record<string, unknown>).requestType as string | undefined;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

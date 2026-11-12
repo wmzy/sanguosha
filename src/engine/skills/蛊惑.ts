@@ -11,6 +11,14 @@
 //   本标版实现沿用既有"标准规则"(真→质疑者失1体力/假→质疑者获牌且作废;每回合限一次),
 //   与现有测试及 research "实现要点"一致;真→缠怨需独立"缠怨"技能,不在本技能范围。
 //
+// 本文件同时承载标版/界版的共享入口(registerGuEntries + mountGuActions):
+// 界蛊惑.ts import 并注入界版差异(质疑流程 runQuestioning 与 respond 分支)。
+// 标界同构的部分:use×3(声明杀/桃/酒)/dodge(闪)/rescue(桃) 五个入口的注册与校验、
+// 蛊惑-杀结算(resolveGuSlash)、影子提供(provideAsBasicToProcessing)、
+// 按声明生效(applyDeclaredEffect)、onMount 全部 defineAction 与激活判定。
+// 真实差异(界版,见 界蛊惑.ts):同时质疑(全面收集质疑者)、真→缠怨+弃牌或失体力、
+// 假→质疑者摸牌、respond 三分支。
+//
 // 三类入口(共用 runQuestioning 质疑流程):
 //   1. use(主动,杀/桃/酒):出牌阶段、自己回合、无阻塞 pending、存活、本回合未用过。
 //      params: { cardId(扣牌), target?(杀的目标) }; 声明牌名编码在 actionType(use:杀/use:桃/use:酒)。
@@ -42,7 +50,7 @@
 // respond(质疑)注册到每个座次(被问询者非于吉),onInit 返回合并卸载函数
 //   (unloadSkillInstance 仅按 (skillId,于吉座次) 清 action,清不到其他座次)。
 import type { ActionContext, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply'
+import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
@@ -52,6 +60,7 @@ import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { usedThisTurnKey } from '../rules/vars-keys';
 import { viewCanAttack } from '../rules/viewDistance';
 import { viewCanSlash } from '../rules/action-active';
+import { USE_ACTION_PREFIX } from '../util/declaredActionType';
 
 const REQUEST_TYPE = '蛊惑/质疑';
 const QUESTIONER_VAR = '蛊惑/质疑者';
@@ -60,6 +69,8 @@ const DECLARE_VAR = '蛊惑/声明';
 const RESCUED_VAR = '求桃/已救';
 /** 主动使用可声明的牌名(有主动效果);闪仅经 dodge 响应路径打出,故不在其中。 */
 const ACTIVE_DECLARATIONS = ['杀', '桃', '酒'] as const;
+
+type ActiveDeclaration = (typeof ACTIVE_DECLARATIONS)[number];
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -137,6 +148,7 @@ async function provideAsBasicToProcessing(
   yuji: number,
   concealedId: string,
   outputName: string,
+  skillKey: string,
 ): Promise<void> {
   // 扣牌回手(经 移动牌 产生 ViewEvent,保持 processedView 一致;弃牌堆→手牌 不暴露牌面)
   await applyAtom(state, {
@@ -145,7 +157,7 @@ async function provideAsBasicToProcessing(
     from: { zone: '弃牌堆' },
     to: { zone: '手牌', player: yuji },
   });
-  const shadowId = `${concealedId}#蛊惑${outputName}`;
+  const shadowId = `${concealedId}#${skillKey}${outputName}`;
   // 当作:扣牌(在手牌)→ 影子 outputName(手牌);影子 name=outputName 供处理区检测
   await applyAtom(state, {
     type: '当作',
@@ -187,7 +199,7 @@ async function applyDeclaredEffect(
   }
 }
 
-/** 蛊惑质疑流程(各入口共用):扣牌 → 质疑循环 → (有人质疑)翻牌结算。
+/** 蛊惑质疑流程(标版,各入口共用):扣牌 → 质疑循环 → (有人质疑)翻牌结算。
  *  返回 { voided: 是否作废(假牌被质疑), downCard: 扣牌 id, questioner?: 质疑者 }。 */
 async function runQuestioning(
   state: GameState,
@@ -253,21 +265,37 @@ function cleanupVars(state: GameState): void {
   delete state.localVars[QUESTIONER_VAR];
 }
 
-type ActiveDeclaration = (typeof ACTIVE_DECLARATIONS)[number];
+/** 标版/界版共用入口的差异注入。 */
+export interface GuEntryDeps {
+  /** 技能键('蛊惑'|'界蛊惑'):限一次标记 + 影子卡 id 后缀 */
+  readonly skillKey: string;
+  /** 质疑流程(标版:首个质疑者即翻牌;界版:全面收集质疑者后统一翻牌) */
+  readonly runQuestioning: (
+    state: GameState,
+    yuji: number,
+    cardId: string,
+    declaredName: string,
+  ) => Promise<{ voided: boolean; downCard: string }>;
+  /** 质疑流程后的 localVars 清理(在 popFrame 前调用;两版清理集不同) */
+  readonly cleanupVars: (state: GameState) => void;
+}
 
-/** 主动使用 action 的 actionType 前缀:一个声明牌名一个 action(`use:杀` / `use:桃` / `use:酒`)。
- *  客户端(浏览器技能按钮 / 无头枚举)无法凭空提供 `params.declaredName` —— 把「声明」
- *  编码进 actionType 后,声明由用户点哪个按钮决定,前后端一一对应。
- *  (与 界渐营/界矫诏 的 `transform:<牌名>` 同款约定。) */
-const USE_ACTION_PREFIX = 'use:';
-
-export function onInit(skill: Skill, state: GameState): (() => void) | void {
+/**
+ * 注册蛊惑的五个入口 + 替代回应声明(标版/界版共用):
+ * declareAlternativeResponse×2 → use×3(`use:杀`/`use:桃`/`use:酒`) → dodge → rescue。
+ * 质疑流程与 respond(质疑分支)由各版注入/自注册。
+ */
+export function registerGuEntries(
+  state: GameState,
+  skill: Skill,
+  deps: GuEntryDeps,
+): Array<() => void> {
   const ownerId = skill.ownerId;
   const unloaders: Array<() => void> = [];
   unloaders.push(declareAlternativeResponse(state, ownerId, '询问闪'));
   unloaders.push(declareAlternativeResponse(state, ownerId, '请求回应', '桃/求桃'));
 
-  // ── use(于吉主动发动:杀/桃/酒)──
+  // ── use(主动发动:杀/桃/酒)──
   // 声明编码进 actionType(`use:杀`…):声明的牌名是 action 身份的一部分,不是客户端可选的
   // params —— 旧实现要求 params.declaredName,而浏览器/无头客户端都构造不出它,整条主动
   // 使用路径在真实客户端不可达(按钮点了没反应 / AI 枚举不出)。
@@ -281,7 +309,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
         if (st.phase !== '出牌') return '只能在出牌阶段发动';
         if (hasBlockingPending(st)) return '当前有未完成的询问';
-        if (usedThisTurn(st, ownerId, '蛊惑')) return '本回合已使用过蛊惑';
+        if (usedThisTurn(st, ownerId, deps.skillKey)) return '本回合已使用过蛊惑';
         const self = st.players[ownerId];
         if (!self?.alive) return '玩家不存在或已死亡';
         const cardId = params.cardId as string | undefined;
@@ -304,15 +332,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const cardId = params.cardId as string;
         const target = params.target as number | undefined;
         // 限一次标记:第一个 await 前设置,防 dispatch 重入
-        await markOncePerTurn(st, from, '蛊惑');
+        await markOncePerTurn(st, from, deps.skillKey);
         await pushFrame(st, '蛊惑', from, { cardId, declaredName });
         try {
-          const result = await runQuestioning(st, from, cardId, declaredName);
+          const result = await deps.runQuestioning(st, from, cardId, declaredName);
           if (!result.voided) {
             await applyDeclaredEffect(st, from, declaredName, target, result.downCard);
           }
         } finally {
-          cleanupVars(st);
+          deps.cleanupVars(st);
           await popFrame(st);
         }
       },
@@ -332,7 +360,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if ((slot.atom as { type: string }).type !== '询问闪') return '当前不是出闪的窗口';
         if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
         if (!st.players[ownerId]?.alive) return '你已死亡';
-        if (usedThisTurn(st, ownerId, '蛊惑')) return '本回合已使用过蛊惑';
+        if (usedThisTurn(st, ownerId, deps.skillKey)) return '本回合已使用过蛊惑';
         const cardId = params.cardId as string | undefined;
         if (typeof cardId !== 'string' || !st.players[ownerId].hand.includes(cardId)) {
           return '请选择一张手牌';
@@ -342,21 +370,21 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       async (st: GameState, params: Record<string, Json>) => {
         const from = ownerId;
         const cardId = params.cardId as string;
-        await markOncePerTurn(st, from, '蛊惑');
+        await markOncePerTurn(st, from, deps.skillKey);
         await pushFrame(st, '蛊惑', from, { cardId, declaredName: '闪' });
         let notVoided: boolean;
         let downCard: string;
         try {
-          const result = await runQuestioning(st, from, cardId, '闪');
+          const result = await deps.runQuestioning(st, from, cardId, '闪');
           notVoided = !result.voided;
           downCard = result.downCard;
         } finally {
-          cleanupVars(st);
+          deps.cleanupVars(st);
           await popFrame(st);
         }
         // 质疑无人/真 → 向外层结算帧(杀帧)处理区提供一张"闪"(供抵消检测)
         if (notVoided) {
-          await provideAsBasicToProcessing(st, from, downCard, '闪');
+          await provideAsBasicToProcessing(st, from, downCard, '闪', deps.skillKey);
         }
         // 作废(假牌被质疑)时不提供闪 → 杀结算检测处理区无闪 → 于吉受伤
       },
@@ -378,7 +406,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (atom.requestType !== '桃/求桃') return '当前不是求桃窗口';
         if (atom.target !== ownerId) return '不是问你的';
         if (!st.players[ownerId]?.alive) return '你已死亡';
-        if (usedThisTurn(st, ownerId, '蛊惑')) return '本回合已使用过蛊惑';
+        if (usedThisTurn(st, ownerId, deps.skillKey)) return '本回合已使用过蛊惑';
         const cardId = params.cardId as string | undefined;
         if (typeof cardId !== 'string' || !st.players[ownerId].hand.includes(cardId)) {
           return '请选择一张手牌';
@@ -388,14 +416,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       async (st: GameState, params: Record<string, Json>) => {
         const from = ownerId;
         const cardId = params.cardId as string;
-        await markOncePerTurn(st, from, '蛊惑');
+        await markOncePerTurn(st, from, deps.skillKey);
         await pushFrame(st, '蛊惑', from, { cardId, declaredName: '桃' });
         let notVoided: boolean;
         try {
-          const result = await runQuestioning(st, from, cardId, '桃');
+          const result = await deps.runQuestioning(st, from, cardId, '桃');
           notVoided = !result.voided;
         } finally {
-          cleanupVars(st);
+          deps.cleanupVars(st);
           await popFrame(st);
         }
         // 质疑无人/真 → 标记已救援(同 桃.respond/急救.respond,runDyingFlow 据此回复濒死者体力)
@@ -406,6 +434,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       },
     ),
   );
+
+  return unloaders;
+}
+
+export function onInit(skill: Skill, state: GameState): (() => void) | void {
+  const unloaders = registerGuEntries(state, skill, {
+    skillKey: '蛊惑',
+    runQuestioning,
+    cleanupVars,
+  });
 
   // ── respond(注册到每个座次:被蛊惑问询的角色选择是否质疑)──
   for (const pl of state.players) {
@@ -436,7 +474,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   };
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
+/** onMount 共用:注册 use×3/dodge/rescue/respond 的前端动作(标版/界版仅 skillKey 不同)。 */
+export function mountGuActions(api: FrontendAPI, skillKey: string): (() => void) | void {
   // use:每个声明牌名一个 action(与后端 `use:<牌名>` 一一对应)。
   // 声明【杀】:需选目标(攻击范围内,与后端 杀 分支的 inAttackRange 同源);
   // 声明【桃】:自疗(同 桃 的 selfTarget),需自己受伤(镜像 桃 的 peachActiveWhen);
@@ -455,7 +494,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       },
     },
     activeWhen: (ctx: ActionContext) =>
-      activeUseActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx),
+      activeUseActive(ctx, skillKey) && viewCanSlash(ctx.view, ctx.perspectiveIdx),
   });
   api.defineAction(`${USE_ACTION_PREFIX}桃`, {
     label: '蛊惑·桃',
@@ -475,7 +514,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       selfTarget: true,
     },
     activeWhen: (ctx: ActionContext) => {
-      if (!activeUseActive(ctx)) return false;
+      if (!activeUseActive(ctx, skillKey)) return false;
       const p = ctx.view.players[ctx.perspectiveIdx];
       return p?.alive === true && p.health < p.maxHealth;
     },
@@ -488,7 +527,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       title: '蛊惑:扣置一张手牌,声明为【酒】使用',
       cardFilter: { filter: () => true, min: 1, max: 1 },
     },
-    activeWhen: (ctx: ActionContext) => activeUseActive(ctx),
+    activeWhen: (ctx: ActionContext) => activeUseActive(ctx, skillKey),
   });
   // dodge:被杀指定时,扣手牌当闪打出。
   api.defineAction('dodge', {
@@ -499,7 +538,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       title: '蛊惑:扣置一张手牌,声明为闪打出',
       cardFilter: { min: 1, max: 1 },
     },
-    activeWhen: (ctx: ActionContext) => dodgeActive(ctx),
+    activeWhen: (ctx: ActionContext) => dodgeActive(ctx, skillKey),
   });
   // rescue:濒死求桃时,扣手牌当桃救援。
   api.defineAction('rescue', {
@@ -510,7 +549,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       title: '蛊惑:扣置一张手牌,声明为桃救援',
       cardFilter: { min: 1, max: 1 },
     },
-    activeWhen: (ctx: ActionContext) => rescueActive(ctx),
+    activeWhen: (ctx: ActionContext) => rescueActive(ctx, skillKey),
   });
   // respond:被蛊惑问询的角色选择是否质疑。前端按 pending prompt 渲染。
   api.defineAction('respond', {
@@ -521,8 +560,12 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
+export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
+  return mountGuActions(api, '蛊惑');
+}
+
 /** use 激活:自己回合出牌阶段 + 无阻塞 pending + 本回合未用过 + 有手牌。 */
-function activeUseActive(ctx: ActionContext): boolean {
+function activeUseActive(ctx: ActionContext, skillKey: string): boolean {
   const { view, perspectiveIdx } = ctx;
   const p = view.players[perspectiveIdx];
   if (!p) return false;
@@ -531,16 +574,16 @@ function activeUseActive(ctx: ActionContext): boolean {
   const pending = view.pending;
   const blocked = pending != null && pending.isBlocking !== false;
   if (blocked) return false;
-  if (p.turnUsage?.[usedThisTurnKey('蛊惑')]) return false;
+  if (p.turnUsage?.[usedThisTurnKey(skillKey)]) return false;
   return (p.hand?.length ?? 0) > 0;
 }
 
 /** dodge 激活:询问闪 pending 命中自己 + 本回合未用过 + 有手牌。 */
-function dodgeActive(ctx: ActionContext): boolean {
+function dodgeActive(ctx: ActionContext, skillKey: string): boolean {
   const { view, perspectiveIdx } = ctx;
   const p = view.players[perspectiveIdx];
   if (!p) return false;
-  if (p.turnUsage?.[usedThisTurnKey('蛊惑')]) return false;
+  if (p.turnUsage?.[usedThisTurnKey(skillKey)]) return false;
   if ((p.hand?.length ?? 0) === 0) return false;
   const pending = view.pending;
   return (
@@ -550,11 +593,11 @@ function dodgeActive(ctx: ActionContext): boolean {
 }
 
 /** rescue 激活:桃/求桃 pending 命中自己 + 本回合未用过 + 有手牌。 */
-function rescueActive(ctx: ActionContext): boolean {
+function rescueActive(ctx: ActionContext, skillKey: string): boolean {
   const { view, perspectiveIdx } = ctx;
   const p = view.players[perspectiveIdx];
   if (!p) return false;
-  if (p.turnUsage?.[usedThisTurnKey('蛊惑')]) return false;
+  if (p.turnUsage?.[usedThisTurnKey(skillKey)]) return false;
   if ((p.hand?.length ?? 0) === 0) return false;
   const pending = view.pending;
   const atom = pending?.atom as { type?: string; requestType?: string } | null;

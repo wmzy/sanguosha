@@ -6,6 +6,7 @@
 import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { defaultPlayActive } from '../../rules/action-active';
+import { requireRequestType } from '../../util/skillRuntime';
 import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 桃的牌特有校验：目标必须已受伤 */
@@ -49,9 +50,11 @@ export const peachEffect: CardEffect = {
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
-      if (slot.atom.type !== '请求回应') return '当前不是求桃';
-      const requestType = (slot.atom as unknown as Record<string, unknown>).requestType as string;
-      if (requestType !== '桃/求桃') return '当前不是求桃';
+      const check = requireRequestType(state, ownerId, ['桃/求桃'], {
+        wrongTypeError: '当前不是求桃',
+        mismatchError: '当前不是求桃',
+      });
+      if (check.error) return check.error;
       const cardId = params.cardId as string | undefined;
       if (cardId) {
         const self = state.players[ownerId];

@@ -34,6 +34,7 @@ import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rule
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
 import { BINGLUE_TARGETS_KEY, getBinglueTargets } from '../rules/vars-keys';
+import { requireRequestType } from '../util/skillRuntime';
 
 // 请求类型(requestType 前缀 = skillId,见 T1)
 const OPTION_RT = '飞军/option'; // owner:选择效果
@@ -307,11 +308,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       seatId,
       'respond',
       (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as { type: string; requestType?: string };
-        if (atom.type !== '请求回应') return '当前不需要回应';
-        const rt = atom.requestType;
+        const check = requireRequestType(
+          st,
+          seatId,
+          [OPTION_RT, TARGET_RT, DISCARD_EQUIP_RT],
+          { mismatchError: '当前不是飞军询问' },
+        );
+        if (check.error) return check.error;
+        const rt = check.requestType;
         if (rt === OPTION_RT) {
           if (params.option !== 'hand' && params.option !== 'equip') return '请选择一项';
           return null;
@@ -336,7 +340,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             return '牌不在装备区';
           return null;
         }
-        return '当前不是飞军询问';
+        return null;
       },
       async (st: GameState, params: Record<string, Json>): Promise<void> => {
         const slot = st.pendingSlots.get(seatId);

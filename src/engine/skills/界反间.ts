@@ -19,6 +19,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 /** 目标二选一请求类型。 */
 const CHOICE_REQUEST = '界反间/choice';
@@ -134,11 +135,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       seatId,
       'respond',
       (st: GameState, params: Record<string, Json>) => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as Record<string, unknown>;
-        if (atom['type'] !== '请求回应') return '当前不需要回应';
-        if (atom['requestType'] !== CHOICE_REQUEST) return '当前不是反间二选一';
+        const check = requireRequestType(st, seatId, [CHOICE_REQUEST], {
+          mismatchError: '当前不是反间二选一',
+        });
+        if (check.error) return check.error;
         // choice 必须是布尔(前端 confirm prompt 提交 choice:true/false)
         if (typeof params.choice !== 'boolean') return '需要选择一项';
         return null;

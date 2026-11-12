@@ -34,6 +34,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界仁心';
@@ -86,12 +87,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as unknown as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt !== '界仁心/confirm' && rt !== '界仁心/selectCard') return '当前不是仁心询问';
+      const check = requireRequestType(st, ownerId, ['界仁心/confirm', '界仁心/selectCard'], {
+        mismatchError: '当前不是仁心询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
 
       if (rt === '界仁心/selectCard') {
         const cardId = params.cardId as string | undefined;

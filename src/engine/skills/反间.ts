@@ -22,6 +22,7 @@ import { createRng } from '../util/rng';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SUIT_REQUEST = '反间/选花色';
 const SUIT_KEY = '反间/suit';
@@ -135,11 +136,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       seatId,
       'respond',
       (st: GameState, params: Record<string, Json>) => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as Record<string, unknown>;
-        if (atom['type'] !== '请求回应') return '当前不需要回应';
-        if (atom['requestType'] !== SUIT_REQUEST) return '当前不是反间选花色';
+        const check = requireRequestType(st, seatId, [SUIT_REQUEST], {
+          mismatchError: '当前不是反间选花色',
+        });
+        if (check.error) return check.error;
         const suit = params.suit;
         if (typeof suit !== 'string' || !(SUITS as readonly string[]).includes(suit)) {
           return '需要选择 ♠/♥/♣/♦ 中的一种花色';

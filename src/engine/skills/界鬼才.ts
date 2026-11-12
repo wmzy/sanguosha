@@ -30,6 +30,7 @@ import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
 import { registerAction, registerJudgeModifier } from '../core/skill';
 import { replaceJudgeCard } from '../flows/judge';
+import { requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -69,12 +70,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as unknown as Record<string, unknown>;
-      if (atom.type !== '请求回应') return '当前不需要回应';
-      const reqType = atom.requestType as string;
-      if (reqType !== '界鬼才/replace') return '当前不是界鬼才询问';
+      const check = requireRequestType(st, ownerId, ['界鬼才/replace'], {
+        mismatchError: '当前不是界鬼才询问',
+      });
+      if (check.error) return check.error;
       // 若选择替换:cardId 必须在手牌或装备区中;若选择不替换:无额外要求
       // 浏览器/Headless 客户端对 useCard 型 pending 只发 {cardId}(无 choice),
       // 故 cardId 出现即视为发动意图;{choice:false}/{} 仍视为不发动。

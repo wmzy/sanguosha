@@ -30,6 +30,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
+import { currentRequestType } from '../util/skillRuntime';
 
 const TRICK_NAME = '乐不思蜀';
 
@@ -60,12 +61,6 @@ function ownsCard(
 /** 场上是否存在乐不思蜀 */
 function _anyLeOnField(state: GameState): boolean {
   return state.players.some((p) => p.pendingTricks.some((t) => t.name === TRICK_NAME));
-}
-
-function currentRequestType(state: GameState, ownerId: number): string | undefined {
-  const slot = state.pendingSlots.get(ownerId);
-  if (!slot) return undefined;
-  return (slot.atom as unknown as Record<string, unknown>).requestType as string | undefined;
 }
 
 export function createSkill(id: string, ownerId: number): Skill {

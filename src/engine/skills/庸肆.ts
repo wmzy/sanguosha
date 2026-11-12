@@ -24,6 +24,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 /** 弃牌选择询问的 requestType(前缀=技能id,符合 T1)。 */
 const DISCARD_RT = '庸肆/弃牌';
@@ -132,11 +133,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是庸肆弃牌窗口';
-      const atom = slot.atom as { requestType?: string; target: number };
-      if (atom.requestType !== DISCARD_RT) return '当前不是庸肆弃牌窗口';
+      const check = requireRequestType(st, ownerId, [DISCARD_RT], {
+        wrongTypeError: '当前不是庸肆弃牌窗口',
+        mismatchError: '当前不是庸肆弃牌窗口',
+      });
+      if (check.error) return check.error;
+      const atom = st.pendingSlots.get(ownerId)!.atom as { target: number };
       if (atom.target !== ownerId) return '不是你的庸肆弃牌';
       const cardIds = params.cardIds;
       if (!Array.isArray(cardIds)) return 'cardIds required';

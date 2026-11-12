@@ -25,6 +25,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { requireRequestType } from '../util/skillRuntime';
 
 const SKILL_NAME = '从谏';
 
@@ -55,11 +56,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== GIVE_RT) return '当前不是从谏询问';
+      const check = requireRequestType(st, ownerId, [GIVE_RT], {
+        mismatchError: '当前不是从谏询问',
+      });
+      if (check.error) return check.error;
       // 无 cardId = 放弃发动(pass/超时)
       const cardId = params.cardId as string | undefined;
       if (!cardId) return null;
