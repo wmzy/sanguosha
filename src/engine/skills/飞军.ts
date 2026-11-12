@@ -311,7 +311,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const check = requireRequestType(
           st,
           seatId,
-          [OPTION_RT, TARGET_RT, DISCARD_EQUIP_RT],
+          [OPTION_RT, TARGET_RT, GIVE_RT, DISCARD_EQUIP_RT],
           { mismatchError: '当前不是飞军询问' },
         );
         if (check.error) return check.error;
