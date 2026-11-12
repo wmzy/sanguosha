@@ -15,7 +15,8 @@ jobs:
   release:
     needs: check
     name: Release sanguosha-agent-plugin
-    runs-on: ubuntu-latest
+    # 与 ci.yml 保持一致:ubuntu-latest 已切到 26.04,固定 24.04。
+    runs-on: ubuntu-24.04
     permissions:
       contents: write # 打 GitHub Release / git tag
       issues: write

@@ -10,7 +10,9 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # ubuntu-latest 已于 2026-10-19 切换到 Ubuntu 26.04,playwright 1.60 尚不支持
+    # 该平台的 chromium;固定 24.04 直到升级 playwright。
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         node-version: [22]
