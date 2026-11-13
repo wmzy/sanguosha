@@ -22,7 +22,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const SKILL_ID = '界纵玄';
 const DISPLAY_NAME = '纵玄';
@@ -104,21 +104,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     await pushFrame(st, SKILL_ID, ownerId, { cardIds: [...eligible] });
     try {
       // ── 第一步:是否发动纵玄 ──
-      delete st.localVars[CONFIRM_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `是否发动纵玄?(${isUpstream ? '上家' : '你'}弃置了 ${eligible.length} 张牌,可选若干置于牌堆顶)`,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(st, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRM_KEY,
+        title: `是否发动纵玄?(${isUpstream ? '上家' : '你'}弃置了 ${eligible.length} 张牌,可选若干置于牌堆顶)`,
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 30,
       });
-      if (st.localVars[CONFIRM_KEY] !== true) {
+      if (confirmed !== true) {
         delete st.localVars[CONFIRM_KEY];
         return;
       }
@@ -172,21 +166,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const rest = remaining.filter((id) => st.zones.discardPile.includes(id));
         if (rest.length === 0) break;
 
-        delete st.localVars[AGAIN_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: AGAIN_RT,
-          target: ownerId,
-          prompt: {
-            type: 'confirm',
-            title: `纵玄:是否继续选牌?(剩余 ${rest.length} 张可选)`,
-            confirmLabel: '继续',
-            cancelLabel: '完成',
-          },
+        const again = await askConfirm(st, AGAIN_RT, ownerId, {
+          confirmedKey: AGAIN_KEY,
+          title: `纵玄:是否继续选牌?(剩余 ${rest.length} 张可选)`,
+          confirmLabel: '继续',
+          cancelLabel: '完成',
           defaultChoice: false,
           timeout: 30,
         });
-        if (st.localVars[AGAIN_KEY] !== true) {
+        if (again !== true) {
           delete st.localVars[AGAIN_KEY];
           break;
         }

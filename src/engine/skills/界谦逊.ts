@@ -30,7 +30,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_RT = '界谦逊/trigger';
 const CONFIRMED_KEY = '界谦逊/confirmed';
@@ -88,21 +88,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!self?.alive) return;
     if (self.hand.length === 0) return; // 无手牌可移出,跳过
 
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `是否发动谦逊?(${reason};将所有手牌移出游戏直到回合结束)`,
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: `是否发动谦逊?(${reason};将所有手牌移出游戏直到回合结束)`,
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (ctx.state.localVars[CONFIRMED_KEY] !== true) return;
+    if (confirmed !== true) return;
 
     // 确认发动:把当前全部手牌移出游戏(重新读取,防御 pending 期间手牌变化)
     const player = ctx.state.players[ownerId];

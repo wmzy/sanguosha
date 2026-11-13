@@ -24,6 +24,7 @@ import { runUseFlow } from './cards/use-card';
 import { defaultPlayActive } from '../rules/action-active';
 import { setPlayerVarUsage } from '../rules/turn-usage';
 import { registerAction, hasBlockingPending } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';
 import type { SkillModule } from '../types';
@@ -225,10 +226,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
         seat,
         'respond',
         (st: GameState, params: Record<string, Json>): string | null => {
-          const slot = st.pendingSlots.get(seat);
-          if (!slot) return '当前不需要回应';
-          if (slot.atom.type !== '请求回应') return '当前不是挑衅询问';
-          const requestType = (slot.atom as { requestType?: string }).requestType;
+          const check = requireRequestType(st, seat, [SLASH_REQUEST, PICK_REQUEST], {
+            wrongTypeError: '当前不是挑衅询问',
+            mismatchError: '当前不是挑衅询问',
+          });
+          if (check.error) return check.error;
+          const requestType = check.requestType;
+          const slot = st.pendingSlots.get(seat)!;
 
           if (requestType === SLASH_REQUEST) {
             // 被挑衅者出杀:目标固定=姜维(ownerId),且须在攻击范围内

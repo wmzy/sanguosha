@@ -39,7 +39,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerBeforeHook } from '../core/skill';
-import { currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType } from '../util/skillRuntime';
 
 /** 玩家是否拥有红颜系锁定技(红颜/界红颜):黑桃视为红桃。 */
 function hasHongyanVariant(state: GameState, ownerId: number): boolean {
@@ -187,21 +187,15 @@ export function registerTianxiangWiring(skill: Skill, state: GameState, variant:
       if (!hasOtherAlive) return;
 
       // 1) 询问是否发动
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: variant.confirmTitle,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: variant.confirmTitle,
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 10,
       });
-      if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+      if (!confirmed) return;
 
       // 2) 询问弃牌 + 转移目标
       delete ctx.state.localVars[CARD_KEY];

@@ -2,6 +2,7 @@
 // 结算帧出栈:技能 execute 结束时弹出栈顶结算帧。
 // 走 atom 管线,保证 view.settlementStack 与后端同步。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast } from './_helpers';
 
 export const 结算帧出栈: AtomDefinition<Record<string, never>> = {
   type: '结算帧出栈',
@@ -14,10 +15,7 @@ export const 结算帧出栈: AtomDefinition<Record<string, never>> = {
   },
   toViewEvents(): ViewEventSplit {
     const view: ViewEvent = { type: '结算帧出栈' };
-    return {
-      ownerViews: new Map(),
-      othersView: view,
-    };
+    return broadcast(view);
   },
   applyView(view) {
     view.settlementStack.pop();

@@ -26,7 +26,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
-import { runVirtualSlash, requireRequestType } from '../util/skillRuntime';
+import { runVirtualSlash, requireRequestType, askConfirm } from '../util/skillRuntime';
 import { skipPhase } from '../rules/skip-phase';
 
 const OPT1_TRIGGER_RT = '神速/opt1-trigger';
@@ -228,21 +228,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const { atom, self } = entry;
 
       // 询问是否发动选项1
-      delete ctx.state.localVars['神速/confirmed'];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: OPT1_TRIGGER_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
+      if (
+        !(await askConfirm(ctx.state, OPT1_TRIGGER_RT, ownerId, {
+          confirmedKey: '神速/confirmed',
           title: '是否发动神速①?(跳过判定+摸牌,视为出杀)',
           confirmLabel: '发动',
           cancelLabel: '不发动',
-        },
-        defaultChoice: false,
-        timeout: 10,
-      });
-      if (ctx.state.localVars['神速/confirmed'] !== true) {
+          defaultChoice: false,
+          timeout: 10,
+        }))
+      ) {
         return; // 不发动 → 判定阶段正常进行
       }
 
@@ -295,21 +290,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (equipCount === 0) return;
 
       // 询问是否发动选项2
-      delete ctx.state.localVars['神速/confirmed'];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: OPT2_TRIGGER_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
+      if (
+        !(await askConfirm(ctx.state, OPT2_TRIGGER_RT, ownerId, {
+          confirmedKey: '神速/confirmed',
           title: '是否发动神速②?(弃置一张装备牌,跳过出牌,视为出杀)',
           confirmLabel: '发动',
           cancelLabel: '不发动',
-        },
-        defaultChoice: false,
-        timeout: 10,
-      });
-      if (ctx.state.localVars['神速/confirmed'] !== true) {
+          defaultChoice: false,
+          timeout: 10,
+        }))
+      ) {
         return; // 不发动 → 出牌阶段正常进行
       }
 
@@ -396,21 +386,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const { atom, self } = entry;
 
       // 询问是否发动选项3
-      delete ctx.state.localVars['神速/confirmed'];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: OPT3_TRIGGER_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
+      if (
+        !(await askConfirm(ctx.state, OPT3_TRIGGER_RT, ownerId, {
+          confirmedKey: '神速/confirmed',
           title: '是否发动神速③?(翻面,跳过弃牌,视为出杀)',
           confirmLabel: '发动',
           cancelLabel: '不发动',
-        },
-        defaultChoice: false,
-        timeout: 10,
-      });
-      if (ctx.state.localVars['神速/confirmed'] !== true) {
+          defaultChoice: false,
+          timeout: 10,
+        }))
+      ) {
         return; // 不发动 → 弃牌阶段正常进行
       }
 

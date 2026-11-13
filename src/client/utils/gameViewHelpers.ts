@@ -392,6 +392,26 @@ export function resolveDistributeCardIds(
   return hand.map((c) => c.id);
 }
 
+/** distribute allocate 模式可选目标:存活 + allowSelf(缺省允许分配给自己,见
+ *  DistributePrompt.allowSelf 文档)+ targetFilter 三重判定。三处消费:无头
+ *  enumerateDistributeActions 的 validTargets、浏览器 isTargetable 的逐座位
+ *  可选性、distribute 子 hook 点座位 toggle——此前三处手写,且 allowSelf 缺省
+ *  语义漂移(无头按文档默认允许,浏览器按 falsy 即排除)。 */
+export function distributeAllocateCandidates(
+  view: GameView,
+  seatIdx: number,
+  prompt: {
+    allowSelf?: boolean;
+    targetFilter?: (view: GameView, target: number) => boolean;
+  },
+): number[] {
+  return view.players
+    .filter((p) => p.alive
+      && (p.index !== seatIdx || prompt.allowSelf !== false)
+      && (!prompt.targetFilter || prompt.targetFilter(view, p.index)))
+    .map((p) => p.index);
+}
+
 // ─── 主动技按钮的提交变体 ───
 
 /** 主动技按钮的提交变体:一个 action 可能对应多个可点按钮。
@@ -469,6 +489,67 @@ export function choosePlayerCandidates(
     .map((p) => p.index);
 }
 
+/** selectTarget 候选解析:存活 + allowSelf + targetFilter.filter 三重判定
+ *  (allowSelf 缺省排除自己,与 engine targetCandidates 的
+ *  `target === ownerId && !filter.allowSelf` 同源)。两处消费:无头
+ *  enumeratePromptActions 的候选列表、浏览器 isTargetable 的逐座位可选性判断
+ *  ——此前无头侧只查存活+filter、漏 allowSelf 挡板,枚举出引擎必拒的自目标动作。 */
+export function selectTargetCandidates(
+  view: GameView,
+  seatIdx: number,
+  prompt: {
+    targetFilter: {
+      allowSelf?: boolean;
+      filter?: (view: GameView, target: number) => boolean;
+    };
+  },
+): number[] {
+  const { allowSelf, filter } = prompt.targetFilter;
+  return view.players
+    .filter((p) => p.alive
+      && (p.index !== seatIdx || !!allowSelf)
+      && (!filter || filter(view, p.index)))
+    .map((p) => p.index);
+}
+
+/** 主动技目标数上下界:selectTarget 读 targetFilter.min/max、choosePlayer 读
+ *  prompt.min/max,缺省均为 1(其余 prompt 类型亦 {1,1})。三处消费:浏览器
+ *  handleTargetClick(单选点座位即提交)、handleSkillAction(未选目标先进入待定
+ *  选目标模式)、无头 enumeratePromptActions(minTarget/maxTarget 投影与多选
+ *  描述性 action 边界)——此前三处各自手写镜像三元。 */
+export function promptTargetBounds(prompt: ActionPrompt): { min: number; max: number } {
+  if (prompt.type === 'selectTarget') {
+    return { min: prompt.targetFilter.min ?? 1, max: prompt.targetFilter.max ?? 1 };
+  }
+  if (prompt.type === 'choosePlayer') {
+    return { min: prompt.min ?? 1, max: prompt.max ?? 1 };
+  }
+  return { min: 1, max: 1 };
+}
+
+/** 目标约束的 card 参数(杀的动态目标上限解释):选中牌只在「就是正在使用的牌」
+ *  时才有意义——调用方通过 usedCardName 显式声明:
+ *   · 无 targetFilter(use 型 prompt):选中牌就是正在使用的牌,内部自动认定;
+ *   · 转化技:传产出牌名(transformWrapperName,武圣 红牌当杀);
+ *   · 普通出牌:调用方确认「选中牌就是本 action 使用的牌」后传其牌名
+ *     (浏览器按 selectedUseAction.skillId === 选中牌名,无头按 牌名 === skillId);
+ *   · 技能代价牌(离间 弃一张牌 + 选两名男性、强袭 弃武器)传 null——代价牌
+ *     不能按杀的动态目标上限解释(否则 min=max=2 塌成 1,永远提交不出合法
+ *     目标数,见 target-selection.ts 的 countsAsSlash 契约)→ 返回 undefined。
+ *  此前浏览器 isTargetable 与无头 availableActions 各持一份启发式(后者按
+ *  preceding/动作名===牌名 判定),现统一:helper 只认调用方的 usedCardName
+ *  声明,不再自行猜测「牌名===杀」(代价牌恰好是杀时会被误判)。 */
+export function effectiveTargetCard(
+  selectedCard: Card | null | undefined,
+  selectedTargetFilter: TargetFilter | null | undefined,
+  usedCardName: string | null | undefined,
+): Card | undefined {
+  const usingSelected = !selectedTargetFilter || usedCardName != null;
+  return selectedCard && usingSelected
+    ? { ...selectedCard, name: usedCardName ?? selectedCard.name }
+    : undefined;
+}
+
 // ─── 出牌操作按钮可见性 ───
 // 与 availableActions 结束回合条件、引擎 hasBlockingPending 对齐:
 // 仅「自己回合 + 出牌阶段 + 无阻塞 pending」可自由出牌/结束回合。
@@ -481,11 +562,17 @@ export type FreePlayWindowInput = {
   pending: PendingBlocking;
 };
 
+/** view 根 pending 是否为阻塞型(默认阻塞,isBlocking===false 才是非阻塞)。
+ *  isFreePlayWindow 与 PlayerCardLarge 的 memo comparator 共用(此前后者私有
+ *  重复实现,注释自认与 isFreePlayWindow 同源)。 */
+export function hasBlockingPending(pending: PendingBlocking): boolean {
+  return pending != null && pending.isBlocking !== false;
+}
+
 /** 是否处于可自由出牌窗口(非回应/弃牌等阻塞询问)。 */
 export function isFreePlayWindow({ isMyTurn, phase, pending }: FreePlayWindowInput): boolean {
   if (!isMyTurn || phase !== '出牌') return false;
-  if (pending && pending.isBlocking !== false) return false;
-  return true;
+  return !hasBlockingPending(pending);
 }
 
 /** 「结束回合」按钮:可操作且处于自由出牌窗口。 */

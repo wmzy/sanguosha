@@ -1,12 +1,12 @@
 // src/engine/atoms/设横置.ts
 // 设横置:设置玩家横置状态(简化为加/去 'chained' mark)
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 
 export const 设横置: AtomDefinition<{ player: number; chained: boolean }> = {
   type: '设横置',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
-    return null;
+    return requirePlayer(state, atom.player, 'player');
   },
   apply(state, atom) {
     const player = state.players[atom.player];
@@ -22,15 +22,15 @@ export const 设横置: AtomDefinition<{ player: number; chained: boolean }> = {
       player: atom.player,
       chained: atom.chained,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi < 0) return;
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
     const chained = event.chained as boolean;
-    view.players[pi].marks = view.players[pi].marks.filter((m) => m.id !== 'chained');
+    p.marks = p.marks.filter((m) => m.id !== 'chained');
     if (chained) {
-      view.players[pi].marks.push({ id: 'chained', scope: view.players[pi].index });
+      p.marks.push({ id: 'chained', scope: p.index });
     }
   },
 };

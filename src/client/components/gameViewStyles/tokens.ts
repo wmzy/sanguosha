@@ -2,7 +2,7 @@
 // 消费方式:
 //   ① css`` 内插值 —— wyw-in-js 支持纯值插值(同 theme.ts 的 colors 用法);
 //     注意类(class)插值不会内联规则,禁止(见 ChatPanel/InfoDock 内注释)。
-//   ② --bead-* CSS 变量值 —— 由 PlayerCardLarge/PlayerSeatView 内联 style 注入
+//   ② --bead-* CSS 变量值 —— 由 HpBeadColumn 组件内联 style 注入
 //     playerCardHpBeadFull 单类,实现满珠三档分色。
 // 本文件不进 index.ts barrel(barrel 只聚合样式类导出)。
 

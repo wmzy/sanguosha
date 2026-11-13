@@ -8,11 +8,11 @@
 //   - 黑色 = ♠ 或 ♣
 //   - faction 从 player.faction 读取
 //   - 仅主公曹丕可用(isLord 判定),非主公时 hook 注册但不触发(主公技限制)
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { registerAfterHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '颂威/confirm';
 const CONFIRMED_KEY = '颂威/confirmed';
@@ -30,20 +30,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── respond:曹丕回应是否发动颂威 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      return requireRequestType(st, ownerId, [CONFIRM_RT], {
-        mismatchError: '当前不是颂威确认',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_RT, CONFIRMED_KEY, {
+    mismatchError: '当前不是颂威确认',
+  });
 
   // ── 判定牌生效后 hook:其他魏势力角色黑色判定牌 → 询问曹丕摸牌 ──
   registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
@@ -67,21 +56,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!self?.alive) return;
 
     // 询问是否摸牌
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `颂威:${judgePlayer.name} 判定牌为${judgeCard.suit}${judgeCard.rank},是否摸一张牌?`,
-        confirmLabel: '摸牌',
-        cancelLabel: '不摸',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: `颂威:${judgePlayer.name} 判定牌为${judgeCard.suit}${judgeCard.rank},是否摸一张牌?`,
+      confirmLabel: '摸牌',
+      cancelLabel: '不摸',
       defaultChoice: false,
       timeout: 10,
     });
-    if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+    if (!confirmed) return;
 
     // 摸一张牌
     await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });

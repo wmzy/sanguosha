@@ -15,6 +15,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 import { effectiveDistance } from '../rules/distance';
 
 /** 是否发动界狂骨的 requestType(前缀必须等于 skillId,同 CHOOSE_REQUEST 说明) */
@@ -90,21 +91,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const fullHealth = self.health >= self.maxHealth;
 
       // 1. 询问是否发动界狂骨(可选触发)
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_REQUEST,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `是否发动界狂骨?(第 ${i + 1}/${amount} 点伤害)`,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: `是否发动界狂骨?(第 ${i + 1}/${amount} 点伤害)`,
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 30,
       });
-      if (ctx.state.localVars[CONFIRMED_KEY] !== true) continue; // 本点不发动,继续下一点
+      if (confirmed !== true) continue; // 本点不发动,继续下一点
 
       // 2. 发动 → 询问二选一(回复 1 点体力 / 摸 1 张牌)
       delete ctx.state.localVars[CHOICE_KEY];

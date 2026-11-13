@@ -16,6 +16,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 import { getGender } from '../data/character-meta';
 
 /** owner 是否发动的确认询问 requestType */
@@ -112,21 +113,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (getGender(self.character) === getGender(target.character)) return;
 
       // owner 是否发动(你可以)
-      delete ctx.state.localVars[CONFIRMED_VAR];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_REQUEST,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '雌雄双股剑:是否发动?(令目标弃1手牌,或你摸1张牌)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const activated = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
+        confirmedKey: CONFIRMED_VAR,
+        title: '雌雄双股剑:是否发动?(令目标弃1手牌,或你摸1张牌)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 10,
       });
-      if (ctx.state.localVars[CONFIRMED_VAR] !== true) {
+      if (!activated) {
         delete ctx.state.localVars[CONFIRMED_VAR];
         return;
       }

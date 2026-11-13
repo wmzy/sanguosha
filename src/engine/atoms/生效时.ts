@@ -5,29 +5,24 @@
 //
 // 仅在 生效前 未被 cancel 时到达(runUseFlow 在 生效前 返回 false 时跳过)。
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
-import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { getBeforeHooks } from '../core/skill';
+import type { AtomDefinition, ViewEventSplit } from '../types';
+import { hookSilentView, requirePlayer } from './_helpers';
 
 export const 生效时: AtomDefinition<{ source: number; target: number; cardId: string }> = {
   type: '生效时',
   validate(state, atom) {
-    if (!state.players[atom.target]) return `target ${atom.target} not found`;
-    return null;
+    return requirePlayer(state, atom.target, 'target');
   },
   apply() {
     // 纯时机型 atom
   },
   toViewEvents(state, atom): ViewEventSplit {
-    if (getBeforeHooks(state, '生效时').length === 0) {
-      return { ownerViews: new Map(), othersView: null };
-    }
-    const view: ViewEvent = {
+    return hookSilentView(state, '生效时', () => ({
       type: '生效时',
       source: atom.source,
       target: atom.target,
       cardId: atom.cardId,
-    };
-    return { ownerViews: new Map(), othersView: view };
+    }));
   },
   applyView() {},
 };

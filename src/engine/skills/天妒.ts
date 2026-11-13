@@ -7,8 +7,8 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { currentJudgeCardId } from '../flows/judge';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { registerAfterHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const CHOOSE_RT = '天妒/choose';
 const CHOICE_KEY = '天妒/choice';
@@ -26,19 +26,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // respond:玩家在「天妒/choose」询问下的选择
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (s): string | null =>
-      requireRequestType(s, ownerId, [CHOOSE_RT], {
-        mismatchError: '当前不是天妒选择',
-      }).error,
-    async (s, params) => {
-      s.localVars[CHOICE_KEY] = params.choice === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CHOOSE_RT, CHOICE_KEY, {
+    mismatchError: '当前不是天妒选择',
+  });
 
   // 判定牌生效后:自己的判定 → 询问是否获得判定牌
   registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
@@ -53,22 +43,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!ctx.state.cardMap[judgeCardId]) return;
 
     // 询问是否获得
-    delete ctx.state.localVars[CHOICE_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CHOOSE_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '天妒:获得判定牌?',
-        confirmLabel: '获得',
-        cancelLabel: '不获得',
-      },
+    const want = await askConfirm(ctx.state, CHOOSE_RT, ownerId, {
+      confirmedKey: CHOICE_KEY,
+      title: '天妒:获得判定牌?',
+      confirmLabel: '获得',
+      cancelLabel: '不获得',
       defaultChoice: false,
       timeout: 10,
     });
-
-    const want = ctx.state.localVars[CHOICE_KEY] === true;
     delete ctx.state.localVars[CHOICE_KEY];
     if (!want) return;
 

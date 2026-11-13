@@ -12,8 +12,8 @@
 // 噪声抑制:无 before hook 时标记型 atom 的 toViewEvents 返回 null(整个 atom 视图上 no-op),
 // 与 damage-timing / move-timing / life-timing / statechange-timing 一致。atom 本身仍走完整
 // pipeline(apply + after hooks),编排函数/测试可从 state.atomHistory 观察时序。
-import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { getBeforeHooks } from '../core/skill';
+import type { AtomDefinition, GameState, ViewEventSplit } from '../types';
+import { hookSilentView, requirePlayer } from './_helpers';
 
 /** 阶段间时机 atom 的形状。 */
 type PhaseBetweenAtom = {
@@ -24,22 +24,17 @@ type PhaseBetweenAtom = {
 
 /** 校验 player 存在(纯标记,不校验 from/to 合法性——编排函数前置保证)。 */
 function validatePhaseBetween(state: GameState, atom: PhaseBetweenAtom): string | null {
-  if (!state.players[atom.player]) return `player ${atom.player} not found`;
-  return null;
+  return requirePlayer(state, atom.player, 'player');
 }
 
 /** 无 before-hook 时静默(no-op 视图),有 before-hook 时发通知事件。 */
 function phaseBetweenView(state: GameState, atom: PhaseBetweenAtom): ViewEventSplit {
-  if (getBeforeHooks(state, '阶段间').length === 0) {
-    return { ownerViews: new Map(), othersView: null };
-  }
-  const view: ViewEvent = {
+  return hookSilentView(state, '阶段间', () => ({
     type: '阶段间',
     player: atom.player,
     from: atom.from,
     to: atom.to,
-  };
-  return { ownerViews: new Map(), othersView: view };
+  }));
 }
 
 export const 阶段间: AtomDefinition<PhaseBetweenAtom> = {

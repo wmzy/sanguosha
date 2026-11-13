@@ -35,6 +35,7 @@ import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerSuppressionProvider } from '../core/skill-suppression';
+import { askConfirm } from '../util/skillRuntime';
 
 /** 标签:目标本回合非锁定技失效(index.runBeforeHooks/runAfterHooks 读取) */
 export const SUPPRESSION_TAG = '界铁骑/非锁定技失效';
@@ -125,21 +126,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (ctx.state.zones.deck.length === 0) return; // 无牌可判
 
     // 询问是否发动铁骑("你可以..."——可选)
-    delete ctx.state.localVars[CONFIRM];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '界铁骑/confirm',
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动铁骑(令目标本回合非锁定技失效并判定)?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, '界铁骑/confirm', ownerId, {
+      confirmedKey: CONFIRM,
+      title: '是否发动铁骑(令目标本回合非锁定技失效并判定)?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (!ctx.state.localVars[CONFIRM]) return;
+    if (!confirmed) return;
 
     // a. 非锁定技失效:给目标加压制标签(回合结束清)
     if (!targetPlayer.tags.includes(SUPPRESSION_TAG)) {

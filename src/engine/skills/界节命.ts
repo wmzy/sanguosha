@@ -39,6 +39,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 
 // 内部 requestType/localVars 键名保持原前缀「节命/」,不改为「界节命/」
 const CONFIRM_RT = '界节命/confirm';
@@ -63,21 +64,15 @@ export function createSkill(id: string, ownerId: number): Skill {
 /** 执行节命主体:询问发动 → 选目标 → 目标摸 X 张 → 目标弃至 X 张。 */
 async function runJieMing(state: GameState, ownerId: number): Promise<void> {
   // 询问是否发动
-  delete state.localVars[CONFIRMED_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: CONFIRM_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: '是否发动节命?(令一名角色摸X张牌,然后将手牌弃至X张)',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+  const confirmed = await askConfirm(state, CONFIRM_RT, ownerId, {
+    confirmedKey: CONFIRMED_KEY,
+    title: '是否发动节命?(令一名角色摸X张牌,然后将手牌弃至X张)',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
     defaultChoice: false,
     timeout: 10,
   });
-  if (!state.localVars[CONFIRMED_KEY]) return;
+  if (!confirmed) return;
 
   // 选目标(任意存活角色,含自己)
   delete state.localVars[TARGET_KEY];

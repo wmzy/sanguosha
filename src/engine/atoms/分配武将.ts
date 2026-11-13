@@ -2,6 +2,7 @@
 // 选将完成时分配武将给玩家(主动选将/超时自动分配共用)。
 // 走 atom 管线:toViewEvents 携带角色信息,applyView 更新前端 view。
 import type { AtomDefinition, ViewEventSplit, ViewEvent, Faction } from '../types';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 import { getCharacterMeta } from '../data/character-meta';
 
 /** 计算分配武将后的体力上限:基础值=武将卡牌 maxHealth。
@@ -19,7 +20,8 @@ function resolveMaxHealth(
 export const 分配武将: AtomDefinition<{ target: number; character: string; skills: string[] }> = {
   type: '分配武将',
   validate(state, atom) {
-    if (!state.players[atom.target]) return `target ${atom.target} not found`;
+    const err = requirePlayer(state, atom.target, 'target');
+    if (err) return err;
     if (!atom.character) return 'character required';
     return null;
   },
@@ -65,7 +67,7 @@ export const 分配武将: AtomDefinition<{ target: number; character: string; s
       const redacted: ViewEvent = { type: '分配武将', target: atom.target };
       return { ownerViews: new Map([[atom.target, view]]), othersView: redacted };
     }
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
     const target = event.target as number;
@@ -73,17 +75,17 @@ export const 分配武将: AtomDefinition<{ target: number; character: string; s
     // 选将期红化事件(无 character):仅标记占位,不写任何可见字段
     if (!character) return;
     const skills = (event.skills ?? []) as string[];
-    const pi = view.players.findIndex((p) => p.index === target);
-    if (pi < 0) return;
-    view.players[pi].character = character;
-    view.players[pi].name = character;
-    view.players[pi].skills = skills;
+    const p = viewPlayer(view, target);
+    if (!p) return;
+    p.character = character;
+    p.name = character;
+    p.skills = skills;
     const faction = event.faction as Faction | undefined;
-    if (faction) view.players[pi].faction = faction;
+    if (faction) p.faction = faction;
     const maxHp = event.maxHealth as number | undefined;
     if (typeof maxHp === 'number') {
-      view.players[pi].maxHealth = maxHp;
-      view.players[pi].health = maxHp;
+      p.maxHealth = maxHp;
+      p.health = maxHp;
     }
   },
 };

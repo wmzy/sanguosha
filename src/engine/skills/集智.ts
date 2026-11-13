@@ -11,28 +11,13 @@
 //
 //   触发后询问是否摸牌(请求回应 confirm,faithful to "可以"),确认则 摸牌 1 张。
 //
-// 非延时锦囊(12):过河拆桥/顺手牵羊/无中生有/无懈可击/借刀杀人/桃园结义/
-//                 五谷丰登/南蛮入侵/万箭齐发/决斗/火攻/铁索连环
+// 非延时锦囊(12)清单单一来源:util/non-delay-tricks.ts
+// (标准版 10 + 军争篇 火攻/铁索连环)
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
-
-/** 非延时锦囊牌名集合(即时锦囊,共 12 张:标准版 10 + 军争篇 火攻/铁索连环) */
-const NON_DELAY_TRICKS = new Set([
-  '过河拆桥',
-  '顺手牵羊',
-  '无中生有',
-  '无懈可击',
-  '借刀杀人',
-  '桃园结义',
-  '五谷丰登',
-  '南蛮入侵',
-  '万箭齐发',
-  '决斗',
-  '火攻',
-  '铁索连环',
-]);
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { NON_DELAY_TRICK_NAMES } from '../util/non-delay-tricks';
 
 const CONFIRM_REQUEST = '集智/confirm';
 
@@ -77,26 +62,20 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const card = ctx.state.cardMap[atom.cardId];
     if (!card) return;
     if (card.type !== '锦囊牌') return;
-    if (!NON_DELAY_TRICKS.has(card.name)) return;
+    if (!NON_DELAY_TRICK_NAMES.has(card.name)) return;
     if (!ctx.state.players[ownerId]?.alive) return;
 
     // 询问是否摸牌(faithful to "你可以摸一张牌")
-    delete ctx.state.localVars['集智/confirmed'];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_REQUEST,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动集智摸一张牌?',
-        confirmLabel: '摸牌',
-        cancelLabel: '不摸',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
+      confirmedKey: '集智/confirmed',
+      title: '是否发动集智摸一张牌?',
+      confirmLabel: '摸牌',
+      cancelLabel: '不摸',
       defaultChoice: true,
       timeout: 15,
     });
     // defaultChoice:true → 超时(undefined=未回应)视为默认确认;仅显式取消(false)放弃摸牌
-    if (ctx.state.localVars['集智/confirmed'] === false) return;
+    if (!confirmed) return;
     await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
   });
 

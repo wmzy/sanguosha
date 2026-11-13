@@ -37,7 +37,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
-import { slotOf } from '../util/skillRuntime';
+import { slotOf, requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const _SKILL_ID = '界直言';
 const DISPLAY_NAME = '直言';
@@ -93,23 +93,17 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!self?.alive) return; // 虞翻须存活
 
     // ── 第一步:是否发动直言 ──
-    delete st.localVars[CONFIRM_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `是否发动直言?(${isSelf ? '你的' : '上家的'}结束阶段)`,
-        description:
-          '令一名角色摸一张牌并展示之:装备牌→其使用之并回复1点体力;非装备牌且其体力不等于你→其失去1点体力',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(st, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: `是否发动直言?(${isSelf ? '你的' : '上家的'}结束阶段)`,
+      description:
+        '令一名角色摸一张牌并展示之:装备牌→其使用之并回复1点体力;非装备牌且其体力不等于你→其失去1点体力',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (st.localVars[CONFIRM_KEY] !== true) {
+    if (confirmed !== true) {
       delete st.localVars[CONFIRM_KEY];
       return;
     }
@@ -197,20 +191,19 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是直言窗口';
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType === CONFIRM_RT) {
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, TARGET_RT], {
+        wrongTypeError: '当前不是直言窗口',
+        mismatchError: '当前不是直言窗口',
+      });
+      if (check.error) return check.error;
+      if (check.requestType === CONFIRM_RT) {
         return null;
       }
-      if (atom.requestType === TARGET_RT) {
-        const target = params.target;
-        if (typeof target !== 'number') return '需要选择一名角色';
-        if (!st.players[target]?.alive) return '目标不合法';
-        return null;
-      }
-      return '当前不是直言窗口';
+      // TARGET_RT:选一名角色
+      const target = params.target;
+      if (typeof target !== 'number') return '需要选择一名角色';
+      if (!st.players[target]?.alive) return '目标不合法';
+      return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
       const slot = st.pendingSlots.get(ownerId);

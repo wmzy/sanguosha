@@ -22,6 +22,7 @@ import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import type { GameView as EngineGameView, Card, Json, ViewEvent } from '../../engine/types';
 import { getAtomDef } from '../../engine/core/atom';
+import { DISCARD_KEEP_PRIORITY } from '../../engine/atoms/请求回应';
 import { CountdownBar } from './CountdownBar';
 import { DEFAULT_COUNTDOWN_TOTAL_MS, useCountdownSeconds } from '../hooks/useCountdown';
 import { viewSlashMax, viewSlashUsed } from '../../engine/rules/action-active';
@@ -78,16 +79,6 @@ import { useAutoSkip } from '../hooks/useAutoSkip';
 import type { QueuedEvent } from '../hooks/useEventPlayback';
 
 import type { ActionMsg } from '../types';
-
-/** 弃牌超时兜底的保留优先级表(桃:0 杀:1 闪:2 无懈可击:3,其余 9)。
- *  字面同步自引擎 src/engine/atoms/请求回应.ts 的 onTimeout(`__弃牌` 分支,内联未导出)——
- *  弃牌预览高亮与引擎实际自动弃置必须同一排序(低价值先弃,与手牌位置无关)。 */
-const DISCARD_KEEP_PRIORITY: Record<string, number> = {
-  '桃': 0,
-  '杀': 1,
-  '闪': 2,
-  '无懈可击': 3,
-};
 
 interface Props {
   view: EngineGameView;

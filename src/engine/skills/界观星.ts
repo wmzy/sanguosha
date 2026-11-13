@@ -22,7 +22,7 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 /** localVars 键:准备阶段全置底 → 结束阶段再次发动(一次性) */
 const ALL_BOTTOM_FLAG = '界观星/全置底';
@@ -64,21 +64,15 @@ async function doGuanxing(state: GameState, ownerId: number): Promise<boolean> {
   if (drawCount === 0) return false;
 
   // 询问是否发动
-  delete state.localVars[CONFIRMED_VAR];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: '界观星/confirm',
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: '是否发动界观星?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+  const confirmed = await askConfirm(state, '界观星/confirm', ownerId, {
+    confirmedKey: CONFIRMED_VAR,
+    title: '是否发动界观星?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
     defaultChoice: false,
     timeout: 15,
   });
-  if (!state.localVars[CONFIRMED_VAR]) return false;
+  if (!confirmed) return false;
 
   // 观察牌堆顶 drawCount 张(deck 末尾为顶)
   const observed = deck.slice(-drawCount);

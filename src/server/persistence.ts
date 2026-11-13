@@ -91,9 +91,8 @@ async function writeNow(roomId: string, wrapper: PersistedWrapper): Promise<void
     } catch {
       // 临时文件清理失败不覆盖原始写入错误
     }
-    const e = normalizeError(err);
-    log.error(`save failed for room ${roomId}`, { error: e.stack ?? String(e) });
-    throw e;
+    log.err(`save failed for room ${roomId}`, err);
+    throw normalizeError(err);
   }
 }
 
@@ -106,9 +105,8 @@ async function readWrapperFromDisk(roomId: string): Promise<PersistedWrapper | n
     return parsed;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    const e = normalizeError(err);
-    log.error(`read failed for room ${roomId}`, { error: e.stack ?? String(e) });
-    throw e;
+    log.err(`read failed for room ${roomId}`, err);
+    throw normalizeError(err);
   }
 }
 
@@ -118,9 +116,8 @@ async function deleteFile(roomId: string): Promise<void> {
     await unlink(path);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
-    const e = normalizeError(err);
-    log.error(`delete failed for room ${roomId}`, { error: e.stack ?? String(e) });
-    throw e;
+    log.err(`delete failed for room ${roomId}`, err);
+    throw normalizeError(err);
   }
 }
 

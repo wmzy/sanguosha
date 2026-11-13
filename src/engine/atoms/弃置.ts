@@ -6,6 +6,7 @@
 // ZoneLoc 不含「装备」区域,装备/判定区弃置不发标记——失去牌类技能主要关心手牌。
 // 本 atom 的 apply + view 事件保持不变(含信息分级),时机标记仅为额外 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 import { applyAtom } from '../core/apply';
 
 /** localVars key:本次弃置中来自手牌的 cardId(afterApply 发时机标记用)。
@@ -16,9 +17,7 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[]; volunta
   type: '弃置',
   validate(state, atom) {
     if (atom.cardIds.length === 0) return 'no cards to discard';
-    const p = state.players[atom.player];
-    if (!p) return `player ${atom.player} not found`;
-    return null;
+    return requirePlayer(state, atom.player, 'player');
   },
   apply(state, atom) {
     const player = state.players[atom.player];
@@ -69,29 +68,29 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[]; volunta
       // 弃牌堆是公开信息:所有玩家都能看到弃了什么牌
       cardNames: atom.cardIds.map((id) => state.cardMap[id]?.name).filter(Boolean),
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi < 0) return;
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
     const cardIds = (event.cardIds as string[]) ?? [];
     const zones = (event.zones as Record<string, string>) ?? {};
     const discardSet = new Set(cardIds);
     // 装备区:清除被弃的装备(与 apply 对称)
     const equipment: Partial<Record<string, string>> = {};
-    for (const [slot, id] of Object.entries(view.players[pi].equipment)) {
+    for (const [slot, id] of Object.entries(p.equipment)) {
       if (id && discardSet.has(id)) {
         // 装备在弃牌集中:不纳入 equipment
       } else if (id) {
         equipment[slot] = id;
       }
     }
-    view.players[pi].equipment = equipment;
+    p.equipment = equipment;
     // 手牌:只减在 hand 区域的牌(判定区牌不在 hand/equip,不应减 handCount)
     const handRemoved = cardIds.filter((id) => zones[id] === 'hand').length;
-    view.players[pi].handCount = Math.max(0, view.players[pi].handCount - handRemoved);
-    if (view.players[pi].hand && handRemoved > 0) {
-      view.players[pi].hand = view.players[pi].hand.filter((c) => !discardSet.has(c.id));
+    p.handCount = Math.max(0, p.handCount - handRemoved);
+    if (p.hand && handRemoved > 0) {
+      p.hand = p.hand.filter((c) => !discardSet.has(c.id));
     }
     if (view.zones) {
       view.zones.discardPileCount += cardIds.length;

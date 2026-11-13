@@ -1,5 +1,6 @@
 // 结算帧 params 字段赋值。默认操作栈顶,也可定位仍在栈中的父帧。
 import type { AtomDefinition, Json } from '../types';
+import { broadcast } from './_helpers';
 
 export const 帧参数赋值: AtomDefinition<{ frameIndex?: number; key: string; value: Json }> = {
   type: '帧参数赋值',
@@ -15,15 +16,12 @@ export const 帧参数赋值: AtomDefinition<{ frameIndex?: number; key: string;
     frame.params[atom.key] = structuredClone(atom.value);
   },
   toViewEvents(state, atom) {
-    return {
-      ownerViews: new Map(),
-      othersView: {
-        type: '帧参数赋值',
-        frameIndex: atom.frameIndex ?? state.settlementStack.length - 1,
-        key: atom.key,
-        value: structuredClone(atom.value),
-      },
-    };
+    return broadcast({
+      type: '帧参数赋值',
+      frameIndex: atom.frameIndex ?? state.settlementStack.length - 1,
+      key: atom.key,
+      value: structuredClone(atom.value),
+    });
   },
   applyView(view, event) {
     const frameIndex = (event.frameIndex as number | undefined) ?? view.settlementStack.length - 1;

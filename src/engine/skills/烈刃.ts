@@ -23,6 +23,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { askRankCard, runRankCompareOrForfeit } from '../flows/rank';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { createRng } from '../util/rng';
+import { askConfirm } from '../util/skillRuntime';
 
 const CONFIRM_RT = '烈刃/confirm';
 const CONFIRMED_KEY = '烈刃/confirmed';
@@ -120,21 +121,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (victimPlayer.hand.length === 0) return;
 
     // 1. 询问是否发动烈刃
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `是否发动烈刃,与 ${victimPlayer.name} 拼点?`,
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: `是否发动烈刃,与 ${victimPlayer.name} 拼点?`,
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+    if (!confirmed) return;
 
     // 再校验双方手牌(发动期间可能变化)
     if (ctx.state.players[ownerId].hand.length === 0) return;

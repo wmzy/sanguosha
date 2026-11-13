@@ -38,7 +38,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerAttackRangeExemptor, effectiveDistance } from '../rules/distance';
 import { getCardValue } from '../flows/rank';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const TAG_BLOCK = '界烈弓/禁闪';
 const TAG_BONUS = '界烈弓/加伤';
@@ -122,21 +122,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!condBlock && !condBonus) return;
 
     // 询问是否发动(单次发动,统一管理两效果)
-    delete ctx.state.localVars[CONFIRM];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '界烈弓/confirm',
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动烈弓?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, '界烈弓/confirm', ownerId, {
+      confirmedKey: CONFIRM,
+      title: '是否发动烈弓?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (!ctx.state.localVars[CONFIRM]) return;
+    if (!confirmed) return;
 
     // 按成立条件加标签(同一杀对同一目标可同时叠加禁闪+加伤)
     if (condBlock) {

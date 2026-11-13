@@ -43,7 +43,7 @@ import { registerAttackRangeExemptor } from '../rules/distance';
 import { DANGXIAN_EXTRA_PHASE_VIEW_KEY, DANGXIAN_NO_RANGE_VIEW_KEY } from '../rules/vars-keys';
 import { setTurnVarUsage, projectTurnUsage } from '../rules/turn-usage';
 import { createRng } from '../util/rng';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const DISPLAY_NAME = '当先';
 
@@ -161,22 +161,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await applyAtom(ctx.state, { type: '阶段开始', player: ownerId, phase: '出牌' });
 
     // 3) 询问:是否获得一张杀?(描述中"你可以",故可选)
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '当先:是否从牌堆或弃牌堆获得一张无距离限制的杀?',
-        confirmLabel: '获得杀',
-        cancelLabel: '不获得',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: '当先:是否从牌堆或弃牌堆获得一张无距离限制的杀?',
+      confirmLabel: '获得杀',
+      cancelLabel: '不获得',
       defaultChoice: false,
       timeout: 15,
     });
 
-    if (ctx.state.localVars[CONFIRMED_KEY] === true) {
+    if (confirmed) {
       // 4) 询问:从哪个区域?(确认=牌堆,取消=弃牌堆)
       delete ctx.state.localVars[SOURCE_KEY];
       await applyAtom(ctx.state, {

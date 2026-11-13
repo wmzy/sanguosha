@@ -1,13 +1,15 @@
 // src/engine/atoms/阶段开始.ts
 // 阶段开始:更新 state.phase
 import type { AtomDefinition, GameView, TurnPhase, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 
 const VALID_PHASES: TurnPhase[] = ['准备', '判定', '摸牌', '出牌', '弃牌', '回合结束'];
 
 export const 阶段开始: AtomDefinition<{ player: number; phase: string }> = {
   type: '阶段开始',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
+    const err = requirePlayer(state, atom.player, 'player');
+    if (err) return err;
     if (!VALID_PHASES.includes(atom.phase as TurnPhase)) return `invalid phase ${atom.phase}`;
     return null;
   },
@@ -22,7 +24,7 @@ export const 阶段开始: AtomDefinition<{ player: number; phase: string }> = {
       player: atom.player,
       phase: atom.phase,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   effect: { sound: 'phase_start', duration: 1000 },
   applyView(view: GameView, event) {

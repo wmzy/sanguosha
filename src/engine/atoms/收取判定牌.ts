@@ -12,6 +12,7 @@
 //
 // 校验:牌必须存在且当前确实在结算帧牌区(防止消费方重复收取 / 收到已入弃牌堆的牌)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast } from './_helpers';
 import { frameCards } from '../core/frame';
 
 export const 收取判定牌: AtomDefinition<{ player: number; cardId: string }> = {
@@ -34,7 +35,7 @@ export const 收取判定牌: AtomDefinition<{ player: number; cardId: string }>
       player: atom.player,
       cardId: atom.cardId,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
     const cardId = event.cardId as string | undefined;

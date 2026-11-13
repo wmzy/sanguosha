@@ -16,15 +16,14 @@ import type {
   FrontendAPI,
   GameState,
   HookResult,
-  Json,
   Skill,
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
 import { peekTop } from '../core/deck';
-import { registerAction, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { registerBeforeHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const TRIGGER_RT = '再起/trigger';
 const TRIGGERED_KEY = '再起/triggered';
@@ -42,19 +41,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // respond:处理 trigger(confirm) 询问
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (s: GameState, _params: Record<string, Json>): string | null =>
-      requireRequestType(s, ownerId, [TRIGGER_RT], {
-        mismatchError: '当前不是再起回应',
-      }).error,
-    async (s: GameState, params: Record<string, Json>) => {
-      s.localVars[TRIGGERED_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, TRIGGER_RT, TRIGGERED_KEY, {
+    mismatchError: '当前不是再起回应',
+  });
 
   // 阶段开始(摸牌) before:询问是否再起,发动则展示+结算+跳过默认摸牌
   registerBeforeHook(
@@ -82,21 +71,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const x = Math.min(lostHealth + 1, ctx.state.zones.deck.length);
 
       // 询问是否发动再起
-      delete ctx.state.localVars[TRIGGERED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: TRIGGER_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `是否发动再起?(放弃摸牌,展示牌堆顶${x}张,红桃回血,其余入手)`,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const triggered = await askConfirm(ctx.state, TRIGGER_RT, ownerId, {
+        confirmedKey: TRIGGERED_KEY,
+        title: `是否发动再起?(放弃摸牌,展示牌堆顶${x}张,红桃回血,其余入手)`,
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 10,
       });
-      if (ctx.state.localVars[TRIGGERED_KEY] !== true) return; // 不发动 → 默认摸牌
+      if (!triggered) return; // 不发动 → 默认摸牌
       const shownCardIds: string[] = [];
       for (let i = 0; i < x; i++) {
         const topCardId = peekTop(ctx.state);

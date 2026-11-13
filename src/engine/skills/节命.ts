@@ -18,7 +18,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const CONFIRM_RT = '节命/confirm';
 const TARGET_RT = '节命/target';
@@ -78,21 +78,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!ctx.state.players[ownerId]?.alive) break;
 
       // 询问是否发动
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动节命?(令一名角色将手牌摸至体力上限)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: '是否发动节命?(令一名角色将手牌摸至体力上限)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 10,
       });
-      if (!ctx.state.localVars[CONFIRMED_KEY]) continue; // 本次不发动,继续下一次(每点独立可选)
+      if (!confirmed) continue; // 本次不发动,继续下一次(每点独立可选)
 
       // 选目标(任意存活角色,含自己)
       delete ctx.state.localVars[TARGET_KEY];

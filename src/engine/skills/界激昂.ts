@@ -5,7 +5,8 @@
 //
 // 两段式加强版(相对标激昂 src/engine/skills/激昂.ts,不修改标版):
 //   第一段(同标激昂):使用/被使用 决斗或红色杀 → 可摸一张牌
-//     (after-hook 挂「成为目标」,覆盖使用/被使用四种情形;source 情形按 cardId 去重)
+//     (复用标版导出的 registerJiangFirstStage 工厂:after-hook 挂「成为目标」,
+//      覆盖使用/被使用四种情形;source 情形按 cardId 去重;键前缀 '界激昂' 与标版隔离)
 //   第二段(界新增):每回合首次有 决斗或红色杀「因弃置」入弃牌堆 → 可失去1点体力获得之
 //     (after-hook 挂「弃置」atom;每回合限一次)
 //
@@ -27,45 +28,22 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply'
-import { topFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, requireRequestType } from '../util/skillRuntime';
+import { isJiangTrigger, registerJiangFirstStage } from './激昂';
 
 const SKILL_ID = '界激昂';
 const DISPLAY_NAME = '激昂';
 
-// 第一段:使用/被使用 → 摸一张牌
+// 第一段:使用/被使用 → 摸一张牌(共享工厂 registerJiangFirstStage 派生同前缀键)
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
 const CONFIRMED_KEY = `${SKILL_ID}/confirmed`;
-/** source 情形去重:已为本 cardId 触发过(localVars 标记,键含 cardId) */
-function srcDoneKey(cardId: string): string {
-  return `${SKILL_ID}/src/${cardId}`;
-}
 
 // 第二段:因弃置入弃牌堆 → 可失去1体力获得之(每回合限一次)
 const RECYCLE_RT = `${SKILL_ID}/recycle`;
 const RECYCLE_CONFIRM_KEY = `${SKILL_ID}/recycleConfirm`;
 /** 每回合限一次标记:后缀 /usedThisTurn 由「回合结束」atom 自动清空 */
 const RECYCLE_USED_KEY = `${SKILL_ID}/recycle/usedThisTurn`;
-
-/** 判定是否为激昂可触发场景(决斗或红色杀);与标激昂同款判定
- *  allowVirtualFallback:仅「成为目标」hook 需要——虚拟决斗(离间)无实体牌,
- *    靠 topFrame.skillId 兜底。「弃置」hook 处理的必是真实弃牌,应按牌本身身份判定,
- *    不可用帧兜底(否则离间弃置非决斗/红杀的代价牌时会误判为触发)。 */
-function isJiangTrigger(
-  state: GameState,
-  cardId: string | undefined,
-  allowVirtualFallback = true,
-): boolean {
-  const card = cardId ? state.cardMap[cardId] : undefined;
-  if (card?.name === '决斗') return true;
-  if (card?.name === '杀' && card.color === '红') return true;
-  // 虚拟决斗(离间无实体牌):用当前结算帧兜底
-  if (!allowVirtualFallback) return false;
-  const frameSkill = topFrame(state)?.skillId;
-  if (frameSkill === '决斗' || frameSkill === '离间') return true;
-  return false;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -92,58 +70,18 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return;
-      const rt = (slot.atom as Record<string, unknown>)['requestType'] as string;
+      // validate 已断言 pending slot 为 请求回应 且 requestType ∈ 两段之一;
+      // 此处按 currentRequestType 分流结果键(skillRuntime 共享读取,替代手写 slot 解析)
+      const rt = currentRequestType(st, ownerId);
+      if (rt === undefined) return;
       const yes = params.choice === true || params.confirmed === true;
       if (rt === CONFIRM_RT) st.localVars[CONFIRMED_KEY] = yes;
       else st.localVars[RECYCLE_CONFIRM_KEY] = yes;
     },
   );
 
-  // ── 第一段:成为目标 after-hook(覆盖使用/被使用全部情形,同标激昂)──
-  registerAfterHook(
-    state,
-    skill.id,
-    ownerId,
-    '成为目标',
-    async (ctx): Promise<void> => {
-      const atom = ctx.atom;
-      const involved = atom.source === ownerId || atom.target === ownerId;
-      if (!involved) return;
-      const self = ctx.state.players[ownerId];
-      if (!self?.alive) return;
-      if (!isJiangTrigger(ctx.state, atom.cardId)) return;
-
-      // source 情形去重:多目标杀只触发一次
-      if (atom.source === ownerId) {
-        const cardId = atom.cardId ?? '__virtual__';
-        const key = srcDoneKey(cardId);
-        if (ctx.state.localVars[key]) return;
-        ctx.state.localVars[key] = true;
-      }
-
-      // 询问是否发动(可选)
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动激昂?(摸一张牌)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
-        defaultChoice: false,
-        timeout: 15,
-      });
-      if (!ctx.state.localVars[CONFIRMED_KEY]) return;
-
-      // 发动:摸一张牌
-      await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
-    },
-  );
+  // ── 第一段:成为目标 after-hook(覆盖使用/被使用全部情形;标激昂共享工厂)──
+  registerJiangFirstStage(skill.id, state, ownerId, { keyPrefix: SKILL_ID });
 
   // ── 第二段:弃置 after-hook — 每回合首次 决斗或红色杀 因弃置入弃牌堆 ──
   registerAfterHook(
@@ -169,21 +107,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       ctx.state.players[ownerId].vars[RECYCLE_USED_KEY] = true;
 
       // 询问是否失去1点体力获得之
-      delete ctx.state.localVars[RECYCLE_CONFIRM_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: RECYCLE_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动激昂?(失去1点体力获得此牌)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const recycle = await askConfirm(ctx.state, RECYCLE_RT, ownerId, {
+        confirmedKey: RECYCLE_CONFIRM_KEY,
+        title: '是否发动激昂?(失去1点体力获得此牌)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 15,
       });
-      if (!ctx.state.localVars[RECYCLE_CONFIRM_KEY]) return;
+      if (!recycle) return;
 
       // 发动:失去1点体力(非伤害,不触发伤害技;体力归零由系统规则进入濒死)
       await applyAtom(ctx.state, { type: '失去体力', target: ownerId, amount: 1 });

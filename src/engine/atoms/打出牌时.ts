@@ -2,12 +2,12 @@
 // after hook 触发"打出牌时"时机技能(雷击/涯角等):打出特定牌后触发判定/摸牌。
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 
 export const 打出牌时: AtomDefinition<{ player: number; cardId: string }> = {
   type: '打出牌时',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
-    return null;
+    return requirePlayer(state, atom.player, 'player');
   },
   apply() {
     // 事件标记——after hook 触发雷击/涯角等"打出牌时"时机技能
@@ -23,7 +23,7 @@ export const 打出牌时: AtomDefinition<{ player: number; cardId: string }> = 
       cardName,
       effect: { sound: `card/${cardName}`, animation: 'highlight', duration: 400 },
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView() {
     // 事件标记——无 GameView 字段需要直接更新(判定/摸牌由后续 atom 的 applyView 体现)。

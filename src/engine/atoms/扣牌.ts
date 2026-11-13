@@ -14,6 +14,7 @@
 //   且后续假牌分支可直接用「移动牌」(弃牌堆→质疑者手牌)取回,无需新造"取回扣牌"atom。
 //   成功(真牌/无人质疑)分支牌留在弃牌堆(即"已使用"),假牌分支牌被质疑者取走(弃牌堆-1)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent, Card } from '../types';
+import { requirePlayer, viewPlayer } from './_helpers';
 
 export const 扣牌: AtomDefinition<{
   player: number;
@@ -22,7 +23,8 @@ export const 扣牌: AtomDefinition<{
 }> = {
   type: '扣牌',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
+    const err = requirePlayer(state, atom.player, 'player');
+    if (err) return err;
     if (!state.cardMap[atom.cardId]) return `card ${atom.cardId} not found`;
     if (!state.players[atom.player].hand.includes(atom.cardId)) return `card not in hand`;
     return null;
@@ -61,12 +63,12 @@ export const 扣牌: AtomDefinition<{
   },
   applyView(view, event) {
     // 手牌 -1(扣牌者);若当前视角是扣牌者,精确移除 cardId
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi >= 0) {
-      view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
+    const p = viewPlayer(view, event.player as number);
+    if (p) {
+      p.handCount = Math.max(0, p.handCount - 1);
       const cardId = event.cardId as string | undefined;
-      if (cardId && view.players[pi].hand) {
-        view.players[pi].hand = view.players[pi].hand.filter((c: Card) => c.id !== cardId);
+      if (cardId && p.hand) {
+        p.hand = p.hand.filter((c: Card) => c.id !== cardId);
       }
     }
     // 弃牌堆 +1(面朝下:仅数量,不下发牌面)

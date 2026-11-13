@@ -14,10 +14,11 @@
 //   - 系统伤害(source<0,如闪电)不触发
 //   - 黑桃 = ♠
 //   - 判定牌在 frame.cards 末尾(判定牌生效后时仍在结算帧牌区顶,runJudgeFlow 收尾后才入弃牌堆)
-import type { AtomAfterContext, AtomOfName, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { AtomAfterContext, AtomOfName, FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '暴虐/confirm';
 const CONFIRMED_KEY = '暴虐/confirmed';
@@ -40,22 +41,9 @@ export function registerTyrannyConfirmRespond(
   ownerId: number,
   confirmRt: string,
 ): void {
-  registerAction(
-    state,
-    skillId,
-    ownerId,
-    'respond',
-    (s: GameState, _params: Record<string, Json>) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== confirmRt) return '当前不是暴虐确认';
-      return null;
-    },
-    async (s: GameState, params: Record<string, Json>) => {
-      s.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skillId, ownerId, confirmRt, CONFIRMED_KEY, {
+    mismatchError: '当前不是暴虐确认',
+  });
 }
 
 /**
@@ -87,22 +75,14 @@ export async function askTyrannyJudgeAfterDamage(
   if (source.faction !== '群') return false; // 仅群雄角色
 
   // 询问是否判定
-  delete ctx.state.localVars[CONFIRMED_KEY];
-  await applyAtom(ctx.state, {
-    type: '请求回应',
-    requestType: confirmRt,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: titleFor(source.name),
-      confirmLabel: '判定',
-      cancelLabel: '不判定',
-    },
+  return askConfirm(ctx.state, confirmRt, ownerId, {
+    confirmedKey: CONFIRMED_KEY,
+    title: titleFor(source.name),
+    confirmLabel: '判定',
+    cancelLabel: '不判定',
     defaultChoice: false,
     timeout: 10,
   });
-
-  return ctx.state.localVars[CONFIRMED_KEY] === true;
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {

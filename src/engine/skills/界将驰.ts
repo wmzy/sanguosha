@@ -50,7 +50,7 @@ import type { SkillModule } from '../types';
 import { getHandLimitBonus, JIANGCHI_CHOICE2_VIEW_KEY } from '../rules/vars-keys';
 import { projectSlashExtra, projectSlashBlocked } from '../rules/slash-quota';
 import { projectTurnUsage } from '../rules/turn-usage';
-import { currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界将驰';
 const DISPLAY_NAME = '将驰';
@@ -185,43 +185,30 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!self?.alive) return;
 
     // ── 询问①:是否发动将驰?(默认不发动,超时=不发动) ──
-    delete ctx.state.localVars[ACTIVATE_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: ACTIVATE_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '将驰:是否发动?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const activated = await askConfirm(ctx.state, ACTIVATE_RT, ownerId, {
+      confirmedKey: ACTIVATE_KEY,
+      title: '将驰:是否发动?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (ctx.state.localVars[ACTIVATE_KEY] !== true) return;
+    if (!activated) return;
 
     // ── 询问②:选哪一项?(手牌为空时跳过,直接走①) ──
     //   CHOICE_KEY: true=①, false=②, undefined(超时)=①(默认选项)
     let option1 = true;
     if (self.hand.length > 0) {
-      delete ctx.state.localVars[CHOICE_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CHOOSE_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title:
-            '将驰:选择一项  ①摸一张(杀次数-1,杀不计入手牌上限)  ②重铸一张(杀次数+1,杀无距离限制)',
-          confirmLabel: '①摸一张',
-          cancelLabel: '②重铸一张',
-        },
+      // CHOICE_KEY === false → 选项②;否则(true/undefined)→ 选项①
+      option1 = await askConfirm(ctx.state, CHOOSE_RT, ownerId, {
+        confirmedKey: CHOICE_KEY,
+        title:
+          '将驰:选择一项  ①摸一张(杀次数-1,杀不计入手牌上限)  ②重铸一张(杀次数+1,杀无距离限制)',
+        confirmLabel: '①摸一张',
+        cancelLabel: '②重铸一张',
         defaultChoice: true, // 超时默认 ①
         timeout: 10,
       });
-      // CHOICE_KEY === false → 选项②;否则(true/undefined)→ 选项①
-      option1 = ctx.state.localVars[CHOICE_KEY] !== false;
     }
 
     if (option1) {

@@ -34,7 +34,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界仁心';
@@ -130,21 +130,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (choices.length === 0) return;
 
     // 询问是否发动
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '界仁心/confirm',
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `仁心:是否弃置一张装备牌并翻面,令 ${targetPlayer.name} 回复至1点体力?`,
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, '界仁心/confirm', ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: `仁心:是否弃置一张装备牌并翻面,令 ${targetPlayer.name} 回复至1点体力?`,
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    const confirmed = ctx.state.localVars[CONFIRMED_KEY] === true;
     delete ctx.state.localVars[CONFIRMED_KEY];
     if (!confirmed) return;
 

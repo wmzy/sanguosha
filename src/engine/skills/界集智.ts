@@ -10,7 +10,7 @@
 //   (→ 处理区:常规锦囊;→ 弃牌堆:无懈可击)。
 //
 //   为什么挂「移动牌」而非「结算帧入栈」:无懈可击是 respond,不 pushFrame,
-//   但会 移动牌(手牌→弃牌堆)。挂移动牌可覆盖全部 10 张非延时锦囊(含无懈可击)。
+//   但会 移动牌(手牌→弃牌堆)。挂移动牌可覆盖全部 12 张非延时锦囊(含无懈可击)。
 //   过滤条件严格限定 from.zone=手牌 + from.player=owner + 卡牌为非延时锦囊,
 //   避免误触(弃置/摸牌/装备/延时锦囊/基本牌均被排除)。
 //
@@ -32,27 +32,14 @@
 //   手牌上限 bonus 经 hand-limit.ts 默认公式(health + turn.vars['手牌上限/bonus:<p>'])
 //   生效;「回合结束」atom 自动清空 turn.vars → 本回合内有效,回合结束归零。
 //
-// 非延时锦囊(10):过河拆桥/顺手牵羊/无中生有/无懈可击/借刀杀人/桃园结义/
-//                 五谷丰登/南蛮入侵/万箭齐发/决斗
+// 非延时锦囊(12)清单单一来源:util/non-delay-tricks.ts
+// (标准版 10 + 军争篇 火攻/铁索连环;旧实现手抄漏了火攻/铁索连环,已修)
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { handLimitBonusKey, getHandLimitBonus } from '../rules/vars-keys';
-import { currentRequestType } from '../util/skillRuntime';
-
-/** 非延时锦囊牌名集合 */
-const NON_DELAY_TRICKS = new Set([
-  '过河拆桥',
-  '顺手牵羊',
-  '无中生有',
-  '无懈可击',
-  '借刀杀人',
-  '桃园结义',
-  '五谷丰登',
-  '南蛮入侵',
-  '万箭齐发',
-  '决斗',
-]);
+import { askConfirm, currentRequestType } from '../util/skillRuntime';
+import { NON_DELAY_TRICK_NAMES } from '../util/non-delay-tricks';
 
 const CONFIRM_REQUEST = '界集智/confirm'; // 是否摸一张牌
 const DISCARD_REQUEST = '界集智/discard'; // 是否弃置基本牌令本回合手牌上限+1
@@ -108,7 +95,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const card = ctx.state.cardMap[atom.cardId];
     if (!card) return;
     if (card.type !== '锦囊牌') return;
-    if (!NON_DELAY_TRICKS.has(card.name)) return;
+    if (!NON_DELAY_TRICK_NAMES.has(card.name)) return;
     // 关键:「非转化锦囊牌」过滤——转化出的锦囊不触发集智
     if (isTransformedCard(card)) return;
     if (!ctx.state.players[ownerId]?.alive) return;
@@ -142,21 +129,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // ── 第三步:若摸到的是基本牌,询问是否弃之换本回合手牌上限+1 ──
     if (drawnCard?.type !== '基本牌') return;
 
-    delete ctx.state.localVars['界集智/discard'];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: DISCARD_REQUEST,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '集智:是否弃置此基本牌令本回合手牌上限+1?',
-        confirmLabel: '弃置',
-        cancelLabel: '保留',
-      },
+    const discardIt = await askConfirm(ctx.state, DISCARD_REQUEST, ownerId, {
+      confirmedKey: '界集智/discard',
+      title: '集智:是否弃置此基本牌令本回合手牌上限+1?',
+      confirmLabel: '弃置',
+      cancelLabel: '保留',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!ctx.state.localVars['界集智/discard']) return;
+    if (!discardIt) return;
 
     // 弃置此牌:从 owner 手牌弃置(走「弃置」atom 以发 reason='弃置' 的「失去牌」时机标记,供连营/落英/屯田等触发)
     const self = ctx.state.players[ownerId];

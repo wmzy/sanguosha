@@ -25,7 +25,7 @@ import {
   registerAfterHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const CONFIRM_RT = '好施/confirm'; // 鲁肃:是否发动好施
 const CHOOSE_TARGET_RT = '好施/target'; // 鲁肃:并列时选目标
@@ -105,21 +105,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (usedThisTurn(ctx.state, ownerId, '好施')) return; // 本回合已发动
 
       // 询问是否发动
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动好施?(额外摸两张牌)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: '是否发动好施?(额外摸两张牌)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 15,
       });
-      if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+      if (!confirmed) return;
 
       // 发动:限一次标记 + ACTIVE 标记(防 dispatch 重入)
       await markOncePerTurn(ctx.state, ownerId, '好施');

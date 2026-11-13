@@ -41,7 +41,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const SKILL_ID = '界镇军';
 const DISPLAY_NAME = '镇军';
@@ -250,21 +250,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
     try {
       // ── 1. 询问发动 ──
-      delete ctx.state.localVars[LV_USE];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: RT_ASK_USE,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动镇军?(弃置一名角色X张牌,X为其手牌数减体力值且至少为1)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const useConfirmed = await askConfirm(ctx.state, RT_ASK_USE, ownerId, {
+        confirmedKey: LV_USE,
+        title: '是否发动镇军?(弃置一名角色X张牌,X为其手牌数减体力值且至少为1)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 15,
       });
-      if (ctx.state.localVars[LV_USE] !== true) {
+      if (useConfirmed !== true) {
         // 不发动 → 撤销 USED 标记,允许后续触发(虽然准备阶段不会再触发)
         delete ctx.state.turn.vars[USED_KEY];
         return;

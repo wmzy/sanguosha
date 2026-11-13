@@ -8,6 +8,7 @@
 //     主公/忠臣 → 主公方;反贼 → 反贼;内奸 → 内奸
 
 import type { GameView } from '../../engine/types';
+import { identityCamp, type Camp } from '../../engine/rules/camp';
 import type { BattleStats } from '../utils/battleStats';
 import { css, cx } from '@linaria/core';
 import { IDENTITY_COLORS, FACTION_BG } from './gameViewConstants';
@@ -30,22 +31,7 @@ export interface GameResultOverlayProps {
   stats?: BattleStats;
 }
 
-/** 身份 → 阵营 */
-type Camp = '主公方' | '反贼' | '内奸';
-
-function identityCamp(identity?: string): Camp | null {
-  switch (identity) {
-    case '主公':
-    case '忠臣':
-      return '主公方';
-    case '反贼':
-      return '反贼';
-    case '内奸':
-      return '内奸';
-    default:
-      return null;
-  }
-}
+/** 身份 → 阵营:identityCamp/Camp 单一来源在 engine/rules/camp.ts(与服务端 gameHistory 共用) */
 
 const CAMP_LABEL: Record<Camp, string> = {
   主公方: '主公与忠臣获胜',

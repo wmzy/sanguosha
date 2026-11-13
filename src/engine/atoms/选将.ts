@@ -13,6 +13,7 @@ import type {
   ViewEventSplit,
 } from '../types';
 import { TARGET_SYSTEM } from '../types';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 import { createRng } from '../util/rng';
 import { createStandardDeck, shuffle } from '../core/deck';
 import { applyAtom } from '../core/apply'
@@ -129,10 +130,7 @@ export const 初始化洗牌: AtomDefinition<{
     // 牌堆从空变为标准牌堆总数。cardMap 内容不变(createStandardDeck 确定性创建,
     // apply 只是先删后加同样的卡),不需要增量更新 cardMap——只需同步 deckCount。
     // 缺少 applyView 时,前端增量视图在选将阶段牌堆数停留在 initialView 时的 0。
-    return {
-      ownerViews: new Map(),
-      othersView: { type: '初始化洗牌', deckCount: createStandardDeck().length },
-    };
+    return broadcast({ type: '初始化洗牌', deckCount: createStandardDeck().length });
   },
   applyView(view, event) {
     if (view.zones) {
@@ -215,7 +213,8 @@ export const 选将询问: AtomDefinition<{
 }> = {
   type: '选将询问',
   validate(state, atom) {
-    if (!state.players[atom.target]) return `target ${atom.target} not found`;
+    const err = requirePlayer(state, atom.target, 'target');
+    if (err) return err;
     if (!Array.isArray(atom.candidates) || atom.candidates.length === 0)
       return 'candidates required';
     return null;
@@ -274,7 +273,8 @@ export const 并行选将: AtomDefinition<{
     if (!Array.isArray(atom.selections) || atom.selections.length === 0)
       return 'selections required';
     for (const s of atom.selections) {
-      if (!state.players[s.target]) return `target ${s.target} not found`;
+      const err = requirePlayer(state, s.target, 'target');
+      if (err) return err;
       if (!Array.isArray(s.candidates) || s.candidates.length === 0)
         return `candidates required for target ${s.target}`;
     }
@@ -327,7 +327,8 @@ export const 亮将: AtomDefinition<{
     if (!Array.isArray(atom.assignments) || atom.assignments.length === 0)
       return 'assignments required';
     for (const a of atom.assignments) {
-      if (!state.players[a.target]) return `target ${a.target} not found`;
+      const err = requirePlayer(state, a.target, 'target');
+      if (err) return err;
       if (!a.character) return 'character required';
     }
     return null;
@@ -337,7 +338,7 @@ export const 亮将: AtomDefinition<{
   },
   toViewEvents(state, atom): ViewEventSplit {
     const view: ViewEvent = { type: '亮将', assignments: atom.assignments };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
     const assignments = (event.assignments ?? []) as Array<{
@@ -349,7 +350,7 @@ export const 亮将: AtomDefinition<{
       skills: string[];
     }>;
     for (const a of assignments) {
-      const p = view.players.find((q) => q.index === a.target);
+      const p = viewPlayer(view, a.target);
       if (!p) continue;
       p.character = a.character;
       // name 与 state 口径一致(分配武将 apply 已把 name 覆写为武将名):

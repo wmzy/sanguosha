@@ -36,13 +36,13 @@
 //   - 摸牌产生的 移动牌(牌堆→手牌)不会触发本技:from.zone='牌堆'≠'手牌',
 //     故无重入。
 //   - 春华在自己的回合内反复触发是合法的(例如连出两张牌,每张都触发一次)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { getCardEffect } from '../skills/cards';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '界伤逝/confirm';
 const CONFIRM_KEY = '伤逝/confirmed';
@@ -64,21 +64,15 @@ async function checkTrigger(state: GameState, ownerId: number): Promise<void> {
   if (hand >= X) return; // 手牌数 ≥ X:不触发
 
   // 询问是否发动
-  delete state.localVars[CONFIRM_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: CONFIRM_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: `伤逝:是否将手牌摸至 ${X} 张?(当前 ${hand} 张,已损失 ${X} 体力)`,
-      confirmLabel: '摸牌',
-      cancelLabel: '不发动',
-    },
+  const confirmed = await askConfirm(state, CONFIRM_RT, ownerId, {
+    confirmedKey: CONFIRM_KEY,
+    title: `伤逝:是否将手牌摸至 ${X} 张?(当前 ${hand} 张,已损失 ${X} 体力)`,
+    confirmLabel: '摸牌',
+    cancelLabel: '不发动',
     defaultChoice: false,
     timeout: 10,
   });
-  if (state.localVars[CONFIRM_KEY] !== true) return;
+  if (confirmed !== true) return;
 
   // 摸至 X 张:count = X - hand。牌堆不足时钳制到可用总数,避免 validate 抛错。
   let count = X - hand;
@@ -102,20 +96,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // respond:玩家在「伤逝/confirm」询问下的确认/取消
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      return requireRequestType(st, ownerId, [CONFIRM_RT], {
-        mismatchError: '当前不是伤逝确认',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_RT, CONFIRM_KEY, {
+    mismatchError: '当前不是伤逝确认',
+  });
 
   // ── 造成伤害 after:春华受伤 → X 增加 ──
   registerAfterHook(state, skill.id, ownerId, '扣减体力后', async (ctx) => {

@@ -42,6 +42,7 @@ import { registerSlashExemptor } from '../rules/slash-quota';
 import { setPlayerVarUsage, projectTurnUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY, GONGQI_ACTIVE_VIEW_KEY, SLASH_EXEMPT_SUIT_KEY } from '../rules/vars-keys';
+import { askConfirm } from '../util/skillRuntime';
 
 const SKILL_ID = '界弓骑';
 const DISPLAY_NAME = '弓骑';
@@ -238,21 +239,15 @@ async function maybeDiscardOthersCard(
   ownerId: number,
 ): Promise<void> {
   // 1. confirm 询问是否弃他人牌
-  delete state.localVars[CONFIRM_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: CONFIRM_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: '弓骑:弃置的牌为装备,是否弃一名其他角色一张牌?',
-      confirmLabel: '弃牌',
-      cancelLabel: '不弃',
-    },
+  const confirmed = await askConfirm(state, CONFIRM_RT, ownerId, {
+    confirmedKey: CONFIRM_KEY,
+    title: '弓骑:弃置的牌为装备,是否弃一名其他角色一张牌?',
+    confirmLabel: '弃牌',
+    cancelLabel: '不弃',
     defaultChoice: false,
     timeout: 10,
   });
-  if (!state.localVars[CONFIRM_KEY]) {
+  if (!confirmed) {
     delete state.localVars[CONFIRM_KEY];
     return;
   }

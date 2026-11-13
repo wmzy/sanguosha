@@ -50,7 +50,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 /** localVars key:最近一个正常开始的摸牌阶段所属玩家 */
 const NORMAL_KEY = '截辎/normalDrawPhase';
@@ -168,21 +168,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!ctx.state.players[ownerId]?.alive) return;
 
     // 询问 owner 是否发动 截辎
-    delete ctx.state.localVars[CONFIRM_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动截辎?(选择一名角色:若其手牌数全场最少且没有"辎",其获得"辎"标记,否则其摸一张牌)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: '是否发动截辎?(选择一名角色:若其手牌数全场最少且没有"辎",其获得"辎"标记,否则其摸一张牌)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!ctx.state.localVars[CONFIRM_KEY]) return;
+    if (!confirmed) return;
 
     // 询问 owner 选目标(任意存活角色:可为自己/跳过者/其他)
     delete ctx.state.localVars[TARGET_KEY];

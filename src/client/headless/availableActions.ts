@@ -28,6 +28,10 @@ import {
   ownMaterialCards,
   expandActionVariants,
   choosePlayerCandidates,
+  selectTargetCandidates,
+  promptTargetBounds,
+  distributeAllocateCandidates,
+  effectiveTargetCard,
   isFreePlayWindow,
   type PlayRules,
 } from '../utils/gameViewHelpers';
@@ -428,15 +432,8 @@ function enumerateDistributeActions(
       });
     } else {
       // allocate 模式(仁德):分配手牌给目标
-      const allowSelf = prompt.allowSelf !== false;
-      const targetFilterFn = prompt.targetFilter;
-      const validTargets: number[] = [];
-      for (const p of view.players) {
-        if (!p.alive) continue;
-        if (p.index === seatIndex && !allowSelf) continue;
-        if (targetFilterFn && !targetFilterFn(view, p.index)) continue;
-        validTargets.push(p.index);
-      }
+      // 候选判定与浏览器 isTargetable/distribute 点座位共享 distributeAllocateCandidates
+      const validTargets = distributeAllocateCandidates(view, seatIndex, prompt);
       result.push({
         description: `发动【${action.skillId}】（分配手牌给目标）`,
         message: {
@@ -492,6 +489,39 @@ function enumerateAltActions(
     }
   }
   return result;
+}
+
+/** 多选描述性 action(selectTarget/choosePlayer 目标数下界 >1 时):targets 留空
+ *  由 agent 从 validTargets 中选 minTarget..maxTarget 个填入;minTarget 仅 min>1
+ *  时给,maxTarget 恒给。enumeratePromptActions(主动技多目标变体展开)与
+ *  appendRespondActions(choosePlayer 多选)两处镜像结构共用,字段形态不变。 */
+function describeMultiSelectAction(
+  base: {
+    description: string;
+    skillId: string;
+    actionType: string;
+    ownerId: number;
+    category: AvailableAction['category'];
+  },
+  validTargets: number[],
+  min: number,
+  max: number,
+  extraParams: Record<string, Json> = {},
+): AvailableAction {
+  return {
+    description: base.description,
+    message: {
+      skillId: base.skillId,
+      actionType: base.actionType,
+      ownerId: base.ownerId,
+      params: { targets: [], ...extraParams },
+      baseSeq: 0,
+    },
+    validTargets,
+    category: base.category,
+    ...(min > 1 ? { minTarget: min } : {}),
+    maxTarget: max,
+  };
 }
 
 /**
@@ -564,15 +594,14 @@ function enumeratePromptActions(
 
     // selectTarget / choosePlayer:合法目标列表
     //   choosePlayer 优先用投影层下发的 candidates(filter 无法跨进程序列化);
-    //   selectTarget 用 targetFilter.filter(本地函数引用可用)。
+    //   selectTarget 走 selectTargetCandidates(存活 + allowSelf + targetFilter.filter,
+    //   与浏览器 isTargetable 同判据——此前无头只查存活+filter、漏 allowSelf,
+    //   会枚举出引擎必拒的自目标动作)。
     let validTargets: number[];
     if (prompt.type === 'choosePlayer') {
       validTargets = choosePlayerCandidates(view, prompt);
     } else {
-      const filter = prompt.targetFilter.filter;
-      validTargets = view.players
-        .filter((p) => p.alive && (!filter || filter(view, p.index)))
-        .map((p) => p.index);
+      validTargets = selectTargetCandidates(view, seatIndex, prompt);
     }
     if (validTargets.length === 0) continue;
 
@@ -588,41 +617,30 @@ function enumeratePromptActions(
     // 改为描述性 action:validTargets 给全集,minTarget/maxTarget 给边界,
     // agent 据此选 minTarget..maxTarget 个;paramVariants 按变体(× 代价牌)各生成
     // 一个描述性 action(与 min=1 的变体展开形态一致),携带 cost/cardId。
-    const multiMin =
-      prompt.type === 'selectTarget'
-        ? (prompt.targetFilter.min ?? 1)
-        : prompt.type === 'choosePlayer'
-          ? (prompt.min ?? 1)
-          : 1;
+    const { min: multiMin, max: declaredMax } = promptTargetBounds(prompt);
     if (multiMin > 1) {
-      const max =
-        prompt.type === 'selectTarget'
-          ? (prompt.targetFilter.max ?? multiMin)
-          : prompt.type === 'choosePlayer'
-            ? (prompt.max ?? multiMin)
-            : multiMin;
+      // max 缺省(或 ≤1 的无效声明)时镜像回填 min:语义为「恰好 min 个」
+      const max = declaredMax > 1 ? declaredMax : multiMin;
       for (const variant of variants) {
         const suffix = variant.label ? `(${variant.label})` : '';
         const costCards: Array<Card | undefined> = variant.cardFilter ? variant.costCards : [undefined];
         if (variant.cardFilter && costCards.length === 0) continue; // 无代价牌 → 该变体不可用
         for (const costCard of costCards) {
           const cardSuffix = costCard ? `(${costCard.suit}${costCard.rank})` : '';
-          result.push({
-            description: `发动【${action.label}】${suffix}${cardSuffix}(选 ${multiMin}${max > multiMin ? `-${max}` : ''} 个目标)`,
-            message: {
-              ...base,
-              // targets 留空由 agent 从 validTargets 中选 minTarget..maxTarget 个填入
-              params: {
-                targets: [],
-                ...variant.params,
-                ...(costCard ? { cardId: costCard.id } : {}),
-              },
+          result.push(describeMultiSelectAction(
+            {
+              description: `发动【${action.label}】${suffix}${cardSuffix}(选 ${multiMin}${max > multiMin ? `-${max}` : ''} 个目标)`,
+              skillId: action.skillId,
+              actionType: 'use',
+              ownerId: seatIndex,
+              category: 'play',
             },
             validTargets,
-            category: 'play',
-            minTarget: multiMin,
-            ...(max > 1 ? { maxTarget: max } : {}),
-          });
+            multiMin,
+            max,
+            // targets 留空由 agent 从 validTargets 中选 minTarget..maxTarget 个填入
+            { ...variant.params, ...(costCard ? { cardId: costCard.id } : {}) },
+          ));
         }
       }
       continue;
@@ -714,17 +732,22 @@ export function enumerateAvailableActions(
     const materialId = material?.cardId ?? (Array.isArray(material?.cardIds) ? material.cardIds[0] : undefined);
     const source = typeof id === 'string' ? view.cardMap[id] : undefined;
     const ingredient = typeof materialId === 'string' ? view.cardMap[materialId] : undefined;
-    // 有 preceding 时原牌是转化原料、产出牌名 = 技能名,原牌名不足为凭(武圣 红牌当杀)。
-    // 没有 preceding 时,同名的 useCardAndTarget 出牌(杀本体)里选中的牌就是正在使用的牌;
-    // 而技能自带 cardFilter 的代价牌(离间 弃一张牌 + 选两名男性)动作名是技能名,
-    // 那张牌不是被使用的牌——按杀解释会让 min=max=2 塌成 1,引擎随即拒
-    // 「需要选择两名男性角色」。故用「动作名 === 牌名」判定是否同一张牌。
-    const slashScaled = !!message.preceding?.length || source?.name === message.skillId;
-    const card = source
-      ? { ...source, countsAsSlash: slashScaled }
-      : ingredient
-        ? { ...ingredient, name: message.skillId, countsAsSlash: slashScaled }
-        : undefined;
+    // 「选中牌是否按杀的动态目标上限解释」与浏览器 isTargetable 共享 effectiveTargetCard:
+    // 选中牌 = 主 action 的牌(source)∪ 转化原料(ingredient)。usedCardName 声明
+    // 「选中牌就是正在使用的牌」:有 preceding → 产出牌名 = 主 action 技能名(武圣
+    // 红牌当杀,原牌名不足为凭);无 preceding 且 牌名 === skillId → 普通出牌
+    // (杀本体);其余(离间 一类技能代价牌,哪怕代价牌恰好是杀)→ null,不按杀
+    // 解释,否则 min=max=2 塌成 1 被引擎拒。
+    const usedCardName = message.preceding?.length
+      ? message.skillId
+      : source?.name === message.skillId
+        ? source.name
+        : null;
+    const card = effectiveTargetCard(
+      source ?? ingredient,
+      filter,
+      usedCardName,
+    );
     const resolved = resolveTargetSelection(view, seatIndex, filter, card);
     if (!resolved.targets) return [];
     const current = Array.isArray(message.params.targets) ? message.params.targets as number[] : [];
@@ -969,20 +992,18 @@ export function appendRespondActions(
           // 多选：描述性 action，agent 需从 validTargets 填 targets。
           // minTarget/maxTarget 与描述文本同源(prompt.min/max):结构化字段让
           // agent 不必解析描述文本即可知道要选几个。
-          out.push({
-            description: `${choosePrompt.title ?? info.skillId}（选 ${min}-${max} 个目标）`,
-            message: {
+          out.push(describeMultiSelectAction(
+            {
+              description: `${choosePrompt.title ?? info.skillId}（选 ${min}-${max} 个目标）`,
               skillId: info.skillId,
               actionType: 'respond',
               ownerId,
-              params: { targets: [] },
-              baseSeq: 0,
+              category: 'respond',
             },
             validTargets,
-            category: 'respond',
-            ...(min > 1 ? { minTarget: min } : {}),
-            maxTarget: max,
-          });
+            min,
+            max,
+          ));
         }
         return;
       }

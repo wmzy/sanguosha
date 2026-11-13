@@ -4,6 +4,7 @@
 //   动态距离修正按能(如 界义从:体力变化触发防御修正 ±)在去标记时也需要同步 view,
 //   故此处复用 distanceVars 通道。apply 不触碰 vars(state 侧由技能维护),仅 view 增量同步。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 import { mergeDistanceVars, type DistanceVarsDelta } from './distance-vars';
 
 export const 去标记: AtomDefinition<{
@@ -13,8 +14,7 @@ export const 去标记: AtomDefinition<{
 }> = {
   type: '去标记',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
-    return null;
+    return requirePlayer(state, atom.player, 'player');
   },
   apply(state, atom) {
     const player = state.players[atom.player];
@@ -34,17 +34,17 @@ export const 去标记: AtomDefinition<{
     if (atom.distanceVars) {
       view.distanceVars = atom.distanceVars;
     }
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi < 0) return;
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
     const markId = event.markId as string | undefined;
     if (markId) {
-      view.players[pi].marks = view.players[pi].marks.filter((m) => m.id !== markId);
+      p.marks = p.marks.filter((m) => m.id !== markId);
     }
     // 距离修正 view 同步(技能如 界义从 切换低血防御时携带)
-    mergeDistanceVars(view.players[pi], event.distanceVars as DistanceVarsDelta | undefined);
+    mergeDistanceVars(p, event.distanceVars as DistanceVarsDelta | undefined);
   },
 };
 

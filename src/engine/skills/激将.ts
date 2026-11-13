@@ -25,7 +25,8 @@ import type { GameState, FrontendAPI, GameView, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
-import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
+import { registerAction, declareAlternativeResponse } from '../core/skill';
+import { engineCanPlayNow } from '../util/skillRuntime';
 import { inAttackRange } from '../rules/distance';
 import { defaultPlayActive, isLordOwner } from '../rules/action-active';
 
@@ -70,12 +71,7 @@ export function registerJijiangUseAction(
     ownerId,
     'use',
     (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 + 主公身份 + 目标合法
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
-      const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
+      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活 → engineCanPlayNow(见下方 ok)
       // 激将是主公技:仅主公位可用(以主公位 ownerId===0 为依据)
       const isLord = ownerId === 0;
       // 目标合法:不是自己 + 存活 + 蜀势力
@@ -91,10 +87,7 @@ export function registerJijiangUseAction(
         killTargetIdx === undefined ||
         (state.players[killTargetIdx]?.alive === true && killTargetIdx !== targetIdx);
       const ok =
-        myTurn &&
-        inActPhase &&
-        free &&
-        selfAlive &&
+        engineCanPlayNow(state, ownerId) &&
         isLord &&
         targetExists &&
         targetNotSelf &&

@@ -28,6 +28,7 @@ import type { FrontendAPI, GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { frameCards } from '../core/frame';
 import { registerAfterHook, declareAlternativeResponse } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 import {
   registerJijiangUseAction,
   registerJijiangRespondActions,
@@ -74,22 +75,16 @@ async function offerLordDraw(
   });
 
   // 询问蜀角色是否令主公摸1张(描述"可以"=可选;选择权在该蜀角色)
-  delete state.localVars[CONFIRMED_VAR];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: REQUEST_TYPE,
-    target: triggerIdx,
-    prompt: {
-      type: 'confirm',
+  if (
+    await askConfirm(state, REQUEST_TYPE, triggerIdx, {
+      confirmedKey: CONFIRMED_VAR,
       title: `界激将:是否令${lordName}摸一张牌?`,
       confirmLabel: '令主公摸牌',
       cancelLabel: '不发动',
-    },
-    defaultChoice: false,
-    timeout: 30,
-  });
-
-  if (state.localVars[CONFIRMED_VAR] === true) {
+      defaultChoice: false,
+      timeout: 30,
+    })
+  ) {
     // 蜀角色选择发动 → 主公(刘备)摸 1 张
     await applyAtom(state, { type: '摸牌', player: ownerId, count: 1 });
   }

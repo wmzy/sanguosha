@@ -2,10 +2,10 @@
 //   每当你使用【杀】对目标角色造成伤害时,若其有牌(手牌或装备区),你可以防止此伤害,
 //   改为依次弃置其两张牌(手牌或装备区,由你逐张选择)。
 import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
-import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { askConfirm } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '寒冰剑', description: '武器:杀造成伤害时可改为依次弃目标2张牌', isLocked: true };
@@ -84,21 +84,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!hasCards) return;
 
       // 询问是否发动
-      delete ctx.state.localVars['寒冰剑/confirmed'];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: '寒冰剑/confirm',
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '寒冰剑:是否改为弃目标2张牌?',
-          confirmLabel: '弃牌',
-          cancelLabel: '正常伤害',
-        },
+      const confirmed = await askConfirm(ctx.state, '寒冰剑/confirm', ownerId, {
+        confirmedKey: '寒冰剑/confirmed',
+        title: '寒冰剑:是否改为弃目标2张牌?',
+        confirmLabel: '弃牌',
+        cancelLabel: '正常伤害',
         defaultChoice: false,
         timeout: 10,
       });
-      if (!ctx.state.localVars['寒冰剑/confirmed']) return;
+      if (!confirmed) return;
 
       // 依次弃目标最多2张牌(手牌或装备区,寒冰剑使用者逐张选择;不含判定区)
       for (let i = 0; i < 2; i++) {

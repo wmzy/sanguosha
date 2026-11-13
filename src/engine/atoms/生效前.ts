@@ -9,30 +9,24 @@
 //
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
 // 噪声抑制:无 before hook 时整个 atom 是 no-op,不发 ViewEvent。
-import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { getBeforeHooks } from '../core/skill';
+import type { AtomDefinition, ViewEventSplit } from '../types';
+import { hookSilentView, requirePlayer } from './_helpers';
 
 export const 生效前: AtomDefinition<{ source: number; target: number; cardId: string }> = {
   type: '生效前',
   validate(state, atom) {
-    if (!state.players[atom.target]) return `target ${atom.target} not found`;
-    return null;
+    return requirePlayer(state, atom.target, 'target');
   },
   apply() {
     // 纯时机型 atom:响应交互(询问闪/被抵消)由 before hook 驱动,apply 无副作用。
   },
   toViewEvents(state, atom): ViewEventSplit {
-    // 无 before hook 时抑制:整个 atom 是 no-op
-    if (getBeforeHooks(state, '生效前').length === 0) {
-      return { ownerViews: new Map(), othersView: null };
-    }
-    const view: ViewEvent = {
+    return hookSilentView(state, '生效前', () => ({
       type: '生效前',
       source: atom.source,
       target: atom.target,
       cardId: atom.cardId,
-    };
-    return { ownerViews: new Map(), othersView: view };
+    }));
   },
   applyView() {
     // 无视图状态变更:响应结果由后续 atom(被抵消/造成伤害)的 applyView 体现。

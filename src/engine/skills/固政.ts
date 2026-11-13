@@ -23,6 +23,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const CONFIRM_REQUEST = '固政/确认';
@@ -164,20 +165,19 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是固政窗口';
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType === CONFIRM_REQUEST) {
+      const check = requireRequestType(st, ownerId, [CONFIRM_REQUEST, PICK_REQUEST], {
+        wrongTypeError: '当前不是固政窗口',
+        mismatchError: '当前不是固政窗口',
+      });
+      if (check.error) return check.error;
+      if (check.requestType === CONFIRM_REQUEST) {
         // 确认/不确认都接受
         return null;
       }
-      if (atom.requestType === PICK_REQUEST) {
-        const cardId = params.cardId;
-        if (typeof cardId !== 'string') return '需要选择一张牌';
-        return null;
-      }
-      return '当前不是固政窗口';
+      // PICK_REQUEST:选一张返回该角色
+      const cardId = params.cardId;
+      if (typeof cardId !== 'string') return '需要选择一张牌';
+      return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
       const slot = st.pendingSlots.get(ownerId)!;

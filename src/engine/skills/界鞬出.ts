@@ -46,6 +46,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 import { registerSlashExtraProvider, projectSlashExtra } from '../rules/slash-quota';
 
 const TAG = '界鞬出/禁闪';
@@ -222,21 +223,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!hasCards) return;
 
     // 询问界庞德是否发动鞬出("你可以"——可选)
-    delete ctx.state.localVars[CONFIRM];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '界鞬出/confirm',
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '鞬出:是否弃置目标一张牌?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, '界鞬出/confirm', ownerId, {
+      confirmedKey: CONFIRM,
+      title: '鞬出:是否弃置目标一张牌?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!ctx.state.localVars[CONFIRM]) return;
+    if (!confirmed) return;
 
     // 目标自选弃一张牌
     await askTargetToDiscard(ctx.state, ownerId, target, atom.cardId);

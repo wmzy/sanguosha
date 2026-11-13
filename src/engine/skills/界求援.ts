@@ -38,7 +38,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
-import { runVirtualSlash } from '../util/skillRuntime';
+import { askConfirm, runVirtualSlash } from '../util/skillRuntime';
 import {
   registerAction,
   registerAfterHook,
@@ -107,21 +107,15 @@ async function runQiuYuan(
   if (candidates.length === 0) return;
 
   // 1) confirm:是否发动
-  delete state.localVars[CONFIRM_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: CONFIRM_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: `求援:是否发动?(被 ${card.name} 指定)`,
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+  const confirmed = await askConfirm(state, CONFIRM_RT, ownerId, {
+    confirmedKey: CONFIRM_KEY,
+    title: `求援:是否发动?(被 ${card.name} 指定)`,
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
     defaultChoice: false,
     timeout: 15,
   });
-  if (!state.localVars[CONFIRM_KEY]) return;
+  if (!confirmed) return;
   delete state.localVars[CONFIRM_KEY];
 
   // 2) chooseTarget:选一名其他角色

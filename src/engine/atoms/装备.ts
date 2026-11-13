@@ -4,6 +4,7 @@
 // 添加技能/移除技能 hook 设置 vars(距离/进攻修正|距离/防御修正),与马术等武将技能一致。
 // 对应 卸下 atom 负责清除武器范围;马匹 vars 由技能卸载清理。
 import type { AtomDefinition, EquipSlot, GameState, ViewEventSplit, ViewEvent, Card } from '../types';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
 
 function inferSlot(cardType: string | undefined): EquipSlot | null {
@@ -39,8 +40,9 @@ function applyEquipVars(
 export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
   type: '装备',
   validate(state, atom) {
+    const err = requirePlayer(state, atom.player, 'player');
+    if (err) return err;
     const p = state.players[atom.player];
-    if (!p) return `player ${atom.player} not found`;
     if (!p.hand.includes(atom.cardId)) return `card not in player's hand`;
     const card = state.cardMap[atom.cardId];
     if (!card) return `card ${atom.cardId} not found`;
@@ -72,26 +74,26 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
       // 按装备名播报专属音效(无对应文件时 audioEngine 静默跳过)
       effect: { sound: `equip/${card.name}` } as const,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi < 0) return;
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
     const slot = event.slot as '武器' | '防具' | '进攻马' | '防御马' | '宝物' | undefined;
     if (slot) {
-      view.players[pi].equipment[slot] = event.cardId as string;
+      p.equipment[slot] = event.cardId as string;
     }
     // 武器攻击范围同步到 distanceVars
     if (slot === '武器' && typeof event.range === 'number') {
-      view.players[pi].distanceVars = {
-        ...view.players[pi].distanceVars,
+      p.distanceVars = {
+        ...p.distanceVars,
         attackRange: event.range,
       };
     }
     // 装备从手牌移出:handCount - 1
-    view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
-    if (view.players[pi].hand) {
-      view.players[pi].hand = view.players[pi].hand.filter((c: Card) => c.id !== event.cardId);
+    p.handCount = Math.max(0, p.handCount - 1);
+    if (p.hand) {
+      p.hand = p.hand.filter((c: Card) => c.id !== event.cardId);
     }
   },
   toViewLog(event) {

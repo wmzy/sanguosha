@@ -34,7 +34,7 @@ import {
   registerBeforeHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
-import { currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType } from '../util/skillRuntime';
 
 const DISPLAY_NAME = '自守';
 
@@ -131,21 +131,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (x <= 0) return; // 无势力可计,不发动
 
       // 询问是否发动
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `是否发动自守?(多摸 ${x} 张牌;若本回合对其他角色造成过伤害,结束阶段弃 ${x} 张)`,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: `是否发动自守?(多摸 ${x} 张牌;若本回合对其他角色造成过伤害,结束阶段弃 ${x} 张)`,
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 15,
       });
-      if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+      if (!confirmed) return;
 
       // 发动:设 ACTIVE 标记 + modify count
       ctx.state.turn.vars[ACTIVE_VAR] = true;

@@ -2,6 +2,7 @@
 // 副作用:清除武器攻击范围 vars(距离/出杀范围)。
 // 进攻马/防御马的 vars 由马匹技能的 移除技能 hook 清理,不在此硬编码。
 import type { AtomDefinition, EquipSlot, GameState, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
 
 /** 清除装备带来的 vars(仅武器范围;马匹由技能处理) */
@@ -18,8 +19,9 @@ export const 卸下: AtomDefinition<{
 }> = {
   type: '卸下',
   validate(state, atom) {
+    const err = requirePlayer(state, atom.player, 'player');
+    if (err) return err;
     const p = state.players[atom.player];
-    if (!p) return `player ${atom.player} not found`;
     if (!p.equipment[atom.slot]) return `no equipment in slot ${atom.slot}`;
     return null;
   },
@@ -40,29 +42,29 @@ export const 卸下: AtomDefinition<{
       slot: atom.slot,
       ...(cardId ? { cardId } : {}),
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi < 0) return;
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
     const slot = event.slot as '武器' | '防具' | '进攻马' | '防御马' | '宝物' | undefined;
     const cardId = event.cardId as string | undefined;
     if (slot) {
-      delete view.players[pi].equipment[slot];
+      delete p.equipment[slot];
     }
     // apply 把卸下的牌返回手牌(player.hand.push(cardId)),applyView 必须镜像:
     // handCount + 1;可见时(owner 视角)把牌加回 hand 数组。
     if (cardId) {
-      view.players[pi].handCount += 1;
-      if (view.players[pi].hand) {
+      p.handCount += 1;
+      if (p.hand) {
         const card = view.cardMap[cardId];
-        if (card) view.players[pi].hand.push(card);
+        if (card) p.hand.push(card);
       }
     }
     // 武器卸下:清除 distanceVars.attackRange(马匹由 移除技能 atom 处理)
-    if (slot === '武器' && view.players[pi].distanceVars) {
-      view.players[pi].distanceVars = {
-        ...view.players[pi].distanceVars,
+    if (slot === '武器' && p.distanceVars) {
+      p.distanceVars = {
+        ...p.distanceVars,
         attackRange: undefined,
       };
     }

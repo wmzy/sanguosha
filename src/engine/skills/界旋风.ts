@@ -47,6 +47,7 @@ import { registerAction, registerAfterHook, registerBeforeHook } from '../core/s
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { askConfirm } from '../util/skillRuntime';
 
 const _SKILL_ID = '界旋风';
 const DISPLAY_NAME = '旋风';
@@ -134,21 +135,15 @@ async function triggerXuanfeng(state: GameState, ownerId: number): Promise<void>
   if (!hasValidTargets(state, ownerId)) return; // 无可弃目标 → 不触发
 
   // ── 1. confirm 询问 ──
-  delete state.localVars[CONFIRM_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: CONFIRM_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: '是否发动旋风?(依次弃至多 2 名角色至多 2 张牌)',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+  const confirmed = await askConfirm(state, CONFIRM_RT, ownerId, {
+    confirmedKey: CONFIRM_KEY,
+    title: '是否发动旋风?(依次弃至多 2 名角色至多 2 张牌)',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
     defaultChoice: false,
     timeout: 10,
   });
-  if (!state.localVars[CONFIRM_KEY]) return;
+  if (!confirmed) return;
 
   // ── 2. 第 1 次弃牌 ──
   if (!me.alive || !hasValidTargets(state, ownerId)) return;
@@ -156,21 +151,15 @@ async function triggerXuanfeng(state: GameState, ownerId: number): Promise<void>
 
   // ── 3. 询问是否继续第 2 次 ──
   if (!me.alive || !hasValidTargets(state, ownerId)) return;
-  delete state.localVars[CONTINUE_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: CONTINUE_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: '是否继续弃置第二张牌?',
-      confirmLabel: '继续',
-      cancelLabel: '结束',
-    },
+  const cont = await askConfirm(state, CONTINUE_RT, ownerId, {
+    confirmedKey: CONTINUE_KEY,
+    title: '是否继续弃置第二张牌?',
+    confirmLabel: '继续',
+    cancelLabel: '结束',
     defaultChoice: false,
     timeout: 10,
   });
-  if (!state.localVars[CONTINUE_KEY]) return;
+  if (!cont) return;
 
   // ── 4. 第 2 次弃牌 ──
   if (!me.alive || !hasValidTargets(state, ownerId)) return;

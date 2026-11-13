@@ -4,7 +4,8 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
+import { engineCanPlayNow } from '../util/skillRuntime';
 import { hasSkillModule } from './registry';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -19,16 +20,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'use',
     (state: GameState, params: Record<string, Json>) => {
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
       const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
       if (typeof params.cardId !== 'string') return 'cardId required';
       const cardInHand = !!self.hand.includes(params.cardId);
       const card = state.cardMap[params.cardId];
       const hasSubtype = !!card?.subtype;
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && hasSubtype;
+      // 时机四合一(自己回合+出牌阶段+无阻塞+存活)由 engineCanPlayNow 统一判定
+      const ok = engineCanPlayNow(state, ownerId) && cardInHand && hasSubtype;
       return ok ? null : '装备使用条件不满足';
     },
     async (state: GameState, params: Record<string, Json>) => {

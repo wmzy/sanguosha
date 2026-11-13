@@ -1,6 +1,7 @@
 // src/engine/atoms/陷入濒死.ts
 // 陷入濒死:标记目标进入濒死状态(体力 ≤ 0,等待求桃)。纯事件标记——不修改 state。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast } from './_helpers';
 
 /** 女性武将名集合——用于濒死求救音效选择(sos_female vs sos_male)。
  *  含标准包+军争篇+界武将中的女性武将。 */
@@ -29,7 +30,7 @@ export const 陷入濒死: AtomDefinition<{ target: number }> = {
       target: atom.target,
       effect: { sound } as const,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView() {
     // 体力（可负）由 扣减体力/失去体力 的 applyView 已正确同步（濒死时 health ≤ 0）。

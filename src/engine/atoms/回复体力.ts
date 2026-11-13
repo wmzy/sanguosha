@@ -1,14 +1,15 @@
 // src/engine/atoms/回复体力.ts
 // 回复体力:target 玩家回复 amount 体力(不超过 maxHealth)
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 
 export const 回复体力: AtomDefinition<{ target: number; amount: number; source?: number }> = {
   type: '回复体力',
   validate(state, atom) {
     if (atom.amount <= 0) return 'amount must be > 0';
-    const p = state.players[atom.target];
-    if (!p) return `target ${atom.target} not found`;
-    if (!p.alive) return `target is dead`;
+    const err = requirePlayer(state, atom.target, 'target');
+    if (err) return err;
+    if (!state.players[atom.target].alive) return `target is dead`;
     return null;
   },
   apply(state, atom) {
@@ -22,12 +23,11 @@ export const 回复体力: AtomDefinition<{ target: number; amount: number; sour
       target: atom.target,
       amount: atom.amount,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view: GameView, event) {
-    const pi = view.players.findIndex((p) => p.index === (event.target as number));
-    if (pi < 0) return;
-    const p = view.players[pi];
+    const p = viewPlayer(view, event.target as number);
+    if (!p) return;
     p.health = Math.min(p.maxHealth, p.health + (event.amount as number));
   },
   toViewLog(event) {

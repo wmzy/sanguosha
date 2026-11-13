@@ -15,6 +15,7 @@ import { applyAtom } from '../core/apply'
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '刚烈/confirm';
 const CHOOSE_REQUEST = '刚烈/choose';
@@ -84,21 +85,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (ctx.state.zones.deck.length === 0) return;
 
     // 询问是否发动刚烈(不是锁定技,可选择不发动)
-    delete ctx.state.localVars['刚烈/confirmed'];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_REQUEST,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动刚烈?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
+      confirmedKey: '刚烈/confirmed',
+      title: '是否发动刚烈?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (!ctx.state.localVars['刚烈/confirmed']) return; // 不发动
+    if (!confirmed) return; // 不发动
 
     const judgeCardId = await runJudgeFlow(ctx.state, ownerId, '刚烈');
     const suit = judgeCardId ? ctx.state.cardMap[judgeCardId]?.suit : undefined;

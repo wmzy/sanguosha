@@ -28,6 +28,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAction, registerBeforeHook } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 
 const TRIGGER_RT = '放权/trigger';
 const DISCARD_RT = '放权/discard';
@@ -125,21 +126,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!self?.alive) return;
 
       // 询问是否发动放权
-      delete ctx.state.localVars[TRIGGERED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: TRIGGER_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动放权?(跳过出牌阶段,回合结束时弃一张手牌令其他角色额外回合)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const triggered = await askConfirm(ctx.state, TRIGGER_RT, ownerId, {
+        confirmedKey: TRIGGERED_KEY,
+        title: '是否发动放权?(跳过出牌阶段,回合结束时弃一张手牌令其他角色额外回合)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 10,
       });
-      if (ctx.state.localVars[TRIGGERED_KEY] !== true) return; // 不发动 → 出牌阶段正常进行
+      if (!triggered) return; // 不发动 → 出牌阶段正常进行
 
       // 设标记:回合结束时消费(用 localVars 而非 turn.vars,因 回合结束 apply 会清空 turn.vars)
       ctx.state.localVars[ACTIVE_KEY] = true;

@@ -5,18 +5,18 @@ import type {
   ViewEventSplit,
   ViewEvent,
   Card,
-  GameView,
 } from '../types';
+import { broadcast, viewPlayer, type PlayerViewEntry } from './_helpers';
 
 /** 从 view 中指定玩家的手牌移除一张:handCount-1(下限 0)+ 按 cardId 精确过滤 hand。
  *  必须用 cardId 精确移除单张,不能用 name/suit/rank 过滤——
  *  标准牌堆中同名同花色同点数的牌有多张(如 杀♠7 有 4 张),
  *  按 name/suit/rank 会误删所有重复牌,导致 hand.length < handCount。
  *  cardId 为空(falsy)时只减计数、不动 hand(与原各调用点守卫一致)。 */
-function removeCardFromHand(view: GameView, pi: number, cardId: string | undefined): void {
-  view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
-  if (cardId && view.players[pi].hand) {
-    view.players[pi].hand = view.players[pi].hand.filter((c: Card) => c.id !== cardId);
+function removeCardFromHand(p: PlayerViewEntry, cardId: string | undefined): void {
+  p.handCount = Math.max(0, p.handCount - 1);
+  if (cardId && p.hand) {
+    p.hand = p.hand.filter((c: Card) => c.id !== cardId);
   }
 }
 
@@ -96,7 +96,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
         cardId: atom.cardId,
         effect,
       };
-      return { ownerViews: new Map(), othersView: view };
+      return broadcast(view);
     }
 
     // 手牌→处理区 = 使用/打出置入处理区。后续必有「使用时」/「打出牌时」atom
@@ -111,7 +111,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
         cardId: atom.cardId,
         effect,
       };
-      return { ownerViews: new Map(), othersView: view };
+      return broadcast(view);
     }
 
     // 牌堆→手牌 = 摸牌（信息分级）
@@ -140,7 +140,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
       // 镜像可能没有该虚拟牌条目——hook 直接写 cardMap 不产生事件),applyView 据此同步。
       ...(state.cardMap[atom.cardId]?.ephemeral ? { ephemeral: true } : {}),
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
     // 通用移动牌:zone 同步必须在 player guard 之前,因为某些移动(如处理区→弃牌堆)无 player
@@ -172,16 +172,16 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
       }
     }
 
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi < 0) return;
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
     switch (event.type) {
       case '弃牌': {
-        removeCardFromHand(view, pi, event.cardId as string);
+        removeCardFromHand(p, event.cardId as string);
         if (view.zones) view.zones.discardPileCount += 1;
         break;
       }
       case '打出': {
-        removeCardFromHand(view, pi, event.cardId as string);
+        removeCardFromHand(p, event.cardId as string);
         if (view.zones && event.cardId) {
           view.zones.processing.push(event.cardId as string);
           const f = view.settlementStack[view.settlementStack.length - 1];
@@ -191,9 +191,9 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
       }
       case '摸牌': {
         const count = (event.count as number) ?? 1;
-        view.players[pi].handCount += count;
-        if (event.cards && view.players[pi].hand) {
-          view.players[pi].hand.push(...(event.cards as Card[]));
+        p.handCount += count;
+        if (event.cards && p.hand) {
+          p.hand.push(...(event.cards as Card[]));
         }
         if (view.zones) view.zones.deckCount = Math.max(0, view.zones.deckCount - count);
         break;
@@ -205,18 +205,18 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
         const to = event.to as ZoneLoc;
         const cardId = event.cardId as string;
         if (from?.zone === '手牌' && from?.player !== undefined) {
-          const fromPi = view.players.findIndex((p) => p.index === from.player);
-          if (fromPi >= 0) {
-            removeCardFromHand(view, fromPi, cardId);
+          const fromP = viewPlayer(view, from.player);
+          if (fromP) {
+            removeCardFromHand(fromP, cardId);
           }
         }
         if (to?.zone === '手牌' && to?.player !== undefined) {
-          const toPi = view.players.findIndex((p) => p.index === to.player);
-          if (toPi >= 0) {
-            view.players[toPi].handCount += 1;
-            if (cardId && view.players[toPi].hand) {
+          const toP = viewPlayer(view, to.player);
+          if (toP) {
+            toP.handCount += 1;
+            if (cardId && toP.hand) {
               const card = view.cardMap[cardId];
-              if (card) view.players[toPi].hand.push(card);
+              if (card) toP.hand.push(card);
             }
           }
         }

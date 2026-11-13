@@ -46,5 +46,14 @@ export function createLogger(context: string) {
     error(message: string, data?: unknown) {
       if (shouldLog('error')) console.error(formatMessage('error', context, message, data));
     },
+    /** error 日志 + thrown 值归一化:等价于 catch 块里的三行样板
+     *  `const e = normalizeError(err); log.error(msg, { error: e.stack ?? String(e) })`,
+     *  载荷格式({ error: stack })与原样板逐字一致。 */
+    err(message: string, err: unknown) {
+      const e = normalizeError(err);
+      if (shouldLog('error')) {
+        console.error(formatMessage('error', context, message, { error: e.stack ?? String(e) }));
+      }
+    },
   };
 }

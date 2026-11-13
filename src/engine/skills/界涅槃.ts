@@ -27,11 +27,12 @@
 //        runDyingFlow 在 陷入濒死 after-hook 后进入求桃循环,首项 health>0 即 return,
 //        涅槃把 health 拉回 3,循环立即退出,庞统不死亡。
 //   三选一参考 化身.ts 的 respond{skill} 模式(prompt=confirm + 候选暂存 localVars)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { setChain } from '../flows/face-down';
 import { locateCard } from '../core/judge-zone';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '界涅槃/confirm';
 const CONFIRMED_KEY = '界涅槃/confirmed';
@@ -55,28 +56,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── respond:庞统回应界涅槃的两个询问(发动确认 / 技能三选一)──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (rt === CONFIRM_RT) return null; // confirm:任意 choice 均可
-      return '当前不是界涅槃询问';
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId)!;
-      const rt = (slot.atom as Record<string, unknown>).requestType as string;
-      if (rt === CONFIRM_RT) {
-        st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-      }
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_RT, CONFIRMED_KEY, {
+    mismatchError: '当前不是界涅槃询问',
+  });
 
   // ── 陷入濒死 after-hook:界涅槃主逻辑 ──
   registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx) => {
@@ -91,21 +73,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (self.health > 0) return;
 
     // 询问是否发动
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动界涅槃?(限定技:弃所有牌,摸3张,回复至3体力,获八阵/火计/看破之一)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: '是否发动界涅槃?(限定技:弃所有牌,摸3张,回复至3体力,获八阵/火计/看破之一)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+    if (!confirmed) return;
 
     // 标记已使用(限定技)。在读到 confirmed 后立即设,防重入。
     // 用 state.vars(不被 回合结束 清理,因后缀不匹配 /usedThisTurn|/healed|/givenCount)。
@@ -160,21 +136,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     //    庞统此时 health=3 且 alive,询问不会卡死濒死流程(濒死循环已退出)。
     let selected: string | undefined;
     for (const skillName of CHOOSABLE_SKILLS) {
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `界涅槃:是否获得「${skillName}」?`,
-          confirmLabel: '获得',
-          cancelLabel: '不要',
-        },
+      const takeSkill = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: `界涅槃:是否获得「${skillName}」?`,
+        confirmLabel: '获得',
+        cancelLabel: '不要',
         defaultChoice: false,
         timeout: 15,
       });
-      if (ctx.state.localVars[CONFIRMED_KEY]) {
+      if (takeSkill) {
         selected = skillName;
         delete ctx.state.localVars[CONFIRMED_KEY];
         break;

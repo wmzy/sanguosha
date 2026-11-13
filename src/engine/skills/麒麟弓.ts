@@ -7,7 +7,7 @@
 import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '麒麟弓', description: '武器:杀造成伤害时可弃目标1匹马', isLocked: true };
@@ -65,20 +65,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (ownedMounts.length === 0) return;
 
       // 询问是否发动
-      delete ctx.state.localVars['麒麟弓/confirmed'];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: '麒麟弓/confirm',
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '麒麟弓:是否弃目标1匹马?',
-          confirmLabel: '弃马',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, '麒麟弓/confirm', ownerId, {
+        confirmedKey: '麒麟弓/confirmed',
+        title: '麒麟弓:是否弃目标1匹马?',
+        confirmLabel: '弃马',
+        cancelLabel: '不发动',
         timeout: 10,
       });
-      if (!ctx.state.localVars['麒麟弓/confirmed']) {
+      if (!confirmed) {
         delete ctx.state.localVars['麒麟弓/confirmed'];
         return;
       }

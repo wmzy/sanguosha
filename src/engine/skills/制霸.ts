@@ -35,7 +35,8 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
+import { askConfirm, engineCanPlayNow } from '../util/skillRuntime';
 import { getHunziAwakened } from '../rules/vars-keys';
 import { askRankCard, getCardValue } from '../flows/rank';
 
@@ -85,11 +86,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
         const self = st.players[allyIdx];
         if (!self?.alive) return '已死亡';
-        // 自己回合 + 出牌阶段 + 无阻塞 pending
-        const myTurn = st.currentPlayerIndex === allyIdx;
-        const inActPhase = st.phase === '出牌';
-        const free = !hasBlockingPending(st);
-        if (!myTurn || !inActPhase || !free) return '现在不能使用制霸';
+        // 自己回合 + 出牌阶段 + 无阻塞 pending(存活已由上方早退校验)→ engineCanPlayNow
+        if (!engineCanPlayNow(st, allyIdx)) return '现在不能使用制霸';
 
         // 每回合限一次
         if (usedThisTurn(st, allyIdx, '制霸')) return '本回合已使用过制霸';
@@ -110,21 +108,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
         // 觉醒后可拒绝拼点:询问孙策(未觉醒则直接接受)
         if (getHunziAwakened(lord.vars)) {
-          delete st.localVars[REFUSE_KEY];
-          await applyAtom(st, {
-            type: '请求回应',
-            requestType: REFUSE_RT,
-            target: ownerId,
-            prompt: {
-              type: 'confirm',
-              title: `${st.players[allyIdx].name} 欲与你制霸拼点,是否接受?`,
-              confirmLabel: '接受',
-              cancelLabel: '拒绝',
-            },
+          const accept = await askConfirm(st, REFUSE_RT, ownerId, {
+            confirmedKey: REFUSE_KEY,
+            title: `${st.players[allyIdx].name} 欲与你制霸拼点,是否接受?`,
+            confirmLabel: '接受',
+            cancelLabel: '拒绝',
             defaultChoice: true,
             timeout: 20,
           });
-          if (st.localVars[REFUSE_KEY] === false) return; // 孙策拒绝,中止
+          if (!accept) return; // 孙策拒绝,中止
         }
 
         await pushFrame(st, '制霸', allyIdx, { ...params });
@@ -182,21 +174,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             }
           } else {
             // 盟友没赢:询问孙策是否获得双方拼点牌
-            delete st.localVars[TAKE_KEY];
-            await applyAtom(st, {
-              type: '请求回应',
-              requestType: TAKE_RT,
-              target: ownerId,
-              prompt: {
-                type: 'confirm',
-                title: '制霸:对方拼点没赢,是否获得双方拼点牌?',
-                confirmLabel: '获得',
-                cancelLabel: '不获得',
-              },
+            const take = await askConfirm(st, TAKE_RT, ownerId, {
+              confirmedKey: TAKE_KEY,
+              title: '制霸:对方拼点没赢,是否获得双方拼点牌?',
+              confirmLabel: '获得',
+              cancelLabel: '不获得',
               defaultChoice: true,
               timeout: 20,
             });
-            const take = st.localVars[TAKE_KEY] !== false;
             for (const id of [allyCardId, lordCardId]) {
               await applyAtom(st, {
                 type: '移动牌',

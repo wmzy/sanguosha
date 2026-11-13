@@ -31,6 +31,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { createRng } from '../util/rng';
+import { askConfirm } from '../util/skillRuntime';
 import { getCardValue } from '../flows/rank';
 import type { SkillModule } from '../types';
 
@@ -99,23 +100,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!self?.alive) return;
 
       // 询问太史慈是否令对方用随机手牌拼点
-      delete ctx.state.localVars[FORCE_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: FORCE_CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '酣战:是否令对方用一张随机手牌拼点?',
-          confirmLabel: '随机拼点',
-          cancelLabel: '正常拼点',
-        },
+      const force = await askConfirm(ctx.state, FORCE_CONFIRM_RT, ownerId, {
+        confirmedKey: FORCE_KEY,
+        title: '酣战:是否令对方用一张随机手牌拼点?',
+        confirmLabel: '随机拼点',
+        cancelLabel: '正常拼点',
         defaultChoice: false,
         timeout: 20,
       });
-      const confirmed = ctx.state.localVars[FORCE_KEY] as boolean | undefined;
       delete ctx.state.localVars[FORCE_KEY];
-      if (!confirmed) return; // 不发动 → 放行正常询问目标
+      if (!force) return; // 不发动 → 放行正常询问目标
 
       // 从目标手牌随机抽一张,写入天义读取的 localVars,并 cancel 该询问
       const rng = createRng(ctx.state.rngSeed);
@@ -148,23 +142,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (candidates.length === 0) return; // 无杀 → 无可获
 
     // 询问是否获得
-    delete st.localVars[GAIN_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: GAIN_CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '酣战:是否获得两张拼点牌中点数最大的杀?',
-        confirmLabel: '获得',
-        cancelLabel: '不获得',
-      },
+    const gain = await askConfirm(st, GAIN_CONFIRM_RT, ownerId, {
+      confirmedKey: GAIN_KEY,
+      title: '酣战:是否获得两张拼点牌中点数最大的杀?',
+      confirmLabel: '获得',
+      cancelLabel: '不获得',
       defaultChoice: false,
       timeout: 20,
     });
-    const confirmed = st.localVars[GAIN_KEY] as boolean | undefined;
     delete st.localVars[GAIN_KEY];
-    if (!confirmed) return;
+    if (!gain) return;
 
     // 取点数最大的杀(并列取第一张),从弃牌堆移入太史慈手牌
     candidates.sort((a, b) => b.value - a.value);

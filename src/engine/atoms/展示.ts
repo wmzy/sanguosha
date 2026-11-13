@@ -16,6 +16,7 @@
 // 新展示替换、或流程收尾广播「展示结束」(见 atoms/展示结束.ts,覆盖旁观/回放/超时路径)。
 // duration 只控制入场翻转动画时长(翻入后停住,不淡出)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent, Card } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 
 /** 展示事件入场翻转入场动画时长(ms);粘性卡常驻至玩家操作,不由时长控制消失 */
 const REVEAL_ENTER_MS = 700;
@@ -23,7 +24,8 @@ const REVEAL_ENTER_MS = 700;
 export const 展示: AtomDefinition<{ player: number; cardId: string }> = {
   type: '展示',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
+    const err = requirePlayer(state, atom.player, 'player');
+    if (err) return err;
     if (!state.cardMap[atom.cardId]) return `card ${atom.cardId} not found`;
     return null;
   },
@@ -43,7 +45,7 @@ export const 展示: AtomDefinition<{ player: number; cardId: string }> = {
       card: cardInfo,
       effect,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView() {
     // no-op:无"已公开身份"持久字段。展示是广播事件,不改持久 view。

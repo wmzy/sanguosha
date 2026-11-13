@@ -18,8 +18,7 @@ import {
   EQUIPMENT_SKILL_NAMES,
   EQUIP_SLOT_ICON,
 } from './gameViewConstants';
-import * as styles from './gameViewStyles';
-import { hpBeadPalette } from './gameViewStyles/tokens';
+import { HpBeadColumn } from './HpBeadColumn';
 import { getCharacterMeta, LORD_SKILLS } from '../../engine/data/character-meta';
 import { getCharacterImage } from '../assets/imageAssets';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
@@ -178,22 +177,6 @@ function SeatCardBody({
   const handleImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     e.currentTarget.style.display = 'none';
   };
-  // 体力珠动态缩放:珠体基础 10×14px + 间距 3px,整列布局高度 = 17N−3(N=maxHealth);
-  // 卡高 200px,仅 N ≥ 12(17×12−3=201>200)才会溢出卡面,此时按 6/maxHealth 等比缩小
-  // 珠体与间距,使珠列完整排在卡右缘内;N ≤ 11 沿用原值(董卓 8 血/主公+1 后 9 血不再无谓缩小)。
-  const hpScale = player.maxHealth >= 12 ? 6 / player.maxHealth : 1;
-  const beadW = `${10 * hpScale}px`;
-  const beadH = `${14 * hpScale}px`;
-  const hpGap = `${3 * hpScale}px`;
-  // 珠列方向:损失的体力(空珠)在上方,剩余体力(满珠)在下方。
-  // 满珠颜色按剩余体力比例分色:>50% 绿 / >25% 黄 / ≤25% 红(濒危警示)。
-  const lostCount = Math.max(0, player.maxHealth - player.health);
-  const hpRatio = player.maxHealth > 0 ? player.health / player.maxHealth : 1;
-  // 满珠色档(与 data-hue 同判据):与大卡共用 gameViewStyles 的 playerCardHpBeadFull
-  // 单类 + tokens.hpBeadPalette 的 --bead-* 内联变量注入
-  const hpHue = hpRatio > 0.5 ? 'green' : hpRatio > 0.25 ? 'yellow' : 'red';
-  const hpBeadFullVars = hpBeadPalette[hpHue];
-
   return (
     // 卡本体包裹层:relative 锚点,承载骑右边的体力珠列与漂浮数字(不被卡本体 overflow 裁剪)
     <div className={cx(seatCardWrap, isDamaged && seatDamageOverlay, isHealed && seatHealOverlay)}>
@@ -260,18 +243,13 @@ function SeatCardBody({
           </span>
         )}
       </div>
-      {/* 右缘体力珠列:垂直排列,骑在卡右边框上;空珠(已损失)在上,满珠在下按余量分色 */}
-      <div className={seatHpBeadCol} style={{ gap: hpGap }} aria-hidden data-hp-beads>
-        {Array.from({ length: player.maxHealth }, (_, i) => (
-          <span
-            key={i}
-            className={i < lostCount ? styles.playerCardHpBeadEmpty : styles.playerCardHpBeadFull}
-            data-full={i < lostCount ? undefined : 'true'}
-            data-hue={i < lostCount ? undefined : hpHue}
-            style={{ width: beadW, height: beadH, ...(i < lostCount ? undefined : hpBeadFullVars) }}
-          />
-        ))}
-      </div>
+      {/* 右缘体力珠列:垂直排列,骑在卡右边框上;空珠(已损失)在上,满珠在下按余量分色
+          (缩放/分色的共享实现见 HpBeadColumn) */}
+      <HpBeadColumn
+        className={seatHpBeadCol}
+        maxHealth={player.maxHealth}
+        health={player.health}
+      />
       {/* 体力变化漂浮数字:伤害「-N」红 / 回血「+N」绿,上浮渐隐(动画状态由 useAnimationState 定时清除) */}
       {hpChange && (
         <span
@@ -894,8 +872,8 @@ const seatDeadStamp = css`
   }
 `;
 // 右缘体力珠列:垂直排列,骑在卡右边框上(right: -5px = 半珠宽);z-index 与大卡珠列分层。
-// 满珠/空珠珠体样式与大卡共用 gameViewStyles 的 playerCardHpBeadFull/playerCardHpBeadEmpty
-// (分色经 --bead-* 内联变量注入,色值 tokens.hpBeadPalette);尺寸由内联按 maxHealth 缩放。
+// 珠体 span、分色与尺寸缩放统一由共享组件 HpBeadColumn 渲染(满珠/空珠样式为大卡共用的
+// gameViewStyles playerCardHpBeadFull/playerCardHpBeadEmpty,分色经 --bead-* 变量注入)。
 const seatHpBeadCol = css`
   position: absolute;
   right: -5px;

@@ -38,6 +38,7 @@ import { applyAtom } from '../core/apply'
 import { pushFrame, popFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
+import { askConfirm } from '../util/skillRuntime';
 
 const SKILL_ID = '界恩怨';
 const DISPLAY_NAME = '恩怨';
@@ -207,21 +208,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!trigger) return;
 
     // 询问法正是否发动(可选)
-    delete ctx.state.localVars[A_CONFIRM_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: RT_A_CONFIRM,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `恩怨:获得 ${ctx.state.players[from].name ?? `P${from}`} 至少 2 张牌,是否令其摸 1 张?`,
-        confirmLabel: '令其摸 1 张',
-        cancelLabel: '不发动',
-      },
+    const aConfirmed = await askConfirm(ctx.state, RT_A_CONFIRM, ownerId, {
+      confirmedKey: A_CONFIRM_KEY,
+      title: `恩怨:获得 ${ctx.state.players[from].name ?? `P${from}`} 至少 2 张牌,是否令其摸 1 张?`,
+      confirmLabel: '令其摸 1 张',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (ctx.state.localVars[A_CONFIRM_KEY] !== true) return;
+    if (aConfirmed !== true) return;
     // 令来源摸 1 张牌
     if (ctx.state.players[from]?.alive) {
       await applyAtom(ctx.state, { type: '摸牌', player: from, count: 1 });
@@ -242,21 +237,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!sourcePlayer?.alive) return;
 
     // 1. 询问法正是否发动(可选)
-    delete ctx.state.localVars[B_CONFIRM_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: RT_B_CONFIRM,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '恩怨:受到伤害后,是否令来源选交红牌或失去 1 体力?',
-        confirmLabel: '令来源选择',
-        cancelLabel: '不发动',
-      },
+    const bConfirmed = await askConfirm(ctx.state, RT_B_CONFIRM, ownerId, {
+      confirmedKey: B_CONFIRM_KEY,
+      title: '恩怨:受到伤害后,是否令来源选交红牌或失去 1 体力?',
+      confirmLabel: '令来源选择',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (ctx.state.localVars[B_CONFIRM_KEY] !== true) return;
+    if (bConfirmed !== true) return;
     if (!ctx.state.players[sourceIdx]?.alive) return; // 法正思考期间来源死亡
 
     await pushFrame(ctx.state, SKILL_ID, ownerId, { source: sourceIdx });

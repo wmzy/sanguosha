@@ -29,6 +29,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const SKILL_NAME = '界固政';
@@ -92,21 +93,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     await pushFrame(st, SKILL_NAME, ownerId, { target: player, cardIds });
 
     // ── 第一步:是否发动界固政 ──
-    delete st.localVars[CONFIRM_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: CONFIRM_REQUEST,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `是否发动界固政?(${st.players[player]?.name ?? ''} 弃置了 ${cardIds.length} 张牌)`,
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(st, CONFIRM_REQUEST, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: `是否发动界固政?(${st.players[player]?.name ?? ''} 弃置了 ${cardIds.length} 张牌)`,
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 30,
     });
-    const confirmed = st.localVars[CONFIRM_KEY] === true;
     if (!confirmed) {
       await popFrame(st);
       return;
@@ -158,21 +152,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // ── 第三步:是否获得其余(可选)──
     const rest = available.filter((id) => id !== chosen);
     if (rest.length > 0) {
-      delete st.localVars[REST_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: REST_REQUEST,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `是否获得其余 ${rest.length} 张牌?`,
-          confirmLabel: '获得',
-          cancelLabel: '不获得',
-        },
+      const getRest = await askConfirm(st, REST_REQUEST, ownerId, {
+        confirmedKey: REST_KEY,
+        title: `是否获得其余 ${rest.length} 张牌?`,
+        confirmLabel: '获得',
+        cancelLabel: '不获得',
         defaultChoice: false,
         timeout: 30,
       });
-      const getRest = st.localVars[REST_KEY] === true;
       if (getRest) {
         for (const id of rest) {
           await applyAtom(st, {
@@ -200,23 +187,25 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是界固政窗口';
-      const atom = slot.atom as { requestType?: string };
-      if (
-        atom.requestType === CONFIRM_REQUEST ||
-        atom.requestType === REST_REQUEST
-      ) {
+      const check = requireRequestType(
+        st,
+        ownerId,
+        [CONFIRM_REQUEST, PICK_REQUEST, REST_REQUEST],
+        {
+          wrongTypeError: '当前不是界固政窗口',
+          mismatchError: '当前不是界固政窗口',
+        },
+      );
+      if (check.error) return check.error;
+      const rt = check.requestType;
+      if (rt === CONFIRM_REQUEST || rt === REST_REQUEST) {
         // 确认/不确认都接受
         return null;
       }
-      if (atom.requestType === PICK_REQUEST) {
-        const cardId = params.cardId;
-        if (typeof cardId !== 'string') return '需要选择一张牌';
-        return null;
-      }
-      return '当前不是界固政窗口';
+      // PICK_REQUEST:选一张交给该角色
+      const cardId = params.cardId;
+      if (typeof cardId !== 'string') return '需要选择一张牌';
+      return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
       const slot = st.pendingSlots.get(ownerId)!;

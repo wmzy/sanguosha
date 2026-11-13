@@ -27,13 +27,12 @@ import type {
   FrontendAPI,
   GameState,
   HookResult,
-  Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { flipFaceDown, flipFaceUp, isFaceDown, performSkipTurn } from '../flows/face-down';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const DISPLAY_NAME = '伏枥';
 
@@ -76,20 +75,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── respond:廖化回应是否发动伏枥 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>): string | null => {
-      return requireRequestType(st, ownerId, [CONFIRM_RT], {
-        mismatchError: '当前不是伏枥询问',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_RT, CONFIRMED_KEY, {
+    mismatchError: '当前不是伏枥询问',
+  });
 
   // ── 陷入濒死 after-hook:伏枥主逻辑 ──
   registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx) => {
@@ -104,21 +92,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (self.health > 0) return;
 
     // 询问是否发动
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动伏枥?(限定技:回复至X体力并摸至X张手牌;X=全场势力数;若X>你造成的伤害数则翻面)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: '是否发动伏枥?(限定技:回复至X体力并摸至X张手牌;X=全场势力数;若X>你造成的伤害数则翻面)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+    if (!confirmed) return;
 
     // 标记已使用(限定技)。在读到 confirmed 后立即设,防重入。
     ctx.state.players[ownerId].vars[USED_KEY] = true;

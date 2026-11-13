@@ -37,6 +37,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { registerSuppressionProvider } from '../core/skill-suppression';
+import { askConfirm } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 /** 请求类型:目标展示一张手牌。 */
@@ -194,22 +195,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         });
 
         // 询问发起者是否令其回复 1 点体力
-        delete st.localVars[HEAL_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: HEAL_REQUEST,
-          target: from,
-          prompt: {
-            type: 'confirm',
-            title: `义绝:是否令 ${st.players[target]?.name ?? '目标'} 回复1点体力?`,
-            confirmLabel: '回复',
-            cancelLabel: '不回复',
-          },
+        const heal = await askConfirm(st, HEAL_REQUEST, from, {
+          confirmedKey: HEAL_KEY,
+          title: `义绝:是否令 ${st.players[target]?.name ?? '目标'} 回复1点体力?`,
+          confirmLabel: '回复',
+          cancelLabel: '不回复',
           defaultChoice: false,
           timeout: 15,
         });
 
-        if (st.localVars[HEAL_KEY] === true) {
+        if (heal) {
           const tp = st.players[target];
           // 仅存活且未满血时回血(回复体力 atom 自带上限校验,这里跳过满血情况避免无意义结算)
           if (tp?.alive && tp.health < tp.maxHealth) {

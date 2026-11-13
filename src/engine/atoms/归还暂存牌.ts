@@ -17,11 +17,13 @@
 // 触发时机:具体技能(界破军/界谦逊)注册的 回合结束 after-hook 检测到
 //   对应 vars[varsKey] 非空时调用本 atom。
 import type { AtomDefinition, Card, GameView, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 
 export const 归还暂存牌: AtomDefinition<{ player: number; varsKey: string }> = {
   type: '归还暂存牌',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
+    const err = requirePlayer(state, atom.player, 'player');
+    if (err) return err;
     if (typeof atom.varsKey !== 'string' || atom.varsKey.length === 0) return `varsKey 不能为空`;
     const list = (state.players[atom.player].vars[atom.varsKey] as string[] | undefined) ?? [];
     if (list.length === 0) return `player ${atom.player} 的 vars['${atom.varsKey}'] 无暂存牌可归还`;
@@ -56,7 +58,7 @@ export const 归还暂存牌: AtomDefinition<{ player: number; varsKey: string }
         cards: cardInfos,
         toDiscard: true,
       };
-      return { ownerViews: new Map(), othersView: view };
+      return broadcast(view);
     }
     const ownerView: ViewEvent = {
       type: '归还暂存牌',
@@ -71,8 +73,8 @@ export const 归还暂存牌: AtomDefinition<{ player: number; varsKey: string }
     return { ownerViews: new Map([[atom.player, ownerView]]), othersView };
   },
   applyView(view: GameView, event: ViewEvent) {
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi < 0) return;
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
     const cards = event.cards as
       | Array<{ id: string; name: string; suit: string; rank: string }>
       | undefined;
@@ -82,14 +84,14 @@ export const 归还暂存牌: AtomDefinition<{ player: number; varsKey: string }
       if (view.zones) view.zones.discardPileCount += count;
       return;
     }
-    view.players[pi].handCount += count;
+    p.handCount += count;
     // target 视角:把归还的牌追加进 view.hand
-    if (cards && view.players[pi].hand) {
+    if (cards && p.hand) {
       for (const c of cards) {
         const card = view.cardMap[c.id];
         if (card) {
-          if (!view.players[pi].hand.some((x: Card) => x.id === c.id)) {
-            view.players[pi].hand.push(card);
+          if (!p.hand.some((x: Card) => x.id === c.id)) {
+            p.hand.push(card);
           }
         }
       }

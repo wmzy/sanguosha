@@ -41,6 +41,7 @@ import {
   registerAfterHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
+import { askConfirm } from '../util/skillRuntime';
 
 // ── 摸牌逻辑常量(镜像标好施)──
 const CONFIRM_RT = '界好施/confirm';
@@ -172,21 +173,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (!self?.alive) return;
         if (usedThisTurn(ctx.state, ownerId, '界好施')) return;
 
-        delete ctx.state.localVars[CONFIRMED_KEY];
-        await applyAtom(ctx.state, {
-          type: '请求回应',
-          requestType: CONFIRM_RT,
-          target: ownerId,
-          prompt: {
-            type: 'confirm',
-            title: '是否发动好施?(额外摸两张牌)',
-            confirmLabel: '发动',
-            cancelLabel: '不发动',
-          },
+        const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+          confirmedKey: CONFIRMED_KEY,
+          title: '是否发动好施?(额外摸两张牌)',
+          confirmLabel: '发动',
+          cancelLabel: '不发动',
           defaultChoice: false,
           timeout: 15,
         });
-        if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+        if (!confirmed) return;
 
         await markOncePerTurn(ctx.state, ownerId, '界好施');
         ctx.state.localVars[ACTIVE_KEY] = true;

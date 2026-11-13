@@ -29,7 +29,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const BONUS_TAG = '界裸衣/bonus';
 /** 询问①:是否发动界裸衣(亮牌+增伤) */
@@ -105,21 +105,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (ctx.state.zones.deck.length < 3) return;
 
       // ── 询问①:是否发动界裸衣(亮牌+增伤,与是否跳过无关)──
-      delete ctx.state.localVars[ACTIVATED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: ACTIVATE_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动界裸衣?(亮出牌堆顶3张;直到你的下回合开始,你的杀/决斗伤害+1)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const activated = await askConfirm(ctx.state, ACTIVATE_RT, ownerId, {
+        confirmedKey: ACTIVATED_KEY,
+        title: '是否发动界裸衣?(亮出牌堆顶3张;直到你的下回合开始,你的杀/决斗伤害+1)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 15,
       });
-      if (ctx.state.localVars[ACTIVATED_KEY] !== true) return; // 不发动 → 默认摸牌
+      if (!activated) return; // 不发动 → 默认摸牌
 
       // 标记本回合已用(防 hook 重入;界裸衣/usedThisTurn 回合结束自动清)
       await markOncePerTurn(ctx.state, ownerId, '界裸衣');
@@ -146,23 +140,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: BONUS_TAG });
 
         // ── 询问②:是否跳过摸牌阶段并获得基本/武器/决斗 ──
-        delete ctx.state.localVars[SKIP_KEY];
-        await applyAtom(ctx.state, {
-          type: '请求回应',
-          requestType: SKIP_RT,
-          target: ownerId,
-          prompt: {
-            type: 'confirm',
-            title:
-              '界裸衣:是否跳过摸牌阶段并获得亮出牌中的基本牌、武器牌和【决斗】?(其余亮出牌置入弃牌堆)',
-            confirmLabel: '跳过并获得',
-            cancelLabel: '不跳过',
-          },
+        shouldSkip = await askConfirm(ctx.state, SKIP_RT, ownerId, {
+          confirmedKey: SKIP_KEY,
+          title:
+            '界裸衣:是否跳过摸牌阶段并获得亮出牌中的基本牌、武器牌和【决斗】?(其余亮出牌置入弃牌堆)',
+          confirmLabel: '跳过并获得',
+          cancelLabel: '不跳过',
           defaultChoice: false,
           timeout: 15,
         });
 
-        shouldSkip = ctx.state.localVars[SKIP_KEY] === true;
         if (shouldSkip) {
           // ── 跳过:基本/武器/决斗入手,其他入弃牌堆 ──
           for (const cardId of top3) {

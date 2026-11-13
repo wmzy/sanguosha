@@ -15,7 +15,7 @@ import { getChatHistory, buildRoomState, ensureSeatOnReconnect, getRecentLeaveGr
 import { resolveSessionIdentity } from './auth/guard';
 import { gameSessions, playerRoomMap } from './registry';
 import { generatePlayerId } from './utils';
-import { createLogger, normalizeError } from './logger';
+import { createLogger } from './logger';
 
 const log = createLogger('sse');
 
@@ -59,10 +59,7 @@ export class SseSink implements ConnectionSink {
     void this.stream.writeSSE({
       data,
       ...(id ? { id } : {}),
-    }).catch((err) => {
-      const e = normalizeError(err);
-      log.error('SSE writeSSE failed', { error: e.stack ?? String(e) });
-    });
+    }).catch((err) => log.err('SSE writeSSE failed', err));
   }
 
   close(): void {
@@ -354,8 +351,7 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
         : playerRole(room, playerId, session, lastSeq);
       await runSseSession(stream, room, playerId, displayName, session, lastSeq, role);
     } catch (err) {
-      const e = normalizeError(err);
-      log.error('SSE handler error', { error: e.stack ?? String(e) });
+      log.err('SSE handler error', err);
     }
   });
 }

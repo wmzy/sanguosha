@@ -27,7 +27,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { getQizhiCount } from '../rules/vars-keys';
-import { currentRequestType } from '../util/skillRuntime';
+import { currentRequestType, askConfirm } from '../util/skillRuntime';
 
 const SKILL_ID = '进趋';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -109,21 +109,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const x = getQizhiCount(ctx.state.turn.vars) ?? 0;
 
       // 1. 询问是否发动进趋
-      delete ctx.state.localVars[CONFIRM_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `是否发动进趋?(摸两张牌,然后将手牌弃至 ${x} 张)`,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRM_KEY,
+        title: `是否发动进趋?(摸两张牌,然后将手牌弃至 ${x} 张)`,
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 15,
       });
-      if (!ctx.state.localVars[CONFIRM_KEY]) {
+      if (!confirmed) {
         delete ctx.state.localVars[CONFIRM_KEY];
         return;
       }

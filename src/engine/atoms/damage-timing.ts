@@ -15,8 +15,8 @@
 // 与 life-timing / 生效前 / 使用结算结束时 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { DamageType } from '../../engine/types';
-import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { getBeforeHooks } from '../core/skill';
+import type { AtomDefinition, GameState, ViewEventSplit } from '../types';
+import { hookSilentView, requirePlayer } from './_helpers';
 
 // ── before-hook modify amount 的回传通道 ────────────────────
 // 伤害结算开始时/造成伤害时/受到伤害时 的 before-hook 可 modify amount;afterApply 把最终
@@ -37,23 +37,18 @@ type DamageTimingAtom = {
 /** 校验 source/target 玩家存在(纯标记,不校验存活/amount——编排函数前置保证)。 */
 function validateDamageTiming(state: GameState, atom: DamageTimingAtom): string | null {
   // source 可为系统来源(TARGET_SYSTEM,如闪电/连环传导),不校验其存在;只校验目标玩家存在。
-  if (!state.players[atom.target]) return `target ${atom.target} not found`;
-  return null;
+  return requirePlayer(state, atom.target, 'target');
 }
 
 /** 无 before-hook 时静默(no-op 视图),有 before-hook 时发通知事件。 */
 function damageTimingView(state: GameState, type: string, atom: DamageTimingAtom): ViewEventSplit {
-  if (getBeforeHooks(state, type).length === 0) {
-    return { ownerViews: new Map(), othersView: null };
-  }
-  const view: ViewEvent = {
+  return hookSilentView(state, type, () => ({
     type,
     source: atom.source,
     target: atom.target,
     amount: atom.amount,
     damageType: atom.damageType,
-  };
-  return { ownerViews: new Map(), othersView: view };
+  }));
 }
 
 // ── 时机1:伤害结算开始时(绝情 cancel / 狂风大雾修正) ─────────

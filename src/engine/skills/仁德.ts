@@ -4,7 +4,8 @@
 import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
+import { engineCanPlayNow } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -24,12 +25,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'use',
     (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
+      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活(engineCanPlayNow 四合一)
       const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
       // 仁德有三种调用格式:
       // 1. 分配格式(distribute UI 提交): params.allocation = [{target, cardIds}](多牌多目标)
       // 2. 分配格式(旧): params.targets = [{target, cardIds}]
@@ -88,10 +85,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         hasCards &&
         normalized.every((t) => t.target !== ownerId && state.players[t.target]?.alive === true);
       const ok =
-        myTurn &&
-        inActPhase &&
-        free &&
-        selfAlive &&
+        engineCanPlayNow(state, ownerId) &&
         hasCards &&
         noDuplicates &&
         allInHand &&

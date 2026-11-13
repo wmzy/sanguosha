@@ -3,6 +3,7 @@
 // 牌堆不足时,合并弃牌堆重洗补充(标准三国杀规则);牌堆+弃牌堆总数仍不足时,
 // 才算不合法(validate 报错)。
 import type { AtomDefinition, Card, ViewEventSplit, ViewEvent } from '../types';
+import { requirePlayer, viewPlayer } from './_helpers';
 import { createRng } from '../util/rng';
 
 interface DrawPlan {
@@ -53,7 +54,8 @@ function planDraw(
 export const 摸牌: AtomDefinition<{ player: number; count: number; fromBottom?: boolean }> = {
   type: '摸牌',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
+    const err = requirePlayer(state, atom.player, 'player');
+    if (err) return err;
     if (atom.count <= 0) return 'count must be > 0';
     // 牌堆 + 弃牌堆总数都不足以满足 count 时才真的无牌可摸
     const total = state.zones.deck.length + state.zones.discardPile.length;
@@ -95,13 +97,13 @@ export const 摸牌: AtomDefinition<{ player: number; count: number; fromBottom?
     };
   },
   applyView(view, event) {
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi < 0) return;
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
     const count = (event.count as number) ?? 0;
-    view.players[pi].handCount += count;
+    p.handCount += count;
     // owner 有 cards 字段，加入手牌；others 没有
-    if (event.cards && view.players[pi].hand) {
-      view.players[pi].hand.push(...(event.cards as Card[]));
+    if (event.cards && p.hand) {
+      p.hand.push(...(event.cards as Card[]));
     }
     // zone 同步
     if (view.zones) {

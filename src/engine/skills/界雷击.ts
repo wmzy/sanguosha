@@ -29,7 +29,7 @@ import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { isCancelled } from '../core/frame';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界雷击';
 const DISPLAY_NAME = '雷击';
@@ -78,22 +78,14 @@ async function run雷击Flow(state: GameState, ownerId: number, triggerDesc: str
   if (!me?.alive) return;
 
   // ── 步骤 1:询问是否判定 ──────────────────────────────
-  delete state.localVars[JUDGE_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: JUDGE_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: `界雷击:是否判定?(${triggerDesc})`,
-      confirmLabel: '判定',
-      cancelLabel: '不判定',
-    },
+  const judgeChoice = await askConfirm(state, JUDGE_RT, ownerId, {
+    confirmedKey: JUDGE_KEY,
+    title: `界雷击:是否判定?(${triggerDesc})`,
+    confirmLabel: '判定',
+    cancelLabel: '不判定',
     defaultChoice: false,
     timeout: 20,
   });
-
-  const judgeChoice = state.localVars[JUDGE_KEY];
   delete state.localVars[JUDGE_KEY];
   if (judgeChoice !== true) return; // 放弃发动
 

@@ -32,7 +32,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界献图';
 const DISPLAY_NAME = '献图';
@@ -127,21 +127,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     delete st.turn.vars[dmgKey(currentPlayer)];
 
     // 1) 是否发动献图(非锁定技,默认不发动)
-    delete st.localVars[CONFIRM_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: TRIGGER_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `是否发动献图?(摸至多两张牌,然后交给 ${st.players[currentPlayer]?.name} 等量牌)`,
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const triggered = await askConfirm(st, TRIGGER_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: `是否发动献图?(摸至多两张牌,然后交给 ${st.players[currentPlayer]?.name} 等量牌)`,
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!st.localVars[CONFIRM_KEY]) {
+    if (!triggered) {
       delete st.localVars[CONFIRM_KEY];
       return;
     }
@@ -151,45 +145,28 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
     // 2) 选摸几张(至多 2):"摸 2 张?" → 是=2 / 否→ "摸 1 张?" → 是=1 / 否=0
     let drawN: number;
-    delete st.localVars[CONFIRM_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: DRAW2_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '献图:摸几张牌?(确认=2张,取消=少一些)',
-        confirmLabel: '摸 2 张',
-        cancelLabel: '少一些',
-      },
+    // defaultChoice:true → 超时(undefined)按默认摸 2,仅显式取消进少摸分支
+    const draw2 = await askConfirm(st, DRAW2_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: '献图:摸几张牌?(确认=2张,取消=少一些)',
+      confirmLabel: '摸 2 张',
+      cancelLabel: '少一些',
       defaultChoice: true,
       timeout: 15,
     });
-    // defaultChoice:true → 超时时 CONFIRM_KEY 仍为 undefined,须按 !== false 判定
-    // (undefined !== false → 默认摸 2),仅显式取消(choice===false)才进少摸分支
-    // 注:用 as Json|undefined 断言读取,避免 Record 索引类型被先前真值检查收窄
-    // (收窄后排除 false,导致 !== false 误报 TS2367 无重叠)
-    const draw2Confirmed = st.localVars[CONFIRM_KEY] as Json | undefined;
-    if (draw2Confirmed !== false) {
+    if (draw2) {
       drawN = 2;
     } else {
-      delete st.localVars[CONFIRM_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: DRAW1_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '献图:摸 1 张牌?(确认=1张,取消=0张/不摸)',
-          confirmLabel: '摸 1 张',
-          cancelLabel: '不摸',
-        },
+      // defaultChoice:true → 超时(undefined)默认摸 1,仅显式取消摸 0
+      const draw1 = await askConfirm(st, DRAW1_RT, ownerId, {
+        confirmedKey: CONFIRM_KEY,
+        title: '献图:摸 1 张牌?(确认=1张,取消=0张/不摸)',
+        confirmLabel: '摸 1 张',
+        cancelLabel: '不摸',
         defaultChoice: true,
         timeout: 15,
       });
-      // defaultChoice:true → 超时(undefined)默认摸 1,仅显式取消摸 0
-      const draw1Confirmed = st.localVars[CONFIRM_KEY] as Json | undefined;
-      drawN = draw1Confirmed !== false ? 1 : 0;
+      drawN = draw1 ? 1 : 0;
     }
     delete st.localVars[CONFIRM_KEY];
 

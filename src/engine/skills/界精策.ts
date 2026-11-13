@@ -37,10 +37,10 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { handLimitBonusKey } from '../rules/vars-keys';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const SKILL_ID = '界精策';
 const DISPLAY_NAME = '精策';
@@ -123,19 +123,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── respond:被询问「是否摸X张」时回应,写 localVars 标记结果 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st, _params) =>
-      requireRequestType(st, ownerId, [CONFIRM_REQUEST], {
-        mismatchError: '当前不是精策确认',
-      }).error,
-    async (st, params) => {
-      st.localVars[CONFIRMED_VAR] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_REQUEST, CONFIRMED_VAR, {
+    mismatchError: '当前不是精策确认',
+  });
 
   // ── 移动牌 after:自己手牌 → 处理区 = 使用了一张非装备牌 ──
   // 覆盖主动使用(杀.use 等)与被动打出(闪.respond、杀.respond 决斗等)
@@ -174,23 +164,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const X = usedTypes(ctx.state, ownerId).length;
     if (X === 0) return; // 未使用过任何牌,无可摸
 
-    // 询问是否发动
-    delete ctx.state.localVars[CONFIRMED_VAR];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_REQUEST,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `精策:是否摸 ${X} 张牌?(本回合已使用 ${X} 种类型的牌)`,
-        confirmLabel: '摸牌',
-        cancelLabel: '不摸',
-      },
+    // 询问是否发动:玩家选不摸 / 超时(defaultChoice=false) → 跳过
+    const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
+      confirmedKey: CONFIRMED_VAR,
+      title: `精策:是否摸 ${X} 张牌?(本回合已使用 ${X} 种类型的牌)`,
+      confirmLabel: '摸牌',
+      cancelLabel: '不摸',
       defaultChoice: false,
       timeout: 15,
     });
-    // 玩家选不摸 / 超时(defaultChoice=false) → 跳过
-    if (!ctx.state.localVars[CONFIRMED_VAR]) return;
+    if (!confirmed) return;
 
     await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: X });
   });

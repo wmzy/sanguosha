@@ -32,6 +32,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 
 const SKILL_ID = '界强识';
 const DISPLAY_NAME = '强识';
@@ -68,27 +69,19 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   /** 询问 owner 是否摸一张牌(非锁定技,默认摸)——供 移动牌/装备 hook 复用。 */
   const askDraw = async (st: GameState): Promise<void> => {
-    delete st.localVars[DRAW_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: DRAW_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '强识:是否摸一张牌?(本阶段使用同类别的牌)',
-        confirmLabel: '摸牌',
-        cancelLabel: '不摸',
-      },
+    // defaultChoice=true:超时(未设 localVars)应按默认摸牌处理,
+    // 故仅在玩家明确选「不摸」(choice=false)时跳过,与 制霸/洛神 defaultChoice=true 模式一致
+    // (askConfirm 对未设确认键按 defaultChoice 兜底)。
+    const draw = await askConfirm(st, DRAW_RT, ownerId, {
+      confirmedKey: DRAW_KEY,
+      title: '强识:是否摸一张牌?(本阶段使用同类别的牌)',
+      confirmLabel: '摸牌',
+      cancelLabel: '不摸',
       defaultChoice: true,
       timeout: 15,
     });
-    // defaultChoice=true:超时(未设 localVars)应按默认摸牌处理,
-    // 故仅在玩家明确选「不摸」(DRAW_KEY===false)时跳过,与 制霸/洛神 defaultChoice=true 模式一致。
-    if (st.localVars[DRAW_KEY] === false) {
-      delete st.localVars[DRAW_KEY];
-      return;
-    }
     delete st.localVars[DRAW_KEY];
+    if (!draw) return;
     await applyAtom(st, { type: '摸牌', player: ownerId, count: 1 });
   };
 
@@ -160,25 +153,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!hasTarget) return;
 
     // 1) 是否发动强识(非锁定技,默认不发动)
-    delete st.localVars[CONFIRM_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动强识?(观看一名其他角色的手牌并展示其中一张牌)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(st, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: '是否发动强识?(观看一名其他角色的手牌并展示其中一张牌)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!st.localVars[CONFIRM_KEY]) {
-      delete st.localVars[CONFIRM_KEY];
-      return;
-    }
     delete st.localVars[CONFIRM_KEY];
+    if (!confirmed) return;
 
     await pushFrame(st, SKILL_ID, ownerId, {});
 

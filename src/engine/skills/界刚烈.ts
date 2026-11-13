@@ -18,12 +18,12 @@
 //   - 来源无任何可弃置的牌时跳过(规则:无法弃置则无事发生)。
 //   - judgeType='界刚烈' 与标版 '刚烈' 区分(日志/调试用,不影响机制)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply'
 import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { askConfirm } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '界刚烈/confirm';
 const PICK_REQUEST = '界刚烈/选牌';
@@ -112,21 +112,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (ctx.state.zones.deck.length === 0) return;
 
     // 询问是否发动界刚烈(不是锁定技,可选择不发动)
-    delete ctx.state.localVars['界刚烈/confirmed'];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_REQUEST,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动界刚烈?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
+      confirmedKey: '界刚烈/confirmed',
+      title: '是否发动界刚烈?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (!ctx.state.localVars['界刚烈/confirmed']) return; // 不发动
+    if (!confirmed) return; // 不发动
 
     const judgeCardId = await runJudgeFlow(ctx.state, ownerId, '界刚烈');
     const color = judgeCardId ? ctx.state.cardMap[judgeCardId]?.color : undefined;

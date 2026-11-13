@@ -13,7 +13,8 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
+import { engineCanPlayNow } from '../util/skillRuntime';
 
 const SKILL_ID = '界黄天';
 const DISPLAY_NAME = '黄天';
@@ -56,11 +57,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
         const self = st.players[allyIdx];
         if (!self?.alive) return '已死亡';
-        // 自己回合 + 出牌阶段 + 无阻塞 pending
-        const myTurn = st.currentPlayerIndex === allyIdx;
-        const inActPhase = st.phase === '出牌';
-        const free = !hasBlockingPending(st);
-        if (!myTurn || !inActPhase || !free) return '现在不能使用界黄天';
+        // 自己回合 + 出牌阶段 + 无阻塞 pending(存活已由上方早退校验)→ engineCanPlayNow
+        if (!engineCanPlayNow(st, allyIdx)) return '现在不能使用界黄天';
 
         // 每回合限一次
         if (usedThisTurn(st, allyIdx, SKILL_ID)) return '本回合已使用过界黄天';

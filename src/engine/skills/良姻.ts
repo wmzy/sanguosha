@@ -28,7 +28,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 /** owner.vars key:箜声牌 cardId 列表(由 箜声.ts 维护,良姻只读) */
 const KONGSHENG_KEY = '箜声/牌';
@@ -88,21 +88,15 @@ async function performLiangyin(
   const x = kongshengCount(state, ownerId);
 
   // 1) 是否发动
-  delete state.localVars[CONFIRMED_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: CONFIRM_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: `是否发动良姻?(与一名其他角色各摸/弃一张牌,X=${x})`,
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+  const confirmed = await askConfirm(state, CONFIRM_RT, ownerId, {
+    confirmedKey: CONFIRMED_KEY,
+    title: `是否发动良姻?(与一名其他角色各摸/弃一张牌,X=${x})`,
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
     defaultChoice: false,
     timeout: 15,
   });
-  if (!state.localVars[CONFIRMED_KEY]) {
+  if (!confirmed) {
     delete state.localVars[CONFIRMED_KEY];
     return;
   }

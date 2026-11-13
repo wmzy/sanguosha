@@ -166,6 +166,11 @@ describe('turnUsage 投影 key 静态契约', () => {
       // 杀/* 前缀族 helper:第 3 参是来源技能名(经 slash-quota 内 slashXxxKey 工厂拼接),
       // 必须是无 '/' 的字面量技能名——工厂保证了前缀命名空间。
       if (kind === 'slashHelper') {
+        // rules/slash-quota.ts 自身的注册工厂(registerAlwaysUnlimitedWithProjection)把
+        // 调用方传入的 skillId 透传给 projectSlash*——与 turn-usage.ts 通用发射器同型:
+        // key 命名空间仍由 slashUnlimitedKey 工厂在运行时保证,真实来源由技能文件
+        // 调用点传入 skill.id(registerSkill 契约 id === 技能名)。
+        if (file === 'rules/slash-quota.ts' && expr === 'skillId') continue;
         if (!/^'[^'/]+'$/.test(expr)) violations.push(`${file}: projectSlash* 来源必须是技能名字面量, got ${expr}`);
         continue;
       }

@@ -49,6 +49,7 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { askConfirm } from '../util/skillRuntime';
 
 const SKILL_ID = '界利驭';
 const DISPLAY_NAME = '利驭';
@@ -162,21 +163,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!hasCards) return;
 
       // 1. 询问是否发动利驭
-      delete ctx.state.localVars[CONFIRM_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动利驭?',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRM_KEY,
+        title: '是否发动利驭?',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 10,
       });
-      if (!ctx.state.localVars[CONFIRM_KEY]) return;
+      if (!confirmed) return;
       delete ctx.state.localVars[CONFIRM_KEY];
 
       // 2. 弹选牌面板:从受伤目标区域选一张牌获得(手牌+装备+判定区)

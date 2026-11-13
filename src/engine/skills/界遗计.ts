@@ -9,7 +9,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 // 内部 requestType/localVars 键名保持原前缀「遗计/」,不改为「界遗计/」
@@ -101,21 +101,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!hasOtherAlive) continue;
 
       // 3) 询问是否交牌(可选)
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '遗计:是否将至多两张手牌交给至多两名其他角色?',
-          confirmLabel: '交牌',
-          cancelLabel: '不交',
-        },
+      const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: '遗计:是否将至多两张手牌交给至多两名其他角色?',
+        confirmLabel: '交牌',
+        cancelLabel: '不交',
         defaultChoice: false,
         timeout: 15,
       });
-      if (!ctx.state.localVars[CONFIRMED_KEY]) {
+      if (!confirmed) {
         delete ctx.state.localVars[CONFIRMED_KEY];
         continue;
       }

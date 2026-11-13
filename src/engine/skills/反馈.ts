@@ -14,10 +14,10 @@
 //   - 选牌面板逻辑与过河拆桥/顺手牵羊共用(见 ../pick-card-panel.ts);反馈为 obtain 模式,
 //     includeJudge=false(经典规则仅手牌+装备)。
 import type { FrontendAPI, Skill } from '../types';
-import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { askConfirm } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -89,21 +89,15 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
     if (!hasCards) return;
 
     // 询问是否发动
-    delete ctx.state.localVars['反馈/confirmed'];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '反馈/confirm',
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动反馈?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, '反馈/confirm', ownerId, {
+      confirmedKey: '反馈/confirmed',
+      title: '是否发动反馈?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (!ctx.state.localVars['反馈/confirmed']) return;
+    if (!confirmed) return;
 
     // 弹选牌面板:从来源区域选一张牌获得(手牌盲选 / 装备明选,不含判定区)
     const source = ctx.state.players[atom.source];

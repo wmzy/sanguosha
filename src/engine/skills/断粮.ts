@@ -15,7 +15,8 @@ import type { Card, GameView, FrontendAPI, GameState, Json, Skill } from '../typ
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
+import { engineCanPlayNow } from '../util/skillRuntime';
 import { effectiveDistance } from '../rules/distance';
 import { viewEffectiveDistance } from '../rules/viewDistance';
 
@@ -46,9 +47,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'use',
     (state: GameState, params: Record<string, Json>): string | null => {
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
       const self = state.players[ownerId];
       if (!self?.alive) return '玩家不存在或已死亡';
       if (typeof params.cardId !== 'string') return '需要选择一张牌';
@@ -67,7 +65,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const handGeq = targetPlayer.hand.length >= self.hand.length;
       const inRange = handGeq || effectiveDistance(state, ownerId, target) <= 1;
 
-      const ok = myTurn && inActPhase && free && inRange;
+      // 时机(自己回合+出牌阶段+无阻塞,存活已由上方早退校验)由 engineCanPlayNow 统一判定
+      const ok = engineCanPlayNow(state, ownerId) && inRange;
       return ok ? null : '断粮使用条件不满足';
     },
     async (state: GameState, params: Record<string, Json>): Promise<void> => {

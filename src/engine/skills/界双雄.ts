@@ -40,7 +40,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界双雄'(避开标双雄冲突);
 //   内部 Skill.name = '双雄'(OL 官方技能名,玩家可见)。
 import type {
-  Card,
   FrontendAPI,
   GameState,
   Json,
@@ -51,13 +50,19 @@ import {
   registerAction,
   registerAfterHook,
   registerBeforeHook,
-  hasBlockingPending,
 } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import { setTurnVarUsage } from '../rules/turn-usage';
 import { JIESHUANGXIONG_COLOR_VIEW_KEY } from '../rules/vars-keys';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import {
+  askConfirm,
+  effectiveCardId,
+  requireRequestType,
+  registerTransformAction,
+  mountTransformAction,
+  type TransformActionOptions,
+} from '../util/skillRuntime';
 
 const _SKILL_ID = '界双雄';
 const DISPLAY_NAME = '双雄';
@@ -87,10 +92,41 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 影子卡 id:${原id}#界双雄('界双雄' 后缀避免与标版影子卡冲突) */
-function shadowIdOf(cardId: string): string {
-  return `${cardId}#界双雄`;
-}
+/** 影子卡 id 由工厂统一构造:${原id}#界双雄('界双雄' 后缀 = 技能 id,避免与标版影子卡冲突) */
+const TRANSFORM_OPTIONS: TransformActionOptions = {
+  outputName: '决斗',
+  // 核心:本回合已发动过双雄(弃置牌颜色已记)且手牌颜色与弃置牌颜色不同(红 vs 黑)
+  cardPredicate: (s, _ownerId, cardIds) => {
+    const discardColor = s.turn.vars[COLOR_KEY] as string | undefined;
+    const card = s.cardMap[cardIds[0]];
+    return (
+      typeof discardColor === 'string' &&
+      discardColor !== '' &&
+      !!card &&
+      card.color !== discardColor
+    );
+  },
+  invalidError: '双雄:需要一张与本回合弃置牌颜色不同的手牌',
+  mount: {
+    label: DISPLAY_NAME,
+    style: 'danger',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '选择一张与本回合弃置牌颜色不同的手牌当决斗使用',
+      cardFilter: { filter: () => true, min: 1, max: 1 },
+      targetFilter: { min: 1, max: 1 },
+    },
+    activeWhen: (ctx) => {
+      if (!defaultPlayActive(ctx)) return false;
+      const p = ctx.view.players[ctx.perspectiveIdx];
+      if (!p?.hand) return false;
+      const discardColor = p.turnUsage?.[COLOR_KEY];
+      if (typeof discardColor !== 'string' || discardColor === '') return false;
+      // 存在颜色不同的手牌时激活
+      return p.hand.some((c) => c.color !== discardColor);
+    },
+  },
+};
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
@@ -162,21 +198,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (self.hand.length === 0) return;
 
     // 询问是否发动双雄
-    delete ctx.state.localVars[ACTIVATE_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: ACTIVATE_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动双雄?(弃置一张牌,本回合可将与之颜色不同的牌当决斗使用)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const activated = await askConfirm(ctx.state, ACTIVATE_RT, ownerId, {
+      confirmedKey: ACTIVATE_KEY,
+      title: '是否发动双雄?(弃置一张牌,本回合可将与之颜色不同的牌当决斗使用)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (ctx.state.localVars[ACTIVATE_KEY] !== true) return;
+    if (!activated) return;
 
     // 询问选一张手牌弃置
     delete ctx.state.localVars[DISCARD_KEY];
@@ -214,11 +244,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if ((atom.amount ?? 0) <= 0) return;
     const cardId = atom.cardId;
     if (!cardId) return; // 无来源伤害(闪电等)无牌可获得
-    const card = ctx.state.cardMap[cardId];
-    if (!card) return;
+    if (!ctx.state.cardMap[cardId]) return;
     // 转化影子卡(武圣红牌当杀等):记录 shadowOf 原卡 id——
     // 影子卡入弃牌堆时引擎用原卡替换,记原卡 id 才能在结束时找到
-    const effectiveId = card.shadowOf ?? cardId;
+    const effectiveId = effectiveCardId(ctx.state, cardId);
 
     const list = (ctx.state.turn.vars[DAMAGE_KEY] as string[] | undefined) ?? [];
     if (!list.includes(effectiveId)) {
@@ -258,50 +287,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // ── transform action:把一张与弃置牌颜色不同的手牌转化为影子"决斗" ──
   // 作为 preceding 在 决斗.use 之前执行。决斗.use validate 读 cardMap[影子id] 看到"决斗"通过。
   // 决斗技能零感知双雄——它看到的永远是 cardMap 里的一张"决斗"。
-  registerAction(state,
-  skill.id,
-  ownerId, 'transform', (s: GameState, params: Record<string, Json>) => {
-    // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活
-    const myTurn = s.currentPlayerIndex === ownerId;
-    const inActPhase = s.phase === '出牌';
-    const free = !hasBlockingPending(s);
-    const self = s.players[ownerId];
-    const selfAlive = self.alive === true;
-    // 本回合必须已发动过双雄(弃置牌颜色已记)
-    const discardColor = s.turn.vars[COLOR_KEY] as string | undefined;
-    const colorSet = typeof discardColor === 'string' && discardColor !== '';
-    const cardId = params.cardId as string;
-    const cardIdOk = typeof cardId === 'string';
-    const cardInHand = cardIdOk && self.hand.includes(cardId);
-    const card = cardIdOk ? s.cardMap[cardId] : undefined;
-    const cardExists = !!card;
-    // 核心:手牌颜色与弃置牌颜色不同(红 vs 黑)
-    const colorDiff = !!card && !!discardColor && card.color !== discardColor;
-    const ok =
-      myTurn && inActPhase && free && selfAlive && colorSet && cardInHand && cardExists && colorDiff;
-    return ok ? null : '双雄:需要一张与本回合弃置牌颜色不同的手牌';
-  },
-  async (s: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const shadowId = shadowIdOf(cardId);
-    // 通过「当作」atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-    await applyAtom(s, {
-      type: '当作',
-      player: ownerId,
-      cardIds: [cardId],
-      shadowId,
-      outputName: '决斗',
-    });
-  },
-  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-  (s: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const sId = shadowIdOf(cardId);
-    delete s.cardMap[sId];
-    const self = s.players[ownerId];
-    const idx = self.hand.indexOf(sId);
-    if (idx >= 0) self.hand[idx] = cardId;
-  },);
+  // 五件套由 skillRuntime 转化技工厂统一实现(弃置牌颜色谓词维度)。
+  registerTransformAction(state, skill.id, ownerId, TRANSFORM_OPTIONS);
 
   return () => {};
 }
@@ -322,30 +309,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   // 提交时 preceding=[界双雄.transform] + 主 action=决斗.use。
   // cardFilter 放宽为任意手牌(颜色匹配由后端 validate 兜底),
   // activeWhen 仅在已发动双雄且存在异色手牌时激活按钮。
-  api.defineAction('transform', {
-    label: DISPLAY_NAME,
-    style: 'danger',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '选择一张与本回合弃置牌颜色不同的手牌当决斗使用',
-      cardFilter: { filter: () => true, min: 1, max: 1 },
-      targetFilter: { min: 1, max: 1 },
-    },
-    transform: (card: Card) => ({
-      name: '决斗',
-      sourceCardId: card.id,
-      fromSkill: skill.id,
-    }),
-    activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
-      const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p?.hand) return false;
-      const discardColor = p.turnUsage?.[COLOR_KEY];
-      if (typeof discardColor !== 'string' || discardColor === '') return false;
-      // 存在颜色不同的手牌时激活
-      return p.hand.some((c) => c.color !== discardColor);
-    },
-  });
+  mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
   return;
 }
 

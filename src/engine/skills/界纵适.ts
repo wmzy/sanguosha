@@ -24,13 +24,12 @@ import type {
   Card,
   FrontendAPI,
   GameState,
-  Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import { getCardValue } from '../flows/rank';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界纵适';
@@ -55,24 +54,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── respond:owner 确认是否获得拼点牌 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>): string | null =>
-      requireRequestType(st, ownerId, [CONFIRM_RT], {
-        mismatchError: '当前不是纵适回应',
-      }).error,
-    async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return;
-      const atom = slot.atom as unknown as Record<string, unknown>;
-      if (atom.type !== '请求回应' || (atom.requestType as string) !== CONFIRM_RT) return;
-      // params.choice: true=获得, false/缺省=放弃
-      st.localVars[CONFIRM_KEY] = params.choice === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_RT, CONFIRM_KEY, {
+    mismatchError: '当前不是纵适回应',
+  });
 
   // ── after-hook:拼点后 atom 后,owner 可获得指定拼点牌 ──
   //   挂「拼点后」(拼点两步化的统一钩子点):驱虎/界惴恐/天义/烈刃/界巧说/界陷阵 等
@@ -110,19 +94,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!ctx.state.zones.discardPile.includes(cardToGain)) return;
 
     // 询问 owner 是否获得
-    delete ctx.state.localVars[CONFIRM_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: win ? '纵适:是否获得点数较小的拼点牌?' : '纵适:是否获得你的拼点牌?',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: win ? '纵适:是否获得点数较小的拼点牌?' : '纵适:是否获得你的拼点牌?',
       timeout: 30,
     });
-
-    const confirmed = ctx.state.localVars[CONFIRM_KEY] === true;
     delete ctx.state.localVars[CONFIRM_KEY];
     if (!confirmed) return;
 

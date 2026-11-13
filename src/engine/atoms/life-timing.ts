@@ -11,7 +11,7 @@
 // 与 生效前/使用结算结束时 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameView, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { getBeforeHooks } from '../core/skill';
+import { broadcast, hookSilentView, requirePlayer, viewPlayer } from './_helpers';
 
 // ── 扣减体力:底层实质 atom ──────────────────────────────────
 // 扣减体力(可负——濒死时 health ≤ 0),不在此处触发濒死/死亡——由编排函数或系统规则现有 after-hook 决定。
@@ -20,9 +20,9 @@ export const 扣减体力: AtomDefinition<{ target: number; amount: number }> = 
   type: '扣减体力',
   validate(state, atom) {
     if (atom.amount < 0) return 'amount must be >= 0';
-    const p = state.players[atom.target];
-    if (!p) return `target ${atom.target} not found`;
-    if (!p.alive) return `target ${atom.target} is dead`;
+    const err = requirePlayer(state, atom.target, 'target');
+    if (err) return err;
+    if (!state.players[atom.target].alive) return `target ${atom.target} is dead`;
     return null;
   },
   apply(state, atom) {
@@ -40,12 +40,11 @@ export const 扣减体力: AtomDefinition<{ target: number; amount: number }> = 
       amount: atom.amount,
       effect: { sound: `injure_${Math.min(Math.max(atom.amount, 1), 3)}`, vfx: 'card/damage' } as const,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view: GameView, event) {
-    const pi = view.players.findIndex((p) => p.index === (event.target as number));
-    if (pi < 0) return;
-    const p = view.players[pi];
+    const p = viewPlayer(view, event.target as number);
+    if (!p) return;
     p.health = p.health - (event.amount as number);
     // alive 由 death-flow 的 系统处理牌 atom applyView 更新,这里不提前设。
   },
@@ -71,25 +70,19 @@ type LifeTimingAtom =
 
 /** 校验 target/player 玩家存在(纯标记,不校验存活/amount——编排函数前置保证)。 */
 function validateLifeTiming(state: GameState, atom: LifeTimingAtom): string | null {
-  if ('target' in atom) {
-    if (!state.players[atom.target]) return `target ${atom.target} not found`;
-  } else {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
-  }
-  return null;
+  return 'target' in atom
+    ? requirePlayer(state, atom.target, 'target')
+    : requirePlayer(state, atom.player, 'player');
 }
 
 /** 无 before-hook 时静默(no-op 视图),有 before-hook 时发通知事件(携带 target/player/amount/source)。 */
 function lifeTimingView(state: GameState, type: string, atom: LifeTimingAtom): ViewEventSplit {
-  if (getBeforeHooks(state, type).length === 0) {
-    return { ownerViews: new Map(), othersView: null };
-  }
-  // source 仅在 atom 携带该字段时下发(回复时机 source 型;失去/扣减时机 {target,amount} 型无 source)。
-  const view: ViewEvent =
-    'target' in atom
+  return hookSilentView(state, type, () => {
+    // source 仅在 atom 携带该字段时下发(回复时机 source 型;失去/扣减时机 {target,amount} 型无 source)。
+    return 'target' in atom
       ? { type, target: atom.target, amount: atom.amount, ...('source' in atom ? { source: atom.source } : {}) }
       : { type, player: atom.player };
-  return { ownerViews: new Map(), othersView: view };
+  });
 }
 
 /** 标记型 atom 视图应用 no-op(实质变更由编排函数/扣减体力等实质 atom 负责)。 */

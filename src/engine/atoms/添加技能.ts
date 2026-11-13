@@ -1,14 +1,14 @@
 // src/engine/atoms/添加技能.ts
 // 添加技能:为玩家添加 skillId(实际 registerAction/onInit 由 skill-loader 监听此 atom 触发)
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 import { 马匹距离修正表 } from '../data/card-defs/equipment';
 import { mergeDistanceVars, type DistanceVarsDelta } from './distance-vars';
 
 export const 添加技能: AtomDefinition<{ player: number; skillId: string }> = {
   type: '添加技能',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
-    return null;
+    return requirePlayer(state, atom.player, 'player');
   },
   apply(state, atom) {
     const player = state.players[atom.player];
@@ -28,17 +28,17 @@ export const 添加技能: AtomDefinition<{ player: number; skillId: string }> =
     if (mountVars) {
       view.mountDistanceVars = mountVars;
     }
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi < 0) return;
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
     const skillId = event.skillId as string;
-    if (!view.players[pi].skills.includes(skillId)) {
-      view.players[pi].skills.push(skillId);
+    if (!p.skills.includes(skillId)) {
+      p.skills.push(skillId);
     }
     // 马匹技能:同步 distanceVars(攻击马=attackMod,防御马=defenseMod)
-    mergeDistanceVars(view.players[pi], event.mountDistanceVars as DistanceVarsDelta | undefined);
+    mergeDistanceVars(p, event.mountDistanceVars as DistanceVarsDelta | undefined);
   },
 };
 

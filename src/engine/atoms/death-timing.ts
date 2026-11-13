@@ -15,25 +15,20 @@
 // 与 damage-timing / life-timing 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { getBeforeHooks } from '../core/skill';
+import { broadcast, hookSilentView, requirePlayer, viewPlayer } from './_helpers';
 import { locateCard } from '../core/judge-zone';
 
 /** 死亡时机 atom 的公共形状(含可选 killer)。 */
 type DeathTimingAtom = { player: number; killer?: number };
 
 /** 校验 player 存在(纯标记,不校验存活——编排函数前置保证)。 */
-function validateDeathTiming(state: { players: Array<{ index: number }> }, atom: { player: number }): string | null {
-  if (!state.players[atom.player]) return `player ${atom.player} not found`;
-  return null;
+function validateDeathTiming(state: GameState, atom: { player: number }): string | null {
+  return requirePlayer(state, atom.player, 'player');
 }
 
 /** 无 before hook 时静默(no-op 视图),有 before-hook 时发通知事件(携带 killer)。 */
 function deathTimingView(state: GameState, type: string, atom: DeathTimingAtom): ViewEventSplit {
-  if (getBeforeHooks(state, type).length === 0) {
-    return { ownerViews: new Map(), othersView: null };
-  }
-  const view: ViewEvent = { type, player: atom.player, killer: atom.killer };
-  return { ownerViews: new Map(), othersView: view };
+  return hookSilentView(state, type, () => ({ type, player: atom.player, killer: atom.killer }));
 }
 
 // ── 时机1:亮身份牌前(焚心·转移身份) ─────────────────────────
@@ -43,11 +38,7 @@ export const 亮身份牌前: AtomDefinition<{ player: number }> = {
   validate: validateDeathTiming,
   apply() {},
   toViewEvents(state, atom): ViewEventSplit {
-    if (getBeforeHooks(state, '亮身份牌前').length === 0) {
-      return { ownerViews: new Map(), othersView: null };
-    }
-    const view: ViewEvent = { type: '亮身份牌前', player: atom.player };
-    return { ownerViews: new Map(), othersView: view };
+    return hookSilentView(state, '亮身份牌前', () => ({ type: '亮身份牌前', player: atom.player }));
   },
   applyView() {},
 };
@@ -65,16 +56,16 @@ export const 亮身份牌: AtomDefinition<{ player: number }> = {
     // 携带阵亡玩家身份——死亡即公开,所有视角都需揭示(与原 击杀.toViewEvents 一致)
     const identity = state.players[atom.player]?.identity;
     const view: ViewEvent = { type: '亮身份牌', player: atom.player, identity };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
     // 揭示阵亡身份(死亡即公开,所有视角可见)
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi >= 0) {
+    const p = viewPlayer(view, event.player as number);
+    if (p) {
       const identity = event.identity as string | undefined;
       if (identity) {
-        view.players[pi].identity = identity;
-        view.players[pi].identityHidden = false;
+        p.identity = identity;
+        p.identityHidden = false;
       }
     }
   },
@@ -104,9 +95,7 @@ export const 死亡时: AtomDefinition<DeathTimingAtom> = {
 export const 系统处理牌: AtomDefinition<{ player: number }> = {
   type: '系统处理牌',
   validate(state, atom) {
-    const p = state.players[atom.player];
-    if (!p) return `player ${atom.player} not found`;
-    return null;
+    return requirePlayer(state, atom.player, 'player');
   },
   apply(state, atom) {
     const p = state.players[atom.player];
@@ -147,12 +136,11 @@ export const 系统处理牌: AtomDefinition<{ player: number }> = {
       // 按武将名播报专属死亡语音(无对应文件时 audioEngine 静默跳过)
       ...(character ? { effect: { sound: `death/${character}` } as const } : {}),
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi >= 0) {
-      const p = view.players[pi];
+    const p = viewPlayer(view, event.player as number);
+    if (p) {
       // 弃牌堆计数:手牌数 + 装备数 + 判定区延时锦囊实际入堆数(与 apply 对称)
       const handCount = p.handCount;
       const equipCount = Object.values(p.equipment).filter(Boolean).length;
@@ -208,12 +196,8 @@ export const 死亡后: AtomDefinition<DeathTimingAtom> = {
 // 注意:这两个 atom 用 target 字段(与 陷入濒死 一致),而非 death-timing 的 player 字段。
 
 /** 校验 target 存在(纯标记,不校验存活/濒死——编排函数前置保证)。 */
-function validateDyingTiming(
-  state: { players: Array<{ index: number }> },
-  atom: { target: number },
-): string | null {
-  if (!state.players[atom.target]) return `target ${atom.target} not found`;
-  return null;
+function validateDyingTiming(state: GameState, atom: { target: number }): string | null {
+  return requirePlayer(state, atom.target, 'target');
 }
 
 // ── 进入濒死状态时(补益/随势①)─────────────────────────────
@@ -222,11 +206,10 @@ export const 进入濒死状态时: AtomDefinition<{ target: number }> = {
   validate: validateDyingTiming,
   apply() {},
   toViewEvents(state, atom): ViewEventSplit {
-    if (getBeforeHooks(state, '进入濒死状态时').length === 0) {
-      return { ownerViews: new Map(), othersView: null };
-    }
-    const view: ViewEvent = { type: '进入濒死状态时', target: atom.target };
-    return { ownerViews: new Map(), othersView: view };
+    return hookSilentView(state, '进入濒死状态时', () => ({
+      type: '进入濒死状态时',
+      target: atom.target,
+    }));
   },
   applyView() {},
 };
@@ -238,11 +221,10 @@ export const 新的濒死状态时: AtomDefinition<{ target: number }> = {
   validate: validateDyingTiming,
   apply() {},
   toViewEvents(state, atom): ViewEventSplit {
-    if (getBeforeHooks(state, '新的濒死状态时').length === 0) {
-      return { ownerViews: new Map(), othersView: null };
-    }
-    const view: ViewEvent = { type: '新的濒死状态时', target: atom.target };
-    return { ownerViews: new Map(), othersView: view };
+    return hookSilentView(state, '新的濒死状态时', () => ({
+      type: '新的濒死状态时',
+      target: atom.target,
+    }));
   },
   applyView() {},
 };

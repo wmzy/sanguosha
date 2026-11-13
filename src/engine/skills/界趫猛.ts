@@ -31,7 +31,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { spliceHandOrderEntry } from '../flows/pick-card-panel';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 /** 是否发动趫猛的 requestType */
 const CONFIRM_REQUEST = '界趫猛/confirm';
@@ -173,21 +173,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!pickOpts.hasCards) return;
 
     // 1. 询问是否发动趫猛(可选触发:官方「你可以」)
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_REQUEST,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '趫猛:是否弃置目标一张牌?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: '趫猛:是否弃置目标一张牌?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (ctx.state.localVars[CONFIRMED_KEY] !== true) return; // 不发动 → 无效果
+    if (!confirmed) return; // 不发动 → 无效果
 
     // 2. 弹选牌面板:从目标区域选一张牌(明牌装备/判定 + 暗牌手牌)
     //    mode='discard':趫猛主效果是"弃置",触发 界奇才 before-hook 就地过滤目标

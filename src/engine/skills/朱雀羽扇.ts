@@ -11,6 +11,7 @@
 //      提交 preceding=[朱雀羽扇.transform] + 主 action=杀.use。后端先创建火杀影子
 //      (shadowOf 还原),再 杀.use。保留此路径供"使用前转化"场景
 //      (如 界疠火+羽扇:先转火杀才可多指定一个目标)。
+//      transform 五件套由 skillRuntime 工厂统一实现(outputDamageType='火焰')。
 //
 // 与疠火的关键差异:
 //   1. 朱雀羽扇仅转化"普通杀"(damageType 为空/普通),不转化雷杀/火杀。
@@ -23,13 +24,17 @@ import type {
   FrontendAPI,
   GameState,
   GameView,
-  Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
-import { requireRequestType } from '../util/skillRuntime';
+import {
+  askConfirm,
+  registerConfirmRespond,
+  registerTransformAction,
+  mountTransformAction,
+  type TransformActionOptions,
+} from '../util/skillRuntime';
 
 /** 是否为普通杀(damageType 为空或 '普通',即非火杀/雷杀) */
 function isNormalSlash(
@@ -42,11 +47,6 @@ function isNormalSlash(
   );
 }
 
-/** 影子卡 id:${原id}#朱雀羽扇 */
-function shadowIdOf(cardId: string): string {
-  return `${cardId}#朱雀羽扇`;
-}
-
 /** owner 是否发动 confirm 询问的 requestType(客户端按首段路由回 skillId='朱雀羽扇') */
 const CONFIRM_REQUEST = '朱雀羽扇/confirm';
 /** localVars key:confirm 结果(true=发动) */
@@ -56,6 +56,43 @@ const ORIG_PREFIX = '朱雀羽扇/origType:';
 function origTypeKey(cardId: string): string {
   return `${ORIG_PREFIX}${cardId}`;
 }
+
+const TRANSFORM_OPTIONS: TransformActionOptions = {
+  outputName: '杀',
+  // outputDamageType='火焰' 是朱雀羽扇核心:普通杀转化为火杀
+  outputDamageType: '火焰',
+  // 仅普通杀可转化(非火杀、非雷杀)
+  cardPredicate: (state, _ownerId, cardIds) => isNormalSlash(state.cardMap[cardIds[0]]),
+  invalidError: '现在不能使用朱雀羽扇',
+  mount: {
+    label: '朱雀羽扇',
+    style: 'danger',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '朱雀羽扇:将普通【杀】当火【杀】使用',
+      // 仅选普通杀(非火杀/雷杀)
+      cardFilter: {
+        filter: (c) => c.name === '杀' && (!c.damageType || c.damageType === '普通'),
+        min: 1,
+        max: 1,
+      },
+      targetFilter: {
+        min: 1,
+        max: 1,
+        filter: (view: GameView, t: number) => {
+          // 排除自己;具体距离校验由后端 杀.use validate 处理
+          const cp = view.currentPlayerIndex;
+          return t !== cp;
+        },
+      },
+    },
+    activeWhen: (ctx) =>
+      defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx),
+    // 原实现 mount 无 transform 回调(客户端按 action.transform 存在判定是否枚举转化
+    // 入口)——转化入口实际由「使用时」confirm 主路径承担,保持原样不新增按钮。
+    noTransform: true,
+  },
+};
 
 /** 还原一张被羽扇临时改性的牌的原属性(幂等;未被改性时无操作)。 */
 function restoreOrigType(state: GameState, cardId: string): void {
@@ -83,70 +120,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const unloaders: Array<() => void> = [];
 
   // ── transform action(preceding,主 action=杀.use 之前执行):普通杀 → 火杀影子 ──
-  unloaders.push(
-    registerAction(state,
-    skill.id,
-    ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
-      const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && !!self && self.hand.includes(cardId);
-      // 仅普通杀可转化(非火杀、非雷杀)
-      const ok =
-        myTurn &&
-        inActPhase &&
-        free &&
-        selfAlive &&
-        cardInHand &&
-        isNormalSlash(card);
-      return ok ? null : '现在不能使用朱雀羽扇';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      // 通过 当作 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-      // outputDamageType='火焰' 是朱雀羽扇核心:普通杀转化为火杀
-      await applyAtom(state, {
-        type: '当作',
-        player: ownerId,
-        cardIds: [cardId],
-        shadowId,
-        outputName: '杀',
-        outputDamageType: '火焰',
-      });
-    },
-    // rollback:主 action validate 失败时撤销转化(删影子、还原手牌)
-    (state: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const shadowId = shadowIdOf(cardId);
-      delete state.cardMap[shadowId];
-      state.players[ownerId].hand = state.players[ownerId].hand.map((id) =>
-        id === shadowId ? cardId : id,
-      );
-    },),
-  );
+  unloaders.push(registerTransformAction(state, skill.id, ownerId, TRANSFORM_OPTIONS));
 
   // ── respond action:owner 回应「使用普通杀时是否发动」的 confirm 询问 ──
   unloaders.push(
-    registerAction(
-      state,
-      skill.id,
-      ownerId,
-      'respond',
-      (st: GameState, _params: Record<string, Json>): string | null =>
-        requireRequestType(st, ownerId, [CONFIRM_REQUEST], {
-          mismatchError: '当前不是朱雀羽扇询问',
-        }).error,
-      async (st: GameState, params: Record<string, Json>) => {
-        st.localVars[CONFIRMED_VAR] = params.choice === true;
-      },
-    ),
+    registerConfirmRespond(state, skill.id, ownerId, CONFIRM_REQUEST, CONFIRMED_VAR, {
+      mismatchError: '当前不是朱雀羽扇询问',
+    }),
   );
 
   // ── 使用时 after-hook(主路径):owner 使用普通杀时询问是否改为火杀 ──
@@ -168,21 +148,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!weaponId || ctx.state.cardMap[weaponId]?.name !== '朱雀羽扇') return;
 
       // 询问是否发动(默认不发动;超时不回应 → CONFIRMED_VAR 未设 → 不发动)
-      delete ctx.state.localVars[CONFIRMED_VAR];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_REQUEST,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '朱雀羽扇:是否发动,将此【杀】改为火【杀】?',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
+        confirmedKey: CONFIRMED_VAR,
+        title: '朱雀羽扇:是否发动,将此【杀】改为火【杀】?',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 10,
       });
-      const confirmed = ctx.state.localVars[CONFIRMED_VAR] === true;
       delete ctx.state.localVars[CONFIRMED_VAR];
       if (!confirmed) return;
 
@@ -213,33 +186,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   };
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
+export function onMount(skill: Skill, api: FrontendAPI): void {
   // transform:前端选普通杀 → 选目标 → 点朱雀羽扇按钮 → 提交 preceding=[朱雀羽扇.transform] + 主 action=杀.use
-  api.defineAction('transform', {
-    label: '朱雀羽扇',
-    style: 'danger',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '朱雀羽扇:将普通【杀】当火【杀】使用',
-      // 仅选普通杀(非火杀/雷杀)
-      cardFilter: {
-        filter: (c) => c.name === '杀' && (!c.damageType || c.damageType === '普通'),
-        min: 1,
-        max: 1,
-      },
-      targetFilter: {
-        min: 1,
-        max: 1,
-        filter: (view: GameView, t: number) => {
-          // 排除自己;具体距离校验由后端 杀.use validate 处理
-          const cp = view.currentPlayerIndex;
-          return t !== cp;
-        },
-      },
-    },
-    activeWhen: (ctx) =>
-      defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx),
-  });
+  mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
 
   // respond:「是否发动朱雀羽扇」confirm 询问的 UI 定义(与 pending 槽 prompt 同文案)
   api.defineAction('respond', {

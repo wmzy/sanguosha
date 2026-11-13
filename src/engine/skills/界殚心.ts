@@ -14,11 +14,11 @@
 //
 // 命名: 文件名/loader key/character skill name 均为 '界殚心'(避开标殚心冲突);
 //   内部 Skill.name = '殚心'(OL 官方技能名,玩家可见)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const SKILL_ID = '界殚心';
 const DISPLAY_NAME = '殚心';
@@ -49,20 +49,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── respond:玩家在「殚心/confirm」询问下的选择(choice=true/false)
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState): string | null => {
-      return requireRequestType(st, ownerId, [CONFIRM_RT], {
-        mismatchError: '当前不是殚心询问',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      st.localVars[CONFIRMED_KEY] = params.choice === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_RT, CONFIRMED_KEY, {
+    mismatchError: '当前不是殚心询问',
+  });
 
   // ── 造成伤害 after:受伤后询问是否发动殚心
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
@@ -73,22 +62,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!ctx.state.players[ownerId]?.alive) return;
 
     // 询问是否发动(可选)
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '殚心:是否发动?(摸X张牌并修改"矫诏",X为已修改次数)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: '殚心:是否发动?(摸X张牌并修改"矫诏",X为已修改次数)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-
-    const confirmed = ctx.state.localVars[CONFIRMED_KEY] === true;
     delete ctx.state.localVars[CONFIRMED_KEY];
     if (!confirmed) return;
 

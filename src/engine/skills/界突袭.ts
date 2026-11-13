@@ -30,7 +30,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { createRng } from '../util/rng';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const TRIGGER_RT = '界突袭/trigger';
 const SELECT_RT = '界突袭/select';
@@ -99,21 +99,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (stealablePlayers.length === 0) return; // 无目标 → 默认摸牌
 
       // 询问是否发动突袭
-      delete ctx.state.localVars[TRIGGERED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: TRIGGER_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动界突袭?(少摸任意张牌并获得等量其他角色的各一张手牌)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const triggered = await askConfirm(ctx.state, TRIGGER_RT, ownerId, {
+        confirmedKey: TRIGGERED_KEY,
+        title: '是否发动界突袭?(少摸任意张牌并获得等量其他角色的各一张手牌)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 10,
       });
-      if (ctx.state.localVars[TRIGGERED_KEY] !== true) return; // 不发动 → 默认摸牌
+      if (triggered !== true) return; // 不发动 → 默认摸牌
 
       // 选择 1~maxTargets 名有手牌的其他角色(选 N 人 = 少摸 N 张 = 偷 N 张各一张)
       const maxTargets = Math.min(baseCount, stealablePlayers.length);

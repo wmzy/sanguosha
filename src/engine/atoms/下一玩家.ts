@@ -2,6 +2,7 @@
 // 下一玩家:currentPlayerIndex 移到逆时针下一位存活玩家。
 // 座次约定:索引递增 = 顺时针,出牌方向 = 逆时针(索引递减)。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast } from './_helpers';
 
 /** 计算下一个存活玩家的索引(apply 和 toViewEvents 共用) */
 function calcNextPlayer(state: { players: { alive: boolean }[]; currentPlayerIndex: number }): {
@@ -42,7 +43,7 @@ export const 下一玩家: AtomDefinition<Record<string, never>> = {
       newPlayer: nextIdx,
       round: state.turn.round + (roundIncrement ? 1 : 0),
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view: GameView, event) {
     view.currentPlayerIndex = event.newPlayer as number;

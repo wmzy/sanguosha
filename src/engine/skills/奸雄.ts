@@ -9,8 +9,8 @@
 // 在该伤害牌被移入弃牌堆的瞬间再 移动牌(弃牌堆→手牌)。此时父收尾已完成、无重复。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { registerAfterHook } from '../core/skill';
+import { askConfirm, effectiveCardId, registerConfirmRespond } from '../util/skillRuntime';
 
 const CHOOSE_RT = '奸雄/choose';
 const WANTCARD_KEY = '奸雄/wantCard';
@@ -29,19 +29,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // respond:玩家在「奸雄/choose」询问下的选择(choice=true=获得伤害牌)
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (s): string | null =>
-      requireRequestType(s, ownerId, [CHOOSE_RT], {
-        mismatchError: '当前不是奸雄选择',
-      }).error,
-    async (s, params) => {
-      s.localVars[CHOICE_KEY] = params.choice === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CHOOSE_RT, CHOICE_KEY, {
+    mismatchError: '当前不是奸雄选择',
+  });
 
   // 造成伤害 after:曹操受伤后,若有伤害牌则询问是否获得
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
@@ -57,24 +47,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (typeof damageCardId !== 'string' || !ctx.state.cardMap[damageCardId]) return;
     // 转化影子卡(武圣红牌当杀等):影子卡入弃牌堆时引擎用原卡(shadowOf)替换并删除影子,
     // 须记录原卡 id 才能在弃牌堆中找到并拿取(同界双雄)
-    const effectiveId = ctx.state.cardMap[damageCardId].shadowOf ?? damageCardId;
+    const effectiveId = effectiveCardId(ctx.state, damageCardId);
 
-    delete ctx.state.localVars[CHOICE_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CHOOSE_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '奸雄:是否获得造成此伤害的牌?',
-        confirmLabel: '获得',
-        cancelLabel: '不发动',
-      },
+    const choice = await askConfirm(ctx.state, CHOOSE_RT, ownerId, {
+      confirmedKey: CHOICE_KEY,
+      title: '奸雄:是否获得造成此伤害的牌?',
+      confirmLabel: '获得',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-
-    const choice = ctx.state.localVars[CHOICE_KEY] === true;
     if (choice) {
       // 界版才有「获得后再摸一张」;标版奸雄仅获得伤害牌(官方逐字)。
       // 获得采用延迟拿取(见下方 移动牌 after hook)。

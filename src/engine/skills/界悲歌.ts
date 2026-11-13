@@ -38,7 +38,7 @@ import { applyAtom } from '../core/apply'
 import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
 import { flipFaceDown, flipFaceUp } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const START_RT = '界悲歌/chooseStart';
 const DISCARD_RT = '界悲歌/chooseDiscard';
@@ -122,21 +122,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (self.hand.length === 0) return;
 
     // 询问是否发动界悲歌(不发动=不判定)
-    delete ctx.state.localVars[START_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: START_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '界悲歌:是否令受伤角色判定?',
-        confirmLabel: '发动(判定)',
-        cancelLabel: '不发动',
-      },
+    const start = await askConfirm(ctx.state, START_RT, ownerId, {
+      confirmedKey: START_KEY,
+      title: '界悲歌:是否令受伤角色判定?',
+      confirmLabel: '发动(判定)',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    const start = ctx.state.localVars[START_KEY] === true;
     delete ctx.state.localVars[START_KEY];
     if (!start) return; // 不发动
 

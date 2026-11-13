@@ -33,6 +33,7 @@ import type {
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 import { mijiPendingKey, getMijiPending } from '../rules/vars-keys';
 
 const _SKILL_ID = '界秘计';
@@ -79,10 +80,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as { requestType?: string }).requestType;
+      const check = requireRequestType(
+        st,
+        ownerId,
+        [CONFIRM_RT, GIVE_CONFIRM_RT, GIVE_TARGET_RT, GIVE_CARDS_RT],
+        { mismatchError: '当前不是秘计询问' },
+      );
+      if (check.error) return check.error;
+      const rt = check.requestType;
 
       if (rt === CONFIRM_RT || rt === GIVE_CONFIRM_RT) {
         return null; // confirm:接受 choice/confirmed
@@ -187,21 +192,15 @@ async function runMijiOnce(
 
   // 1) (可选)发动确认
   if (askActivate) {
-    delete state.localVars[CONFIRM_KEY];
-    await applyAtom(state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `秘计:是否摸 ${x} 张牌(X=已损失体力)?然后可交给其他角色至多 ${x} 张牌`,
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const activated = await askConfirm(state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: `秘计:是否摸 ${x} 张牌(X=已损失体力)?然后可交给其他角色至多 ${x} 张牌`,
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (state.localVars[CONFIRM_KEY] !== true) {
+    if (!activated) {
       delete state.localVars[CONFIRM_KEY];
       return;
     }
@@ -215,21 +214,15 @@ async function runMijiOnce(
   if (!state.players[ownerId]?.alive) return;
 
   // 3) 是否分发
-  delete state.localVars[GIVE_CONFIRM_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: GIVE_CONFIRM_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: `秘计:是否交给其他角色至多 ${x} 张牌?`,
-      confirmLabel: '分发',
-      cancelLabel: '不分发',
-    },
+  const giveConfirmed = await askConfirm(state, GIVE_CONFIRM_RT, ownerId, {
+    confirmedKey: GIVE_CONFIRM_KEY,
+    title: `秘计:是否交给其他角色至多 ${x} 张牌?`,
+    confirmLabel: '分发',
+    cancelLabel: '不分发',
     defaultChoice: false,
     timeout: 15,
   });
-  if (state.localVars[GIVE_CONFIRM_KEY] !== true) {
+  if (!giveConfirmed) {
     delete state.localVars[GIVE_CONFIRM_KEY];
     return;
   }

@@ -19,7 +19,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { addJu, juCount, removeJu } from './怀橘';
 import type { SkillModule } from '../types';
-import { currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '遗礼';
 
@@ -104,21 +104,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (others.length === 0) return;
 
     // 1. 询问是否发动
-    delete st.localVars[CONFIRM_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动遗礼?(失去1点体力或移除1枚橘,令一名其他角色获得1枚橘)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(st, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: '是否发动遗礼?(失去1点体力或移除1枚橘,令一名其他角色获得1枚橘)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 20,
     });
-    if (!st.localVars[CONFIRM_KEY]) {
+    if (!confirmed) {
       delete st.localVars[CONFIRM_KEY];
       return; // 不发动
     }

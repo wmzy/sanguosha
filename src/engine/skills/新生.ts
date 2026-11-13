@@ -22,12 +22,11 @@
 //
 // 通用机制:不涉及出杀次数/装备/横切规则。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
 import { createRng } from '../util/rng';
 import { HUASHEN_POOL_KEY as POOL_KEY, getHuashenPool } from '../rules/vars-keys';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '新生/confirm';
 const CHOICE_KEY = '新生/choice';
@@ -102,23 +101,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const candidate = drawNew化身CardSnapshot(st, ownerId);
     if (candidate === null) return;
 
-    delete st.localVars[CHOICE_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: CONFIRM_REQUEST,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '新生:是否获得一张新的化身牌?',
-        confirmLabel: '获得',
-        cancelLabel: '不获得',
-      },
+    const confirmed = await askConfirm(st, CONFIRM_REQUEST, ownerId, {
+      confirmedKey: CHOICE_KEY,
+      title: '新生:是否获得一张新的化身牌?',
+      confirmLabel: '获得',
+      cancelLabel: '不获得',
       defaultChoice: false,
       timeout: 30,
     });
-    const choice = st.localVars[CHOICE_KEY];
     delete st.localVars[CHOICE_KEY];
-    if (choice !== true) return;
+    if (!confirmed) return;
 
     // 确认 → 从未登场武将抽 1 张加入牌池
     const drawn = drawNew化身Card(st, ownerId);

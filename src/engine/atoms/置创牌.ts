@@ -20,6 +20,7 @@
 //
 // 注意:牌堆顶 = zones.deck 末尾元素,与「摸牌」语义一致(slice(-n)/pop)。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 import { drawFromTop, peekTop } from '../core/deck';
 
 export const 置创牌: AtomDefinition<{
@@ -29,7 +30,8 @@ export const 置创牌: AtomDefinition<{
 }> = {
   type: '置创牌',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
+    const err = requirePlayer(state, atom.player, 'player');
+    if (err) return err;
     if (state.zones.deck.length === 0) return `牌堆为空,无法置创牌`;
     return null;
   },
@@ -72,7 +74,7 @@ export const 置创牌: AtomDefinition<{
       rank,
       duplicate,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view: GameView, event) {
     // 创牌来自牌堆顶:牌堆-1(与 buildView 的 deckCount=deck.length 对齐)

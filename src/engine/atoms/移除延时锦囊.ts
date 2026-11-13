@@ -1,12 +1,12 @@
 // src/engine/atoms/移除延时锦囊.ts
 // 移除延时锦囊:从玩家判定区移除指定延时锦囊
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 
 export const 移除延时锦囊: AtomDefinition<{ player: number; trickName: string }> = {
   type: '移除延时锦囊',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
-    return null;
+    return requirePlayer(state, atom.player, 'player');
   },
   apply(state, atom) {
     state.players[atom.player].pendingTricks = state.players[atom.player].pendingTricks.filter(
@@ -23,28 +23,28 @@ export const 移除延时锦囊: AtomDefinition<{ player: number; trickName: str
       trickName: atom.trickName,
       ...(trick?.card?.id ? { cardId: trick.card.id } : {}),
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi < 0) return;
-    const list = view.players[pi].pendingTricks;
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
+    const list = p.pendingTricks;
     if (!list || list.length === 0) return;
     const targetId = event.cardId as string | undefined;
     const targetName = event.trickName as string | undefined;
     if (targetId) {
       // 直接按 cardId 移除
-      view.players[pi].pendingTricks = list.filter((id) => id !== targetId);
+      p.pendingTricks = list.filter((id) => id !== targetId);
       return;
     }
     if (!targetName) return;
     // 兜底:按 trickName 反查 cardMap 找匹配的 cardId(此时 cardMap 中 Card.name === trickName)
     const cardId = Object.keys(view.cardMap).find((id) => view.cardMap[id]?.name === targetName);
     if (cardId) {
-      view.players[pi].pendingTricks = list.filter((id) => id !== cardId);
+      p.pendingTricks = list.filter((id) => id !== cardId);
     } else {
       // 无法定位:保留 list 不动(下一次 toViewEvents 重建会刷新)
-      view.players[pi].pendingTricks = [...list];
+      p.pendingTricks = [...list];
     }
   },
 };

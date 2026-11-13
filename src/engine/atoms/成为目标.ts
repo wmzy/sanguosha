@@ -4,13 +4,12 @@
 // before hook 可被"不能成为目标"类技能拦截(空城/帷幕等 cancel)。
 // after hook 触发"成为目标后"时机技能(流离转移等)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 
 export const 成为目标: AtomDefinition<{ source: number; cardId?: string; target: number }> = {
   type: '成为目标',
   validate(state, atom) {
-    if (!state.players[atom.source]) return `source ${atom.source} not found`;
-    if (!state.players[atom.target]) return `target ${atom.target} not found`;
-    return null;
+    return requirePlayer(state, atom.source, 'source') ?? requirePlayer(state, atom.target, 'target');
   },
   apply(_state) {
     // 事件标记——before hook cancel = 此目标无效,跳过结算
@@ -25,7 +24,7 @@ export const 成为目标: AtomDefinition<{ source: number; cardId?: string; tar
       ...(atom.cardId !== undefined ? { cardId: atom.cardId } : {}),
       ...(cardName !== undefined ? { cardName } : {}),
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(_view, _event) {
     // 事件标记——无 GameView 字段需要直接更新(高亮态由前端处理 effect 期间临时绘制)。

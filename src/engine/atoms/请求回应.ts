@@ -3,10 +3,21 @@
 // src/engine/atoms/请求回应.ts
 // 请求回应:通用等待型 atom — 等待 target 玩家回应
 import type { ActionPrompt, AtomDefinition, Card, Json, ViewEventSplit } from '../types';
+import { broadcast } from './_helpers';
 
 import { applyAtom } from '../core/apply';
 import { handLimit } from '../rules/hand-limit';
 import { cardResponsePreResolveForTarget } from '../core/card-response-availability';
+
+/** 弃牌超时兜底的保留优先级表(桃:0 杀:1 闪:2 无懈可击:3,值越小越优先保留;
+ *  未列出的牌按 9 处理,优先被弃)。客户端 GameView 的弃牌预览高亮 import 此常量,
+ *  与引擎超时自动弃置必须同一排序(低价值先弃,与手牌位置无关)。 */
+export const DISCARD_KEEP_PRIORITY: Record<string, number> = {
+  '桃': 0,
+  '杀': 1,
+  '闪': 2,
+  '无懈可击': 3,
+};
 
 /** 请求回应 的卡牌回应 filter:仅 useCard+cardFilter.filter 的非 mandatory 回应。
  *  其他(confirm / choosePlayer / distribute / pickTargetCard / mandatory 等)返回 null → 正常询问。
@@ -59,12 +70,11 @@ export const 请求回应: AtomDefinition<{
         const excess = p.hand.length - limit;
         // 超时自动弃牌：保留高价值牌（桃/杀/闪/无懈可击），弃掉低优先级牌。
         // 避免盲弃末尾导致关键牌丢失，与 AI 玩家弃牌策略一致。
-        const priority: Record<string, number> = { '桃': 0, '杀': 1, '闪': 2, '无懈可击': 3 };
         // 降序排列：低价值牌（priority 值大）排在前面，优先被弃
         const sorted = [...p.hand].sort((a, b) => {
           const ca = state.cardMap[a];
           const cb = state.cardMap[b];
-          return (priority[cb?.name ?? ''] ?? 9) - (priority[ca?.name ?? ''] ?? 9);
+          return (DISCARD_KEEP_PRIORITY[cb?.name ?? ''] ?? 9) - (DISCARD_KEEP_PRIORITY[ca?.name ?? ''] ?? 9);
         });
         const toDiscard = sorted.slice(0, excess);
         await applyAtom(state, { type: '弃置', player: target, cardIds: toDiscard });
@@ -88,9 +98,6 @@ export const 请求回应: AtomDefinition<{
   effect: { blockUntilDone: true, duration: 200 },
   toViewEvents(_state, atom): ViewEventSplit {
     // Prompts/candidates belong only to the per-viewer authoritative pending envelope.
-    return {
-      ownerViews: new Map(),
-      othersView: { type: '请求回应', requestType: atom.requestType, target: atom.target },
-    };
+    return broadcast({ type: '请求回应', requestType: atom.requestType, target: atom.target });
   },
 };

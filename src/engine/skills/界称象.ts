@@ -28,7 +28,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { getCardValue } from '../flows/rank';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界称象';
@@ -133,21 +133,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       for (let k = 0; k < n; k++) revealed.push(deck[deck.length - 1 - k]);
 
       // 询问是否发动(可选)
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: '界称象/confirm',
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `称象:是否亮出牌堆顶 ${n} 张牌并获取点数和≤13的若干张?`,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, '界称象/confirm', ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: `称象:是否亮出牌堆顶 ${n} 张牌并获取点数和≤13的若干张?`,
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 20,
       });
-      if (!ctx.state.localVars[CONFIRMED_KEY]) {
+      if (!confirmed) {
         delete ctx.state.localVars[CONFIRMED_KEY];
         continue;
       }

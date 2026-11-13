@@ -23,14 +23,12 @@ import type {
   FrontendAPI,
   GameState,
   HookResult,
-  Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const BASE_VAR = '博图/base'; // turn.vars:本回合弃牌堆基线长度
 const LAST_ROUND_KEY = '博图/lastRound'; // player.vars:计数所在轮次
@@ -78,20 +76,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── respond:吕蒙确认是否执行额外回合 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      return requireRequestType(st, ownerId, [CONFIRM_RT], {
-        mismatchError: '当前不是博图确认',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_RT, CONFIRMED_KEY, {
+    mismatchError: '当前不是博图确认',
+  });
 
   // ── 回合开始 after-hook:记录本回合弃牌堆基线长度 ──
   registerAfterHook(state, skill.id, ownerId, '回合开始', async (ctx) => {
@@ -143,22 +130,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!(suits.has('♠') && suits.has('♥') && suits.has('♣') && suits.has('♦'))) return;
 
       // 询问是否执行额外回合
-      delete st.localVars[CONFIRMED_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '博图:本回合弃牌堆已含四种花色,是否执行一个额外回合?',
-          description: `每轮限 ${x} 次(已用 ${used} 次)`,
-          confirmLabel: '执行额外回合',
-          cancelLabel: '不执行',
-        },
+      const confirmed = await askConfirm(st, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: '博图:本回合弃牌堆已含四种花色,是否执行一个额外回合?',
+        description: `每轮限 ${x} 次(已用 ${used} 次)`,
+        confirmLabel: '执行额外回合',
+        cancelLabel: '不执行',
         defaultChoice: false,
         timeout: 20,
       });
-      const confirmed = st.localVars[CONFIRMED_KEY] as boolean | undefined;
       delete st.localVars[CONFIRMED_KEY];
       if (!confirmed) return; // 不发动 → 放行正常回合结束
 

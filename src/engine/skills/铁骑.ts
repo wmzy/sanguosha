@@ -21,6 +21,7 @@ import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 
 const TAG = '铁骑/禁闪';
 const CONFIRM = '铁骑/confirmed';
@@ -73,21 +74,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (ctx.state.zones.deck.length === 0) return; // 无牌可判
 
     // 询问是否发动铁骑("你可以进行一次判定"——可选)
-    delete ctx.state.localVars[CONFIRM];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '铁骑/confirm',
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动铁骑判定?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, '铁骑/confirm', ownerId, {
+      confirmedKey: CONFIRM,
+      title: '是否发动铁骑判定?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (!ctx.state.localVars[CONFIRM]) return;
+    if (!confirmed) return;
 
     // 记录当前目标,供 判定牌生效后 hook 读取
     ctx.state.localVars[TARGET_VAR] = target;

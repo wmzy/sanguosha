@@ -26,11 +26,11 @@
 //   - 嵌套安全:改对孙权的 回复体力 target=孙权(=ownerId),本 hook 条件 target≠ownerId → 不重入。
 //   - 与濒死求桃无关:濒死求桃时 target=孙权(被救者),本 hook 要求 target≠孙权,
 //     故天然不与濒死求桃场景冲突,无需检查 求桃/已救 标志。
-import type { GameState, HookResult, Json, Skill } from '../types';
+import type { GameState, HookResult, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { registerBeforeHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 /** 界救援问询的 requestType(隔离 respond 路由) */
 const REQUEST_TYPE = '界救援/choose';
@@ -76,22 +76,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (getHealthValue(healer) < getHealthValue(sunquan)) return;
 
       // 询问回复者是否改为令孙权回1血(描述"可以"= 可选)
-      delete ctx.state.localVars[CONFIRMED_VAR];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: REQUEST_TYPE,
-        target,
-        prompt: {
-          type: 'confirm',
-          title: `界救援:是否改为令${sunquan.name}回复1点体力,然后你摸一张牌?`,
-          confirmLabel: '改为救援',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, REQUEST_TYPE, target, {
+        confirmedKey: CONFIRMED_VAR,
+        title: `界救援:是否改为令${sunquan.name}回复1点体力,然后你摸一张牌?`,
+        confirmLabel: '改为救援',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 30,
       });
 
-      if (ctx.state.localVars[CONFIRMED_VAR] === true) {
+      if (confirmed) {
         // "改为":该角色本次不回血,改为孙权回复1点体力,然后该角色摸1张牌。
         await applyAtom(ctx.state, { type: '回复体力', target: ownerId, amount: 1 });
         await applyAtom(ctx.state, { type: '摸牌', player: target, count: 1 });
@@ -109,20 +103,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const pid = p.index;
     if (pid === ownerId) continue;
     if (p.faction !== '吴') continue;
-    const off = registerAction(
-      state,
-      skill.id,
-      pid,
-      'respond',
-      (st: GameState, _params: Record<string, Json>): string | null => {
-        return requireRequestType(st, pid, [REQUEST_TYPE], {
-          mismatchError: '当前不是界救援询问',
-        }).error;
-      },
-      async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        st.localVars[CONFIRMED_VAR] = params.choice === true || params.confirmed === true;
-      },
-    );
+    const off = registerConfirmRespond(state, skill.id, pid, REQUEST_TYPE, CONFIRMED_VAR, {
+      mismatchError: '当前不是界救援询问',
+    });
     offs.push(off);
   }
 

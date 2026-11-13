@@ -1,12 +1,12 @@
 // src/engine/atoms/阶段结束.ts
 // 阶段结束:事件标记
 import type { AtomDefinition, GameView, TurnPhase, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 
 export const 阶段结束: AtomDefinition<{ player: number; phase: string }> = {
   type: '阶段结束',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
-    return null;
+    return requirePlayer(state, atom.player, 'player');
   },
   apply(_state) {
     // 事件标记
@@ -17,7 +17,7 @@ export const 阶段结束: AtomDefinition<{ player: number; phase: string }> = {
       player: atom.player,
       phase: atom.phase,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   effect: { sound: 'phase_end', duration: 600 },
   applyView(view: GameView, event) {

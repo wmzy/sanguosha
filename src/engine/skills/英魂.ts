@@ -26,7 +26,7 @@ import type {
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_RT = '英魂/confirm'; // 孙坚:是否发动
 const TARGET_RT = '英魂/target'; // 孙坚:选目标
@@ -79,21 +79,15 @@ export async function performYinghunPrepare(
   const x = self.maxHealth - getHealthValue(self);
 
   // 1) 询问是否发动
-  delete state.localVars[CONFIRMED_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: CONFIRM_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: `是否发动英魂?(令一名其他角色摸弃,X=${x})`,
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+  const confirmed = await askConfirm(state, CONFIRM_RT, ownerId, {
+    confirmedKey: CONFIRMED_KEY,
+    title: `是否发动英魂?(令一名其他角色摸弃,X=${x})`,
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
     defaultChoice: false,
     timeout: 10,
   });
-  if (!state.localVars[CONFIRMED_KEY]) return;
+  if (!confirmed) return;
 
   // 2) 选一名其他角色(存活且非自己)
   delete state.localVars[TARGET_KEY];

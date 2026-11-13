@@ -424,8 +424,7 @@ export const playerCardHpBeadCol = css`
 `;
 // 满珠水滴珠(单类):三档分色经 --bead-c1/--bead-c2/--bead-border/--bead-glow CSS 变量
 // 注入(缺省=绿档),色值统一来自 tokens.hpBeadPalette——剩余体力 >50% 绿 / >25% 黄 /
-// ≤25% 红(濒危警示),由 PlayerCardLarge/PlayerSeatView(座位卡)按剩余比例内联选择,
-// 大卡与座位卡共用同一套珠色(此前两文件各镜像三份色值类)。
+// ≤25% 红(濒危警示),由 HpBeadColumn(大卡/座位卡共用的珠列组件)按剩余比例内联选择。
 export const playerCardHpBeadFull = css`
   box-sizing: border-box;
   flex-shrink: 0;

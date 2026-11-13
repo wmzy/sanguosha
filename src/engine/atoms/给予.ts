@@ -5,17 +5,17 @@
 // 给予.validate 保证 cardId 在 from 手牌,from/to 均为手牌区域(ZoneLoc 可表达),标记 from/to 准确。
 // 本 atom 的 apply + view 事件保持不变(含信息分级)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { requirePlayer, viewPlayer } from './_helpers';
 import { applyAtom } from '../core/apply';
 
 export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }> = {
   type: '给予',
   validate(state, atom) {
     if (!state.cardMap[atom.cardId]) return `card ${atom.cardId} not found`;
-    const fromP = state.players[atom.from];
-    if (!fromP) return `from ${atom.from} not found`;
-    if (!fromP.hand.includes(atom.cardId)) return `card not in from's hand`;
-    if (!state.players[atom.to]) return `to ${atom.to} not found`;
-    return null;
+    const fromErr = requirePlayer(state, atom.from, 'from');
+    if (fromErr) return fromErr;
+    if (!state.players[atom.from].hand.includes(atom.cardId)) return `card not in from's hand`;
+    return requirePlayer(state, atom.to, 'to');
   },
   apply(state, atom) {
     const fromIdx = atom.from;
@@ -63,19 +63,19 @@ export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }
   },
   applyView(view, event) {
     const cardId = event.cardId as string | undefined;
-    const fromPi = view.players.findIndex((p) => p.index === (event.from as number));
-    if (fromPi >= 0) {
-      view.players[fromPi].handCount = Math.max(0, view.players[fromPi].handCount - 1);
-      if (cardId && view.players[fromPi].hand) {
-        view.players[fromPi].hand = view.players[fromPi].hand.filter((c) => c.id !== cardId);
+    const fromP = viewPlayer(view, event.from as number);
+    if (fromP) {
+      fromP.handCount = Math.max(0, fromP.handCount - 1);
+      if (cardId && fromP.hand) {
+        fromP.hand = fromP.hand.filter((c) => c.id !== cardId);
       }
     }
-    const toPi = view.players.findIndex((p) => p.index === (event.to as number));
-    if (toPi >= 0) {
-      view.players[toPi].handCount += 1;
-      if (cardId && view.players[toPi].hand) {
+    const toP = viewPlayer(view, event.to as number);
+    if (toP) {
+      toP.handCount += 1;
+      if (cardId && toP.hand) {
         const card = view.cardMap[cardId];
-        if (card) view.players[toPi].hand.push(card);
+        if (card) toP.hand.push(card);
       }
     }
   },

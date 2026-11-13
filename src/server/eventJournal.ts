@@ -21,7 +21,7 @@ import { appendFile, mkdir, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { AppliedAtomEntry } from '../engine/types';
 import { serializeAtomHistory } from './snapshot';
-import { createLogger, normalizeError } from './logger';
+import { createLogger } from './logger';
 import { register as registerLifecycle } from './lifecycles';
 
 const log = createLogger('eventJournal');
@@ -53,10 +53,9 @@ function journalPath(roomId: string): string | null {
 /** per-room 串行执行 IO 操作:后到的操作等先前的完成,失败不阻断后续。 */
 function enqueue(roomId: string, op: () => Promise<void>): Promise<void> {
   const prev = chains.get(roomId) ?? Promise.resolve();
-  const next = prev.then(op, op).catch((err) => {
-    const e = normalizeError(err);
-    log.error(`journal io failed for room ${roomId}`, { error: e.stack ?? String(e) });
-  });
+  const next = prev.then(op, op).catch((err) =>
+    log.err(`journal io failed for room ${roomId}`, err),
+  );
   chains.set(roomId, next);
   void next.finally(() => {
     if (chains.get(roomId) === next) chains.delete(roomId);

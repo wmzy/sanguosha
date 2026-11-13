@@ -26,7 +26,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
-import { runVirtualSlash } from '../util/skillRuntime';
+import { runVirtualSlash, askConfirm } from '../util/skillRuntime';
 import {
   FLIP_TAG,
   SKIP_MO_TAG,
@@ -154,59 +154,38 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // ── 逐项询问 ──────────────────────────────────
       // 选项1:跳过判定+摸牌
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: OPT1_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动界神速①?(跳过判定+摸牌,视为出杀)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const opt1 = await askConfirm(ctx.state, OPT1_RT, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: '是否发动界神速①?(跳过判定+摸牌,视为出杀)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 10,
       });
-      const opt1 = ctx.state.localVars[CONFIRMED_KEY] === true;
 
       // 选项2:弃装备+跳过出牌(仅有装备时询问)
       let opt2 = false;
       const equipCount = equipCardIds(ctx.state, ownerId).length;
       if (equipCount > 0) {
-        delete ctx.state.localVars[CONFIRMED_KEY];
-        await applyAtom(ctx.state, {
-          type: '请求回应',
-          requestType: OPT2_RT,
-          target: ownerId,
-          prompt: {
-            type: 'confirm',
-            title: '是否发动界神速②?(弃置一张装备牌,跳过出牌,视为出杀)',
-            confirmLabel: '发动',
-            cancelLabel: '不发动',
-          },
+        opt2 = await askConfirm(ctx.state, OPT2_RT, ownerId, {
+          confirmedKey: CONFIRMED_KEY,
+          title: '是否发动界神速②?(弃置一张装备牌,跳过出牌,视为出杀)',
+          confirmLabel: '发动',
+          cancelLabel: '不发动',
           defaultChoice: false,
           timeout: 10,
         });
-        opt2 = ctx.state.localVars[CONFIRMED_KEY] === true;
       }
 
       // 选项3:翻面+跳过弃牌
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: OPT3_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动界神速③?(翻面,跳过弃牌,视为出杀)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const opt3 = await askConfirm(ctx.state, OPT3_RT, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: '是否发动界神速③?(翻面,跳过弃牌,视为出杀)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 10,
       });
-      const opt3 = ctx.state.localVars[CONFIRMED_KEY] === true;
 
       // 三项全否 → 未发动神速
       if (!opt1 && !opt2 && !opt3) {

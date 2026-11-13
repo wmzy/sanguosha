@@ -25,7 +25,11 @@ import type {
 } from '../../../engine/types';
 import type { SkillActionDef } from '../../skillActionRegistry';
 import type { PendingRespondInfo } from '../../utils/pendingRespond';
-import { isActiveAction, resolveDistributeCardIds } from '../../utils/gameViewHelpers';
+import {
+  isActiveAction,
+  resolveDistributeCardIds,
+  distributeAllocateCandidates,
+} from '../../utils/gameViewHelpers';
 import type { PlaySend } from './common';
 import { invertOrdered, selectAllOrdered } from './orderedSelection';
 
@@ -275,8 +279,11 @@ export function useDistributeInteraction(p: DistributeInteractionParams): Distri
       // 制衡(select)无目标,座位点击忽略
       if (mode === 'select') return;
       if (activeDistribute.externalTargetSelection) {
-        // 仁德:点玩家设为目标
-        if (!activeDistribute.prompt.allowSelf && idx === perspectiveIdx) return;
+        // 仁德:点玩家设为目标(可选性与外壳 isTargetable/无头枚举共享
+        // distributeAllocateCandidates:存活 + allowSelf + targetFilter)
+        if (!distributeAllocateCandidates(view, perspectiveIdx, activeDistribute.prompt).includes(idx)) {
+          return;
+        }
         setDistTargetName(distTargetName === name ? null : name);
         return;
       }
@@ -293,7 +300,7 @@ export function useDistributeInteraction(p: DistributeInteractionParams): Distri
         setDistSelected(new Set());
       }
     },
-    [activeDistribute, perspectiveIdx, distTargetName, distSelected],
+    [activeDistribute, perspectiveIdx, distTargetName, distSelected, view],
   );
 
   // distribute 提交:与 CenterActionBar 的三分支(select / 外部目标 / allocate)同源。

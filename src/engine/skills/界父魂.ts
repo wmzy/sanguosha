@@ -34,21 +34,26 @@
 //   - localVars['闪/色限制']:生产=询问闪 before hook,消费=闪.respond validate,清=询问闪 after hook
 import type {
   Card,
-  EquipSlot,
   GameView,
   GameState,
-  Json,
   Skill,
   FrontendAPI,
   HookResult,
 } from '../types';
-import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
-import { applyAtom } from '../core/apply'
+import { registerAfterHook, registerBeforeHook, declareAlternativeResponse } from '../core/skill';
 import { topFrame } from '../core/frame';
 import { registerSlashUnlimitedProvider, projectSlashUnlimited } from '../rules/slash-quota';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
-import { DISTANCE_ATTACK_RANGE_KEY, slashUnlimitedKey } from '../rules/vars-keys';
+import { slashUnlimitedKey } from '../rules/vars-keys';
+import {
+  registerTransformAction,
+  mountTransformAction,
+  engineCanPlayNow,
+  isAskedKillSlot,
+  viewAskedKill,
+  type TransformActionOptions,
+} from '../util/skillRuntime';
 
 const GRANT_VAR = '父魂/granted';
 const COLOR_LIMIT_VAR = '闪/色限制';
@@ -64,25 +69,104 @@ export function createSkill(id: string, ownerId: number): Skill {
 }
 
 // ─── A. 父魂 转化 action:2 张牌(手牌或装备区)→ 杀 ─────────────
+// 五件套由 skillRuntime 转化技工厂统一实现(cardCount=2 + includeEquipment 维度):
+// 影子 id = ${id1}#${id2}#界父魂(后缀 = 技能 id,与客户端构造约定一致),多卡转化
+// shadowOf=undefined,颜色取综合;装备区牌先「卸下」再「当作」,rollback 还原槽位与距离 vars。
 
-/** 界父魂 影子卡 id:${id1}#${id2}#界父魂(后缀 = 技能 id,与客户端构造约定一致) */
-function shadowIdOf(id1: string, id2: string): string {
-  return `${id1}#${id2}#界父魂`;
-}
+const TRANSFORM_OPTIONS: TransformActionOptions = {
+  outputName: '杀',
+  cardCount: 2,
+  // 使用(自己回合出牌阶段)或打出(被询问杀:决斗/南蛮)均可
+  context: 'playOrRespondKill',
+  includeEquipment: true,
+  needCardsError: '需要选择 2 张牌',
+  invalidError: '父魂转化条件不满足',
+  mount: {
+    label: '父魂',
+    style: 'passive',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '选择 2 张牌当杀使用',
+      cardFilter: { filter: () => true, min: 2, max: 2 },
+      targetFilter: {
+        min: 1,
+        max: 1,
+        filter: (view: GameView, t: number) =>
+          viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
+      },
+    },
+    activeWhen: (ctx) => {
+      const p = ctx.view.players[ctx.perspectiveIdx];
+      if (!p?.alive) return false;
+      // 手牌 + 装备区合计 ≥ 2
+      const equipCount = Object.values(p.equipment ?? {}).filter(Boolean).length;
+      const total = (p.handCount ?? 0) + equipCount;
+      if (total < 2) return false;
+      // 出杀路径(自己回合 + 出牌阶段 + 还能出杀)
+      const ownTurnCanSlash =
+        defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+      // 回应路径(被询问杀:南蛮入侵/决斗):与武圣/龙胆同构
+      return ownTurnCanSlash || viewAskedKill(ctx);
+    },
+  },
+};
 
-/** 玩家某张牌是否在自己的可控区域(手牌或装备区) */
-function cardInOwnZone(self: GameState['players'][number], cardId: string): boolean {
-  if (self.hand.includes(cardId)) return true;
-  return Object.values(self.equipment).some((id) => id === cardId);
-}
+// ─── B'. granted 武圣 转化:1 张红色手牌 → 杀(granted 时生效) ─────────────
+// 影子 id = ${原id}#界父魂:后缀统一为技能 id(界父魂)——客户端按 `${cardId}#${skillId}`
+// 构造主 action 的 cardId,与两条转化路径(两张牌 / granted 单张牌)都对齐;
+// 两种路径的 id 因牌数不同不会冲突。
+// validate 自定义:granted 前置拒绝与通用拒绝文案不同,逐字保留。
 
-// ─── B'. granted 武圣 影子卡 id:${原id}#界父魂 ─────────────
-// 后缀统一为技能 id(界父魂):客户端按 `${cardId}#${skillId}` 构造主 action 的 cardId,
-// 与两条转化路径(两张牌 / granted 单张牌)都对齐;两种路径的 id 因牌数不同不会冲突。
-
-function grantedShadowIdOf(cardId: string): string {
-  return `${cardId}#界父魂`;
-}
+const GRANTED_OPTIONS: TransformActionOptions = {
+  outputName: '杀',
+  actionType: '武圣transform',
+  context: 'playOrRespondKill',
+  validate: (st, ownerId, params): string | null => {
+    if (!isGranted(st, ownerId)) return '本回合未获得武圣';
+    const self = st.players[ownerId];
+    const cardId = params.cardId as string | undefined;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? st.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && !!self && self.hand.includes(cardId);
+    const isRed = !!card && card.color === '红';
+    const slot = st.pendingSlots.get(ownerId);
+    const askedKill =
+      !!slot &&
+      (slot.atom as { target?: number }).target === ownerId &&
+      isAskedKillSlot(slot);
+    const contextOk = engineCanPlayNow(st, ownerId) || askedKill;
+    const ok = contextOk && self?.alive === true && cardInHand && isRed;
+    return ok ? null : '现在不能使用武圣';
+  },
+  mount: {
+    label: '武圣',
+    style: 'passive',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '选择一张红色手牌当杀使用',
+      cardFilter: { filter: (c: Card) => c.color === '红', min: 1, max: 1 },
+      targetFilter: {
+        min: 1,
+        max: 1,
+        filter: (view: GameView, t: number) =>
+          viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
+      },
+    },
+    activeWhen: (ctx) => {
+      const p = ctx.view.players[ctx.perspectiveIdx];
+      if (!p?.alive) return false;
+      // 仅在获得武圣时显示
+      if (!p.turnUsage?.[slashUnlimitedKey('父魂')]) return false;
+      const hasRed = p.hand?.some((c) => c.color === '红') ?? false;
+      if (!hasRed) return false;
+      // 出杀路径(自己回合 + 出牌阶段 + 还能出杀)
+      const ownTurnCanSlash =
+        defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+      // 回应路径(决斗中被询问杀):与武圣/龙胆同构
+      return ownTurnCanSlash || viewAskedKill(ctx);
+    },
+  },
+};
 
 // ─── granted 标记读写 helper ─────────────────────────
 
@@ -94,151 +178,21 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── A. 父魂 转化(主动 preceding) ──
-  const unregTransform = registerAction(state,
-  skill.id,
-  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
-    const myTurn = state.currentPlayerIndex === ownerId;
-    const inActPhase = state.phase === '出牌';
-    const free = !hasBlockingPending(state);
-    const self = state.players[ownerId];
-    const selfAlive = self.alive === true;
-    const cardIds = params.cardIds;
-    if (!Array.isArray(cardIds) || cardIds.length !== 2) return '需要选择 2 张牌';
-    const [id1, id2] = cardIds as string[];
-    if (typeof id1 !== 'string' || typeof id2 !== 'string') return 'cardIds 必须为字符串';
-    if (id1 === id2) return '不能选择同一张牌';
-    const cardsOwned = !!self && cardInOwnZone(self, id1) && cardInOwnZone(self, id2);
-    const c1 = state.cardMap[id1];
-    const c2 = state.cardMap[id2];
-    const cardsExist = !!c1 && !!c2;
-    // 时机由两条路径之一满足:
-    //   1. 出杀路径(自己回合 + 出牌阶段 + 无阻塞 pending):preceding 在 杀.use 前
-    //   2. 回应路径(被询问杀:南蛮入侵/决斗):preceding 在 杀.respond 前
-    const slot = state.pendingSlots.get(ownerId);
-    const atomType = (slot?.atom as { type?: string })?.type;
-    const reqType = (slot?.atom as { requestType?: string })?.requestType;
-    const atomTarget = (slot?.atom as { target?: number })?.target;
-    const askedKill =
-      !!slot &&
-      atomTarget === ownerId &&
-      (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
-    const contextOk = (myTurn && inActPhase && free) || askedKill;
-    const ok = contextOk && selfAlive && cardsOwned && cardsExist;
-    return ok ? null : '父魂转化条件不满足';
-  },
-  async (state: GameState, params: Record<string, Json>) => {
-    const cardIds = params.cardIds as string[];
-    const [id1, id2] = cardIds;
-    const self = state.players[ownerId];
-    // 装备区牌:先卸下到手牌(当作要求牌在手牌)。记录原槽位供 rollback。
-    // 同 界武圣.ts / 奇袭.ts 的装备转化模式。
-    const equipsToUnequip: Array<{ slot: EquipSlot; cardId: string }> = [];
-    for (const cid of cardIds) {
-      const entry = Object.entries(self.equipment).find(([, id]) => id === cid);
-      if (entry) equipsToUnequip.push({ slot: entry[0] as EquipSlot, cardId: cid });
-    }
-    if (equipsToUnequip.length > 0) {
-      params['_unequipped'] = equipsToUnequip;
-      for (const { slot } of equipsToUnequip) {
-        await applyAtom(state, { type: '卸下', player: ownerId, slot });
-      }
-    }
-    const shadowId = shadowIdOf(id1, id2);
-    await applyAtom(state, {
-      type: '当作',
-      player: ownerId,
-      cardIds,
-      shadowId,
-      outputName: '杀',
-    });
-  },
-  // rollback:主 action validate 失败时撤销转化(删影子 + 还原牌)
-  (state: GameState, params: Record<string, Json>) => {
-    const cardIds = params.cardIds;
-    const [id1, id2] = Array.isArray(cardIds) ? (cardIds as string[]) : [];
-    const sId = id1 && id2 ? shadowIdOf(id1, id2) : undefined;
-    if (!sId) return;
-    delete state.cardMap[sId];
-    const self = state.players[ownerId];
-    // 影子从手牌移除
-    const idx = self.hand.indexOf(sId);
-    if (idx >= 0) self.hand.splice(idx, 1);
-    // 还原:装备区牌回装备槽;手牌回手牌
-    const unequipped = params['_unequipped'] as
-      | Array<{ slot: EquipSlot; cardId: string }>
-      | undefined;
-    if (unequipped) {
-      for (const { slot, cardId } of unequipped) {
-        // 若已被其他流程占用槽位,退回手牌兜底
-        if (self.equipment[slot] === undefined) {
-          self.equipment[slot] = cardId;
-          // 卸下武器时清除了 vars[DISTANCE_ATTACK_RANGE_KEY](由 卸下 atom 设值,不会重算),
-          // 回滚必须还原,否则武器已归位但攻击范围退化为徒手(1)。镜像 界武圣 回滚。
-        if (slot === '武器') {
-          const card = state.cardMap[cardId];
-          self.vars[DISTANCE_ATTACK_RANGE_KEY] = card?.range ?? 1;
-        }
-        } else {
-          self.hand.push(cardId);
-        }
-      }
-    }
-    // 手牌原卡还原(当作把手牌过滤掉了)
-    for (const cid of cardIds as string[]) {
-      if (!self.hand.includes(cid) && !unequipped?.some((u) => u.cardId === cid)) {
-        self.hand.push(cid);
-      }
-    }
-  },);
+  const unregTransform = registerTransformAction(
+    state,
+    skill.id,
+    ownerId,
+    TRANSFORM_OPTIONS,
+  );
 
   // ── B'. granted 武圣 转化(主动 preceding,granted 时生效) ──
   // 标准"武圣":将一张红色手牌当【杀】使用或打出。
-  const unregWusheng = registerAction(state,
-  skill.id,
-  ownerId, '武圣transform', (state: GameState, params: Record<string, Json>) => {
-    if (!isGranted(state, ownerId)) return '本回合未获得武圣';
-    const myTurn = state.currentPlayerIndex === ownerId;
-    const inActPhase = state.phase === '出牌';
-    const free = !hasBlockingPending(state);
-    const self = state.players[ownerId];
-    const selfAlive = self.alive === true;
-    const cardId = params.cardId as string;
-    const cardIdOk = typeof cardId === 'string';
-    const card = cardIdOk ? state.cardMap[cardId] : undefined;
-    const cardInHand = cardIdOk && self.hand.includes(cardId);
-    const isRed = !!card && card.color === '红';
-    // 时机:出杀路径(自己回合 + 出牌阶段 + 无阻塞)或回应路径(决斗中被询问杀)
-    const slot = state.pendingSlots.get(ownerId);
-    const atomType = (slot?.atom as { type?: string })?.type;
-    const reqType = (slot?.atom as { requestType?: string })?.requestType;
-    const atomTarget = (slot?.atom as { target?: number })?.target;
-    const askedKill =
-      !!slot &&
-      atomTarget === ownerId &&
-      (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
-    const contextOk = (myTurn && inActPhase && free) || askedKill;
-    const ok = contextOk && selfAlive && cardInHand && isRed;
-    return ok ? null : '现在不能使用武圣';
-  },
-  async (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const shadowId = grantedShadowIdOf(cardId);
-    await applyAtom(state, {
-      type: '当作',
-      player: ownerId,
-      cardIds: [cardId],
-      shadowId,
-      outputName: '杀',
-    });
-  },
-  (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const sId = grantedShadowIdOf(cardId);
-    delete state.cardMap[sId];
-    const self = state.players[ownerId];
-    const idx = self.hand.indexOf(sId);
-    if (idx >= 0) self.hand[idx] = cardId;
-  },);
+  const unregWusheng = registerTransformAction(
+    state,
+    skill.id,
+    ownerId,
+    GRANTED_OPTIONS,
+  );
 
   // ── C. granted 咆哮:无限出杀提供者读 turn.vars,granted 时 true → slashMax=∞ ──
   const unregMax = registerSlashUnlimitedProvider(state, ownerId, (s, p) =>
@@ -326,78 +280,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
 export function onMount(skill: Skill, api: FrontendAPI): void {
   // 父魂 转化:2 张牌(手牌或装备区)→ 杀
-  api.defineAction('transform', {
-    label: '父魂',
-    style: 'passive',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '选择 2 张牌当杀使用',
-      cardFilter: { filter: () => true, min: 2, max: 2 },
-      targetFilter: {
-        min: 1,
-        max: 1,
-        filter: (view: GameView, t: number) =>
-          viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
-      },
-    },
-    transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id }),
-    activeWhen: (ctx) => {
-      const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p?.alive) return false;
-      // 手牌 + 装备区合计 ≥ 2
-      const equipCount = Object.values(p.equipment ?? {}).filter(Boolean).length;
-      const total = (p.handCount ?? 0) + equipCount;
-      if (total < 2) return false;
-      // 出杀路径(自己回合 + 出牌阶段 + 还能出杀)
-      const ownTurnCanSlash = defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
-      // 回应路径(被询问杀:南蛮入侵/决斗):与武圣/龙胆同构
-      const slot = ctx.view.pending;
-      const atomType = (slot?.atom as { type?: string })?.type;
-      const reqType = (slot?.atom as { requestType?: string })?.requestType;
-      const askedKill =
-        !!slot &&
-        slot.target === ctx.perspectiveIdx &&
-        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
-      return ownTurnCanSlash || askedKill;
-    },
-  });
+  mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
 
   // granted 武圣 转化:1 张红色手牌 → 杀(granted 时才显示)
-  api.defineAction('武圣transform', {
-    label: '武圣',
-    style: 'passive',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '选择一张红色手牌当杀使用',
-      cardFilter: { filter: (c: Card) => c.color === '红', min: 1, max: 1 },
-      targetFilter: {
-        min: 1,
-        max: 1,
-        filter: (view: GameView, t: number) =>
-          viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
-      },
-    },
-    transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id }),
-    activeWhen: (ctx) => {
-      const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p?.alive) return false;
-      // 仅在获得武圣时显示
-      if (!p.turnUsage?.[slashUnlimitedKey('父魂')]) return false;
-      const hasRed = p.hand?.some((c) => c.color === '红') ?? false;
-      if (!hasRed) return false;
-      // 出杀路径(自己回合 + 出牌阶段 + 还能出杀)
-      const ownTurnCanSlash = defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
-      // 回应路径(决斗中被询问杀):与武圣/龙胆同构
-      const slot = ctx.view.pending;
-      const atomType = (slot?.atom as { type?: string })?.type;
-      const reqType = (slot?.atom as { requestType?: string })?.requestType;
-      const askedKill =
-        !!slot &&
-        slot.target === ctx.perspectiveIdx &&
-        (atomType === '询问杀' || (atomType === '请求回应' && reqType === '杀/respondKill'));
-      return ownTurnCanSlash || askedKill;
-    },
-  });
+  mountTransformAction(api, skill.id, GRANTED_OPTIONS);
 
   return;
 }

@@ -33,6 +33,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAction, registerBeforeHook } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 
 // requestType 前缀必须等于技能 id('界放权'):前端 resolvePendingRespond 按
 // requestType 前缀解析 skillId 后提交 respond,前缀≠技能 id 则 dispatch 找不到
@@ -135,21 +136,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!self?.alive) return;
 
       // 询问是否发动放权
-      delete ctx.state.localVars[TRIGGERED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: TRIGGER_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动放权?(跳过出牌阶段,弃牌阶段开始时弃一张手牌令一名角色额外回合)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const triggered = await askConfirm(ctx.state, TRIGGER_RT, ownerId, {
+        confirmedKey: TRIGGERED_KEY,
+        title: '是否发动放权?(跳过出牌阶段,弃牌阶段开始时弃一张手牌令一名角色额外回合)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 10,
       });
-      if (ctx.state.localVars[TRIGGERED_KEY] !== true) return; // 不发动 → 出牌阶段正常进行
+      if (triggered !== true) return; // 不发动 → 出牌阶段正常进行
 
       // 设标记:弃牌阶段开始时消费
       ctx.state.localVars[ACTIVE_KEY] = true;

@@ -1,13 +1,13 @@
 // src/engine/atoms/移除技能.ts
 // 移除技能:从玩家移除 skillId
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 import { 马匹距离修正表 } from '../data/card-defs/equipment';
 
 export const 移除技能: AtomDefinition<{ player: number; skillId: string }> = {
   type: '移除技能',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
-    return null;
+    return requirePlayer(state, atom.player, 'player');
   },
   apply(state, atom) {
     state.players[atom.player].skills = state.players[atom.player].skills.filter(
@@ -27,26 +27,26 @@ export const 移除技能: AtomDefinition<{ player: number; skillId: string }> =
     if (mountVars) {
       view.clearMountDistanceVars = mountVars;
     }
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi < 0) return;
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
     const skillId = event.skillId as string;
-    view.players[pi].skills = view.players[pi].skills.filter((id) => id !== skillId);
+    p.skills = p.skills.filter((id) => id !== skillId);
     // 马匹技能:清除对应的 distanceVars(攻击马=attackMod,防御马=defenseMod)
     const clearVars = event.clearMountDistanceVars as
       | { attackMod?: number; defenseMod?: number }
       | undefined;
     if (clearVars) {
-      view.players[pi].distanceVars = {
-        ...view.players[pi].distanceVars,
+      p.distanceVars = {
+        ...p.distanceVars,
         attackMod:
-          clearVars.attackMod !== undefined ? undefined : view.players[pi].distanceVars?.attackMod,
+          clearVars.attackMod !== undefined ? undefined : p.distanceVars?.attackMod,
         defenseMod:
           clearVars.defenseMod !== undefined
             ? undefined
-            : view.players[pi].distanceVars?.defenseMod,
+            : p.distanceVars?.defenseMod,
       };
     }
   },

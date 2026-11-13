@@ -48,6 +48,7 @@ import {
   registerBeforeHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
+import { askConfirm } from '../util/skillRuntime';
 
 const SKILL_ID = '界潜袭';
 const DISPLAY_NAME = '潜袭';
@@ -163,21 +164,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!ctx.state.players[ownerId]?.alive) return;
 
     // 询问是否发动潜袭
-    delete ctx.state.localVars[CONFIRM_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动潜袭?(摸一张并展示一张牌;距离1的其他角色本回合不能使用/打出同色手牌,你用此牌造伤+1)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: '是否发动潜袭?(摸一张并展示一张牌;距离1的其他角色本回合不能使用/打出同色手牌,你用此牌造伤+1)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (ctx.state.localVars[CONFIRM_KEY] !== true) {
+    if (!confirmed) {
       delete ctx.state.localVars[CONFIRM_KEY];
       return;
     }

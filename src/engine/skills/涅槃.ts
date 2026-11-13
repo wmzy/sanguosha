@@ -15,12 +15,12 @@
 //   关键:濒死时 alive 仍 true(击杀 atom 才设 false),故 回复体力 validate 通过;
 //        runDyingFlow 在 陷入濒死 after-hook 后进入求桃循环,首项 health>0 即 return,
 //        涅槃把 health 拉回 3,循环立即退出,庞统不死亡。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { setChain } from '../flows/face-down';
 import { locateCard } from '../core/judge-zone';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { registerAfterHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '涅槃/confirm';
 const CONFIRMED_KEY = '涅槃/confirmed';
@@ -40,20 +40,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── respond:庞统回应是否发动涅槃 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      return requireRequestType(st, ownerId, [CONFIRM_RT], {
-        mismatchError: '当前不是涅槃确认',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_RT, CONFIRMED_KEY, {
+    mismatchError: '当前不是涅槃确认',
+  });
 
   // ── 陷入濒死 after-hook:涅槃主逻辑 ──
   registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx) => {
@@ -68,21 +57,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (self.health > 0) return;
 
     // 询问是否发动
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动涅槃?(限定技:弃所有牌,摸3张,回复至3体力)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: '是否发动涅槃?(限定技:弃所有牌,摸3张,回复至3体力)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+    if (!confirmed) return;
 
     // 标记已使用(限定技)。在读到 confirmed 后立即设,防重入。
     // 用 state.vars(不被 回合结束 清理,因后缀不匹配 /usedThisTurn|/healed|/givenCount)。

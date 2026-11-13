@@ -34,7 +34,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import type { SkillModule } from '../types';
 import { getHandLimitBonus } from '../rules/vars-keys';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界血裔';
 const DISPLAY_NAME = '血裔';
@@ -148,22 +148,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (yiCount(st, ownerId) <= 0) return; // 无裔,无法发动
 
       // 询问是否发动
-      delete st.localVars[USE_CHOICE_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: USE_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '血裔:是否移除 1 枚裔标记并摸一张牌?',
-          confirmLabel: '移除裔并摸牌',
-          cancelLabel: '不发动',
-        },
+      const choice = await askConfirm(st, USE_RT, ownerId, {
+        confirmedKey: USE_CHOICE_KEY,
+        title: '血裔:是否移除 1 枚裔标记并摸一张牌?',
+        confirmLabel: '移除裔并摸牌',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 20,
       });
-
-      const choice = st.localVars[USE_CHOICE_KEY];
       delete st.localVars[USE_CHOICE_KEY];
       if (choice !== true) return; // 不发动
 

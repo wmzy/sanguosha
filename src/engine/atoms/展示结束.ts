@@ -13,11 +13,13 @@
 // 发射方:火攻(所有收尾路径,见 skills/cards/火攻.ts);其他展示类技能
 // (界火计/义绝/攻心/蛊惑)按需采用同一契约。
 import type { AtomDefinition, ViewEvent, ViewEventSplit } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 
 export const 展示结束: AtomDefinition<{ player: number; cardId: string }> = {
   type: '展示结束',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
+    const err = requirePlayer(state, atom.player, 'player');
+    if (err) return err;
     if (!state.cardMap[atom.cardId]) return `card ${atom.cardId} not found`;
     return null;
   },
@@ -26,7 +28,7 @@ export const 展示结束: AtomDefinition<{ player: number; cardId: string }> = 
   },
   toViewEvents(_state, atom): ViewEventSplit {
     const view: ViewEvent = { type: '展示结束', player: atom.player, cardId: atom.cardId };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView() {
     // no-op:无持久 view 字段。

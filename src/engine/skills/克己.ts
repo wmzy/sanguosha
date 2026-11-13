@@ -19,8 +19,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 /** turn.vars key:本回合是否使用/打出过杀(移动牌 after 写,阶段开始 before 读)。
  *  随「回合结束」atom 的 state.turn.vars = {} 自动清空。 */
@@ -43,19 +43,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── respond:被询问「是否发动克己」时回应,写 localVars 标记结果 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (state, _params) =>
-      requireRequestType(state, ownerId, [CONFIRM_REQUEST], {
-        mismatchError: '当前不是克己确认',
-      }).error,
-    async (state, params) => {
-      state.localVars[CONFIRMED_VAR] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_REQUEST, CONFIRMED_VAR, {
+    mismatchError: '当前不是克己确认',
+  });
 
   // ── 移动牌 after hook:检测自己使用/打出的杀(手牌→处理区) ──
   registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
@@ -83,22 +73,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (ctx.state.turn.vars[PLAYED_SLASH_VAR]) return;
 
       // 询问是否发动克己(跳过弃牌阶段)
-      delete ctx.state.localVars[CONFIRMED_VAR];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_REQUEST,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '克己:本回合未出杀,是否跳过弃牌阶段?',
-          confirmLabel: '跳过',
-          cancelLabel: '不跳过',
-        },
+      // 玩家选不发动 / 超时(defaultChoice=false) → 不干预,正常进入弃牌阶段
+      const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
+        confirmedKey: CONFIRMED_VAR,
+        title: '克己:本回合未出杀,是否跳过弃牌阶段?',
+        confirmLabel: '跳过',
+        cancelLabel: '不跳过',
         defaultChoice: false,
         timeout: 15,
       });
-      // 玩家选不发动 / 超时(defaultChoice=false) → 不干预,正常进入弃牌阶段
-      if (!ctx.state.localVars[CONFIRMED_VAR]) return;
+      if (!confirmed) return;
 
       // 跳过弃牌阶段:
       //   1) 触发「阶段结束」(弃牌) → 回合管理 after hook 把阶段推进到「回合结束」

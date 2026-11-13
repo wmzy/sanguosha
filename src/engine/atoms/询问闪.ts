@@ -1,6 +1,7 @@
 // src/engine/atoms/询问闪.ts
 // 询问闪:等待型 atom — 等待 target 出闪
 import type { ActionPrompt, AtomDefinition, ViewEventSplit } from '../types';
+import { broadcast } from './_helpers';
 import { cardResponsePreResolveForTarget } from '../core/card-response-availability';
 
 const TIMEOUT_SEC = 15;
@@ -32,9 +33,6 @@ export const 询问闪: AtomDefinition<{ target: number; source: number }> = {
   effect: { blockUntilDone: true, duration: 200 },
   // Interactive state is published from the actual slot, never reconstructed by the client clock.
   toViewEvents(_state, atom): ViewEventSplit {
-    return {
-      ownerViews: new Map(),
-      othersView: { type: '询问闪', target: atom.target, source: atom.source },
-    };
+    return broadcast({ type: '询问闪', target: atom.target, source: atom.source });
   },
 };

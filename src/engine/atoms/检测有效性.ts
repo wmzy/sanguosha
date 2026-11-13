@@ -11,13 +11,13 @@
 // 噪声抑制:此 atom 是纯时机型(apply/applyView 均无副作用)。当没有任何技能注册
 // before hook 时,整个执行是 no-op——不发 ViewEvent,不写日志,避免前端噪声。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 import { getBeforeHooks } from '../core/skill';
 
 export const 检测有效性: AtomDefinition<{ source: number; target: number; cardId: string }> = {
   type: '检测有效性',
   validate(state, atom) {
-    if (!state.players[atom.target]) return `target ${atom.target} not found`;
-    return null;
+    return requirePlayer(state, atom.target, 'target');
   },
   apply() {
     // 纯时机型 atom:有效性由 before hook 判定(cancel=无效),apply 无副作用。
@@ -25,7 +25,7 @@ export const 检测有效性: AtomDefinition<{ source: number; target: number; c
   toViewEvents(state, atom): ViewEventSplit {
     // 无 before hook 时抑制:整个 atom 是 no-op,不发事件给任何人
     if (getBeforeHooks(state, '检测有效性').length === 0) {
-      return { ownerViews: new Map(), othersView: null };
+      return broadcast(null);
     }
     const view: ViewEvent = {
       type: '检测有效性',

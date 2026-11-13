@@ -32,6 +32,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const CONFIRM_RT_PREFIX = '奋激/confirm';
@@ -84,21 +85,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!st.players[target]?.alive) return;
 
     const rt = `${CONFIRM_RT_PREFIX}/${target}`;
-    delete st.localVars[rt];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: rt,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `是否发动奋激?(失去1点体力令 ${st.players[target]?.name ?? `P${target}`} 摸两张牌)`,
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(st, rt, ownerId, {
+      confirmedKey: rt,
+      title: `是否发动奋激?(失去1点体力令 ${st.players[target]?.name ?? `P${target}`} 摸两张牌)`,
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    const confirmed = st.localVars[rt] as boolean | undefined;
     delete st.localVars[rt];
     if (!confirmed) return;
 

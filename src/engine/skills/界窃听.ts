@@ -29,7 +29,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界窃听';
 const DISPLAY_NAME = '窃听';
@@ -266,23 +266,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ctx.state.localVars[CHOICES_KEY] = choices;
 
     // 询问:是否发动窃听?
-    delete ctx.state.localVars[CONFIRM_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: TRIGGER_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `窃听:${ctx.state.players[turnPlayer]?.name ?? `P${turnPlayer}`} 本回合${noDamage ? '未' : '已'}对其他角色造成伤害,${noCardUse ? '未' : '已'}使用过牌。是否发动?`,
-        description: choices === 2 ? '可选两项(夺装备+摸牌)' : '可选一项(夺装备或摸牌)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const triggered = await askConfirm(ctx.state, TRIGGER_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: `窃听:${ctx.state.players[turnPlayer]?.name ?? `P${turnPlayer}`} 本回合${noDamage ? '未' : '已'}对其他角色造成伤害,${noCardUse ? '未' : '已'}使用过牌。是否发动?`,
+      description: choices === 2 ? '可选两项(夺装备+摸牌)' : '可选一项(夺装备或摸牌)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
 
-    if (ctx.state.localVars[CONFIRM_KEY] !== true) {
+    if (!triggered) {
       delete ctx.state.localVars[CONFIRM_KEY];
       delete ctx.state.localVars[TURN_PLAYER_KEY];
       delete ctx.state.localVars[CHOICES_KEY];
@@ -304,21 +298,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (choices === 1) {
       // 选一项:有装备询问,无装备则只能摸牌
       if (hasEquip) {
-        delete ctx.state.localVars[STEAL_CHOICE_KEY];
-        await applyAtom(ctx.state, {
-          type: '请求回应',
-          requestType: STEAL_OR_DRAW_RT,
-          target: ownerId,
-          prompt: {
-            type: 'confirm',
-            title: '窃听:夺一张装备?(确认=夺装备,取消=摸一张牌)',
-            confirmLabel: '夺装备',
-            cancelLabel: '摸一张牌',
-          },
+        const steal = await askConfirm(ctx.state, STEAL_OR_DRAW_RT, ownerId, {
+          confirmedKey: STEAL_CHOICE_KEY,
+          title: '窃听:夺一张装备?(确认=夺装备,取消=摸一张牌)',
+          confirmLabel: '夺装备',
+          cancelLabel: '摸一张牌',
           defaultChoice: false,
           timeout: 15,
         });
-        const steal = ctx.state.localVars[STEAL_CHOICE_KEY] === true;
         delete ctx.state.localVars[STEAL_CHOICE_KEY];
         if (steal) {
           await executeStealEquip(ctx.state, ownerId, turnPlayer);

@@ -21,7 +21,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const CONFIRM_RT = '荐降/confirm';
 const CHOOSE_RT = '荐降/choose';
@@ -90,21 +90,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!ctx.state.players[ownerId]?.alive) return;
 
     // 询问是否发动
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '荐降:是否令手牌数最少的一名角色摸一张牌?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: '荐降:是否令手牌数最少的一名角色摸一张牌?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+    if (!confirmed) return;
     delete ctx.state.localVars[CONFIRMED_KEY];
 
     // 找手牌数最少的存活角色(含自己)

@@ -25,7 +25,7 @@ import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { registerSlashExtraProvider, projectSlashExtra } from '../rules/slash-quota';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, effectiveCardId, requireRequestType } from '../util/skillRuntime';
 
 const ALLY_CONFIRM_RT = '立军/盟友确认'; // 问盟友:是否把杀交给主公
 const LORD_CONFIRM_RT = '立军/主公确认'; // 问主公:是否令其摸牌+杀次+1
@@ -83,7 +83,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         type: '帧参数赋值',
         frameIndex: ctx.state.settlementStack.indexOf(ctx.frame),
         key: EFFECTIVE_CARD_KEY,
-        value: card.shadowOf ?? atom.cardId,
+        value: effectiveCardId(ctx.state, atom.cardId),
       });
     }),
   );
@@ -122,21 +122,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       await pushFrame(st, '立军', ownerId, { ally: source, cardId: effectiveCardId });
 
       // ── 第一步:问盟友是否把此杀交给主公 ──
-      delete st.localVars[ALLY_CONFIRM_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: ALLY_CONFIRM_RT,
-        target: source,
-        prompt: {
-          type: 'confirm',
-          title: `立军:是否将此【杀】交给 ${lord.name ?? '主公'}?`,
-          confirmLabel: '交给主公',
-          cancelLabel: '不交',
-        },
+      const allyYes = await askConfirm(st, ALLY_CONFIRM_RT, source, {
+        confirmedKey: ALLY_CONFIRM_KEY,
+        title: `立军:是否将此【杀】交给 ${lord.name ?? '主公'}?`,
+        confirmLabel: '交给主公',
+        cancelLabel: '不交',
         defaultChoice: false,
         timeout: 30,
       });
-      const allyYes = st.localVars[ALLY_CONFIRM_KEY] === true;
       delete st.localVars[ALLY_CONFIRM_KEY];
       if (!allyYes) {
         await popFrame(st);
@@ -157,21 +150,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
 
       // ── 第二步:问主公是否令其摸牌+杀次+1 ──
-      delete st.localVars[LORD_CONFIRM_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: LORD_CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `立军:是否令 ${ally.name ?? '该角色'} 摸一张牌且本回合使用杀的限制次数+1?`,
-          confirmLabel: '令其摸牌+杀次+1',
-          cancelLabel: '不发动',
-        },
+      const lordYes = await askConfirm(st, LORD_CONFIRM_RT, ownerId, {
+        confirmedKey: LORD_CONFIRM_KEY,
+        title: `立军:是否令 ${ally.name ?? '该角色'} 摸一张牌且本回合使用杀的限制次数+1?`,
+        confirmLabel: '令其摸牌+杀次+1',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 30,
       });
-      const lordYes = st.localVars[LORD_CONFIRM_KEY] === true;
       delete st.localVars[LORD_CONFIRM_KEY];
       if (!lordYes) {
         await popFrame(st);

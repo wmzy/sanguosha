@@ -5,6 +5,7 @@
 // 时机标记(reason='获得'),为失去牌类技能提供统一 hook 点。ZoneLoc 不含「装备」区域,
 // 从装备区获得不发标记。本 atom 的 apply + view 事件保持不变(含信息分级)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { requirePlayer, viewPlayer } from './_helpers';
 import { applyAtom } from '../core/apply';
 
 /** localVars key:本次获得是否来自 from 玩家的手牌(afterApply 发时机标记用) */
@@ -14,9 +15,10 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
   type: '获得',
   validate(state, atom) {
     if (!state.cardMap[atom.cardId]) return `card ${atom.cardId} not found`;
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
-    if (atom.from !== undefined && !state.players[atom.from]) return `from ${atom.from} not found`;
-    return null;
+    const err =
+      requirePlayer(state, atom.player, 'player') ??
+      (atom.from !== undefined ? requirePlayer(state, atom.from, 'from') : null);
+    return err;
   },
   apply(state, atom) {
     let fromWasHand = false;
@@ -85,31 +87,31 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
   },
   applyView(view, event) {
     const cardId = event.cardId as string | undefined;
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi < 0) return;
-    view.players[pi].handCount += 1;
-    if (cardId && view.players[pi].hand) {
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
+    p.handCount += 1;
+    if (cardId && p.hand) {
       const card = view.cardMap[cardId];
-      if (card) view.players[pi].hand.push(card);
+      if (card) p.hand.push(card);
     }
     // from 玩家:手牌/装备移除(与 apply 对称)
     const from = event.from as number | undefined;
     const fromZone = event.fromZone as 'hand' | 'equipment' | undefined;
     if (from !== undefined) {
-      const fromPi = view.players.findIndex((p) => p.index === from);
-      if (fromPi >= 0) {
+      const fromP = viewPlayer(view, from);
+      if (fromP) {
         if (fromZone === 'equipment') {
           // 从装备区移除
           const equipment: Partial<Record<string, string>> = {};
-          for (const [slot, id] of Object.entries(view.players[fromPi].equipment)) {
+          for (const [slot, id] of Object.entries(fromP.equipment)) {
             if (id && id !== cardId) equipment[slot] = id;
           }
-          view.players[fromPi].equipment = equipment;
+          fromP.equipment = equipment;
         } else {
           // 从手牌移除:handCount - 1;可见时同步 hand 数组
-          view.players[fromPi].handCount = Math.max(0, view.players[fromPi].handCount - 1);
-          if (cardId && view.players[fromPi].hand) {
-            view.players[fromPi].hand = view.players[fromPi].hand.filter((c) => c.id !== cardId);
+          fromP.handCount = Math.max(0, fromP.handCount - 1);
+          if (cardId && fromP.hand) {
+            fromP.hand = fromP.hand.filter((c) => c.id !== cardId);
           }
         }
       }

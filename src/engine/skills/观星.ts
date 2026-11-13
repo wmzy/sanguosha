@@ -20,7 +20,7 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -84,21 +84,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (drawCount === 0) return;
 
     // 询问是否发动
-    delete ctx.state.localVars['观星/confirmed'];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '观星/confirm',
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动观星?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, '观星/confirm', ownerId, {
+      confirmedKey: '观星/confirmed',
+      title: '是否发动观星?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!ctx.state.localVars['观星/confirmed']) return;
+    if (!confirmed) return;
 
     // 观察牌堆顶 drawCount 张(deck 末尾为顶)
     const observed = deck.slice(-drawCount);

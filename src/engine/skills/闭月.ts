@@ -12,102 +12,120 @@
 //   - 每回合限一次:回合结束阶段天然一次,无需额外标记。
 //   - 可选发动:描述明确"你可以摸一张牌",需询问玩家(confirm)。
 //   - respond action 注册在貂蝉本人座次(ownerId),因询问目标是自己。
+//
+// 本文件同时导出 createEndPhaseDrawSkill 工厂(结束阶段摸牌技共享实现),
+// 界闭月 复用之,仅注入摸牌张数(无手牌摸 2 张)与文案/键差异参数(镜像 鬼道/界鬼道)。
 import type {
   FrontendAPI,
   GameState,
-  Json,
+  PlayerState,
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
-const CONFIRM_REQUEST = '闭月/confirm';
-const CONFIRMED_KEY = '闭月/confirmed';
-
-export function createSkill(id: string, ownerId: number): Skill {
-  return {
-    id,
-    ownerId,
-    name: '闭月',
-    description: '回合结束阶段,你可以摸一张牌',
-  };
+/** 结束阶段摸牌技(闭月族)差异参数 */
+export interface EndPhaseDrawOptions {
+  /** Skill.name(玩家可见技能名;标/界官方均为 '闭月') */
+  name: string;
+  description: string;
+  /** confirm 询问的 requestType(技能名/xxx 命名空间,标/界键隔离) */
+  requestType: string;
+  /** 记录确认结果的 localVars 键 */
+  confirmedKey: string;
+  /** 摸牌张数:在阶段开始(回合结束)时按 owner 状态求值(标版恒 1;界版无手牌 2,否则 1) */
+  drawCount: (self: PlayerState) => number;
+  /** onMount defineAction 的 confirm 标题(标版与询问文案一致;界版无"(摸X张牌)"后缀) */
+  mountTitle: string;
 }
 
-export function onInit(skill: Skill, state: GameState): (() => void) | void {
-  const ownerId = skill.ownerId;
+/** 闭月族共享实现:标闭月与界闭月仅摸牌张数与文案/键不同,respond/hook/onMount 骨架一致。 */
+export function createEndPhaseDrawSkill(opts: EndPhaseDrawOptions) {
+  return {
+    createSkill(id: string, ownerId: number): Skill {
+      return {
+        id,
+        ownerId,
+        name: opts.name,
+        description: opts.description,
+      };
+    },
 
-  // ── confirm respond:貂蝉本人回应是否发动闭月 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      return requireRequestType(st, ownerId, [CONFIRM_REQUEST], {
+    onInit(skill: Skill, state: GameState): (() => void) | void {
+      const ownerId = skill.ownerId;
+
+      // ── confirm respond:貂蝉本人回应是否发动闭月 ──
+      registerConfirmRespond(state, skill.id, ownerId, opts.requestType, opts.confirmedKey, {
         mismatchError: '当前不是闭月确认',
-      }).error;
+      });
+
+      // ── 回合结束阶段开始 → 询问是否摸牌 ──
+      registerAfterHook(
+        state,
+        skill.id,
+        ownerId,
+        '阶段开始',
+        async (ctx) => {
+          const atom = ctx.atom;
+          if (atom.type !== '阶段开始') return;
+          if (atom.phase !== '回合结束') return;
+          if (atom.player !== ownerId) return;
+
+          const self = ctx.state.players[ownerId];
+          if (!self?.alive) return;
+
+          // 摸牌张数(标版恒 1 张;界版:0 张 → 2 张,否则 → 1 张)
+          const drawCount = opts.drawCount(self);
+          const countLabel = drawCount === 2 ? '两张牌' : '一张牌';
+
+          // 询问是否发动闭月
+          const confirmed = await askConfirm(ctx.state, opts.requestType, ownerId, {
+            confirmedKey: opts.confirmedKey,
+            title: `是否发动${opts.name}?(摸${countLabel})`,
+            confirmLabel: '发动',
+            cancelLabel: '不发动',
+            defaultChoice: false,
+            timeout: 15,
+          });
+
+          if (confirmed) {
+            await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: drawCount });
+          }
+        },
+      );
+
+      return () => {};
     },
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
 
-  // ── 回合结束阶段开始 → 询问是否摸牌 ──
-  registerAfterHook(
-    state,
-    skill.id,
-    ownerId,
-    '阶段开始',
-    async (ctx) => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.phase !== '回合结束') return;
-      if (atom.player !== ownerId) return;
-
-      const self = ctx.state.players[ownerId];
-      if (!self?.alive) return;
-
-      // 询问是否发动闭月
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_REQUEST,
-        target: ownerId,
+    onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
+      api.defineAction('respond', {
+        label: opts.name,
+        style: 'primary',
         prompt: {
           type: 'confirm',
-          title: '是否发动闭月?(摸一张牌)',
+          title: opts.mountTitle,
           confirmLabel: '发动',
           cancelLabel: '不发动',
         },
-        defaultChoice: false,
-        timeout: 15,
       });
 
-      if (ctx.state.localVars[CONFIRMED_KEY]) {
-        await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
-      }
+      return () => {};
     },
-  );
-
-  return () => {};
+  };
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
-    label: '闭月',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动闭月?(摸一张牌)',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+const OPTIONS: EndPhaseDrawOptions = {
+  name: '闭月',
+  description: '回合结束阶段,你可以摸一张牌',
+  requestType: '闭月/confirm',
+  confirmedKey: '闭月/confirmed',
+  drawCount: () => 1,
+  mountTitle: '是否发动闭月?(摸一张牌)',
+};
 
-  return () => {};
-}
+export const { createSkill, onInit, onMount } = createEndPhaseDrawSkill(OPTIONS);
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;

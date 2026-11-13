@@ -7,32 +7,13 @@
 //   1. 文案前缀 '界鬼道'(询问/报错文案),并附 '(黑桃2~9摸一张)' 提示后缀;
 //      requestType/localVars 键独立('界鬼道/…',与标版键隔离);
 //   2. 替换牌为黑桃2~9 → 额外摸一张牌(onReplaced)。
+//      黑桃2~9 判定复用 flows/rank 的 isSpade2to9(与闪电命中判定同语义,无本地副本)。
 //
 // 命名:文件名/loader key/character skill name 均为 '界鬼道';
 //   内部 Skill.name = '鬼道'(OL 官方技能名,玩家可见)。
-import type { Card } from '../types';
 import { applyAtom } from '../core/apply';
+import { isSpade2to9 } from '../flows/rank';
 import { createJudgeReplaceSkill, type JudgeReplaceOptions } from './鬼道';
-
-/** 判断一张牌的点数是否为 2~9 */
-function isRank2to9(rank: string): boolean {
-  const n =
-    rank === 'A'
-      ? 1
-      : rank === 'J'
-        ? 11
-        : rank === 'Q'
-          ? 12
-          : rank === 'K'
-            ? 13
-            : parseInt(rank, 10);
-  return !Number.isNaN(n) && n >= 2 && n <= 9;
-}
-
-/** 判断一张牌是否为黑桃2~9(触发界鬼道摸牌效果) */
-function isSpade2to9(card: Card | undefined): boolean {
-  return !!card && card.suit === '♠' && isRank2to9(card.rank);
-}
 
 const OPTIONS: JudgeReplaceOptions = {
   name: '鬼道',

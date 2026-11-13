@@ -16,7 +16,7 @@
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
 import { runJudgeModifiers } from '../core/apply';
-import { getBeforeHooks } from '../core/skill';
+import { hookSilentView, requirePlayer } from './_helpers';
 
 /** 判定时机 atom 的公共形状。cardId 仅 生效前/生效后 携带(翻出的判定牌)。 */
 type JudgeTimingAtom = {
@@ -27,29 +27,28 @@ type JudgeTimingAtom = {
 
 /** 校验 player 存在(纯标记,不校验存活——编排函数前置保证)。 */
 function validateJudgeTiming(state: GameState, atom: JudgeTimingAtom): string | null {
-  if (!state.players[atom.player]) return `player ${atom.player} not found`;
-  return null;
+  return requirePlayer(state, atom.player, 'player');
 }
 
 /** 校验 player 与判定牌存在(生效前/后 携带 cardId)。 */
 function validateJudgeTimingWithCard(state: GameState, atom: JudgeTimingAtom): string | null {
-  if (!state.players[atom.player]) return `player ${atom.player} not found`;
+  const err = requirePlayer(state, atom.player, 'player');
+  if (err) return err;
   if (atom.cardId !== undefined && !state.cardMap[atom.cardId]) return `card ${atom.cardId} not found`;
   return null;
 }
 
 /** 无 before hook 时静默(no-op 视图),有 before-hook 时发通知事件。 */
 function judgeTimingView(state: GameState, type: string, atom: JudgeTimingAtom): ViewEventSplit {
-  if (getBeforeHooks(state, type).length === 0) {
-    return { ownerViews: new Map(), othersView: null };
-  }
-  const view: ViewEvent = {
-    type,
-    player: atom.player,
-    judgeType: atom.judgeType,
-  };
-  if (atom.cardId !== undefined) view.cardId = atom.cardId;
-  return { ownerViews: new Map(), othersView: view };
+  return hookSilentView(state, type, () => {
+    const view: ViewEvent = {
+      type,
+      player: atom.player,
+      judgeType: atom.judgeType,
+    };
+    if (atom.cardId !== undefined) view.cardId = atom.cardId;
+    return view;
+  });
 }
 
 // ── 判定时(咒缚 before-hook modify:替换判定牌来源) ─────────

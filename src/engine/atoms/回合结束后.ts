@@ -15,18 +15,18 @@
 // after-hook,故额外回合型技能(博图)在其 before-hook cancel 本 atom 即可阻止正常推进、
 // 亲自启动额外回合(放权则在更早的 回合结束 before-hook cancel)。
 import type { AtomDefinition, ViewEventSplit } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 
 export const 回合结束后: AtomDefinition<{ player: number }> = {
   type: '回合结束后',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
-    return null;
+    return requirePlayer(state, atom.player, 'player');
   },
   apply() {},
   toViewEvents(): ViewEventSplit {
     // 纯后端时机标记,不下发视图事件:回合结束已下发回合结束信号,本时机的技能效果
     // (化身询问/博图额外回合)各自通过 请求回应/回合开始 等原子对前端表现。
-    return { ownerViews: new Map(), othersView: null };
+    return broadcast(null);
   },
   applyView() {},
 };

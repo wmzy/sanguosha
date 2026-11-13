@@ -12,13 +12,13 @@
 // 与 使用结算结束时 的区别:使用结算结束时 是逐目标时机(携带 target),
 // 使用结算结束后 是所有目标结算完毕后的整体时机(无 target,携带 source+cardId)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 import { getBeforeHooks, getAfterHooks } from '../core/skill';
 
 export const 使用结算结束后: AtomDefinition<{ source: number; cardId: string }> = {
   type: '使用结算结束后',
   validate(state, atom) {
-    if (!state.players[atom.source]) return `source ${atom.source} not found`;
-    return null;
+    return requirePlayer(state, atom.source, 'source');
   },
   apply() {},
   toViewEvents(state, atom): ViewEventSplit {
@@ -27,14 +27,14 @@ export const 使用结算结束后: AtomDefinition<{ source: number; cardId: str
       getBeforeHooks(state, '使用结算结束后').length === 0 &&
       getAfterHooks(state, '使用结算结束后').length === 0
     ) {
-      return { ownerViews: new Map(), othersView: null };
+      return broadcast(null);
     }
     const view: ViewEvent = {
       type: '使用结算结束后',
       source: atom.source,
       cardId: atom.cardId,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView() {},
 };

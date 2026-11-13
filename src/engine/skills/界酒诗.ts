@@ -41,7 +41,7 @@ import {
 } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界酒诗';
 const DISPLAY_NAME = '酒诗';
@@ -157,21 +157,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!self?.alive) return;
     if (!isFlipped(self.tags)) return; // 仅背面朝上时询问翻回
 
-    delete ctx.state.localVars[DAMAGE_FLIP_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: DAMAGE_FLIP_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '酒诗:受到伤害后,是否将武将牌翻至正面?',
-        confirmLabel: '翻至正面',
-        cancelLabel: '保持背面',
-      },
+    const flip = await askConfirm(ctx.state, DAMAGE_FLIP_RT, ownerId, {
+      confirmedKey: DAMAGE_FLIP_KEY,
+      title: '酒诗:受到伤害后,是否将武将牌翻至正面?',
+      confirmLabel: '翻至正面',
+      cancelLabel: '保持背面',
       defaultChoice: false,
       timeout: 10,
     });
-    const flip = ctx.state.localVars[DAMAGE_FLIP_KEY] === true;
     delete ctx.state.localVars[DAMAGE_FLIP_KEY];
     if (!flip) return;
 

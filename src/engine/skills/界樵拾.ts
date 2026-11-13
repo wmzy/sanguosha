@@ -17,11 +17,11 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界樵拾'(避开标版冲突);
 //   内部 Skill.name = '樵拾'(OL 官方技能名,玩家可见)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const SKILL_ID = '界樵拾';
 const DISPLAY_NAME = '樵拾';
@@ -52,20 +52,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── respond:owner 在「樵拾/confirm」询问下的选择(choice=true/false) ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      return requireRequestType(st, ownerId, [CONFIRM_RT], {
-        mismatchError: '当前不是樵拾确认',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_RT, CONFIRMED_KEY, {
+    mismatchError: '当前不是樵拾确认',
+  });
 
   // ── 阶段开始(回合结束 = 结束阶段) after-hook:任意玩家的结束阶段都触发 ──
   registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
@@ -85,22 +74,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (isDisabledThisRound(st, ownerId)) return;
 
     // 询问是否发动(非锁定技,默认不发动)
-    delete st.localVars[CONFIRMED_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动樵拾?(你与当前回合角色各摸一张牌;若手牌数不相等,本轮失效)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(st, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: '是否发动樵拾?(你与当前回合角色各摸一张牌;若手牌数不相等,本轮失效)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-
-    if (!st.localVars[CONFIRMED_KEY]) return;
+    if (!confirmed) return;
     delete st.localVars[CONFIRMED_KEY];
 
     // 各摸一张:owner + 当前回合角色(若同一人,只摸一张)

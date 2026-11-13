@@ -37,6 +37,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
+import { askConfirm } from '../util/skillRuntime';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
 
@@ -274,21 +275,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!hasOther) return;
 
       // 1. 询问是否发动
-      delete ctx.state.localVars[TRIGGER_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: RT_TRIGGER,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动眩惑?(交给一名其他角色两张牌)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const triggered = await askConfirm(ctx.state, RT_TRIGGER, ownerId, {
+        confirmedKey: TRIGGER_KEY,
+        title: '是否发动眩惑?(交给一名其他角色两张牌)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 10,
       });
-      if (ctx.state.localVars[TRIGGER_KEY] !== true) return;
+      if (!triggered) return;
 
       // 2. 法正选目标 X
       delete ctx.state.localVars[TARGET_KEY];

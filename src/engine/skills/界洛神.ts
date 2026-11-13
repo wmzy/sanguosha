@@ -27,6 +27,7 @@ import { frameCards } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import { getHandLimitBonus } from '../rules/vars-keys';
+import { askConfirm } from '../util/skillRuntime';
 
 /** turn.vars key:本回合经洛神获得的判定牌 id 列表(随「回合结束」自动清空) */
 const EXEMPT_VAR = '界洛神/豁免牌';
@@ -117,21 +118,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (ctx.state.zones.deck.length === 0) return; // 牌堆空:无法判定
 
     // 询问是否发动洛神
-    delete ctx.state.localVars['洛神/confirmed'];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '界洛神/confirm',
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动洛神?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const startConfirmed = await askConfirm(ctx.state, '界洛神/confirm', ownerId, {
+      confirmedKey: '洛神/confirmed',
+      title: '是否发动洛神?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (!ctx.state.localVars['洛神/confirmed']) return;
+    if (!startConfirmed) return;
 
     // 主循环:判定 → 黑色获得(记入豁免牌)→ 询问继续 → 重复;红色不获得直接停止
     let keepGoing = true;
@@ -162,23 +157,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
 
       // 询问是否继续
-      delete ctx.state.localVars['洛神/confirmed'];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: '界洛神/continue',
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '判定为黑色,是否继续洛神?',
-          confirmLabel: '继续',
-          cancelLabel: '停止',
-        },
+      // defaultChoice=true:超时(未设 localVars)按「继续」处理(askConfirm 未设键
+      // 回落 defaultChoice);玩家明确选择停止(confirmed===false)才退出,
+      // 与 洛神/制霸 defaultChoice=true 模式一致。
+      keepGoing = await askConfirm(ctx.state, '界洛神/continue', ownerId, {
+        confirmedKey: '洛神/confirmed',
+        title: '判定为黑色,是否继续洛神?',
+        confirmLabel: '继续',
+        cancelLabel: '停止',
         defaultChoice: true,
         timeout: 10,
       });
-      // defaultChoice=true:超时(未设 localVars)应按「继续」处理,
-      // 故仅在玩家明确选择停止(confirmed===false)时退出,与 洛神/制霸 defaultChoice=true 模式一致。
-      keepGoing = (ctx.state.localVars['洛神/confirmed'] as boolean | undefined) !== false;
     }
     delete ctx.state.localVars['洛神/confirmed'];
   });

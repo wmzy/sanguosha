@@ -30,13 +30,9 @@ import { applyAtom } from '../core/apply'
 import { currentJudgeCardId } from '../flows/judge';
 import { frameCards } from '../core/frame';
 import { flipFaceUpAll } from '../flows/face-down';
-import {
-  registerAction,
-  registerAfterHook,
-  registerBeforeHook,
-} from '../core/skill';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const _SKILL_ID = '界落英';
 const DISPLAY_NAME = '落英';
@@ -86,22 +82,14 @@ async function askAndGain(
   // 翻面增强:无距离限制且不能被响应(本实现无可观察行为,标版注释)
   // const flipped = self.tags.some((t) => t.endsWith('/翻面'));
 
-  delete state.localVars[CHOICE_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: CHOOSE_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: `落英:是否获得 ${clubCardIds.length} 张梅花牌?`,
-      confirmLabel: '获得',
-      cancelLabel: '不获得',
-    },
+  const want = await askConfirm(state, CHOOSE_RT, ownerId, {
+    confirmedKey: CHOICE_KEY,
+    title: `落英:是否获得 ${clubCardIds.length} 张梅花牌?`,
+    confirmLabel: '获得',
+    cancelLabel: '不获得',
     defaultChoice: false,
     timeout: 10,
   });
-
-  const want = state.localVars[CHOICE_KEY] === true;
   delete state.localVars[CHOICE_KEY];
   if (!want) return 0;
 
@@ -156,21 +144,14 @@ async function recordGainAndMaybeFlipBack(
   if (newCount < self.maxHealth) return;
 
   // 询问是否翻回正面
-  delete state.localVars['酒诗/flipChoice'];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: '界酒诗/flipBack',
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: `酒诗:回合外累计获得 ${newCount} 张"落英"牌(≥体力上限 ${self.maxHealth}),是否翻至正面?`,
-      confirmLabel: '翻至正面',
-      cancelLabel: '保持背面',
-    },
+  const flip = await askConfirm(state, '界酒诗/flipBack', ownerId, {
+    confirmedKey: '酒诗/flipChoice',
+    title: `酒诗:回合外累计获得 ${newCount} 张"落英"牌(≥体力上限 ${self.maxHealth}),是否翻至正面?`,
+    confirmLabel: '翻至正面',
+    cancelLabel: '保持背面',
     defaultChoice: false,
     timeout: 10,
   });
-  const flip = state.localVars['酒诗/flipChoice'] === true;
   delete state.localVars['酒诗/flipChoice'];
   if (!flip) return;
 
@@ -185,19 +166,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── respond:玩家在「落英/choose」询问下的选择 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (s): string | null =>
-      requireRequestType(s, ownerId, [CHOOSE_RT], {
-        mismatchError: '当前不是落英选择',
-      }).error,
-    async (s, params) => {
-      s.localVars[CHOICE_KEY] = params.choice === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CHOOSE_RT, CHOICE_KEY, {
+    mismatchError: '当前不是落英选择',
+  });
 
   // ── 弃置 after hook:其他玩家弃置的梅花牌入弃牌堆后 ──
   registerAfterHook(state, skill.id, ownerId, '弃置', async (ctx) => {

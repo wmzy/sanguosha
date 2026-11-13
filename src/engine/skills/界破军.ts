@@ -49,7 +49,7 @@ import { applyAtom } from '../core/apply'
 import { pushFrame, popFrame } from '../core/frame';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界破军';
 const DISPLAY_NAME = '破军';
@@ -187,21 +187,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     await pushFrame(ctx.state, SKILL_ID, ownerId, {});
     try {
       // ── 1. 询问发动 ──
-      delete ctx.state.localVars[LV_USE];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: RT_ASK_USE,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `是否发动破军?(将 ${targetPlayer.name} 至多 ${X} 张牌移出游戏直到回合结束)`,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const useConfirmed = await askConfirm(ctx.state, RT_ASK_USE, ownerId, {
+        confirmedKey: LV_USE,
+        title: `是否发动破军?(将 ${targetPlayer.name} 至多 ${X} 张牌移出游戏直到回合结束)`,
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 15,
       });
-      if (ctx.state.localVars[LV_USE] !== true) return;
+      if (useConfirmed !== true) return;
 
       // ── 2. 询问选 1~X 张牌 ──
       // 重新读取(防御 pending 期间状态变化)

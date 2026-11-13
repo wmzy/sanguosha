@@ -4,6 +4,7 @@
 import type { Card, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 import { instantiateSkill, unloadSkillInstance } from './lifecycle';
 import { DEFAULT_SKILLS } from '../atoms/选将';
 import { hasSkillModule } from './registry';
@@ -77,11 +78,12 @@ export function registerSystemRespondActions(state: GameState, ownerId: number):
       ownerId,
       'respond',
       (state: GameState, params: Record<string, Json>) => {
-        const slot = state.pendingSlots.get(ownerId);
-        if (!slot) return '当前不需要回应';
-        if (slot.atom.type !== '请求回应') return '当前不是弃牌窗口';
-        const atom = slot.atom as { requestType?: string; target: number };
-        if (atom.requestType !== '__弃牌') return '当前不是弃牌窗口';
+        const check = requireRequestType(state, ownerId, ['__弃牌'], {
+          wrongTypeError: '当前不是弃牌窗口',
+          mismatchError: '当前不是弃牌窗口',
+        });
+        if (check.error) return check.error;
+        const atom = state.pendingSlots.get(ownerId)!.atom as { target: number };
         if (atom.target !== ownerId) return '不是你的弃牌回合';
         const cardIds = params.cardIds;
         if (!Array.isArray(cardIds)) return 'cardIds required';

@@ -9,13 +9,11 @@ import type {
   FrontendAPI,
   GameState,
   HookResult,
-  Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../core/apply';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
-import { registerAction, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { registerBeforeHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '英姿/confirm';
 
@@ -32,20 +30,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── confirm respond:周瑜本人回应是否发动英姿 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      return requireRequestType(st, ownerId, [CONFIRM_REQUEST], {
-        mismatchError: '当前不是英姿确认',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars['英姿/confirmed'] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_REQUEST, '英姿/confirmed', {
+    mismatchError: '当前不是英姿确认',
+  });
 
   // ── 摸牌 before hook:摸牌阶段询问,发动则额外摸一张 ──
   registerBeforeHook(
@@ -64,21 +51,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (usedThisTurn(ctx.state, ownerId, '英姿')) return; // 本回合已发动
 
       // 询问是否发动
-      delete ctx.state.localVars['英姿/confirmed'];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_REQUEST,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动英姿?(额外摸一张牌)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
+        confirmedKey: '英姿/confirmed',
+        title: '是否发动英姿?(额外摸一张牌)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 15,
       });
-      if (!ctx.state.localVars['英姿/confirmed']) return;
+      if (!confirmed) return;
 
       // 发动:限一次标记(防 dispatch 重入),modify 额外摸一张
       await markOncePerTurn(ctx.state, ownerId, '英姿');

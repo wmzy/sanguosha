@@ -56,6 +56,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
 import { getCharacterMeta } from '../data/character-meta';
 import { HUASHEN_POOL_KEY as POOL_KEY, getHuashenPool } from '../rules/vars-keys';
+import { askConfirm } from '../util/skillRuntime';
 
 // ── 角色分派 ──
 const JIE_CHAR = '界左慈';
@@ -348,22 +349,14 @@ async function offerSwitch(state: GameState, ownerId: number): Promise<void> {
   const pool = getHuashenPool(player.vars);
   if (!pool || pool.length < 2) return; // 不足两张无法更换
 
-  delete state.localVars[SWITCH_CHOICE_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: SWITCH_REQUEST,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: '化身:是否更改化身牌?',
-      confirmLabel: '更改',
-      cancelLabel: '不更改',
-    },
+  const choice = await askConfirm(state, SWITCH_REQUEST, ownerId, {
+    confirmedKey: SWITCH_CHOICE_KEY,
+    title: '化身:是否更改化身牌?',
+    confirmLabel: '更改',
+    cancelLabel: '不更改',
     defaultChoice: false,
     timeout: 30,
   });
-  const choice = state.localVars[SWITCH_CHOICE_KEY];
-  delete state.localVars[SWITCH_CHOICE_KEY];
   if (choice !== true) return;
 
   // 另一张化身牌须有可选技能;否则放弃切换并保留当前技能

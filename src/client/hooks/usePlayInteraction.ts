@@ -48,6 +48,10 @@ import {
   extractCardFilter,
   ownEquipCards,
   choosePlayerCandidates,
+  selectTargetCandidates,
+  distributeAllocateCandidates,
+  effectiveTargetCard,
+  promptTargetBounds,
 } from '../utils/gameViewHelpers';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
 import { targetCandidates, targetSelectionBounds, toggleTargetSelection, validateTargetSelection } from '../../engine/rules/target-selection';
@@ -563,8 +567,8 @@ export function usePlayInteraction(
         const p = pendingSkillAction.action.prompt;
         if (!view.players[i]?.alive) return false;
         if (p.type === 'selectTarget') {
-          if (i === perspectiveIdx && !p.targetFilter.allowSelf) return false;
-          return p.targetFilter.filter ? p.targetFilter.filter(view, i) : true;
+          // 候选解析与无头枚举共享 selectTargetCandidates(存活 + allowSelf + filter)
+          return selectTargetCandidates(view, perspectiveIdx, p).includes(i);
         }
         if (p.type === 'choosePlayer') {
           // 候选解析与无头枚举共享 choosePlayerCandidates(candidates 优先,filter 兜底)
@@ -575,10 +579,9 @@ export function usePlayInteraction(
         const mode = activeDistribute.prompt.mode ?? 'allocate';
         // 制衡(select)无目标选择
         if (mode === 'select') return false;
-        if (!activeDistribute.prompt.allowSelf && i === perspectiveIdx) return false;
-        if (activeDistribute.prompt.targetFilter && !activeDistribute.prompt.targetFilter(view, i))
-          return false;
-        return view.players[i]?.alive === true;
+        // 候选判定与无头枚举/distribute 点座位共享 distributeAllocateCandidates
+        // (存活 + allowSelf + targetFilter)
+        return distributeAllocateCandidates(view, perspectiveIdx, activeDistribute.prompt).includes(i);
       }
       const tf = isMyAwaiting && respondTargetFilter ? respondTargetFilter : selectedTargetFilter;
       if (!tf) return !!view.players[i]?.alive;
@@ -587,19 +590,17 @@ export function usePlayInteraction(
         : selectedTarget ? [selectedTarget] : [];
       const selected = isMyAwaiting && respondTargetFilter ? respondTargets : names.map((name) => view.players.findIndex((player) => player.name === name));
       if (selected.includes(i)) return true;
-      // 目标约束的 card 参数只在「这张牌就是正在使用的牌」时有意义:
-      //   · 回应窗口(出闪/出杀)用的是正在打出的牌;
-      //   · 主动出牌 useCard 型(杀本体)/ 有转化产出牌名时同理;
-      //   · useCardAndTarget 但无产出名(离间 弃一张牌 + 选两名男性)里的选中牌是代价牌,
-      //     不能按杀的动态目标上限解释(否则上限塌成 1,永远提交不出合法目标数)。
-      const usingSelected = !selectedTargetFilter
-        || !!transformWrapperName
-        || selectedCard?.name === '杀';
+      // 目标约束的 card 参数与无头枚举共享 effectiveTargetCard(杀的动态目标上限
+      // 只对「正在使用的牌」生效,代价牌不算,判据见该函数);回应窗口用的则是
+      // 正在打出的牌(respondCard)。usedCardName:转化技传产出牌名;普通出牌
+      // 按「use action 的 skillId 就是选中牌名」认定选中牌为使用牌;代价牌 null。
+      const usedCardName = transformWrapperName
+        ?? (selectedUseAction && selectedUseAction.skillId === selectedCard?.name
+          ? selectedCard.name
+          : null);
       const card = isMyAwaiting && respondTargetFilter
         ? respondCard
-        : selectedCard && usingSelected
-          ? { ...selectedCard, name: transformWrapperName ?? selectedCard.name }
-          : undefined;
+        : effectiveTargetCard(selectedCard, selectedTargetFilter, usedCardName);
       const { max } = targetSelectionBounds(view, perspectiveIdx, tf, card);
       const prefix = !tf.slots?.length && max === 1 ? [] : selected;
       return prefix.length < max && targetCandidates(view, perspectiveIdx, tf, prefix, card).includes(i);
@@ -610,6 +611,7 @@ export function usePlayInteraction(
       perspectiveIdx,
       view,
       selectedTargetFilter,
+      selectedUseAction,
       selectedTarget,
       playRules,
       selectedMultiTargets,
@@ -691,12 +693,7 @@ export function usePlayInteraction(
       // 主动技选目标模式:单选技能(挑衅/强袭/反间 等 max=1)点座位即提交,无需再点按钮
       if (pendingSkillAction) {
         const p = pendingSkillAction.action.prompt;
-        const maxTargets =
-          p.type === 'selectTarget'
-            ? (p.targetFilter.max ?? 1)
-            : p.type === 'choosePlayer'
-              ? (p.max ?? 1)
-              : 1;
+        const { max: maxTargets } = promptTargetBounds(p);
         if (maxTargets <= 1) {
           submitSkillTarget(pendingSkillAction.action, name, pendingSkillAction.params);
           return;
@@ -762,8 +759,7 @@ export function usePlayInteraction(
       // (座位环按 prompt 的 targetFilter/filter 高亮),选好目标再点按钮提交——
       // 与出牌(选牌→选目标→出牌)同一交互范式。此前无目标直接 return,按钮点了没反应。
       if (prompt.type === 'selectTarget' || prompt.type === 'choosePlayer') {
-        const maxTargets =
-          prompt.type === 'selectTarget' ? (prompt.targetFilter.max ?? 1) : (prompt.max ?? 1);
+        const { max: maxTargets } = promptTargetBounds(prompt);
         if (!selectedTarget) {
           // 未选目标:进入选目标模式(座位环按 prompt 的 targetFilter/filter 高亮)
           setPendingSkillAction({ action, params });

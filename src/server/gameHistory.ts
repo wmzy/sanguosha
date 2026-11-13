@@ -24,6 +24,7 @@ import { ReplayRecorder } from '../client/replay/recorder';
 import { eventsForViewer } from '../engine/view/events-for-viewer';
 import type { ReplayFile, ReplayMeta, SeatDelta } from '../client/replay/types';
 import type { GameState, GameView } from '../engine/types';
+import { identityCamp } from '../engine/rules/camp';
 
 const log = createLogger('gameHistory');
 
@@ -81,13 +82,9 @@ export interface GameHistoryEntry {
   hasReplay: boolean;
 }
 
-/** 身份 → 阵营(与前端 GameResultOverlay.identityCamp 语义一致) */
-export function identityCamp(identity: string | undefined): '主公方' | '反贼' | '内奸' | null {
-  if (identity === '主公' || identity === '忠臣') return '主公方';
-  if (identity === '反贼') return '反贼';
-  if (identity === '内奸') return '内奸';
-  return null;
-}
+/** 身份 → 阵营:单一来源在 engine/rules/camp.ts(与前端 GameResultOverlay 共用)。
+ *  此处 re-export 保留本模块既有导入面(服务端调用方与单测)。 */
+export { identityCamp };
 
 // ── 纯构造函数(供 session 调用 + 单测) ──
 

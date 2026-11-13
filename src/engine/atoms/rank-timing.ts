@@ -13,7 +13,7 @@
 //   拼点后(纯标记 atom):validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
 //     无 before hook 时 toViewEvents 返回 null(与 damage-timing / move-timing 一致)。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent, Card } from '../types';
-import { getBeforeHooks } from '../core/skill';
+import { broadcast, hookSilentView, requirePlayer, viewPlayer } from './_helpers';
 
 /** 拼点时机 atom 的公共形状(扣置/亮出)。 */
 type RankCompareAtom = {
@@ -25,9 +25,9 @@ type RankCompareAtom = {
 
 /** 校验 initiator/target 玩家存在(纯标记视角;不校验存活/手牌——编排函数前置保证)。 */
 function validateRankCompare(state: GameState, atom: RankCompareAtom): string | null {
-  if (!state.players[atom.initiator]) return `initiator ${atom.initiator} not found`;
-  if (!state.players[atom.target]) return `target ${atom.target} not found`;
-  return null;
+  const err = requirePlayer(state, atom.initiator, 'initiator');
+  if (err) return err;
+  return requirePlayer(state, atom.target, 'target');
 }
 
 function cardFace(card: Card | undefined): { name: string; suit: string; rank: string } | null {
@@ -90,11 +90,11 @@ export const 拼点扣置: AtomDefinition<RankCompareAtom> = {
     const targetCard = event.targetCard as string;
     // 双方各从手牌移除一张(handCount -1 + 按 cardId 精确过滤)
     const removeOne = (playerIdx: number, cardId: string): void => {
-      const pi = view.players.findIndex((p) => p.index === playerIdx);
-      if (pi < 0) return;
-      view.players[pi].handCount = Math.max(0, view.players[pi].handCount - 1);
-      if (cardId && view.players[pi].hand) {
-        view.players[pi].hand = view.players[pi].hand.filter((c: Card) => c.id !== cardId);
+      const p = viewPlayer(view, playerIdx);
+      if (!p) return;
+      p.handCount = Math.max(0, p.handCount - 1);
+      if (cardId && p.hand) {
+        p.hand = p.hand.filter((c: Card) => c.id !== cardId);
       }
     };
     removeOne(initiator, initiatorCard);
@@ -148,7 +148,7 @@ export const 拼点亮出: AtomDefinition<RankCompareAtom> = {
       targetCardFace: cardFace(state.cardMap[atom.targetCard]),
       effect: { sound: 'flip', animation: 'flip', duration: 600 },
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView() {
     // no-op:处理区在 view 中只投影 cardId(牌面不持久化);亮出是一次性广播事件。
@@ -177,25 +177,17 @@ export const 拼点后: AtomDefinition<{
   result: '赢' | '没赢';
 }> = {
   type: '拼点后',
-  validate(state, atom) {
-    if (!state.players[atom.initiator]) return `initiator ${atom.initiator} not found`;
-    if (!state.players[atom.target]) return `target ${atom.target} not found`;
-    return null;
-  },
+  validate: validateRankCompare,
   apply() {},
   toViewEvents(state, atom): ViewEventSplit {
-    if (getBeforeHooks(state, '拼点后').length === 0) {
-      return { ownerViews: new Map(), othersView: null };
-    }
-    const view: ViewEvent = {
+    return hookSilentView(state, '拼点后', () => ({
       type: '拼点后',
       initiator: atom.initiator,
       target: atom.target,
       initiatorCard: atom.initiatorCard,
       targetCard: atom.targetCard,
       result: atom.result,
-    };
-    return { ownerViews: new Map(), othersView: view };
+    }));
   },
   applyView() {},
 };

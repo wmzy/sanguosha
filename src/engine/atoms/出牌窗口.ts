@@ -4,6 +4,7 @@
 // 每次操作都 resolve 当前窗口(回合管理的 IIFE 循环重建它)。超时则结束回合。
 // isBlocking=false 让 hasBlockingPending / 前端 isPerspectiveAwaiting 跳过它。
 import type { AtomDefinition, ViewEventSplit } from '../types';
+import { broadcast } from './_helpers';
 import { applyAtom } from '../core/apply';
 
 const DEFAULT_TIMEOUT_SEC = 50;
@@ -30,6 +31,6 @@ export const 出牌窗口: AtomDefinition<{ player: number; timeout?: number }> 
   },
   effect: { blockUntilDone: true, duration: 200 },
   toViewEvents(_state, atom): ViewEventSplit {
-    return { ownerViews: new Map(), othersView: { type: '出牌窗口', player: atom.player } };
+    return broadcast({ type: '出牌窗口', player: atom.player });
   },
 };

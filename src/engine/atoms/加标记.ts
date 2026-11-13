@@ -1,6 +1,7 @@
 // src/engine/atoms/加标记.ts
 // 加标记:为玩家添加一个 Mark
 import type { AtomDefinition, Mark, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 import { mergeDistanceVars, type DistanceVarsDelta } from './distance-vars';
 
 export const 加标记: AtomDefinition<{
@@ -10,8 +11,7 @@ export const 加标记: AtomDefinition<{
 }> = {
   type: '加标记',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
-    return null;
+    return requirePlayer(state, atom.player, 'player');
   },
   apply(state, atom) {
     state.players[atom.player].marks.push(atom.mark);
@@ -28,15 +28,15 @@ export const 加标记: AtomDefinition<{
     if (atom.distanceVars) {
       view.distanceVars = atom.distanceVars;
     }
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(view, event) {
-    const pi = view.players.findIndex((p) => p.index === (event.player as number));
-    if (pi < 0) return;
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
     const mark = event.mark as Mark | undefined;
-    if (mark) view.players[pi].marks.push(mark);
+    if (mark) p.marks.push(mark);
     // 距离修正 view 同步(技能如屯田加田时携带)
-    mergeDistanceVars(view.players[pi], event.distanceVars as DistanceVarsDelta | undefined);
+    mergeDistanceVars(p, event.distanceVars as DistanceVarsDelta | undefined);
   },
 };
 

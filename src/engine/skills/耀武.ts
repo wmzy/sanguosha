@@ -25,6 +25,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const CHOICE_RT = '耀武/选择';
@@ -57,11 +58,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
         pid,
         'respond',
         (st: GameState, params: Record<string, Json>): string | null => {
-          const slot = st.pendingSlots.get(pid);
-          if (!slot) return '当前不需要回应';
-          if (slot.atom.type !== '请求回应') return '当前不需要回应';
-          const reqType = (slot.atom as { requestType?: string }).requestType;
-          if (reqType !== CHOICE_RT) return '当前不是耀武选择';
+          const check = requireRequestType(st, pid, [CHOICE_RT], {
+            mismatchError: '当前不是耀武选择',
+          });
+          if (check.error) return check.error;
           const opt = params.option;
           if (opt !== OPT_RECOVER && opt !== OPT_DRAW) return '请选择回复体力或摸牌';
           return null;

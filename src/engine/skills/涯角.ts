@@ -24,7 +24,7 @@ import { peekTop } from '../core/deck';
 import { inAttackRange } from '../rules/distance';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType } from '../util/skillRuntime';
 
 /** localVars keys */
 const CONFIRMED_KEY = '涯角/confirmed';
@@ -104,21 +104,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (deck.length === 0) return;
 
     // ── 第一步:询问是否发动涯角 ──
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动涯角?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: '是否发动涯角?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+    if (!confirmed) return;
 
     // ── 第二步:展示牌堆顶牌(广播身份给所有人) ──
     const topCardId = peekTop(ctx.state);

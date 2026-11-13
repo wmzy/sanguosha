@@ -4,12 +4,12 @@
 // 仅经过声明→生效两步;本时机是声明阶段的转化/替换点。
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 
 export const 声明打出时: AtomDefinition<{ player: number; cardId: string }> = {
   type: '声明打出时',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
-    return null;
+    return requirePlayer(state, atom.player, 'player');
   },
   apply() {
     // 事件标记——转化技可经 before hook modify 替换打出的牌
@@ -23,7 +23,7 @@ export const 声明打出时: AtomDefinition<{ player: number; cardId: string }>
       cardId: atom.cardId,
       cardName,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView() {
     // 事件标记——无 GameView 字段需要直接更新(转化由后续打出/响应 atom 体现)。

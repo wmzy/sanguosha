@@ -13,8 +13,8 @@
 // 摸一张牌无此问题,在受伤害 hook 内直接 摸牌 count=1(先摸后延迟获得,结果与官方语序一致)。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { registerAfterHook } from '../core/skill';
+import { askConfirm, effectiveCardId, registerConfirmRespond } from '../util/skillRuntime';
 
 const CHOOSE_RT = '界奸雄/choose';
 const WANTCARD_KEY = '奸雄/wantCard';
@@ -33,19 +33,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // respond:玩家在「奸雄/choose」询问下的选择(choice=true/false)
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (s): string | null =>
-      requireRequestType(s, ownerId, [CHOOSE_RT], {
-        mismatchError: '当前不是奸雄选择',
-      }).error,
-    async (s, params) => {
-      s.localVars[CHOICE_KEY] = params.choice === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CHOOSE_RT, CHOICE_KEY, {
+    mismatchError: '当前不是奸雄选择',
+  });
 
   // 造成伤害 after:曹操受伤后询问是否发动(两项:摸一张 + 获得伤害牌)
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
@@ -61,27 +51,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 转化影子卡(武圣红牌当杀等):影子卡入弃牌堆时引擎用原卡(shadowOf)替换并删除影子,
     // 须记录原卡 id 才能在弃牌堆中找到并拿取(同标奸雄/界双雄)
     const effectiveId: string = hasCard
-      ? (ctx.state.cardMap[damageCardId].shadowOf ?? damageCardId)
+      ? effectiveCardId(ctx.state, damageCardId)
       : (damageCardId as string);
 
-    delete ctx.state.localVars[CHOICE_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CHOOSE_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: hasCard
-          ? '界奸雄:是否发动?(摸一张牌并获得造成此伤害的牌)'
-          : '界奸雄:是否发动?(无伤害牌可获得,仅摸一张牌)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const choice = await askConfirm(ctx.state, CHOOSE_RT, ownerId, {
+      confirmedKey: CHOICE_KEY,
+      title: hasCard
+        ? '界奸雄:是否发动?(摸一张牌并获得造成此伤害的牌)'
+        : '界奸雄:是否发动?(无伤害牌可获得,仅摸一张牌)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-
-    const choice = ctx.state.localVars[CHOICE_KEY] === true;
     if (!choice) {
       delete ctx.state.localVars[CHOICE_KEY];
       return;

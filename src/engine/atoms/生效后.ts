@@ -6,12 +6,12 @@
 //
 // 事件标记型——apply 无副作用,效果执行由 CardEffect.resolve 完成。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 
 export const 生效后: AtomDefinition<{ source: number; target: number; cardId: string }> = {
   type: '生效后',
   validate(state, atom) {
-    if (!state.players[atom.target]) return `target ${atom.target} not found`;
-    return null;
+    return requirePlayer(state, atom.target, 'target');
   },
   apply() {
     // 纯时机型 atom:效果由 CardEffect.resolve 执行
@@ -25,7 +25,7 @@ export const 生效后: AtomDefinition<{ source: number; target: number; cardId:
       cardId: atom.cardId,
       cardName,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView() {},
 };

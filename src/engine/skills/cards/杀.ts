@@ -17,6 +17,7 @@ import { viewCanAttack } from '../../rules/viewDistance';
 import { incSlashUsed, isSlashExempted } from '../../rules/slash-quota';
 import { slashTargetMax } from '../../rules/slash-target';
 import { defaultPlayActive, viewCanSlash } from '../../rules/action-active';
+import { isAskedKillSlot } from '../../util/skillRuntime';
 import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 杀的合法性追加检测：仅校验目标在攻击范围内。
@@ -77,12 +78,7 @@ export const slashEffect: CardEffect = {
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
-      const atomType = slot.atom.type;
-      const reqType = (slot.atom as { requestType?: string }).requestType;
-      const pendingMatches =
-        atomType === '询问杀' ||
-        (atomType === '请求回应' && reqType === '杀/respondKill');
-      if (!pendingMatches) return '当前不是出杀的窗口';
+      if (!isAskedKillSlot(slot)) return '当前不是出杀的窗口';
       const cardId = params.cardId as string | undefined;
       if (cardId) {
         const self = state.players[ownerId];

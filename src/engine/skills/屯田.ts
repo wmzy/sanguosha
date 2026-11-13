@@ -27,13 +27,13 @@ import type {
   AtomAfterContext,
   FrontendAPI,
   GameState,
-  Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import { DISTANCE_ATTACK_MOD_KEY } from '../rules/vars-keys';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '屯田/confirm';
 const CONFIRMED_KEY = '屯田/confirmed';
@@ -72,23 +72,11 @@ export function registerTunTianConfirmRespond(
   ownerId: number,
   confirmRt: string,
 ): void {
-  registerAction(
-    state,
-    skillId,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      if (atom['requestType'] !== confirmRt) return '当前不是屯田确认';
-      return null;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  // 错误文案与原手写校验逐字一致:无 slot/非 请求回应 → '当前不需要回应',
+  // requestType 不匹配 → '当前不是屯田确认'(requireRequestType 默认值同源)。
+  registerConfirmRespond(state, skillId, ownerId, confirmRt, CONFIRMED_KEY, {
+    mismatchError: '当前不是屯田确认',
+  });
 }
 
 /**
@@ -158,22 +146,16 @@ export async function askAndJudgeTunTian(
   // 牌堆空:无法判定,跳过
   if (ctx.state.zones.deck.length === 0) return;
 
-  // 询问是否发动
-  delete ctx.state.localVars[CONFIRMED_KEY];
-  await applyAtom(ctx.state, {
-    type: '请求回应',
-    requestType: confirmRt,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title,
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+  // 询问是否发动(askConfirm 读后不删确认键:下方判定的 after hook 仍要读它)
+  const confirmed = await askConfirm(ctx.state, confirmRt, ownerId, {
+    confirmedKey: CONFIRMED_KEY,
+    title,
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
     defaultChoice: false,
     timeout: 10,
   });
-  if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+  if (!confirmed) return;
 
   // 判定(判定 after hook 会读取 CONFIRMED_KEY 并完成拿牌/加田)
   await runJudgeFlow(ctx.state, ownerId, '屯田');

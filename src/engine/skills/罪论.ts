@@ -23,7 +23,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '罪论';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -182,21 +182,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const gainCount = Math.min(x, drawCount);
 
     // 1. 询问是否发动
-    delete st.localVars[CONFIRM_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `是否发动罪论?(满足 ${x} 项,获得 ${gainCount} 张)`,
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(st, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: `是否发动罪论?(满足 ${x} 项,获得 ${gainCount} 张)`,
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!st.localVars[CONFIRM_KEY]) {
+    if (!confirmed) {
       delete st.localVars[CONFIRM_KEY];
       return;
     }

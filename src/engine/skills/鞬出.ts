@@ -33,6 +33,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 
 const TAG = '鞬出/禁闪';
 const CONFIRM = '鞬出/confirmed';
@@ -197,21 +198,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     }
 
     // 询问庞德是否发动鞬出("你可以"——可选)
-    delete ctx.state.localVars[CONFIRM];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '鞬出/confirm',
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '鞬出:是否弃置目标一张牌?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, '鞬出/confirm', ownerId, {
+      confirmedKey: CONFIRM,
+      title: '鞬出:是否弃置目标一张牌?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!ctx.state.localVars[CONFIRM]) return;
+    if (!confirmed) return;
 
     // 目标自选弃一张牌
     await askTargetToDiscard(ctx.state, target, atom.cardId);

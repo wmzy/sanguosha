@@ -1,13 +1,12 @@
 // src/engine/atoms/指定目标.ts
 // 指定目标:事件标记(目标关系在事件流中记录)
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 
 export const 指定目标: AtomDefinition<{ source: number; cardId?: string; target: number }> = {
   type: '指定目标',
   validate(state, atom) {
-    if (!state.players[atom.source]) return `source ${atom.source} not found`;
-    if (!state.players[atom.target]) return `target ${atom.target} not found`;
-    return null;
+    return requirePlayer(state, atom.source, 'source') ?? requirePlayer(state, atom.target, 'target');
   },
   apply(_state) {
     // 事件标记——目标关系在事件流中记录
@@ -22,7 +21,7 @@ export const 指定目标: AtomDefinition<{ source: number; cardId?: string; tar
       ...(atom.cardId !== undefined ? { cardId: atom.cardId } : {}),
       ...(cardName !== undefined ? { cardName } : {}),
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView(_view, _event) {
     // 事件标记——目标关系在事件流中记录,前端 highlight 通过 effect 动画展示。

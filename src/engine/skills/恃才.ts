@@ -20,16 +20,21 @@
 //   eligible 追踪:turn.vars['恃才/待触发'] = string[](待触发的 cardId effective id)。
 //   均随 turn.vars 在回合结束自动清空。
 //
-// 转化牌(影子卡):effectiveId = card.shadowOf ?? cardId。使用时与使用结算结束后
-//   均用 effectiveId 关联;弃牌堆中影子卡已被引擎还原为原卡,用 effectiveId 查找。
+// 转化牌(影子卡):effectiveId = card.shadowOf ?? cardId(skillRuntime.effectiveCardId)。
+//   使用时与使用结算结束后均用 effectiveId 关联;弃牌堆中影子卡已被引擎还原为原卡,
+//   用 effectiveId 查找。
 //
 // 范围:owner 使用的所有牌(主动使用 + 被迫使用如逼杀;respond 出闪亦走 runUseFlow
 //   → 使用时,故防守出闪也可触发)。source===ownerId 判定。
-import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { EquipSlot, FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import {
+  askConfirm,
+  effectiveCardId,
+  registerConfirmRespond,
+} from '../util/skillRuntime';
 
 const SKILL_ID = '恃才';
 /** turn.vars:本回合已占用的牌类型(string[])。 */
@@ -42,12 +47,6 @@ const CONFIRM_KEY = '恃才/confirmed';
 const EFFECTIVE_ID_KEY = '恃才/effectiveCardId';
 /** 询问 requestType(T1:前缀 = skillId)。 */
 const CONFIRM_RT = '恃才/confirm';
-
-/** 计算牌的有效 id(转化牌用原卡 id)。 */
-function effectiveIdOf(state: GameState, cardId: string): string {
-  const card = state.cardMap[cardId];
-  return card?.shadowOf ?? cardId;
-}
 
 /** 在 owner 装备区查找 cardId 所在槽位。 */
 function findEquipSlot(state: GameState, ownerId: number, cardId: string): EquipSlot | null {
@@ -72,20 +71,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── respond:恃才发动确认(恃才/confirm) ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>): string | null => {
-      return requireRequestType(st, ownerId, [CONFIRM_RT], {
-        mismatchError: '当前不是恃才询问',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_RT, CONFIRM_KEY, {
+    mismatchError: '当前不是恃才询问',
+  });
 
   // ── 使用时 after-hook:首次使用某类型 → 占用类型 + 标记 eligible ──
   registerAfterHook(state, skill.id, ownerId, '使用时', async (ctx) => {
@@ -100,15 +88,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     used.push(type);
     ctx.state.turn.vars[USED_TYPES_VAR] = used;
     const pending = (ctx.state.turn.vars[PENDING_VAR] as string[] | undefined) ?? [];
-    pending.push(effectiveIdOf(ctx.state, atom.cardId));
+    pending.push(effectiveCardId(ctx.state, atom.cardId));
     ctx.state.turn.vars[PENDING_VAR] = pending;
     // 影子卡(转化牌)入弃牌堆时被引擎还原为原卡并删除影子条目——结算结束后
-    // effectiveIdOf 将无法反查。趁影子仍在,把实体原卡 id 记入当前结算帧参数。
+    // effectiveCardId 将无法反查。趁影子仍在,把实体原卡 id 记入当前结算帧参数。
     await applyAtom(ctx.state, {
       type: '帧参数赋值',
       frameIndex: ctx.state.settlementStack.indexOf(ctx.frame),
       key: EFFECTIVE_ID_KEY,
-      value: card.shadowOf ?? atom.cardId,
+      value: effectiveCardId(ctx.state, atom.cardId),
     });
   });
 
@@ -123,28 +111,22 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // 无记录(如纯虚拟使用)回退 cardMap 反查
     const effectiveId =
       (ctx.frame.params[EFFECTIVE_ID_KEY] as string | undefined) ??
-      effectiveIdOf(ctx.state, atom.cardId);
+      effectiveCardId(ctx.state, atom.cardId);
     const pending = (ctx.state.turn.vars[PENDING_VAR] as string[] | undefined) ?? [];
     if (!pending.includes(effectiveId)) return; // 非首次使用此类型,不触发
     // 移除 eligible 标记(无论是否发动,本类型本回合不再触发)
     ctx.state.turn.vars[PENDING_VAR] = pending.filter((id) => id !== effectiveId);
 
     // 询问是否发动
-    delete ctx.state.localVars[CONFIRM_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动恃才?(将此牌置于牌堆顶,然后摸一张牌)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: '是否发动恃才?(将此牌置于牌堆顶,然后摸一张牌)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (ctx.state.localVars[CONFIRM_KEY] !== true) {
+    if (confirmed !== true) {
       delete ctx.state.localVars[CONFIRM_KEY];
       return;
     }

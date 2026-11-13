@@ -28,6 +28,7 @@
 //   内部 Skill.name = '醇醪'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { registerAction, registerAfterHook, declareAlternativeResponse } from '../core/skill';
+import { requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界醇醪';
 const DISPLAY_NAME = '醇醪';
@@ -122,9 +123,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const slot = s.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       if ((slot.atom as { target?: number }).target !== ownerId) return '不是问你的';
-      if (slot.atom.type !== '请求回应') return '当前不是求桃';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType;
-      if (rt !== '桃/求桃') return '当前不是求桃';
+      const check = requireRequestType(s, ownerId, ['桃/求桃'], {
+        wrongTypeError: '当前不是求桃',
+        mismatchError: '当前不是求桃',
+      });
+      if (check.error) return check.error;
       // 计算 X 并校验醇数
       const x = computeX(s, ownerId);
       const list = getAleTokenIds(s, ownerId);

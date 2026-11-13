@@ -24,7 +24,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType } from '../util/skillRuntime';
 
 const CONFIRM_RT = '飘零/confirm';
 const GIVE_RT = '飘零/give';
@@ -103,21 +103,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (ctx.state.zones.deck.length === 0) return; // 牌堆空:无法判定
 
     // 1. 询问是否判定
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动飘零判定?',
-        confirmLabel: '判定',
-        cancelLabel: '不判定',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: '是否发动飘零判定?',
+      confirmLabel: '判定',
+      cancelLabel: '不判定',
       defaultChoice: false,
       timeout: 10,
     });
-    if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+    if (!confirmed) return;
 
     // 2. 判定
     await runJudgeFlow(ctx.state, ownerId, '飘零');
@@ -131,21 +125,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (card?.suit !== '♥') return;
 
     // 4. 红桃:询问是否交给一名角色(确认=交给,取消=置牌堆顶)
-    delete ctx.state.localVars[GIVE_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: GIVE_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '飘零:将判定牌交给一名角色?(否则置于牌堆顶)',
-        confirmLabel: '交给角色',
-        cancelLabel: '置牌堆顶',
-      },
+    const wantGive = await askConfirm(ctx.state, GIVE_RT, ownerId, {
+      confirmedKey: GIVE_KEY,
+      title: '飘零:将判定牌交给一名角色?(否则置于牌堆顶)',
+      confirmLabel: '交给角色',
+      cancelLabel: '置牌堆顶',
       defaultChoice: false,
       timeout: 15,
     });
-    const wantGive = ctx.state.localVars[GIVE_KEY] === true;
     delete ctx.state.localVars[GIVE_KEY];
 
     if (!wantGive) {

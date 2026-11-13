@@ -28,6 +28,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { instantiateSkill } from './lifecycle';
 import { hasSkillModule } from './registry';
 import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
+import { askConfirm } from '../util/skillRuntime';
 
 // ── 效果①:装备→无懈可击 转化 ──
 const SHADOW_SUFFIX = '解围';
@@ -316,21 +317,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ctx.state.localVars[MOVING_FLAG] = true;
     try {
       // 步骤 1:确认是否发动
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '解围:是否弃置一张牌移动场上的一张牌?',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: '解围:是否弃置一张牌移动场上的一张牌?',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 15,
       });
-      if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+      if (!confirmed) return;
 
       // 步骤 2:选弃置的手牌
       delete ctx.state.localVars[DISCARD_KEY];

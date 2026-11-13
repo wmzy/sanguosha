@@ -40,6 +40,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const BASE_VAR = '界再起/base'; // turn.vars:本回合弃牌堆基线长度
@@ -174,22 +175,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const maxTargets = Math.min(x, aliveCount);
 
       // 1) 询问孟获是否发动(描述"你可以"= 可选)
-      delete st.localVars[TRIGGER_CONFIRMED_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: TRIGGER_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `界再起:本回合置入弃牌堆 ${x} 张红色牌。是否令至多 ${maxTargets} 名角色各选一项?`,
-          description: '选项:1.摸一张牌;2.令孟获回复1点体力',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(st, TRIGGER_RT, ownerId, {
+        confirmedKey: TRIGGER_CONFIRMED_KEY,
+        title: `界再起:本回合置入弃牌堆 ${x} 张红色牌。是否令至多 ${maxTargets} 名角色各选一项?`,
+        description: '选项:1.摸一张牌;2.令孟获回复1点体力',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 20,
       });
-      const confirmed = st.localVars[TRIGGER_CONFIRMED_KEY] === true;
       delete st.localVars[TRIGGER_CONFIRMED_KEY];
       if (!confirmed) return; // 不发动 / 超时
 

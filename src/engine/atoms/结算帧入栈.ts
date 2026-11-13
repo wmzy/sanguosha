@@ -5,6 +5,7 @@
 // 与 pushFrame 函数的关系:pushFrame 内部 applyAtom({ type: '结算帧入栈', ... }),
 // 返回被压入的 frame 引用(与旧同步签名行为一致)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast } from './_helpers';
 import { createRng } from '../util/rng';
 import { bindPushedFrame } from '../core/frame';
 
@@ -42,10 +43,7 @@ export const 结算帧入栈: AtomDefinition<{
     };
     // 结算帧是公开信息:所有玩家看到相同的栈(包括 params)。
     // params 由技能负责只放公开数据(如 resolvedTargets/revealedIds/pickedBy)。
-    return {
-      ownerViews: new Map(),
-      othersView: view,
-    };
+    return broadcast(view);
   },
   applyView(view, event) {
     view.settlementStack.push({

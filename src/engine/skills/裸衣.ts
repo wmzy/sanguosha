@@ -11,13 +11,12 @@ import type {
   FrontendAPI,
   GameState,
   HookResult,
-  Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const BONUS_TAG = '裸衣/bonus';
 const CONFIRM_REQUEST = '裸衣/confirm';
@@ -35,20 +34,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── confirm respond:许褚本人回应是否发动裸衣 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      return requireRequestType(st, ownerId, [CONFIRM_REQUEST], {
-        mismatchError: '当前不是裸衣确认',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars['裸衣/confirmed'] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_REQUEST, '裸衣/confirmed', {
+    mismatchError: '当前不是裸衣确认',
+  });
 
   // ── 摸牌 before hook:摸牌阶段询问,发动则少摸一张 + 加增伤标签 ──
   registerBeforeHook(
@@ -67,21 +55,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (usedThisTurn(ctx.state, ownerId, '裸衣')) return; // 本回合已发动
 
       // 询问是否发动
-      delete ctx.state.localVars['裸衣/confirmed'];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_REQUEST,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动裸衣?(少摸一张牌,杀/决斗伤害 +1)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
+        confirmedKey: '裸衣/confirmed',
+        title: '是否发动裸衣?(少摸一张牌,杀/决斗伤害 +1)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 15,
       });
-      if (!ctx.state.localVars['裸衣/confirmed']) return;
+      if (!confirmed) return;
 
       // 发动:限一次标记(防 dispatch 重入),加增伤标签,modify 少摸一张
       await markOncePerTurn(ctx.state, ownerId, '裸衣');

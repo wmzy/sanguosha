@@ -12,9 +12,28 @@ import { getRoom, leaveRoom, deleteRoom, setRoomStatus } from './room';
 import { deletePersistedRoom } from './persistence';
 import { deleteRoomFromDb } from './roomStore';
 import { deleteRoomHistory } from './gameHistory';
-import { createLogger, normalizeError } from './logger';
+import { createLogger } from './logger';
 
 const log = createLogger('teardown');
+
+/** 移除 session 记录并 fire-and-forget destroy(destroyRoomCompletely 与
+ *  downgradeRoomToLobby 共用):同步删除 gameSessions 记录,destroy 失败仅记日志。 */
+function destroySessionQuietly(roomId: string): void {
+  const session = gameSessions.get(roomId);
+  gameSessions.delete(roomId);
+  void session?.destroy().catch((err) => {
+    log.err(`session.destroy failed for ${roomId}`, err);
+  });
+}
+
+/** 删除持久化文件,失败仅记日志(destroyRoomCompletely 与 downgradeRoomToLobby 共用)。 */
+async function deletePersistedQuietly(roomId: string): Promise<void> {
+  try {
+    await deletePersistedRoom(roomId);
+  } catch (err) {
+    log.err(`deletePersistedRoom failed for ${roomId}`, err);
+  }
+}
 
 /**
  * 完全销毁房间:移除 session、清理玩家映射、删除 roomList 记录、
@@ -27,12 +46,7 @@ const log = createLogger('teardown');
  */
 export async function destroyRoomCompletely(roomId: string): Promise<void> {
   // 1. 移除 session 记录 + fire-and-forget destroy
-  const session = gameSessions.get(roomId);
-  gameSessions.delete(roomId);
-  void session?.destroy().catch((err) => {
-    const e = normalizeError(err);
-    log.error(`session.destroy failed for ${roomId}`, { error: e.stack ?? String(e) });
-  });
+  destroySessionQuietly(roomId);
 
   // 2. 清理玩家映射(leaveRoom 处理 room 内部状态)
   const room = getRoom(roomId);
@@ -52,27 +66,20 @@ export async function destroyRoomCompletely(roomId: string): Promise<void> {
   }
 
   // 5. 删除持久化文件
-  try {
-    await deletePersistedRoom(roomId);
-  } catch (err) {
-    const e = normalizeError(err);
-    log.error(`deletePersistedRoom failed for ${roomId}`, { error: e.stack ?? String(e) });
-  }
+  await deletePersistedQuietly(roomId);
 
   // 6. 删除 DB 元数据(幂等:quick 房间无记录则 no-op)
   try {
     await deleteRoomFromDb(roomId);
   } catch (err) {
-    const e = normalizeError(err);
-    log.error(`deleteRoomFromDb failed for ${roomId}`, { error: e.stack ?? String(e) });
+    log.err(`deleteRoomFromDb failed for ${roomId}`, err);
   }
 
   // 7. 删除对局历史目录(幂等)
   try {
     await deleteRoomHistory(roomId);
   } catch (err) {
-    const e = normalizeError(err);
-    log.error(`deleteRoomHistory failed for ${roomId}`, { error: e.stack ?? String(e) });
+    log.err(`deleteRoomHistory failed for ${roomId}`, err);
   }
 
   log.info(`完全销毁房间 ${roomId}`);
@@ -101,23 +108,13 @@ export function resetRoomToLobby(roomId: string): void {
  */
 export async function downgradeRoomToLobby(roomId: string): Promise<void> {
   // 1. 移除 session 记录 + fire-and-forget destroy
-  const session = gameSessions.get(roomId);
-  gameSessions.delete(roomId);
-  void session?.destroy().catch((err) => {
-    const e = normalizeError(err);
-    log.error(`session.destroy failed for ${roomId}`, { error: e.stack ?? String(e) });
-  });
+  destroySessionQuietly(roomId);
 
   // 2. 重置 room 状态
   resetRoomToLobby(roomId);
 
   // 3. 删除持久化文件(避免下次启动恢复出空壳 session)
-  try {
-    await deletePersistedRoom(roomId);
-  } catch (err) {
-    const e = normalizeError(err);
-    log.error(`deletePersistedRoom failed for ${roomId}`, { error: e.stack ?? String(e) });
-  }
+  await deletePersistedQuietly(roomId);
 
   log.info(`降级房间 ${roomId} 到等待中`);
 }

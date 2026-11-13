@@ -5,6 +5,7 @@
 // 其他玩家应看到"X 张放牌堆顶,Y 张放牌堆底"。具体牌内容不广播(只对操作者可见)。
 // topCount/bottomCount 由调用方(观星)传入,反映操作者选择的划分。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast } from './_helpers';
 
 export const 整理牌堆: AtomDefinition<{
   cards: string[];
@@ -33,7 +34,7 @@ export const 整理牌堆: AtomDefinition<{
       bottomCount: atom.bottomCount ?? 0,
     };
     // 排列信息是公开的:所有玩家看到相同数据(不含具体牌)
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView() {
     // 牌堆数量不变,无需更新 zones

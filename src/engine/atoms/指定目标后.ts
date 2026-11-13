@@ -4,13 +4,12 @@
 // 目标确定后触发,供判定/封印类技能介入影响后续响应。
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 
 export const 指定目标后: AtomDefinition<{ source: number; cardId?: string; target: number }> = {
   type: '指定目标后',
   validate(state, atom) {
-    if (!state.players[atom.source]) return `source ${atom.source} not found`;
-    if (!state.players[atom.target]) return `target ${atom.target} not found`;
-    return null;
+    return requirePlayer(state, atom.source, 'source') ?? requirePlayer(state, atom.target, 'target');
   },
   apply() {
     // 事件标记——after hook 触发铁骑/烈弓/无双①等"指定目标后"时机技能
@@ -25,7 +24,7 @@ export const 指定目标后: AtomDefinition<{ source: number; cardId?: string; 
       ...(atom.cardId !== undefined ? { cardId: atom.cardId } : {}),
       ...(cardName !== undefined ? { cardName } : {}),
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView() {
     // 事件标记——无 GameView 字段需要直接更新(封印/必中由后续 atom 的询问/伤害体现)。

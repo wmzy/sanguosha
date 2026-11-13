@@ -31,6 +31,7 @@ import { runDamageFlow } from '../flows/damage';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
+import { askConfirm } from '../util/skillRuntime';
 import { SHENSHI_STATE_VIEW_KEY } from '../rules/vars-keys';
 import { projectTurnUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
@@ -209,21 +210,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       // 若其因此死亡,可令一名角色摸至四张
       if (!st.players[target]?.alive) {
-        delete st.localVars[YANG_DEATH_CONFIRMED_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: YANG_DEATH_CONFIRM_RT,
-          target: from,
-          prompt: {
-            type: 'confirm',
-            title: '审时:目标因此死亡,是否令一名角色将手牌摸至四张?',
-            confirmLabel: '发动',
-            cancelLabel: '不发动',
-          },
+        const deathConfirmed = await askConfirm(st, YANG_DEATH_CONFIRM_RT, from, {
+          confirmedKey: YANG_DEATH_CONFIRMED_KEY,
+          title: '审时:目标因此死亡,是否令一名角色将手牌摸至四张?',
+          confirmLabel: '发动',
+          cancelLabel: '不发动',
           defaultChoice: false,
           timeout: 20,
         });
-        if (st.localVars[YANG_DEATH_CONFIRMED_KEY]) {
+        if (deathConfirmed) {
           delete st.localVars[YANG_DEATH_TARGET_KEY];
           await applyAtom(st, {
             type: '请求回应',
@@ -268,21 +263,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!self || self.hand.length === 0) return;
 
     // 询问是否发动
-    delete ctx.state.localVars[YIN_CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: YIN_CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '审时(阴):是否观看其手牌并交给其一张牌?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const yinConfirmed = await askConfirm(ctx.state, YIN_CONFIRM_RT, ownerId, {
+      confirmedKey: YIN_CONFIRMED_KEY,
+      title: '审时(阴):是否观看其手牌并交给其一张牌?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!ctx.state.localVars[YIN_CONFIRMED_KEY]) return; // 不发动 → 不翻转
+    if (!yinConfirmed) return; // 不发动 → 不翻转
     delete ctx.state.localVars[YIN_CONFIRMED_KEY];
 
     // 选一张手牌交给其(owner 选自己的一张手牌;"观看其手牌"为信息优势,牌由 owner 给出)

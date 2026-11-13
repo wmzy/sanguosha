@@ -33,7 +33,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const TRIGGER_RT = '界连营/trigger';
 const SELECT_RT = '界连营/select';
@@ -72,21 +72,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (maxTargets < 1) return;
 
     // ① 是否发动界连营
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: TRIGGER_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `是否发动界连营?(失去${X}张手牌,令至多${maxTargets}名角色各摸一张牌)`,
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, TRIGGER_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: `是否发动界连营?(失去${X}张手牌,令至多${maxTargets}名角色各摸一张牌)`,
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (ctx.state.localVars[CONFIRMED_KEY] !== true) return;
+    if (confirmed !== true) return;
 
     // ② 选择 1~maxTargets 名角色(含自己)各摸一张
     delete ctx.state.localVars[TARGETS_KEY];

@@ -30,6 +30,7 @@ import { registerAction, registerAfterHook, hasBlockingPending } from '../core/s
 import { defaultPlayActive } from '../rules/action-active';
 import { getCardEffect } from './cards';
 import { TRANSFORM_ACTION_PREFIX } from '../util/declaredActionType';
+import { NORMAL_TRICK_NAMES } from '../util/non-delay-tricks';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界矫诏';
@@ -43,27 +44,13 @@ const USED_NAMES_KEY = `${SKILL_ID}/已用牌名`;
 const LAST_ROUND_KEY = `${SKILL_ID}/lastRound`;
 
 /**
- * 矫诏可声明的目标牌名(基本牌 + 普通锦囊)。
- * 排除: 延时锦囊(乐不思蜀/兵粮寸断/闪电)、响应锦囊(无懈可击)、纯回应基本牌(闪)、装备牌。
+ * 矫诏可声明的目标牌名(基本牌 + 普通锦囊)——技能自身的有意子集,由单一来源派生:
+ *   - 普通锦囊 = util/non-delay-tricks.ts 的 NORMAL_TRICK_NAMES
+ *     (非延时锦囊 12 张 − 响应锦囊·无懈可击 − 延时锦囊 乐不思蜀/兵粮寸断/闪电);
+ *   - 基本牌仅 杀/桃/酒(排除闪:闪 timing='生效前',纯回应牌,无 use action,
+ *     不能主动"使用");装备牌不在声明范围。
  */
-const ALLOWED_NAMES: ReadonlySet<string> = new Set([
-  // 基本牌(排除闪:闪 timing='生效前',纯回应牌,无 use action,不能主动"使用")
-  '杀',
-  '桃',
-  '酒',
-  // 普通锦囊
-  '决斗',
-  '过河拆桥',
-  '顺手牵羊',
-  '无中生有',
-  '借刀杀人',
-  '桃园结义',
-  '五谷丰登',
-  '南蛮入侵',
-  '万箭齐发',
-  '火攻',
-  '铁索连环',
-]);
+const ALLOWED_NAMES: ReadonlySet<string> = new Set(['杀', '桃', '酒', ...NORMAL_TRICK_NAMES]);
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

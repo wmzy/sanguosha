@@ -7,6 +7,7 @@
 // outputName 决定转化后的牌名。rollback(删影子/还原卡)由调用方技能回调负责,本 atom 不处理。
 import type { AtomDefinition, Card, ViewEventSplit, ViewEvent } from '../types';
 import type { Color } from '../../engine/types';
+import { requirePlayer, viewPlayer } from './_helpers';
 import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../data/card-defs';
 
 /** 牌名→类型映射(从卡牌定义派生,数据驱动,不硬编码牌名)。
@@ -52,8 +53,9 @@ export const 当作: AtomDefinition<{
 }> = {
   type: '当作',
   validate(state, atom) {
+    const err = requirePlayer(state, atom.player, 'player');
+    if (err) return err;
     const self = state.players[atom.player];
-    if (!self) return `player ${atom.player} not found`;
     if (!self.alive) return 'player not alive';
     const allInHand = atom.cardIds.every((id) => self.hand.includes(id));
     if (!allInHand) return 'cards not in hand';
@@ -103,9 +105,8 @@ export const 当作: AtomDefinition<{
     };
   },
   applyView(view, event) {
-    const playerIdx = event.player as number;
-    const pi = view.players.findIndex((p) => p.index === playerIdx);
-    if (pi < 0) return;
+    const p = viewPlayer(view, event.player as number);
+    if (!p) return;
 
     const ev = event as Record<string, unknown>;
     const cardIds = ev.cardIds as string[] | undefined;
@@ -113,9 +114,9 @@ export const 当作: AtomDefinition<{
     const count = (ev.count as number | undefined) ?? cardIds?.length ?? 1;
     const outputName = typeof ev.outputName === 'string' ? ev.outputName : '杀';
 
-    view.players[pi].handCount = Math.max(0, view.players[pi].handCount - (count - 1));
+    p.handCount = Math.max(0, p.handCount - (count - 1));
 
-    if (cardIds && shadowId && view.players[pi].hand) {
+    if (cardIds && shadowId && p.hand) {
       let shadowCard = view.cardMap[shadowId];
       if (!shadowCard) {
         const origCard = view.cardMap[cardIds[0]];
@@ -134,8 +135,8 @@ export const 当作: AtomDefinition<{
         view.cardMap[shadowId] = shadowCard;
       }
       const idSet = new Set(cardIds);
-      view.players[pi].hand = view.players[pi].hand.filter((c) => !idSet.has(c.id));
-      view.players[pi].hand.push(shadowCard);
+      p.hand = p.hand.filter((c) => !idSet.has(c.id));
+      p.hand.push(shadowCard);
     }
   },
   toViewLog(event) {

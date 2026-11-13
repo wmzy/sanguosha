@@ -13,13 +13,12 @@
 import type {
   FrontendAPI,
   GameState,
-  Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { obtainJudgeZoneCard } from '../core/judge-zone';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { registerAfterHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '行殇/confirm';
 const CONFIRMED_KEY = '行殇/confirmed';
@@ -37,20 +36,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── respond:曹丕回应是否发动行殇 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      return requireRequestType(st, ownerId, [CONFIRM_RT], {
-        mismatchError: '当前不是行殇确认',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_RT, CONFIRMED_KEY, {
+    mismatchError: '当前不是行殇确认',
+  });
 
   // ── 死亡时 after hook:死亡角色所有牌转移给曹丕(系统处理牌之前)──
   registerAfterHook(state, skill.id, ownerId, '死亡时', async (ctx) => {
@@ -77,21 +65,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (total === 0) return; // 无牌可拿,不触发
 
       // 询问是否发动(FAQ:行殇主动发动,可不发动)
-      delete ctx.state.localVars[CONFIRMED_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `是否发动行殇?(从 ${ctx.state.players[deadIdx]?.name ?? `P${deadIdx}`} 获得 ${total} 张牌)`,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: `是否发动行殇?(从 ${ctx.state.players[deadIdx]?.name ?? `P${deadIdx}`} 获得 ${total} 张牌)`,
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 10,
       });
-      if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+      if (!confirmed) return;
 
       // 转移所有牌:
       //   - 手牌:获得 atom 直接处理(hand filter + push)

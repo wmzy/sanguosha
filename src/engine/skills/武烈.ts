@@ -34,7 +34,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const USED_KEY = '武烈/used';
 const CONFIRM_RT = '武烈/confirm';
@@ -126,22 +126,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (otherAlive.length === 0) return; // 无其他存活角色
 
       // 1) 询问是否发动武烈
-      delete st.localVars[CONFIRMED_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动武烈?(限定技)',
-          description: '结束阶段:失去任意点体力,令等量其他角色各获得1个「烈」标记',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(st, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: '是否发动武烈?(限定技)',
+        description: '结束阶段:失去任意点体力,令等量其他角色各获得1个「烈」标记',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 15,
       });
-      if (!st.localVars[CONFIRMED_KEY]) {
+      if (!confirmed) {
         delete st.localVars[CONFIRMED_KEY];
         return;
       }

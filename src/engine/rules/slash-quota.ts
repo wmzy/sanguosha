@@ -23,6 +23,7 @@
 // 无模块级全局状态泄漏(与 skill.ts 的 registries 同构)。
 
 import type { GameState } from '../types';
+import { registerAfterHook } from '../core/skill';
 import { createProviderRegistry } from './provider-registry';
 import { setTurnUsage, projectTurnUsage } from './turn-usage';
 import { getSlashQuotaUsed, getSlashExtraUsed, slashQuotaUsedKey, slashExtraUsedKey, slashExtraKey, slashUnlimitedKey, slashBlockedKey, SLASH_QUOTA_USED_KEY as QUOTA_USED_VAR, SLASH_EXTRA_USED_KEY as EXTRA_USED_VAR, SLASH_USED_COUNT_KEY } from './vars-keys';
@@ -288,4 +289,34 @@ export async function projectSlashBlocked(
   source: string,
 ): Promise<void> {
   await projectTurnUsage(state, player, slashBlockedKey(source), true);
+}
+
+/**
+ * 注册「无条件无限出杀 + view 投影」组合(咆哮/界咆哮 样板收敛):
+ *   1. 无限出杀提供者(恒 true)→ slashMax = ∞,本回合出杀无次数限制;
+ *   2. 拥有者每个出牌阶段开始时把 '杀/unlimited/<skillId>' 投影到 view.turnUsage
+ *      (回合结束自动清空)——前端/MCP 客户端的 viewSlashMax 据此推断无限出杀;
+ *      缺失则首次出杀后(usedCount=1 ≥ max 1)viewCanSlash 误判为 false,
+ *      【杀】从 availableActions 消失。
+ * skillId 既是 hook 注册 key 又是投影来源字符串(= 技能名;视图键前缀
+ * '杀/unlimited/' 由 slashUnlimitedKey 内拼,CLAUDE.md view 投影契约)。
+ * 返回取消注册函数——应并入 onInit 返回的 unload。
+ */
+export function registerAlwaysUnlimitedWithProjection(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+): () => void {
+  const unregMax = registerSlashUnlimitedProvider(state, ownerId, () => true);
+  const unregHook = registerAfterHook(state, skillId, ownerId, '阶段开始', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.type !== '阶段开始') return;
+    if (atom.phase !== '出牌') return;
+    if (atom.player !== ownerId) return;
+    await projectSlashUnlimited(ctx.state, ownerId, skillId);
+  });
+  return () => {
+    unregMax();
+    unregHook();
+  };
 }

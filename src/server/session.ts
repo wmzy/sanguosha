@@ -28,7 +28,7 @@ import {
 
 import type { ServerMessage, DeadlineInfo } from './protocol';
 import type { Room } from './room';
-import { createLogger, normalizeError } from './logger';
+import { createLogger } from './logger';
 import { setRoomStatus, occupiedSeatEntries } from './room';
 import { sendSafe, broadcastToRoom } from './connection';
 import { saveRoom, deletePersistedRoom } from './persistence';
@@ -182,17 +182,12 @@ export class GameSession {
     // mode 用房间配置(与开局一致;state.config.mode 由 create 写入快照,二者一致)
     const playerCount = state.players.length;
     const offset = computeSeatRotation(state.rngSeed, playerCount);
-    const config: GameConfig = {
-      characters: resolveCharPool(this.room.config.charPool),
+    // 恢复对局沿用原座位显示名(旧持久化快照无 playerNames 时回退 stub 名,兼容)
+    const config = this.buildGameConfig(
       playerCount,
-      seed: state.rngSeed,
-      gameId: this.room.id,
-      handSize: this.room.config.handSize,
-      timeoutSec: this.room.config.timeoutSec,
-      mode: this.room.config.gameMode,
-      // 恢复对局沿用原座位显示名(旧持久化快照无 playerNames 时回退 stub 名,兼容)
-      playerNames: this.seatDisplayNames(playerCount, offset, state.players.map((p) => p.name)),
-    };
+      state.rngSeed,
+      state.players.map((p) => p.name),
+    );
     const fresh = create(config);
     // 注入虚拟时钟:重放期间超时按 actionLog 时间戳确定性推导,不依赖真实系统时间。
     // startedAt 归零对齐 VirtualClock(相对时间从 0 起)。
@@ -204,19 +199,12 @@ export class GameSession {
     fresh.clock = new RealClock();
     this.state = fresh;
     // 恢复座次轮转偏移:与 startGame 一致(同 seed 派生),保证重连后视角不错位。
-    this.state.seatRotation = computeSeatRotation(config.seed, this.state.players.length);
+    this.state.seatRotation = offset;
     this.actionLog = fresh.actionLog;
     this.attachStateListener();
 
-    // 从 room.seats 恢复 playerId → 座次下标映射,使重启后玩家可重连。
-    // startGame 正常路径会在游戏开始时设置 playerNames;恢复路径需手动填充。
-    // 应用与 startGame 一致的座次轮转偏移(seatRotation),否则重连后视角错位。
-    // 占座序号映射(与 startGame 同款):座位表有空洞(等待中离开只清空不压缩)时,
-    // 物理下标 i 对 n 同余会碰撞覆盖;用第 k 个非空座位计数,保证映射互不相同。
-    const n = this.state.players.length;
-    for (const { playerId, seat } of occupiedSeatEntries(this.room, n, offset)) {
-      this.playerNames.set(playerId, seat);
-    }
+    // 从 room.seats 恢复 playerId → 座次下标映射,使重启后玩家可重连(遍历语义见 syncSeatMappings)
+    this.syncSeatMappings(this.state.players.length, offset);
     // 恢复局也记录历史:基线取恢复时刻的视图(若选将已完成则立即捕获;否则等
     // onStateChange 在选将完成后捕获)。startedAt 用恢复时刻近似。
     // 恢复 = 新一局起点(epoch 变化):journal 重新开始,裁剪水位归零
@@ -224,27 +212,50 @@ export class GameSession {
     this.maybeCaptureReplayBaseline();
   }
 
+  /** 从房间配置派生 GameConfig(restoreState 与 startGame 共用,仅 seed 来源与
+   *  fallbackNames 不同:恢复路径 seed=state.rngSeed 且传入旧快照玩家名兜底,
+   *  开局路径 seed=sessionSeed 无兜底名)。playerNames 的座次轮转偏移由 seed 派生,
+   *  保证与 state.seatRotation 同源同值。 */
+  private buildGameConfig(playerCount: number, seed: number, fallbackNames?: string[]): GameConfig {
+    const offset = computeSeatRotation(seed, playerCount);
+    return {
+      characters: resolveCharPool(this.room.config.charPool),
+      playerCount,
+      seed,
+      gameId: this.room.id,
+      handSize: this.room.config.handSize,
+      timeoutSec: this.room.config.timeoutSec,
+      mode: this.room.config.gameMode,
+      playerNames: this.seatDisplayNames(playerCount, offset, fallbackNames),
+    };
+  }
+
+  /** 用权威座位表(而非 players.keys() 连接序)重建 playerId → 游戏座次 映射,
+   *  startGame 正常路径与 restoreState 恢复路径共用同一遍历。
+   *  应用座次轮转偏移 offset:第 k 个非空座位 → 游戏座次 (k + offset) % n;
+   *  主公恒在游戏座次 0(引擎不变量),经偏移后落到随机物理座位,房主不再恒为主公。
+   *  必须遍历 seats(权威座位表)而非 players.keys():换座(moveSeat/seat-swap)
+   *  只改 seats 不改 Map 插入序,按连接序映射会让玩家拿到他人座次的私有视图,
+   *  且 ownerId 校验随之错位。
+   *  用占座序号 k 而非物理下标 i:座位表可能有空洞(等待中玩家离开只清空座位
+   *  不压缩 seats),空洞后最高占座下标 ≥ n 时 i 与 i-n 对 n 同余 → 两玩家映射
+   *  到同一座次互相覆盖(handleAction 静默丢弃被顶者的操作),另一座次无人控制。 */
+  private syncSeatMappings(n: number, offset: number): void {
+    for (const { playerId, seat } of occupiedSeatEntries(this.room, n, offset)) {
+      this.playerNames.set(playerId, seat);
+    }
+  }
+
   async startGame(playerCount?: number): Promise<boolean> {
     if (this.destroyed) return false;
     const count = this.debug ? (playerCount ?? this.room.players.size) : this.room.players.size;
     if (count < 2) return false;
 
-    // 从房间配置派生 GameConfig:将池预设 + 手牌数 + 操作倒时秒数 + 游戏模式(规则包)
-    const cfg = this.room.config;
-    // 座次轮转偏移:决定主公(游戏座次 0)对应哪个物理座位。随 seed 确定,可复现;
-    // 与下方 state.seatRotation 同源同值(config.seed = sessionSeed)。
-    const seatOffset = computeSeatRotation(this.sessionSeed, count);
-    const config: GameConfig = {
-      characters: resolveCharPool(cfg.charPool),
-      playerCount: count,
-      seed: this.sessionSeed,
-      gameId: this.room.id,
-      handSize: cfg.handSize,
-      timeoutSec: cfg.timeoutSec,
-      mode: cfg.gameMode,
-      // 引擎玩家 g 的显示名 = 物理座位 (g - offset) 的昵称(与 playerId↔座次映射一致)
-      playerNames: this.seatDisplayNames(count, seatOffset),
-    };
+    // 从房间配置派生 GameConfig:将池预设 + 手牌数 + 操作倒时秒数 + 游戏模式(规则包)。
+    // 座次轮转偏移由 seed 派生(见 buildGameConfig),与下方 state.seatRotation 同源
+    // 同值(config.seed = sessionSeed);引擎玩家 g 的显示名 = 物理座位 (g - offset)
+    // 的昵称(与 playerId↔座次映射一致)。
+    const config = this.buildGameConfig(count, this.sessionSeed);
     this.state = create(config);
     // 座次轮转偏移:决定主公(游戏座次 0)对应哪个物理座位。在 bootstrap 之前同步设置,
     // 供下方 playerId↔座次映射读取——房主不再恒为主公。随 seed 确定,可复现。
@@ -270,38 +281,21 @@ export class GameSession {
         // 由 maybeCaptureReplayBaseline 在选将完成后的 onStateChange 中捕获
       })
       .catch((err) => {
-        const e = normalizeError(err);
-        this.logger.error('bootstrap error', { error: e.stack ?? String(e) });
+        this.logger.err('bootstrap error', err);
       });
 
     // 建立 playerId → 座次下标 映射
     const state = this.state;
     if (this.debug) {
       // debug 模式:座次已在 joinDebugRoom 时由 assignDebugSeat 分配(配置阶段)。
-      // 这里仅补充 startGame 后新加入连接(超出预期座次数),不再覆盖已有映射。
-      const playerIds = [...this.room.players.keys()];
-      for (let i = 0; i < playerIds.length && i < state.players.length; i++) {
-        if (this.playerNames.has(playerIds[i])) continue;
-        // 未分配:找下一个未占用座次
-        const used = new Set([...this.playerNames.values()]);
-        let seat = i;
-        while (used.has(seat) && seat < state.players.length) seat++;
-        if (seat < state.players.length) this.playerNames.set(playerIds[i], seat);
+      // 这里仅补充 startGame 后新加入连接(超出预期座次数);assignDebugSeat 对已
+      // 分配玩家原样返回既有座次,不会覆盖已有映射。
+      for (const playerId of this.room.players.keys()) {
+        this.assignDebugSeat(playerId);
       }
     } else {
-      // 应用座次轮转偏移(seatRotation):第 k 个非空座位 → 游戏座次 (k + offset) % n。
-      // 主公恒在游戏座次 0(引擎不变量),经偏移后落到随机物理座位,房主不再恒为主公。
-      // 必须遍历 seats(权威座位表)而非 players.keys():换座(moveSeat/seat-swap)
-      // 只改 seats 不改 Map 插入序,按连接序映射会让玩家拿到他人座次的私有视图,
-      // 且 ownerId 校验随之错位(与 restoreState 的恢复路径同款遍历)。
-      // 用占座序号 k 而非物理下标 i:座位表可能有空洞(等待中玩家离开只清空座位
-      // 不压缩 seats),空洞后最高占座下标 ≥ n 时 i 与 i-n 对 n 同余 → 两玩家映射
-      // 到同一座次互相覆盖(handleAction 静默丢弃被顶者的操作),另一座次无人控制。
-      const n = state.players.length;
-      const offset = state.seatRotation ?? 0;
-      for (const { playerId, seat } of occupiedSeatEntries(this.room, n, offset)) {
-        this.playerNames.set(playerId, seat);
-      }
+      // 正常模式:按权威座位表 + 座次轮转偏移建立映射(遍历语义见 syncSeatMappings)
+      this.syncSeatMappings(state.players.length, state.seatRotation ?? 0);
     }
 
     // 检查游戏是否开局时已结束(3 人场开不了,直接结束)
@@ -358,8 +352,7 @@ export class GameSession {
     // dispatch 返回 DispatchResult:{ accepted, settle }。settle 供重放用,正常对局忽略。
     // state 变更的广播/持久化/结束检查由 onStateChange 回调驱动(见 attachStateListener)。
     const result = await dispatch(this.state, action).catch((err) => {
-      const e = normalizeError(err);
-      this.logger.error('dispatch error', { error: e.stack ?? String(e) });
+      this.logger.err('dispatch error', err);
       return { accepted: false, settle: Promise.resolve<Error | undefined>(undefined) } as const;
     });
     if (!result.accepted) {
@@ -466,12 +459,10 @@ export class GameSession {
           : null;
       entry.hasReplay = replay !== null;
       void appendGameHistory(this.room.id, entry, replay).catch((err) => {
-        const e = normalizeError(err);
-        this.logger.error('记录对局历史失败', { error: e.stack ?? String(e) });
+        this.logger.err('记录对局历史失败', err);
       });
     } catch (err) {
-      const e = normalizeError(err);
-      this.logger.error('组装对局历史失败', { error: e.stack ?? String(e) });
+      this.logger.err('组装对局历史失败', err);
     }
   }
 
@@ -496,10 +487,7 @@ export class GameSession {
     this.room.readyPlayers.clear();
     // 清除旧持久化数据,避免重启时恢复到已结束的局面
     void deletePersistedRoom(this.room.id).catch((err) => {
-      const e = normalizeError(err);
-      this.logger.error('resetToLobby: deletePersistedRoom failed', {
-        error: e.stack ?? String(e),
-      });
+      this.logger.err('resetToLobby: deletePersistedRoom failed', err);
     });
     // 通知所有连接:游戏已重置,客户端清除 gameOver/gameStarted/views
     this.broadcast({ type: 'game_reset' });
@@ -752,8 +740,7 @@ export class GameSession {
     this.broadcast({ type: 'gameOver', winner: '无人' });
     // 必须 destroy 以清理 idle timer，否则定时器会通过 onStateChange 自循环
     void this.destroy().catch((err) => {
-      const e = normalizeError(err);
-      this.logger.error('destroy after disconnect failed', { error: e.stack ?? String(e) });
+      this.logger.err('destroy after disconnect failed', err);
     });
   }
 
@@ -873,8 +860,7 @@ export class GameSession {
       state,
       this.actionLog,
     ).catch((err) => {
-      const e = normalizeError(err);
-      this.logger.error('saveRoom failed', { error: e.stack ?? String(e) });
+      this.logger.err('saveRoom failed', err);
     });
   }
 

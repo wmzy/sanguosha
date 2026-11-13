@@ -26,7 +26,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界忘隙';
@@ -90,21 +90,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!state.players[ownerId]?.alive) return;
     if (!state.players[other]?.alive) return;
 
-    delete state.localVars[CONFIRMED_KEY];
-    await applyAtom(state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `忘隙:是否摸两张牌并交给 P${other} 一张?`,
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: `忘隙:是否摸两张牌并交给 P${other} 一张?`,
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (!state.localVars[CONFIRMED_KEY]) {
+    if (!confirmed) {
       delete state.localVars[CONFIRMED_KEY];
       return;
     }

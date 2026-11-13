@@ -8,7 +8,7 @@ import { gameSessions } from './registry';
 import { applyRestRoutes } from './rest';
 import { applyAuthRoutes } from './auth/routes';
 import { GameSession } from './session';
-import { createLogger, normalizeError } from './logger';
+import { createLogger } from './logger';
 import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } from './persistence';
 import { normalizeRoomConfig } from './protocol';
 import { addRoom, getRoom, getAllRooms, type Room } from './room';
@@ -47,18 +47,14 @@ export async function startServerLifecycle(): Promise<void> {
   }, DISCONNECTED_ROOM_SCAN_MS).unref();
   await initRoomStore();
   await restoreNormalRoomsFromDb();
-  await restorePersistedRooms().catch((err) => {
-    const e = normalizeError(err);
-    log.error('restorePersistedRooms failed', { error: e.stack ?? String(e) });
-  });
+  await restorePersistedRooms().catch((err) => log.err('restorePersistedRooms failed', err));
   // 普通房间元数据存在但无可恢复对局时退回等待大厅。
   await downgradeStaleNormalRooms();
   cleanupIdleRooms();
   cleanupDisconnectedRooms();
-  void sweepOrphanHistory(getAllRooms().map((r) => r.id)).catch((err) => {
-    const e = normalizeError(err);
-    log.error('sweepOrphanHistory failed', { error: e.stack ?? String(e) });
-  });
+  void sweepOrphanHistory(getAllRooms().map((r) => r.id)).catch((err) =>
+    log.err('sweepOrphanHistory failed', err),
+  );
 }
 
 /** 从 DB 恢复普通房间元数据。快闪房间不入库,无需恢复。

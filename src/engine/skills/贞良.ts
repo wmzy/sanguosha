@@ -33,7 +33,7 @@ import { defaultPlayActive } from '../rules/action-active';
 import { viewCanAttack } from '../rules/viewDistance';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { REN_MARK_ID, getRenColor } from './明任';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '贞良';
 /** 转换态 key(state:player.vars 跨回合持久;view:经 回合用量 atom 投影 turnUsage)。
@@ -231,21 +231,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!renColor || usedColor !== renColor) return;
 
     // 询问是否发动
-    delete st.localVars[YIN_CONFIRMED_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: YIN_CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '贞良(阴):是否令一名角色摸一张牌?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(st, YIN_CONFIRM_RT, ownerId, {
+      confirmedKey: YIN_CONFIRMED_KEY,
+      title: '贞良(阴):是否令一名角色摸一张牌?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!st.localVars[YIN_CONFIRMED_KEY]) return; // 不发动 → 不翻转
+    if (!confirmed) return; // 不发动 → 不翻转
     delete st.localVars[YIN_CONFIRMED_KEY];
 
     // 选择摸牌角色(任意存活角色,含自己)

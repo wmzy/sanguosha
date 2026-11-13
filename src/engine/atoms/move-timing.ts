@@ -17,8 +17,8 @@
 // 噪声抑制:无 before hook 时标记型 atom 的 toViewEvents 返回 null(整个 atom 视图上 no-op),
 // 与 damage-timing / life-timing / statechange-timing 一致。atom 本身仍走完整 pipeline
 // (apply + after hooks),编排函数/测试可从 state.atomHistory 观察时序。
-import type { AtomDefinition, GameState, MoveReason, ViewEventSplit, ViewEvent, ZoneLoc } from '../types';
-import { getBeforeHooks } from '../core/skill';
+import type { AtomDefinition, GameState, MoveReason, ViewEventSplit, ZoneLoc } from '../types';
+import { hookSilentView } from './_helpers';
 
 // ── before-hook modify to 的回传通道 ─────────────────────────
 // 移动到目标区域前 的 before-hook 可 modify to(纵玄/章武②);afterApply 把折叠后的
@@ -41,17 +41,13 @@ function validateMoveTiming(state: GameState, atom: MoveTimingAtom): string | nu
 
 /** 无 before-hook 时静默(no-op 视图),有 before-hook 时发通知事件。 */
 function moveTimingView(state: GameState, type: string, atom: MoveTimingAtom): ViewEventSplit {
-  if (getBeforeHooks(state, type).length === 0) {
-    return { ownerViews: new Map(), othersView: null };
-  }
-  const view: ViewEvent = {
+  return hookSilentView(state, type, () => ({
     type,
     cardId: atom.cardId,
     from: atom.from,
     to: atom.to,
     reason: atom.reason,
-  };
-  return { ownerViews: new Map(), othersView: view };
+  }));
 }
 
 // ── 时机1:移动到目标区域前(纵玄/章武② 可改变目标区域) ───────

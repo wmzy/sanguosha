@@ -36,7 +36,7 @@ import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rule
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const SKILL_ID = '界翦灭';
 const DISPLAY_NAME = '翦灭';
@@ -99,38 +99,28 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       try {
         // 1) 春华 选色
-        delete st.localVars[OWNER_COLOR_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: OWNER_COLOR_RT,
-          target: from,
-          prompt: {
-            type: 'confirm',
+        const ownerColor: Color = colorFromChoice(
+          await askConfirm(st, OWNER_COLOR_RT, from, {
+            confirmedKey: OWNER_COLOR_KEY,
             title: '翦灭:选择你的颜色(确认=红色,取消=黑色)',
             confirmLabel: '红色',
             cancelLabel: '黑色',
-          },
-          defaultChoice: false,
-          timeout: 15,
-        });
-        const ownerColor: Color = colorFromChoice(st.localVars[OWNER_COLOR_KEY]);
+            defaultChoice: false,
+            timeout: 15,
+          }),
+        );
 
         // 2) 目标 选色
-        delete st.localVars[TARGET_COLOR_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: TARGET_COLOR_RT,
-          target,
-          prompt: {
-            type: 'confirm',
+        const targetColor: Color = colorFromChoice(
+          await askConfirm(st, TARGET_COLOR_RT, target, {
+            confirmedKey: TARGET_COLOR_KEY,
             title: `翦灭:${st.players[from].name} 与你各选一色,各自弃该色手牌,多者对少者决斗。选择你的颜色(确认=红色,取消=黑色)`,
             confirmLabel: '红色',
             cancelLabel: '黑色',
-          },
-          defaultChoice: false,
-          timeout: 15,
-        });
-        const targetColor: Color = colorFromChoice(st.localVars[TARGET_COLOR_KEY]);
+            defaultChoice: false,
+            timeout: 15,
+          }),
+        );
 
         // 3) 各自弃置所选颜色的手牌
         const ownerCards = colorCards(st, from, ownerColor);

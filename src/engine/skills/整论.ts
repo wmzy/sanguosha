@@ -11,13 +11,12 @@
 // 注意:整论仅在"无橘"时触发。有橘时正常摸牌(由 怀橘 的 before-hook 多摸一张)。
 //   获得的橘在本阶段即时生效——但因摸牌阶段已被跳过,怀橘的 摸牌 before-hook 不会触发
 //   (摸牌 atom 根本未发出),无冲突。
-import { applyAtom } from '../core/apply';
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 import { addJu, juCount } from './怀橘';
 import type { SkillModule } from '../types';
-import { currentRequestType } from '../util/skillRuntime';
+import { currentRequestType, askConfirm } from '../util/skillRuntime';
 
 const SKILL_ID = '整论';
 
@@ -64,21 +63,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (juCount(st, ownerId) > 0) return; // 有橘 → 不触发
 
     // 询问是否发动整论
-    delete st.localVars[CONFIRM_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '整论:你没有橘标记,是否跳过摸牌阶段并获得 1 枚橘?',
-        confirmLabel: '跳过并获橘',
-        cancelLabel: '正常摸牌',
-      },
+    const confirmed = await askConfirm(st, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: '整论:你没有橘标记,是否跳过摸牌阶段并获得 1 枚橘?',
+      confirmLabel: '跳过并获橘',
+      cancelLabel: '正常摸牌',
       defaultChoice: false,
       timeout: 20,
     });
-    if (!st.localVars[CONFIRM_KEY]) {
+    if (!confirmed) {
       delete st.localVars[CONFIRM_KEY];
       return; // 不发动 → 正常摸牌
     }

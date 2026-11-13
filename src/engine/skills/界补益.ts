@@ -31,7 +31,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { spliceHandOrderEntry } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY as PICK_KEY } from '../rules/vars-keys';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const _SKILL_NAME = '界补益';
 const DISPLAY_NAME = '补益';
@@ -145,21 +145,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (equipment.length === 0 && handCount === 0) return;
 
     // 询问是否发动
-    delete ctx.state.localVars[CONFIRM_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `补益:是否选择 ${targetPlayer.name} 的一张牌?若非基本牌,弃置之并回复1点体力`,
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRM_KEY,
+      title: `补益:是否选择 ${targetPlayer.name} 的一张牌?若非基本牌,弃置之并回复1点体力`,
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    const confirmed = ctx.state.localVars[CONFIRM_KEY] === true;
     delete ctx.state.localVars[CONFIRM_KEY];
     if (!confirmed) return;
 

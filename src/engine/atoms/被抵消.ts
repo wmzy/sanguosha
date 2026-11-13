@@ -9,12 +9,12 @@
 // 调用方约定:applyAtom(被抵消) 后重新检查处理区,武器技可能已移走闪(贯石斧强命)
 // 或追杀改变状态(青龙),据此决定 drain 闪 / 造成伤害。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 
 export const 被抵消: AtomDefinition<{ source: number; target: number; cardId: string }> = {
   type: '被抵消',
   validate(state, atom) {
-    if (!state.players[atom.target]) return `target ${atom.target} not found`;
-    return null;
+    return requirePlayer(state, atom.target, 'target');
   },
   apply() {
     // 纯时机型 atom:抵消后的武器技介入由 after hook 处理,apply 无副作用。
@@ -26,7 +26,7 @@ export const 被抵消: AtomDefinition<{ source: number; target: number; cardId:
       target: atom.target,
       cardId: atom.cardId,
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   applyView() {
     // 无视图状态变更:处理区变化由移动牌 atom 的 applyView 驱动。

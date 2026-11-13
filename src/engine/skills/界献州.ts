@@ -34,7 +34,7 @@ import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive } from '../rules/action-active';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界献州';
 const DISPLAY_NAME = '献州';
@@ -131,24 +131,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // ── 2. 询问 target 选择回血/造伤 ──
       st.localVars[COUNT_KEY] = X;
       st.localVars[TARGET_KEY] = target;
-      delete st.localVars[OPTION_KEY];
 
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: OPTION_RT,
-        target,
-        prompt: {
-          type: 'confirm',
-          title: `献州:${st.players[from]?.name ?? `P${from}`} 将 ${X} 张装备交给你。选择一项`,
-          description: `确认 = 令其回复 ${X} 点体力;取消 = 对你攻击范围内至多 ${X} 名角色各造成 1 点伤害`,
-          confirmLabel: `令其回复 ${X} 点体力`,
-          cancelLabel: `对至多 ${X} 名角色造伤`,
-        },
+      const heal = await askConfirm(st, OPTION_RT, target, {
+        confirmedKey: OPTION_KEY,
+        title: `献州:${st.players[from]?.name ?? `P${from}`} 将 ${X} 张装备交给你。选择一项`,
+        description: `确认 = 令其回复 ${X} 点体力;取消 = 对你攻击范围内至多 ${X} 名角色各造成 1 点伤害`,
+        confirmLabel: `令其回复 ${X} 点体力`,
+        cancelLabel: `对至多 ${X} 名角色造伤`,
         defaultChoice: false,
         timeout: 20,
       });
-
-      const heal = st.localVars[OPTION_KEY] === true;
       delete st.localVars[OPTION_KEY];
 
       if (heal) {

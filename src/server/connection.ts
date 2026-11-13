@@ -3,7 +3,7 @@
 
 import type { ServerMessage } from './protocol';
 import type { Room } from './room';
-import { createLogger, normalizeError } from './logger';
+import { createLogger } from './logger';
 
 const log = createLogger('connection');
 
@@ -26,8 +26,7 @@ export function sendSafe(sink: ConnectionSink, message: ServerMessage, describe:
   try {
     sink.send(message);
   } catch (err) {
-    const e = normalizeError(err);
-    log.error(describe, { error: e.stack ?? String(e) });
+    log.err(describe, err);
   }
 }
 

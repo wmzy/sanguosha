@@ -21,14 +21,13 @@
 //   - isCardBanned(validate.ts)检查 turn.vars[禁出牌] → 阻止后续出牌
 //
 // turn.vars 在「回合结束」atom 自动清空 → 首张已用/禁出牌效果每回合重置。
-import type { Card, FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import type { Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerDistanceExemptor } from '../rules/distance';
 import { WANGLIE_FIRST_VIEW_KEY } from '../rules/vars-keys';
 import { projectTurnUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 /** turn.vars:本回合首张牌是否已使用(首张牌无距离限制的开关)。 */
 const FIRST_USED_VAR = '往烈/首张已用';
@@ -86,19 +85,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ─── respond:玩家在 往烈/choose 询问下的选择 ────────────
-  const unloadRespond = registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>): string | null =>
-      requireRequestType(st, ownerId, [CHOOSE_RT], {
-        mismatchError: '当前不是往烈选择',
-      }).error,
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars[CHOICE_KEY] = params.choice === true;
-    },
-  );
+  const unloadRespond = registerConfirmRespond(state, skill.id, ownerId, CHOOSE_RT, CHOICE_KEY, {
+    mismatchError: '当前不是往烈选择',
+  });
 
   // ─── 阶段开始(出牌)after-hook:投影「首张牌无距离限制」到 view ───
   //  state 侧由 FIRST_USED_VAR 的反面表达;前端 viewEffectiveDistance 需要正向键,
@@ -129,22 +118,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!isBasicOrNormalTrick(card)) return;
 
     // 询问是否发动
-    delete ctx.state.localVars[CHOICE_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CHOOSE_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动往烈,令此牌不能被响应,然后本阶段不能再使用牌?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const choice = await askConfirm(ctx.state, CHOOSE_RT, ownerId, {
+      confirmedKey: CHOICE_KEY,
+      title: '是否发动往烈,令此牌不能被响应,然后本阶段不能再使用牌?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
 
-    if (ctx.state.localVars[CHOICE_KEY] === true) {
+    if (choice) {
       ctx.state.localVars[UNRESPONDABLE_VAR] = atom.cardId;
       ctx.state.turn.vars[BAN_VAR] = ownerId;
     }

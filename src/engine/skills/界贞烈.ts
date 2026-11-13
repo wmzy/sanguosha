@@ -52,7 +52,7 @@ import { registerAction, registerAfterHook, registerBeforeHook } from '../core/s
 import { isDelayedTrick } from '../data/card-meta';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY, mijiPendingKey } from '../rules/vars-keys';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const _SKILL_ID = '界贞烈';
 const DISPLAY_NAME = '贞烈';
@@ -131,21 +131,15 @@ async function runZhenlie(
   sourceId: number,
 ): Promise<void> {
   // 1) 发动确认
-  delete state.localVars[CONFIRM_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: CONFIRM_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: '是否发动贞烈?(失去1点体力令此牌对你无效,然后二选一)',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+  const confirmed = await askConfirm(state, CONFIRM_RT, ownerId, {
+    confirmedKey: CONFIRM_KEY,
+    title: '是否发动贞烈?(失去1点体力令此牌对你无效,然后二选一)',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
     defaultChoice: false,
     timeout: 15,
   });
-  if (state.localVars[CONFIRM_KEY] !== true) return;
+  if (confirmed !== true) return;
 
   // 2) 失去1点体力(非伤害,不触发反馈/奸雄;触发濒死)
   await applyAtom(state, { type: '失去体力', target: ownerId, amount: 1 });

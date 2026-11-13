@@ -37,7 +37,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { runVirtualSlash } from '../util/skillRuntime';
+import { askConfirm, runVirtualSlash } from '../util/skillRuntime';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../rules/once-per-turn';
@@ -162,21 +162,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           if (!st.players[target]?.alive) return;
 
           // 2) 询问 target 选择:confirm=选项①出杀,cancel/超时=选项②摸牌
-          delete st.localVars[CHOICE_KEY];
-          await applyAtom(st, {
-            type: '请求回应',
-            requestType: CHOICE_RT,
-            target,
-            prompt: {
-              type: 'confirm',
-              title: `明策:选择一项(确认=对 ${killTarget + 1} 号视为使用一张杀,若造成伤害再各摸一张;取消=你与陈宫各摸一张)`,
-              confirmLabel: '①视为出杀',
-              cancelLabel: '②双方各摸一张',
-            },
+          const choseSlash = await askConfirm(st, CHOICE_RT, target, {
+            confirmedKey: CHOICE_KEY,
+            title: `明策:选择一项(确认=对 ${killTarget + 1} 号视为使用一张杀,若造成伤害再各摸一张;取消=你与陈宫各摸一张)`,
+            confirmLabel: '①视为出杀',
+            cancelLabel: '②双方各摸一张',
             defaultChoice: false, // 超时默认选项②摸牌
             timeout: 20,
           });
-          const choseSlash = st.localVars[CHOICE_KEY] === true;
           delete st.localVars[CHOICE_KEY];
 
           if (choseSlash) {

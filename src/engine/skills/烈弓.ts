@@ -24,7 +24,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { getDistanceAttackRange } from '../rules/vars-keys';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const TAG = '烈弓/禁闪';
 const CONFIRM = '烈弓/confirmed';
@@ -80,21 +80,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!condMet) return;
 
     // 询问是否发动烈弓("你可以令其不能出闪"——可选)
-    delete ctx.state.localVars[CONFIRM];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '烈弓/confirm',
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动烈弓(令目标不能出闪)?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(ctx.state, '烈弓/confirm', ownerId, {
+      confirmedKey: CONFIRM,
+      title: '是否发动烈弓(令目标不能出闪)?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (!ctx.state.localVars[CONFIRM]) return;
+    if (!confirmed) return;
 
     await applyAtom(ctx.state, { type: '加标签', player: target, tag: TAG });
   });

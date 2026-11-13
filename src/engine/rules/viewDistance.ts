@@ -8,8 +8,7 @@
 // 让前端 UI 能在不访问 GameState 的情况下判断距离/攻击范围(高亮/禁用)。
 // 后端 validate 始终是最终权威检查(用 src/engine/distance.ts 基于 GameState)。
 //
-// 注:src/client/utils/distance.ts 的同名函数语义一致,前端组件可直接用本模块,
-// 也可继续用 client util(两者基于同一套 distanceVars 投影)。
+// 注:本模块是前端 UI 判断距离/攻击范围的唯一实现(高亮/禁用)。
 
 import type { GameView } from '../types';
 import {
@@ -205,7 +204,7 @@ export function viewCanAttack(
   fromIdx: number,
   toIdx: number,
 ): boolean {
-  void cardMap; // 签名与 client utils/distance 对齐,GameView 投影不需要 cardMap
+  void cardMap; // 兼容既有调用签名,GameView 投影不需要 cardMap
   if (fromIdx === toIdx) return false;
   // 与引擎 inAttackRange 同构:攻击范围豁免直接放行;
   // 否则 effectiveDistance(含通用距离豁免)≤ 攻击范围。

@@ -24,12 +24,12 @@
 import type { GameState, FrontendAPI, GameView, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { canSlash } from '../rules/slash-quota';
 import { usedThisTurn } from '../rules/once-per-turn';
 import { runUseFlow } from './cards/use-card';
-import { runVirtualSlash, requireRequestType } from '../util/skillRuntime';
+import { runVirtualSlash, requireRequestType, engineCanPlayNow } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 // localVars keys(界刘备视为使用基本牌流程)
@@ -113,12 +113,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (state: GameState, params: Record<string, Json>) => {
-      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
+      // 通用合法条件:自己回合 + 出牌阶段 + 无 pending + 存活(engineCanPlayNow 四合一)
       const self = state.players[ownerId];
-      const selfAlive = self.alive === true;
 
       const normalized = normalizeAllocation(params, ownerId);
       if (!normalized) return '需要指定牌和目标';
@@ -159,10 +155,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         : [];
       const notGivenBefore = !givenTargets.includes(normalized[0].target);
       const ok =
-        myTurn &&
-        inActPhase &&
-        free &&
-        selfAlive &&
+        engineCanPlayNow(state, ownerId) &&
         hasCards &&
         noDuplicates &&
         allInHand &&

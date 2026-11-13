@@ -30,7 +30,7 @@ import { applyAtom } from '../core/apply'
 import { setFrameCancelled, topFrame } from '../core/frame';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 const USED_KEY = '奋威/used';
 const CONFIRM_RT = '奋威/confirm';
@@ -61,21 +61,15 @@ async function runFenweiPanel(
   targets: number[],
 ): Promise<number[] | null> {
   // 1) 询问是否发动奋威
-  delete st.localVars[CONFIRMED_KEY];
-  await applyAtom(st, {
-    type: '请求回应',
-    requestType: CONFIRM_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: `是否发动奋威?(限定技:令${skillName}对任意个目标无效)`,
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+  const confirmed = await askConfirm(st, CONFIRM_RT, ownerId, {
+    confirmedKey: CONFIRMED_KEY,
+    title: `是否发动奋威?(限定技:令${skillName}对任意个目标无效)`,
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
     defaultChoice: false,
     timeout: 15,
   });
-  if (!st.localVars[CONFIRMED_KEY]) return null; // 不发动
+  if (!confirmed) return null; // 不发动
 
   // 2) 多选目标面板(选任意个令其无效)
   delete st.localVars[CHOSEN_KEY];

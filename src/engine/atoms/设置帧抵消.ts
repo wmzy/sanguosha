@@ -1,5 +1,6 @@
 // 设置指定结算帧的抵消状态。响应牌须定位下层帧,不能隐式修改栈顶。
 import type { AtomDefinition } from '../types';
+import { broadcast } from './_helpers';
 
 export const 设置帧抵消: AtomDefinition<{ frameIndex: number; cancelled: boolean }> = {
   type: '设置帧抵消',
@@ -13,14 +14,11 @@ export const 设置帧抵消: AtomDefinition<{ frameIndex: number; cancelled: bo
     state.settlementStack[atom.frameIndex].cancelled = atom.cancelled;
   },
   toViewEvents(_state, atom) {
-    return {
-      ownerViews: new Map(),
-      othersView: {
-        type: '设置帧抵消',
-        frameIndex: atom.frameIndex,
-        cancelled: atom.cancelled,
-      },
-    };
+    return broadcast({
+      type: '设置帧抵消',
+      frameIndex: atom.frameIndex,
+      cancelled: atom.cancelled,
+    });
   },
   applyView(view, event) {
     const frame = view.settlementStack[event.frameIndex as number];

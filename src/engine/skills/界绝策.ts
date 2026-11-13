@@ -30,7 +30,7 @@ import { applyAtom } from '../core/apply';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界绝策';
 const DISPLAY_NAME = '绝策';
@@ -115,21 +115,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!hasLegalTarget) return;
 
       // 1) 询问是否发动绝策
-      delete st.localVars[CONFIRMED_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: CONFIRM_RT,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: '是否发动绝策?(对一名手牌数≤你的其他角色造成1点伤害)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
+      const confirmed = await askConfirm(st, CONFIRM_RT, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: '是否发动绝策?(对一名手牌数≤你的其他角色造成1点伤害)',
+        confirmLabel: '发动',
+        cancelLabel: '不发动',
         defaultChoice: false,
         timeout: 15,
       });
-      if (!st.localVars[CONFIRMED_KEY]) {
+      if (!confirmed) {
         delete st.localVars[CONFIRMED_KEY];
         return;
       }

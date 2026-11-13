@@ -33,8 +33,8 @@ import {
   registerAction,
   registerAfterHook,
   registerBeforeHook,
-  hasBlockingPending,
 } from '../core/skill';
+import { askConfirm, engineCanPlayNow } from '../util/skillRuntime';
 import { getGender } from '../data/character-meta';
 import { setPlayerVarUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
@@ -101,17 +101,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'recycle',
     (st: GameState, params: Record<string, Json>) => {
-      const myTurn = st.currentPlayerIndex === ownerId;
-      const inActPhase = st.phase === '出牌';
-      const free = !hasBlockingPending(st);
       const self = st.players[ownerId];
-      const selfAlive = self?.alive === true;
       const cardId = params.cardId as string;
       const cardIdOk = typeof cardId === 'string';
       const card = cardIdOk ? st.cardMap[cardId] : undefined;
       const cardInHand = cardIdOk && self.hand.includes(cardId);
       const isSha = !!card && card.name === '杀';
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && isSha;
+      // 时机四合一(自己回合+出牌阶段+无阻塞+存活)由 engineCanPlayNow 统一判定
+      const ok = engineCanPlayNow(st, ownerId) && cardInHand && isSha;
       return ok ? null : '现在不能重铸(需出牌阶段、手中【杀】)';
     },
     async (st: GameState, params: Record<string, Json>) => {
@@ -199,21 +196,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!hasMaleAlive(st)) return; // 无男性存活 → 不询问
 
     // 1. 询问是否发动(非锁定技,默认不发动)
-    delete st.localVars[CONFIRMED_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动燕语?(令一名男性角色摸两张牌)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    const confirmed = await askConfirm(st, CONFIRM_RT, ownerId, {
+      confirmedKey: CONFIRMED_KEY,
+      title: '是否发动燕语?(令一名男性角色摸两张牌)',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 15,
     });
-    if (!st.localVars[CONFIRMED_KEY]) return;
+    if (!confirmed) return;
     delete st.localVars[CONFIRMED_KEY];
 
     // 2. 选一名男性角色

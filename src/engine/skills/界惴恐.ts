@@ -40,7 +40,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { askRankCard, runRankCompareFlow } from '../flows/rank';
-import { runVirtualSlash } from '../util/skillRuntime';
+import { askConfirm, runVirtualSlash } from '../util/skillRuntime';
 import {
   registerAction,
   registerAfterHook,
@@ -195,21 +195,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (target.hand.length === 0) return;
 
         // 1) confirm:是否发动惴恐
-        delete st.localVars[CONFIRM_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: CONFIRM_RT,
-          target: ownerId,
-          prompt: {
-            type: 'confirm',
-            title: `惴恐:是否与 ${target.name} 拼点?`,
-            confirmLabel: '发动',
-            cancelLabel: '不发动',
-          },
+        const confirmed = await askConfirm(st, CONFIRM_RT, ownerId, {
+          confirmedKey: CONFIRM_KEY,
+          title: `惴恐:是否与 ${target.name} 拼点?`,
+          confirmLabel: '发动',
+          cancelLabel: '不发动',
           defaultChoice: false,
           timeout: 15,
         });
-        if (!st.localVars[CONFIRM_KEY]) return;
+        if (!confirmed) return;
         delete st.localVars[CONFIRM_KEY];
 
         // confirm 后再次校验(target 可能在此期间失去手牌)

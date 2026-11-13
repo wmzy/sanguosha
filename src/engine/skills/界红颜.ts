@@ -6,16 +6,15 @@
 //    你的手牌上限等于体力上限。"
 //
 // 界版变化(相对标版 src/engine/skills/红颜.ts):
-//   - 判定牌黑桃→红桃:与标版一致(判定 before hook 改花色)。
+//   - 判定牌黑桃→红桃:与标版一致(复用标版导出的 registerSpadeToHeartJudgeHook 共享注册)。
 //   - 新增:装备区有红桃牌时,手牌上限 = 体力上限(覆盖型 provider,条件生效)。
 //     无红桃装备时不返回(走默认公式 = 当前体力),不强行压低上限。
 //
 // 与天香的联动:界天香检查 skills.includes('红颜')||includes('界红颜'),
 //   界小乔拥有界红颜时,黑桃手牌/装备也作为合法弃牌。
-import type { Card, FrontendAPI, HookResult, Skill, GameState } from '../types';
-import { registerBeforeHook } from '../core/skill';
-import { peekTop } from '../core/deck';
+import type { FrontendAPI, Skill, GameState } from '../types';
 import { registerHandLimitProvider } from '../rules/hand-limit';
+import { registerSpadeToHeartJudgeHook } from './红颜';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -42,24 +41,9 @@ function hasHeartInEquipment(state: GameState, player: number): boolean {
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
-  // 判定 before:自己判定时,牌堆顶黑桃 → 红桃(在翻开前改花色,确保 toViewEvents 展示红桃)
-  const unloadHook = registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '判定',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.player !== ownerId) return;
-      const topId = peekTop(ctx.state);
-      if (!topId) return;
-      const card: Card | undefined = ctx.state.cardMap[topId];
-      if (!card) return;
-      if (card.suit !== '♠') return;
-      card.suit = '♥';
-      card.color = '红';
-    },
-  );
+  // 判定 before:自己判定时,牌堆顶黑桃 → 红桃(标红颜共享工厂,在翻开前改花色,
+  // 确保 toViewEvents 展示红桃)
+  const unloadHook = registerSpadeToHeartJudgeHook(state, skill.id, ownerId);
 
   // 手牌上限覆盖提供者:装备区有红桃牌时 = 体力上限
   const unloadProvider = registerHandLimitProvider(state, ownerId, (st, player) => {

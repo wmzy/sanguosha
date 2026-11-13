@@ -28,7 +28,8 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { recastCard } from '../flows/recast';
 import { setChain } from '../flows/face-down';
-import { registerAction, hasBlockingPending, validateUseCard } from '../core/skill';
+import { registerAction, validateUseCard } from '../core/skill';
+import { engineCanPlayNow } from '../util/skillRuntime';
 import { promptCancel } from '../flows/cancel';
 import { defaultPlayActive } from '../rules/action-active';
 
@@ -66,17 +67,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'recycle',
     (state: GameState, params: Record<string, Json>) => {
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inActPhase = state.phase === '出牌';
-      const free = !hasBlockingPending(state);
       const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
       const cardId = params.cardId as string;
       const cardIdOk = typeof cardId === 'string';
       const card = cardIdOk ? state.cardMap[cardId] : undefined;
       const cardInHand = cardIdOk && self.hand.includes(cardId);
       const isClub = !!card && card.suit === '♣';
-      const ok = myTurn && inActPhase && free && selfAlive && cardInHand && isClub;
+      // 时机四合一(自己回合+出牌阶段+无阻塞+存活)由 engineCanPlayNow 统一判定
+      const ok = engineCanPlayNow(state, ownerId) && cardInHand && isClub;
       return ok ? null : '现在不能重铸(需出牌阶段、手中梅花牌)';
     },
     async (state: GameState, params: Record<string, Json>) => {

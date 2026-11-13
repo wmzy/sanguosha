@@ -12,9 +12,41 @@
 //
 // 联动:天香发动条件("弃一张红桃手牌")由天香自身检查玩家是否拥有红颜来判定
 //   黑桃手牌是否合法,不依赖本文件。本文件负责判定牌的花色转换。
-import type { Card, FrontendAPI, HookResult, Skill } from '../types';
+//
+// 本文件同时导出 registerSpadeToHeartJudgeHook(黑桃判定牌→红桃 before hook,
+// 红颜族共享注册),界红颜 复用之(镜像 鬼道/八卦阵/闭月)。
+import type { Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { registerBeforeHook } from '../core/skill';
 import { peekTop } from '../core/deck';
+
+/**
+ * 注册红颜族判定 before hook:拥有者判定时,牌堆顶黑桃 → 红桃(在翻开前改花色)。
+ * 标红颜与界红颜此段逐字同构。在判定 atom 翻开牌(toViewEvents/apply)之前改花色,
+ * 这样:
+ *   - 判定视图事件展示红桃(玩家可见红颜效果)
+ *   - 消费技能(闪电/兵粮寸断/乐不思蜀/八卦阵判定)的 after hook 读到红桃
+ * before hook 先于 apply 与所有 after hook 运行,故无注册顺序依赖(优于 after hook 改判)。
+ * 返回取消注册函数(调用方按需并入 onInit unload)。
+ */
+export function registerSpadeToHeartJudgeHook(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+): () => void {
+  return registerBeforeHook(state, skillId, ownerId, '判定', async (ctx): Promise<HookResult | void> => {
+    const atom = ctx.atom;
+    // 仅拥有者自己的判定:判定牌归其所有,红颜才生效
+    if (atom.player !== ownerId) return;
+    const topId = peekTop(ctx.state);
+    if (!topId) return;
+    const card: Card | undefined = ctx.state.cardMap[topId];
+    if (!card) return;
+    if (card.suit !== '♠') return;
+    // 黑桃视为红桃:改花色 + 颜色(在翻开前生效,确保 toViewEvents 展示红桃)
+    card.suit = '♥';
+    card.color = '红';
+  });
+}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -26,29 +58,9 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-export function onInit(skill: Skill, state: import('../types').GameState): () => void {
-  const ownerId = skill.ownerId;
-
-  // 判定 before:小乔判定时,牌堆顶黑桃 → 红桃(在翻开前改花色)
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '判定',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      // 仅小乔自己的判定:判定牌归小乔所有,红颜才生效
-      if (atom.player !== ownerId) return;
-      const topId = peekTop(ctx.state);
-      if (!topId) return;
-      const card: Card | undefined = ctx.state.cardMap[topId];
-      if (!card) return;
-      if (card.suit !== '♠') return;
-      // 黑桃视为红桃:改花色 + 颜色(在翻开前生效,确保 toViewEvents 展示红桃)
-      card.suit = '♥';
-      card.color = '红';
-    },
-  );
+export function onInit(skill: Skill, state: GameState): () => void {
+  // 判定 before:小乔判定时,牌堆顶黑桃 → 红桃(共享工厂,界红颜复用)
+  registerSpadeToHeartJudgeHook(state, skill.id, skill.ownerId);
 
   return () => {};
 }

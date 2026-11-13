@@ -18,7 +18,7 @@ import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { hasSkillModule } from './registry';
-import { slotOf } from '../util/skillRuntime';
+import { slotOf, requireRequestType } from '../util/skillRuntime';
 
 const SKIP_TAG = '据守/翻面';
 const SKIP_FLAG = '据守/skipAll';
@@ -139,12 +139,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (s: GameState, _params: Record<string, Json>) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是选牌窗口';
-      const rt = (slot.atom as { requestType?: string }).requestType;
-      if (rt !== DISCARD_RT) return '当前不是据守弃牌窗口';
-      return null;
+      return requireRequestType(s, ownerId, [DISCARD_RT], {
+        wrongTypeError: '当前不是选牌窗口',
+        mismatchError: '当前不是据守弃牌窗口',
+      }).error;
     },
     async (s: GameState, params: Record<string, Json>) => {
       // 客户端契约:mandatory 多选弃牌 UI 与 HeadlessGameClient 提交 {cardIds:[x]},

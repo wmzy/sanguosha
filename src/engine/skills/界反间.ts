@@ -19,7 +19,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 /** 目标二选一请求类型。 */
 const CHOICE_REQUEST = '界反间/choice';
@@ -85,21 +85,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       });
 
       // ── 目标二选一(选项1=弃同色,选项2=失体力)──
-      delete st.localVars[CHOICE_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: CHOICE_REQUEST,
-        target,
-        prompt: {
-          type: 'confirm',
-          title: '反间:展示所有手牌弃置同色牌，或失去1点体力',
-          confirmLabel: '展示并弃置同色牌',
-          cancelLabel: '失去1点体力',
-        },
+      const choseDiscard = await askConfirm(st, CHOICE_REQUEST, target, {
+        confirmedKey: CHOICE_KEY,
+        title: '反间:展示所有手牌弃置同色牌，或失去1点体力',
+        confirmLabel: '展示并弃置同色牌',
+        cancelLabel: '失去1点体力',
         defaultChoice: false,
         timeout: 30,
       });
-      const choseDiscard = st.localVars[CHOICE_KEY] === true;
 
       if (choseDiscard) {
         // 选项1:目标展示所有手牌,弃置所有与所给牌同花色的牌(含刚收到的那张牌本身)。

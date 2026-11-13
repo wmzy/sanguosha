@@ -8,14 +8,14 @@
 // applyView 与 apply 对称:deckCount -1 + 判定牌进 processing/帧牌区;
 // 判定牌离开处理区由后续 atom 投影(移动牌 / 收取判定牌),本 atom 不预支弃牌堆计数。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { broadcast, requirePlayer } from './_helpers';
 import { bindJudgeCard } from '../flows/judge';
 import { drawFromTop, peekTop } from '../core/deck';
 
 export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
   type: '判定',
   validate(state, atom) {
-    if (!state.players[atom.player]) return `player ${atom.player} not found`;
-    return null;
+    return requirePlayer(state, atom.player, 'player');
   },
   apply(state, atom) {
     // 牌堆顶翻一张到栈顶结算帧的牌区(亮出判定牌)
@@ -57,7 +57,7 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
           }
         : {}),
     };
-    return { ownerViews: new Map(), othersView: view };
+    return broadcast(view);
   },
   effect: { sound: 'flip', animation: 'flip', blockUntilDone: true, duration: 1800 },
   applyView(view, _event) {

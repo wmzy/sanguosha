@@ -8,10 +8,15 @@
 import { memo } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
-import { hpBeadPalette } from './gameViewStyles/tokens';
+import { HpBeadColumn } from './HpBeadColumn';
 import type { GameView, Json } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
-import { isActiveAction, isFreePlayWindow, skillActionVariants } from '../utils/gameViewHelpers';
+import {
+  isActiveAction,
+  isFreePlayWindow,
+  skillActionVariants,
+  hasBlockingPending,
+} from '../utils/gameViewHelpers';
 import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES } from './gameViewConstants';
 import { getCharacterMeta, LORD_SKILLS } from '../../engine/data/character-meta';
 import { getCharacterImage } from '../assets/imageAssets';
@@ -123,20 +128,6 @@ export function PlayerCardLargeImpl({
       phase: view.phase,
       pending: view.pending,
     });
-  // 体力珠缩放:整列布局高度 = 17N−3(N=maxHealth),卡高 200px,仅 N ≥ 12(17×12−3=201>200)
-  // 才会溢出卡面,此时按 6/maxHealth 等比缩小珠体与间距(与座位卡 PlayerSeatView 同规则);
-  // N ≤ 11 沿用基础尺寸(标准 4 血场景无回归)。
-  const hpScale = p.maxHealth >= 12 ? 6 / p.maxHealth : 1;
-  const beadW = `${10 * hpScale}px`;
-  const beadH = `${14 * hpScale}px`;
-  const hpGap = `${3 * hpScale}px`;
-  // 珠列方向与分色(与座位卡 PlayerSeatView 同规则):损失的体力(空珠)在上方,
-  // 剩余体力(满珠)在下方;满珠颜色按剩余比例分色:>50% 绿 / >25% 黄 / ≤25% 红(濒危警示)。
-  const lostCount = Math.max(0, p.maxHealth - p.health);
-  const hpRatio = p.maxHealth > 0 ? p.health / p.maxHealth : 1;
-  // 满珠色档(与 data-hue 同判据):playerCardHpBeadFull 单类 + --bead-* 内联变量注入
-  const hpHue = hpRatio > 0.5 ? 'green' : hpRatio > 0.25 ? 'yellow' : 'red';
-  const hpBeadFullVars = hpBeadPalette[hpHue];
   // 身份小方章(左缘竖带顶部):主公金/忠臣蓝/反贼红/内奸紫
   const identityBadgeClass =
     identity === '主公'
@@ -170,18 +161,13 @@ export function PlayerCardLargeImpl({
           />
         )}
       </div>
-      {/* 右缘体力珠列:垂直排列,骑在卡右边框上;空珠(已损失)在上,满珠在下按余量分色 */}
-      <div className={styles.playerCardHpBeadCol} style={{ gap: hpGap }} aria-hidden data-hp-beads>
-        {Array.from({ length: p.maxHealth }, (_, i) => (
-          <span
-            key={i}
-            className={i < lostCount ? styles.playerCardHpBeadEmpty : styles.playerCardHpBeadFull}
-            data-full={i < lostCount ? undefined : 'true'}
-            data-hue={i < lostCount ? undefined : hpHue}
-            style={{ width: beadW, height: beadH, ...(i < lostCount ? undefined : hpBeadFullVars) }}
-          />
-        ))}
-      </div>
+      {/* 右缘体力珠列:垂直排列,骑在卡右边框上;空珠(已损失)在上,满珠在下按余量分色
+          (缩放/分色的共享实现见 HpBeadColumn) */}
+      <HpBeadColumn
+        className={styles.playerCardHpBeadCol}
+        maxHealth={p.maxHealth}
+        health={p.health}
+      />
       {/* 文字内容层:名牌横条(上) + 左缘竖带 + 底部紧凑技能排;中部透出立绘 */}
       <div className={cx(styles.playerCardContent, isChained && styles.playerCardChained)}>
       {/* 体力变化漂浮数字:伤害「-N」红 / 回血「+N」绿,上浮渐隐(动画状态由 useAnimationState 定时清除) */}
@@ -371,11 +357,6 @@ function playerCardLargePropsEqual(
     // 以及阻塞型 pending 的有无(自由出牌窗口开合,驱动按钮↔标签/置灰切换)
     hasBlockingPending(prev.view.pending) === hasBlockingPending(next.view.pending)
   );
-}
-
-/** view 根 pending 是否为阻塞型(与 isFreePlayWindow/defaultPlayActive 同源的判定)。 */
-function hasBlockingPending(pending: GameView['pending']): boolean {
-  return pending != null && pending.isBlocking !== false;
 }
 
 const PlayerCardLargeMemo = memo(PlayerCardLargeImpl, playerCardLargePropsEqual);

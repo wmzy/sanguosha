@@ -29,7 +29,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
-import { slotOf } from '../util/skillRuntime';
+import { slotOf, requireRequestType, askConfirm } from '../util/skillRuntime';
 
 /** owner.vars key:箜声牌 cardId 列表(与良姻共享) */
 const KONGSHENG_KEY = '箜声/牌';
@@ -67,21 +67,15 @@ async function performKongshengPrepare(
   if (self.hand.length === 0) return; // 无牌可置
 
   // 1) 是否发动
-  delete state.localVars[CONFIRMED_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: CONFIRM_RT,
-    target: ownerId,
-    prompt: {
-      type: 'confirm',
-      title: '是否发动箜声?(将任意张牌置于武将牌上)',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+  const confirmed = await askConfirm(state, CONFIRM_RT, ownerId, {
+    confirmedKey: CONFIRMED_KEY,
+    title: '是否发动箜声?(将任意张牌置于武将牌上)',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
     defaultChoice: false,
     timeout: 15,
   });
-  if (!state.localVars[CONFIRMED_KEY]) {
+  if (!confirmed) {
     delete state.localVars[CONFIRMED_KEY];
     return;
   }
@@ -238,10 +232,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as { requestType?: string }).requestType;
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, SELECT_RT, TARGET_RT], {
+        mismatchError: '当前不是箜声询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === CONFIRM_RT) {
         return null;
       }

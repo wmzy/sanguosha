@@ -29,6 +29,7 @@
 import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 import { isCancelled } from '../core/frame';
 import { runUseFlow, chargeOnSettle } from './cards/use-card';
 
@@ -50,13 +51,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (state, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (slot.atom as unknown as Record<string, unknown>).requestType as string;
-      if (requestType !== '青龙偃月刀/confirm' && requestType !== '青龙偃月刀/useKill') {
-        return '当前不是青龙偃月刀询问';
-      }
+      const check = requireRequestType(
+        state,
+        ownerId,
+        ['青龙偃月刀/confirm', '青龙偃月刀/useKill'],
+        { mismatchError: '当前不是青龙偃月刀询问' },
+      );
+      if (check.error) return check.error;
+      const requestType = check.requestType;
       // useKill 阶段:校验 cardId 是 owner 手牌中的一张杀
       if (requestType === '青龙偃月刀/useKill') {
         const cardId = params.cardId as string | undefined;
@@ -101,21 +103,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!hasKill) return;
 
     // 第一步:询问是否追杀
-    delete ctx.state.localVars['青龙偃月刀/confirmed'];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '青龙偃月刀/confirm',
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '青龙偃月刀:是否追杀?',
-        confirmLabel: '追杀',
-        cancelLabel: '不追杀',
-      },
+    const confirmed = await askConfirm(ctx.state, '青龙偃月刀/confirm', ownerId, {
+      confirmedKey: '青龙偃月刀/confirmed',
+      title: '青龙偃月刀:是否追杀?',
+      confirmLabel: '追杀',
+      cancelLabel: '不追杀',
       defaultChoice: false,
       timeout: 10,
     });
-    if (!ctx.state.localVars['青龙偃月刀/confirmed']) return;
+    if (!confirmed) return;
     delete ctx.state.localVars['青龙偃月刀/confirmed'];
 
     // 第二步:让 owner 选一张杀牌

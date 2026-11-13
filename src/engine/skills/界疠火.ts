@@ -8,10 +8,12 @@
 //   3. 多目标效果两版相同(火杀可+1目标)。
 //
 // 实现:
-//   ① transform action(preceding,主 action=杀.use 之前执行):
-//      校验 owner 手中的杀 damageType !== '火焰'(即非火杀,含普通/雷杀);
-//      创建影子卡 `${cardId}#界疠火`(后缀 = 技能 id,与客户端构造约定一致),name='杀',damageType='火焰',继承花色/点数/颜色,shadowOf 指向原卡。
-//      标记 `localVars['疠火/converted:${shadowId}']` = true 供后续 hook 识别。
+//   ① transform action(preceding,主 action=杀.use 之前执行):经 skillRuntime 转化技工厂
+//      注册(outputDamageType='火焰'):校验 owner 手中的杀 damageType !== '火焰'
+//      (即非火杀,含普通/雷杀),创建影子卡 `${cardId}#界疠火`(后缀 = 技能 id,与客户端
+//      构造约定一致),name='杀',damageType='火焰',继承花色/点数/颜色,shadowOf 指向原卡。
+//      标记 `localVars['疠火/converted:${shadowId}']` = true 供后续 hook 识别
+//      (工厂 afterExecute 维度;rollback 经 extraRollback 清理)。
 //   ② 造成伤害 after-hook:
 //      若 atom.source===owner + atom.cardId 是疠火转化影子 + amount>0 →
 //      标记 `localVars['疠火/damaged:${shadowId}']` = true。
@@ -26,24 +28,17 @@
 // 命名:文件名/loader key/character skill name 均为 '界疠火'(避开标疠火冲突);
 //   内部 Skill.name = '疠火'(OL 官方技能名,玩家可见)。
 import type {
-  Card,
   FrontendAPI,
   GameState,
   GameView,
-  Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import {
-  registerAction,
-  registerAfterHook,
-  hasBlockingPending,
-} from '../core/skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
 import { registerSlashTargetProvider } from '../rules/slash-target';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, registerTransformAction, mountTransformAction, type TransformActionOptions } from '../util/skillRuntime';
 
-const _SKILL_ID = '界疠火';
 const DISPLAY_NAME = '疠火';
 const COST_RT = '界疠火/cost';
 const COST_CARD_KEY = '疠火/costCard';
@@ -58,12 +53,6 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 影子卡 id:${原id}#界疠火(后缀 = 技能 id,须与客户端构造约定一致;写技能名"疠火"
- *  会让客户端构造的影子 id 与引擎创建的不一致 → 界疠火整类转化在客户端恒被拒)。 */
-function shadowIdOf(cardId: string): string {
-  return `${cardId}#界疠火`;
-}
-
 /** 标记某影子为疠火转化(在 localVars 里) */
 function convertedKey(shadowId: string): string {
   return `疠火/converted:${shadowId}`;
@@ -73,6 +62,52 @@ function convertedKey(shadowId: string): string {
 function damagedKey(shadowId: string): string {
   return `疠火/damaged:${shadowId}`;
 }
+
+const TRANSFORM_OPTIONS: TransformActionOptions = {
+  outputName: '杀',
+  // outputDamageType='火焰' 是疠火核心:非火杀转化为火杀
+  outputDamageType: '火焰',
+  // 非火杀:name === '杀' 且 damageType !== '火焰'(含普通杀与雷杀)
+  cardPredicate: (state, _ownerId, cardIds) => {
+    const card = state.cardMap[cardIds[0]];
+    return !!card && card.name === '杀' && card.damageType !== '火焰';
+  },
+  invalidError: '现在不能使用疠火',
+  // 标记此影子为疠火转化,供后续 hook 识别
+  afterExecute: (state, _ownerId, shadowId) => {
+    state.localVars[convertedKey(shadowId)] = true;
+  },
+  // rollback 配对清理 localVars 标记(影子/手牌还原由工厂与 dispatch 快照负责)
+  extraRollback: (state, _ownerId, _cardIds, shadowId) => {
+    delete state.localVars[convertedKey(shadowId)];
+    delete state.localVars[damagedKey(shadowId)];
+  },
+  mount: {
+    label: DISPLAY_NAME,
+    style: 'danger',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '疠火:将非火【杀】当火【杀】使用',
+      // 选非火杀(普通/雷杀)
+      cardFilter: {
+        filter: (c) => c.name === '杀' && c.damageType !== '火焰',
+        min: 1,
+        max: 1,
+      },
+      targetFilter: {
+        min: 1,
+        // 火杀可多指定一个目标(默认 1 + 1 = 2);后端 slashTargetProvider 权威校验
+        max: 2,
+        filter: (view: GameView, t: number) => {
+          // 排除自己;具体距离校验由后端 杀.use validate 处理
+          const cp = view.currentPlayerIndex;
+          return t !== cp;
+        },
+      },
+    },
+    activeWhen: (ctx) => defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx),
+  },
+};
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
@@ -93,52 +128,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ─── transform action:把非火杀转化为火杀影子(preceding,杀.use 之前) ──
-  registerAction(state,
-  skill.id,
-  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
-    // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending + 存活
-    const myTurn = state.currentPlayerIndex === ownerId;
-    const inActPhase = state.phase === '出牌';
-    const free = !hasBlockingPending(state);
-    const self = state.players[ownerId];
-    const selfAlive = self.alive === true;
-    const cardId = params.cardId as string;
-    const cardIdOk = typeof cardId === 'string';
-    const card = cardIdOk ? state.cardMap[cardId] : undefined;
-    const cardInHand = cardIdOk && self.hand.includes(cardId);
-    // 非火杀:name === '杀' 且 damageType !== '火焰'(含普通杀与雷杀)
-    const isNonFireSlash = !!card && card.name === '杀' && card.damageType !== '火焰';
-    const ok =
-      myTurn && inActPhase && free && selfAlive && cardInHand && isNonFireSlash;
-    return ok ? null : '现在不能使用疠火';
-  },
-  async (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const shadowId = shadowIdOf(cardId);
-    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-    // outputDamageType='火焰' 是疠火核心:非火杀转化为火杀
-    await applyAtom(state, {
-      type: '当作',
-      player: ownerId,
-      cardIds: [cardId],
-      shadowId,
-      outputName: '杀',
-      outputDamageType: '火焰',
-    });
-    // 标记此影子为疠火转化,供后续 hook 识别
-    state.localVars[convertedKey(shadowId)] = true;
-  },
-  // rollback:主 action validate 失败时撤销转化
-  (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const shadowId = shadowIdOf(cardId);
-    delete state.cardMap[shadowId];
-    delete state.localVars[convertedKey(shadowId)];
-    delete state.localVars[damagedKey(shadowId)];
-    state.players[ownerId].hand = state.players[ownerId].hand.map((id) =>
-      id === shadowId ? cardId : id,
-    );
-  },);
+  registerTransformAction(state, skill.id, ownerId, TRANSFORM_OPTIONS);
 
   // ─── respond:玩家在「疠火/cost」询问下选弃哪张牌;超时 = 失去1体力 ──
   registerAction(
@@ -235,33 +225,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
 export function onMount(skill: Skill, api: FrontendAPI): void {
   // transform:前端选非火杀 → 选目标 → 点疠火按钮 → 提交 preceding=[疠火.transform] + 主 action=杀.use
-  api.defineAction('transform', {
-    label: DISPLAY_NAME,
-    style: 'danger',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '疠火:将非火【杀】当火【杀】使用',
-      // 选非火杀(普通/雷杀)
-      cardFilter: {
-        filter: (c) => c.name === '杀' && c.damageType !== '火焰',
-        min: 1,
-        max: 1,
-      },
-      targetFilter: {
-        min: 1,
-        // 火杀可多指定一个目标(默认 1 + 1 = 2);后端 slashTargetProvider 权威校验
-        max: 2,
-        filter: (view: GameView, t: number) => {
-          // 排除自己;具体距离校验由后端 杀.use validate 处理
-          const cp = view.currentPlayerIndex;
-          return t !== cp;
-        },
-      },
-    },
-    // 转化技前端入口:缺 transform 字段则前端无法进入转化模式(不会发 preceding + 影子 cardId)
-    transform: (card: Card) => ({ name: '杀', sourceCardId: card.id, fromSkill: skill.id }),
-    activeWhen: (ctx) => defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx),
-  });
+  // (转化技前端入口:transform 回调由工厂附带,缺 transform 字段则前端无法进入转化模式)
+  mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
   // respond:代价选择(弃1张牌或放弃=失去1体力)
   api.defineAction('respond', {
     label: '弃1张牌',

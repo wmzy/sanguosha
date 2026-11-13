@@ -8,7 +8,7 @@ import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
-import { requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -88,23 +88,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const selfPlayer = ctx.state.players[ownerId];
     if (!selfPlayer || selfPlayer.hand.length === 0) return;
 
-    // 询问是否发动流离
-    delete ctx.state.localVars['流离/confirmed'];
-    ctx.state.localVars['流离/来源'] = atom.source; // respond 兜底校验用(pending atom 无 source)
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '流离/confirm',
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: '是否发动流离?',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-      },
+    // 询问是否发动流离(先记杀来源:respond 兜底校验用,pending atom 无 source)
+    ctx.state.localVars['流离/来源'] = atom.source;
+    const confirmed = await askConfirm(ctx.state, '流离/confirm', ownerId, {
+      confirmedKey: '流离/confirmed',
+      title: '是否发动流离?',
+      confirmLabel: '发动',
+      cancelLabel: '不发动',
       defaultChoice: false,
       timeout: 10,
     });
-    if (!ctx.state.localVars['流离/confirmed']) return;
+    if (!confirmed) return;
 
     // 询问选择新目标(在杀来源的攻击范围内)
     delete ctx.state.localVars['流离/target'];

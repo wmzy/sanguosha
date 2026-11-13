@@ -30,7 +30,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, declareAlternativeResponse } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 
 // localVars keys(标护驾主技路径)
 const DODGE_PLAYED_VAR = '界护驾/闪出';
@@ -170,22 +170,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         });
 
         // 询问魏角色是否令曹操摸1张(描述"可以"=可选;选择权在该魏角色)
-        delete ctx.state.localVars[CONFIRMED_VAR];
-        await applyAtom(ctx.state, {
-          type: '请求回应',
-          requestType: REQUEST_TYPE,
-          target: sourceIdx,
-          prompt: {
-            type: 'confirm',
-            title: `界护驾:是否令${lord.name}摸一张牌?`,
-            confirmLabel: '令曹操摸牌',
-            cancelLabel: '不发动',
-          },
+        const confirmed = await askConfirm(ctx.state, REQUEST_TYPE, sourceIdx, {
+          confirmedKey: CONFIRMED_VAR,
+          title: `界护驾:是否令${lord.name}摸一张牌?`,
+          confirmLabel: '令曹操摸牌',
+          cancelLabel: '不发动',
           defaultChoice: false,
           timeout: 30,
         });
 
-        if (ctx.state.localVars[CONFIRMED_VAR] === true) {
+        if (confirmed) {
           // 魏角色选择发动 → 曹操摸 1 张
           await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
         }
