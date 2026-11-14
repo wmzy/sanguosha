@@ -33,7 +33,7 @@ import { applyAtom } from '../core/apply'
 import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
 import { registerAfterHook } from '../core/skill';
 import { DISTANCE_ATTACK_MOD_KEY } from '../rules/vars-keys';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '屯田/confirm';
 const CONFIRMED_KEY = '屯田/confirmed';
@@ -243,15 +243,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '屯田',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动屯田?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动屯田?',
   });
 }
 

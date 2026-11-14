@@ -55,6 +55,12 @@ export function viewSeatDistance(
 //
 // 注意:前端 filter 无法感知当前选中卡的花色/点数,per-card 豁免(成略/诈降/界武圣/
 // 界烈弓/界当先)在此保持宽松(激活即放行);后端 validate 按 cardId 严格校验。
+//
+// 契约(两侧必须同步):登记表的 source 技能名集合必须与 src/engine/skills/ 下所有
+// registerDistanceExemptor / registerAttackRangeExemptor 调用点所在的技能文件名集合
+// 完全一致——由 tests/engine/view-distance-sync.test.ts 静态源码扫描锁定。
+// 新增豁免器调用点时必须同步在 VIEW_DISTANCE_EXEMPTIONS 登记(反之亦然,删调用点
+// 也须删登记),否则该测试失败、view 侧漏投影(引擎放行但前端目标置灰)。
 
 type DistanceExemptKind = 'distance' | 'attackRange';
 

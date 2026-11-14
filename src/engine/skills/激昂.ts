@@ -29,7 +29,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '激昂/confirm';
 const CONFIRMED_KEY = '激昂/confirmed';
@@ -133,15 +133,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '激昂',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动激昂?(摸一张牌)',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动激昂?(摸一张牌)',
   });
 }
 

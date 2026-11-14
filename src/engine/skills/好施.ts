@@ -25,7 +25,7 @@ import {
   registerAfterHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_RT = '好施/confirm'; // 鲁肃:是否发动好施
 const CHOOSE_TARGET_RT = '好施/target'; // 鲁肃:并列时选目标
@@ -217,15 +217,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '好施',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '好施',
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
+    title: '好施',
+    confirmLabel: '确认',
+    cancelLabel: '取消',
   });
   return () => {};
 }

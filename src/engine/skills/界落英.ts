@@ -30,9 +30,14 @@ import { applyAtom } from '../core/apply'
 import { currentJudgeCardId } from '../flows/judge';
 import { frameCards } from '../core/frame';
 import { flipFaceUpAll } from '../flows/face-down';
-import { registerAfterHook, registerBeforeHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import {
+  askConfirm,
+  registerConfirmRespond,
+  defineConfirmAction,
+  registerPhaseStartHook,
+} from '../util/skillRuntime';
 
 const _SKILL_ID = '界落英';
 const DISPLAY_NAME = '落英';
@@ -205,35 +210,22 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── 阶段开始(准备) before hook:曹植回合开始时清零"外得计数" ──
   //   "回合外累计"语义:在曹植回合内不累计,回合外才累计;进入自己回合即清零。
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '阶段开始',
-    async (ctx) => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== '准备') return;
-      const self = ctx.state.players[ownerId];
-      if (!self) return;
-      delete self.vars[OUTSIDE_GAIN_COUNT_KEY];
-    },
-  );
+  registerPhaseStartHook(state, skill.id, ownerId, '准备', async (ctx) => {
+    const self = ctx.state.players[ownerId];
+    if (!self) return;
+    delete self.vars[OUTSIDE_GAIN_COUNT_KEY];
+  });
 
   return () => {};
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
+    title: '是否发动落英?',
+    confirmLabel: '获得',
+    cancelLabel: '不获得',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动落英?',
-      confirmLabel: '获得',
-      cancelLabel: '不获得',
-    },
   });
   return undefined;
 }

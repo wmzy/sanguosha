@@ -9,7 +9,7 @@
 // - 裁剪时 appendEventJournal 追加被裁条目(每行 { epoch, ...entry });
 // - 房间清理统一走 persistence.deletePersistedRoom(内部 await removeEventJournal)。
 //
-// 并发模型:per-room 串行链(与 gameHistory.serializeWrite 同范式)——append 与删除
+// 并发模型:per-room 串行链(serialChain.ts 共享实现)——append 与删除
 // 按到达顺序执行,删除必等在途 append 完成,避免「rm 先完成、appendFile 后落盘」
 // 留下孤儿 journal。
 //
@@ -22,45 +22,32 @@ import { dirname, join } from 'node:path';
 import type { AppliedAtomEntry } from '../engine/types';
 import { serializeAtomHistory } from './snapshot';
 import { createLogger } from './logger';
-import { register as registerLifecycle } from './lifecycles';
+import { register as registerLifecycle } from './resourceRegistry';
+import { createRoomSerialChain } from './serialChain';
+import { isSafeRoomId } from './safeId';
 
 const log = createLogger('eventJournal');
 
 const DATA_DIR = join(process.cwd(), 'data', 'rooms');
 
-/** roomId 白名单(与 gameHistory.SAFE_ROOM_ID 同规则):服务端生成的房间码为
- *  字母数字;拒绝路径穿越/特殊字符。 */
-const SAFE_ROOM_ID = /^[A-Za-z0-9_-]+$/;
-
 /** 已确认存在的 journal 目录(避免每次 append 都 mkdir)。 */
 const ensuredDirs = new Set<string>();
 
-/** roomId → 进行中的 IO 链尾(append/remove 串行执行)。 */
-const chains = new Map<string, Promise<void>>();
+/** 每房间 journal IO 串行链:失败不阻断后续,只记 error(对局不受磁盘故障影响)。 */
+const { chains, enqueue } = createRoomSerialChain('eventJournalChains', {
+  onError: (roomId, err) => log.err(`journal io failed for room ${roomId}`, err),
+});
 
 registerLifecycle('eventJournalChains', chains, () => {
   chains.clear();
 });
 
 function journalPath(roomId: string): string | null {
-  if (!SAFE_ROOM_ID.test(roomId)) {
+  if (!isSafeRoomId(roomId)) {
     log.warn(`拒绝为非法 roomId 生成 journal 路径: ${roomId}`);
     return null;
   }
   return join(DATA_DIR, `${roomId}.events.jsonl`);
-}
-
-/** per-room 串行执行 IO 操作:后到的操作等先前的完成,失败不阻断后续。 */
-function enqueue(roomId: string, op: () => Promise<void>): Promise<void> {
-  const prev = chains.get(roomId) ?? Promise.resolve();
-  const next = prev.then(op, op).catch((err) =>
-    log.err(`journal io failed for room ${roomId}`, err),
-  );
-  chains.set(roomId, next);
-  void next.finally(() => {
-    if (chains.get(roomId) === next) chains.delete(roomId);
-  });
-  return next;
 }
 
 /** 追加被裁剪的 atomHistory 条目到 journal,每行 JSON:{ epoch, ...entry }。
@@ -97,13 +84,7 @@ export async function removeEventJournal(roomId: string): Promise<void> {
   await enqueue(roomId, () => rm(path, { force: true }));
 }
 
-/** 删除 journal 文件(房间销毁/清理时调用,persistence.deletePersistedRoom 统一
- *  await removeEventJournal)。fire-and-forget 便捷别名。 */
-export function deleteEventJournal(roomId: string): void {
-  void removeEventJournal(roomId);
-}
-
-/** 新一局 journal 重新开始(epoch 变化,旧局条目作废)。语义别名,同 delete。 */
+/** 新一局 journal 重新开始(epoch 变化,旧局条目作废)。fire-and-forget 删除旧 journal。 */
 export function resetEventJournal(roomId: string): void {
-  deleteEventJournal(roomId);
+  void removeEventJournal(roomId);
 }

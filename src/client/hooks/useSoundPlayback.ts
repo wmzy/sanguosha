@@ -24,6 +24,7 @@ import type { ViewEvent } from '../../engine/types';
 import { getAtomDef } from '../../engine/core/atom';
 import { audioEngine } from '../sounds/audioEngine';
 import type { QueuedEvent } from './useEventPlayback';
+import { useFreshSeqFilter } from './useFreshSeqFilter';
 
 /** ViewEvent 自带的 effect 片段(移动牌等派生事件携带;静态 atom 走 getAtomDef) */
 type EventEffect = { sound?: string; volume?: number } | undefined;
@@ -67,7 +68,7 @@ function clamp(v: number, lo: number, hi: number): number {
  *                  null/undefined/空数组时无副作用。
  */
 export function useSoundPlayback(ingested: readonly QueuedEvent[] | null | undefined): void {
-  const lastSeqRef = useRef(0);
+  const filterFresh = useFreshSeqFilter();
   const actionQueueRef = useRef<{ sound: string; volume?: number }[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -92,9 +93,9 @@ export function useSoundPlayback(ingested: readonly QueuedEvent[] | null | undef
 
   useEffect(() => {
     if (ingested && ingested.length > 0) {
-      const fresh = ingested.filter((e) => e.seq > lastSeqRef.current);
+      // seq 去重(共享水位过滤,见 useFreshSeqFilter)
+      const fresh = filterFresh(ingested);
       if (fresh.length > 0) {
-        lastSeqRef.current = Math.max(...fresh.map((e) => e.seq));
         for (const { event } of fresh) {
           const s = extractSound(event);
           if (!s) continue;
@@ -111,7 +112,7 @@ export function useSoundPlayback(ingested: readonly QueuedEvent[] | null | undef
     // 总是尝试出队:StrictMode remount 时 fresh 为空但队列可能有余项,
     // timer 已被 cleanup 清除(null)→ 可正常出队。
     drain();
-  }, [ingested, drain]);
+  }, [ingested, drain, filterFresh]);
 
   // 卸载/StrictMode cleanup:清 timer 即同时解锁 drain(timerRef=null)
   useEffect(() => {

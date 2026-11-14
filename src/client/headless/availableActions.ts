@@ -5,6 +5,7 @@ import type {
   Card,
   GameView,
   ActionContext,
+  ActionPrompt,
   ClientMessage as EngineClientMessage,
   Json,
   TargetFilter,
@@ -30,6 +31,7 @@ import {
   choosePlayerCandidates,
   selectTargetCandidates,
   promptTargetBounds,
+  isTriggerablePromptType,
   distributeAllocateCandidates,
   effectiveTargetCard,
   isFreePlayWindow,
@@ -59,17 +61,16 @@ function computeValidTargets(
   return selection.targets ? selection.contract.candidates : [];
 }
 
-/** 目标数上下界(prompt.targetFilter 的投影)。
- *  仅在「需要目标且非自动自身目标」时给值:min 缺省 1(不设字段),max 缺省 1(不设字段)。
+/** 目标数上下界(promptTargetBounds 的 AvailableAction 投影)。
+ *  仅在「需要目标且非自动自身目标」时给值,且 >1 才输出字段(min/max 缺省 1 不设字段)。
  *  引擎 validate 用同一份 targetFilter 判定,AI 少了这个下界就只会填 1 个目标 →
  *  离间(两名男性角色)一类多目标技能恒拒。 */
-function targetBounds(
-  targetFilter: TargetFilter | null | undefined,
+function targetBoundsOf(
+  prompt: ActionPrompt,
   rules: PlayRules,
 ): { minTarget?: number; maxTarget?: number } {
   if (!rules.needsTarget || rules.selfTarget) return {};
-  const min = targetFilter?.min ?? 1;
-  const max = targetFilter?.max ?? 1;
+  const { min, max } = promptTargetBounds(prompt);
   return {
     ...(min > 1 ? { minTarget: min } : {}),
     ...(max > 1 ? { maxTarget: max } : {}),
@@ -139,7 +140,7 @@ function buildCardPlaySkeleton(
       baseSeq: 0,
     },
     validTargets,
-    bounds: targetBounds(targetFilter, rules),
+    bounds: targetBoundsOf(action.prompt, rules),
     rules,
   };
 }
@@ -270,7 +271,9 @@ function buildTransformUseAction(
   // 影子卡 id 契约:`${选中牌 id 以 # 连接}#${skillId}`(与引擎 shadowIdOf 同约定)
   const shadowCardId = buildShadowCardId(ids, action.skillId);
   const desc = materials.map((c) => `${c.suit}${c.rank}`).join('+');
-  const bounds = targetBounds(cardTargetFilter, cardRules);
+  // 目标数边界与 promptTargetBounds 同源:产出牌 use action 的 prompt(无注册时
+  // 回退 transform 自身 prompt),>1 才输出的投影格式见 targetBoundsOf。
+  const bounds = targetBoundsOf((gate.produced ?? action).prompt, cardRules);
   const slashMax = slashTargetMaxOf(view, seatIndex, { name: wrapperName }, cardRules);
   // selfTarget 产出牌(桃/酒):与 buildPlayParams 同源预填 targets=[自己]
   const mainParams: EngineClientMessage['params'] = cardRules.selfTarget
@@ -554,14 +557,9 @@ function enumeratePromptActions(
   for (const action of skillActions) {
     if (action.actionType !== 'use') continue;
     const prompt = action.prompt;
-    if (
-      prompt.type !== 'confirm' &&
-      prompt.type !== 'selectTarget' &&
-      prompt.type !== 'choosePlayer' &&
-      prompt.type !== 'chooseOption'
-    ) {
-      continue;
-    }
+    // 与浏览器技能按钮共享 isTriggerablePromptType 白名单(不带 opts:转化类/
+    // distribute 在无头侧走各自的独立枚举器,不在此纳入)。
+    if (!isTriggerablePromptType(prompt)) continue;
     if (!isActiveAction(action, ctx)) continue;
     const base = {
       skillId: action.skillId,

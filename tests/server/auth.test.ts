@@ -31,7 +31,7 @@ import { fireTimeoutAndWait } from '../engine-harness';
 import { GameSession } from '../../src/server/session';
 import { gameSessions } from '../../src/server/registry';
 import { setRoomStatus } from '../../src/server/room';
-import { _resetForTests as resetLifecycles } from '../../src/server/lifecycles';
+import { _resetForTests as resetLifecycles } from '../../src/server/resourceRegistry';
 
 function makeApp(): Hono {
   const app = new Hono();

@@ -19,7 +19,7 @@ import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -130,15 +130,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '枭姬',
+    title: '是否发动枭姬？(摸两张牌)',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动枭姬？(摸两张牌)',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
   });
 }
 

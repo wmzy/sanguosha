@@ -14,7 +14,12 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, effectiveCardId, registerConfirmRespond } from '../util/skillRuntime';
+import {
+  askConfirm,
+  defineConfirmAction,
+  effectiveCardId,
+  registerConfirmRespond,
+} from '../util/skillRuntime';
 
 const CHOOSE_RT = '界奸雄/choose';
 const WANTCARD_KEY = '奸雄/wantCard';
@@ -103,15 +108,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '界奸雄',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动奸雄?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动奸雄?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
 }
 

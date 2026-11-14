@@ -16,7 +16,7 @@ import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -125,14 +125,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '洛神',
+    title: '是否发动洛神?',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动洛神?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
   });
 }

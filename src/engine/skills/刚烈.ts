@@ -15,7 +15,7 @@ import { applyAtom } from '../core/apply'
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '刚烈/confirm';
 const CHOOSE_REQUEST = '刚烈/choose';
@@ -134,15 +134,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '刚烈',
+    title: '刚烈:弃置两张手牌,或受到 1 点伤害?',
+    confirmLabel: '弃两张手牌',
+    cancelLabel: '受 1 点伤害',
     style: 'danger',
-    prompt: {
-      type: 'confirm',
-      title: '刚烈:弃置两张手牌,或受到 1 点伤害?',
-      confirmLabel: '弃两张手牌',
-      cancelLabel: '受 1 点伤害',
-    },
   });
 }
 

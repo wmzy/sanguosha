@@ -21,7 +21,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界恂恂';
@@ -186,15 +186,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动恂恂?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动恂恂?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
   return undefined;
 }

@@ -25,7 +25,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { hasSkillModule } from './registry';
-import { slotOf, requireRequestType } from '../util/skillRuntime';
+import { firstCardId, slotOf, requireRequestType } from '../util/skillRuntime';
 
 const USED_KEY = '据守/usedThisTurn';
 const DISCARD_RT = '据守/弃牌';
@@ -146,13 +146,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
         mismatchError: '当前不是据守弃牌窗口',
       }).error;
     },
-    async (s: GameState, params: Record<string, Json>) => {
+    async (s: GameState, params: Record<string, Json>): Promise<void> => {
       // 客户端契约:mandatory 多选弃牌 UI 与 HeadlessGameClient 提交 {cardIds:[x]},
       // 旧单发形状为 {cardId}。归一化双形状,且仅接受自己手牌中的牌(防注入他人牌);
       // 非法形状不写 → use execute 走兜底弃首张。
-      const raw: unknown = Array.isArray(params.cardIds) ? params.cardIds[0] : params.cardId;
+      const raw = firstCardId(params);
       const self = s.players[ownerId];
-      if (typeof raw === 'string' && self?.hand.includes(raw)) {
+      if (raw !== undefined && self?.hand.includes(raw)) {
         s.localVars[DISCARD_CHOICE_KEY] = raw;
       }
     },

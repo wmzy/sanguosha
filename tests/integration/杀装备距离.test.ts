@@ -287,7 +287,7 @@ describe('杀 + 装备 + 距离', () => {
     expect(state.players[1].health).toBe(healthAfterFirst - 1);
 
     // usedCount 0 → 1(上限 ∞ → 可出)
-    expect(state.turn.vars['杀/quotaUsed']).toBe(1);
+    expect(state.turn.vars['杀/quotaUsed/0']).toBe(1);
 
     // 第二次出杀:应被允许(usedCount 1 < ∞)
     await dispatchAndWait(state, {

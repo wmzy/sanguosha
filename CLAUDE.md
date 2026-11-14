@@ -215,7 +215,7 @@ vars['unlimitedKills']  // 应改为 '诸葛连弩/active'
 - 使用 `pnpm lint --fix` 修复代码风格
 - 组件使用 named export（不用 default export）
 - 服务端状态管理使用 plain object + event emitter，不用状态管理库
-- **引擎分层**（2026-06-06 重构后）：`src/engine/{characters,skills,equipment,create-engine}/`——角色/武将技能/装备技能已物理隔离，`createEngine()` 返回带闭包的 `EngineInstance`（`clearForTest()` 可重置全局 hooks）。详细 ADR：`docs/decisions/0013-skill-character-decouple.md`。
+- **引擎分层**：`src/engine/{core,atoms,flows,rules,skills,view,data,util}/`——武将技能与装备技能统一在 `skills/`（装备技能在根、卡牌效果在 `skills/cards/`），角色声明在 `data/characters/`。引擎入口是 `src/engine/index.ts`（纯门面 re-export `core/` 的 `create`/`dispatch`/`restore` 等）。详细 ADR：`docs/decisions/0013-skill-character-decouple.md`。
 
 ## 关键架构决策
 
@@ -298,11 +298,10 @@ pnpm test:watch        # 监听模式
 
 - `src/client/` — 前端 React 应用
 - `src/engine/` — 游戏引擎（纯逻辑）
-  - `characters/` — 角色声明（`CharacterConfig`）
-  - `skills/` — 武将技能实现（`SkillDef`），按角色单文件（汉字命名）
-  - `equipment/` — 装备技能实现（武器/防具/马）
-  - `create-engine.ts` — 引擎入口，提供 `createEngine()` 返回带闭包的 `EngineInstance`
-- `src/shared/` — 前后端共享的类型和数据（types/cards/deck/rng 等）
+  - `skills/` — 武将与装备技能实现（`SkillDef`），按技能单文件（汉字命名），`skills/cards/` 为卡牌效果
+  - `data/characters/` — 角色声明（`CharacterConfig`），按势力组织
+  - `core/`、`atoms/`、`flows/`、`rules/`、`view/` — 引擎核心（调度/原子操作/流程/规则/视图投影）
+  - `index.ts` — 引擎对外唯一入口（门面 re-export）
 - `src/server/` — 后端服务器
 - `tests/` — 测试
 - `docs/` — 设计文档和实现计划

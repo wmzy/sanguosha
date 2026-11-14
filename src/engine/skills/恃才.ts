@@ -30,11 +30,7 @@ import type { EquipSlot, FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import {
-  askConfirm,
-  effectiveCardId,
-  registerConfirmRespond,
-} from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, effectiveCardId, registerConfirmRespond } from '../util/skillRuntime';
 
 const SKILL_ID = '恃才';
 /** turn.vars:本回合已占用的牌类型(string[])。 */
@@ -167,15 +163,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: SKILL_ID,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '恃才',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '恃才',
   });
   return () => {};
 }

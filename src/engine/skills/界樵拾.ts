@@ -21,7 +21,7 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 const SKILL_ID = '界樵拾';
 const DISPLAY_NAME = '樵拾';
@@ -106,15 +106,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动樵拾?(你与当前回合角色各摸一张牌;若手牌数不相等,本轮失效)',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动樵拾?(你与当前回合角色各摸一张牌;若手牌数不相等,本轮失效)',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
   return () => {};
 }

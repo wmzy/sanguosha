@@ -24,7 +24,7 @@ import { peekTop } from '../core/deck';
 import { inAttackRange } from '../rules/distance';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm, currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 /** localVars keys */
 const CONFIRMED_KEY = '涯角/confirmed';
@@ -188,15 +188,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '涯角',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动涯角?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动涯角?',
   });
 }
 

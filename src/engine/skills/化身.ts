@@ -56,7 +56,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
 import { getCharacterMeta } from '../data/character-meta';
 import { HUASHEN_POOL_KEY as POOL_KEY, getHuashenPool } from '../rules/vars-keys';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 // ── 角色分派 ──
 const JIE_CHAR = '界左慈';
@@ -574,15 +574,11 @@ async function askSelectSkill(
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   // 化身的 respond(选技能 / 选化身牌 / 是否更换 / 选择行动)由 pending 驱动,无主动按钮。
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '化身',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '化身',
-      confirmLabel: '确定',
-      cancelLabel: '取消',
-    },
+    title: '化身',
+    confirmLabel: '确定',
+    cancelLabel: '取消',
   });
   return undefined;
 }

@@ -276,7 +276,7 @@ async function runSseSession(
 
 /**
  * 注册 SSE stream 路由到 Hono app。
- * 在 rest.ts 中通过 app.get('/api/rooms/:id/stream', sseStreamHandler) 注册。
+ * 在 routes/room-routes.ts 中通过 app.get('/api/rooms/:id/stream', sseStreamHandler) 注册。
  */
 export async function sseStreamHandler(c: Context): Promise<Response> {
   const roomId = c.req.param('id')!;

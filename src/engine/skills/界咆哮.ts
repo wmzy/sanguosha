@@ -13,7 +13,7 @@
 //      + atom.source===ownerId 精准定位"自己主动使用的杀被闪抵消"。
 import type { Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAfterHook } from '../core/skill';
+import { registerOnOwnSlashDodged } from '../util/skillRuntime';
 import { registerAlwaysUnlimitedWithProjection } from '../rules/slash-quota';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -33,20 +33,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const unregUnlimited = registerAlwaysUnlimitedWithProjection(state, skill.id, ownerId);
 
   // 杀被闪抵消后摸一张牌(无次数限制,每次被闪都摸)。
-  const unregHook = registerAfterHook(
-    state,
-    skill.id,
-    ownerId,
-    '被抵消',
-    async (ctx) => {
-      // 只对杀生效:万箭齐发等锦囊被闪抵消不触发(贯石斧/青龙同款判断)
-      if (ctx.frame.skillId !== '杀') return;
-      const atom = ctx.atom;
-      // 只在"自己使用的杀"被抵消时触发
-      if (atom.source !== ownerId) return;
-      await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
-    },
-  );
+  // 「自己使用的杀被闪抵消」前导守卫(仅杀生效/来源为自己)收敛于 registerOnOwnSlashDodged。
+  const unregHook = registerOnOwnSlashDodged(state, skill.id, ownerId, async (ctx) => {
+    await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
+  });
 
   return () => {
     unregUnlimited();

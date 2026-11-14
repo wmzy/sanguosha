@@ -19,7 +19,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 const TARGET_RT = '缔盟/target'; // 鲁肃:选两名目标
 const DISCARD_RT = '缔盟/discard'; // 鲁肃:选弃牌
@@ -202,16 +202,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     activeWhen: (ctx) => activeUnlessUsedThisTurn('缔盟')(ctx),
   });
 
-  api.defineAction('respond', {
-    label: '缔盟',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '缔盟',
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '缔盟', title: '缔盟', confirmLabel: '确认', cancelLabel: '取消' });
 
   return () => {};
 }

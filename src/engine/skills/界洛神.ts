@@ -27,7 +27,7 @@ import { frameCards } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import { getHandLimitBonus } from '../rules/vars-keys';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 /** turn.vars key:本回合经洛神获得的判定牌 id 列表(随「回合结束」自动清空) */
 const EXEMPT_VAR = '界洛神/豁免牌';
@@ -178,15 +178,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '界洛神',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动洛神?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动洛神?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
 }
 

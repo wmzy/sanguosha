@@ -10,6 +10,8 @@ import { css, cx } from '@linaria/core';
 import type { RoomConfig, CharPoolPreset } from '../../../server/protocol';
 import { colors } from '../../theme';
 import { ChatConfigSection } from '../ChatConfigSection';
+// 将池/倒计时选项与等待大厅(RoomConfigSection)共用同一出处,见 multiplayerStyles
+import { POOL_OPTIONS, TIMEOUT_OPTIONS, timeoutLabel } from '../../pages/multiplayer/multiplayerStyles';
 
 interface RoomConfigPanelProps {
   /** 当前房间配置 */
@@ -237,19 +239,6 @@ const errorBox = css`
   z-index: 1000;
 `;
 
-const TIMEOUT_OPTIONS: Array<{ label: string; value: number }> = [
-  { label: '快 (15s)', value: 15 },
-  { label: '标准 (30s)', value: 30 },
-  { label: '慢 (60s)', value: 60 },
-  { label: '无限', value: 0 },
-];
-
-const POOL_OPTIONS: Array<{ label: string; value: CharPoolPreset }> = [
-  { label: '标准池 (~32人)', value: 'standard' },
-  { label: '扩展池', value: 'extended' },
-  { label: '全武将 (60人)', value: 'all' },
-];
-
 export function RoomConfigPanel({
   config,
   readyPlayers,
@@ -363,7 +352,7 @@ export function RoomConfigPanel({
               ))}
               {!TIMEOUT_OPTIONS.some((o) => o.value === editConfig.timeoutSec) && (
                 <option value={editConfig.timeoutSec}>
-                  {editConfig.timeoutSec <= 0 ? '无限' : `${editConfig.timeoutSec}s`}
+                  {timeoutLabel(editConfig.timeoutSec)}
                 </option>
               )}
             </select>

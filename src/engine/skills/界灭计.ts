@@ -37,7 +37,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界灭计';
 const DISPLAY_NAME = '灭计';
@@ -306,15 +306,12 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     activeWhen: (ctx) => activeUnlessUsedThisTurn(SKILL_ID)(ctx),
   });
   // respond:目标回应 confirm 或 useCard。前端按 pending prompt 渲染。
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '灭计:选择一项',
-      confirmLabel: '弃一张锦囊',
-      cancelLabel: '依次弃两张',
-    },
+    title: '灭计:选择一项',
+    confirmLabel: '弃一张锦囊',
+    cancelLabel: '依次弃两张',
   });
   return undefined;
 }

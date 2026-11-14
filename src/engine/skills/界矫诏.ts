@@ -26,6 +26,7 @@
 //   矫诏效果恒为基础版本,殚心仅做计数(见 界殚心.ts)。
 import type { ActionContext, Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
+import { setPlayerVarUsage } from '../rules/turn-usage';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import { getCardEffect } from './cards';
@@ -124,9 +125,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const shadowId = shadowIdOf(cardId);
 
         // 限一次标记:同步设 vars(防 dispatch 重入)+ 回合用量 atom 投影 view(前端禁用按钮)。
-        // 必须在第一个 await 之前设置(见制衡.ts 注释)。
-        st.players[ownerId].vars[USED_KEY] = true;
-        await applyAtom(st, { type: '回合用量', player: ownerId, key: USED_KEY, value: true });
+        // 必须在第一个 await 之前设置(见制衡.ts 注释);setPlayerVarUsage 内部先写 vars 再 await。
+        await setPlayerVarUsage(st, ownerId, USED_KEY, true);
 
         // 创建影子卡(原卡仍在 cardMap,shadowOf 指向原卡;原卡花色/颜色继承)
         await applyAtom(st, {

@@ -26,7 +26,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
-import { runVirtualSlash, askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, runVirtualSlash } from '../util/skillRuntime';
 import {
   FLIP_TAG,
   SKIP_MO_TAG,
@@ -280,15 +280,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '界神速',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动界神速?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动界神速?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
 }
 

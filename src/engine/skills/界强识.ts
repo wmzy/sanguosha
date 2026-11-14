@@ -32,7 +32,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 const SKILL_ID = '界强识';
 const DISPLAY_NAME = '强识';
@@ -306,15 +306,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动强识?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动强识?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
   return undefined;
 }

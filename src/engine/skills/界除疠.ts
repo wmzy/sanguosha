@@ -26,7 +26,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { createRng } from '../util/rng';
+import { pickRandom } from '../util/rng';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
@@ -60,11 +60,7 @@ function listDiscardable(state: GameState, player: number): string[] {
 /** 用 state.rngSeed 派生 RNG 等概率抽目标区域一张可弃置的牌,推进后写回(保证重放确定性)。 */
 function pickRandomCard(state: GameState, player: number): string | null {
   const cards = listDiscardable(state, player);
-  if (cards.length === 0) return null;
-  const rng = createRng(state.rngSeed);
-  const idx = rng.nextInt(cards.length);
-  state.rngSeed = rng.getState();
-  return cards[idx];
+  return pickRandom(state, cards) ?? null;
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

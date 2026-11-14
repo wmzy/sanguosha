@@ -40,7 +40,7 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY, JUZHAN_STATE_VIEW_KEY } from '../rules/vars-keys';
 import { projectTurnUsage } from '../rules/turn-usage';
-import { requireRequestType } from '../util/skillRuntime';
+import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '拒战';
 /** 转换态 key(state:player.vars 跨回合持久,无 /usedThisTurn 后缀;view:经 回合用量 atom 投影 turnUsage)。
@@ -270,15 +270,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: SKILL_ID,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '拒战',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '拒战',
   });
   return () => {};
 }

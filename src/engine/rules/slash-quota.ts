@@ -2,7 +2,7 @@
 //
 // 三层模型(对齐 docs/architecture/出牌流程重设计.md 模块 K / condition.md):
 //   上限 = 额定(quota,覆盖型 max) + 额外(extra,叠加型 Σ);任一无限提供者命中 → ∞
-//   已用 = 杀/quotaUsed(额定已用) + 杀/extraUsed(额外已用),消耗时优先扣额定
+//   已用 = 杀/quotaUsed/<座次>(额定已用) + 杀/extraUsed/<座次>(额外已用),消耗时优先扣额定
 //
 // 三类提供者:
 //   · SlashQuotaProvider(额定):返回该来源设定的额定上限。slashQuotaMax = max(基础1, 各提供者)。
@@ -16,8 +16,9 @@
 //   - ∞ 与数值分走不同机制(无限提供者布尔判定,额定/额外数值贡献)
 //   - 多技能天然叠加(额定取大、额外求和)
 //
-// 已用次数 = turn.vars['杀/quotaUsed'] + turn.vars['杀/extraUsed']
-//   (出杀时优先扣额定,额定满后扣额外;回合结束随 turn.vars 清空)
+// 已用次数 = turn.vars['杀/quotaUsed/<座次>'] + turn.vars['杀/extraUsed/<座次>']
+//   (按玩家 key 存储——非当前回合玩家被逼杀(借刀杀人/挑衅)也各记各的;
+//    出杀时优先扣额定,额定满后扣额外;回合结束随 turn.vars 清空)
 //
 // 注册表为 state-bound(WeakMap 外挂在 GameState 上),随 state 自动隔离与 GC,
 // 无模块级全局状态泄漏(与 skill.ts 的 registries 同构)。
@@ -26,11 +27,11 @@ import type { GameState } from '../types';
 import { registerAfterHook } from '../core/skill';
 import { createProviderRegistry } from './provider-registry';
 import { setTurnUsage, projectTurnUsage } from './turn-usage';
-import { getSlashQuotaUsed, getSlashExtraUsed, slashQuotaUsedKey, slashExtraUsedKey, slashExtraKey, slashUnlimitedKey, slashBlockedKey, SLASH_QUOTA_USED_KEY as QUOTA_USED_VAR, SLASH_EXTRA_USED_KEY as EXTRA_USED_VAR, SLASH_USED_COUNT_KEY } from './vars-keys';
+import { getSlashQuotaUsed, getSlashExtraUsed, slashQuotaUsedKey, slashExtraUsedKey, slashExtraKey, slashUnlimitedKey, slashBlockedKey, SLASH_USED_COUNT_KEY } from './vars-keys';
 
 /**
  * view 侧"已出杀次数"投影 key(由「回合用量」atom 同步到 view.turnUsage)。
- * 历史上也是 state 计数 vars key;模块 K 拆分后 state 改用 杀/quotaUsed + 杀/extraUsed,
+ * 历史上也是 state 计数 vars key;模块 K 拆分后 state 改用 杀/quotaUsed/<座次> + 杀/extraUsed/<座次>,
  * 本常量保留为 view 投影 key(viewSlashUsed / 前端 turnUsage 消费),值 = slashUsed() 合计。
  */
 export const SLASH_USED_VAR = SLASH_USED_COUNT_KEY;
@@ -154,17 +155,13 @@ export function slashMax(state: GameState, player: number): number {
   return slashQuotaMax(state, player) + slashExtraMax(state, player);
 }
 
-/** 该玩家本回合额定已用次数(默认 0)。旧测试/存档的无玩家 key 仅归当前回合玩家。 */
+/** 该玩家本回合额定已用次数(默认 0)。按玩家 key(杀/quotaUsed/<座次>)存于 turn.vars。 */
 export function slashQuotaUsed(state: GameState, player = state.currentPlayerIndex): number {
-  const legacy = getSlashQuotaUsed(state.turn.vars);
-  if (player === state.currentPlayerIndex && legacy !== undefined) return legacy;
   return getSlashQuotaUsed(state.turn.vars, player) ?? 0;
 }
 
-/** 该玩家本回合额外已用次数(默认 0)。旧测试/存档的无玩家 key 仅归当前回合玩家。 */
+/** 该玩家本回合额外已用次数(默认 0)。 */
 export function slashExtraUsed(state: GameState, player = state.currentPlayerIndex): number {
-  const legacy = getSlashExtraUsed(state.turn.vars);
-  if (player === state.currentPlayerIndex && legacy !== undefined) return legacy;
   return getSlashExtraUsed(state.turn.vars, player) ?? 0;
 }
 
@@ -241,13 +238,11 @@ export async function incSlashUsed(state: GameState, player = state.currentPlaye
     const value = quota + 1;
     await setTurnUsage(state, player, SLASH_USED_COUNT_KEY, value + extra, [
       { scope: 'turn', key: slashQuotaUsedKey(player), value },
-      ...(player === state.currentPlayerIndex ? [{ scope: 'turn' as const, key: QUOTA_USED_VAR, value }] : []),
     ]);
   } else {
     const value = extra + 1;
     await setTurnUsage(state, player, SLASH_USED_COUNT_KEY, quota + value, [
       { scope: 'turn', key: slashExtraUsedKey(player), value },
-      ...(player === state.currentPlayerIndex ? [{ scope: 'turn' as const, key: EXTRA_USED_VAR, value }] : []),
     ]);
   }
 }

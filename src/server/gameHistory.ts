@@ -19,7 +19,9 @@
 import { mkdir, readFile, writeFile, rm, readdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { createLogger } from './logger';
-import { register as registerLifecycle } from './lifecycles';
+import { register as registerLifecycle } from './resourceRegistry';
+import { createRoomSerialChain } from './serialChain';
+import { isSafeRoomId } from './safeId';
 import { ReplayRecorder } from '../client/replay/recorder';
 import { eventsForViewer } from '../engine/view/events-for-viewer';
 import type { ReplayFile, ReplayMeta, SeatDelta } from '../client/replay/types';
@@ -35,14 +37,14 @@ export const HISTORY_DIR = process.env.SGS_HISTORY_DIR
 /** 每房间保留的历史条数上限(含录像文件),防止磁盘无限增长 */
 export const MAX_ENTRIES_PER_ROOM = 20;
 
-/** roomId 白名单:服务端生成的房间码为字母数字;拒绝路径穿越/特殊字符 */
-const SAFE_ROOM_ID = /^[A-Za-z0-9_-]+$/;
+/** roomId 白名单:统一走 safeId.ts 单一来源(拒绝路径穿越/特殊字符) */
 const SAFE_ENTRY_ID = /^[A-Za-z0-9_-]+$/;
 
 /** roomId → 条目列表(时间升序,最新在末尾)。懒加载缓存 */
 const cache = new Map<string, GameHistoryEntry[]>();
-/** roomId → 进行中的写链(串行化 append/delete/clear,防 index 并发覆盖) */
-const inflight = new Map<string, Promise<unknown>>();
+/** 每房间写操作串行链(append/delete/clear 串行执行,防 index 并发覆盖;
+ *  prev 失败不阻断本操作,本操作错误抛给调用方)。 */
+const writeChain = createRoomSerialChain('gameHistoryWrites');
 
 registerLifecycle('gameHistoryCache', cache, () => {
   cache.clear();
@@ -162,10 +164,6 @@ export function buildReplayFile(
 
 // ── 磁盘存取 ──
 
-function isSafeId(id: string): boolean {
-  return SAFE_ROOM_ID.test(id);
-}
-
 function roomDir(roomId: string): string {
   return join(HISTORY_DIR, roomId);
 }
@@ -202,16 +200,6 @@ async function readIndexFromDisk(roomId: string): Promise<GameHistoryEntry[]> {
   }
 }
 
-/** per-room 串行执行写操作:后到的写等待先前的写落盘,防 index 互相覆盖。 */
-function serializeWrite<T>(roomId: string, run: () => Promise<T>): Promise<T> {
-  const prev = inflight.get(roomId) ?? Promise.resolve();
-  const next = prev.catch(() => {}).then(run);
-  inflight.set(roomId, next);
-  return next.finally(() => {
-    if (inflight.get(roomId) === next) inflight.delete(roomId);
-  });
-}
-
 /** 追加一局历史(通常在游戏结束时调用一次)。replay 为 null 时条目 hasReplay=false。
  *  超出上限时裁掉最旧条目并删除其录像文件。 */
 export async function appendGameHistory(
@@ -219,8 +207,8 @@ export async function appendGameHistory(
   entry: GameHistoryEntry,
   replay: ReplayFile | null,
 ): Promise<void> {
-  if (!isSafeId(roomId)) return;
-  await serializeWrite(roomId, async () => {
+  if (!isSafeRoomId(roomId)) return;
+  await writeChain.enqueue(roomId, async () => {
     const entries = await readIndexFromDisk(roomId);
     entries.push(entry);
     const trimmed = entries.slice(-MAX_ENTRIES_PER_ROOM);
@@ -239,7 +227,7 @@ export async function appendGameHistory(
 
 /** 历史列表(时间降序,最新在前)。懒加载:首次读盘,之后走缓存。 */
 export async function listGameHistory(roomId: string): Promise<GameHistoryEntry[]> {
-  if (!isSafeId(roomId)) return [];
+  if (!isSafeRoomId(roomId)) return [];
   const cached = cache.get(roomId);
   if (cached) return [...cached].reverse();
   const entries = await readIndexFromDisk(roomId);
@@ -249,7 +237,7 @@ export async function listGameHistory(roomId: string): Promise<GameHistoryEntry[
 
 /** 读取单局录像。文件缺失/格式不符 → null。 */
 export async function getGameReplay(roomId: string, entryId: string): Promise<ReplayFile | null> {
-  if (!isSafeId(roomId) || !SAFE_ENTRY_ID.test(entryId)) return null;
+  if (!isSafeRoomId(roomId) || !SAFE_ENTRY_ID.test(entryId)) return null;
   try {
     const raw = await readFile(replayPath(roomId, entryId), 'utf8');
     const parsed: unknown = JSON.parse(raw);
@@ -297,8 +285,8 @@ export function filterReplayForViewer(file: ReplayFile, seat: number | null): Re
 
 /** 删除单条历史(含录像文件)。返回条目是否存在。 */
 export async function deleteGameHistoryEntry(roomId: string, entryId: string): Promise<boolean> {
-  if (!isSafeId(roomId) || !SAFE_ENTRY_ID.test(entryId)) return false;
-  return serializeWrite(roomId, async () => {
+  if (!isSafeRoomId(roomId) || !SAFE_ENTRY_ID.test(entryId)) return false;
+  return writeChain.enqueue(roomId, async () => {
     const entries = await readIndexFromDisk(roomId);
     const next = entries.filter((e) => e.id !== entryId);
     if (next.length === entries.length) return false;
@@ -311,8 +299,8 @@ export async function deleteGameHistoryEntry(roomId: string, entryId: string): P
 
 /** 清空房间全部历史(房主「清空」按钮)。 */
 export async function clearGameHistory(roomId: string): Promise<void> {
-  if (!isSafeId(roomId)) return;
-  await serializeWrite(roomId, async () => {
+  if (!isSafeRoomId(roomId)) return;
+  await writeChain.enqueue(roomId, async () => {
     await rm(roomDir(roomId), { recursive: true, force: true });
     cache.delete(roomId);
   });
@@ -327,7 +315,7 @@ export async function deleteRoomHistory(roomId: string): Promise<void> {
  *  场景:进程崩溃时快速房的历史已落盘,但重启后快速房不恢复 → 历史无主。
  *  在房间恢复完成后调用,validRoomIds = 当前 roomList 全量 id。 */
 export async function sweepOrphanHistory(validRoomIds: string[]): Promise<void> {
-  const valid = new Set(validRoomIds.filter(isSafeId));
+  const valid = new Set(validRoomIds.filter(isSafeRoomId));
   let dirents: string[];
   try {
     dirents = await readdir(HISTORY_DIR);

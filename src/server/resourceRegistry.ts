@@ -1,8 +1,8 @@
-// server/lifecycles.ts
+// server/resourceRegistry.ts
 // 集中管理所有模块级 Map 和资源的清理
 import { createLogger } from './logger';
 
-const log = createLogger('lifecycles');
+const log = createLogger('resourceRegistry');
 
 type Cleanup = () => void | Promise<void>;
 type Resource = { name: string; ref: unknown; cleanup: Cleanup };
@@ -29,20 +29,6 @@ export function register(name: string, ref: unknown, cleanup?: Cleanup): void {
         resources.delete(name);
       }),
   });
-}
-
-/**
- * 注销一个资源并立即调用其清理函数
- */
-export async function unregister(name: string): Promise<void> {
-  const resource = resources.get(name);
-  if (!resource) return;
-  try {
-    await resource.cleanup();
-  } catch (err) {
-    log.error(`注销资源 ${name} 失败`, { error: String(err) });
-  }
-  resources.delete(name);
 }
 
 /**

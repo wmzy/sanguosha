@@ -14,9 +14,9 @@
 import type { Plugin, ViteDevServer } from 'vite';
 import type { IncomingMessage, ServerResponse } from 'http';
 
-/** 从 SSR 世界取到的形状(app 默认导出 + 生命周期函数)。 */
+/** 从 SSR 世界取到的形状(app 命名导出 + 生命周期函数)。 */
 interface ServerModule {
-  default: {
+  app: {
     fetch: (req: Request, env: { incoming: IncomingMessage; outgoing: ServerResponse }) => Response | Promise<Response>;
   };
   startServerLifecycle(): Promise<void>;
@@ -49,12 +49,12 @@ export function honoApiPlugin(): Plugin {
           // SSR 世界里的清理函数
           const mods = await Promise.all([
             server.ssrLoadModule('/src/server/persistence.ts').catch(() => null),
-            server.ssrLoadModule('/src/server/lifecycles.ts').catch(() => null),
+            server.ssrLoadModule('/src/server/resourceRegistry.ts').catch(() => null),
             server.ssrLoadModule('/src/server/roomStore.ts').catch(() => null),
           ]);
-          const [persistence, lifecycles, roomStore] = mods as Array<Record<string, (() => unknown) | null> | null>;
+          const [persistence, resourceRegistry, roomStore] = mods as Array<Record<string, (() => unknown) | null> | null>;
           await persistence?.flushPendingWrites?.();
-          await lifecycles?.shutdownAll?.();
+          await resourceRegistry?.shutdownAll?.();
           await roomStore?.closeRoomStore?.();
         } catch {
           // 清理失败不阻塞关闭
@@ -88,10 +88,9 @@ export function honoApiPlugin(): Plugin {
       // 挂载 Hono REST API 到 /api(经 ssrLoadModule 与引擎同一模块世界)
       server.middlewares.use('/api', async (req: IncomingMessage, res: ServerResponse) => {
         try {
-          const app = await loadServer(server);
+          const mod = await loadServer(server);
           const fullPath = `/api${req.url ?? ''}`;
           const url = new URL(fullPath, `http://${req.headers.host}`);
-
 
           let body: string | undefined;
           if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -113,7 +112,7 @@ export function honoApiPlugin(): Plugin {
             body,
           });
 
-          const response = await app.default.fetch(request, {
+          const response = await mod.app.fetch(request, {
             incoming: req, outgoing: res,
           });
           res.statusCode = response.status;

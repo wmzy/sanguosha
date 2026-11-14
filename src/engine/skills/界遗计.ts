@@ -9,7 +9,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 // 内部 requestType/localVars 键名保持原前缀「遗计/」,不改为「界遗计/」
@@ -159,16 +159,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
-    label: '界遗计',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动遗计?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '界遗计', title: '是否发动遗计?' });
 }
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };

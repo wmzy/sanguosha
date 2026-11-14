@@ -26,6 +26,7 @@
 //   - respond 第三分支(被动型 drawChoice)经 RESPOND_OPTIONS 的 extraRequestTypes 注入共享注册。
 import type { FrontendAPI, GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
+import { setTurnVarUsage } from '../rules/turn-usage';
 import { frameCards } from '../core/frame';
 import { registerAfterHook, declareAlternativeResponse } from '../core/skill';
 import { askConfirm } from '../util/skillRuntime';
@@ -66,13 +67,7 @@ async function offerLordDraw(
   lordName: string,
 ): Promise<void> {
   // 标记本回合已触发(同步写 turn.vars 防止 hook 重入;turn.vars 由回合结束自动清空)
-  state.turn.vars[PER_TURN_VAR] = true;
-  await applyAtom(state, {
-    type: '回合用量',
-    player: ownerId,
-    key: PER_TURN_VAR,
-    value: true,
-  });
+  await setTurnVarUsage(state, ownerId, PER_TURN_VAR, true);
 
   // 询问蜀角色是否令主公摸1张(描述"可以"=可选;选择权在该蜀角色)
   if (

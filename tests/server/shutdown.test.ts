@@ -1,4 +1,4 @@
-// tests/server/lifecycle.test.ts
+// tests/server/shutdown.test.ts
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 describe('setupGracefulShutdown', () => {
@@ -37,7 +37,7 @@ describe('setupGracefulShutdown', () => {
   });
 
   it('should register SIGTERM and SIGINT handlers', async () => {
-    const { setupGracefulShutdown } = await import('../../src/server/lifecycle');
+    const { setupGracefulShutdown } = await import('../../src/server/shutdown');
     const mockServer = { close: vi.fn((cb?: () => void) => cb?.()) };
     setupGracefulShutdown(mockServer);
     const signals = listeners.map((l) => l.signal);
@@ -46,7 +46,7 @@ describe('setupGracefulShutdown', () => {
   });
 
   it('should call server.close on SIGTERM', async () => {
-    const { setupGracefulShutdown } = await import('../../src/server/lifecycle');
+    const { setupGracefulShutdown } = await import('../../src/server/shutdown');
     const mockServer = { close: vi.fn((cb?: () => void) => cb?.()) };
     setupGracefulShutdown(mockServer);
     const handler = listeners.find((l) => l.signal === 'SIGTERM')?.handler;
@@ -57,7 +57,7 @@ describe('setupGracefulShutdown', () => {
 
   it('should call process.exit(0) after server closes', async () => {
     vi.resetModules();
-    const { setupGracefulShutdown } = await import('../../src/server/lifecycle');
+    const { setupGracefulShutdown } = await import('../../src/server/shutdown');
     const mockServer = { close: vi.fn((cb?: () => void) => cb?.()) };
     setupGracefulShutdown(mockServer);
     const handler = listeners.find((l) => l.signal === 'SIGINT')?.handler;
@@ -68,7 +68,7 @@ describe('setupGracefulShutdown', () => {
 
   it('should ignore duplicate shutdown signals', async () => {
     vi.resetModules();
-    const { setupGracefulShutdown } = await import('../../src/server/lifecycle');
+    const { setupGracefulShutdown } = await import('../../src/server/shutdown');
     const mockServer = { close: vi.fn((cb?: () => void) => cb?.()) };
     setupGracefulShutdown(mockServer);
     const handler = listeners.find((l) => l.signal === 'SIGTERM')?.handler;

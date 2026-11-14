@@ -1,11 +1,11 @@
-// server/lifecycle.ts
+// server/shutdown.ts
 
 import { flushPendingWrites } from './persistence';
-import { shutdownAll } from './lifecycles';
+import { shutdownAll } from './resourceRegistry';
 import { closeRoomStore } from './roomStore';
 import { createLogger } from './logger';
 
-const log = createLogger('lifecycle');
+const log = createLogger('shutdown');
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 let isShuttingDown = false;

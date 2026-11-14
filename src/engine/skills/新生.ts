@@ -24,9 +24,9 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
-import { createRng } from '../util/rng';
+import { pickRandom } from '../util/rng';
 import { HUASHEN_POOL_KEY as POOL_KEY, getHuashenPool } from '../rules/vars-keys';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '新生/confirm';
 const CHOICE_KEY = '新生/choice';
@@ -51,10 +51,7 @@ function drawNew化身Card(state: GameState, ownerId: number): string | null {
   const taken = new Set<string>([...debuted, ...existingPool]);
   const available = allCharacters.map((c) => c.name).filter((name) => !taken.has(name));
   if (available.length === 0) return null;
-  const rng = createRng(state.rngSeed);
-  const idx = rng.nextInt(available.length);
-  state.rngSeed = rng.getState();
-  return available[idx];
+  return pickRandom(state, available) ?? null;
 }
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -137,15 +134,12 @@ function drawNew化身CardSnapshot(state: GameState, ownerId: number): string | 
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '新生',
+    title: '新生:是否获得一张新的化身牌?',
+    confirmLabel: '获得',
+    cancelLabel: '不获得',
     style: 'passive',
-    prompt: {
-      type: 'confirm',
-      title: '新生:是否获得一张新的化身牌?',
-      confirmLabel: '获得',
-      cancelLabel: '不获得',
-    },
   });
   return undefined;
 }

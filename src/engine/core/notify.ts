@@ -46,6 +46,30 @@ export function notifyPendingResolved(state: GameState, slot: PendingSlot): void
   notifyStateChange(state);
 }
 
+/** 从 pendingSlots 删除 slot 并通知前端:先按 key 精确匹配(key 缺省时由 atom 提取),
+ *  未命中再按引用遍历兜底。仅在实际删除时发 pendingResolved 通知。返回是否删除。
+ *  共用方:dispatch(respond/execute 完成的 cleanupSlot,随后自行 resolve/releaseClaim)、
+ *  apply(超时 fireTimeoutNow 的 finally,随后自行 safeResolve/endRun)。 */
+export function removePendingSlot(state: GameState, slot: PendingSlot, key?: number): boolean {
+  const target = key ?? extractPendingTarget(slot.atom);
+  let deleted = false;
+  if (state.pendingSlots.get(target) === slot) {
+    state.pendingSlots.delete(target);
+    deleted = true;
+  }
+  if (!deleted) {
+    for (const [k, v] of state.pendingSlots) {
+      if (v === slot) {
+        state.pendingSlots.delete(k);
+        deleted = true;
+        break;
+      }
+    }
+  }
+  if (deleted) notifyPendingResolved(state, slot);
+  return deleted;
+}
+
 /** 推送 notify 事件(不改变 state) */
 export function pushNotify(state: GameState, event: NotifyEvent): void {
   state.seq += 1;

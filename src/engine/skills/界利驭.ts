@@ -49,7 +49,7 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 const SKILL_ID = '界利驭';
 const DISPLAY_NAME = '利驭';
@@ -251,15 +251,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
+    title: '是否发动利驭?',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动利驭?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
   });
 }
 

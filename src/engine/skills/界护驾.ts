@@ -28,6 +28,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
+import { setTurnVarUsage } from '../rules/turn-usage';
 import { registerAction, registerAfterHook, declareAlternativeResponse } from '../core/skill';
 import type { SkillModule } from '../types';
 import { requireRequestType, askConfirm } from '../util/skillRuntime';
@@ -161,13 +162,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (ctx.state.turn.vars[PER_TURN_VAR] === true) return;
 
         // 标记本回合已触发(同步写 turn.vars 防止 hook 重入;turn.vars 由回合结束自动清空)
-        ctx.state.turn.vars[PER_TURN_VAR] = true;
-        await applyAtom(ctx.state, {
-          type: '回合用量',
-          player: ownerId,
-          key: PER_TURN_VAR,
-          value: true,
-        });
+        await setTurnVarUsage(ctx.state, ownerId, PER_TURN_VAR, true);
 
         // 询问魏角色是否令曹操摸1张(描述"可以"=可选;选择权在该魏角色)
         const confirmed = await askConfirm(ctx.state, REQUEST_TYPE, sourceIdx, {

@@ -55,14 +55,7 @@ import { defaultPlayActive } from '../rules/action-active';
 import { setTurnVarUsage } from '../rules/turn-usage';
 import { JIESHUANGXIONG_COLOR_VIEW_KEY } from '../rules/vars-keys';
 import type { SkillModule } from '../types';
-import {
-  askConfirm,
-  effectiveCardId,
-  requireRequestType,
-  registerTransformAction,
-  mountTransformAction,
-  type TransformActionOptions,
-} from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, effectiveCardId, mountTransformAction, registerTransformAction, requireRequestType, type TransformActionOptions } from '../util/skillRuntime';
 
 const _SKILL_ID = '界双雄';
 const DISPLAY_NAME = '双雄';
@@ -294,15 +287,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动双雄?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动双雄?',
   });
 
   // 转化技 transform:把一张异色手牌当【决斗】。前端两步 UI(选牌+目标),

@@ -32,7 +32,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { flipFaceDown, flipFaceUp, isFaceDown, performSkipTurn } from '../flows/face-down';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 const DISPLAY_NAME = '伏枥';
 
@@ -206,15 +206,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动伏枥?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动伏枥?',
   });
   return;
 }

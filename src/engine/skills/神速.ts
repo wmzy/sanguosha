@@ -26,7 +26,14 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
-import { runVirtualSlash, requireRequestType, askConfirm } from '../util/skillRuntime';
+import {
+  runVirtualSlash,
+  requireRequestType,
+  askConfirm,
+  firstCardId,
+  registerPhaseStartHook,
+  defineConfirmAction,
+} from '../util/skillRuntime';
 import { skipPhase } from '../rules/skip-phase';
 
 const OPT1_TRIGGER_RT = '神速/opt1-trigger';
@@ -90,20 +97,16 @@ export function registerShensuTagSkipHook(
   phase: string,
   tag: string,
 ): void {
-  registerBeforeHook(
+  registerPhaseStartHook(
     state,
     skillId,
     ownerId,
-    '阶段开始',
+    phase,
     async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== phase) return;
       const self = ctx.state.players[ownerId];
       if (!self?.tags.includes(tag)) return;
       // 标签型跳过:去标签 + 阶段结束(当前阶段) + cancel
-      return skipPhase(ctx.state, atom, tag);
+      return skipPhase(ctx.state, ctx.atom, tag);
     },
   );
 }
@@ -207,21 +210,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (typeof t === 'number') s.localVars['神速/target'] = t;
       } else if (rt === OPT2_EQUIP_RT) {
         // 兼容 distribute/select 的 cardIds 数组与单 cardId
-        const cardIds = params.cardIds as string[] | undefined;
-        const single = params.cardId as string | undefined;
-        s.localVars['神速/equipCardId'] =
-          (Array.isArray(cardIds) && cardIds.length > 0 ? { cardIds: [cardIds[0]] } : null) ??
-          (typeof single === 'string' ? single : null);
+        s.localVars['神速/equipCardId'] = firstCardId(params) ?? null;
       }
     },
   );
 
   // ── 选项1:阶段开始(判定) before-hook ──────────────────────────
-  registerBeforeHook(
+  registerPhaseStartHook(
     state,
     skill.id,
     ownerId,
-    '阶段开始',
+    '判定',
     async (ctx): Promise<HookResult | void> => {
       const entry = shensuPhaseEntry(ctx, ownerId, '判定', OPT1_USED_KEY);
       if (!entry) return;
@@ -272,14 +271,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 跳过判定阶段(直接型):阶段结束(判定)+ cancel
       return skipPhase(ctx.state, atom);
     },
+    { requireCurrentPlayer: true },
   );
 
   // ── 选项2:阶段开始(出牌) before-hook ──────────────────────────
-  registerBeforeHook(
+  registerPhaseStartHook(
     state,
     skill.id,
     ownerId,
-    '阶段开始',
+    '出牌',
     async (ctx): Promise<HookResult | void> => {
       const entry = shensuPhaseEntry(ctx, ownerId, '出牌', OPT2_USED_KEY);
       if (!entry) return;
@@ -319,14 +319,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         },
         timeout: 15,
       });
-      const equipCardIdRaw = ctx.state.localVars['神速/equipCardId'] as
-        | { cardIds: string[] }
-        | string
-        | undefined;
-      const equipCardId =
-        (equipCardIdRaw && typeof equipCardIdRaw === 'object'
-          ? equipCardIdRaw.cardIds?.[0]
-          : (equipCardIdRaw)) ?? undefined;
+      const equipCardId = ctx.state.localVars['神速/equipCardId'] as string | undefined;
       delete ctx.state.localVars['神速/equipCardId'];
       if (!equipCardId || !Object.values(self.equipment).includes(equipCardId)) {
         return; // 无效选择 → 出牌阶段正常进行
@@ -366,6 +359,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 跳过出牌阶段(直接型):阶段结束(出牌)+ cancel
       return skipPhase(ctx.state, atom);
     },
+    { requireCurrentPlayer: true },
   );
 
   // ── 跳过摸牌阶段:有标签 → skip(同兵粮寸断) ──────────────────
@@ -375,11 +369,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
   registerShensuTagSkipHook(state, skill.id, ownerId, '出牌', SKIP_PLAY_TAG);
 
   // ── 选项3:阶段开始(弃牌) before-hook ──────────────────────────
-  registerBeforeHook(
+  registerPhaseStartHook(
     state,
     skill.id,
     ownerId,
-    '阶段开始',
+    '弃牌',
     async (ctx): Promise<HookResult | void> => {
       const entry = shensuPhaseEntry(ctx, ownerId, '弃牌', OPT3_USED_KEY);
       if (!entry) return;
@@ -430,6 +424,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 跳过弃牌阶段(直接型):阶段结束(弃牌)+ cancel
       return skipPhase(ctx.state, atom);
     },
+    { requireCurrentPlayer: true },
   );
 
   // ── 翻面:下一回合跳过整回合(机制同据守/放逐) ────────────────
@@ -439,14 +434,5 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
-    label: '神速',
-    style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动神速?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '神速', title: '是否发动神速?', style: 'default' });
 }

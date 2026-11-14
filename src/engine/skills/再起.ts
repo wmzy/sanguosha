@@ -22,8 +22,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
 import { peekTop } from '../core/deck';
-import { registerBeforeHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond, registerPhaseStartHook } from '../util/skillRuntime';
 
 const TRIGGER_RT = '再起/trigger';
 const TRIGGERED_KEY = '再起/triggered';
@@ -46,17 +45,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // 阶段开始(摸牌) before:询问是否再起,发动则展示+结算+跳过默认摸牌
-  registerBeforeHook(
+  // (三查 + 回合角色检查收敛于 registerPhaseStartHook 的 requireCurrentPlayer)
+  registerPhaseStartHook(
     state,
     skill.id,
     ownerId,
-    '阶段开始',
+    '摸牌',
     async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== '摸牌') return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
       const self = ctx.state.players[ownerId];
       if (!self?.alive) return;
 
@@ -141,21 +136,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '摸牌' });
       return { kind: 'cancel' };
     },
+    { requireCurrentPlayer: true },
   );
 
   return () => {};
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '再起',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动再起?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动再起?',
   });
 }
 

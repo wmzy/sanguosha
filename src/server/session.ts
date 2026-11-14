@@ -133,6 +133,21 @@ export class GameSession {
     return this.gameStartedAt;
   }
 
+  /** 是否调试房(快照权限校验用)。只读访问器,替代外部反射窃取私有字段。 */
+  get isDebug(): boolean {
+    return this.debug;
+  }
+
+  /** 本局随机种子(快照/录像元数据用;resetToLobby 换局后会重新生成)。 */
+  getSessionSeed(): number {
+    return this.sessionSeed;
+  }
+
+  /** 房间名(快照元数据用)。读实时 room.name,与快照旧行为(反射读 room.name)一致。 */
+  getRoomName(): string {
+    return this.room.name;
+  }
+
   /** 引擎座次 g 的玩家显示名。第 k 个非空座位的玩家映射到游戏座次 (k + offset) % n
    *  (与 playerId↔座次映射一致),故其昵称必须写在 out[(k + offset) % count]——
    *  直接按 seats 序填写会让 offset≠0 时每个玩家顶着别人的昵称/武将打完整局。

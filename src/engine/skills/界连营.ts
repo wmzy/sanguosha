@@ -33,7 +33,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 const TRIGGER_RT = '界连营/trigger';
 const SELECT_RT = '界连营/select';
@@ -139,11 +139,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt === TRIGGER_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === SELECT_RT) {
-        // 兼容 targets(数组)与 target(单数)
-        const targets =
-          (params.targets as number[] | undefined) ??
-          (typeof params.target === 'number' ? [params.target] : undefined);
-        st.localVars[TARGETS_KEY] = targets ?? [];
+        // dispatch 入口已统一补齐 targets/target 两种形状,直接读 targets
+        st.localVars[TARGETS_KEY] = (params.targets) ?? [];
       }
     },
   );
@@ -267,15 +264,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '界连营',
+    title: '是否发动界连营?',
+    confirmLabel: '发动(令角色摸牌)',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动界连营?',
-      confirmLabel: '发动(令角色摸牌)',
-      cancelLabel: '不发动',
-    },
   });
 }
 

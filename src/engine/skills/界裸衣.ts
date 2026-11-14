@@ -29,7 +29,12 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import {
+  askConfirm,
+  requireRequestType,
+  registerPhaseStartHook,
+  defineConfirmAction,
+} from '../util/skillRuntime';
 
 const BONUS_TAG = '界裸衣/bonus';
 /** 询问①:是否发动界裸衣(亮牌+增伤) */
@@ -87,17 +92,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 阶段开始(摸牌) before:亮牌+增伤+可选跳过摸牌获得匹配牌 ──
-  registerBeforeHook(
+  registerPhaseStartHook(
     state,
     skill.id,
     ownerId,
-    '阶段开始',
+    '摸牌',
     async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== '摸牌') return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
       const self = ctx.state.players[ownerId];
       if (!self?.alive) return;
       if (usedThisTurn(ctx.state, ownerId, '界裸衣')) return; // 本回合已发动
@@ -198,6 +198,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
       // 不跳过:默认摸牌照常进行(不 cancel,原顶3张会被摸2张)
     },
+    { requireCurrentPlayer: true },
   );
 
   // ── 造成伤害 before hook:杀/决斗伤害 +1 ──
@@ -240,16 +241,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
-    label: '界裸衣',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动界裸衣?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '界裸衣', title: '是否发动界裸衣?' });
   return () => {};
 }
 

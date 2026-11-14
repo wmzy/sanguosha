@@ -34,7 +34,7 @@ import {
   registerAfterHook,
   registerBeforeHook,
 } from '../core/skill';
-import { askConfirm, engineCanPlayNow } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, engineCanPlayNow } from '../util/skillRuntime';
 import { getGender } from '../data/character-meta';
 import { setPlayerVarUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
@@ -245,15 +245,12 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
     },
   });
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动燕语?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动燕语?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
   return () => {};
 }

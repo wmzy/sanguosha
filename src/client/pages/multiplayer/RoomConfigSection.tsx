@@ -12,6 +12,7 @@ import {
   configVal,
   GAME_MODE_OPTIONS,
   GAME_MODE_LABELS,
+  POOL_OPTIONS,
   POOL_LABELS,
   TIMEOUT_OPTIONS,
   timeoutLabel,
@@ -79,9 +80,11 @@ export function RoomConfigSection({ editConfig, onFieldChange, onCommit }: RoomC
                   onCommit({ ...editConfig, charPool: v });
                 }}
               >
-                <option value="standard">标准池 (~32人)</option>
-                <option value="extended">扩展池</option>
-                <option value="all">全武将 (60人)</option>
+                {POOL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div>

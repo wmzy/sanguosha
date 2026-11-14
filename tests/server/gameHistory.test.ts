@@ -23,7 +23,7 @@ import {
 import { applyRestRoutes } from '../../src/server/rest';
 import { applyAuthRoutes } from '../../src/server/auth/routes';
 import { initRoomStore, closeRoomStore } from '../../src/server/roomStore';
-import { _resetForTests as resetLifecycles } from '../../src/server/lifecycles';
+import { _resetForTests as resetLifecycles } from '../../src/server/resourceRegistry';
 import { gameSessions, playerRoomMap } from '../../src/server/registry';
 import { createRoom, getRoom, deleteRoom } from '../../src/server/room';
 import { GameSession } from '../../src/server/session';

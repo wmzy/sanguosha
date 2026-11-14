@@ -32,7 +32,8 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
-import { createRng } from '../util/rng';
+import { pickRandom } from '../util/rng';
+import { defineConfirmAction, firstCardId } from '../util/skillRuntime';
 
 const SKILL_NAME = '巧变';
 
@@ -238,10 +239,7 @@ async function stealHandCardOnSkipDraw(
       const target = ctx.state.players[t];
       if (!target?.alive || target.hand.length === 0) continue;
       // 手牌不公开:盲取一张随机手牌(与突袭一致,不展示)
-      const rng = createRng(ctx.state.rngSeed);
-      const idx = rng.nextInt(target.hand.length);
-      ctx.state.rngSeed = rng.getState();
-      const cardId = target.hand[idx];
+      const cardId = pickRandom(ctx.state, target.hand)!;
       await applyAtom(ctx.state, {
         type: '获得',
         player: ownerId,
@@ -374,11 +372,7 @@ export function handleQiaobianRespond(
     return;
   }
   if (rt === `${skillName}/discard`) {
-    const cardIds = params.cardIds as string[] | undefined;
-    const single = params.cardId as string | undefined;
-    const id =
-      (Array.isArray(cardIds) && cardIds.length > 0 ? cardIds[0] : undefined) ??
-      (typeof single === 'string' ? single : undefined);
+    const id = firstCardId(params);
     if (id) st.localVars[`${skillName}/discardCardId`] = id;
     return;
   }
@@ -395,11 +389,7 @@ export function handleQiaobianRespond(
     return;
   }
   if (rt === `${skillName}/move-source-card`) {
-    const cardIds = params.cardIds as string[] | undefined;
-    const single = params.cardId as string | undefined;
-    const id =
-      (Array.isArray(cardIds) && cardIds.length > 0 ? cardIds[0] : undefined) ??
-      (typeof single === 'string' ? single : undefined);
+    const id = firstCardId(params);
     if (id) st.localVars[`${skillName}/moveSourceCardId`] = id;
     return;
   }
@@ -490,15 +480,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: SKILL_NAME,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动巧变?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动巧变?',
   });
 }
 

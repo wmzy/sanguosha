@@ -1,8 +1,8 @@
 // src/engine/view/buildView.ts
 // src/engine/view/buildView.ts
-import type { GameState, GameView, ActionLogEntry, ClientMessage, Json, Card } from '../types';
+import type { GameState, GameView, ActionLogEntry, ClientMessage, Card } from '../types';
 import { projectVisiblePending } from './pending';
-import { getDistanceAttackMod, getDistanceDefenseMod, getDistanceAttackRange } from '../rules/vars-keys';
+import { projectPlayer } from './projectPlayer';
 
 /** 日志格式化上下文:把内部 cardId / 座次号翻译成玩家可读文本。
  *  省略时退化为只靠 cardId 自身解析(兼容旧调用/测试)。 */
@@ -112,62 +112,9 @@ export function buildView(state: GameState, viewer: number, debug = false): Game
     // 必须是快照:processedView 的 回合结束.applyView 会写 view.turn.vars = {}；
     // 若共享 state.turn 引用，增量视图回放会清掉权威回合用量镜像(buildView 丢失 turnUsage)。
     turn: { round: state.turn.round, phase: state.turn.phase, vars: { ...state.turn.vars } },
-    players: state.players.map((p, i) => {
-      // 选将保密:选将进行中,非本人视角不投影角色/势力/技能(名字投影昵称);
-      // 选将结束由 亮将 原子统一公开。debug 视角不受限。
-      const hideChar = state.charSelecting === true && !debug && i !== viewer;
-      return {
-      // 名牌回退链 nickname→name:nickname 只在 分配武将.apply 时写入,分配前的
-      // 窗口内 undefined——直接投影空串会让他人/旁观视角名牌全空(CharSelectWaitingOverlay
-      // 拼出「、、、、正在选将」)。回退 p.name 无泄漏:分配前 name 仍是原昵称
-      // (分配武将 apply 才覆写为武将名并留存 nickname);分配后 nickname 已留存,
-      // 优先取昵称,武将名不会经 name 通道泄漏(角色保密由 character/skills 红化控制)。
-      index: i,
-      name: hideChar ? (p.nickname ?? p.name) : p.name,
-      character: hideChar ? '' : p.character,
-      faction: hideChar ? undefined : p.faction,
-      health: p.health,
-      maxHealth: p.maxHealth,
-      alive: p.alive,
-      equipment: { ...p.equipment },
-      skills: hideChar ? [] : [...p.skills],
-      handCount: p.hand.length,
-      hand: (i === viewer || debug) ? p.hand.map((id) => state.cardMap[id]).filter(Boolean) : undefined,
-      marks: [...p.marks],
-      tags: [...p.tags],
-      // 距离修正 vars(只投影距离相关三个 key,不暴露身份等敏感 vars)
-      distanceVars: {
-        attackMod: getDistanceAttackMod(p.vars),
-        defenseMod: getDistanceDefenseMod(p.vars),
-        attackRange: getDistanceAttackRange(p.vars),
-      },
-      // 回合用量仅来自显式「回合用量」atom 的 state 镜像。
-      // 镜像按玩家归属存储，支持他人回合中的强制用牌；不再从 player.vars
-      // 自动投影 /usedThisTurn 等内部门控标记。
-      turnUsage: Object.fromEntries(
-        Object.entries(state.turn.vars)
-          .map(([k, v]) => {
-            const prefix = `__view/${i}/`;
-            return k.startsWith(prefix) ? [k.slice(prefix.length), v] : null;
-          })
-          .filter((entry): entry is [string, Json] => entry !== null),
-      ),
-      // 判定区:延时锦囊的 cardId 列表(乐不思蜀/闪电/兵粮寸断)
-      pendingTricks: p.pendingTricks.map((t) => t.card.id),
-      ...(() => {
-        const rawIdentity = p.identity;
-        if (!rawIdentity) return { identity: undefined, identityHidden: false };
-        // 自己:可见
-        if (i === viewer) return { identity: rawIdentity, identityHidden: false };
-        // 主公:公开
-        if (rawIdentity === '主公') return { identity: rawIdentity, identityHidden: false };
-        // 死亡:揭示
-        if (!p.alive) return { identity: rawIdentity, identityHidden: false };
-        // 其他玩家:隐藏
-        return { identity: undefined, identityHidden: true };
-      })(),
-      };
-    }),
+    // 玩家投影收敛到 projectPlayer(单一实现);choosePlayerCandidates 的轻量 view
+    // 与本全量视图共用同一字段集,新增 GameView.players 字段不再两处平行维护。
+    players: state.players.map((_p, i) => projectPlayer(state, i, { viewer, debug })),
     cardMap: state.cardMap,
     pending,
     deadline,

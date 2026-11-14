@@ -29,7 +29,12 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, currentRequestType, requireRequestType } from '../util/skillRuntime';
+import {
+  askConfirm,
+  currentRequestType,
+  defineConfirmAction,
+  requireRequestType,
+} from '../util/skillRuntime';
 import { isJiangTrigger, registerJiangFirstStage } from './激昂';
 
 const SKILL_ID = '界激昂';
@@ -139,15 +144,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动激昂?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动激昂?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
 }
 

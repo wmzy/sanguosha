@@ -41,7 +41,7 @@ import {
   registerAfterHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, firstCardId } from '../util/skillRuntime';
 
 // ── 摸牌逻辑常量(镜像标好施)──
 const CONFIRM_RT = '界好施/confirm';
@@ -148,9 +148,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             }
           } else if (rt === PASSIVE_GIVE_RT) {
             // 客户端契约:useCard 型 pending(min=max=1)只发 {cardId}
-            const raw: unknown = params.cardIds ?? params.cardId;
-            const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
-            if (ids && ids.length > 0) st.localVars[PASSIVE_CARD_KEY] = ids[0];
+            const cardId = firstCardId(params);
+            if (cardId !== undefined) st.localVars[PASSIVE_CARD_KEY] = cardId;
           }
         },
       ),
@@ -378,15 +377,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: DISPLAY_NAME,
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
+    title: DISPLAY_NAME,
+    confirmLabel: '确认',
+    cancelLabel: '取消',
   });
   return () => {};
 }

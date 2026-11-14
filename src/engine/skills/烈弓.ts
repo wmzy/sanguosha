@@ -24,7 +24,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { getDistanceAttackRange } from '../rules/vars-keys';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const TAG = '烈弓/禁闪';
 const CONFIRM = '烈弓/confirmed';
@@ -115,14 +115,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '烈弓',
+    title: '是否发动烈弓？',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动烈弓？',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
   });
 }

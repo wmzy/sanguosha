@@ -16,7 +16,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond, defineConfirmAction } from '../util/skillRuntime';
 
 const BONUS_TAG = '裸衣/bonus';
 const CONFIRM_REQUEST = '裸衣/confirm';
@@ -109,16 +109,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
-    label: '裸衣',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动裸衣?(少摸一张牌,杀/决斗伤害 +1)',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '裸衣', title: '是否发动裸衣?(少摸一张牌,杀/决斗伤害 +1)' });
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

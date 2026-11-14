@@ -20,6 +20,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
+import { normalizeCardIds } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 /** skillId / loader key / once-per-turn key(与标苦肉隔离)。 */
@@ -52,10 +53,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!self?.alive) return '玩家不存在或已死亡';
       if (self.health <= 0) return '体力不足，无法发动苦肉';
       // 代价:弃置一张牌(手牌或装备)。兼容 cardIds 数组与单数 cardId。
-      const cardIds =
-        (params.cardIds as string[] | undefined) ??
-        (typeof params.cardId === 'string' ? [params.cardId] : undefined);
-      if (!Array.isArray(cardIds) || cardIds.length === 0) return '需选择一张牌弃置';
+      const cardIds = normalizeCardIds(params);
+      if (cardIds.length === 0) return '需选择一张牌弃置';
       if (cardIds.length > 1) return '苦肉只能弃置一张牌';
       const cardId = cardIds[0];
       const inHand = self.hand.includes(cardId);
@@ -67,9 +66,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const from = ownerId;
       // 限一次标记:必须在第一个 await 之前设(防 dispatch 重入,见制衡.ts 注释)。
       await markOncePerTurn(state, from, SKILL_ID);
-      const cardIds =
-        (params.cardIds as string[] | undefined) ??
-        (typeof params.cardId === 'string' ? [params.cardId] : []);
+      const cardIds = normalizeCardIds(params);
       await pushFrame(state, DISPLAY_NAME, from, {});
       // 1. 弃置一张牌(代价:手牌或装备)
       await applyAtom(state, { type: '弃置', player: from, cardIds, voluntary: true });

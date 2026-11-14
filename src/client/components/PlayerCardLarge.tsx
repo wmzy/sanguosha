@@ -14,12 +14,12 @@ import type { SkillActionDef } from '../skillActionRegistry';
 import {
   isActiveAction,
   isFreePlayWindow,
+  isTriggerablePromptType,
   skillActionVariants,
   hasBlockingPending,
 } from '../utils/gameViewHelpers';
-import { FACTION_BG, SUIT_COLOR, EQUIPMENT_SKILL_NAMES } from './gameViewConstants';
-import { getCharacterMeta, LORD_SKILLS } from '../../engine/data/character-meta';
-import { getCharacterImage } from '../assets/imageAssets';
+import { SUIT_COLOR, EQUIPMENT_SKILL_NAMES } from './gameViewConstants';
+import { LORD_SKILLS } from '../../engine/data/character-meta';
 import { getSkillDescription } from '../../engine/skills/lifecycle';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import type { HpChangeNumber } from '../hooks/useAnimationState';
@@ -27,6 +27,12 @@ import { SkillTag } from './SkillTooltip';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 import { playerVisibleEqual } from '../utils/memo';
 import { displaySkillName } from '../utils/skillDisplay';
+import {
+  getCharacterCardVisuals,
+  hideImgOnError,
+  identityStampClass,
+} from '../utils/characterVisuals';
+import { HpFloatNumber } from '../utils/HpFloatNumber';
 import { useGameView } from './GameViewCtx';
 
 const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
@@ -86,10 +92,8 @@ export function PlayerCardLargeImpl({
   const isDead = !p.alive;
   // 横置(铁索连环):marks 含 'chained' —— 大卡给出铁链光泽 + 连环徽章
   const isChained = p.marks.some((m) => m.id === 'chained');
-  const charInfo = p.character ? getCharacterMeta(p.character) : undefined;
-  const faction = charInfo?.faction ?? '群';
-  const factionColor = FACTION_BG[faction] || '#8e44ad';
-  const charImg = p.character ? getCharacterImage(p.character) : null;
+  // 势力信息(与座位卡/选将遮罩共享派生,见 utils/characterVisuals)
+  const { factionColor, charImg } = getCharacterCardVisuals(p.character);
   const identity = p.identity;
   const isLordSeat = identity === '主公';
   // 技能列表(过滤默认技能与装备技能;非主公隐藏主公技)
@@ -100,18 +104,13 @@ export function PlayerCardLargeImpl({
       (isLordSeat || !LORD_SKILLS.has(s)),
   );
   // 主动技(confirm/choosePlayer/selectTarget/转化类/distribute)渲染为可点按钮。
-  // selectTarget 型(挑衅/反间/强袭/攻心/雄乱/界翦灭/界势斩/界解烦/界献州)此前被漏掉 →
-  // 整类技能在浏览器里无按钮、无法发动(与 distribute 漏网同因)。
-  const triggerableActions = skillActions.filter(
-    (a) =>
-      a.prompt.type === 'confirm' ||
-      a.prompt.type === 'chooseOption' ||
-      a.prompt.type === 'choosePlayer' ||
-      a.prompt.type === 'selectTarget' ||
-      (a.prompt.type === 'useCardAndTarget' && !!a.transform) ||
-      // useCard 型转化技(倾国黑牌当闪/看破黑牌当无懈):同样需要按钮进入转化选牌模式
-      (a.prompt.type === 'useCard' && !!a.transform) ||
-      a.prompt.type === 'distribute',
+  // 白名单与无头枚举共享 isTriggerablePromptType:selectTarget 型(挑衅/反间/强袭/
+  // 攻心/雄乱/界翦灭/界势斩/界解烦/界献州)此前被漏掉 → 整类技能在浏览器里无按钮、
+  // 无法发动(与 distribute 漏网同因);转化类(useCard/useCardAndTarget 携带
+  // transform)与 distribute 仅浏览器纳入(需要按钮进入转化选牌/分配模式,无头侧
+  // 各有独立枚举器)。
+  const triggerableActions = skillActions.filter((a) =>
+    isTriggerablePromptType(a.prompt, { transform: !!a.transform, distribute: true }),
   );
   // 技能按钮显隐:由 action 声明的 activeWhen 决定(缺省=出牌阶段+自己回合+无 pending)。
   // canOperate(debug 可操作性开关)作为外层闸门;激活时机不再硬编码在组件里。
@@ -129,16 +128,14 @@ export function PlayerCardLargeImpl({
       pending: view.pending,
     });
   // 身份小方章(左缘竖带顶部):主公金/忠臣蓝/反贼红/内奸紫
-  const identityBadgeClass =
-    identity === '主公'
-      ? styles.playerCardStampLord
-      : identity === '忠臣'
-        ? styles.playerCardStampLoyalist
-        : identity === '反贼'
-          ? styles.playerCardStampRebel
-          : identity === '内奸'
-            ? styles.playerCardStampRenegade
-            : '';
+  // (身份→样式映射的共享逻辑见 utils/characterVisuals;大卡非四身份走 base 无追加样式)
+  const identityBadgeClass = identityStampClass(identity, {
+    lord: styles.playerCardStampLord,
+    loyalist: styles.playerCardStampLoyalist,
+    rebel: styles.playerCardStampRebel,
+    renegade: styles.playerCardStampRenegade,
+    hidden: '',
+  });
 
   return (
     <>
@@ -155,9 +152,7 @@ export function PlayerCardLargeImpl({
             alt=""
             loading="lazy"
             decoding="async"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
+            onError={hideImgOnError}
           />
         )}
       </div>
@@ -171,18 +166,7 @@ export function PlayerCardLargeImpl({
       {/* 文字内容层:名牌横条(上) + 左缘竖带 + 底部紧凑技能排;中部透出立绘 */}
       <div className={cx(styles.playerCardContent, isChained && styles.playerCardChained)}>
       {/* 体力变化漂浮数字:伤害「-N」红 / 回血「+N」绿,上浮渐隐(动画状态由 useAnimationState 定时清除) */}
-      {hpChange && (
-        <span
-          key={`hpnum-${hpChange.version}`}
-          className={cx(
-            styles.hpFloatNumber,
-            hpChange.kind === 'heal' ? styles.hpFloatHeal : styles.hpFloatDamage,
-          )}
-          aria-hidden
-        >
-          {hpChange.kind === 'heal' ? `+${hpChange.amount}` : `-${hpChange.amount}`}
-        </span>
-      )}
+      {hpChange && <HpFloatNumber hpChange={hpChange} variant="large" />}
       {/* 名牌横条(卡顶):玩家名 + 徽章组(我/回合/⛓) */}
       <div
         className={styles.playerCardHeader}

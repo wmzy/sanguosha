@@ -28,7 +28,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAction, registerBeforeHook } from '../core/skill';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerPhaseStartHook } from '../util/skillRuntime';
 
 const TRIGGER_RT = '放权/trigger';
 const DISCARD_RT = '放权/discard';
@@ -111,17 +111,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 阶段开始(出牌) before:询问是否放权(跳过出牌) ──
-  registerBeforeHook(
+  registerPhaseStartHook(
     state,
     skill.id,
     ownerId,
-    '阶段开始',
+    '出牌',
     async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== '出牌') return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
       const self = ctx.state.players[ownerId];
       if (!self?.alive) return;
 
@@ -143,6 +138,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '出牌' });
       return { kind: 'cancel' };
     },
+    { requireCurrentPlayer: true },
   );
 
   // ── 回合结束 before:放权的额外回合机制 ──
@@ -256,15 +252,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '放权',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动放权?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动放权?',
   });
 }
 

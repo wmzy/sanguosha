@@ -13,6 +13,7 @@
 // 田的存储/距离修正等不变量见 屯田.ts 头注。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { registerAfterHook } from '../core/skill';
+import { defineConfirmAction } from '../util/skillRuntime';
 import {
   askAndJudgeTunTian,
   registerTianJudgeAfterHook,
@@ -69,15 +70,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '界屯田',
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动屯田?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动屯田?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
 }
 

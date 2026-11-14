@@ -4,6 +4,7 @@
 import { css } from '@linaria/core';
 import { colors, pageStyle, pageBgStyle, glassPanelStyle, goldHeadingStyle, goldColors } from '../../theme';
 import type { GameMode } from '../../../engine/rules/types';
+import type { CharPoolPreset } from '../../../server/protocol';
 
 // wyw-in-js 下 css`` 内插值其他 css 类(如 ${pageBgStyle})不会内联其属性,
 // 统一改为「自身属性类 + 基类字符串拼接」导出,使用处 className 零改动。
@@ -188,12 +189,17 @@ export const GAME_MODE_LABELS: Record<string, string> = {
   '1v1': '1v1 对决',
 };
 
-export const POOL_LABELS: Record<string, string> = {
+/** 将池选项:将池编码的单一出处(等待大厅 RoomConfigSection + 调试面板 RoomConfigPanel
+ *  三处消费);POOL_LABELS 只读展示由此派生,不再各留一份 label 副本。 */
+export const POOL_OPTIONS: Array<{ label: string; value: CharPoolPreset }> = [
+  { label: '标准池 (~32人)', value: 'standard' },
+  { label: '扩展池', value: 'extended' },
+  { label: '全武将 (60人)', value: 'all' },
+];
 
-  standard: '标准池 (~32人)',
-  extended: '扩展池',
-  all: '全武将 (60人)',
-};
+export const POOL_LABELS: Record<string, string> = Object.fromEntries(
+  POOL_OPTIONS.map((o) => [o.value, o.label]),
+);
 
 export const TIMEOUT_OPTIONS: Array<{ label: string; value: number }> = [
   { label: '快 (15s)', value: 15 },

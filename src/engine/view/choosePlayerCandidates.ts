@@ -12,11 +12,13 @@
 //
 // 策略:
 //   1. prompt 已显式提供 candidates(技能在 applyAtom 时算好)→ 直接用,权威。
-//   2. 无 candidates 但有 filter → 构造轻量 view 跑 filter 计算。
-//      filter 主要访问 view.players[t] 与 view.cardMap,故两者均提供;
-//      filter 访问未提供字段而抛错时保守纳入(后端 respond validate 拒非法目标)。
+//   2. 无 candidates 但有 filter → 构造轻量 view(与 buildView 共用 projectPlayer
+//      权威玩家投影)跑 filter 计算。filter 主要访问 view.players[t] 与 view.cardMap,
+//      故两者均提供;filter 访问了 view 上不存在的字段而抛错时保守纳入(后端 respond
+//      validate 拒非法目标)。
 //   3. 无 filter → 返回原样(前端 fallback 到所有存活)。
 import type { ActionPrompt, GameState, GameView } from '../types';
+import { projectPlayer } from './projectPlayer';
 
 export function resolveChoosePlayerCandidates(
   prompt: ActionPrompt,
@@ -31,20 +33,12 @@ export function resolveChoosePlayerCandidates(
   if (!cp.filter) return prompt;
 
   // 2. 构造轻量 view 跑 filter。
-  const players = state.players.map((p, i) => ({
-    index: i,
-    name: p.name,
-    character: p.character,
-    faction: p.faction,
-    health: p.health,
-    maxHealth: p.maxHealth,
-    alive: p.alive,
-    equipment: { ...p.equipment },
-    skills: [...p.skills],
-    handCount: p.hand.length,
-    marks: [...p.marks],
-    pendingTricks: p.pendingTricks.map((t) => t.card.id),
-  }));
+  // 与 buildView 共用 projectPlayer 权威投影(同一字段集):filter 访问
+  // tags/distanceVars/turnUsage 等新字段不再抛错走保守纳入。
+  // viewer=-1:candidates 随 pending 广播给所有 viewer,不按单一视角红化
+  // (无手牌投影;身份仅主公/阵亡等公开信息可见)。
+  // filter 访问了 view 上确实不存在的字段而抛错时仍保守纳入(后端 respond validate 拒非法目标)。
+  const players = state.players.map((_p, i) => projectPlayer(state, i, { viewer: -1 }));
   const partialView = { players, cardMap: state.cardMap } as GameView;
 
   const candidates: number[] = [];

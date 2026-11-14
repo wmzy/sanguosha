@@ -18,7 +18,6 @@
 // 限一次:player.vars['天义/usedThisTurn'](后缀约定,回合结束 atom 自动清空)。
 // 目标需 respond 选拼点牌——respond action 为所有玩家注册(validate 严格校验 pending requestType)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { askRankCardAndCompare, registerRankCardRespond } from '../flows/rank';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
@@ -27,6 +26,7 @@ import { registerSlashExtraProvider, registerSlashBlocker } from '../rules/slash
 import { registerSlashTargetProvider } from '../rules/slash-target';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import { slashExtraKey, slashTargetKey, slashBlockedKey, TIANYI_WIN_VIEW_KEY } from '../rules/vars-keys';
+import { setTurnVarUsage, projectTurnUsage } from '../rules/turn-usage';
 
 const TARGET_CARD_KEY = '天义/targetCard';
 const PD_RT = '天义/拼点';
@@ -120,17 +120,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 3) 结算输赢:发起方点数严格大于目标 = 赢;否则(输或平)没赢
       if (win) {
         // 赢:三项效果(攻击范围无限 / +1 杀 / 额外目标)统一由 turn.vars['天义/win'] 驱动
-        st.turn.vars[WIN_VAR] = from;
-        // 「攻击范围无限」须投影到 view:前端 viewCanAttack/无头枚举据此放开距离,
-        // 否则拼点赢后仍按徒手范围 1 置灰,超出范围的目标选不中。
-        await applyAtom(st, { type: '回合用量', player: from, key: WIN_VAR, value: from });
+        // (state 真相 + view 投影同 key 同值一步提交;「攻击范围无限」投影到 view 后,
+        //  前端 viewCanAttack/无头枚举据此放开距离,否则超出徒手范围的目标选不中)
+        await setTurnVarUsage(st, from, WIN_VAR, from);
         // 投影到 view.turnUsage,供前端 viewSlashMax/viewSlashTargetMax 推断(通用前缀 key)
-        await applyAtom(st, { type: '回合用量', player: from, key: slashExtraKey('天义'), value: 1 });
-        await applyAtom(st, { type: '回合用量', player: from, key: slashTargetKey('天义'), value: 1 });
+        await projectTurnUsage(st, from, slashExtraKey('天义'), 1);
+        await projectTurnUsage(st, from, slashTargetKey('天义'), 1);
       } else {
-        // 没赢:本回合不能使用杀(由 slashBlocker 落实)
+        // 没赢:本回合不能使用杀(由 slashBlocker 落实;state 存座次、view 投影 true,不同值须分开写)
         st.turn.vars[LOST_VAR] = from;
-        await applyAtom(st, { type: '回合用量', player: from, key: slashBlockedKey('天义'), value: true });
+        await projectTurnUsage(st, from, slashBlockedKey('天义'), true);
       }
 
       await popFrame(st);

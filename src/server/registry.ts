@@ -4,7 +4,7 @@
 
 import type { GameSession } from './session';
 import { setSessionChecker } from './room';
-import { register as registerLifecycle } from './lifecycles';
+import { register as registerLifecycle } from './resourceRegistry';
 
 // 游戏会话管理(进程级单例,按 roomId 索引)
 export const gameSessions = new Map<string, GameSession>();

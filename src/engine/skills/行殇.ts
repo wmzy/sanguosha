@@ -18,7 +18,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { obtainJudgeZoneCard } from '../core/judge-zone';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond, defineConfirmAction } from '../util/skillRuntime';
 
 const CONFIRM_RT = '行殇/confirm';
 const CONFIRMED_KEY = '行殇/confirmed';
@@ -115,16 +115,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
-    label: '行殇',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动行殇?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '行殇', title: '是否发动行殇?' });
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

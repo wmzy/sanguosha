@@ -42,8 +42,8 @@ import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPendi
 import { registerAttackRangeExemptor } from '../rules/distance';
 import { DANGXIAN_EXTRA_PHASE_VIEW_KEY, DANGXIAN_NO_RANGE_VIEW_KEY } from '../rules/vars-keys';
 import { setTurnVarUsage, projectTurnUsage } from '../rules/turn-usage';
-import { createRng } from '../util/rng';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { pickRandom } from '../util/rng';
+import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const DISPLAY_NAME = '当先';
 
@@ -192,15 +192,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const zones = source === 'discard'
         ? ctx.state.zones.discardPile
         : ctx.state.zones.deck;
-      // 盲取一张杀(seed RNG 推进并写回,保证重放确定性):
-      // 固定取第一张 = 永远获得同一张牌(信息泄露 + 与官方"获得一张杀"的随机语义不符)。
       const slashIds = zones.filter((cid) => ctx.state.cardMap[cid]?.name === '杀');
-      let killCardId: string | undefined;
-      if (slashIds.length > 0) {
-        const rng = createRng(ctx.state.rngSeed);
-        killCardId = slashIds[rng.nextInt(slashIds.length)];
-        ctx.state.rngSeed = rng.getState();
-      }
+      // 盲取一张杀(pickRandom 空数组不推进 seed;seed 推进并写回,保证重放确定性):
+      // 固定取第一张 = 永远获得同一张牌(信息泄露 + 与官方"获得一张杀"的随机语义不符)。
+      const killCardId = pickRandom(ctx.state, slashIds);
       if (killCardId) {
         await applyAtom(ctx.state, {
           type: '移动牌',
@@ -345,15 +340,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'passive',
-    prompt: {
-      type: 'confirm',
-      title: '当先:是否获得一张无距离限制的杀?',
-      confirmLabel: '获得杀',
-      cancelLabel: '不获得',
-    },
+    title: '当先:是否获得一张无距离限制的杀?',
+    confirmLabel: '获得杀',
+    cancelLabel: '不获得',
   });
   api.defineAction('end', {
     label: '当先·结束额外阶段',

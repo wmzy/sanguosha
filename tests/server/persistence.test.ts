@@ -21,7 +21,7 @@ let getRoom!: typeof import('../../src/server/room').getRoom;
 let createRoom!: typeof import('../../src/server/room').createRoom;
 let initRoomStore!: typeof import('../../src/server/roomStore').initRoomStore;
 let closeRoomStore!: typeof import('../../src/server/roomStore').closeRoomStore;
-let resetLifecycles!: typeof import('../../src/server/lifecycles')._resetForTests;
+let resetLifecycles!: typeof import('../../src/server/resourceRegistry')._resetForTests;
 let gameSessions!: typeof import('../../src/server/registry').gameSessions;
 let playerRoomMap!: typeof import('../../src/server/registry').playerRoomMap;
 
@@ -57,7 +57,7 @@ async function loadTestModules(configureFs?: (isolatedFs: FsPromisesModule) => v
   ({ applyAuthRoutes } = await import('../../src/server/auth/routes'));
   ({ getRoom, createRoom } = await import('../../src/server/room'));
   ({ initRoomStore, closeRoomStore } = await import('../../src/server/roomStore'));
-  ({ _resetForTests: resetLifecycles } = await import('../../src/server/lifecycles'));
+  ({ _resetForTests: resetLifecycles } = await import('../../src/server/resourceRegistry'));
   ({ gameSessions, playerRoomMap } = await import('../../src/server/registry'));
 }
 

@@ -17,7 +17,7 @@ import { resolveTimeoutMs } from './timeout';
 import {
   pushNotify,
   notifyStateChange,
-  notifyPendingResolved,
+  removePendingSlot,
   extractPendingTarget,
 } from './notify';
 import { topFrame, emptyFrame } from './frame';
@@ -371,12 +371,7 @@ function createAndAwaitSlot(
         // 错误恢复边界(非防御性编程):onTimeout 内部编排若抛错,引擎状态已不可信,
         // 但仍必须清理 pendingSlots + resolve 父 execute 的 Promise,否则 execute
         // 永远 await → 游戏死锁。异常本身会通过 dispatch 的 .catch→onError 上报。
-        let deleted = false;
-        if (state.pendingSlots.get(target) === slot) {
-          state.pendingSlots.delete(target);
-          deleted = true;
-        }
-        if (deleted) notifyPendingResolved(state, slot);
+        removePendingSlot(state, slot, target);
         safeResolve();
         endRun();
       }

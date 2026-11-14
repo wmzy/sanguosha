@@ -41,7 +41,7 @@ import {
 } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 const SKILL_ID = '界酒诗';
 const DISPLAY_NAME = '酒诗';
@@ -194,16 +194,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       return true;
     },
   });
-  api.defineAction('respond', {
-    label: DISPLAY_NAME,
-    style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '酒诗',
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: DISPLAY_NAME, title: '酒诗', confirmLabel: '确认', cancelLabel: '取消', style: 'default' });
   return undefined;
 }
 

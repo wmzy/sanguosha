@@ -694,7 +694,7 @@ describe('借刀杀人', () => {
     await P2.pass(); // P2 不闪 → 受 1 点伤害
     expect(harness.state.players[1].health).toBe(p2HealthBefore - 1);
     // 关键前提:P1 的出杀次数已达上限
-    expect(harness.state.turn.vars['杀/quotaUsed']).toBe(1);
+    expect(harness.state.turn.vars['杀/quotaUsed/0']).toBe(1);
 
     // P1 发动借刀杀人逼 P2 对 P3 出杀
     await P1.triggerAction('借刀杀人', 'use', { cardId: 'jd1', target: 1, killTarget: 2 });

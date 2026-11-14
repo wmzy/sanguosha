@@ -1,20 +1,20 @@
 import type { ActionPrompt, Atom, GameState, PendingSlot, PendingView } from '../types';
-import { TARGET_BROADCAST, TARGET_SYSTEM } from '../types';
+import { TARGET_BROADCAST } from '../types';
 import { getCardResponseMode, SILENT_RESPONSE_PROMPT } from '../core/card-response-availability';
 import { resolveTimeoutMs } from '../core/timeout';
+import { extractPendingTarget } from '../core/notify';
 import { resolveChoosePlayerCandidates } from './choosePlayerCandidates';
 import { resolveCardFilterCandidates } from './cardFilterCandidates';
+
+// extractPendingTarget 主实现在 core/notify.ts(本模块原有等价副本 targetOf,已收敛)。
+// notify.ts ↔ 本模块互为循环依赖:双方均只在函数体内调用对方导出,无顶层求值,
+// ESM 活绑定安全(先例:core/index.ts ↔ core/restore.ts)。
+const targetOf = extractPendingTarget;
 
 const OBSERVABLE_TYPES = new Set(['询问闪', '询问杀', '请求回应', '出牌窗口']);
 const WAITING_PROMPT: ActionPrompt = { type: 'confirm', title: '等待回应', cancelLabel: '' };
 
 const publishedViews = new WeakMap<GameState['pendingSlots'], Map<number, { signature: string; pending: PendingView | null }>>();
-
-function targetOf(atom: Atom): number {
-  if ('target' in atom && typeof atom.target === 'number') return atom.target;
-  if ('player' in atom && typeof atom.player === 'number') return atom.player;
-  return TARGET_SYSTEM;
-}
 
 function visibleSlot(state: GameState, viewer: number): PendingSlot | undefined {
   const alive = viewer >= 0 && state.players[viewer]?.alive === true;

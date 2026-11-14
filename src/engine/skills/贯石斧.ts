@@ -7,9 +7,9 @@
 //   不选/超时 → 贯石斧不发动(杀正常被闪抵消)
 import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { isCancelled, setFrameCancelled } from '../core/frame';
-import { requireRequestType } from '../util/skillRuntime';
+import { registerAction } from '../core/skill';
+import { setFrameCancelled } from '../core/frame';
+import { requireRequestType, registerOnOwnSlashDodged } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -51,55 +51,50 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  registerAfterHook(state, skill.id, ownerId, '被抵消', async (ctx) => {
-    // 只对杀生效:万箭齐发等锦囊被闪抵消不触发武器技(规则:贯石斧是"你使用的杀被抵消")
-    if (ctx.frame.skillId !== '杀') return;
-    const atom = ctx.atom;
-    if (atom.source !== ownerId) return;
-    const self = ctx.state.players[ownerId];
-    if (!self) return;
-    const weaponId = self.equipment['武器'];
-    if (!weaponId) return;
-    const weapon = ctx.state.cardMap[weaponId];
-    if (weapon?.name !== '贯石斧') return;
+  registerOnOwnSlashDodged(
+    state,
+    skill.id,
+    ownerId,
+    async (ctx) => {
+      const self = ctx.state.players[ownerId];
+      if (!self) return;
 
-    // 检查是否被抵消（闪已设置标记,但闪已被 drain 到弃牌堆）
-    if (!isCancelled(ctx.state, atom.cardId, atom.target)) return;
+      // 可弃牌数不足 2 张时无法强命(手牌 + 装备区)
+      const equipIds = Object.values(self.equipment).filter(
+        (id): id is string => typeof id === 'string',
+      );
+      const availableCount = self.hand.length + equipIds.length;
+      if (availableCount < 2) return;
 
-    // 可弃牌数不足 2 张时无法强命(手牌 + 装备区)
-    const equipIds = Object.values(self.equipment).filter(
-      (id): id is string => typeof id === 'string',
-    );
-    const availableCount = self.hand.length + equipIds.length;
-    if (availableCount < 2) return;
+      // 直接弹选牌面板:玩家选 2 张牌弃置(不选/超时 → 不发动)
+      delete ctx.state.localVars['贯石斧/selected'];
+      await applyAtom(ctx.state, {
+        type: '请求回应',
+        requestType: '贯石斧/select',
+        target: ownerId,
+        prompt: {
+          type: 'distribute',
+          title: '贯石斧:选择 2 张牌弃置强命(不选则不发动)',
+          mode: 'select',
+          source: 'handAndEquip',
+          minTotal: 2,
+          maxTotal: 2,
+        },
+        defaultChoice: false,
+        timeout: 30,
+      });
+      const selectedIds = ctx.state.localVars['贯石斧/selected'] as string[] | undefined;
+      delete ctx.state.localVars['贯石斧/selected'];
+      if (selectedIds?.length !== 2) return;
 
-    // 直接弹选牌面板:玩家选 2 张牌弃置(不选/超时 → 不发动)
-    delete ctx.state.localVars['贯石斧/selected'];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '贯石斧/select',
-      target: ownerId,
-      prompt: {
-        type: 'distribute',
-        title: '贯石斧:选择 2 张牌弃置强命(不选则不发动)',
-        mode: 'select',
-        source: 'handAndEquip',
-        minTotal: 2,
-        maxTotal: 2,
-      },
-      defaultChoice: false,
-      timeout: 30,
-    });
-    const selectedIds = ctx.state.localVars['贯石斧/selected'] as string[] | undefined;
-    delete ctx.state.localVars['贯石斧/selected'];
-    if (selectedIds?.length !== 2) return;
+      // 弃置选中的 2 张牌(手牌+装备区均可,用弃置 atom 统一处理)
+      await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: selectedIds, voluntary: true });
 
-    // 弃置选中的 2 张牌(手牌+装备区均可,用弃置 atom 统一处理)
-    await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: selectedIds, voluntary: true });
-
-    // 清除已抵消标记:杀不再被抵消,将正常造成伤害(runSettlementPhase 检测标记被清除后继续 resolve)
-    await setFrameCancelled(ctx.state, ctx.frame, false);
-  });
+      // 清除已抵消标记:杀不再被抵消,将正常造成伤害(runSettlementPhase 检测标记被清除后继续 resolve)
+      await setFrameCancelled(ctx.state, ctx.frame, false);
+    },
+    { weaponName: '贯石斧' },
+  );
 
   return () => {};
 }

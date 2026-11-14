@@ -33,7 +33,8 @@ import { defaultPlayActive } from '../rules/action-active';
 import { viewCanAttack } from '../rules/viewDistance';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { REN_MARK_ID, getRenColor } from './明任';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { projectTurnUsage } from '../rules/turn-usage';
 
 const SKILL_ID = '贞良';
 /** 转换态 key(state:player.vars 跨回合持久;view:经 回合用量 atom 投影 turnUsage)。
@@ -54,12 +55,8 @@ function getState(state: GameState, ownerId: number): '阳' | '阴' {
 }
 
 async function syncStateView(state: GameState, ownerId: number): Promise<void> {
-  await applyAtom(state, {
-    type: '回合用量',
-    player: ownerId,
-    key: STATE_KEY,
-    value: getState(state, ownerId),
-  });
+  // state 真相在 player.vars(跨回合持久),此处仅把转换态投影到 view.turnUsage
+  await projectTurnUsage(state, ownerId, STATE_KEY, getState(state, ownerId));
 }
 
 /** 记录卢植使用/打出的一张牌 id 及其颜色(若已记录则不覆盖)。 */
@@ -319,15 +316,11 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     },
   });
 
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: SKILL_ID,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '贞良',
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
+    title: '贞良',
+    confirmLabel: '确认',
+    cancelLabel: '取消',
   });
 
   return () => {};

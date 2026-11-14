@@ -44,8 +44,8 @@ import type {
   Skill,
 } from '../types';
 import { getHealthValue } from '../types';
-import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
+import { setTurnVarUsage, projectTurnUsage } from '../rules/turn-usage';
 import { askRankCardAndCompare, registerRankCardRespond } from '../flows/rank';
 import {
   registerAction,
@@ -184,19 +184,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       // 3) 结算输赢:发起方点数严格大于目标 = 赢;否则(输或平)没赢
       if (win) {
-        st.turn.vars[WIN_VAR] = target;
-        await applyAtom(st, { type: '回合用量', player: from, key: WIN_VAR, value: target });
+        await setTurnVarUsage(st, from, WIN_VAR, target);
         // 「对其使用牌无次数限制」须投影到 view:前端 viewCanSlash/无头枚举读
         // view.turnUsage['杀/unlimited/*'],缺失则拼点赢后第 2 张杀在客户端不可用。
-        await applyAtom(st, {
-          type: '回合用量',
-          player: from,
-          key: slashUnlimitedKey('界陷阵'),
-          value: true,
-        });
+        await projectTurnUsage(st, from, slashUnlimitedKey('界陷阵'), true);
       } else {
-        st.turn.vars[LOST_VAR] = target;
-        await applyAtom(st, { type: '回合用量', player: from, key: LOST_VAR, value: target });
+        await setTurnVarUsage(st, from, LOST_VAR, target);
       }
 
       await popFrame(st);

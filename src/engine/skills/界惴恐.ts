@@ -39,8 +39,9 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
+import { setPlayerVarUsage } from '../rules/turn-usage';
 import { askRankCard, runRankCompareFlow } from '../flows/rank';
-import { askConfirm, runVirtualSlash } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, runVirtualSlash } from '../util/skillRuntime';
 import {
   registerAction,
   registerAfterHook,
@@ -245,13 +246,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const ownerWins = result === '赢';
         if (ownerWins) {
           // owner 赢:目标本回合不能对除其以外角色用牌
-          st.players[turnPlayer].vars[RESTRICTED_KEY] = true;
-          await applyAtom(st, {
-            type: '回合用量',
-            player: turnPlayer,
-            key: RESTRICTED_KEY,
-            value: true,
-          });
+          await setPlayerVarUsage(st, turnPlayer, RESTRICTED_KEY, true);
         } else {
           // owner 没赢:获得其拼点牌(从弃牌堆移到 owner 手牌)
           //   runRankCompareFlow 已把两张牌移入弃牌堆,此处从弃牌堆取回 targetCardId。
@@ -277,15 +272,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: DISPLAY_NAME,
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
+    title: DISPLAY_NAME,
+    confirmLabel: '确认',
+    cancelLabel: '取消',
   });
   return () => {};
 }

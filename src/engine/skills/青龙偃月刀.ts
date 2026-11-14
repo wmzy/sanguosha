@@ -28,9 +28,13 @@
 // 青龙腰月刀是额外使用一张新杀(新杀进处理区,旧闪移走)。
 import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
-import { isCancelled } from '../core/frame';
+import { registerAction } from '../core/skill';
+import {
+  askConfirm,
+  requireRequestType,
+  registerOnOwnSlashDodged,
+  defineConfirmAction,
+} from '../util/skillRuntime';
 import { runUseFlow, chargeOnSettle } from './cards/use-card';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -83,77 +87,70 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  registerAfterHook(state, skill.id, ownerId, '被抵消', async (ctx) => {
-    // 只对杀生效:万箭齐发等锦囊被闪抵消不触发武器技(规则:青龙腰月刀是"你使用的杀被闪抵消")
-    if (ctx.frame.skillId !== '杀') return;
-    const atom = ctx.atom;
-    if (atom.source !== ownerId) return;
-    const self = ctx.state.players[ownerId];
-    if (!self) return;
-    const weaponId = self.equipment['武器'];
-    if (!weaponId) return;
-    const weapon = ctx.state.cardMap[weaponId];
-    if (weapon?.name !== '青龙偃月刀') return;
+  registerOnOwnSlashDodged(
+    state,
+    skill.id,
+    ownerId,
+    async (ctx) => {
+      const atom = ctx.atom;
+      const self = ctx.state.players[ownerId];
+      if (!self) return;
 
-    // 检查是否被抵消（闪已设置标记,但闪已被 drain 到弃牌堆）
-    if (!isCancelled(ctx.state, atom.cardId, atom.target)) return;
+      // owner 手牌中没有杀 → 无法追杀,直接放弃
+      const hasKill = self.hand.some((id) => ctx.state.cardMap[id]?.name === '杀');
+      if (!hasKill) return;
 
-    // owner 手牌中没有杀 → 无法追杀,直接放弃
-    const hasKill = self.hand.some((id) => ctx.state.cardMap[id]?.name === '杀');
-    if (!hasKill) return;
+      // 第一步:询问是否追杀
+      const confirmed = await askConfirm(ctx.state, '青龙偃月刀/confirm', ownerId, {
+        confirmedKey: '青龙偃月刀/confirmed',
+        title: '青龙偃月刀:是否追杀?',
+        confirmLabel: '追杀',
+        cancelLabel: '不追杀',
+        defaultChoice: false,
+        timeout: 10,
+      });
+      if (!confirmed) return;
+      delete ctx.state.localVars['青龙偃月刀/confirmed'];
 
-    // 第一步:询问是否追杀
-    const confirmed = await askConfirm(ctx.state, '青龙偃月刀/confirm', ownerId, {
-      confirmedKey: '青龙偃月刀/confirmed',
-      title: '青龙偃月刀:是否追杀?',
-      confirmLabel: '追杀',
-      cancelLabel: '不追杀',
-      defaultChoice: false,
-      timeout: 10,
-    });
-    if (!confirmed) return;
-    delete ctx.state.localVars['青龙偃月刀/confirmed'];
+      // 第二步:让 owner 选一张杀牌
+      delete ctx.state.localVars['青龙偃月刀/killCardId'];
+      await applyAtom(ctx.state, {
+        type: '请求回应',
+        requestType: '青龙偃月刀/useKill',
+        target: ownerId,
+        prompt: {
+          type: 'useCard',
+          title: '青龙偃月刀:选择一张杀追杀',
+          cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
+        },
+        defaultChoice: false,
+        timeout: 15,
+      });
+      const killCardId = ctx.state.localVars['青龙偃月刀/killCardId'] as string | undefined;
+      delete ctx.state.localVars['青龙偃月刀/killCardId'];
+      if (!killCardId) return; // 超时未选 → 放弃追杀
 
-    // 第二步:让 owner 选一张杀牌
-    delete ctx.state.localVars['青龙偃月刀/killCardId'];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: '青龙偃月刀/useKill',
-      target: ownerId,
-      prompt: {
-        type: 'useCard',
-        title: '青龙偃月刀:选择一张杀追杀',
-        cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
-      },
-      defaultChoice: false,
-      timeout: 15,
-    });
-    const killCardId = ctx.state.localVars['青龙偃月刀/killCardId'] as string | undefined;
-    delete ctx.state.localVars['青龙偃月刀/killCardId'];
-    if (!killCardId) return; // 超时未选 → 放弃追杀
-
-    // 追杀:走 runUseFlow（与普通杀一致，chargeOnSettle 保证出杀次数累加）。
-    // runUseFlow 内部：手牌→处理区 → 询问闪（cancelledBy={闪}）→
-    //   被闪 → 杀帧 cancelled → 被抵消 atom → 本 hook 递归追杀
-    //   未被闪 → 杀.resolve 造成伤害
-    //   处理区→弃牌堆（finally 自动清理）
-    await runUseFlow(ctx.state, ownerId, killCardId, [atom.target], '杀', {
-      onSettle: chargeOnSettle(ctx.state, ownerId, killCardId),
-    });
-  });
+      // 追杀:走 runUseFlow（与普通杀一致，chargeOnSettle 保证出杀次数累加）。
+      // runUseFlow 内部：手牌→处理区 → 询问闪（cancelledBy={闪}）→
+      //   被闪 → 杀帧 cancelled → 被抵消 atom → 本 hook 递归追杀
+      //   未被闪 → 杀.resolve 造成伤害
+      //   处理区→弃牌堆（finally 自动清理）
+      await runUseFlow(ctx.state, ownerId, killCardId, [atom.target], '杀', {
+        onSettle: chargeOnSettle(ctx.state, ownerId, killCardId),
+      });
+    },
+    { weaponName: '青龙偃月刀' },
+  );
 
   return () => {};
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '青龙偃月刀',
+    title: '青龙偃月刀：是否追杀？',
+    confirmLabel: '追杀',
+    cancelLabel: '不追杀',
     style: 'danger',
-    prompt: {
-      type: 'confirm',
-      title: '青龙偃月刀：是否追杀？',
-      confirmLabel: '追杀',
-      cancelLabel: '不追杀',
-    },
   });
 }

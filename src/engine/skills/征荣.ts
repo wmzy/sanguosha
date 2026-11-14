@@ -22,7 +22,7 @@ import { applyAtom } from '../core/apply';
 import { topFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
 
@@ -214,15 +214,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '征荣',
+    title: '是否发动征荣？',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动征荣？',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
   });
 }
 

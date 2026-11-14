@@ -11,7 +11,7 @@ import { GameSession } from './session';
 import { createLogger } from './logger';
 import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } from './persistence';
 import { normalizeRoomConfig } from './protocol';
-import { addRoom, getRoom, getAllRooms, type Room } from './room';
+import { getRoom, getAllRooms, createRoomShell, type Room } from './room';
 import { cleanupIdleRooms, cleanupDisconnectedRooms } from './cleanup';
 import { initRoomStore, loadAllRoomsFromDb } from './roomStore';
 import { resetRoomToLobby } from './teardown';
@@ -63,32 +63,27 @@ async function restoreNormalRoomsFromDb(): Promise<void> {
   const rows = await loadAllRoomsFromDb();
   log.info(`启动恢复：发现 ${rows.length} 个普通房间记录`);
   for (const row of rows) {
-    const room: Room = {
-      id: row.id,
-      name: row.name,
-      players: new Map(),
-      maxPlayers: row.maxPlayers,
-      status: row.status as Room['status'],
-      hostId: row.hostId,
-      readyPlayers: new Set(),
-      roomType: 'normal',
-      isDebug: row.isDebug,
-      config: normalizeRoomConfig(row.config),
-      spectators: new Map(),
-      viewGrants: new Map(),
-      pendingViewRequests: new Map(),
-      chatUsage: new Map(),
-      chatHistory: [],
-      seats: Array(row.maxPlayers).fill(null),
-      pendingSeatSwaps: new Map(),
-      // 近期离开宽限表纯内存、不持久化(重启恢复路径由 playerNames 覆盖)
-      recentlyLeft: new Map(),
-      // 密码哈希随房间元数据持久化,重启后密码继续生效
-      passwordHash: row.passwordHash ?? null,
-      // 成员显示名随房间元数据持久化(重启后房间内名字仍可显示)
-      playerNames: new Map(Object.entries(row.playerNames ?? {})),
-    };
-    addRoom(room);
+    // 恢复路径字段与 DB 行逐字段对应:id/name/maxPlayers/status/hostId/isDebug/
+    // config/passwordHash/playerNames 来自 DB;seats 全 null(DB schema 不存座次);
+    // recentlyLeft 纯内存不持久化(重启恢复路径由 playerNames 覆盖)。
+    createRoomShell(
+      {
+        name: row.name,
+        maxPlayers: row.maxPlayers,
+        hostId: row.hostId,
+        roomType: 'normal',
+        isDebug: row.isDebug,
+        config: normalizeRoomConfig(row.config),
+        passwordHash: row.passwordHash ?? null,
+        playerNames: new Map(Object.entries(row.playerNames ?? {})),
+      },
+      {
+        id: row.id,
+        maxPlayers: row.maxPlayers,
+        seats: Array(row.maxPlayers).fill(null),
+        status: row.status as Room['status'],
+      },
+    );
     log.info(`恢复普通房间 ${row.id}（${row.name}，状态: ${row.status}）`);
   }
 }
@@ -167,28 +162,28 @@ async function restorePersistedRooms(): Promise<void> {
       // 旧数据无 seats 字段时退回全 null(玩家无法重连,依赖安全网清理)。
       const restoredSeats = persisted.seats ?? Array(persisted.maxPlayers || state.players.length).fill(null);
       const existingRoom = getRoom(roomId);
-      const room: Room = existingRoom ?? {
-        id: roomId,
-        name: persisted.roomName || `恢复-${roomId}`,
-        players: new Map(),
-        maxPlayers: persisted.maxPlayers || state.players.length,
-        status: '进行中',
-        hostId: persisted.hostId,
-        readyPlayers: new Set(),
-        roomType: 'quick',
-        isDebug: persisted.debug,
-        config: restoredConfig,
-        spectators: new Map(),
-        viewGrants: new Map(),
-        pendingViewRequests: new Map(),
-        chatUsage: new Map(),
-        chatHistory: [],
-        seats: restoredSeats,
-        pendingSeatSwaps: new Map(),
-        recentlyLeft: new Map(),
-        passwordHash: null,
-        playerNames: new Map(),
-      };
+      // 恢复路径字段与持久化 wrapper 逐字段对应:name/config/seats/maxPlayers/
+      // hostId/isDebug 来自 .json;players/readyPlayers 等连接态重置为空;
+      // passwordHash/playerNames 不持久化在 wrapper(quick 房),恢复为空值。
+      // existingRoom(normal 房从 DB 恢复)时复用已存在的 Room 对象。
+      const room: Room =
+        existingRoom ??
+        createRoomShell(
+          {
+            name: persisted.roomName || `恢复-${roomId}`,
+            maxPlayers: persisted.maxPlayers || state.players.length,
+            hostId: persisted.hostId,
+            roomType: 'quick',
+            isDebug: persisted.debug,
+            config: restoredConfig,
+          },
+          {
+            id: roomId,
+            maxPlayers: persisted.maxPlayers || state.players.length,
+            seats: restoredSeats,
+            status: '进行中',
+          },
+        );
       // 复用 existingRoom(normal 房间从 DB 恢复)时,DB schema 不存 seats,
       // existingRoom.seats 是恢复时初始化的全 null 数组。必须用 .json 的 seats 覆盖,
       // 否则 GameSession 构造时从 room.seats 填充 playerNames 会得到空映射,
@@ -197,7 +192,7 @@ async function restorePersistedRooms(): Promise<void> {
         existingRoom.seats = restoredSeats;
         if (persisted.hostId !== undefined) existingRoom.hostId = persisted.hostId;
       }
-      if (!existingRoom) addRoom(room);
+      // 新建分支已由 createRoomShell 注册进 roomList(等价于原 addRoom)。
       const session = new GameSession(room, persisted.debug);
       await session.restoreState(state, persisted.actionLog);
       gameSessions.set(roomId, session);
@@ -206,9 +201,13 @@ async function restorePersistedRooms(): Promise<void> {
       );
     } catch (err) {
       log.info(`房间 ${roomId} 恢复失败: ${err},删除`);
-      await deletePersistedRoom(roomId);
+      // 非法 roomId(磁盘上手工放置的越界文件名)会让 deletePersistedRoom 直接
+      // 拒绝抛错;不能让它中断整个恢复循环,剩余房间照常恢复。
+      await deletePersistedRoom(roomId).catch((e) =>
+        log.err(`删除残留持久化文件失败: ${roomId}`, e),
+      );
     }
   }
 }
 
-export default app;
+export { app };

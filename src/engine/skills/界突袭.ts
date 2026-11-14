@@ -20,22 +20,15 @@
 //
 // 内部 localVars/requestType 键名统一使用 '界突袭/xxx' 前缀(T1:界版不得复用标版前缀):
 //   requestType 与 localVars 键均独立于标版突袭,避免同对局两版本共存时的命名空间冲突。
-import type {
-  FrontendAPI,
-  GameView,
-  GameState,
-  HookResult,
-  Skill,
-} from '../types';
-import { applyAtom } from '../core/apply';
-import { registerAction, registerBeforeHook } from '../core/skill';
-import { createRng } from '../util/rng';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+//   respond 注册/选目标询问/偷牌循环复用 突袭.ts 导出的共享助手(键前缀作参数)。
+import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
+import { registerBeforeHook } from '../core/skill';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { registerTuxiRespond, tuxiAskSelectTargets, tuxiStealCards } from './突袭';
 
-const TRIGGER_RT = '界突袭/trigger';
-const SELECT_RT = '界突袭/select';
-const TRIGGERED_KEY = '界突袭/triggered';
-const TARGETS_KEY = '界突袭/targets';
+const PREFIX = '界突袭';
+const TRIGGER_RT = `${PREFIX}/trigger`;
+const TRIGGERED_KEY = `${PREFIX}/triggered`;
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -50,28 +43,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // respond:处理 trigger(confirm) 与 select(choosePlayer) 两类询问
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (s): string | null =>
-      requireRequestType(s, ownerId, [TRIGGER_RT, SELECT_RT], {
-        mismatchError: '当前不是突袭回应',
-      }).error,
-    async (s, params) => {
-      const slot = s.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
-      if (rt === TRIGGER_RT) {
-        s.localVars[TRIGGERED_KEY] = params.choice === true;
-      } else if (rt === SELECT_RT) {
-        // 兼容 targets(数组)与 target(单数)
-        const targets = (params.targets as number[] | undefined) ??
-          (typeof params.target === 'number' ? [params.target] : undefined);
-        s.localVars[TARGETS_KEY] = targets ?? [];
-      }
-    },
-  );
+  registerTuxiRespond(state, skill.id, ownerId, PREFIX);
 
   // 摸牌 before-hook:仅自己摸牌阶段的摸牌触发(同裸衣/英姿,排除其他摸牌场景)
   registerBeforeHook(
@@ -109,49 +81,18 @@ export function onInit(skill: Skill, state: GameState): () => void {
       });
       if (triggered !== true) return; // 不发动 → 默认摸牌
 
-      // 选择 1~maxTargets 名有手牌的其他角色(选 N 人 = 少摸 N 张 = 偷 N 张各一张)
-      const maxTargets = Math.min(baseCount, stealablePlayers.length);
-      delete ctx.state.localVars[TARGETS_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: SELECT_RT,
-        target: ownerId,
-        prompt: {
-          type: 'choosePlayer',
-          title: `界突袭:选择 1~${maxTargets} 名角色(各获得一张手牌;少摸等量张)`,
-          min: 1,
-          max: maxTargets,
-          filter: (view: GameView, target: number) =>
-            target !== ownerId &&
-            view.players[target]?.alive === true &&
-            (view.players[target]?.handCount ?? 0) > 0,
-        },
-        timeout: 15,
-      });
-
-      const rawTargets = ctx.state.localVars[TARGETS_KEY] as number[] | undefined;
-      const targets = Array.isArray(rawTargets)
-        ? rawTargets.filter(
-            (t) =>
-              t !== ownerId &&
-              ctx.state.players[t]?.alive === true &&
-              ctx.state.players[t].hand.length > 0,
-          )
-        : [];
-
+      // 选择 1~maxTargets 名有手牌的其他角色(选 N 人 = 少摸 N 张 = 偷 N 张各一张);
       // 未选到有效目标 → 不 modify,默认摸牌
+      const maxTargets = Math.min(baseCount, stealablePlayers.length);
+      const targets = await tuxiAskSelectTargets(ctx.state, ownerId, {
+        prefix: PREFIX,
+        title: `界突袭:选择 1~${maxTargets} 名角色(各获得一张手牌;少摸等量张)`,
+        max: maxTargets,
+      });
       if (targets.length === 0) return;
 
       // 各获得一张随机手牌(在 modify 摸牌数之前完成偷牌)
-      for (const target of targets) {
-        const tp = ctx.state.players[target];
-        if (!tp || !tp.alive || tp.hand.length === 0) continue;
-        const rng = createRng(ctx.state.rngSeed);
-        const idx = rng.nextInt(tp.hand.length);
-        ctx.state.rngSeed = rng.getState();
-        const cardId = tp.hand[idx];
-        await applyAtom(ctx.state, { type: '获得', player: ownerId, cardId, from: target });
-      }
+      await tuxiStealCards(ctx.state, ownerId, targets);
 
       // 少摸 N 张:modify 摸牌 atom 的 count;N=baseCount 时 cancel(摸牌 atom validate 要求 count>0)
       const newCount = baseCount - targets.length;
@@ -166,15 +107,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '界突袭',
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动界突袭?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动界突袭?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
 }
 

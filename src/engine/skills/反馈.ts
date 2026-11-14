@@ -17,7 +17,7 @@ import type { FrontendAPI, Skill } from '../types';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -113,14 +113,9 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '反馈',
+    title: '是否发动反馈？',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动反馈？',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
   });
 }

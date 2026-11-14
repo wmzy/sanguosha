@@ -33,7 +33,7 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { applyAtom } from '../core/apply'
+import { projectTurnUsage } from '../rules/turn-usage';
 import { popFrame, pushFrame } from '../core/frame';
 import { askRankCardAndCompare, registerRankCardRespond } from '../flows/rank';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
@@ -132,12 +132,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         // 赢:下一张牌可 +/-1 目标。turn.vars['巧说/winNext'] 驱动 slashTargetProvider(+1 杀目标);
         // 投影 turnUsage['杀/target/界巧说']=1 供前端 viewSlashTargetMax 放宽多选。
         // 移动牌 after-hook 在 owner 下张牌打出时清除 winNext + 投影(消费"下一张")。
+        // state 存座次(from)、view 投影常量 1,key/值不同 → 走 projectTurnUsage。
         st.turn.vars[WIN_NEXT_VAR] = from;
-        await applyAtom(st, { type: '回合用量', player: from, key: SLASH_TARGET_TU, value: 1 });
+        await projectTurnUsage(st, from, SLASH_TARGET_TU, 1);
       } else {
         // 没赢:本回合不能使用锦囊牌(由 trickBlocker + validateUseCard 落实)
+        // state 存座次、view 投影 true → 同上走 projectTurnUsage。
         st.turn.vars[LOST_VAR] = from;
-        await applyAtom(st, { type: '回合用量', player: from, key: LOST_VAR, value: true });
+        await projectTurnUsage(st, from, LOST_VAR, true);
       }
 
       await popFrame(st);
@@ -167,12 +169,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // 仅在 winNext 当前生效时清除(消费"下一张牌"的 +/- 目标效果)
     if (ctx.state.turn.vars[WIN_NEXT_VAR] === ownerId) {
       delete ctx.state.turn.vars[WIN_NEXT_VAR];
-      await applyAtom(ctx.state, {
-        type: '回合用量',
-        player: ownerId,
-        key: SLASH_TARGET_TU,
-        value: false,
-      });
+      await projectTurnUsage(ctx.state, ownerId, SLASH_TARGET_TU, false);
     }
   });
 

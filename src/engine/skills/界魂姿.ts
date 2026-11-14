@@ -32,7 +32,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { performYinghunPrepare } from './英魂';
 import { HUNZI_AWAKENED_KEY as AWAKENED_KEY, getHunziAwakened, markAwakened } from '../rules/vars-keys';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 // 觉醒标记:沿用标版键名 '魂姿/awakened',供复用的标 制霸/界制霸 读取觉醒状态。
 // 觉醒当回合结束阶段收益标记:准备阶段觉醒成功后置 true,结束阶段消费后清空。
@@ -164,15 +164,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   // 结束阶段二选一 respond action(觉醒当回合结束阶段触发)
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '界魂姿',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '魂姿:摸两张牌,还是回复1点体力?',
-      confirmLabel: '摸两张牌',
-      cancelLabel: '回复1点体力',
-    },
+    title: '魂姿:摸两张牌,还是回复1点体力?',
+    confirmLabel: '摸两张牌',
+    cancelLabel: '回复1点体力',
   });
   return undefined;
 }

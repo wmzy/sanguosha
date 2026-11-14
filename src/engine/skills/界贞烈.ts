@@ -52,7 +52,7 @@ import { registerAction, registerAfterHook, registerBeforeHook } from '../core/s
 import { isDelayedTrick } from '../data/card-meta';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY, mijiPendingKey } from '../rules/vars-keys';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 const _SKILL_ID = '界贞烈';
 const DISPLAY_NAME = '贞烈';
@@ -340,16 +340,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
-    label: DISPLAY_NAME,
-    style: 'danger',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动贞烈?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: DISPLAY_NAME, title: '是否发动贞烈?', style: 'danger' });
   return undefined;
 }
 

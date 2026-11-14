@@ -30,7 +30,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 const CONFIRM_RT = '界谦逊/trigger';
 const CONFIRMED_KEY = '界谦逊/confirmed';
@@ -173,15 +173,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '谦逊',
+    title: '是否发动谦逊?',
+    confirmLabel: '发动(将所有手牌移出游戏)',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动谦逊?',
-      confirmLabel: '发动(将所有手牌移出游戏)',
-      cancelLabel: '不发动',
-    },
   });
 }
 

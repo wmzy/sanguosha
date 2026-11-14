@@ -29,33 +29,13 @@ import { startTurn } from '../flows/turn';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { clearPerTurnState } from '../rules/vars-keys';
 
 const BASE_VAR = '博图/base'; // turn.vars:本回合弃牌堆基线长度
 const LAST_ROUND_KEY = '博图/lastRound'; // player.vars:计数所在轮次
 const COUNT_KEY = '博图/count'; // player.vars:本轮已发动次数
 const CONFIRM_RT = '博图/confirm';
 const CONFIRMED_KEY = '博图/confirmed';
-
-/** 复刻「回合结束」atom 的 per-turn 清理(幂等防御:博图 cancel 回合结束后 时,
- *  回合结束 已先行 apply 清理过,此处重复执行无副作用,仅作防御)。
- *  与 回合结束.ts apply 保持一致:清空 turn.vars、清所有玩家 duration='turn' 标记、
- *  清 /usedThisTurn|/healed|/givenCount|/givenTargets|/basicUsed vars。 */
-function clearPerTurnState(state: GameState): void {
-  state.turn.vars = {};
-  for (const p of state.players) {
-    p.marks = p.marks.filter((m) => m.duration !== 'turn');
-    p.vars = Object.fromEntries(
-      Object.entries(p.vars).filter(
-        ([k]) =>
-          !k.endsWith('/usedThisTurn') &&
-          !k.endsWith('/healed') &&
-          !k.endsWith('/givenCount') &&
-          !k.endsWith('/givenTargets') &&
-          !k.endsWith('/basicUsed'),
-      ),
-    );
-  }
-}
 
 /** 存活角色数 */
 function aliveCount(state: GameState): number {

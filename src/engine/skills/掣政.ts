@@ -22,7 +22,7 @@ import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { inAttackRange } from '../rules/distance';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { createRng } from '../util/rng';
+import { pickRandom } from '../util/rng';
 import { requireRequestType } from '../util/skillRuntime';
 
 const CHOOSE_RT = '掣政/选目标';
@@ -139,9 +139,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (tp?.alive) {
       let discardId: string | undefined;
       if (tp.hand.length > 0) {
-        const rng = createRng(st.rngSeed);
-        discardId = tp.hand[rng.nextInt(tp.hand.length)];
-        st.rngSeed = rng.getState();
+        discardId = pickRandom(st, tp.hand)!;
       } else {
         const equipIds = Object.values(tp.equipment).filter(
           (id): id is string => !!id,

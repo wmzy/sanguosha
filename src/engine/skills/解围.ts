@@ -28,7 +28,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { instantiateSkill } from './lifecycle';
 import { hasSkillModule } from './registry';
 import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, firstCardId, defineConfirmAction } from '../util/skillRuntime';
 
 // ── 效果①:装备→无懈可击 转化 ──
 const SHADOW_SUFFIX = '解围';
@@ -257,11 +257,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         return;
       }
       if (rt === DISCARD_RT) {
-        const cardIds = params.cardIds as string[] | undefined;
-        const single = params.cardId as string | undefined;
-        const id =
-          (Array.isArray(cardIds) && cardIds.length > 0 ? cardIds[0] : undefined) ??
-          (typeof single === 'string' ? single : undefined);
+        const id = firstCardId(params);
         if (id) st.localVars[DISCARD_KEY] = id;
         return;
       }
@@ -492,16 +488,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   });
 
   // 效果②:被动触发确认
-  api.defineAction('respond', {
-    label: '解围',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动解围?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '解围', title: '是否发动解围?' });
   return;
 }
 

@@ -34,7 +34,7 @@ import {
   registerBeforeHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 const DISPLAY_NAME = '自守';
 
@@ -217,16 +217,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
-    label: '自守',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动自守?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '自守', title: '是否发动自守?' });
   return () => {};
 }
 

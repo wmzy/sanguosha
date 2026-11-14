@@ -24,7 +24,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const CHOOSE_RT = '界崩坏/choose';
 const CHOICE_KEY = '崩坏/choice'; // 'maxHealth' | 'health'
@@ -114,15 +114,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '崩坏',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '崩坏:减1点体力上限,还是减1点体力?',
-      confirmLabel: '减体力上限',
-      cancelLabel: '减体力',
-    },
+    title: '崩坏:减1点体力上限,还是减1点体力?',
+    confirmLabel: '减体力上限',
+    cancelLabel: '减体力',
   });
 }
 

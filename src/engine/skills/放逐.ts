@@ -32,7 +32,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_RT = '放逐/confirm';
 const TARGET_RT = '放逐/target';
@@ -196,15 +196,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '放逐',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动放逐?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动放逐?',
   });
 }
 

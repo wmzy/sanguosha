@@ -18,7 +18,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { buildView } from '../../src/engine/index';
 import { canSlash, slashMax } from '../../src/engine/rules/slash-quota';
 import { viewCanSlash, viewSlashMax } from '../../src/engine/rules/action-active';
-import { SLASH_USED_COUNT_KEY, slashExtraKey } from '../../src/engine/rules/vars-keys';
+import { SLASH_USED_COUNT_KEY, slashExtraKey, slashQuotaUsedKey } from '../../src/engine/rules/vars-keys';
 import { applyAtom } from '../../src/engine/core/apply';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -64,7 +64,7 @@ function mkPlayer(opts: {
 
 /** 模拟「本回合已出过 1 张杀」:state 侧计数 + view 侧投影(与 杀.onSettle 同构) */
 async function markOneSlashUsed(state: GameState, seat: number): Promise<void> {
-  state.turn.vars['杀/quotaUsed'] = 1;
+  state.turn.vars[slashQuotaUsedKey(seat)] = 1;
   await applyAtom(state, {
     type: '回合用量',
     player: seat,

@@ -22,7 +22,7 @@ import { applyAtom } from '../core/apply';
 import { runUseFlow } from './cards/use-card';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 const SKILL_ID = '界诛害';
 const DISPLAY_NAME = '诛害';
@@ -193,16 +193,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
-    label: DISPLAY_NAME,
-    style: 'danger',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动诛害?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: DISPLAY_NAME, title: '是否发动诛害?', style: 'danger' });
 }
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };

@@ -50,7 +50,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 /** localVars key:最近一个正常开始的摸牌阶段所属玩家 */
 const NORMAL_KEY = '截辎/normalDrawPhase';
@@ -213,14 +213,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '截辎',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '截辎',
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
+    title: '截辎',
+    confirmLabel: '确认',
+    cancelLabel: '取消',
   });
 }

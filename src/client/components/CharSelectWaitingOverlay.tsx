@@ -10,9 +10,7 @@
 import type { ReactNode } from 'react';
 import type { GameView } from '../../engine/types';
 import { CountdownBar } from './CountdownBar';
-import { FACTION_BG } from './gameViewConstants';
-import { getCharacterMeta } from '../../engine/data/character-meta';
-import { getCharacterImage } from '../assets/imageAssets';
+import { getCharacterCardVisuals, hideImgOnError } from '../utils/characterVisuals';
 import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 import { getSkillDescription } from '../../engine/skills/lifecycle';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
@@ -45,14 +43,10 @@ export function CharSelectWaitingOverlay({
     .map((p) => p.name)
     .join('、');
 
-  // 当前视角玩家已选的武将信息(用于展示选择结果)
+  // 当前视角玩家已选的武将信息(用于展示选择结果;派生与座位卡/大卡共享,见 utils/characterVisuals)
   const me = view.players[perspectiveIdx];
   const selectedChar = me?.character ?? '';
-  const charInfo = selectedChar ? getCharacterMeta(selectedChar) : undefined;
-  const faction = charInfo?.faction ?? '群';
-  const factionColor = FACTION_BG[faction] ?? '#8e44ad';
-  const maxHealth = charInfo?.maxHealth ?? 4;
-  const charImg = selectedChar ? getCharacterImage(selectedChar) : null;
+  const { faction, factionColor, charImg, maxHealth } = getCharacterCardVisuals(selectedChar);
   // player.skills 包含默认技能,只展示武将自身技能(过滤掉默认技能)
   const charSkills = (me?.skills ?? []).filter((s) => !DEFAULT_SKILLS.has(s));
 
@@ -73,9 +67,7 @@ export function CharSelectWaitingOverlay({
                 alt=""
                 loading="lazy"
                 decoding="async"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
+                onError={hideImgOnError}
               />
             </div>
           )}

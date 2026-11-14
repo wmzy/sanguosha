@@ -206,15 +206,15 @@ export async function createSnapshot(
   const state = session.getState();
   if (!state) return { error: '会话无状态', status: 404 };
 
-  // 校验 debug 标志(通过 reflection:session 未暴露 isDebug getter)
-  const isDebug = (session as unknown as { debug: boolean }).debug;
+  // 校验 debug 标志(session 只读访问器)
+  const isDebug = session.isDebug;
   if (!isDebug) return { error: '仅 debug 模式可用', status: 403 };
 
   const snapshotId = `${timestampId()}-${req.roomId}`;
   const backendCapturedAt = Date.now();
 
-  // 取 sessionSeed(私有字段,reflection 读取)
-  const sessionSeed = (session as unknown as { sessionSeed: number }).sessionSeed;
+  // 取 sessionSeed(只读访问器)
+  const sessionSeed = session.getSessionSeed();
 
   try {
     await ensureSnapshotDir(snapshotId);
@@ -254,7 +254,7 @@ export async function createSnapshot(
       meta: {
         snapshotId,
         roomId: req.roomId,
-        roomName: (session as unknown as { room: { name: string } }).room.name,
+        roomName: session.getRoomName(),
         createdAt: backendCapturedAt,
         description: null,
         playerCount: state.players.length,

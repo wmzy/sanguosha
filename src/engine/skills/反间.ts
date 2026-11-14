@@ -18,7 +18,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
-import { createRng } from '../util/rng';
+import { pickRandom } from '../util/rng';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
@@ -101,10 +101,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         await popFrame(st);
         return;
       }
-      const rng = createRng(st.rngSeed);
-      const idx = rng.nextInt(self.hand.length);
-      st.rngSeed = rng.getState();
-      const cardId = self.hand[idx];
+      const cardId = pickRandom(st, self.hand)!;
 
       await applyAtom(st, {
         type: '移动牌',

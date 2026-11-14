@@ -13,7 +13,7 @@ import type {
 } from '../types';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerBeforeHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond, defineConfirmAction } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '英姿/confirm';
 
@@ -72,16 +72,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
-    label: '英姿',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动英姿?(额外摸一张牌)',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '英姿', title: '是否发动英姿?(额外摸一张牌)' });
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

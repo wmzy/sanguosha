@@ -20,7 +20,7 @@ import { snapshotState, restoreState } from './rollback';
 import { SYSTEM_OWNER } from './notify';
 import {
   notifyStateChange,
-  notifyPendingResolved,
+  removePendingSlot,
   extractPendingTarget,
   logAction,
 } from './notify';
@@ -306,6 +306,13 @@ export async function dispatch(
       if (rollbackFailure) state.onError?.(rollbackFailure);
     }
   };
+  // 拒绝样板:回滚 preceding → 清理快照后残留的 pending → 返回拒绝结果。
+  // reject() 会带上 rollbackPreceding 记录的 rollbackFailure 上报。
+  const rejectRolledBack = async (): Promise<DispatchResult> => {
+    await rollbackPreceding();
+    snapshot.pending.cleanupResidual();
+    return reject();
+  };
   if (message.preceding?.length) {
     preparingStates.add(state);
     ownsPreparation = true;
@@ -315,9 +322,7 @@ export async function dispatch(
       // 没有 rollback 的动作(如 制衡)一律不允许作为 preceding —— 否则会出现
       // 「牌已弃置进弃牌堆、主 action 被拒、牌仍在手牌」的重复归属。
       if (!pEntry?.rollback) {
-        await rollbackPreceding();
-        snapshot.pending.cleanupResidual();
-        return reject();
+        return rejectRolledBack();
       }
       let pError: unknown;
       try {
@@ -326,18 +331,14 @@ export async function dispatch(
         pError = error;
       }
       if (pError !== null) {
-        await rollbackPreceding();
-        snapshot.pending.cleanupResidual();
-        return reject();
+        return rejectRolledBack();
       }
       rollbacks.push({ entry: pEntry, params: p.params });
       try {
         await pEntry.execute(state, p.params);
       } catch {
         snapshot.pending.trackNew();
-        await rollbackPreceding();
-        snapshot.pending.cleanupResidual();
-        return reject();
+        return rejectRolledBack();
       }
       snapshot.pending.trackNew();
     }
@@ -346,20 +347,17 @@ export async function dispatch(
   // preceding+skip 是矛盾的(skip 无转化),但安全处理:flush 缓冲
   if (message.actionType === 'skip') {
     if (hasPreceding) {
-      await rollbackPreceding();
-      snapshot.pending.cleanupResidual();
-      return reject();
+      return rejectRolledBack();
     }
     // 优先查找广播型 slot(target<0,如无懈可击):出牌阶段 findPendingSlot 可能返回
     // 当前玩家的出牌窗口 slot(target=0),导致 skip 误匹配非广播型 pending。
-    const broadcastSlot = [...state.pendingSlots.values()].find((s) => {
-      const t = (s.atom as { target?: unknown }).target;
-      return typeof t === 'number' && t < 0;
-    });
+    // (extractPendingTarget:内置等待型 atom 必有 target 或 player 字段,player≥0。)
+    const broadcastSlot = [...state.pendingSlots.values()].find(
+      (s) => extractPendingTarget(s.atom) < 0,
+    );
     const slot = broadcastSlot ?? findPendingSlot(state, message.ownerId);
     if (!slot || slot.isTimeout || slot.isPaused || slot.isClaimed) return reject();
-    const atomTarget = (slot.atom as { target?: number }).target;
-    const isBroadcast = typeof atomTarget === 'number' && atomTarget < 0;
+    const isBroadcast = extractPendingTarget(slot.atom) < 0;
     if (isBroadcast) {
       // 广播型:记录该玩家已 skip,全员 skip 时提前触发超时。
       // skip 是真实玩家决策,记入 actionLog(缺陷①:此前不记录,服务端重启重放时
@@ -394,9 +392,7 @@ export async function dispatch(
   const targetKey = message.ownerId;
   const oldSlot = findPendingSlot(state, targetKey);
   if (!oldSlot && message.pendingSeq !== undefined && message.actionType === 'respond') {
-    await rollbackPreceding();
-    snapshot.pending.cleanupResidual();
-    return reject();
+    return rejectRolledBack();
   }
   let entryError: unknown;
   try {
@@ -405,15 +401,11 @@ export async function dispatch(
     entryError = error;
   }
   if (!entry || entryError !== null) {
-    await rollbackPreceding();
-    snapshot.pending.cleanupResidual();
-    return reject();
+    return rejectRolledBack();
   }
   if (oldSlot) {
     if (oldSlot.isTimeout || oldSlot.isPaused || oldSlot.isClaimed) {
-      await rollbackPreceding();
-      snapshot.pending.cleanupResidual();
-      return reject();
+      return rejectRolledBack();
     }
     // pending-scoped 版本校验：只影响 respond 路径(阻塞型 pending 如 请求回应/询问闪)
     // 出牌窗口是非阻塞 pending，主动出牌/用技不应校验 pendingSeq
@@ -427,16 +419,12 @@ export async function dispatch(
       message.pendingSeq !== undefined &&
       message.pendingSeq < oldSlot.createdSeq
     ) {
-      await rollbackPreceding();
-      snapshot.pending.cleanupResidual();
-      return reject();
+      return rejectRolledBack();
     }
     const claim = oldSlot.claim;
     const claimedHere = claim ? claim() : false;
     if (claim && !claimedHere) {
-      await rollbackPreceding();
-      snapshot.pending.cleanupResidual();
-      return reject();
+      return rejectRolledBack();
     }
     oldSlot.pause();
   }
@@ -450,25 +438,10 @@ export async function dispatch(
 
   const resolve = oldSlot?.resolve ?? (() => {});
   logAction(state, message);
-  // 统一 slot 清理 helper：按 key 精确匹配 → 引用遍历兜底 → resolve
+  // 统一 slot 清理 helper：按 key 精确匹配 → 引用遍历兜底(notify.removePendingSlot)
   const cleanupSlot = () => {
     if (!oldSlot) return;
-    const key = extractPendingTarget(oldSlot.atom);
-    let deleted = false;
-    if (state.pendingSlots.get(key) === oldSlot) {
-      state.pendingSlots.delete(key);
-      deleted = true;
-    }
-    if (!deleted) {
-      for (const [k, v] of state.pendingSlots) {
-        if (v === oldSlot) {
-          state.pendingSlots.delete(k);
-          deleted = true;
-          break;
-        }
-      }
-    }
-    if (deleted) notifyPendingResolved(state, oldSlot);
+    removePendingSlot(state, oldSlot);
     resolve();
     oldSlot.releaseClaim?.();
   };

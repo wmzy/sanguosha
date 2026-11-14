@@ -33,7 +33,7 @@ import type {
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, normalizeCardIds, requireRequestType } from '../util/skillRuntime';
 import { mijiPendingKey, getMijiPending } from '../rules/vars-keys';
 
 const _SKILL_ID = '界秘计';
@@ -101,12 +101,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
       if (rt === GIVE_CARDS_RT) {
         // 客户端契约:useCard 型 pending 只发 {cardId},{}(「不回应」)=不选牌(至多语义允许 0 张)。
-        const raw: unknown = params.cardIds ?? params.cardId;
-        const cardIds = Array.isArray(raw)
-          ? raw
-          : typeof raw === 'string'
-            ? [raw]
-            : ([] as Json[]);
+        const cardIds = normalizeCardIds(params);
         const maxN = (st.localVars[GIVE_MAX_VAR] as number | undefined) ?? 0;
         if (cardIds.length > maxN) return `至多 ${maxN} 张`;
         const set = new Set(cardIds);
@@ -130,13 +125,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       } else if (rt === GIVE_TARGET_RT) {
         st.localVars[GIVE_TARGET_KEY] = params.target;
       } else if (rt === GIVE_CARDS_RT) {
-        const raw: unknown = params.cardIds ?? params.cardId;
-        const normalized = Array.isArray(raw)
-          ? raw
-          : typeof raw === 'string'
-            ? [raw]
-            : [];
-        st.localVars[GIVE_CARDS_KEY] = normalized.filter(
+        st.localVars[GIVE_CARDS_KEY] = normalizeCardIds(params).filter(
           (id): id is string => typeof id === 'string',
         );
       }

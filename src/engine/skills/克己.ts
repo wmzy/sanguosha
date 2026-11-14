@@ -19,8 +19,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { registerAfterHook } from '../core/skill';
+import { askConfirm, defineConfirmAction, registerConfirmRespond, registerPhaseStartHook } from '../util/skillRuntime';
 
 /** turn.vars key:本回合是否使用/打出过杀(移动牌 after 写,阶段开始 before 读)。
  *  随「回合结束」atom 的 state.turn.vars = {} 自动清空。 */
@@ -59,53 +59,39 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 阶段开始 before hook:弃牌阶段跳过 ──
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '阶段开始',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== '弃牌') return;
-      // 本回合使用或打出过杀 → 不满足发动条件
-      if (ctx.state.turn.vars[PLAYED_SLASH_VAR]) return;
+  registerPhaseStartHook(state, skill.id, ownerId, '弃牌', async (ctx): Promise<HookResult | void> => {
+    // 本回合使用或打出过杀 → 不满足发动条件
+    if (ctx.state.turn.vars[PLAYED_SLASH_VAR]) return;
 
-      // 询问是否发动克己(跳过弃牌阶段)
-      // 玩家选不发动 / 超时(defaultChoice=false) → 不干预,正常进入弃牌阶段
-      const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
-        confirmedKey: CONFIRMED_VAR,
-        title: '克己:本回合未出杀,是否跳过弃牌阶段?',
-        confirmLabel: '跳过',
-        cancelLabel: '不跳过',
-        defaultChoice: false,
-        timeout: 15,
-      });
-      if (!confirmed) return;
+    // 询问是否发动克己(跳过弃牌阶段)
+    // 玩家选不发动 / 超时(defaultChoice=false) → 不干预,正常进入弃牌阶段
+    const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
+      confirmedKey: CONFIRMED_VAR,
+      title: '克己:本回合未出杀,是否跳过弃牌阶段?',
+      confirmLabel: '跳过',
+      cancelLabel: '不跳过',
+      defaultChoice: false,
+      timeout: 15,
+    });
+    if (!confirmed) return;
 
-      // 跳过弃牌阶段:
-      //   1) 触发「阶段结束」(弃牌) → 回合管理 after hook 把阶段推进到「回合结束」
-      //   2) cancel 当前「阶段开始」(弃牌) —— state.phase 已是「回合结束」,
-      //      回合管理 阶段结束 after hook 检测 phase !== '弃牌' → 不创建弃牌 pending
-      await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '弃牌' });
-      return { kind: 'cancel' };
-    },
-  );
+    // 跳过弃牌阶段:
+    //   1) 触发「阶段结束」(弃牌) → 回合管理 after hook 把阶段推进到「回合结束」
+    //   2) cancel 当前「阶段开始」(弃牌) —— state.phase 已是「回合结束」,
+    //      回合管理 阶段结束 after hook 检测 phase !== '弃牌' → 不创建弃牌 pending
+    await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '弃牌' });
+    return { kind: 'cancel' };
+  });
 
   return () => {};
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '克己',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '克己:是否跳过弃牌阶段？',
-      confirmLabel: '跳过',
-      cancelLabel: '不跳过',
-    },
+    title: '克己:是否跳过弃牌阶段？',
+    confirmLabel: '跳过',
+    cancelLabel: '不跳过',
   });
 }
 

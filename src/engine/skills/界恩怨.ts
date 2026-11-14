@@ -38,7 +38,7 @@ import { applyAtom } from '../core/apply'
 import { pushFrame, popFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 const SKILL_ID = '界恩怨';
 const DISPLAY_NAME = '恩怨';
@@ -321,15 +321,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动恩怨?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动恩怨?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
   return undefined;
 }

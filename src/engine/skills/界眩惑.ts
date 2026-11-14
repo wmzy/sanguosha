@@ -37,7 +37,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
 
@@ -382,15 +382,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动眩惑?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动眩惑?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
   return undefined;
 }

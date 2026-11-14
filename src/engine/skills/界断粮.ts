@@ -31,6 +31,7 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply'
+import { setTurnVarUsage } from '../rules/turn-usage';
 import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, registerAfterHook } from '../core/skill';
@@ -69,14 +70,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const atom = ctx.atom;
     if (atom.source !== ownerId) return;
     if ((atom.amount ?? 0) <= 0) return;
-    if (ctx.state.turn.vars[DMG_VAR]) return; // 已标记,避免重复 applyAtom
-    ctx.state.turn.vars[DMG_VAR] = true;
-    await applyAtom(ctx.state, {
-      type: '回合用量',
-      player: ownerId,
-      key: DMG_VAR,
-      value: true,
-    });
+    if (ctx.state.turn.vars[DMG_VAR]) return; // 已标记,避免重复投影
+    await setTurnVarUsage(ctx.state, ownerId, DMG_VAR, true);
   });
 
   registerAction(

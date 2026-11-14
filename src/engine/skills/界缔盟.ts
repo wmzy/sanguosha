@@ -28,6 +28,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
+import { defineConfirmAction } from '../util/skillRuntime';
 
 const TARGET_RT = '界缔盟/target';
 const DISCARD_RT = '界缔盟/discard';
@@ -260,15 +261,12 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     activeWhen: (ctx) => activeCheck(ctx),
   });
 
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: DISPLAY_NAME,
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
+    title: DISPLAY_NAME,
+    confirmLabel: '确认',
+    cancelLabel: '取消',
   });
 
   return () => {};

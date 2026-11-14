@@ -19,7 +19,7 @@
 //   - 两个效果相互独立,各自询问;均可放弃。
 //   - 拼点发起者=太史慈:由 st.currentPlayerIndex===ownerId 且 requestType='天义/拼点' 判定。
 //   - 点数:A=1,2-10=面值,J=11,Q=12,K=13。
-//   - 随机手牌用 state.rngSeed 的 createRng,保证可复现。
+//   - 随机手牌用 pickRandom(内部走 state.rngSeed),保证可复现。
 import type {
   Card,
   FrontendAPI,
@@ -30,7 +30,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { createRng } from '../util/rng';
+import { pickRandom } from '../util/rng';
 import { askConfirm } from '../util/skillRuntime';
 import { getCardValue } from '../flows/rank';
 import type { SkillModule } from '../types';
@@ -112,11 +112,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!force) return; // 不发动 → 放行正常询问目标
 
       // 从目标手牌随机抽一张,写入天义读取的 localVars,并 cancel 该询问
-      const rng = createRng(ctx.state.rngSeed);
       const hand = ctx.state.players[target].hand;
-      const idx = rng.nextInt(hand.length);
-      const randomCardId = hand[idx];
-      ctx.state.rngSeed = rng.getState();
+      const randomCardId = pickRandom(ctx.state, hand);
+      if (randomCardId === undefined) return; // 目标无手牌已被前置守卫排除,防御性处理
       ctx.state.localVars[TIAN_YI_TARGET_CARD_KEY] = randomCardId;
       return { kind: 'cancel' };
     },

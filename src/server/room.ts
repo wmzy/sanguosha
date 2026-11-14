@@ -4,7 +4,7 @@ import { broadcastToRoom } from './connection';
 import type { RoomInfo, RoomConfig, ServerMessage } from './protocol';
 import { DEFAULT_ROOM_CONFIG, normalizeRoomConfig } from './protocol';
 import { createRng } from '../engine/util/rng';
-import { register } from './lifecycles';
+import { register } from './resourceRegistry';
 import { verifyPassword } from './auth/password';
 
 export interface Room {
@@ -118,8 +118,8 @@ export async function checkRoomPassword(
   return verifyPassword(password, room.passwordHash);
 }
 
-/** 房间构造参数(普通房/调试房共用工厂)。 */
-interface RoomInit {
+/** 房间构造参数(普通房/调试房/恢复路径共用工厂)。 */
+export interface RoomInit {
   name: string;
   maxPlayers: number;
   hostId: string | null;
@@ -131,22 +131,42 @@ interface RoomInit {
   playerNames?: Map<string, string>;
 }
 
-/** 房间工厂:生成 id、初始化全部成员结构并注册进 roomList(不触发持久化通知,
- *  由调用方按需调用 roomChangeHandler)。房主(hostId 非 null)占 0 号座。 */
-function makeRoom(init: RoomInit): Room {
-  const id = generateRoomId();
-  const seats: (string | null)[] = Array(clampPlayers(init.maxPlayers)).fill(null);
-  if (init.hostId !== null) seats[0] = init.hostId;
+/** 恢复路径(DB/JSON 重启恢复)对外注入的覆盖字段;缺省时走新建语义。 */
+export interface RoomShellOverrides {
+  /** 已有房间 id;缺省生成新 id */
+  id?: string;
+  /** 最终 maxPlayers,以传入值为准、不再 clamp(恢复路径信任持久化数据) */
+  maxPlayers?: number;
+  /** 已保存的座次表(不再放置房主);缺省按 maxPlayers 全 null 且房主占 0 号座 */
+  seats?: (string | null)[];
+  /** 恢复的状态;缺省 '等待中' */
+  status?: Room['status'];
+}
+
+/** 房间外壳工厂:初始化全部成员结构并注册进 roomList(不触发持久化通知,
+ *  由调用方按需调用 roomChangeHandler)。新建路径只传 init(生成 id、clamp
+ *  maxPlayers、房主占 0 号座、状态等待中);恢复路径经 overrides 注入
+ *  id/seats/status/maxPlayers(app.ts DB/JSON 恢复),消灭 Room 16 字段多写。 */
+export function createRoomShell(init: RoomInit, overrides: RoomShellOverrides = {}): Room {
+  const id = overrides.id ?? generateRoomId();
+  const maxPlayers = overrides.maxPlayers ?? clampPlayers(init.maxPlayers);
+  let seats: (string | null)[];
+  if (overrides.seats) {
+    seats = overrides.seats;
+  } else {
+    seats = Array(maxPlayers).fill(null);
+    if (init.hostId !== null) seats[0] = init.hostId;
+  }
   const room: Room = {
     id,
     name: init.name,
     players: init.players ?? new Map(),
-    maxPlayers: clampPlayers(init.maxPlayers),
-    status: '等待中',
+    maxPlayers,
+    status: overrides.status ?? '等待中',
     hostId: init.hostId,
     readyPlayers: new Set(),
     roomType: init.roomType,
-    ...(init.isDebug ? { isDebug: true } : {}),
+    ...(init.isDebug !== undefined ? { isDebug: init.isDebug } : {}),
     config: init.config ?? { ...DEFAULT_ROOM_CONFIG, name: init.name },
     spectators: new Map(),
     viewGrants: new Map(),
@@ -175,7 +195,7 @@ export function createRoom(
   passwordHash: string | null = null,
   hostName?: string | null,
 ): Room {
-  const room = makeRoom({
+  const room = createRoomShell({
     name,
     maxPlayers,
     hostId,
@@ -192,7 +212,7 @@ export function createRoom(
 /** 创建调试房间:无人加入、无 host。后续由玩家调用 joinDebugRoom 进入。
  *  不立即开局——进入「配置+准备」阶段,所有座次就绪后由 start_game 触发。 */
 export function createDebugRoom(name: string, maxPlayers: number, config?: RoomConfig): Room {
-  return makeRoom({ name, maxPlayers, hostId: null, config, roomType: 'quick', isDebug: true });
+  return createRoomShell({ name, maxPlayers, hostId: null, config, roomType: 'quick', isDebug: true });
 }
 
 /** 是否本房成员(占座玩家或旁观者);log/chat/history 等读取守卫共用。 */

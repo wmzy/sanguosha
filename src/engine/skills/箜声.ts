@@ -29,7 +29,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
-import { slotOf, requireRequestType, askConfirm } from '../util/skillRuntime';
+import { slotOf, requireRequestType, askConfirm, normalizeCardIds } from '../util/skillRuntime';
 
 /** owner.vars key:箜声牌 cardId 列表(与良姻共享) */
 const KONGSHENG_KEY = '箜声/牌';
@@ -242,9 +242,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
       if (rt === SELECT_RT) {
         // 客户端契约:useCard 型 pending 只发 {cardId};{}=不置于武将牌上。
-        const raw: unknown = params.cardIds ?? params.cardId;
-        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
-        if (!ids || ids.length === 0) return null; // 放弃 → 消费端按未置牌结束
+        const ids = normalizeCardIds(params);
+        if (ids.length === 0) return null; // 放弃 → 消费端按未置牌结束
         return null;
       }
       if (rt === TARGET_RT) {
@@ -263,9 +262,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         st.localVars[CONFIRMED_KEY] =
           params.choice === true || params.confirmed === true;
       } else if (rt === SELECT_RT) {
-        const raw: unknown = params.cardIds ?? params.cardId;
-        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
-        if (ids && ids.length > 0) st.localVars[SELECT_KEY] = ids;
+        const ids = normalizeCardIds(params);
+        if (ids.length > 0) st.localVars[SELECT_KEY] = ids;
       } else if (rt === TARGET_RT) {
         const t = params.target;
         if (typeof t === 'number') st.localVars[TARGET_KEY] = t;

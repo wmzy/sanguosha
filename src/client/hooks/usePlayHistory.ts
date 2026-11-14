@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameView } from '../../engine/types';
 import type { QueuedEvent } from './useEventPlayback';
+import { useFreshSeqFilter } from './useFreshSeqFilter';
 import {
   expirePlayHistory,
   pushPlayHistory,
@@ -17,15 +18,15 @@ export function usePlayHistory(
   view: GameView,
 ): PlayHistoryItem[] {
   const [items, setItems] = useState<PlayHistoryItem[]>([]);
-  const lastSeqRef = useRef(0);
+  const filterFresh = useFreshSeqFilter();
   const viewRef = useRef(view);
   viewRef.current = view;
 
   useEffect(() => {
     if (!ingested || ingested.length === 0) return;
-    const fresh = ingested.filter((e) => e.seq > lastSeqRef.current);
+    // seq 去重(共享水位过滤,见 useFreshSeqFilter)
+    const fresh = filterFresh(ingested);
     if (fresh.length === 0) return;
-    lastSeqRef.current = Math.max(...fresh.map((e) => e.seq));
 
     setItems((prev) => {
       const now = Date.now();
@@ -41,7 +42,7 @@ export function usePlayHistory(
       }
       return next;
     });
-  }, [ingested]);
+  }, [ingested, filterFresh]);
 
   useEffect(() => {
     if (items.length === 0) return;

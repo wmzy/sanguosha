@@ -29,7 +29,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { QIZHI_COUNT_KEY as COUNT_VAR, PICK_RESULT_KEY, getQizhiCount } from '../rules/vars-keys';
-import { currentRequestType } from '../util/skillRuntime';
+import { currentRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 const SKILL_ID = '奇制';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -214,15 +214,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: SKILL_ID,
+    title: '奇制',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '奇制',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
   });
   return () => {};
 }

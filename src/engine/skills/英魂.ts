@@ -25,8 +25,13 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerBeforeHook } from '../core/skill';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { registerAction } from '../core/skill';
+import {
+  askConfirm,
+  requireRequestType,
+  registerPhaseStartHook,
+  defineConfirmAction,
+} from '../util/skillRuntime';
 
 const CONFIRM_RT = '英魂/confirm'; // 孙坚:是否发动
 const TARGET_RT = '英魂/target'; // 孙坚:选目标
@@ -229,19 +234,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   }
 
   // 阶段开始(准备) before:英魂主逻辑(委托给 performYinghunPrepare,便于魂姿觉醒复用)
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '阶段开始',
-    async (ctx): Promise<void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== '准备') return;
-      await performYinghunPrepare(ctx.state, ownerId);
-    },
-  );
+  registerPhaseStartHook(state, skill.id, ownerId, '准备', async (ctx): Promise<void> => {
+    await performYinghunPrepare(ctx.state, ownerId);
+  });
 
   return () => {
     unloaders.forEach((u) => u());
@@ -249,15 +244,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '英魂',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '英魂',
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
+    title: '英魂',
+    confirmLabel: '确认',
+    cancelLabel: '取消',
   });
   return () => {};
 }

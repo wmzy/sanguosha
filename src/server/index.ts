@@ -1,8 +1,8 @@
 // server/index.ts — 独立运行模式（与 Vite 共享端口时不需要此文件）
 import { serve } from '@hono/node-server';
-import app, { startServerLifecycle } from './app';
+import { app, startServerLifecycle } from './app';
 import { createLogger } from './logger';
-import { setupGracefulShutdown } from './lifecycle';
+import { setupGracefulShutdown } from './shutdown';
 
 const log = createLogger('server');
 

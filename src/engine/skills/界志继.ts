@@ -21,7 +21,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { isAwakened, markAwakened } from '../rules/vars-keys';
-import { requireRequestType } from '../util/skillRuntime';
+import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const CHOOSE_RT = '界志继/choose';
 const CHOICE_KEY = '志继/choice';
@@ -120,15 +120,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '志继',
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '志继:摸两张牌,还是回复1点体力?',
-      confirmLabel: '摸两张牌',
-      cancelLabel: '回复1点体力',
-    },
+    title: '志继:摸两张牌,还是回复1点体力?',
+    confirmLabel: '摸两张牌',
+    cancelLabel: '回复1点体力',
   });
   return undefined;
 }

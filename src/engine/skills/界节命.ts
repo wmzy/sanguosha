@@ -39,7 +39,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, normalizeCardIds, defineConfirmAction } from '../util/skillRuntime';
 
 // 内部 requestType/localVars 键名保持原前缀「节命/」,不改为「界节命/」
 const CONFIRM_RT = '界节命/confirm';
@@ -159,11 +159,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
         if (rt === DISCARD_RT) {
           // 目标座次选弃牌:校验 cardIds 在手牌中,数量 == excess
-          const cardIds = Array.isArray(params.cardIds)
-            ? (params.cardIds as string[])
-            : typeof params.cardId === 'string'
-              ? [params.cardId]
-              : [];
+          const cardIds = normalizeCardIds(params);
           if (cardIds.length === 0) return '请选择要弃置的牌';
           const self = st.players[seatId];
           if (!self?.alive) return '你已死亡';
@@ -188,11 +184,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             (typeof params.target === 'number' ? params.target : undefined);
           if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
         } else if (rt === DISCARD_RT) {
-          const cardIds = Array.isArray(params.cardIds)
-            ? (params.cardIds as string[])
-            : typeof params.cardId === 'string'
-              ? [params.cardId]
-              : [];
+          const cardIds = normalizeCardIds(params);
           if (cardIds.length > 0) st.localVars[DISCARD_KEY] = cardIds;
         }
       },
@@ -246,16 +238,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
-    label: '界节命',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动节命?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '界节命', title: '是否发动节命?' });
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

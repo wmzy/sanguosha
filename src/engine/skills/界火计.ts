@@ -43,7 +43,7 @@ import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { promptCancel } from '../flows/cancel';
 import { defaultPlayActive } from '../rules/action-active';
-import { createRng } from '../util/rng';
+import { pickRandom } from '../util/rng';
 import {
   registerTransformAction,
   mountTransformAction,
@@ -150,11 +150,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             delete state.localVars['界火计/弃牌'];
 
             // ── 1) 随机展示目标一张手牌(界版:目标无选择权) ──
-            const handLen = targetPlayer.hand.length;
-            const rng = createRng(state.rngSeed);
-            const randomIdx = rng.nextInt(handLen);
-            state.rngSeed = rng.getState();
-            const revealedCardId = targetPlayer.hand[randomIdx];
+            // pickRandom 空数组返回 undefined;上方 hand.length>0 守卫保证非空,必取到
+            const revealedCardId = pickRandom(state, targetPlayer.hand)!;
             const revealedCard = state.cardMap[revealedCardId];
             const revealedColor = revealedCard?.color ?? '无色';
             state.localVars['界火计/展示'] = {

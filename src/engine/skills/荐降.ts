@@ -21,7 +21,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 const CONFIRM_RT = '荐降/confirm';
 const CHOOSE_RT = '荐降/choose';
@@ -140,16 +140,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
-    label: '荐降',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '荐降',
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '荐降', title: '荐降', confirmLabel: '确认', cancelLabel: '取消' });
   return () => {};
 }
 

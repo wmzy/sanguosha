@@ -16,7 +16,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 import { getGender } from '../data/character-meta';
 
 /** owner 是否发动的确认询问 requestType */
@@ -169,16 +169,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
-    label: '雌雄双股剑',
-    style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '雌雄双股剑:是否发动?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '雌雄双股剑', title: '雌雄双股剑:是否发动?', style: 'default' });
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

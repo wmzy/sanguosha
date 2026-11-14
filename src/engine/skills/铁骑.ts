@@ -21,7 +21,7 @@ import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 const TAG = '铁骑/禁闪';
 const CONFIRM = '铁骑/confirmed';
@@ -134,14 +134,5 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
-    label: '铁骑',
-    style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动铁骑判定？',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '铁骑', title: '是否发动铁骑判定？', style: 'default' });
 }

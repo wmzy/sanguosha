@@ -108,12 +108,21 @@ const distanceExemptorRegistry = createProviderRegistry<DistanceExemptor>();
 /**
  * 注册一个攻击范围豁免器(技能 onInit 时调用)。
  * 返回的取消注册函数应并入 onInit 返回的 unload,由 setSkillInstanceUnload 统一清理。
+ *
+ * view 侧投影:凡调用本函数的技能必须同步登记到 rules/viewDistance.ts 的
+ * VIEW_DISTANCE_EXEMPTIONS(kinds 含 'attackRange'),两侧技能名集合由
+ * tests/engine/view-distance-sync.test.ts 契约测试锁定——漏登记 = 引擎放行
+ * 但前端目标置灰。
  */
 export function registerAttackRangeExemptor(
   state: GameState,
   ownerId: number,
   exemptor: AttackRangeExemptor,
+  /** 豁免归属技能名:仅用于 view 侧契约测试归因(工厂宿主文件替别的技能注册时必须传),
+   *  与 VIEW_DISTANCE_EXEMPTIONS 登记名一致;不参与运行时判定。 */
+  skillId?: string,
 ): () => void {
+  void skillId;
   return attackRangeExemptorRegistry.register(state, ownerId, exemptor);
 }
 
@@ -130,12 +139,21 @@ export function isAttackRangeExempted(
 /**
  * 注册一个通用距离豁免器(技能 onInit 时调用)。
  * 返回的取消注册函数应并入 onInit 返回的 unload,由 setSkillInstanceUnload 统一清理。
+ *
+ * view 侧投影:凡调用本函数的技能必须同步登记到 rules/viewDistance.ts 的
+ * VIEW_DISTANCE_EXEMPTIONS(kinds 含 'distance'),两侧技能名集合由
+ * tests/engine/view-distance-sync.test.ts 契约测试锁定——漏登记 = 引擎放行
+ * 但前端目标置灰。
  */
 export function registerDistanceExemptor(
   state: GameState,
   ownerId: number,
   exemptor: DistanceExemptor,
+  /** 豁免归属技能名:仅用于 view 侧契约测试归因(工厂宿主文件替别的技能注册时必须传),
+   *  与 VIEW_DISTANCE_EXEMPTIONS 登记名一致;不参与运行时判定。 */
+  skillId?: string,
 ): () => void {
+  void skillId;
   return distanceExemptorRegistry.register(state, ownerId, exemptor);
 }
 

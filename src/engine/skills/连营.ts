@@ -23,7 +23,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 const CONFIRM_RT = '连营/confirm';
 const CONFIRMED_KEY = '连营/confirmed';
@@ -176,15 +176,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '连营',
+    title: '是否发动连营?',
+    confirmLabel: '发动(摸一张牌)',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动连营?',
-      confirmLabel: '发动(摸一张牌)',
-      cancelLabel: '不发动',
-    },
   });
 }
 

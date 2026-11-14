@@ -20,6 +20,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import type { Color, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { normalizeCardIds } from '../util/skillRuntime';
 
 const SKILL_ID = '明任';
 /** 任标记 id(单张,固定 id;替换时先 去标记 再 加标记)。 */
@@ -111,9 +112,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
       if (rt === PLACE_RT) {
         // 客户端契约:useCard 型 pending 的两步式 UI 只发 {cardId}(无 cardIds),{}=点「不回应」放弃。
-        const raw: unknown = params.cardIds ?? params.cardId;
-        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
-        if (!ids || ids.length === 0) return null; // 放弃(消费端按未置牌处理)
+        const ids = normalizeCardIds(params);
+        if (ids.length === 0) return null; // 放弃(消费端按未置牌处理)
         const self = st.players[ownerId];
         if (!ids.every((id) => self.hand.includes(id))) return '牌不在手牌中';
         return null;
@@ -126,9 +126,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === PLACE_RT) {
-        const raw: unknown = params.cardIds ?? params.cardId;
-        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
-        if (ids && ids.length > 0) st.localVars[PLACE_KEY] = ids;
+        const ids = normalizeCardIds(params);
+        if (ids.length > 0) st.localVars[PLACE_KEY] = ids;
       }
     },
   );

@@ -30,7 +30,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
-import { currentRequestType } from '../util/skillRuntime';
+import { currentRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 const TRICK_NAME = '乐不思蜀';
 
@@ -374,15 +374,11 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       return hasDiamondInHand || hasDiamondInEquip;
     },
   });
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '界国色',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '界国色',
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
+    title: '界国色',
+    confirmLabel: '确认',
+    cancelLabel: '取消',
   });
   return () => {};
 }

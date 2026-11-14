@@ -47,7 +47,7 @@ import { registerAction, registerAfterHook, registerBeforeHook } from '../core/s
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 const _SKILL_ID = '界旋风';
 const DISPLAY_NAME = '旋风';
@@ -286,15 +286,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动旋风？',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动旋风？',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
 }
 

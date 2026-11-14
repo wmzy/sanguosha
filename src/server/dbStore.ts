@@ -1,10 +1,10 @@
 // src/server/dbStore.ts — 共享 DB 句柄单例。
 // PGLite 是进程内单实例数据库;roomStore(房间元数据)与 auth(用户/会话)共用同一连接。
-// 本模块拥有唯一的 DB 生命周期:init(幂等,含迁移)/get/close,并注册 lifecycles 清理。
+// 本模块拥有唯一的 DB 生命周期:init(幂等,含迁移)/get/close,并注册 resourceRegistry 清理。
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { createDB, migrateDB, type DB } from '../db';
-import { register as registerLifecycle } from './lifecycles';
+import { register as registerLifecycle } from './resourceRegistry';
 import { createLogger } from './logger';
 
 const log = createLogger('dbStore');

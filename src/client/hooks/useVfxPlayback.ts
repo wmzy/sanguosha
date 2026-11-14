@@ -5,18 +5,19 @@
 // 缺失资源静默跳过。
 //
 // 与 useSoundPlayback 同构：监听 ingested 批次（立即触发，不等延时播放队列），
-// 用 ref 记录已处理的最大 seq 过滤重复（seq 单调递增）。
+// seq 去重经共享 useFreshSeqFilter（seq 单调递增，跟踪已处理最大值）。
 //
 // 关键：返回值为 React state（useState），而非 ref。原 plan 用 queueRef 累积项目，
 // 但 ref 不触发 re-render，导致 VfxLayer 永远收不到新 items。这里改用 useState，
 // 新批次到来时 setState 推送 VfxPlaybackItem[]，驱动 VfxLayer 重新渲染。
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ViewEvent, Card } from '../../engine/types';
 import { getAtomDef } from '../../engine/core/atom';
 import { resourceManager } from '../resources';
 import { getCardVfx } from '../cardVfx';
 import type { QueuedEvent } from './useEventPlayback';
+import { useFreshSeqFilter } from './useFreshSeqFilter';
 
 /** ViewEvent 自带的 effect 片段（派生事件携带；静态 atom 走 getAtomDef） */
 type EventEffect = { vfx?: string } | undefined;
@@ -69,15 +70,14 @@ export function useVfxPlayback(
   ingested: readonly QueuedEvent[] | null | undefined,
   cardMap: Record<string, Card>,
 ): VfxPlaybackItem[] {
-  const lastSeqRef = useRef(0);
+  const filterFresh = useFreshSeqFilter();
   const [items, setItems] = useState<VfxPlaybackItem[]>([]);
 
   useEffect(() => {
     if (!ingested || ingested.length === 0) return;
-    // 过滤已处理的 seq（seq 单调递增，只需跟踪最大值）
-    const fresh = ingested.filter((e) => e.seq > lastSeqRef.current);
+    // 过滤已处理的 seq(共享水位过滤,见 useFreshSeqFilter)
+    const fresh = filterFresh(ingested);
     if (fresh.length === 0) return;
-    lastSeqRef.current = Math.max(...fresh.map((e) => e.seq));
 
     const newItems: VfxPlaybackItem[] = [];
     for (const { event, seq } of fresh) {
@@ -100,7 +100,7 @@ export function useVfxPlayback(
     // cardMap 引用每次渲染变化,但 fresh 事件由 ingested 数组引用驱动;
     // 这里只在 ingested 变化时触发(cardMap 在闭包中取最新传入值)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ingested]);
+  }, [ingested, filterFresh]);
 
   return items;
 }

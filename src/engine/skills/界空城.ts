@@ -14,7 +14,8 @@
 import type { HookResult, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
-import { registerAfterHook, registerBeforeHook } from '../core/skill';
+import { registerBeforeHook } from '../core/skill';
+import { registerOnOwnSlashDodged } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -58,21 +59,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // 杀被闪抵消后摸一张牌(与界张飞咆哮同款 after hook)
-  const unregAfter = registerAfterHook(
-    state,
-    skill.id,
-    ownerId,
-    '被抵消',
-    async (ctx) => {
-      // 只对杀生效:万箭齐发等锦囊被闪抵消不触发(贯石斧/青龙/咆哮同款判断)
-      if (ctx.frame.skillId !== '杀') return;
-      const atom = ctx.atom;
-      // 只在"自己使用的杀"被抵消时触发
-      if (atom.source !== ownerId) return;
-      await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
-    },
-  );
+  // 杀被闪抵消后摸一张牌(与界张飞咆哮同款:武将技形态,不传 weaponName)
+  const unregAfter = registerOnOwnSlashDodged(state, skill.id, ownerId, async (ctx) => {
+    await applyAtom(ctx.state, { type: '摸牌', player: ownerId, count: 1 });
+  });
 
   return () => {
     unregBefore();

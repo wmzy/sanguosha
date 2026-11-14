@@ -217,6 +217,54 @@ export function getSelfTarget(prompt: ActionPrompt): boolean {
   return prompt.type === 'useCardAndTarget' ? !!prompt.selfTarget : false;
 }
 
+/** isTriggerablePromptType 的端侧开关:转化类/distribute 是否纳入白名单。 */
+export interface TriggerablePromptOptions {
+  /** 转化类(useCard/useCardAndTarget 且 action.transform 存在)是否纳入 */
+  transform?: boolean;
+  /** distribute 类是否纳入 */
+  distribute?: boolean;
+}
+
+/** triggerable prompt.type 白名单:浏览器技能按钮渲染(PlayerCardLarge)与无头
+ *  主动技枚举(availableActions 的 enumeratePromptActions)的共享判据,此前两侧
+ *  各手写一份集合。
+ *  confirm/chooseOption/choosePlayer/selectTarget 两端一致纳入;转化类与 distribute
+ *  由 opts 按端纳入——浏览器需要按钮进入转化选牌/分配模式,无头侧两者各有独立
+ *  枚举器(transform/distribute 专用路径),不在此重复纳入,两侧现有行为严格等价。
+ *  注意 opts.transform 传「该 action 是否携带 transform 回调」而非裸 true:无
+ *  transform 的 use 型 prompt 是普通出牌路径(选手牌触发),不渲染为技能按钮。
+ *  无 opts 重载是类型谓词:不带端侧开关时只有四种基础类型可通过,调用方(无头
+ *  枚举)据此收窄 prompt;带 opts 时不承诺收窄(浏览器侧 filter 也不需要)。 */
+export type BasicTriggerablePrompt = Extract<
+  ActionPrompt,
+  { type: 'confirm' | 'chooseOption' | 'choosePlayer' | 'selectTarget' }
+>;
+
+export function isTriggerablePromptType(prompt: ActionPrompt): prompt is BasicTriggerablePrompt;
+export function isTriggerablePromptType(
+  prompt: ActionPrompt,
+  opts: TriggerablePromptOptions,
+): boolean;
+export function isTriggerablePromptType(
+  prompt: ActionPrompt,
+  opts?: TriggerablePromptOptions,
+): boolean {
+  switch (prompt.type) {
+    case 'confirm':
+    case 'chooseOption':
+    case 'choosePlayer':
+    case 'selectTarget':
+      return true;
+    case 'distribute':
+      return !!opts?.distribute;
+    case 'useCard':
+    case 'useCardAndTarget':
+      return !!opts?.transform;
+    default:
+      return false;
+  }
+}
+
 /** 转化动作「产出牌门」+ 目标语义解析结果。produced 为 undefined 表示产出牌
  *  无注册 use action(回退 transform 自身的 targetFilter/rules)。 */
 export interface ProducedTransformGate {
@@ -512,13 +560,15 @@ export function selectTargetCandidates(
     .map((p) => p.index);
 }
 
-/** 主动技目标数上下界:selectTarget 读 targetFilter.min/max、choosePlayer 读
- *  prompt.min/max,缺省均为 1(其余 prompt 类型亦 {1,1})。三处消费:浏览器
- *  handleTargetClick(单选点座位即提交)、handleSkillAction(未选目标先进入待定
- *  选目标模式)、无头 enumeratePromptActions(minTarget/maxTarget 投影与多选
- *  描述性 action 边界)——此前三处各自手写镜像三元。 */
+/** 主动技目标数上下界:selectTarget/useCardAndTarget 读 targetFilter.min/max、
+ *  choosePlayer 读 prompt.min/max,缺省均为 1(其余 prompt 类型亦 {1,1})。
+ *  消费方:浏览器 handleTargetClick(单选点座位即提交)、handleSkillAction(未选目标
+ *  先进入待定选目标模式)、无头 enumeratePromptActions(minTarget/maxTarget 投影与
+ *  多选描述性 action 边界)及出牌/转化路径的 targetBoundsOf(use 型 prompt 的
+ *  minTarget/maxTarget 投影,如铁索连环 max 2、杀 max 3)——useCardAndTarget 分支
+ *  补齐前,use 路径只能私有一份 targetFilter 手写镜像。 */
 export function promptTargetBounds(prompt: ActionPrompt): { min: number; max: number } {
-  if (prompt.type === 'selectTarget') {
+  if (prompt.type === 'selectTarget' || prompt.type === 'useCardAndTarget') {
     return { min: prompt.targetFilter.min ?? 1, max: prompt.targetFilter.max ?? 1 };
   }
   if (prompt.type === 'choosePlayer') {

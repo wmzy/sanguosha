@@ -22,8 +22,8 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { askRankCard, runRankCompareOrForfeit } from '../flows/rank';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { createRng } from '../util/rng';
-import { askConfirm } from '../util/skillRuntime';
+import { pickRandom } from '../util/rng';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 const CONFIRM_RT = '烈刃/confirm';
 const CONFIRMED_KEY = '烈刃/confirmed';
@@ -177,9 +177,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const target = ctx.state.players[victim];
     if (!target) return;
     if (target.hand.length > 0) {
-      const rng = createRng(ctx.state.rngSeed);
-      const cardId = target.hand[rng.nextInt(target.hand.length)];
-      ctx.state.rngSeed = rng.getState();
+      const cardId = pickRandom(ctx.state, target.hand)!;
       await applyAtom(ctx.state, { type: '获得', player: ownerId, cardId, from: victim });
     } else {
       const equipSlot = Object.keys(target.equipment)[0] as keyof typeof target.equipment;
@@ -198,15 +196,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '烈刃',
+    title: '是否发动烈刃?',
     style: 'danger',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动烈刃?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
   });
   return undefined;
 }

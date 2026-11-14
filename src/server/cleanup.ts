@@ -9,7 +9,7 @@ import { gameSessions } from './registry';
 import { getAllRooms, getRoom } from './room';
 import type { Room } from './room';
 import { destroyRoomCompletely, downgradeRoomToLobby } from './teardown';
-import { register } from './lifecycles';
+import { register } from './resourceRegistry';
 import { createLogger } from './logger';
 import type { GameSession } from './session';
 

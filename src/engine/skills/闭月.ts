@@ -24,7 +24,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond, defineConfirmAction } from '../util/skillRuntime';
 
 /** 结束阶段摸牌技(闭月族)差异参数 */
 export interface EndPhaseDrawOptions {
@@ -100,16 +100,7 @@ export function createEndPhaseDrawSkill(opts: EndPhaseDrawOptions) {
     },
 
     onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-      api.defineAction('respond', {
-        label: opts.name,
-        style: 'primary',
-        prompt: {
-          type: 'confirm',
-          title: opts.mountTitle,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
-      });
+      defineConfirmAction(api, 'respond', { label: opts.name, title: opts.mountTitle });
 
       return () => {};
     },

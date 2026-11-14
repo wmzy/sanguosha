@@ -33,19 +33,12 @@ import { applyAtom } from '../core/apply'
 import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
 import {
   registerAfterHook,
-  registerBeforeHook,
 } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 import { defaultPlayActive } from '../rules/action-active';
 import { setTurnVarUsage } from '../rules/turn-usage';
 import { SHUANGXIONG_COLOR_VIEW_KEY } from '../rules/vars-keys';
-import {
-  askConfirm,
-  registerConfirmRespond,
-  registerTransformAction,
-  mountTransformAction,
-  type TransformActionOptions,
-} from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, mountTransformAction, registerConfirmRespond, registerPhaseStartHook, registerTransformAction, type TransformActionOptions } from '../util/skillRuntime';
 
 const CONFIRM_RT = '双雄/confirm';
 const TRIGGERED_KEY = '双雄/triggered';
@@ -100,17 +93,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // 阶段开始(摸牌) before:询问发动 → 进行一次判定 → 跳过默认摸牌
-  registerBeforeHook(
+  registerPhaseStartHook(
     state,
     skill.id,
     ownerId,
-    '阶段开始',
+    '摸牌',
     async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== '摸牌') return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
       const self = ctx.state.players[ownerId];
       if (!self?.alive) return;
 
@@ -138,6 +126,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 跳过默认摸牌(直接型):阶段结束(摸牌)+ cancel
       return skipPhase(ctx.state, { player: ownerId, phase: '摸牌' });
     },
+    { requireCurrentPlayer: true },
   );
 
   // 判定牌生效后 hook(judgeType='双雄'):玩家获得判定牌 + 记颜色
@@ -175,15 +164,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '双雄',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动双雄?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动双雄?',
   });
 
   // 转化技 transform:把一张异色手牌当【决斗】。前端两步 UI(选牌+目标),

@@ -27,7 +27,7 @@ import { registerDistanceExemptor } from '../rules/distance';
 import { WANGLIE_FIRST_VIEW_KEY } from '../rules/vars-keys';
 import { projectTurnUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 /** turn.vars:本回合首张牌是否已使用(首张牌无距离限制的开关)。 */
 const FIRST_USED_VAR = '往烈/首张已用';
@@ -186,15 +186,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '往烈',
+    title: '是否发动往烈,令此牌不能被响应,然后本阶段不能再使用牌?',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动往烈,令此牌不能被响应,然后本阶段不能再使用牌?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
   });
 }
 

@@ -28,13 +28,7 @@ import type {
 } from '../types';
 import { registerAfterHook } from '../core/skill';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
-import {
-  askConfirm,
-  registerConfirmRespond,
-  registerTransformAction,
-  mountTransformAction,
-  type TransformActionOptions,
-} from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, mountTransformAction, registerConfirmRespond, registerTransformAction, type TransformActionOptions } from '../util/skillRuntime';
 
 /** 是否为普通杀(damageType 为空或 '普通',即非火杀/雷杀) */
 function isNormalSlash(
@@ -191,15 +185,10 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
 
   // respond:「是否发动朱雀羽扇」confirm 询问的 UI 定义(与 pending 槽 prompt 同文案)
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '朱雀羽扇',
+    title: '朱雀羽扇:是否发动,将此【杀】改为火【杀】?',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '朱雀羽扇:是否发动,将此【杀】改为火【杀】?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
   });
 }
 

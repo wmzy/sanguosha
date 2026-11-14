@@ -38,6 +38,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { registerAction, registerBeforeHook, registerAfterHook } from '../core/skill';
+import { defineConfirmAction } from '../util/skillRuntime';
 import {
   askConfirmToSkipPhase,
   askDiscardCardForSkip,
@@ -258,15 +259,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: SKILL_NAME,
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动界巧变?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动界巧变?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
 }
 

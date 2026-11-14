@@ -22,7 +22,7 @@
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 /** localVars 键:准备阶段全置底 → 结束阶段再次发动(一次性) */
 const ALL_BOTTOM_FLAG = '界观星/全置底';
@@ -193,16 +193,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
-    label: '界观星',
-    style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动界观星?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '界观星', title: '是否发动界观星?', style: 'default' });
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

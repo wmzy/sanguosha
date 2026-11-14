@@ -21,31 +21,11 @@ import type {
 import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
-import { isAwakened, markAwakened } from '../rules/vars-keys';
+import { isAwakened, markAwakened, clearPerTurnState } from '../rules/vars-keys';
 
 const AWAKENED_KEY = '凿险/awakened';
 const EXTRA_TURN_KEY = '凿险/extraTurn'; // localVars:本回合结束时应启动额外回合
 const TIAN_PREFIX = '屯田/田:';
-
-/** 复刻「回合结束」atom 的 per-turn 清理(cancel 回合结束后 atom.apply 不执行,需手动清理)。
- *  与 回合结束.ts apply 保持一致:清空 turn.vars、清所有玩家 duration='turn' 标记、
- *  清 /usedThisTurn|/healed|/givenCount|/givenTargets|/basicUsed vars。 */
-function clearPerTurnState(state: GameState): void {
-  state.turn.vars = {};
-  for (const p of state.players) {
-    p.marks = p.marks.filter((m) => m.duration !== 'turn');
-    p.vars = Object.fromEntries(
-      Object.entries(p.vars).filter(
-        ([k]) =>
-          !k.endsWith('/usedThisTurn') &&
-          !k.endsWith('/healed') &&
-          !k.endsWith('/givenCount') &&
-          !k.endsWith('/givenTargets') &&
-          !k.endsWith('/basicUsed'),
-      ),
-    );
-  }
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

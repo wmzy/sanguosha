@@ -39,7 +39,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerBeforeHook } from '../core/skill';
-import { askConfirm, currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 /** 玩家是否拥有红颜系锁定技(红颜/界红颜):黑桃视为红桃。 */
 function hasHongyanVariant(state: GameState, ownerId: number): boolean {
@@ -301,15 +301,9 @@ export function registerTianxiangWiring(skill: Skill, state: GameState, variant:
 
 /** onMount 共用:注册 respond 动作(标版/界版仅 label/标题文案不同)。 */
 export function mountTianxiangRespondAction(api: FrontendAPI, label: string, title: string): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title,
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title,
   });
 }
 

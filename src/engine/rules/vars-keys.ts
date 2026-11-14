@@ -106,6 +106,37 @@ export function usedThisTurnKey(skillName: string): string {
   return skillName + USED_THIS_TURN_SUFFIX;
 }
 
+// ── per-turn 清理(「回合结束」atom 权威实现 + cancel 回合结束路径复用) ──────
+
+/** per-turn vars 后缀:「回合结束」清空 state vars 时按此清单过滤
+ *  (usedThisTurn=限一次、healed=已回血、givenCount=累计计数、
+ *   givenTargets=界仁德已给目标、basicUsed=界仁德视为使用基本牌已触发)。
+ *  新增后缀 = 该 var 只活一回合,消费点(clearPerTurnState)自动跟上,勿再手抄 endsWith 链。 */
+export const PER_TURN_SUFFIXES: readonly string[] = [
+  USED_THIS_TURN_SUFFIX,
+  '/healed',
+  '/givenCount',
+  '/givenTargets',
+  '/basicUsed',
+];
+
+/** 回合结束的 per-turn 清理:清空 turn.vars、清所有玩家 duration='turn' 标记、
+ *  清所有玩家 PER_TURN_SUFFIXES 后缀 vars。
+ *  权威调用方:atoms/回合结束.apply(每回合一次);
+ *  防御性调用方:博图 cancel 回合结束后 时手动复刻(否则 apply 不执行,状态残留)——
+ *  此时 回合结束 已先行 apply 清理过,重复执行幂等无副作用。 */
+export function clearPerTurnState(state: GameState): void {
+  state.turn.vars = {};
+  for (const p of state.players) {
+    p.marks = p.marks.filter((m) => m.duration !== 'turn');
+    p.vars = Object.fromEntries(
+      Object.entries(p.vars).filter(
+        ([k]) => !PER_TURN_SUFFIXES.some((suffix) => k.endsWith(suffix)),
+      ),
+    );
+  }
+}
+
 // ── turn 作用域具名 view 投影键:单一声明点 ──────────────────
 //
 // 具名键原先三处登记(技能文件别名 + 本文件常量 + TURN_SCOPED_VIEW_KEYS 数组),

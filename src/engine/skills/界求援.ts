@@ -38,7 +38,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
-import { askConfirm, runVirtualSlash } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, runVirtualSlash } from '../util/skillRuntime';
 import {
   registerAction,
   registerAfterHook,
@@ -343,15 +343,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: DISPLAY_NAME,
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
+    title: DISPLAY_NAME,
+    confirmLabel: '确认',
+    cancelLabel: '取消',
   });
   return () => {};
 }

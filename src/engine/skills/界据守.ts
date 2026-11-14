@@ -18,7 +18,7 @@ import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { hasSkillModule } from './registry';
-import { slotOf, requireRequestType } from '../util/skillRuntime';
+import { firstCardId, slotOf, requireRequestType } from '../util/skillRuntime';
 
 const SKIP_TAG = '据守/翻面';
 const SKIP_FLAG = '据守/skipAll';
@@ -146,11 +146,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
     async (s: GameState, params: Record<string, Json>) => {
       // 客户端契约:mandatory 多选弃牌 UI 与 HeadlessGameClient 提交 {cardIds:[x]},
-      // 旧单发形状为 {cardId}。归一化双形状,且仅接受自己手牌中的牌(防注入他人牌);
+      // 旧单发形状为 {cardId}。firstCardId 归一化双形状,且仅接受自己手牌中的牌(防注入他人牌);
       // 非法形状不写 → use execute 走兜底弃首张。
-      const raw: unknown = Array.isArray(params.cardIds) ? params.cardIds[0] : params.cardId;
+      const raw = firstCardId(params);
       const self = s.players[ownerId];
-      if (typeof raw === 'string' && self?.hand.includes(raw)) {
+      if (raw !== undefined && self?.hand.includes(raw)) {
         s.localVars[DISCARD_CHOICE_KEY] = raw;
       }
     },

@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 import { applyRestRoutes } from '../../src/server/rest';
 import { applyAuthRoutes } from '../../src/server/auth/routes';
 import { initRoomStore, closeRoomStore } from '../../src/server/roomStore';
-import { _resetForTests as resetLifecycles } from '../../src/server/lifecycles';
+import { _resetForTests as resetLifecycles } from '../../src/server/resourceRegistry';
 import { gameSessions, playerRoomMap } from '../../src/server/registry';
 import { createRoom, getRoom, deleteRoom, joinRoom, joinAsSpectator, leaveRoom, removeSpectator, RECENT_LEAVE_GRACE_MS } from '../../src/server/room';
 import type { ConnectionSink } from '../../src/server/connection';

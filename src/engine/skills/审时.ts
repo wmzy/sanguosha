@@ -31,7 +31,7 @@ import { runDamageFlow } from '../flows/damage';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, normalizeCardIds } from '../util/skillRuntime';
 import { SHENSHI_STATE_VIEW_KEY } from '../rules/vars-keys';
 import { projectTurnUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
@@ -119,9 +119,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
       if (rt === YIN_GIVE_RT) {
         // 客户端契约:useCard 型 pending 只发 {cardId};{}=不发动(交给其一张牌是可选确认后的动作)。
-        const raw: unknown = params.cardIds ?? params.cardId;
-        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
-        if (!ids || ids.length === 0) return null; // 放弃 → 消费端按未给牌中止
+        const ids = normalizeCardIds(params);
+        if (ids.length === 0) return null; // 放弃 → 消费端按未给牌中止
         const self = st.players[ownerId];
         if (!ids.every((id) => self.hand.includes(id))) return '牌不在手牌中';
         return null;
@@ -142,9 +141,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (rt === YIN_CONFIRM_RT) {
         st.localVars[YIN_CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === YIN_GIVE_RT) {
-        const raw: unknown = params.cardIds ?? params.cardId;
-        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
-        if (ids && ids.length > 0) st.localVars[YIN_GIVE_KEY] = ids;
+        const ids = normalizeCardIds(params);
+        if (ids.length > 0) st.localVars[YIN_GIVE_KEY] = ids;
       } else if (rt === YANG_DEATH_CONFIRM_RT) {
         st.localVars[YANG_DEATH_CONFIRMED_KEY] =
           params.choice === true || params.confirmed === true;
@@ -384,15 +382,11 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     },
   });
 
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: SKILL_ID,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '审时',
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
+    title: '审时',
+    confirmLabel: '确认',
+    cancelLabel: '取消',
   });
 
   return () => {};

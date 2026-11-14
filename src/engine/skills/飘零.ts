@@ -24,7 +24,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 const CONFIRM_RT = '飘零/confirm';
 const GIVE_RT = '飘零/give';
@@ -212,16 +212,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
-    label: '飘零',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动飘零?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '飘零', title: '是否发动飘零?' });
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

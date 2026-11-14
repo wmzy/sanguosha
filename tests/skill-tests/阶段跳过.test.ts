@@ -175,7 +175,7 @@ describe('阶段跳过 skipPhase 集成', () => {
     expect(harness.state.phase).toBe('出牌');
 
     // 神速①虚拟杀计入出杀次数(charge)→ quotaUsed=1 已达基础上限
-    expect(harness.state.turn.vars['杀/quotaUsed']).toBe(1);
+    expect(harness.state.turn.vars['杀/quotaUsed/0']).toBe(1);
     // 出牌阶段再出真杀 → 被次数上限拒绝(validate 失败,静默丢弃)
     // (关闭视图自检:出牌窗口 IIFE 与增量视图存在已知时序竞争,非引擎 bug)
     const restoreCompare = disableAutoCompare();

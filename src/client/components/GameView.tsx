@@ -26,7 +26,7 @@ import { DISCARD_KEEP_PRIORITY } from '../../engine/atoms/请求回应';
 import { CountdownBar } from './CountdownBar';
 import { DEFAULT_COUNTDOWN_TOTAL_MS, useCountdownSeconds } from '../hooks/useCountdown';
 import { viewSlashMax, viewSlashUsed } from '../../engine/rules/action-active';
-import { viewEffectiveDistance } from '../../engine/rules/viewDistance';
+import { viewEffectiveDistance, viewCanAttack } from '../../engine/rules/viewDistance';
 import { PlayerCardLarge } from './PlayerCardLarge';
 import { EventBanner } from './EventBanner';
 import { ActionOverlay } from './ActionOverlay';
@@ -51,6 +51,7 @@ import { GameViewProvider, type GameViewCtxValue } from './GameViewCtx';
 import {
   canShowCancelSelectionButton,
   canShowEndTurnButton,
+  effectiveTargetCard,
   findUseActionForCard,
   hasUseEntry,
   isActiveAction,
@@ -284,6 +285,8 @@ export function GameViewComponentImpl({
   const {
     selectedCardId,
     selectedCard,
+    selectedUseAction,
+    selectedTargetFilter,
     selectedTarget,
     selectedKillTarget,
     selectedMultiTargets,
@@ -417,15 +420,40 @@ export function GameViewComponentImpl({
       if (!player.alive) return { distance, reason: '已阵亡' };
       if (isTargetable(idx)) return { distance, reason: null };
       if (idx === perspectiveIdx) return { distance, reason: '不能选择自己' };
-      if (selectedCard?.name === '杀' || isRespondTransformContext) {
+      // 「正在使用的牌」与 usePlayInteraction.isTargetable 同源:effectiveTargetCard
+      // 只认显式 usedCardName(转化技传产出牌名 transformWrapperName;普通出牌按
+      // 「use action 的 skillId === 选中牌名」认定),不凭「牌名===杀」猜——技能代价
+      // 牌恰好是杀(离间)或转化原料是杀(龙胆 杀→闪)时旧判据会误报攻击范围。
+      // 回应窗口(useCardAndTarget 型 pending,借刀杀人)用正在打出的回应牌。
+      const respondWindow = isMyAwaiting && pending?.prompt?.type === 'useCardAndTarget';
+      const usedCardName = transformWrapperName
+        ?? (selectedUseAction && selectedUseAction.skillId === selectedCard?.name
+          ? selectedCard.name
+          : null);
+      const usingCard = respondWindow
+        ? perspectiveHand.find((c) => c.id === selectedRespondCardId)
+        : effectiveTargetCard(selectedCard, selectedTargetFilter, usedCardName);
+      // 攻击范围与引擎/无头枚举同源走 viewCanAttack(含攻击范围豁免),替代手写
+      // distance > attackRange 比较;range 仅用于提示文案(与 viewCanAttack 内部同式)。
+      if (usingCard?.name === '杀' && !viewCanAttack(view.players, view.cardMap, perspectiveIdx, idx)) {
         const range = view.players[perspectiveIdx]?.distanceVars?.attackRange ?? 1;
-        if (distance > range) {
-          return { distance, reason: `距离 ${distance}，超出攻击范围 ${range}` };
-        }
+        return { distance, reason: `距离 ${distance}，超出攻击范围 ${range}` };
       }
       return { distance, reason: '不满足目标条件' };
     },
-    [view, perspectiveIdx, isTargetable, selectedCard, isRespondTransformContext],
+    [
+      view,
+      perspectiveIdx,
+      isTargetable,
+      selectedCard,
+      selectedUseAction,
+      selectedTargetFilter,
+      transformWrapperName,
+      selectedRespondCardId,
+      perspectiveHand,
+      isMyAwaiting,
+      pending,
+    ],
   );
 
   // ─── stabilized callbacks（引用稳定，避免子组件 memo 失效） ───

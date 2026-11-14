@@ -17,7 +17,7 @@ import type { Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { registerBeforeHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 /** 八卦阵族(询问闪判定视为出闪)差异参数 */
 export interface BaguaDodgeOptions {
@@ -113,15 +113,10 @@ export function createBaguaDodgeSkill(opts: BaguaDodgeOptions) {
     },
 
     onMount(_skill: Skill, api: FrontendAPI): void {
-      api.defineAction('respond', {
+      defineConfirmAction(api, 'respond', {
         label: opts.name,
+        title: `是否发动${opts.name}？`,
         style: 'default',
-        prompt: {
-          type: 'confirm',
-          title: `是否发动${opts.name}？`,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
       });
     },
   };

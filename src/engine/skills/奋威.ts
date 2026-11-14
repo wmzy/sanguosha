@@ -30,7 +30,7 @@ import { applyAtom } from '../core/apply'
 import { setFrameCancelled, topFrame } from '../core/frame';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const USED_KEY = '奋威/used';
 const CONFIRM_RT = '奋威/confirm';
@@ -225,15 +225,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '奋威',
+    title: '奋威',
+    confirmLabel: '确认',
+    cancelLabel: '取消',
     style: 'danger',
-    prompt: {
-      type: 'confirm',
-      title: '奋威',
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
   });
   return () => {};
 }

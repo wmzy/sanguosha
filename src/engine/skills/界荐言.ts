@@ -33,6 +33,7 @@ import { defaultPlayActive } from '../rules/action-active';
 import type { GameView } from '../types';
 import type { SkillModule } from '../types';
 import { requireRequestType } from '../util/skillRuntime';
+import { setPlayerVarUsage } from '../rules/turn-usage';
 
 const SKILL_ID = '界荐言';
 const DISPLAY_NAME = '荐言';
@@ -152,13 +153,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const from = ownerId;
 
       // 标记本回合已用(同步设 vars,防 dispatch 重入)
-      st.players[from].vars[USED_KEY] = true;
-      await applyAtom(st, {
-        type: '回合用量',
-        player: from,
-        key: USED_KEY,
-        value: true,
-      });
+      await setPlayerVarUsage(st, from, USED_KEY, true);
 
       await pushFrame(st, SKILL_ID, from, {});
 

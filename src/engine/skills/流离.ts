@@ -8,7 +8,7 @@ import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, normalizeCardIds, requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -49,9 +49,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
       if (requestType === '流离/pickDiscard') {
         // 客户端契约:useCard 型 pending 只发 {cardId};{}=不支付代价(不弃牌不转移)。
-        const raw: unknown = _params.cardIds ?? _params.cardId;
-        const cardIds = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
-        if (!cardIds || cardIds.length === 0) return null; // 放弃支付
+        const cardIds = normalizeCardIds(_params);
+        if (cardIds.length === 0) return null; // 放弃支付
         if (cardIds.length !== 1) return '请选择弃置的 1 张手牌';
         const cid = cardIds[0];
         if (typeof cid !== 'string' || !state.players[ownerId].hand.includes(cid)) {
@@ -68,9 +67,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         state.localVars['流离/confirmed'] = params.choice === true || params.confirmed === true;
       } else if (requestType === '流离/pickDiscard') {
         // 兼容 {cardIds:[id]} 与浏览器两步式 {cardId} 两种形状
-        const raw: unknown = params.cardIds ?? params.cardId;
-        const ids = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : undefined;
-        state.localVars['流离/discard'] = ids?.[0];
+        state.localVars['流离/discard'] = normalizeCardIds(params)[0];
       } else {
         state.localVars['流离/target'] = params.target;
       }
@@ -174,14 +171,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '流离',
+    title: '是否发动流离？',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动流离？',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
   });
 }

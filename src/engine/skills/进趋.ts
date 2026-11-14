@@ -27,7 +27,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { getQizhiCount } from '../rules/vars-keys';
-import { currentRequestType, askConfirm } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 const SKILL_ID = '进趋';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -162,16 +162,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
-    label: SKILL_ID,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动进趋?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: SKILL_ID, title: '是否发动进趋?' });
   return () => {};
 }
 

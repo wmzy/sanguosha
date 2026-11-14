@@ -3,7 +3,9 @@ import { writeFile, readFile, unlink, rename, mkdir, readdir, stat } from 'node:
 import { join } from 'node:path';
 import type { ActionLogEntry, GameState } from '../engine/types';
 import { RealClock } from '../engine/core/clock';
-import { register as registerLifecycle } from './lifecycles';
+import { register as registerLifecycle } from './resourceRegistry';
+import { createRoomSerialChain } from './serialChain';
+import { isSafeRoomId } from './safeId';
 import { createLogger, normalizeError } from './logger';
 // 函数级循环依赖(persistence→eventJournal→snapshot→persistence):所有交叉引用均在
 // 函数体内调用,模块求值期无访问,ESM 下安全。详见 eventJournal.ts 头部注释。
@@ -17,25 +19,10 @@ const DEBOUNCE_MS = 1000;
 const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const pendingWrappers = new Map<string, PersistedWrapper>();
 
-/** 每房间所有快照写入、flush 与删除共享一条串行链。 */
-const roomChains = new Map<string, Promise<void>>();
+/** 每房间所有快照写入、flush 与删除共享一条串行链(错误抛给调用方)。 */
+const { chains: roomChains, enqueue: enqueueRoom } = createRoomSerialChain('roomChains');
 /** 墓碑:正在删除的 roomId。阻止 debounce 回调和 saveRoom 在删除后重新写盘。 */
 const deletedRoomIds = new Set<string>();
-
-function enqueueRoom(roomId: string, operation: () => Promise<void>): Promise<void> {
-  const previous = roomChains.get(roomId) ?? Promise.resolve();
-  const next = previous.then(operation, operation);
-  roomChains.set(roomId, next);
-  next.then(
-    () => {
-      if (roomChains.get(roomId) === next) roomChains.delete(roomId);
-    },
-    () => {
-      if (roomChains.get(roomId) === next) roomChains.delete(roomId);
-    },
-  );
-  return next;
-}
 
 registerLifecycle('roomChains', roomChains, () => {
   roomChains.clear();
@@ -76,6 +63,11 @@ async function ensureDir(): Promise<void> {
 }
 
 function filePath(roomId: string): string {
+  // 与 eventJournal/gameHistory 同一白名单(单一来源 safeId):拒绝路径穿越/特殊字符。
+  // 非法 roomId 直接抛错 → 落盘/删除被拒,不允许越界文件名触盘。
+  if (!isSafeRoomId(roomId)) {
+    throw new Error(`拒绝为非法 roomId 生成持久化路径: ${roomId}`);
+  }
   return join(DATA_DIR, `${roomId}.json`);
 }
 
@@ -305,7 +297,7 @@ export async function listPersistedRooms(): Promise<string[]> {
 }
 
 export async function flushPendingWrites(): Promise<void> {
-  const pending: Promise<void>[] = [];
+  const pending: Promise<unknown>[] = [];
   for (const [roomId, wrapper] of pendingWrappers) {
     const timer = pendingTimers.get(roomId);
     if (timer) clearTimeout(timer);

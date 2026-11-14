@@ -12,11 +12,11 @@
 //   获得的橘在本阶段即时生效——但因摸牌阶段已被跳过,怀橘的 摸牌 before-hook 不会触发
 //   (摸牌 atom 根本未发出),无冲突。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction, registerBeforeHook } from '../core/skill';
+import { registerAction } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 import { addJu, juCount } from './怀橘';
 import type { SkillModule } from '../types';
-import { currentRequestType, askConfirm } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, registerPhaseStartHook } from '../util/skillRuntime';
 
 const SKILL_ID = '整论';
 
@@ -52,11 +52,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── 阶段开始(摸牌) before-hook:无橘时可跳过摸牌 + 获得 1 枚橘 ──
-  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.type !== '阶段开始') return;
-    if (atom.phase !== '摸牌') return;
-    if (atom.player !== ownerId) return;
+  registerPhaseStartHook(state, skill.id, ownerId, '摸牌', async (ctx) => {
     const st = ctx.state;
     const me = st.players[ownerId];
     if (!me?.alive) return;

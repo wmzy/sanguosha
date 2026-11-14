@@ -26,12 +26,20 @@
 //   内部 Skill.name = '渐营'(OL 官方技能名,玩家可见)。
 import type { ActionContext, Card, FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
+import { setPlayerVarUsage } from '../rules/turn-usage';
 import { registerAfterHook, hasBlockingPending } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import { getCardEffect } from './cards';
 import { TRANSFORM_ACTION_PREFIX } from '../util/declaredActionType';
 import type { SkillModule } from '../types';
-import { askConfirm, registerConfirmRespond, registerTransformAction, mountTransformAction, type TransformActionOptions } from '../util/skillRuntime';
+import {
+  askConfirm,
+  defineConfirmAction,
+  mountTransformAction,
+  registerConfirmRespond,
+  registerTransformAction,
+  type TransformActionOptions,
+} from '../util/skillRuntime';
 
 const SKILL_ID = '界渐营';
 const DISPLAY_NAME = '渐营';
@@ -134,14 +142,8 @@ function transformOptionsOf(outputName: string): TransformActionOptions {
     },
     beforeExecute: async (st, ownerId, _cardIds) => {
       // 限一次标记:同步设 vars(防 dispatch 重入)+ 回合用量 atom 投影 view(前端禁用按钮)。
-      // 必须在第一个 await 之前设置(见制衡.ts 注释)。
-      st.players[ownerId].vars[TRANSFORM_USED_KEY] = true;
-      await applyAtom(st, {
-        type: '回合用量',
-        player: ownerId,
-        key: TRANSFORM_USED_KEY,
-        value: true,
-      });
+      // 必须在第一个 await 之前设置(见制衡.ts 注释);setPlayerVarUsage 内部先写 vars 再 await。
+      await setPlayerVarUsage(st, ownerId, TRANSFORM_USED_KEY, true);
     },
     afterExecute: (st, _ownerId, shadowId) => {
       // 若上一张牌有花色,override 影子卡 suit/color 与之一致
@@ -270,15 +272,12 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   for (const outputName of ALLOWED_NAMES) {
     mountTransformAction(api, SKILL_ID, transformOptionsOf(outputName));
   }
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动渐营?',
-      confirmLabel: '摸一张',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动渐营?',
+    confirmLabel: '摸一张',
+    cancelLabel: '不发动',
   });
   return undefined;
 }

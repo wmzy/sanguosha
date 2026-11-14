@@ -33,7 +33,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 const TAG = '鞬出/禁闪';
 const CONFIRM = '鞬出/confirmed';
@@ -279,16 +279,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
-    label: '鞬出',
-    style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '鞬出:是否弃置目标一张牌？',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
-  });
+  defineConfirmAction(api, 'respond', { label: '鞬出', title: '鞬出:是否弃置目标一张牌？', style: 'default' });
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

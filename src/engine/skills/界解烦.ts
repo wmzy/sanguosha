@@ -34,6 +34,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
+import { projectTurnUsage } from '../rules/turn-usage';
 import {
   registerAction,
   registerBeforeHook,
@@ -127,15 +128,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
         // 标记限定技已用(永久 player.vars)。即便后续询问异常也算用过。
         st.players[from].vars[USED_KEY] = true;
-        // 第一轮发动:设 turn-scoped 重置标记
+        // 第一轮发动:设 turn-scoped 重置标记。
+        // state 存座次(from),view 投影 true——两侧值不同,不可用 setTurnVarUsage,走纯投影。
         if (st.turn.round === 1) {
           st.turn.vars[RESET_ON_END_VAR] = from;
-          await applyAtom(st, {
-            type: '回合用量',
-            player: from,
-            key: RESET_ON_END_VAR,
-            value: true,
-          });
+          await projectTurnUsage(st, from, RESET_ON_END_VAR, true);
         }
 
         await pushFrame(st, SKILL_ID, from, { ...params, chosenTarget: target });

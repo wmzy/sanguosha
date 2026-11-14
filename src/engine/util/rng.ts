@@ -1,3 +1,5 @@
+import type { GameState } from '../types';
+
 export interface Rng {
   next(): number;
   nextInt(max: number): number;
@@ -21,4 +23,27 @@ export function createRng(seed: number): Rng {
       return state;
     },
   };
+}
+
+/**
+ * 从数组中等概率随机取一个元素(种子化随机数的「取一」样板收敛:
+ * createRng(state.rngSeed) → 使用 → 写回 state.rngSeed,与各技能手写
+ * `const rng = createRng(state.rngSeed); const idx = rng.nextInt(arr.length);
+ *  state.rngSeed = rng.getState();` 逐字等价)。
+ * 空数组返回 undefined 且不推进 seed(不消耗随机序列,后续取数序列不变)。
+ *
+ * 用法(突袭:从目标手牌中随机获得一张):
+ * ```ts
+ * const cardId = pickRandom(state, state.players[target].hand);
+ * if (cardId !== undefined) {
+ *   await applyAtom(state, { type: '获得', player: ownerId, cardId, from: target });
+ * }
+ * ```
+ */
+export function pickRandom<T>(state: GameState, arr: readonly T[]): T | undefined {
+  if (arr.length === 0) return undefined;
+  const rng = createRng(state.rngSeed);
+  const picked = arr[rng.nextInt(arr.length)];
+  state.rngSeed = rng.getState();
+  return picked;
 }

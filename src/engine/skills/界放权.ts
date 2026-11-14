@@ -33,7 +33,8 @@ import type {
 import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAction, registerBeforeHook } from '../core/skill';
-import { askConfirm } from '../util/skillRuntime';
+import { clearPerTurnState } from '../rules/vars-keys';
+import { askConfirm, defineConfirmAction, registerPhaseStartHook } from '../util/skillRuntime';
 
 // requestType 前缀必须等于技能 id('界放权'):前端 resolvePendingRespond 按
 // requestType 前缀解析 skillId 后提交 respond,前缀≠技能 id 则 dispatch 找不到
@@ -48,26 +49,11 @@ const DISCARD_CARD_KEY = '放权/discardCard';
 const EXTRA_TARGET_KEY = '放权/extraTarget';
 const ORIGINAL_NEXT_KEY = '放权/originalNext';
 
-/** 复刻「回合结束」atom 的 per-turn 清理(cancel 回合结束后 atom.apply 不执行,需手动清理)。
- *  清空 turn.vars、清所有玩家 duration='turn' 标记、清 /usedThisTurn|/healed|/givenCount|/givenTargets|/basicUsed vars。
+/** 复刻「回合结束」atom 的 per-turn 清理(cancel 回合结束后 atom.apply 不执行,需手动清理):
+ *  统一走 rules/vars-keys 的 clearPerTurnState(清空 turn.vars、清所有玩家 duration='turn' 标记、
+ *  清 PER_TURN_SUFFIXES 后缀 vars;幂等,重复执行无副作用)。
  *  marks 多数由 end action 的 清过期标记 已清(仅结束玩家),此处补全所有玩家以保持与 atom 一致。
  *  注意:不清理 state.localVars(放权内部标记 extraTarget/originalNext 须跨清理存活)。 */
-function clearPerTurnState(state: GameState): void {
-  state.turn.vars = {};
-  for (const p of state.players) {
-    p.marks = p.marks.filter((m) => m.duration !== 'turn');
-    p.vars = Object.fromEntries(
-      Object.entries(p.vars).filter(
-        ([k]) =>
-          !k.endsWith('/usedThisTurn') &&
-          !k.endsWith('/healed') &&
-          !k.endsWith('/givenCount') &&
-          !k.endsWith('/givenTargets') &&
-          !k.endsWith('/basicUsed'),
-      ),
-    );
-  }
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -121,17 +107,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 阶段开始(出牌) before:询问是否放权(跳过出牌) ──
-  registerBeforeHook(
+  registerPhaseStartHook(
     state,
     skill.id,
     ownerId,
-    '阶段开始',
+    '出牌',
     async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== '出牌') return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
       const self = ctx.state.players[ownerId];
       if (!self?.alive) return;
 
@@ -153,20 +134,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '出牌' });
       return { kind: 'cancel' };
     },
+    { requireCurrentPlayer: true },
   );
 
   // ── 阶段开始(弃牌) before:放权代价(弃一张手牌)+ 选额外回合目标(对齐官方「弃牌阶段开始时」) ──
-  registerBeforeHook(
+  registerPhaseStartHook(
     state,
     skill.id,
     ownerId,
-    '阶段开始',
+    '弃牌',
     async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      if (atom.phase !== '弃牌') return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
       const st = ctx.state;
       if (st.localVars[ACTIVE_KEY] !== true) return; // 未发动放权跳过出牌 → 不触发
       delete st.localVars[ACTIVE_KEY]; // 消费 active 标记
@@ -217,6 +194,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
       // 不 cancel:让正常弃牌阶段按手牌上限继续进行
     },
+    { requireCurrentPlayer: true },
   );
 
   // ── 回合结束 before:放权额外回合的执行机制(目标已在弃牌阶段选定) ──
@@ -288,15 +266,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '界放权',
     style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动界放权?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动界放权?',
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
   });
 }
 
