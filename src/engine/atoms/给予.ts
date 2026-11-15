@@ -5,7 +5,7 @@
 // 给予.validate 保证 cardId 在 from 手牌,from/to 均为手牌区域(ZoneLoc 可表达),标记 from/to 准确。
 // 本 atom 的 apply + view 事件保持不变(含信息分级)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { requirePlayer, viewPlayer } from './_helpers';
+import { addCardToHand, removeCardFromHand, requirePlayer, viewPlayer } from './_helpers';
 import { applyAtom } from '../core/apply';
 
 export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }> = {
@@ -64,20 +64,8 @@ export const 给予: AtomDefinition<{ cardId: string; from: number; to: number }
   applyView(view, event) {
     const cardId = event.cardId as string | undefined;
     const fromP = viewPlayer(view, event.from as number);
-    if (fromP) {
-      fromP.handCount = Math.max(0, fromP.handCount - 1);
-      if (cardId && fromP.hand) {
-        fromP.hand = fromP.hand.filter((c) => c.id !== cardId);
-      }
-    }
-    const toP = viewPlayer(view, event.to as number);
-    if (toP) {
-      toP.handCount += 1;
-      if (cardId && toP.hand) {
-        const card = view.cardMap[cardId];
-        if (card) toP.hand.push(card);
-      }
-    }
+    if (fromP) removeCardFromHand(fromP, cardId);
+    addCardToHand(view, event.to as number, cardId);
   },
   toViewLog(event, viewer, resolveName) {
     const from = event.from as number;

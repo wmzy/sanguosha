@@ -4,26 +4,27 @@
 import type { Context, Hono } from 'hono';
 import {
   getRoom,
-  broadcastMessage,
   joinAsSpectator,
   switchRole,
   requestView,
   approveView,
   rejectView,
   revokeView,
-  checkRoomPassword,
   type Room,
 } from '../room';
 import { requireUser, resolveApprover } from '../auth/guard';
 import type { ServerMessage } from '../protocol';
-import { gameSessions, playerRoomMap } from '../registry';
+import { gameSessions } from '../registry';
 import {
   authRequired,
   broadcastRoomState,
   detachFromOtherRooms,
   nullSink,
+  notifyRoom,
   optString,
+  parseTargetSeat,
   readJsonBody,
+  requireRoomPassword,
   resolvePlayerOrRespond,
 } from './helpers';
 
@@ -50,7 +51,7 @@ async function handleViewAuthRoute(c: Context, spec: ViewAuthRouteSpec): Promise
   const roomId = c.req.param('id')!;
   const raw = await readJsonBody(c);
   const spectatorId = optString(raw.spectatorId);
-  const targetSeat = typeof raw.targetSeat === 'number' ? raw.targetSeat : -1;
+  const targetSeat = parseTargetSeat(raw);
   if (!spectatorId || (spec.requireTargetSeat && targetSeat < 0)) {
     return c.json({ error: spec.missingParamError }, 400);
   }
@@ -68,9 +69,10 @@ async function handleViewAuthRoute(c: Context, spec: ViewAuthRouteSpec): Promise
   }
 
   if (spec.notify) {
-    broadcastMessage(room, spec.notify(spectatorId, targetSeat));
+    notifyRoom(room, spec.notify(spectatorId, targetSeat));
+  } else {
+    broadcastRoomState(room);
   }
-  broadcastRoomState(room);
 
   // 如果游戏进行中,立即发送新视图
   if (spec.refreshView && session && room.status === '进行中') {
@@ -96,11 +98,13 @@ export function applySpectatorRoutes(app: Hono): void {
     const spectatorId = user.id;
 
     // 有密码房间:旁观同样需要密码;已是本房旁观者(spectators 含该 id,重连/刷新)豁免
-    if (room.passwordHash && !room.spectators.has(spectatorId)) {
-      const password = typeof raw.password === 'string' ? raw.password : '';
-      const ok = await checkRoomPassword(room, password);
-      if (!ok) return c.json({ error: '房间密码错误', code: 'ROOM_PASSWORD_REQUIRED' }, 403);
-    }
+    const forbidden = await requireRoomPassword(
+      c,
+      room,
+      raw.password,
+      room.spectators.has(spectatorId),
+    );
+    if (forbidden) return forbidden;
 
     // 清理旧房间关联(仅限其他房间的残留;同房走下方 switchRole 就地转换)
     detachFromOtherRooms(spectatorId, roomId, true);
@@ -117,10 +121,9 @@ export function applySpectatorRoutes(app: Hono): void {
       const joined = joinAsSpectator(roomId, spectatorId, nullSink(), user.displayName);
       if (!joined) return c.json({ error: '加入失败' }, 400);
     }
-    playerRoomMap.set(spectatorId, roomId);
+    // switchRole/joinAsSpectator 内部绑定 playerRoomMap 映射
 
-    broadcastMessage(room, { type: 'spectator_joined', spectatorId });
-    broadcastRoomState(room);
+    notifyRoom(room, { type: 'spectator_joined', spectatorId });
 
     return c.json({ roomId, playerId: spectatorId, playerName: user.displayName });
   });
@@ -142,8 +145,7 @@ export function applySpectatorRoutes(app: Hono): void {
     if (!result.room) return c.json({ error: '房间不存在' }, 404);
     if (!result.success) return c.json({ error: '切换失败（仅等待中/已结束允许，或房间已满）' }, 400);
 
-    broadcastMessage(result.room, { type: 'role_changed', playerId, newRole });
-    broadcastRoomState(result.room);
+    notifyRoom(result.room, { type: 'role_changed', playerId, newRole });
     return c.json({ success: true });
   });
 
@@ -151,7 +153,7 @@ export function applySpectatorRoutes(app: Hono): void {
   app.post('/api/rooms/:id/request-view', async (c) => {
     const roomId = c.req.param('id');
     const raw = await readJsonBody(c);
-    const targetSeat = typeof raw.targetSeat === 'number' ? raw.targetSeat : -1;
+    const targetSeat = parseTargetSeat(raw);
     if (targetSeat < 0) return c.json({ error: '缺少 targetSeat' }, 400);
     // 非调试房间:spectatorId 取会话 userId,防以他人名义发起申请
     const resolved = await resolvePlayerOrRespond(c, roomId, optString(raw.spectatorId));
@@ -163,8 +165,7 @@ export function applySpectatorRoutes(app: Hono): void {
 
     // 广播 view_request(客户端日志) + room_state(含更新后的 pendingViewRequests,
     // 驱动审批 UI——客户端从 room_state 同步 pendingViewRequests,而非 view_request 消息)
-    broadcastMessage(room, { type: 'view_request', spectatorId, targetSeat });
-    broadcastRoomState(room);
+    notifyRoom(room, { type: 'view_request', spectatorId, targetSeat });
     return c.json({ success: true });
   });
 

@@ -38,8 +38,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, normalizeCardIds, defineConfirmAction } from '../util/skillRuntime';
+import { registerAfterHook } from '../core/skill';
+import { askConfirm, normalizeCardIds, defineConfirmAction, registerRespondForAllSeats } from '../util/skillRuntime';
 
 // 内部 requestType/localVars 键名保持原前缀「节命/」,不改为「界节命/」
 const CONFIRM_RT = '界节命/confirm';
@@ -140,15 +140,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   //   ownerId 座次:回应 confirm + 选目标
   //   任意目标座次:回应 弃牌 询问(目标可能是任意角色,故跨座次注册)
   // 参考 驱虎/享乐 跨座次注册模式,以 skillId='界节命' 隔离,不与他技 respond 冲突。
+  // 多座次广播注册经 registerRespondForAllSeats 统一封装。
   const unloaders: Array<() => void> = [];
-  for (const p of state.players) {
-    const seatId = p.index;
-    const off = registerAction(
+  unloaders.push(
+    ...registerRespondForAllSeats(
       state,
       skill.id,
-      seatId,
-      'respond',
-      (st: GameState, params: Record<string, Json>): string | null => {
+      (st: GameState, seatId: number, params: Record<string, Json>): string | null => {
         const slot = st.pendingSlots.get(seatId);
         if (!slot) return '当前不需要回应';
         const atom = slot.atom as Record<string, unknown>;
@@ -173,7 +171,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
         return null;
       },
-      async (st: GameState, params: Record<string, Json>): Promise<void> => {
+      async (st: GameState, seatId: number, params: Record<string, Json>): Promise<void> => {
         const slot = st.pendingSlots.get(seatId);
         const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
         if (rt === CONFIRM_RT) {
@@ -188,11 +186,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           if (cardIds.length > 0) st.localVars[DISCARD_KEY] = cardIds;
         }
       },
-    );
-    unloaders.push(off);
-  }
+    ),
+  );
 
   // ── 受到伤害后 after:荀彧受伤后触发(非致死 或 致死被救活)──
+  // 注:不用 registerOnDamagedAsTarget——节命不限伤害来源(官方"当你受到1点伤害后",
+  // 无来源闪电/系统伤害、自伤均触发),该 helper 的 `source===undefined||source===ownerId`
+  // 守卫会改变行为,故保留手写两行守卫(target/amount)。
   // 濒死检查在扣减体力时(先于 受到伤害后)执行:若荀彧被救活(health>0)则此处触发;
   // 若荀彧未被救活(死亡),此处因 !alive 跳过,改由 死亡时 hook 触发。
   // 对所有存活伤害统一触发节命并置标记;若随后荀彧死亡,死亡时 hook 见标记去重跳过。

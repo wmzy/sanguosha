@@ -11,20 +11,32 @@
 // 判定牌时序:消费方 hook 挂在「判定牌生效后」,在 runJudgeFlow 收尾(把判定牌移入弃牌堆)之前跑。
 // 因此洛神的 判定牌生效后 hook 读 frameCards(此时判定牌还在处理区);随后 runJudgeFlow 收尾把
 // 判定牌移入弃牌堆。洛神主循环在 runJudgeFlow 返回后,从弃牌堆顶读判定牌。
+//
+// 本文件同时导出 createLuoshenSkill 工厂(洛神族共享实现),界洛神 复用之,
+// 仅注入 名称/描述/询问 requestType/手牌上限豁免 差异参数(确认键 '洛神/confirmed'
+// 与 judgeType '洛神' 两版共享——标/界甄姬只会拥有一版洛神)。
 import type { FrontendAPI, Skill, GameState, Card } from '../types';
-import { applyAtom } from '../core/apply'
+import { applyAtom } from '../core/apply';
 import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
-export function createSkill(id: string, ownerId: number): Skill {
-  return {
-    id,
-    ownerId,
-    name: '洛神',
-    description: '准备阶段判定:黑色获得判定牌并重复,直到红色或停止',
-  };
+/** 洛神族(被动技)差异参数 */
+export interface LuoshenOptions {
+  /** Skill.name(标 '洛神' / 界 '界洛神') */
+  name: string;
+  description: string;
+  /** 发动询问 requestType(标 '洛神/confirm' / 界 '界洛神/confirm',键空间隔离) */
+  confirmRt: string;
+  /** 继续询问 requestType(标 '洛神/continue' / 界 '界洛神/continue') */
+  continueRt: string;
+  /** onMount 按钮文案(标 '洛神' / 界 '界洛神') */
+  mountLabel: string;
+  /** 界版:获得判定牌后回调(记入豁免牌列表,本回合不计入手牌上限)。 */
+  onJudgeCardGained?: (state: GameState, cardId: string) => void;
+  /** 界版附加初始化(手牌上限豁免 provider),返回 unloader。 */
+  extraInit?: (state: GameState, ownerId: number) => () => void;
 }
 
 /** 判定牌是否为黑色(黑桃 ♠ 或梅花 ♣) */
@@ -32,102 +44,144 @@ function isBlack(card: Card | undefined): boolean {
   return !!card && (card.suit === '♠' || card.suit === '♣');
 }
 
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
-
-  // respond:被询问"是否发动洛神/是否继续"时回应,设 localVars 标记结果
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (state, _params) => {
-      return requireRequestType(state, ownerId, ['洛神/confirm', '洛神/continue'], {
-        mismatchError: '当前不是洛神询问',
-      }).error;
+/** 洛神族共享实现:标版洛神与界洛神的判定主循环逐字一致;
+ *  界版仅在获得判定牌后多记一次豁免牌,并多注册一个手牌上限 provider。 */
+export function createLuoshenSkill(opts: LuoshenOptions) {
+  return {
+    createSkill(id: string, ownerId: number): Skill {
+      return {
+        id,
+        ownerId,
+        name: opts.name,
+        description: opts.description,
+      };
     },
-    async (state, params) => {
-      // 两个询问共用 confirmed 标记:发动 confirm + 继续 continue
-      state.localVars['洛神/confirmed'] = params.choice === true || params.confirmed === true;
-    },
-  );
 
-  // 判定牌生效后 hook:读判定牌花色,把结果存 localVars(供主循环消费)
-  // 注意:此 hook 在 runJudgeFlow 收尾(判定牌入弃牌堆)之前运行,判定牌仍在 frameCards
-  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.player !== ownerId) return;
-    if (atom.judgeType !== '洛神') return;
+    onInit(skill: Skill, state: GameState): (() => void) | undefined {
+      const ownerId = skill.ownerId;
 
-    const processing = frameCards(ctx.state);
-    const judgeCardId = (ctx.atom as { cardId?: string }).cardId ?? processing[processing.length - 1];
-    if (!judgeCardId) return;
-    const judgeCard = ctx.state.cardMap[judgeCardId];
-    if (!judgeCard) return;
-  });
+      // respond:被询问"是否发动洛神/是否继续"时回应,设 localVars 标记结果
+      registerAction(
+        state,
+        skill.id,
+        ownerId,
+        'respond',
+        (state, _params) => {
+          return requireRequestType(state, ownerId, [opts.confirmRt, opts.continueRt], {
+            mismatchError: '当前不是洛神询问',
+          }).error;
+        },
+        async (state, params) => {
+          // 两个询问共用 confirmed 标记:发动 confirm + 继续 continue
+          state.localVars['洛神/confirmed'] = params.choice === true || params.confirmed === true;
+        },
+      );
 
-  // 阶段开始(准备) after-hook:洛神主循环
-  registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.type !== '阶段开始') return;
-    if (atom.player !== ownerId) return;
-    if (atom.phase !== '准备') return;
-    if (!ctx.state.players[ownerId]?.alive) return;
-    if (ctx.state.zones.deck.length === 0) return; // 牌堆空:无法判定
+      // 判定牌生效后 hook:读判定牌花色,把结果存 localVars(供主循环消费)
+      // 注意:此 hook 在 runJudgeFlow 收尾(判定牌入弃牌堆)之前运行,判定牌仍在 frameCards
+      registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
+        const atom = ctx.atom;
+        if (atom.player !== ownerId) return;
+        if (atom.judgeType !== '洛神') return;
 
-    // 询问是否发动洛神
-    const start = await askConfirm(ctx.state, '洛神/confirm', ownerId, {
-      confirmedKey: '洛神/confirmed',
-      title: '是否发动洛神?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-      defaultChoice: false,
-      timeout: 10,
-    });
-    if (!start) return;
-
-    // 主循环:判定 → 黑色获得 → 询问继续 → 重复
-    let keepGoing = true;
-    while (keepGoing) {
-      if (ctx.state.zones.deck.length === 0) break;
-      // 判定:判定 atom 把判定牌移入处理区,after-hook 读花色存 localVars,
-      // def.afterHooks 把判定牌移入弃牌堆。
-      const judgeCardId = await runJudgeFlow(ctx.state, ownerId, '洛神');
-      const result = judgeCardId && ctx.state.cardMap[judgeCardId] && isBlack(ctx.state.cardMap[judgeCardId]) ? 'black' : 'red';
-
-      if (result !== 'black' || !judgeCardId) break; // 红色或异常:退出
-
-      // 获得判定牌:判定牌此刻已在弃牌堆顶(def.afterHooks 已运行)。
-      // 用 移动牌 把判定牌从弃牌堆移到手牌。
-      await applyAtom(ctx.state, {
-        type: '移动牌',
-        cardId: judgeCardId,
-        from: { zone: '弃牌堆' },
-        to: { zone: '手牌', player: ownerId },
+        const processing = frameCards(ctx.state);
+        const judgeCardId =
+          (ctx.atom as { cardId?: string }).cardId ?? processing[processing.length - 1];
+        if (!judgeCardId) return;
+        const judgeCard = ctx.state.cardMap[judgeCardId];
+        if (!judgeCard) return;
       });
 
-      // 询问是否继续
-      // defaultChoice=true:超时(未设 localVars)应按「继续」处理,
-      // 故仅在玩家明确选择停止(confirmed===false)时退出,与 制霸 defaultChoice=true 模式一致。
-      keepGoing = await askConfirm(ctx.state, '洛神/continue', ownerId, {
-        confirmedKey: '洛神/confirmed',
-        title: '判定为黑色,是否继续洛神?',
-        confirmLabel: '继续',
-        cancelLabel: '停止',
-        defaultChoice: true,
-        timeout: 10,
+      // 界版附加初始化(手牌上限豁免 provider)
+      const unloaders: Array<() => void> = [];
+      if (opts.extraInit) {
+        unloaders.push(opts.extraInit(state, ownerId));
+      }
+
+      // 阶段开始(准备) after-hook:洛神主循环
+      registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
+        const atom = ctx.atom;
+        if (atom.type !== '阶段开始') return;
+        if (atom.player !== ownerId) return;
+        if (atom.phase !== '准备') return;
+        if (!ctx.state.players[ownerId]?.alive) return;
+        if (ctx.state.zones.deck.length === 0) return; // 牌堆空:无法判定
+
+        // 询问是否发动洛神
+        const start = await askConfirm(ctx.state, opts.confirmRt, ownerId, {
+          confirmedKey: '洛神/confirmed',
+          title: '是否发动洛神?',
+          confirmLabel: '发动',
+          cancelLabel: '不发动',
+          defaultChoice: false,
+          timeout: 10,
+        });
+        if (!start) return;
+
+        // 主循环:判定 → 黑色获得 → 询问继续 → 重复
+        let keepGoing = true;
+        while (keepGoing) {
+          if (ctx.state.zones.deck.length === 0) break;
+          // 判定:判定 atom 把判定牌移入处理区,after-hook 读花色存 localVars,
+          // def.afterHooks 把判定牌移入弃牌堆。
+          const judgeCardId = await runJudgeFlow(ctx.state, ownerId, '洛神');
+          const result =
+            judgeCardId && ctx.state.cardMap[judgeCardId] && isBlack(ctx.state.cardMap[judgeCardId])
+              ? 'black'
+              : 'red';
+
+          if (result !== 'black' || !judgeCardId) break; // 红色或异常:退出
+
+          // 获得判定牌:判定牌此刻已在弃牌堆顶(def.afterHooks 已运行)。
+          // 用 移动牌 把判定牌从弃牌堆移到手牌。
+          await applyAtom(ctx.state, {
+            type: '移动牌',
+            cardId: judgeCardId,
+            from: { zone: '弃牌堆' },
+            to: { zone: '手牌', player: ownerId },
+          });
+
+          // 界版:记入豁免牌(本回合不计入手牌上限)
+          opts.onJudgeCardGained?.(ctx.state, judgeCardId);
+
+          // 询问是否继续
+          // defaultChoice=true:超时(未设 localVars)应按「继续」处理,
+          // 故仅在玩家明确选择停止(confirmed===false)时退出,与 制霸 defaultChoice=true 模式一致。
+          keepGoing = await askConfirm(ctx.state, opts.continueRt, ownerId, {
+            confirmedKey: '洛神/confirmed',
+            title: '判定为黑色,是否继续洛神?',
+            confirmLabel: '继续',
+            cancelLabel: '停止',
+            defaultChoice: true,
+            timeout: 10,
+          });
+        }
+        delete ctx.state.localVars['洛神/confirmed'];
       });
-    }
-    delete ctx.state.localVars['洛神/confirmed'];
-  });
 
-  return () => {};
+      return () => {
+        for (const u of unloaders) u();
+      };
+    },
+
+    onMount(_skill: Skill, api: FrontendAPI): void {
+      defineConfirmAction(api, 'respond', {
+        label: opts.mountLabel,
+        title: '是否发动洛神?',
+        style: 'default',
+      });
+    },
+  };
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '洛神',
-    title: '是否发动洛神?',
-    style: 'default',
-  });
-}
+const OPTIONS: LuoshenOptions = {
+  name: '洛神',
+  description: '准备阶段判定:黑色获得判定牌并重复,直到红色或停止',
+  confirmRt: '洛神/confirm',
+  continueRt: '洛神/continue',
+  mountLabel: '洛神',
+};
+
+export const { createSkill, onInit, onMount } = createLuoshenSkill(OPTIONS);
+
+export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

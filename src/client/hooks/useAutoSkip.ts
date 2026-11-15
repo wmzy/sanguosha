@@ -13,6 +13,7 @@ import type { GameView, Json } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import type { PendingRespondInfo } from '../utils/pendingRespond';
 import { decideAutoSkipForView, type AutoSkipPrefs } from '../utils/autoSkip';
+import { SKIP_ACTION_TYPE, SKIP_SKILL_ID } from '../utils/skipMessage';
 
 export interface UseAutoSkipInput {
   view: GameView;
@@ -69,7 +70,7 @@ export function useAutoSkip(input: UseAutoSkipInput): void {
       // 防串扰:延迟期间 view 可能推进到新 pending(如杀问询),此时发 skip 会误作用于新窗口。
       // effect 重跑的 clearTimeout 是主防御;此处比对决策时的 deadline 作双保险。
       if ((latestViewRef.current.pending?.deadline ?? null) !== (pending.deadline ?? null)) return;
-      send('__skip', 'skip', {});
+      send(SKIP_SKILL_ID, SKIP_ACTION_TYPE, {});
       // 广播型:标记本地跳过(隐藏弹窗,与手动「不回应」一致)
       if (pending.target < 0) markBroadcastSkipped(broadcastKey);
     };

@@ -41,26 +41,25 @@
 //            · 假 → 移动牌(扣牌 弃牌堆→质疑者手牌) → voided=true(作废)。
 //
 // 蛊惑-杀(use 声明杀,生效路径):扣牌留弃牌堆(不进处理区,避免 cardMap 暴露真身破坏隐藏信息),
-//   杀结算复用标准三阶段(成为目标→检测有效性→询问闪→被抵消/伤害):
-//     · pushFrame('杀',…)——使武器技(贯石斧/青龙)的 被抵消 after-hook(frame.skillId==='杀')生效;
-//     · 检测有效性期间临时把 cardMap[扣牌].name 置为'杀'(try/finally 还原)——使仁王盾
-//       (检测有效性 before-hook: name==='杀' && color==='黑' → cancel)按物理花色判定假牌当杀。
-//   扣牌不在处理区,故 frameCards 的闪检测不受其真身影响(仅目标打出的闪在处理区)。
+//   杀结算复用 skillRuntime.runVirtualSlash(时机 atom 序列与实体杀一致:成为目标→检测有效性→
+//   询问闪(promptCancel 统一闪清理)→被抵消/伤害;武器技/无双按杀帧 hook 生效)。
+//   虚拟杀经 physicalCard 借用扣牌花色/颜色/点数/伤害属性——仁王盾按物理花色判假杀,
+//   火杀保留火焰伤害;charge:true 计入出杀次数。
 //
 // respond(质疑)注册到每个座次(被问询者非于吉),onInit 返回合并卸载函数
 //   (unloadSkillInstance 仅按 (skillId,于吉座次) 清 action,清不到其他座次)。
 import type { ActionContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
-import { popFrame, pushFrame, frameCards } from '../core/frame';
-import { runDamageFlow } from '../flows/damage';
+import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
-import { inAttackRange } from '../rules/distance';
-import { canSlash, incSlashUsed } from '../rules/slash-quota';
+import { canSlash } from '../rules/slash-quota';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { usedThisTurnKey } from '../rules/vars-keys';
 import { viewCanAttack } from '../rules/viewDistance';
 import { viewCanSlash } from '../rules/action-active';
 import { USE_ACTION_PREFIX } from '../util/declaredActionType';
+import { runVirtualSlash, registerRespondForAllSeats } from '../util/skillRuntime';
+import { canUseSlash } from './cards/杀';
 
 const REQUEST_TYPE = '蛊惑/质疑';
 const QUESTIONER_VAR = '蛊惑/质疑者';
@@ -81,63 +80,24 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 蛊惑-杀 生效后的杀结算:成为目标→检测有效性→询问闪→(被抵消/伤害)。
- *  扣牌留弃牌堆(不进处理区,保隐藏),cardId 仅作 hook 来源标识。
- *  pushFrame('杀') + 检测有效性期间临时改 cardMap[name]='杀',使武器技/仁王盾生效。 */
+/** 蛊惑-杀 生效后的杀结算:复用 runVirtualSlash(时机 atom 序列与实体杀一致——
+ *  指定目标/成为目标/检测有效性/生效前/询问闪(经 promptCancel 统一闪清理)/被抵消/
+ *  伤害/生效后,武器技与无双等杀帧 hook 均生效)。
+ *  扣牌留弃牌堆(不进处理区,保隐藏——虚拟杀是独立 cardMap 条目,结算后即删);
+ *  physicalCard 借用扣牌的花色/颜色/点数/伤害属性:仁王盾按物理花色判假杀(黑扣牌当杀
+ *  会被无效),火杀扣牌保留火焰伤害。charge:true 计入出杀次数(标准 FAQ:真牌/无人质疑
+ *  =正常使用;被闪抵消/仁王盾无效同样计次,与原实现无条件 incSlashUsed 一致)。 */
 async function resolveGuSlash(
   state: GameState,
   source: number,
   target: number,
   cardId: string,
 ): Promise<void> {
-  const card = state.cardMap[cardId];
-  const damageType = card?.damageType;
-  await pushFrame(state, '杀', source, { cardId, declaredName: '杀', target });
-  // 临时把扣牌当作"杀"(仅 cardMap.name),供仁王盾按物理花色判定;try/finally 必还原。
-  const origName = card?.name;
-  if (card && origName !== '杀') card.name = '杀';
-  try {
-    const became = await applyAtom(state, { type: '成为目标', source, target, cardId });
-    if (!became) return; // 空城等:目标不合法
-    const valid = await applyAtom(state, { type: '检测有效性', source, target, cardId });
-    if (!valid) return; // 仁王盾黑杀无效等
-    await applyAtom(state, { type: '询问闪', target, source });
-    // 真实闪走 runUseFlow → resolve 设杀帧 cancelled=true(牌已自动入弃牌堆,不在处理区);
-    // 八卦阵等虚拟闪直接入处理区。两者皆须检测(镜像 询问抵消 helper 的双轨逻辑)。
-    const slashFrame = state.settlementStack[state.settlementStack.length - 1];
-    const dodgeIds = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-    if (slashFrame?.cancelled || dodgeIds.length > 0) {
-      // 被抵消:触发武器技(贯石斧强命/青龙追杀,frame.skillId==='杀' 命中)
-      await applyAtom(state, { type: '被抵消', source, target, cardId });
-      const remaining = frameCards(state).filter((id) => state.cardMap[id]?.name === '闪');
-      for (const dId of remaining) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: dId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-    } else if (state.players[target]?.alive) {
-      await runDamageFlow(state, source, target, 1, cardId, damageType);
-    }
-  } finally {
-    // 异常安全:弹帧 + 清理滞留处理区的闪 + 还原 cardMap.name
-    for (const id of frameCards(state)) {
-      if (state.cardMap[id]?.name === '闪') {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId: id,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      }
-    }
-    await popFrame(state);
-    if (card && origName !== undefined && origName !== '杀') card.name = origName;
-  }
-  // 蛊惑-杀 成功计入出杀次数(标准 FAQ:真牌/无人质疑=正常使用)
-  await incSlashUsed(state, source);
+  await runVirtualSlash(state, source, target, {
+    prefix: '蛊惑',
+    physicalCard: state.cardMap[cardId],
+    charge: true,
+  });
 }
 
 /** 将扣牌(在弃牌堆)经 弃牌堆→手牌→当作(影子 outputName)→手牌→处理区 提供到当前结算帧。
@@ -315,9 +275,14 @@ export function registerGuEntries(
         const cardId = params.cardId as string | undefined;
         if (typeof cardId !== 'string' || !self.hand.includes(cardId)) return '请选择一张手牌';
         if (declaredName === '杀') {
+          // 目标必须显式给出且存活(canUseSlash 读数组,空 targets 不报错——单目标存在性
+          // 由此处保证,错误文案保持原实现);范围/目标数上限复用 杀.ts 的 canUseSlash
+          // (读 params.targets,dispatch 入口已归一 target/targets 两种形状)。
+          // 出杀次数上限仍由 canSlash 自查(蛊惑 use 不走 validateCardUse,checkUsageLimit 不会代查)。
           const target = params.target as number | undefined;
           if (typeof target !== 'number' || !st.players[target]?.alive) return '请选择合法目标';
-          if (!inAttackRange(st, ownerId, target)) return '目标不在攻击范围内';
+          const slashErr = canUseSlash(st, ownerId, params);
+          if (slashErr) return slashErr;
           if (!canSlash(st, ownerId, cardId)) return '出杀次数已达上限';
         } else if (declaredName === '桃') {
           const target = (params.target as number | undefined) ?? ownerId;
@@ -446,28 +411,23 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── respond(注册到每个座次:被蛊惑问询的角色选择是否质疑)──
-  for (const pl of state.players) {
-    const seat = pl.index;
-    unloaders.push(
-      registerAction(
-        state,
-        skill.id,
-        seat,
-        'respond',
-        (st: GameState, _params: Record<string, Json>): string | null => {
-          const slot = st.pendingSlots.get(seat);
-          if (!slot) return '当前不需要回应';
-          const atom = slot.atom as { requestType?: string };
-          if (atom.requestType !== REQUEST_TYPE) return '当前不是蛊惑质疑窗口';
-          if (!st.players[seat]?.alive) return '你已死亡';
-          return null;
-        },
-        async (st: GameState, _params: Record<string, Json>) => {
-          st.localVars[QUESTIONER_VAR] = seat;
-        },
-      ),
-    );
-  }
+  unloaders.push(
+    ...registerRespondForAllSeats(
+      state,
+      skill.id,
+      (st, seat): string | null => {
+        const slot = st.pendingSlots.get(seat);
+        if (!slot) return '当前不需要回应';
+        const atom = slot.atom as { requestType?: string };
+        if (atom.requestType !== REQUEST_TYPE) return '当前不是蛊惑质疑窗口';
+        if (!st.players[seat]?.alive) return '你已死亡';
+        return null;
+      },
+      async (st, seat) => {
+        st.localVars[QUESTIONER_VAR] = seat;
+      },
+    ),
+  );
 
   return () => {
     for (const u of unloaders) u();

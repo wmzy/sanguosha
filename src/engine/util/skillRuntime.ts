@@ -20,7 +20,13 @@
 //      (贯石斧/青龙偃月刀/界咆哮/界空城 四处时机一致,均为 '被抵消' after);
 //  12) defineConfirmAction:confirm 型 defineAction 的 onMount 样板(默认 发动/不发动/primary,
 //      显式传入不覆盖);
-//  13) registerPhaseStartHook:「阶段开始」before-hook 前导三查(type/player/phase 归属)。
+//  13) registerPhaseStartHook:「阶段开始」before-hook 前导三查(type/player/phase 归属);
+//  14) shadowCardId:影子卡 id 构造(`${牌id}#${技能id}`,多卡 id 以 # 连接;后缀=技能 id
+//      的 CLAUDE.md 不变量,转化工厂内部同源使用);
+//  15) hasNullifyWindow:无懈可击广播窗口扫描(看破/界看破/解围 转化 validate 共用);
+//  16) askResponse:请求回应通用三段式(delete 键残值 → applyAtom → 读键 → delete 键);
+//  17) registerOnDamagedAsTarget:「受到伤害后」四行前导守卫 after-hook(刚烈 骨架);
+//  18) registerRespondForAllSeats:respond 注册到全部座次的 for 循环样板(鞬出 骨架)。
 // 命名:函数/类型英文;业务字面量(牌名 '杀'/atom 类型 '请求回应'/错误文案)保持中文。
 import type {
   ActionActiveWhen,
@@ -49,6 +55,9 @@ export interface RunVirtualSlashOptions {
   prefix: string;
   /** 是否计入出杀次数(挂 chargeOnSettle 计费,由 杀.onSettle→incSlashUsed 累加)。默认不计。 */
   charge?: boolean;
+  /** 借用真实牌的花色/颜色/点数/伤害属性(蛊惑:扣牌当杀,仁王盾按物理花色判假杀、
+   *  火杀保留火焰伤害)。缺省为无色 'A'(原有语义:type 恒为 '基本牌',不借牌型)。 */
+  physicalCard?: Card;
 }
 
 /**
@@ -69,13 +78,15 @@ export async function runVirtualSlash(
   if (!state.players[target]?.alive) return false;
   const targetHealthBefore = state.players[target].health;
   const cardId = `${opts.prefix}:杀:${source}:${target}:${state.seq}`;
+  const physical = opts.physicalCard;
   state.cardMap[cardId] = {
     id: cardId,
     name: '杀',
-    suit: '',
-    color: '无色',
-    rank: 'A',
+    suit: physical?.suit ?? '',
+    color: physical?.color ?? '无色',
+    rank: physical?.rank ?? 'A',
     type: '基本牌',
+    ...(physical?.damageType !== undefined ? { damageType: physical.damageType } : {}),
   };
   await runUseFlow(state, source, cardId, [target], '杀', {
     virtual: true,
@@ -222,6 +233,45 @@ export async function askConfirm(
   return answer === true;
 }
 
+// ────────────────────────── 请求回应通用三段式 ──────────────────────────
+
+export interface AskResponseOptions {
+  /** prompt(必填;type 由调用方决定:useCard/choosePlayer/chooseOption/…) */
+  prompt: ActionPrompt;
+  /** 超时秒数;缺省不注入 → 请求回应 atom 默认(30,无懈可击 10) */
+  timeout?: number;
+  /** 超时/跳过的缺省回应(透传 atom defaultChoice) */
+  defaultChoice?: Json;
+  /** localVars 结果键;缺省由 requestType 派生:`${requestType}/回应结果`。
+   *  respond execute 写入的键必须与此一致才能读到。 */
+  resultKey?: string;
+}
+
+/** 请求回应三段式:delete 结果键残值 → applyAtom({type:'请求回应',…})
+ * → 读键 → delete 键(返回回应值,未回应为 undefined)。
+ *  各技能 respond execute「写 localVars 键、编排函数读后即删」的公共骨架
+ *  (界弓骑选目标、界荐言声明/选目标、放权弃牌/选额外目标等)。 */
+export async function askResponse<T = Json | undefined>(
+  state: GameState,
+  requestType: string,
+  target: number,
+  opts: AskResponseOptions,
+): Promise<T | undefined> {
+  const key = opts.resultKey ?? `${requestType}/回应结果`;
+  delete state.localVars[key];
+  await applyAtom(state, {
+    type: '请求回应',
+    requestType,
+    target,
+    prompt: opts.prompt,
+    ...(opts.defaultChoice !== undefined ? { defaultChoice: opts.defaultChoice } : {}),
+    ...(opts.timeout !== undefined ? { timeout: opts.timeout } : {}),
+  });
+  const result = state.localVars[key] as T | undefined;
+  delete state.localVars[key];
+  return result;
+}
+
 // ────────────────────────── pending requestType 读取 ──────────────────────────
 
 /** 当前 pending 的 requestType(类型安全读取)。座次无 pending 时返回 undefined。 */
@@ -251,12 +301,36 @@ export function slotOf(card: { subtype?: string } | undefined): EquipSlot | null
   }
 }
 
-// ────────────────────────── 影子卡有效 id ──────────────────────────
+// ────────────────────────── 影子卡 id ──────────────────────────
+
+/** 影子卡 id 构造:`${牌id}#${技能id}`(多卡:牌 id 以 # 连接后再接技能 id)。
+ *  ⚠ 后缀必须是技能 id——客户端按同一约定构造主 action 的 cardId,写成技能名会让
+ *  主 action 读不到 cardMap[影子id] → validate 恒失败(见 CLAUDE.md)。 */
+export function shadowCardId(cardId: string, skillId: string): string {
+  return `${cardId}#${skillId}`;
+}
 
 /** 牌的有效 id:转化影子卡 → shadowOf 原卡 id(影子卡入弃牌堆时被引擎还原为原卡,
  *  须按原卡 id 才能在弃牌堆/装备区找到);真实牌即本体 id。 */
 export function effectiveCardId(state: GameState, cardId: string): string {
   return state.cardMap[cardId]?.shadowOf ?? cardId;
+}
+
+// ────────────────────────── 无懈可击广播窗口 ──────────────────────────
+
+/** 当前是否存在无懈可击广播窗口(玩家可回应):扫描 pendingSlots 找
+ *  请求回应 + requestType='无懈可击',广播型(target<0)或精确指向本玩家。
+ *  看破/界看破/解围 的转化 validate 与 activeWhen 共用此判据(自 看破.ts 上提)。 */
+export function hasNullifyWindow(state: GameState, playerId: number): boolean {
+  for (const slot of state.pendingSlots.values()) {
+    const atom = slot.atom as { type?: string; requestType?: string; target?: number };
+    if (atom.type !== '请求回应') continue;
+    if (atom.requestType !== '无懈可击') continue;
+    // 广播型(target<0)或精确指向本玩家
+    if (typeof atom.target === 'number' && (atom.target < 0 || atom.target === playerId))
+      return true;
+  }
+  return false;
 }
 
 // ────────────────────────── 出牌时机四合一 ──────────────────────────
@@ -343,8 +417,12 @@ export interface TransformMountOptions {
 }
 
 export interface TransformActionOptions {
-  /** 产出牌名:决定主 action 语义(客户端按产出牌自己的 use/respond action 派发) */
+  /** 产出牌名:决定主 action 语义(客户端按产出牌自己的 use/respond action 派发)。
+   *  多向转化技(龙胆 杀↔闪)改用 outputNameOf 按原卡名定向,此处为缺省占位。 */
   outputName: string;
+  /** 多向转化的动态产出牌名(按消耗牌名推导,如 龙胆/界龙胆):返回 undefined 视为
+   *  不成立(execute 静默返回,validate 已拦截)。缺省用固定 outputName。 */
+  outputNameOf?: (sourceCardName: string) => string | undefined;
   /** 产出牌伤害属性(朱雀羽扇/界疠火 → '火焰')。缺省不设。 */
   outputDamageType?: '普通' | '火焰' | '雷电';
   /** 消耗牌张数(默认 1;丈八蛇矛/乱击族/界父魂主转化 = 2)。 */
@@ -453,7 +531,7 @@ export function registerTransformAction(
   const count = opts.cardCount ?? 1;
   /** 影子卡 id:单卡 `${cardId}#${skillId}`,多卡 `${id1}#…#${skillId}`。
    *  ⚠ 后缀必须是技能 id(客户端按同一约定构造主 action 的 cardId,见 CLAUDE.md)。 */
-  const shadowIdOf = (cardIds: string[]): string => `${cardIds.join('#')}#${skillId}`;
+  const shadowIdOf = (cardIds: string[]): string => shadowCardId(cardIds.join('#'), skillId);
 
   const defaultValidate = (st: GameState, params: Record<string, Json>): string | null => {
     const self = st.players[ownerId];
@@ -531,6 +609,11 @@ export function registerTransformAction(
       }
     }
     await opts.beforeExecute?.(st, ownerId, cardIds, params);
+    // 多向转化(龙胆/界龙胆)按消耗牌名定向;返回 undefined = validate 已拦截,防御性返回
+    const outputName = opts.outputNameOf
+      ? opts.outputNameOf(st.cardMap[cardIds[0]]?.name ?? '')
+      : opts.outputName;
+    if (!outputName) return;
     // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
     const shadowId = shadowIdOf(cardIds);
     await applyAtom(st, {
@@ -538,7 +621,7 @@ export function registerTransformAction(
       player: ownerId,
       cardIds,
       shadowId,
-      outputName: opts.outputName,
+      outputName,
       ...(opts.outputDamageType ? { outputDamageType: opts.outputDamageType } : {}),
     });
     await opts.afterExecute?.(st, ownerId, shadowId, cardIds);
@@ -602,7 +685,9 @@ export function mountTransformAction(
       ? {}
       : {
           transform: (card: Card) => ({
-            name: opts.outputName,
+            // 多向转化按选牌定向(龙胆 杀→闪/闪→杀);cardPredicate 已保证可选牌可映射,
+            // 此处兜底固定 outputName
+            name: opts.outputNameOf?.(card.name) ?? opts.outputName,
             sourceCardId: card.id,
             fromSkill: skillId,
           }),
@@ -710,6 +795,75 @@ export function registerOnOwnSlashDodged(
     }
     await handler(ctx);
   });
+}
+
+// ────────────────────── 「受到伤害后(以自己为目标)」after-hook ──────────────────────
+
+/**
+ * 注册「受到伤害后」技能 hook,封装四行前导守卫(不满足则直接放行,不进入 handler):
+ *   ① atom.target === ownerId——只在自己受到伤害后触发;
+ *   ② (atom.amount ?? 0) > 0——失去体力/零伤害不触发;
+ *   ③ atom.source !== undefined——无来源伤害不触发;
+ *   ④ atom.source !== ownerId——自伤不触发。
+ * 参考现状 刚烈.ts:75(刚烈/遗计/反馈/放逐 等「被他人伤害后」技能共用此骨架)。
+ *
+ * @returns unloader(registerAfterHook 原样透传)。
+ */
+export function registerOnDamagedAsTarget(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  handler: (ctx: AtomAfterContext<AtomOfName<'受到伤害后'>>) => Promise<void>,
+): () => void {
+  return registerAfterHook(state, skillId, ownerId, '受到伤害后', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.target !== ownerId) return;
+    if ((atom.amount ?? 0) <= 0) return;
+    if (atom.source === undefined || atom.source === ownerId) return;
+    await handler(ctx);
+  });
+}
+
+// ────────────────────── respond 注册到全部座次的 for 循环样板 ──────────────────────
+
+/**
+ * 把技能的 respond action 注册到全部座次(每个座次一个 (skillId, seat, 'respond') 键,
+ * validate/execute 收到座次号,自行读 pendingSlots.get(seat))。
+ * 收敛 36 处 `for (const p of state.players) { const seatId = p.index;
+ * unloaders.push(registerAction(state, skill.id, seatId, 'respond', …)) }` 样板
+ * (参考现状 鞬出.ts:104-143;技能可被任意座次的玩家获得,注册须覆盖全部座次)。
+ *
+ * @returns 每座次的 unloader 列表(调用方 spread 进自己的 unloaders)。
+ */
+export function registerRespondForAllSeats(
+  state: GameState,
+  skillId: string,
+  validate: (
+    state: GameState,
+    seat: number,
+    params: Record<string, Json>,
+  ) => string | null,
+  execute: (
+    state: GameState,
+    seat: number,
+    params: Record<string, Json>,
+  ) => Promise<void>,
+): Array<() => void> {
+  const unloaders: Array<() => void> = [];
+  for (const p of state.players) {
+    const seat = p.index;
+    unloaders.push(
+      registerAction(
+        state,
+        skillId,
+        seat,
+        'respond',
+        (st, params) => validate(st, seat, params),
+        (st, params) => execute(st, seat, params),
+      ),
+    );
+  }
+  return unloaders;
 }
 
 // ────────────────────────── confirm 型 defineAction 样板 ──────────────────────────

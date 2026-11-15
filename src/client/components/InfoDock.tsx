@@ -6,12 +6,12 @@
 // 设计:
 //   - 右下角 fixed 浮窗,可折叠(默认展开),不占用底层布局空间。
 //   - 顶部两个 tab:📜 日志 / 💬 聊天。
-//     - 日志 tab 直接渲染 GameLog(view.log 已有玩家名映射)。
-//     - 聊天 tab 渲染 ChatPanel 的核心(消息列表 + 输入)。
+//     - 日志 tab 由内置 LogTab 渲染(view.log 已有玩家名映射)。
+//     - 聊天 tab 由内置 ChatTab 渲染(消息列表 + 输入)。
 //   - 聊天配置 / 消息 / onSend 均可选:DebugLobby 不传 → 只显示日志 tab。
 //
-// 复用既有组件:GameLog 的渲染抽到 GameLogContent(下方),ChatPanel 的渲染保留但拆出
-// ChatContent 子组件。本组件只做 tab 容器与浮窗外壳。
+// 日志/聊天的渲染内容自原 GameLog/ChatPanel 复制内联为本文件的 LogTab/ChatTab
+// 组件(两个旧组件已删除)。本组件只做 tab 容器与浮窗外壳。
 // 共享数据(view)来自 GameViewCtx,专属数据(chatMessages/chatConfig/onSendChat/
 // mySeatIndex/embedded)仍走 props。为保留 memo 拦截采用「context 消费壳 + 内部
 // memo impl」模式:壳取 view 转发给 memo impl(默认浅比较),行为不变。
@@ -291,6 +291,13 @@ function fmtChatTime(ts: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/** 座次 → 展示名:优先 view.players 的玩家名,查不到回退 1 基座次号 P<n>
+ *  (与 ChatTab、座位名牌 #n 座号同口径);本人追加「（我）」标注。 */
+function seatDisplayName(view: GameView, seatIndex: number, isMe: boolean): string {
+  const playerView = view.players.find((p) => p.index === seatIndex);
+  return `${playerView?.name ?? `P${seatIndex + 1}`}${isMe ? '（我）' : ''}`;
+}
+
 function LogTab({ view }: { view: GameView }) {
   return (
     <div className={logContent}>
@@ -300,11 +307,7 @@ function LogTab({ view }: { view: GameView }) {
         .reverse()
         .map((entry, i) => {
           const isMe = entry.player === view.viewer;
-          const playerView = view.players.find((p) => p.index === entry.player);
-          const playerName =
-            entry.player >= 0
-              ? `${playerView?.name ?? `P${entry.player}`}${isMe ? '（我）' : ''}`
-              : '系统';
+          const playerName = entry.player >= 0 ? seatDisplayName(view, entry.player, isMe) : '系统';
           return (
             <div key={i} className={logEntry}>
               <span className={logTime}>{fmtGameTime(entry.time)}</span>
@@ -367,9 +370,8 @@ function ChatTab({
         )}
         {messages.map((m, i) => {
           const mine = mySeatIndex !== undefined && m.seatIndex === mySeatIndex;
-          // 发送者显示武将名,与 LogTab 同源(查 view.players);查不到时退回座次号。
-          const playerView = view.players.find((p) => p.index === m.seatIndex);
-          const name = `${playerView?.name ?? `P${m.seatIndex + 1}`}${mine ? '（我）' : ''}`;
+          // 发送者显示武将名,与 LogTab 同一 seatDisplayName(含座次号回退口径)。
+          const name = seatDisplayName(view, m.seatIndex, mine);
           return (
             <div key={i} className={mine ? chatMsgRowMine : chatMsgRow}>
               <span className={chatMsgName}>{name}</span>
@@ -429,6 +431,8 @@ const InfoDockImpl = memo(({
   const chatCount = chatMessages?.length ?? 0;
   const [lastSeenCount, setLastSeenCount] = useState(chatCount);
   const chatUnread = Math.max(0, chatCount - lastSeenCount);
+  // 未读提示文案:聊天 tab 按钮徽标与折叠药丸共用同一派生,避免两处内联表达式口径漂移
+  const chatUnreadText = chatUnread > 0 ? `新增 ${chatUnread} 条` : null;
   useEffect(() => {
     if (!collapsed && tab === 'chat') {
       setLastSeenCount(chatCount);
@@ -464,8 +468,8 @@ const InfoDockImpl = memo(({
               }}
             >
               💬 聊天{' '}
-              {chatUnread > 0 ? (
-                <span className={unreadBadge}>新增 {chatUnread} 条</span>
+              {chatUnreadText !== null ? (
+                <span className={unreadBadge}>{chatUnreadText}</span>
               ) : chatCount > 0 ? (
                 `(${chatCount})`
               ) : null}
@@ -501,8 +505,8 @@ const InfoDockImpl = memo(({
           style={{ borderRadius: '18px', padding: '6px 14px' }}
         >
           {/* 未读优先;无未读时不再显示恒增的消息总数,只保留当前 tab 图标/日志数 */}
-          {chatUnread > 0
-            ? `💬 新增 ${chatUnread} 条`
+          {chatUnreadText !== null
+            ? `💬 ${chatUnreadText}`
             : tab === 'log'
               ? `📜 ${view.log.length}`
               : '💬'}

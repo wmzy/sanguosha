@@ -18,10 +18,17 @@
 // 后端 dispatch 先执行 界龙胆.transform(创建影子卡),再主 action validate 读 cardMap[影子id] 通过。
 // 主 action(闪/杀/桃/酒)零感知界龙胆——它们看到的永远是 cardMap 里的目标牌。
 // transform validate 不限定回合/阶段:由主 action(杀.use/桃.use/酒.use/respond 等)校验。
+//
+// 五件套(影子 id 后缀=技能 id '界龙胆'、当作、rollback、defineAction)由 skillRuntime 工厂
+// 统一实现;四向转化用 outputNameOf 按原卡名定向,validate 逐字保留 to 校验。
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
-import { registerAction, declareAlternativeResponse } from '../core/skill';
-import { applyAtom } from '../core/apply';
+import { declareAlternativeResponse } from '../core/skill';
 import { viewCanSlash, defaultPlayActive } from '../rules/action-active';
+import {
+  mountTransformAction,
+  registerTransformAction,
+  type TransformActionOptions,
+} from '../util/skillRuntime';
 
 /** 源卡名 → 转化目标牌名(四向双向映射;每张源卡唯一确定目标) */
 const TRANSFORM_MAP: Record<string, string> = {
@@ -41,19 +48,12 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 影子卡 id:${原id}#界龙胆(单卡转化,同一张牌只可能转一个方向) */
-function shadowIdOf(cardId: string): string {
-  return `${cardId}#界龙胆`;
-}
-
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
-  // transform action:把一张手牌(杀/闪/酒/桃)转化为影子目标牌。
-  // params.to 决定转化方向;缺省时由原卡名推导(兼容 headless availableActions 不传 to)。
-  // 作为 preceding 在主 action(闪/杀/桃/酒 的 use/respond)之前执行。
-  registerAction(state,
-  skill.id,
-  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+/** transform 五件套工厂配置(杀↔闪 + 酒↔桃,方向由原卡名推导)。 */
+const TRANSFORM_OPTIONS: TransformActionOptions = {
+  // 占位:实际产出牌名由 outputNameOf 按原卡名推导
+  outputName: '杀',
+  outputNameOf: (sourceCardName: string) => TRANSFORM_MAP[sourceCardName],
+  validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
     const self = state.players[ownerId];
     const selfAlive = self?.alive === true;
     const cardId = params.cardId as string;
@@ -69,46 +69,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (to !== expectedTo) return '转化方向与原牌不符';
     return null;
   },
-  async (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const card = state.cardMap[cardId];
-    // validate 已保证原卡可转化(TRANSFORM_MAP 命中);to 缺省时按原卡名推导
-    const to =
-      (params.to as string | undefined) ?? (card ? TRANSFORM_MAP[card.name] : undefined);
-    if (!to) return; // validate 已拦截,防御性兜底
-    const shadowId = shadowIdOf(cardId);
-    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-    await applyAtom(state, {
-      type: '当作',
-      player: ownerId,
-      cardIds: [cardId],
-      shadowId,
-      outputName: to,
-    });
-  },
-  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-  (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const sId = shadowIdOf(cardId);
-    delete state.cardMap[sId];
-    const self = state.players[ownerId];
-    const idx = self.hand.indexOf(sId);
-    if (idx >= 0) self.hand[idx] = cardId;
-  },);
-  const unloadDodge = declareAlternativeResponse(state, ownerId, '询问闪');
-  const unloadSlash = declareAlternativeResponse(state, ownerId, '询问杀');
-  const unloadRescue = declareAlternativeResponse(state, ownerId, '请求回应', '桃/求桃');
-  return () => { unloadDodge(); unloadSlash(); unloadRescue(); };
-}
-
-export function onMount(skill: Skill, api: FrontendAPI): void {
-  // 前端:界龙胆是四向转化技,defineAction 声明杀/闪/酒/桃。
-  // 前端 UI 流程:
-  //   - 自己回合(出杀):选闪 → 点界龙胆 → preceding=[界龙胆.transform{to:'杀'}] + 主 action=杀.use
-  //   - 被询问闪(防御):选杀 → 点界龙胆 → preceding=[界龙胆.transform{to:'闪'}] + 主 action=闪.respond
-  //   - 自己回合(回血):选酒(已受伤) → 点界龙胆 → preceding=[界龙胆.transform{to:'桃'}] + 主 action=桃.use
-  //   - 自己回合(增伤):选桃 → 点界龙胆 → preceding=[界龙胆.transform{to:'酒'}] + 主 action=酒.use
-  api.defineAction('transform', {
+  mount: {
     label: '界龙胆',
     style: 'passive',
     prompt: {
@@ -130,11 +91,6 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
         },
       },
     },
-    transform: (card: Card) => ({
-      name: TRANSFORM_MAP[card.name] ?? card.name,
-      sourceCardId: card.id,
-      fromSkill: skill.id,
-    }),
     activeWhen: (ctx) => {
       const p = ctx.view.players[ctx.perspectiveIdx];
       if (!p?.alive) return false;
@@ -165,8 +121,28 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
       if (askedKill && has('闪')) return true;
       return false;
     },
-  });
-  return;
+  },
+};
+
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+  // transform action:把一张手牌(杀/闪/酒/桃)转化为影子目标牌。
+  // 作为 preceding 在主 action(闪/杀/桃/酒 的 use/respond)之前执行。
+  registerTransformAction(state, skill.id, ownerId, TRANSFORM_OPTIONS);
+  const unloadDodge = declareAlternativeResponse(state, ownerId, '询问闪');
+  const unloadSlash = declareAlternativeResponse(state, ownerId, '询问杀');
+  const unloadRescue = declareAlternativeResponse(state, ownerId, '请求回应', '桃/求桃');
+  return () => { unloadDodge(); unloadSlash(); unloadRescue(); };
+}
+
+export function onMount(skill: Skill, api: FrontendAPI): void {
+  // 前端:界龙胆是四向转化技,defineAction 声明杀/闪/酒/桃。
+  // 前端 UI 流程:
+  //   - 自己回合(出杀):选闪 → 点界龙胆 → preceding=[界龙胆.transform{to:'杀'}] + 主 action=杀.use
+  //   - 被询问闪(防御):选杀 → 点界龙胆 → preceding=[界龙胆.transform{to:'闪'}] + 主 action=闪.respond
+  //   - 自己回合(回血):选酒(已受伤) → 点界龙胆 → preceding=[界龙胆.transform{to:'桃'}] + 主 action=桃.use
+  //   - 自己回合(增伤):选桃 → 点界龙胆 → preceding=[界龙胆.transform{to:'酒'}] + 主 action=酒.use
+  mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

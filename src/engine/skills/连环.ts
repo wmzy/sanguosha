@@ -7,19 +7,18 @@
 //   transform(转化):preceding action,把梅花手牌通过「当作」atom 转化为影子「铁索连环」。
 //     前端组合:preceding=[连环.transform] + 主 action=铁索连环.use。
 //     铁索连环.use 零感知连环——它看到的是 cardMap 里的一张"铁索连环"。
-//     模式参考 龙胆.ts / 武圣.ts。
+//     五件套由 skillRuntime 工厂统一实现(模式参考 武圣.ts)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { recastCard } from '../flows/recast';
 import { registerAction } from '../core/skill';
-import { engineCanPlayNow } from '../util/skillRuntime';
+import {
+  engineCanPlayNow,
+  mountTransformAction,
+  registerTransformAction,
+  type TransformActionOptions,
+} from '../util/skillRuntime';
 import { defaultPlayActive } from '../rules/action-active';
-
-/** 影子卡 id:${原id}#连环 */
-function shadowIdOf(cardId: string): string {
-  return `${cardId}#连环`;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -29,6 +28,40 @@ export function createSkill(id: string, ownerId: number): Skill {
     description: '你可以将一张梅花手牌当【铁索连环】使用或重铸',
   };
 }
+
+/** transform 五件套工厂配置(梅花手牌 → 影子铁索连环)。 */
+const TRANSFORM_OPTIONS: TransformActionOptions = {
+  outputName: '铁索连环',
+  validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
+    const self = state.players[ownerId];
+    const selfAlive = self?.alive === true;
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const isClub = !!card && card.suit === '♣';
+    if (!selfAlive) return '你已死亡';
+    if (!cardIdOk || !cardInHand) return '牌不在手牌中';
+    if (!isClub) return '只能将梅花牌当铁索连环';
+    return null;
+  },
+  mount: {
+    label: '连环',
+    style: 'primary',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '连环:将一张梅花手牌当铁索连环使用',
+      cardFilter: { filter: (c: Card) => c.suit === '♣', min: 1, max: 1 },
+      targetFilter: { min: 1, max: 2, allowSelf: true },
+    },
+    activeWhen: (ctx) => {
+      if (!defaultPlayActive(ctx)) return false;
+      const p = ctx.view.players[ctx.perspectiveIdx];
+      if (!p) return false;
+      return p.hand?.some((c) => c.suit === '♣') ?? false;
+    },
+  },
+};
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
@@ -60,41 +93,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── transform:梅花手牌 → 影子"铁索连环"(作为 preceding,主 action=铁索连环.use) ──
-  registerAction(state,
-  skill.id,
-  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
-    const self = state.players[ownerId];
-    const selfAlive = self?.alive === true;
-    const cardId = params.cardId as string;
-    const cardIdOk = typeof cardId === 'string';
-    const card = cardIdOk ? state.cardMap[cardId] : undefined;
-    const cardInHand = cardIdOk && self.hand.includes(cardId);
-    const isClub = !!card && card.suit === '♣';
-    if (!selfAlive) return '你已死亡';
-    if (!cardIdOk || !cardInHand) return '牌不在手牌中';
-    if (!isClub) return '只能将梅花牌当铁索连环';
-    return null;
-  },
-  async (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const shadowId = shadowIdOf(cardId);
-    await applyAtom(state, {
-      type: '当作',
-      player: ownerId,
-      cardIds: [cardId],
-      shadowId,
-      outputName: '铁索连环',
-    });
-  },
-  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-  (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const sId = shadowIdOf(cardId);
-    delete state.cardMap[sId];
-    const self = state.players[ownerId];
-    const idx = self.hand.indexOf(sId);
-    if (idx >= 0) self.hand[idx] = cardId;
-  },);
+  // 五件套(影子 id 后缀=技能 id '连环'、当作、rollback、defineAction)由工厂统一实现;
+  // validate 逐字保留原逐条件拒绝文案。
+  registerTransformAction(state, skill.id, ownerId, TRANSFORM_OPTIONS);
 
   return () => {};
 }
@@ -116,25 +117,9 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       return hasClub;
     },
   });
-  api.defineAction('transform', {
-    label: '连环',
-    style: 'primary',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '连环:将一张梅花手牌当铁索连环使用',
-      cardFilter: { filter: (c: Card) => c.suit === '♣', min: 1, max: 1 },
-      targetFilter: { min: 1, max: 2, allowSelf: true },
-    },
-    // transform 字段:前端据此进入转化模式,组合 preceding=[连环.transform]
-    // + 主 action=铁索连环.use(wrapperName='铁索连环')。缺失则前端无法发动。
-    transform: (card: Card) => ({ name: '铁索连环', sourceCardId: card.id, fromSkill: skill.id }),
-    activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
-      const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p) return false;
-      return p.hand?.some((c) => c.suit === '♣') ?? false;
-    },
-  });
+  // transform 声明由工厂统一构造(前端据此进入转化模式,组合 preceding=[连环.transform]
+  // + 主 action=铁索连环.use(wrapperName='铁索连环'))。
+  mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
   return undefined;
 }
 

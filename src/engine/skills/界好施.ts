@@ -13,46 +13,37 @@
 //   鲁肃被杀/普通锦囊指定时→收到好施牌的角色可交鲁肃1张手牌)。
 //
 // 实现:
-//   A. 摸牌逻辑(镜像标好施):before hook +2张 / after hook >5分半给最少者。
+//   A. 摸牌逻辑(before +2张 / after >5分半给最少者):复用标版好施导出的
+//      registerHaoshiDrawHooks(标/界逐字相同,键前缀 '界好施'),仅在给牌完成后
+//      经 afterGive 回调激活跨回合被动。
 //   B. 被动追踪:给牌后记 localVars[受益者/被动激活];回合开始 after hook 清。
 //   C. 被动触发:
 //      - 杀: 成为目标 after hook(atom.target===owner 且卡是杀)
 //      - 普通锦囊: 请求回应 before hook(cancelTarget===owner 且卡非延时锦囊)
 //        ——全体/单目标锦囊在结算前均经 询问无懈可击(cancelTarget=目标座次)。
-//   D. respond 注册到每个座次:鲁肃处理 confirm/target/give;其他座次处理 passiveGive。
+//   D. respond 注册到每个座次:鲁肃处理 confirm/target/give(标/界共享分支
+//      applyHaoshiDrawRespond,界版给牌守卫额外拒绝重复牌);其他座次处理 passiveGive。
 //
 // 命名:文件名/loader key/character name = '界好施'(避标版冲突);
 //   内部 Skill.name = '好施'(OL 官方技能名)。
-import type {
-  FrontendAPI,
-  GameView,
-  GameState,
-  HookResult,
-  Json,
-  Skill,
-} from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
-import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { isDelayedTrick, isRespondOnly } from '../data/card-meta';
 import {
-  registerAction,
   registerBeforeHook,
   registerAfterHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, defineConfirmAction, firstCardId } from '../util/skillRuntime';
+import {
+  defineConfirmAction,
+  firstCardId,
+  currentRequestType,
+  registerRespondForAllSeats,
+} from '../util/skillRuntime';
+import { registerHaoshiDrawHooks, applyHaoshiDrawRespond } from './好施';
 
-// ── 摸牌逻辑常量(镜像标好施)──
-const CONFIRM_RT = '界好施/confirm';
-const CHOOSE_TARGET_RT = '界好施/target';
-const GIVE_RT = '界好施/give';
-const CONFIRMED_KEY = '界好施/confirmed';
-const ACTIVE_KEY = '界好施/active';
-const TARGET_KEY = '界好施/chosenTarget';
-const GIVE_KEY = '界好施/giveCards';
-
-// ── 被动逻辑常量 ──
+// ── 被动逻辑常量(摸牌逻辑常量由 ./好施 的共享实现按 '界好施' 前缀派生)──
 const PASSIVE_GIVE_RT = '界好施/passiveGive';
 const PASSIVE_CARD_KEY = '界好施/passiveCard';
 const PASSIVE_ACTIVE_KEY = '界好施/被动激活';
@@ -60,6 +51,7 @@ const RECIPIENT_KEY = '界好施/受益者';
 const PASSIVE_PROCESSED_PREFIX = '界好施/被动已触发/';
 
 const DISPLAY_NAME = '好施';
+const PREFIX = '界好施';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -101,186 +93,42 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const unloaders: Array<() => void> = [];
 
   // ── respond action:注册到每个座次 ──
-  // 鲁肃(ownerId)处理 confirm/target/give;其他座次处理 passiveGive
-  for (const pl of state.players) {
-    const seat = pl.index;
-    unloaders.push(
-      registerAction(
-        state,
-        skill.id,
-        seat,
-        'respond',
-        (st: GameState, _params: Record<string, Json>): string | null => {
-          const slot = st.pendingSlots.get(seat);
-          if (!slot) return '当前不需要回应';
-          const atom = slot.atom as Record<string, unknown>;
-          if (atom['type'] !== '请求回应') return '当前不需要回应';
-          const rt = atom['requestType'] as string;
-          if (!rt?.startsWith('界好施/')) return '当前不是界好施询问';
-          return null;
-        },
-        async (st: GameState, params: Record<string, Json>): Promise<void> => {
-          const slot = st.pendingSlots.get(seat);
-          const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
-          if (rt === CONFIRM_RT) {
-            st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-          } else if (rt === CHOOSE_TARGET_RT) {
-            const t =
-              (params.targets as number[] | undefined)?.[0] ??
-              (typeof params.target === 'number' ? params.target : undefined);
-            if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
-          } else if (rt === GIVE_RT) {
-            const ids = params.cardIds as string[] | undefined;
-            // 校验:恰好 N 张、全部为 owner 手牌、无重复(镜像标版好施 GIVE_RT 守卫;
-            // 非法提交不写 GIVE_KEY → 走摸牌 after-hook 的兜底给牌 hand.slice(0, N),
-            // 否则 给予 atom validate 抛错会打断技能结算)
-            const need = (
-              slot?.atom as { prompt?: { cardFilter?: { min?: number } } } | undefined
-            )?.prompt?.cardFilter?.min;
-            if (
-              Array.isArray(ids) &&
-              typeof need === 'number' &&
-              ids.length === need &&
-              new Set(ids).size === ids.length &&
-              ids.every((id) => st.players[seat]?.hand.includes(id))
-            ) {
-              st.localVars[GIVE_KEY] = ids;
-            }
-          } else if (rt === PASSIVE_GIVE_RT) {
-            // 客户端契约:useCard 型 pending(min=max=1)只发 {cardId}
-            const cardId = firstCardId(params);
-            if (cardId !== undefined) st.localVars[PASSIVE_CARD_KEY] = cardId;
-          }
-        },
-      ),
-    );
-  }
-
-  // ── 摸牌 before hook:摸牌阶段询问,发动则额外摸两张 ──
+  // 鲁肃(ownerId)处理 confirm/target/give(标/界共享分支);所有座次处理 passiveGive
   unloaders.push(
-    registerBeforeHook(
+    ...registerRespondForAllSeats(
       state,
       skill.id,
-      ownerId,
-      '摸牌',
-      async (ctx): Promise<HookResult | void> => {
-        const atom = ctx.atom;
-        if (atom.player !== ownerId) return;
-        if (ctx.state.currentPlayerIndex !== ownerId) return;
-        if (ctx.state.phase !== '摸牌') return;
-        const self = ctx.state.players[ownerId];
-        if (!self?.alive) return;
-        if (usedThisTurn(ctx.state, ownerId, '界好施')) return;
-
-        const confirmed = await askConfirm(ctx.state, CONFIRM_RT, ownerId, {
-          confirmedKey: CONFIRMED_KEY,
-          title: '是否发动好施?(额外摸两张牌)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-          defaultChoice: false,
-          timeout: 15,
-        });
-        if (!confirmed) return;
-
-        await markOncePerTurn(ctx.state, ownerId, '界好施');
-        ctx.state.localVars[ACTIVE_KEY] = true;
-
-        const count = atom.count ?? 2;
-        return { kind: 'modify', atom: { ...ctx.atom, count: count + 2 } as typeof ctx.atom };
+      (st: GameState, seat: number, _params: Record<string, Json>): string | null => {
+        const slot = st.pendingSlots.get(seat);
+        if (!slot) return '当前不需要回应';
+        const atom = slot.atom as Record<string, unknown>;
+        if (atom['type'] !== '请求回应') return '当前不需要回应';
+        const rt = atom['requestType'] as string;
+        if (!rt?.startsWith(`${PREFIX}/`)) return '当前不是界好施询问';
+        return null;
+      },
+      async (st: GameState, seat: number, params: Record<string, Json>): Promise<void> => {
+        const rt = currentRequestType(st, seat);
+        if (applyHaoshiDrawRespond(st, seat, rt, params, PREFIX, true)) return;
+        if (rt === PASSIVE_GIVE_RT) {
+          // 客户端契约:useCard 型 pending(min=max=1)只发 {cardId}
+          const cardId = firstCardId(params);
+          if (cardId !== undefined) st.localVars[PASSIVE_CARD_KEY] = cardId;
+        }
       },
     ),
   );
 
-  // ── 摸牌 after hook:若手牌 > 5,给牌给手牌最少的角色 + 激活被动 ──
+  // ── 摸牌 before/after hooks:发动 +2 摸、>5 分半给最少者(标/界共享实现)──
   unloaders.push(
-    registerAfterHook(
-      state,
-      skill.id,
-      ownerId,
-      '摸牌',
-      async (ctx): Promise<void> => {
-        const atom = ctx.atom;
-        if (atom.player !== ownerId) return;
-        if (!ctx.state.localVars[ACTIVE_KEY]) return;
-        delete ctx.state.localVars[ACTIVE_KEY];
-
-        const st = ctx.state;
-        const self = st.players[ownerId];
-        if (!self?.alive) return;
-        const handCount = self.hand.length;
-        if (handCount <= 5) return;
-
-        const giveCount = Math.floor(handCount / 2);
-
-        let minCount = Infinity;
-        const candidates: number[] = [];
-        for (const p of st.players) {
-          if (p.index === ownerId || !p.alive) continue;
-          if (p.hand.length < minCount) {
-            minCount = p.hand.length;
-            candidates.length = 0;
-            candidates.push(p.index);
-          } else if (p.hand.length === minCount) {
-            candidates.push(p.index);
-          }
-        }
-        if (candidates.length === 0) return;
-
-        let target: number;
-        if (candidates.length === 1) {
-          target = candidates[0];
-        } else {
-          delete st.localVars[TARGET_KEY];
-          await applyAtom(st, {
-            type: '请求回应',
-            requestType: CHOOSE_TARGET_RT,
-            target: ownerId,
-            prompt: {
-              type: 'choosePlayer',
-              title: '好施:选择手牌最少的角色(给予手牌)',
-              min: 1,
-              max: 1,
-              filter: (_view: GameView, t: number) => candidates.includes(t),
-            },
-            timeout: 15,
-          });
-          const chosen = st.localVars[TARGET_KEY] as number | undefined;
-          delete st.localVars[TARGET_KEY];
-          if (typeof chosen !== 'number') return;
-          target = chosen;
-        }
-
-        delete st.localVars[GIVE_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: GIVE_RT,
-          target: ownerId,
-          prompt: {
-            type: 'useCard',
-            title: `好施:选择 ${giveCount} 张牌交给 ${st.players[target].name}`,
-            cardFilter: { filter: () => true, min: giveCount, max: giveCount },
-          },
-          // 强制型给牌(「分半给最少者」是效果必要部分):前端走多选弃牌式 UI 提交 {cardIds}
-          mandatory: true,
-          timeout: 30,
-        });
-        let giveCards = st.localVars[GIVE_KEY] as string[] | undefined;
-        delete st.localVars[GIVE_KEY];
-        // 强制给牌兜底:超时未回应 → 自动从手牌首张起补足(不放弃给牌义务,
-        // 与庸肆/英魂/成略的 mandatory 兜底范式一致)
-        if (!giveCards || giveCards.length === 0) {
-          giveCards = st.players[ownerId]?.hand.slice(0, giveCount) ?? [];
-        }
-        if (giveCards && giveCards.length > 0) {
-          for (const cardId of giveCards) {
-            await applyAtom(st, { type: '给予', cardId, from: ownerId, to: target });
-          }
-          // ★ 界版新增:激活跨回合被动(直到鲁肃下回合开始)
-          st.localVars[PASSIVE_ACTIVE_KEY] = true;
-          st.localVars[RECIPIENT_KEY] = target;
-        }
+    ...registerHaoshiDrawHooks(state, skill.id, ownerId, {
+      prefix: PREFIX,
+      afterGive: (st, target) => {
+        // ★ 界版新增:激活跨回合被动(直到鲁肃下回合开始)
+        st.localVars[PASSIVE_ACTIVE_KEY] = true;
+        st.localVars[RECIPIENT_KEY] = target;
       },
-    ),
+    }),
   );
 
   // ── 回合开始 after hook:鲁肃下回合开始时清除被动 ──

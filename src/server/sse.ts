@@ -8,12 +8,12 @@ import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import type { ServerMessage, EventSeq } from './protocol';
 import { serialize } from './protocol';
 import type { ConnectionSink } from './connection';
-import { getRoom, removeSpectator, leaveRoom, type Room } from './room';
+import { getRoom, removeSpectator, leaveRoom, bindPlayerRoom, unbindPlayerRoom, type Room } from './room';
 import type { GameSession } from './session';
 import { broadcastMessage } from './room';
 import { getChatHistory, buildRoomState, ensureSeatOnReconnect, getRecentLeaveGrace } from './room';
 import { resolveSessionIdentity } from './auth/guard';
-import { gameSessions, playerRoomMap } from './registry';
+import { gameSessions } from './registry';
 import { generatePlayerId } from './utils';
 import { createLogger } from './logger';
 
@@ -127,8 +127,8 @@ function spectatorRole(room: Room, playerId: string, lastSeq: number): SseRoleAd
     resumeGame: (session) => session.sendSpectatorInitialView(playerId, lastSeq),
     logDisconnected: () => log.info('SSE 旁观者连接断开', { roomId: room.id, playerId }),
     cleanupOnDisconnect: () => {
+      // removeSpectator 内部解除 playerRoomMap 映射
       removeSpectator(room.id, playerId, 'disconnect');
-      playerRoomMap.delete(playerId);
       // 广播 spectator_left
       const r = getRoom(room.id);
       if (r) {
@@ -148,6 +148,10 @@ function playerRole(
 ): SseRoleAdapter {
   return {
     registerSink: (sink) => {
+      // sink 注册单一所有者:对局进行中由紧随其后的 resumeGame→reconnectPlayer
+      // 统一注册(与 runSseSession 的调用条件同一同步段,状态不会漂移),
+      // 避免同一 sink 双写;其余阶段(大厅/已结束)在此注册。
+      if (session && room.status === '进行中') return;
       room.players.set(playerId, sink);
     },
     currentSink: () => room.players.get(playerId),
@@ -190,7 +194,7 @@ function playerRole(
         // 座位必须保留,否则断线玩家在宽限期内重连将无法归位。
         currentSession.handleDisconnect(playerId);
         if (room.isDebug) {
-          playerRoomMap.delete(playerId);
+          unbindPlayerRoom(playerId);
         }
         return;
       }
@@ -203,8 +207,8 @@ function playerRole(
       // EventSource 自动重连(不重走 POST /join)在窗口内仍被上方门禁放行,
       // 由 ensureSeatOnReconnect 补座;否则断线超过心跳窗口(约 10s,网络抖动/
       // 休眠唤醒)的玩家重连即 403 且 EventSource 永久失败,只能手动重进。
+      // leaveRoom 内部解除 playerRoomMap 映射。
       const left = leaveRoom(room.id, playerId, 'disconnect');
-      playerRoomMap.delete(playerId);
       if (left) {
         broadcastMessage(left, buildRoomState(left));
       }
@@ -230,7 +234,8 @@ async function runSseSession(
   sink.setSeq(lastSeq);
 
   role.registerSink(sink);
-  playerRoomMap.set(playerId, roomId);
+  // registerSink 直改名单(不经成员函数),这里显式绑定房间映射
+  bindPlayerRoom(playerId, roomId);
   if (displayName) room.playerNames.set(playerId, displayName);
   // 身份已恢复，撤销断线宽限条目(下次断线由 onAbort 重新记录)
   room.recentlyLeft.delete(playerId);

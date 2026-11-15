@@ -1,6 +1,8 @@
 // src/client/headless/availableActions.ts
 // 枚举当前座次可执行操作。纯函数，零副作用。
-// 复用 gameViewHelpers 的 isActiveAction / findUseActionForCard / derivePlayRules / buildPlayParams。
+// 复用 gameViewHelpers 的 isActiveAction / findUseActionForCard / derivePlayRules /
+// buildPlayParams / buildTransformSubmitMessage(转化提交装配)/ usedCardNameOfMessage,
+// 以及 utils/skipMessage 的 buildSkipMessage(skip 兜底动作)。
 import type {
   Card,
   GameView,
@@ -23,7 +25,7 @@ import {
   getSelfTarget,
   producedNameOf,
   resolveProducedAction,
-  buildShadowCardId,
+  buildTransformSubmitMessage,
   comboSatisfied,
   resolveDistributeCardIds,
   ownMaterialCards,
@@ -34,9 +36,11 @@ import {
   isTriggerablePromptType,
   distributeAllocateCandidates,
   effectiveTargetCard,
+  usedCardNameOfMessage,
   isFreePlayWindow,
   type PlayRules,
 } from '../utils/gameViewHelpers';
+import { buildSkipMessage } from '../utils/skipMessage';
 import {
   resolvePendingRespond,
   getPendingRequestType,
@@ -77,10 +81,8 @@ function targetBoundsOf(
   };
 }
 
-/** skip 兜底动作(广播无懈/不出/不发动等)的共享 message 字面量。 */
-function skipMessage(ownerId: number): EngineClientMessage {
-  return { skillId: '__skip', actionType: 'skip', ownerId, params: {}, baseSeq: 0 };
-}
+/** skip 兜底动作(广播无懈/不出/不发动等)的共享 message 构造在 utils/skipMessage.ts
+ *  (与 HeadlessGameClient.pass、浏览器回应/自动跳过同一处)。 */
 
 /** 杀类目标数上限(出牌/转化三处共用):仅【杀】且需目标时求 viewSlashTargetMax,
  *  其余牌 undefined。出牌路径传真实牌(火杀带 damageType,界疠火按之放宽);
@@ -216,25 +218,19 @@ function buildTransformRespondAction(
   const wrapperName = producedNameOf(transform, materials[0]);
   if (wrapperName !== requestedName) return null; // 产出牌名 = 请求牌名时可用
   const ids = materials.map((c) => c.id);
-  // 影子卡 id 契约:`${选中牌 id 以 # 连接}#${skillId}`(与引擎 shadowIdOf 同约定)
-  const shadowCardId = buildShadowCardId(ids, action.skillId);
   const desc = materials.map((c) => `${c.suit}${c.rank}`).join('+');
   return {
     description: `${action.skillId}转化【${wrapperName}】(${desc})打出`,
-    message: {
-      skillId: wrapperName,
+    // 消息装配(影子 id/preceding/selfTarget)与浏览器 handleTransformPlay 共享
+    // buildTransformSubmitMessage
+    message: buildTransformSubmitMessage({
+      wrapperName,
       actionType: 'respond',
       ownerId: seatIndex,
-      params: { cardId: shadowCardId },
-      preceding: [
-        {
-          skillId: action.skillId,
-          actionType: action.actionType,
-          params: materials.length > 1 ? { cardIds: ids } : { cardId: ids[0] },
-        },
-      ],
-      baseSeq: 0,
-    },
+      skillId: action.skillId,
+      transformActionType: action.actionType,
+      materialIds: ids,
+    }),
     validTargets: [],
     category: 'transform',
   };
@@ -242,7 +238,8 @@ function buildTransformRespondAction(
 
 /** 转化·出牌路径(单卡/多卡两分支原手写的同管线合并):
  *  resolveProducedAction → computeValidTargets → 空目标跳过 → slashMax →
- *  selfTarget 预填 targets=[自己] → 影子 id → 构造主 action。
+ *  构造主 action(selfTarget 预填 targets=[自己],影子 id/preceding 装配共享
+ *  buildTransformSubmitMessage)。
  *  - 产出牌名由 transform 回调**逐组合的首张原料**求值:丈八蛇矛 → 杀、乱击 → 万箭齐发;
  *    多向转化技(产出牌名随组合变化)不能只按 matchingCards[0] 取一次,硬编码 '杀'
  *    会让非杀产出的主 action 恒为 杀.use,引擎读影子卡名 validate 恒拒「不是杀」。
@@ -268,36 +265,28 @@ function buildTransformUseAction(
   // 需要目标但无合法目标(如距离不够)→ 跳过该组合
   if (cardRules.needsTarget && !cardRules.selfTarget && validTargets.length === 0) return null;
   const ids = materials.map((c) => c.id);
-  // 影子卡 id 契约:`${选中牌 id 以 # 连接}#${skillId}`(与引擎 shadowIdOf 同约定)
-  const shadowCardId = buildShadowCardId(ids, action.skillId);
   const desc = materials.map((c) => `${c.suit}${c.rank}`).join('+');
   // 目标数边界与 promptTargetBounds 同源:产出牌 use action 的 prompt(无注册时
   // 回退 transform 自身 prompt),>1 才输出的投影格式见 targetBoundsOf。
   const bounds = targetBoundsOf((gate.produced ?? action).prompt, cardRules);
   const slashMax = slashTargetMaxOf(view, seatIndex, { name: wrapperName }, cardRules);
-  // selfTarget 产出牌(桃/酒):与 buildPlayParams 同源预填 targets=[自己]
-  const mainParams: EngineClientMessage['params'] = cardRules.selfTarget
-    ? { cardId: shadowCardId, targets: [seatIndex] }
-    : { cardId: shadowCardId };
   return {
     description:
       wrapperName === '杀' && slashMax && slashMax > 1
         ? `${action.skillId}转化【${wrapperName}】(${desc}) (最多${slashMax}目标)`
         : `${action.skillId}转化【${wrapperName}】(${desc})`,
-    message: {
-      skillId: wrapperName,
+    // 消息装配(影子 id/preceding/selfTarget 预填 targets=[自己])与浏览器
+    // handleTransformPlay 共享 buildTransformSubmitMessage;targets 留给 agent
+    // 从 validTargets 补全,不传 targetIdx。
+    message: buildTransformSubmitMessage({
+      wrapperName,
       actionType: 'use',
       ownerId: seatIndex,
-      params: mainParams,
-      preceding: [
-        {
-          skillId: action.skillId,
-          actionType: action.actionType,
-          params: materials.length > 1 ? { cardIds: ids } : { cardId: ids[0] },
-        },
-      ],
-      baseSeq: 0,
-    },
+      skillId: action.skillId,
+      transformActionType: action.actionType,
+      materialIds: ids,
+      selfTarget: cardRules.selfTarget,
+    }),
     validTargets,
     category: 'transform',
     ...bounds,
@@ -527,6 +516,20 @@ function describeMultiSelectAction(
   };
 }
 
+/** 变体 × 代价牌展开(enumeratePromptActions 的多目标描述性/逐目标两分支共用,
+ *  原两处逐字重复):无 cardFilter 的变体按单个 undefined 代价展开;声明 cardFilter
+ *  但无匹配代价牌(强袭·弃武器 手上无武器)则整组跳过(该变体不可用)。 */
+function forEachVariantCostCard(
+  variants: ReturnType<typeof expandActionVariants>,
+  fn: (variant: ReturnType<typeof expandActionVariants>[number], costCard: Card | undefined) => void,
+): void {
+  for (const variant of variants) {
+    const costCards: Array<Card | undefined> = variant.cardFilter ? variant.costCards : [undefined];
+    if (variant.cardFilter && costCards.length === 0) continue; // 无代价牌 → 该变体不可用
+    for (const costCard of costCards) fn(variant, costCard);
+  }
+}
+
 /**
  * 枚举 prompt 非 useCard/useCardAndTarget/distribute 的主动技 use action。
  *
@@ -619,57 +622,49 @@ function enumeratePromptActions(
     if (multiMin > 1) {
       // max 缺省(或 ≤1 的无效声明)时镜像回填 min:语义为「恰好 min 个」
       const max = declaredMax > 1 ? declaredMax : multiMin;
-      for (const variant of variants) {
+      forEachVariantCostCard(variants, (variant, costCard) => {
         const suffix = variant.label ? `(${variant.label})` : '';
-        const costCards: Array<Card | undefined> = variant.cardFilter ? variant.costCards : [undefined];
-        if (variant.cardFilter && costCards.length === 0) continue; // 无代价牌 → 该变体不可用
-        for (const costCard of costCards) {
-          const cardSuffix = costCard ? `(${costCard.suit}${costCard.rank})` : '';
-          result.push(describeMultiSelectAction(
-            {
-              description: `发动【${action.label}】${suffix}${cardSuffix}(选 ${multiMin}${max > multiMin ? `-${max}` : ''} 个目标)`,
-              skillId: action.skillId,
-              actionType: 'use',
-              ownerId: seatIndex,
-              category: 'play',
-            },
-            validTargets,
-            multiMin,
-            max,
-            // targets 留空由 agent 从 validTargets 中选 minTarget..maxTarget 个填入
-            { ...variant.params, ...(costCard ? { cardId: costCard.id } : {}) },
-          ));
-        }
-      }
+        const cardSuffix = costCard ? `(${costCard.suit}${costCard.rank})` : '';
+        result.push(describeMultiSelectAction(
+          {
+            description: `发动【${action.label}】${suffix}${cardSuffix}(选 ${multiMin}${max > multiMin ? `-${max}` : ''} 个目标)`,
+            skillId: action.skillId,
+            actionType: 'use',
+            ownerId: seatIndex,
+            category: 'play',
+          },
+          validTargets,
+          multiMin,
+          max,
+          // targets 留空由 agent 从 validTargets 中选 minTarget..maxTarget 个填入
+          { ...variant.params, ...(costCard ? { cardId: costCard.id } : {}) },
+        ));
+      });
       continue;
     }
 
     for (const t of validTargets) {
       const targetName = view.players[t]?.name ?? `P${t}`;
-      for (const variant of variants) {
+      forEachVariantCostCard(variants, (variant, costCard) => {
         const suffix = variant.label ? `(${variant.label})` : '';
-        const costCards: Array<Card | undefined> = variant.cardFilter ? variant.costCards : [undefined];
-        if (variant.cardFilter && costCards.length === 0) continue; // 无代价牌 → 该变体不可用
-        for (const costCard of costCards) {
-          const cardSuffix = costCard ? `(${costCard.suit}${costCard.rank})` : '';
-          result.push({
-            description: `发动【${action.label}】${suffix}${cardSuffix} → ${targetName}`,
-            message: {
-              ...base,
-              // target 与 targets 同时携带:selectTarget 型技能两种读法都有
-              // (反间/雄乱 读 params.targets,挑衅/强袭/激将 读 params.target)。
-              params: {
-                target: t,
-                targets: [t],
-                ...variant.params,
-                ...(costCard ? { cardId: costCard.id } : {}),
-              },
+        const cardSuffix = costCard ? `(${costCard.suit}${costCard.rank})` : '';
+        result.push({
+          description: `发动【${action.label}】${suffix}${cardSuffix} → ${targetName}`,
+          message: {
+            ...base,
+            // target 与 targets 同时携带:selectTarget 型技能两种读法都有
+            // (反间/雄乱 读 params.targets,挑衅/强袭/激将 读 params.target)。
+            params: {
+              target: t,
+              targets: [t],
+              ...variant.params,
+              ...(costCard ? { cardId: costCard.id } : {}),
             },
-            validTargets: [t],
-            category: 'play',
-          });
-        }
-      }
+          },
+          validTargets: [t],
+          category: 'play',
+        });
+      });
     }
   }
   return result;
@@ -731,20 +726,13 @@ export function enumerateAvailableActions(
     const source = typeof id === 'string' ? view.cardMap[id] : undefined;
     const ingredient = typeof materialId === 'string' ? view.cardMap[materialId] : undefined;
     // 「选中牌是否按杀的动态目标上限解释」与浏览器 isTargetable 共享 effectiveTargetCard:
-    // 选中牌 = 主 action 的牌(source)∪ 转化原料(ingredient)。usedCardName 声明
-    // 「选中牌就是正在使用的牌」:有 preceding → 产出牌名 = 主 action 技能名(武圣
-    // 红牌当杀,原牌名不足为凭);无 preceding 且 牌名 === skillId → 普通出牌
-    // (杀本体);其余(离间 一类技能代价牌,哪怕代价牌恰好是杀)→ null,不按杀
-    // 解释,否则 min=max=2 塌成 1 被引擎拒。
-    const usedCardName = message.preceding?.length
-      ? message.skillId
-      : source?.name === message.skillId
-        ? source.name
-        : null;
+    // 选中牌 = 主 action 的牌(source)∪ 转化原料(ingredient)。usedCardName 判定
+    // (有 preceding → 产出牌名 = 主 action 技能名;牌名 === skillId → 普通出牌的
+    // 牌本体;其余技能代价牌 → null)收敛为 gameViewHelpers 的 usedCardNameOfMessage。
     const card = effectiveTargetCard(
       source ?? ingredient,
       filter,
-      usedCardName,
+      usedCardNameOfMessage(message, source),
     );
     const resolved = resolveTargetSelection(view, seatIndex, filter, card);
     if (!resolved.targets) return [];
@@ -814,7 +802,7 @@ export function appendRespondActions(
     if (pending.target < 0) {
       out.push({
         description: '跳过（不打出无懈可击）',
-        message: skipMessage(ownerId),
+        message: buildSkipMessage(ownerId),
         validTargets: [],
         category: 'skip',
       });
@@ -1098,7 +1086,7 @@ export function appendRespondActions(
         if (pending.target >= 0 && pending.mandatory !== true) {
           out.push({
             description: `不发动【${info.skillId}】`,
-            message: skipMessage(ownerId),
+            message: buildSkipMessage(ownerId),
             validTargets: [],
             category: 'skip',
           });
@@ -1156,7 +1144,7 @@ export function appendRespondActions(
         if (pending.target >= 0) {
           out.push({
             description: candidates.length === 0 ? `无牌可出，跳过` : `不出【${info.skillId}】`,
-            message: skipMessage(ownerId),
+            message: buildSkipMessage(ownerId),
             validTargets: [],
             category: 'skip',
           });
@@ -1218,7 +1206,7 @@ export function appendRespondActions(
         if (pending.target >= 0) {
           out.push({
             description: candidates.length === 0 ? `无牌可出，跳过` : `不出【${info.skillId}】`,
-            message: skipMessage(ownerId),
+            message: buildSkipMessage(ownerId),
             validTargets: [],
             category: 'skip',
           });

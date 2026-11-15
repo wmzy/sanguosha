@@ -3,7 +3,8 @@
 //   红色,你对其造成1点伤害;黑色,你弃置其一张牌。
 //   每个伤害事件触发一次(与标版刚烈一致:"受到伤害后"按事件触发,非按点)。
 //
-// 模式 A(被动触发):after hook 挂在「受到伤害后」。
+// 模式 A(被动触发):after hook 挂在「受到伤害后」(前导守卫由 skillRuntime 的
+//   registerOnDamagedAsTarget 封装:target=自己 + amount>0 + 有来源且非自伤)。
 //   受到伤害(target=自己, source 存活, amount>0) → 询问是否发动 → 判定:
 //     红色(♥/♦) → 界夏侯惇对来源造成 1 点伤害
 //     黑色(♠/♣) → 界夏侯惇弃置来源一张牌(手牌/装备/判定区,选牌面板)
@@ -23,7 +24,7 @@ import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, registerOnDamagedAsTarget } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '界刚烈/confirm';
 const PICK_REQUEST = '界刚烈/选牌';
@@ -96,16 +97,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!judgeCard) return;
   });
 
-  // ── 受到伤害后 after hook:界刚烈主逻辑 ──
+  // ── 受到伤害后 after hook:界刚烈主逻辑(前导守卫由 registerOnDamagedAsTarget
+  //    封装:target=自己 + amount>0 + 有来源且非自伤)──
   // 规则:"当你受到伤害后" —— 每个伤害事件触发一次(与标版刚烈一致,非按点触发)。
   //   触发条件 "受到伤害后"(无"1点")= 按事件触发,区别于 遗计/节命 的"受到1点伤害后"(按点)。
   //   来源已死亡则不发动(FAQ)。
-  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.target !== ownerId) return;
-    if ((atom.amount ?? 0) <= 0) return;
-    if (atom.source === undefined || atom.source === ownerId) return;
-    const sourceIdx = atom.source;
+  registerOnDamagedAsTarget(state, skill.id, ownerId, async (ctx) => {
+    const sourceIdx = ctx.atom.source;
     const sourcePlayer = ctx.state.players[sourceIdx];
     if (!sourcePlayer?.alive) return; // 来源必须存活(FAQ)
     // 牌堆空则无法判定,跳过

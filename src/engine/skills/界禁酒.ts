@@ -37,9 +37,13 @@ import {
   registerActionEntry,
 } from '../core/skill';
 import type { ActionEntry } from '../types';
-import { applyAtom } from '../core/apply';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
 import { viewCanAttack } from '../rules/viewDistance';
+import {
+  mountTransformAction,
+  registerTransformAction,
+  type TransformActionOptions,
+} from '../util/skillRuntime';
 
 const _SKILL_ID = '界禁酒';
 const DISPLAY_NAME = '禁酒';
@@ -55,11 +59,6 @@ export function createSkill(id: string, ownerId: number): Skill {
       '锁定技:你的【酒】视为点数K的【杀】;其他角色不能于你的回合使用【酒】',
     isLocked: true,
   };
-}
-
-/** 影子卡 id:${原id}#界禁酒(与标版禁酒隔离)。 */
-function shadowIdOf(cardId: string): string {
-  return `${cardId}#界禁酒`;
 }
 
 /** 保存被 wrap 的原始 酒:pid:respond entry,供卸载时恢复。
@@ -78,13 +77,10 @@ function getWrappedOriginalsMap(state: GameState): Map<number, ActionEntry> {
   return m;
 }
 
-export function onInit(skill: Skill, state: GameState): (() => void) | void {
-  const ownerId = skill.ownerId;
-
-  // ─── transform action:把【酒】手牌转化为影子"杀"(点数 K)──
-  registerAction(state,
-  skill.id,
-  ownerId, 'transform', (st: GameState, params: Record<string, Json>): string | null => {
+/** transform 五件套工厂配置(酒 → 影子杀;afterExecute 强制点数 K)。 */
+const TRANSFORM_OPTIONS: TransformActionOptions = {
+  outputName: '杀',
+  validate: (st: GameState, ownerId: number, params: Record<string, Json>): string | null => {
     // 锁定技常驻(任意回合);转化需在自己回合 + 无 pending + 存活 + 手牌 + 酒
     const myTurn = st.currentPlayerIndex === ownerId;
     const free = !hasBlockingPending(st);
@@ -98,32 +94,51 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const ok = myTurn && free && selfAlive && cardInHand && isWine;
     return ok ? null : '现在不能使用禁酒';
   },
-  async (st: GameState, params: Record<string, Json>): Promise<void> => {
-    const cardId = params.cardId as string;
-    const shadowId = shadowIdOf(cardId);
-    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-    await applyAtom(st, {
-      type: '当作',
-      player: ownerId,
-      cardIds: [cardId],
-      shadowId,
-      outputName: '杀',
-    });
-    // 强制覆盖点数为 K(当作 atom 默认继承首张原卡 rank,界禁酒需固定 K)
+  // 强制覆盖点数为 K(当作 atom 默认继承首张原卡 rank,界禁酒需固定 K)。
+  // 影子卡是纯数据,直接 mutate 不破坏 invariants(引擎约定:影子卡创建/调整豁免)。
+  afterExecute: (st: GameState, _ownerId: number, shadowId: string): void => {
     const shadow = st.cardMap[shadowId];
     if (shadow) {
       shadow.rank = SHADOW_RANK;
     }
   },
-  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-  (st: GameState, params: Record<string, Json>): void => {
-    const cardId = params.cardId as string;
-    const sId = shadowIdOf(cardId);
-    delete st.cardMap[sId];
-    const self = st.players[ownerId];
-    const idx = self.hand.indexOf(sId);
-    if (idx >= 0) self.hand[idx] = cardId;
-  },);
+  mount: {
+    label: DISPLAY_NAME,
+    style: 'passive',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '选择一张【酒】当点数K的【杀】使用',
+      cardFilter: {
+        filter: (c: Card) => c.name === '酒',
+        min: 1,
+        max: 1,
+      },
+      targetFilter: {
+        min: 1,
+        max: 1,
+        // 攻击范围检查(转化出的杀同样需距离):filter 仅为前端 UI 提示,后端 杀.use 权威校验
+        filter: (view: GameView, t: number) =>
+          viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
+      },
+    },
+    activeWhen: (ctx) => {
+      const p = ctx.view.players[ctx.perspectiveIdx];
+      if (!p?.alive) return false;
+      const hasWine = p.hand?.some((c) => c.name === '酒') ?? false;
+      if (!hasWine) return false;
+      // 转化出的是【杀】,需遵守出杀次数上限(与武圣一致),否则按钮在已用尽杀次数时仍亮起
+      return defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
+    },
+  },
+};
+
+export function onInit(skill: Skill, state: GameState): (() => void) | void {
+  const ownerId = skill.ownerId;
+
+  // ─── transform action:把【酒】手牌转化为影子"杀"(点数 K)──
+  // 五件套(影子 id 后缀=技能 id '界禁酒'、当作、rollback、defineAction)由工厂统一实现;
+  // validate 逐字保留原逐条件拒绝文案,afterExecute 强制覆盖点数为 K。
+  registerTransformAction(state, skill.id, ownerId, TRANSFORM_OPTIONS);
 
   // ─── wrap 其他玩家的 酒.respond:owner 回合内禁止他人用酒 ──
   //   酒.respond 由 使用牌 skill 按座次逐个实例化时注册。registerSkillsFromState
@@ -189,40 +204,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   //   - availableActions(AI) 转化枚举要求 prompt.type===useCardAndTarget,否则 cardFilter=null
   //     被跳过,AI 无法构造 preceding + 目标。
   // 前端 UI 流程:选【酒】手牌 → 选目标 → 点禁酒 → 提交 preceding=[界禁酒.transform] + 杀.use。
-  api.defineAction('transform', {
-    label: DISPLAY_NAME,
-    style: 'passive',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '选择一张【酒】当点数K的【杀】使用',
-      cardFilter: {
-        filter: (c: Card) => c.name === '酒',
-        min: 1,
-        max: 1,
-      },
-      targetFilter: {
-        min: 1,
-        max: 1,
-        // 攻击范围检查(转化出的杀同样需距离):filter 仅为前端 UI 提示,后端 杀.use 权威校验
-        filter: (view: GameView, t: number) =>
-          viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
-      },
-    },
-    transform: (card: Card) => ({
-      name: '杀',
-      sourceCardId: card.id,
-      fromSkill: skill.id,
-    }),
-    activeWhen: (ctx) => {
-      const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p?.alive) return false;
-      const hasWine = p.hand?.some((c) => c.name === '酒') ?? false;
-      if (!hasWine) return false;
-      // 转化出的是【杀】,需遵守出杀次数上限(与武圣一致),否则按钮在已用尽杀次数时仍亮起
-      return defaultPlayActive(ctx) && viewCanSlash(ctx.view, ctx.perspectiveIdx);
-    },
-  });
-  return;
+  mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
 }
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };

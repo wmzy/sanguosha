@@ -12,6 +12,7 @@ import { identityCamp, type Camp } from '../../engine/rules/camp';
 import type { BattleStats } from '../utils/battleStats';
 import { css, cx } from '@linaria/core';
 import { IDENTITY_COLORS, FACTION_BG } from './gameViewConstants';
+import { DEFAULT_FACTION_COLOR } from '../utils/characterVisuals';
 import { audioEngine } from '../sounds/audioEngine';
 import { useEffect, useRef, useState } from 'react';
 
@@ -164,7 +165,9 @@ export function GameResultOverlay({
                   {p.faction && (
                     <span
                       className={factionTag}
-                      style={{ '--fac-bg': FACTION_BG[p.faction] ?? '#555' } as React.CSSProperties}
+                      style={
+                        { '--fac-bg': FACTION_BG[p.faction] ?? DEFAULT_FACTION_COLOR } as React.CSSProperties
+                      }
                     >
                       {p.faction}
                     </span>

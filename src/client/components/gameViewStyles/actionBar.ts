@@ -1,10 +1,16 @@
 // 操作栏 + 技能/装备按钮 + 装备区纵向列 + 角色大卡样式。
+// 角色大卡与座位卡(seat.ts)的同语言成对样式在此收敛:逐字同的族(徽章组/我/回合
+// 徽章/连环徽章/身份章/竖排武将名/技能标签/判定行)别名复用 seat.ts 单一定义;
+// 参数有差的族(体力数字 17/16px、珠列 z-index 5/4、死亡滤镜亮度 0.6/0.7、
+// 手牌角标定位)共享 seat.ts 的 base 类 + 本文件的大卡变体。
 
 import { css } from '@linaria/core';
+import { handBadgeBase, hpBeadColBase, hpNumberBase } from './seat';
 import {
   goldCandidateColors,
   greenSelectedColors,
   hpBeadPalette,
+  largeCardDeadPortraitFilter,
   playerCardBottomFade,
 } from './tokens';
 
@@ -294,72 +300,24 @@ export const playerCardName = css`
   color: rgba(255, 255, 255, 0.94);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 `;
-// 名牌右侧徽章组
-export const playerCardBadges = css`
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  flex-shrink: 0;
-`;
-export const playerCardBadgeYou = css`
-  background: rgba(52, 152, 219, 0.92);
-  border-radius: 3px;
-  padding: 1px 4px;
-  font-size: 9px;
-  color: #fff;
-  font-weight: bold;
-  line-height: 1.5;
-`;
-export const playerCardBadgeTurn = css`
-  background: #d4a017;
-  border-radius: 3px;
-  padding: 1px 4px;
-  font-size: 9px;
-  color: #241a04;
-  font-weight: bold;
-  line-height: 1.5;
-`;
-export const playerCardBadgeChain = css`
-  display: inline-flex;
-  align-items: center;
-  background: linear-gradient(135deg, #6b8294, #9bb3c4);
-  border: 1px solid #b9cdd9;
-  border-radius: 3px;
-  padding: 1px 4px;
-  font-size: 10px;
-  color: #fff;
-  font-weight: bold;
-  line-height: 1.5;
-`;
-// 身份小方章:base + 主公金/忠臣蓝/反贼红/内奸紫变体(与座位卡名牌身份章同语言)
-export const playerCardStampBase = css`
-  flex-shrink: 0;
-  min-width: 22px;
-  text-align: center;
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: bold;
-  line-height: 1.5;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-`;
-export const playerCardStampLord = css`
-  background: #d4a017;
-  color: #3a2400;
-`;
-export const playerCardStampLoyalist = css`
-  background: #3f6fb5;
-  color: #fff;
-`;
-export const playerCardStampRebel = css`
-  background: #b03a30;
-  color: #fff;
-`;
-export const playerCardStampRenegade = css`
-  background: #8e5aa8;
-  color: #fff;
-`;
+// 名牌右侧徽章组 + 身份小方章:与座位卡名牌逐字同语言,别名复用 seat.ts 单一定义
+// (连环徽章大卡版无 text-shadow,取 chainBadgeBase;色板见 tokens.identityStampPalette)。
+export {
+  seatBadgeGroup as playerCardBadges,
+  youBadge as playerCardBadgeYou,
+  turnBadge as playerCardBadgeTurn,
+  chainBadgeBase as playerCardBadgeChain,
+  seatIdentityStamp as playerCardStampBase,
+  seatIdentityLord as playerCardStampLord,
+  seatIdentityLoyalist as playerCardStampLoyalist,
+  seatIdentityRebel as playerCardStampRebel,
+  seatIdentityRenegade as playerCardStampRenegade,
+  seatCharName as playerCardChar,
+  skillTag as playerCardSkillTag,
+  judgeRow as playerCardJudgeRow,
+  judgeRowLabel as playerCardJudgeLabel,
+  judgeTag as playerCardJudgeTag,
+} from './seat';
 // 卡内左缘竖带:自上而下渐变暗带;顶部身份章、中间竖排武将名、底部体力数字
 export const playerCardSideBand = css`
   position: absolute;
@@ -381,47 +339,18 @@ export const playerCardSideBand = css`
     rgba(0, 0, 0, 0.08) 100%
   );
 `;
-// 竖排武将名(原顶部条横排名,重塑为左缘竖排):vertical-rl + upright,金白粗体深色描边
-export const playerCardChar = css`
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-  writing-mode: vertical-rl;
-  text-orientation: upright;
-  font-weight: bold;
-  font-size: 13px;
-  letter-spacing: 3px;
-  color: #f3e6c2;
-  text-shadow:
-    1px 0 2px rgba(0, 0, 0, 0.9),
-    -1px 0 2px rgba(0, 0, 0, 0.9),
-    0 1px 2px rgba(0, 0, 0, 0.9),
-    0 -1px 2px rgba(0, 0, 0, 0.9);
-`;
-// 竖带底部体力数字(当前体力):红色粗体,伤害/回复红/绿闪烁挂在此处
-export const playerCardHpNumber = css`
-  flex-shrink: 0;
-  display: inline-block;
-  line-height: 1;
+// 竖带底部体力数字(当前体力):共享 seat.hpNumberBase,大卡 17px(座位卡 16px);
+// 伤害/回复红/绿闪烁挂在此处
+const playerCardHpNumberSize = css`
   font-size: 17px;
-  font-weight: 900;
-  color: #ff5f52;
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.85),
-    0 0 6px rgba(255, 60, 40, 0.45);
 `;
-// 右缘体力珠列:垂直排列,骑在卡右边框上(与座位卡同款水滴珠;尺寸由内联按 maxHealth 缩放)
-export const playerCardHpBeadCol = css`
-  position: absolute;
-  right: -5px;
-  top: 50%;
-  transform: translateY(-50%);
+export const playerCardHpNumber = `${hpNumberBase} ${playerCardHpNumberSize}`;
+// 右缘体力珠列:共享 seat.hpBeadColBase(与座位卡同款水滴珠,尺寸由内联按 maxHealth
+// 缩放);大卡 z-index 5,高于座位卡的 4,与大卡文字层(z-index 2)分层
+const playerCardHpBeadColZ = css`
   z-index: 5;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  pointer-events: none;
 `;
+export const playerCardHpBeadCol = `${hpBeadColBase} ${playerCardHpBeadColZ}`;
 // 满珠水滴珠(单类):三档分色经 --bead-c1/--bead-c2/--bead-border/--bead-glow CSS 变量
 // 注入(缺省=绿档),色值统一来自 tokens.hpBeadPalette——剩余体力 >50% 绿 / >25% 黄 /
 // ≤25% 红(濒危警示),由 HpBeadColumn(大卡/座位卡共用的珠列组件)按剩余比例内联选择。
@@ -486,8 +415,9 @@ export const playerCardPortraitImg = css`
   object-position: center top;
   transition: filter 0.3s;
 `;
+// 死亡立绘:grayscale + 压亮 0.6(座位卡 0.7;滤镜值单一来源 tokens)
 export const playerCardPortraitDead = css`
-  filter: grayscale(1) brightness(0.6);
+  filter: ${largeCardDeadPortraitFilter};
 `;
 // 横置(铁索连环):大卡铁链光泽脉冲,代表武将牌横置状态(chainPulse 定义在 animations.css)
 export const playerCardChained = css`
@@ -519,58 +449,14 @@ export const playerCardSkillRow = css`
   flex-wrap: wrap;
   gap: 3px;
 `;
-// 被动技能标签:暗底金字小圆角(与座位卡技能 chips 同语言)
-export const playerCardSkillTag = css`
-  display: inline-block;
-  background: rgba(10, 8, 6, 0.68);
-  border: 1px solid rgba(138, 116, 72, 0.42);
-  border-radius: 3px;
-  padding: 1px 6px;
-  font-size: 10px;
-  color: #e8c47a;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-`;
-// 判定行(延时锦囊):紫边 chip,花色点数着色
-export const playerCardJudgeRow = css`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 3px;
-  font-size: 10px;
-`;
-export const playerCardJudgeLabel = css`
-  color: #c9a2ff;
-  font-weight: bold;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
-`;
-export const playerCardJudgeTag = css`
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  border: 1px solid #8e6cc8;
-  color: var(--suit-color, #ccc);
-  background: rgba(24, 16, 34, 0.78);
-  font-weight: bold;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
-`;
-// 手牌数角标:底部区右下角小暗章
-export const playerCardHandChip = css`
+// 被动技能标签/判定行(延时锦囊):与座位卡逐字同语言,别名复用 seat.ts
+// (playerCardSkillTag / playerCardJudgeRow / playerCardJudgeLabel / playerCardJudgeTag,
+//  见上方 re-export 块)
+// 手牌数角标:共享 seat.handBadgeBase,底部紧凑区内右对齐(座位卡为卡内右下角绝对定位)
+const playerCardHandChipAlign = css`
   align-self: flex-end;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 1px 6px;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.55);
-  border: 1px solid rgba(138, 116, 72, 0.5);
-  color: #e8c47a;
-  font-size: 10px;
-  font-weight: bold;
-  line-height: 1.4;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 `;
+export const playerCardHandChip = `${handBadgeBase} ${playerCardHandChipAlign}`;
 export const playerCardEquip = css`
   padding: 6px 12px 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);

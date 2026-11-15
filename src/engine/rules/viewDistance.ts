@@ -24,8 +24,8 @@ import {
   slashExtraKey,
 } from './vars-keys';
 
-/** GameView 上 from 到 to 的环形座位距离(只算存活玩家) */
-export function viewSeatDistance(
+/** GameView 上 from 到 to 的环形座位距离(只算存活玩家;仅本文件消费) */
+function viewSeatDistance(
   players: GameView['players'],
   fromIdx: number,
   toIdx: number,

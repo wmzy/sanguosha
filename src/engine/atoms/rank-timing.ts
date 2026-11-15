@@ -13,7 +13,7 @@
 //   拼点后(纯标记 atom):validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
 //     无 before hook 时 toViewEvents 返回 null(与 damage-timing / move-timing 一致)。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent, Card } from '../types';
-import { broadcast, hookSilentView, requirePlayer, viewPlayer } from './_helpers';
+import { broadcast, hookSilentView, removeCardFromHand, requirePlayer, viewPlayer } from './_helpers';
 
 /** 拼点时机 atom 的公共形状(扣置/亮出)。 */
 type RankCompareAtom = {
@@ -91,11 +91,7 @@ export const 拼点扣置: AtomDefinition<RankCompareAtom> = {
     // 双方各从手牌移除一张(handCount -1 + 按 cardId 精确过滤)
     const removeOne = (playerIdx: number, cardId: string): void => {
       const p = viewPlayer(view, playerIdx);
-      if (!p) return;
-      p.handCount = Math.max(0, p.handCount - 1);
-      if (cardId && p.hand) {
-        p.hand = p.hand.filter((c: Card) => c.id !== cardId);
-      }
+      if (p) removeCardFromHand(p, cardId);
     };
     removeOne(initiator, initiatorCard);
     removeOne(target, targetCard);

@@ -38,7 +38,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
-import { askConfirm, defineConfirmAction, runVirtualSlash } from '../util/skillRuntime';
+import { askConfirm, askResponse, defineConfirmAction, runVirtualSlash } from '../util/skillRuntime';
 import {
   registerAction,
   registerAfterHook,
@@ -119,11 +119,7 @@ async function runQiuYuan(
   delete state.localVars[CONFIRM_KEY];
 
   // 2) chooseTarget:选一名其他角色
-  delete state.localVars[TARGET_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: CHOOSE_TARGET_RT,
-    target: ownerId,
+  const helperIdx = await askResponse<number | undefined>(state, CHOOSE_TARGET_RT, ownerId, {
     prompt: {
       type: 'choosePlayer',
       title: '求援:选择一名其他角色',
@@ -133,19 +129,14 @@ async function runQiuYuan(
         idx !== ownerId && idx !== source && state.players[idx]?.alive === true,
     },
     timeout: 15,
+    resultKey: TARGET_KEY,
   });
-  const helperIdx = state.localVars[TARGET_KEY] as number | undefined;
-  delete state.localVars[TARGET_KEY];
   if (typeof helperIdx !== 'number') return;
   if (!state.players[helperIdx]?.alive) return;
   if (helperIdx === ownerId || helperIdx === source) return;
 
   // 3) helper 选 1(给牌) 或 2(成为额外目标)
-  delete state.localVars[OPTION_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: OPTION_RT,
-    target: helperIdx,
+  const option = await askResponse<number | undefined>(state, OPTION_RT, helperIdx, {
     prompt: {
       type: 'confirm',
       title: `求援:1.交给 ${self.name} 一张同类型不同牌名的牌  2.成为此牌的额外目标`,
@@ -154,9 +145,8 @@ async function runQiuYuan(
     },
     defaultChoice: false,
     timeout: 15,
+    resultKey: OPTION_KEY,
   });
-  const option = state.localVars[OPTION_KEY] as number | undefined;
-  delete state.localVars[OPTION_KEY];
   // choice=true → option=1(给牌);choice=false/超时 → option=2(额外目标)
   const choseGive = option === 1;
 
@@ -171,11 +161,7 @@ async function runQiuYuan(
       await runVirtualSlash(state, source, helperIdx, { prefix: SKILL_ID });
       return;
     }
-    delete state.localVars[CARD_KEY];
-    await applyAtom(state, {
-      type: '请求回应',
-      requestType: GIVE_CARD_RT,
-      target: helperIdx,
+    let giveCardId = await askResponse<string | undefined>(state, GIVE_CARD_RT, helperIdx, {
       prompt: {
         type: 'useCard',
         title: `求援:交给 ${self.name} 一张同类型不同牌名的牌`,
@@ -186,9 +172,8 @@ async function runQiuYuan(
         },
       },
       timeout: 20,
+      resultKey: CARD_KEY,
     });
-    let giveCardId = state.localVars[CARD_KEY] as string | undefined;
-    delete state.localVars[CARD_KEY];
     if (!giveCardId || !matching.includes(giveCardId)) {
       giveCardId = matching[0]; // 超时/非法兜底:给第一张符合牌(matching 已基于手牌计算)
     }

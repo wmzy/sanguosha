@@ -11,8 +11,9 @@
 // 效果②实现(被动触发,镜像巧变移动):
 //   after hook 挂在「翻面后」(模块 E 状态变更时机):faceDown===false(从背面翻至正面)时触发。
 //   (官方描述:「当你从背面翻至正面时」——即解除翻面状态时才能移牌。)
-//   询问 → 选弃牌(手牌)→ 选源玩家 → 选源牌(pickTargetCard)→ 选目标玩家 →
-//   移动场上牌(获得 atom,与巧变 moveFieldCard 一致)。
+//   询问 → 选弃牌(手牌)→ 选源玩家 → 选源牌(pickTargetCard,经
+//   flows/pick-card-panel.ts 的 askPickTargetCard)→ 选目标玩家 →
+//   移动场上牌(flows/field-card.ts 的 moveFieldCard,与巧变共用)。
 //   触发时机:翻面标签被消费、从背面翻回正面的瞬间——据守/放逐/悲歌 等翻面技能
 //   在目标下回合准备阶段 flipFaceUp,或 回合管理/界落英 调 flipFaceUpAll 清标签。
 import type {
@@ -27,30 +28,17 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { instantiateSkill } from './lifecycle';
 import { hasSkillModule } from './registry';
-import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
-import { askConfirm, firstCardId, defineConfirmAction } from '../util/skillRuntime';
+import { DISTANCE_ATTACK_RANGE_KEY, PICK_RESULT_KEY } from '../rules/vars-keys';
+import { fieldCardIds, moveFieldCard } from '../flows/field-card';
+import { askPickTargetCard } from '../flows/pick-card-panel';
+import { askConfirm, firstCardId, defineConfirmAction, shadowCardId, hasNullifyWindow } from '../util/skillRuntime';
 
-// ── 效果①:装备→无懈可击 转化 ──
+// ── 效果①:装备→无懈可击 转化(影子 id/广播窗口判据走 skillRuntime 共享 helper) ──
 const SHADOW_SUFFIX = '解围';
+const shadowIdOf = (cardId: string): string => shadowCardId(cardId, SHADOW_SUFFIX);
 
-/** 影子卡 id:${原id}#解围 */
-function shadowIdOf(cardId: string): string {
-  return `${cardId}#${SHADOW_SUFFIX}`;
-}
 
-/** 当前是否存在无懈可击广播窗口(玩家可回应) */
-function hasNullifyWindow(state: GameState, playerId: number): boolean {
-  for (const slot of state.pendingSlots.values()) {
-    const atom = slot.atom as { type?: string; requestType?: string; target?: number };
-    if (atom.type !== '请求回应') continue;
-    if (atom.requestType !== '无懈可击') continue;
-    if (typeof atom.target === 'number' && (atom.target < 0 || atom.target === playerId))
-      return true;
-  }
-  return false;
-}
-
-// ── 效果②:翻回正面→弃牌移动 ──
+// ── 效果②:翻回正面→弃牌移动(场上牌枚举/移动复用 flows/field-card.ts,与巧变共用) ──
 const CONFIRM_RT = '解围/confirm';
 const DISCARD_RT = '解围/discard';
 const SOURCE_PLAYER_RT = '解围/source-player';
@@ -59,63 +47,9 @@ const DEST_PLAYER_RT = '解围/dest-player';
 const CONFIRMED_KEY = '解围/confirmed';
 const DISCARD_KEY = '解围/discardCardId';
 const SOURCE_PLAYER_KEY = '解围/sourcePlayer';
-const SOURCE_CARD_KEY = '解围/sourceCard';
 const DEST_PLAYER_KEY = '解围/destPlayer';
 /** 重入保护:效果②交互进行中时设为 true,防止嵌套触发 */
 const MOVING_FLAG = '解围/moving';
-
-/** 取玩家"场上"的牌(手牌+装备+判定区)——用于源牌选择 */
-function fieldCardIds(state: GameState, player: number): string[] {
-  const p = state.players[player];
-  if (!p) return [];
-  const hand = [...p.hand];
-  const equip = Object.values(p.equipment).filter((id): id is string => !!id);
-  const judge = p.pendingTricks.map((t) => t.card.id);
-  return [...hand, ...equip, ...judge];
-}
-
-/**
- * 把 srcPlayer 场上的 srcCardId 移动到 destPlayer 场上(与巧变 moveFieldCard 一致)。
- * 判定区牌:先移除延时锦囊,再获得。
- * 装备/手牌:统一获得(获得 atom 自动处理 hand/equip 的 filter)。
- */
-async function moveFieldCard(
-  state: GameState,
-  srcPlayer: number,
-  srcCardId: string,
-  destPlayer: number,
-): Promise<void> {
-  if (srcPlayer === destPlayer) return;
-  const srcP = state.players[srcPlayer];
-  if (!srcP) return;
-  const card = state.cardMap[srcCardId];
-  if (!card) return;
-
-  // 判定区牌:先从判定区移除,再获得
-  const judgeTrick = srcP.pendingTricks.find((t) => t.card.id === srcCardId);
-  if (judgeTrick) {
-    await applyAtom(state, {
-      type: '移除延时锦囊',
-      player: srcPlayer,
-      trickName: judgeTrick.name,
-    });
-    await applyAtom(state, {
-      type: '获得',
-      player: destPlayer,
-      cardId: srcCardId,
-      from: srcPlayer,
-    });
-    return;
-  }
-
-  // 手牌/装备 → 目标手牌(获得 atom 自动处理)
-  await applyAtom(state, {
-    type: '获得',
-    player: destPlayer,
-    cardId: srcCardId,
-    from: srcPlayer,
-  });
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -233,7 +167,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (st: GameState, _params: Record<string, Json>) => {
+    (st: GameState, params: Record<string, Json>) => {
       const slot = st.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as Record<string, unknown>;
@@ -247,6 +181,18 @@ export function onInit(skill: Skill, state: GameState): () => void {
         DEST_PLAYER_RT,
       ];
       if (!valid.includes(rt)) return '当前不是解围询问';
+      // 选源牌面板参数校验(同过河拆桥/顺手牵羊 respond;面板候选校验由
+      // askPickTargetCard 的 equipment/judge/hand 解析兜底)
+      if (rt === SOURCE_CARD_RT) {
+        const zone = params.zone;
+        if (zone === 'equipment' || zone === 'judge') {
+          if (typeof params.cardId !== 'string') return 'cardId required';
+        } else if (zone === 'hand') {
+          if (typeof params.handIndex !== 'number') return 'handIndex required';
+        } else {
+          return 'zone required (equipment|judge|hand)';
+        }
+      }
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
@@ -269,11 +215,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
         return;
       }
       if (rt === SOURCE_CARD_RT) {
-        // pickTargetCard respond: { zone, cardId, handIndex }
-        const zone = params.zone as string | undefined;
-        const cardId = params.cardId as string | undefined;
-        const handIndex = params.handIndex as number | undefined;
-        st.localVars[SOURCE_CARD_KEY] = JSON.stringify({ zone, cardId, handIndex });
+        // pickTargetCard respond: { zone, cardId, handIndex } → 选牌/结果(由 askPickTargetCard 读取)
+        st.localVars[PICK_RESULT_KEY] = {
+          zone: params.zone,
+          cardId: params.cardId ?? null,
+          handIndex: params.handIndex ?? null,
+        };
         return;
       }
       if (rt === DEST_PLAYER_RT) {
@@ -371,61 +318,20 @@ export function onInit(skill: Skill, state: GameState): () => void {
       delete ctx.state.localVars[SOURCE_PLAYER_KEY];
       if (typeof srcPlayer !== 'number') return;
 
-      // 步骤 4:选源牌(pickTargetCard 显示源玩家的装备/判定/手牌)
+      // 步骤 4:选源牌(pickTargetCard 显示源玩家的装备/判定/手牌)。
+      // 无超时兜底(旧手写面板无 defaultChoice):超时未选 → 技能落空;
+      // 手牌盲选/装备与判定候选校验由 askPickTargetCard 解析。
       const srcPlayerState = ctx.state.players[srcPlayer];
       if (!srcPlayerState?.alive || fieldCardIds(ctx.state, srcPlayer).length === 0) return;
 
-      const equipment = Object.entries(srcPlayerState.equipment)
-        .filter(([, id]) => typeof id === 'string')
-        .map(([slot, id]) => ({ slot, cardId: id, cardName: ctx.state.cardMap[id]?.name ?? '?' }));
-      const judge = srcPlayerState.pendingTricks.map((t) => ({
-        cardId: t.card.id,
-        cardName: t.card.name,
-      }));
-      const handCount = srcPlayerState.hand.length;
-
-      if (equipment.length === 0 && judge.length === 0 && handCount === 0) return;
-
-      delete ctx.state.localVars[SOURCE_CARD_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
+      delete ctx.state.localVars[PICK_RESULT_KEY];
+      const selection = await askPickTargetCard(ctx.state, ownerId, srcPlayer, srcPlayerState, {
         requestType: SOURCE_CARD_RT,
-        target: ownerId,
-        prompt: {
-          type: 'pickTargetCard',
-          title: '解围:选择要移动的场上牌',
-          target: srcPlayer,
-          equipment,
-          judge,
-          handCount,
-        },
-        timeout: 20,
+        title: '解围:选择要移动的场上牌',
+        timeoutFallback: false,
       });
-
-      // 解析源牌选择
-      const sourceCardRaw = ctx.state.localVars[SOURCE_CARD_KEY] as string | undefined;
-      delete ctx.state.localVars[SOURCE_CARD_KEY];
-      let srcCardId: string | undefined;
-      if (sourceCardRaw) {
-        try {
-          const parsed = JSON.parse(sourceCardRaw) as {
-            zone?: string;
-            cardId?: string;
-            handIndex?: number;
-          };
-          if (parsed.zone === 'equipment' || parsed.zone === 'judge') {
-            if (typeof parsed.cardId === 'string') srcCardId = parsed.cardId;
-          } else if (parsed.zone === 'hand') {
-            const idx = typeof parsed.handIndex === 'number' ? parsed.handIndex : 0;
-            srcCardId = srcPlayerState.hand[idx] ?? srcPlayerState.hand[0];
-          }
-        } catch {
-          // JSON 解析失败:忽略
-        }
-      }
+      const srcCardId = selection?.cardId;
       if (!srcCardId) return;
-      // 验证源牌仍在源玩家场上
-      if (!fieldCardIds(ctx.state, srcPlayer).includes(srcCardId)) return;
 
       // 步骤 5:选目标玩家
       delete ctx.state.localVars[DEST_PLAYER_KEY];

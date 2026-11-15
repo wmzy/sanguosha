@@ -40,9 +40,10 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import { registerSlashExemptor } from '../rules/slash-quota';
 import { setPlayerVarUsage, projectTurnUsage } from '../rules/turn-usage';
+import { usedThisTurn as usedOncePerTurn } from '../rules/once-per-turn';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY, GONGQI_ACTIVE_VIEW_KEY, SLASH_EXEMPT_SUIT_KEY } from '../rules/vars-keys';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, askResponse } from '../util/skillRuntime';
 
 const SKILL_ID = '界弓骑';
 const DISPLAY_NAME = '弓骑';
@@ -73,9 +74,9 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 判断玩家本回合是否已发动过弓骑 */
+/** 判断玩家本回合是否已发动过弓骑(rules/once-per-turn 共享版,键 = `${SKILL_ID}/usedThisTurn`) */
 function usedThisTurn(state: GameState, ownerId: number): boolean {
-  return state.players[ownerId]?.vars[USED_KEY] === true;
+  return usedOncePerTurn(state, ownerId, SKILL_ID);
 }
 
 /** 玩家区域(手牌+装备)是否有牌可被弃 */
@@ -258,11 +259,7 @@ async function maybeDiscardOthersCard(
   if (!hasValidTargets(state, ownerId)) return;
 
   // 3. 选目标(其他存活且有牌的角色)
-  delete state.localVars[TARGET_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: TARGET_RT,
-    target: ownerId,
+  const targetIdx = await askResponse<number | undefined>(state, TARGET_RT, ownerId, {
     prompt: {
       type: 'choosePlayer',
       title: '弓骑:选择要弃置其一张牌的其他角色',
@@ -274,9 +271,8 @@ async function maybeDiscardOthersCard(
         hasDiscardableCards(state.players[t]),
     },
     timeout: 20,
+    resultKey: TARGET_KEY,
   });
-  const targetIdx = state.localVars[TARGET_KEY] as number | undefined;
-  delete state.localVars[TARGET_KEY];
   if (typeof targetIdx !== 'number') return;
 
   const target = state.players[targetIdx];

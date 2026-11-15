@@ -231,16 +231,6 @@ export function handLimitBonusKey(player: number): string {
 // 下列 getter 把 `as`/运行时收窄收敛到此处:返回值已是窄类型,缺失或形状不符返回 undefined,
 // 调用方照旧用 `?? 默认` 兜底(语义不变)。写入仍可直接 `vars[KEY] = value`(value 本身已是 Json)。
 
-/** 读取并按 T 断言 vars[key];缺失返回 undefined。仅作 escape hatch,优先用下方 per-key getter。 */
-export function getVar<T extends Json>(vars: Record<string, Json> | undefined, key: string): T | undefined {
-  return vars?.[key] as T | undefined;
-}
-
-/** 类型化写入。 */
-export function setVar(vars: Record<string, Json>, key: string, value: Json): void {
-  vars[key] = value;
-}
-
 function asNumber(v: Json | undefined): number | undefined {
   return typeof v === 'number' ? v : undefined;
 }

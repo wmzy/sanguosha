@@ -68,3 +68,20 @@ export const handCardMetaFade = bottomFadeGradient('0, 0, 0', '0.82', '0.55', '6
 export const eventCardMetaFade = bottomFadeGradient('0, 0, 0', '0.85', '0.55', '60%');
 /** 大卡底部紧凑区蒙版(暖黑) */
 export const playerCardBottomFade = bottomFadeGradient('10, 8, 5', '0.9', '0.78', '72%');
+
+/** 身份章色板:主公金/忠臣蓝/反贼红/内奸紫。座位卡名牌身份章(seat.ts 的
+ *  seatIdentity* 系列)与角色大卡身份章(actionBar 的 playerCardStamp* 别名)共用,
+ *  色板单一来源,两卡不再各持一份色值。 */
+export const identityStampPalette = {
+  lord: { background: '#d4a017', color: '#3a2400' },
+  loyalist: { background: '#3f6fb5', color: '#fff' },
+  rebel: { background: '#b03a30', color: '#fff' },
+  renegade: { background: '#8e5aa8', color: '#fff' },
+} as const;
+
+/** 死亡立绘滤镜(灰度 + 压亮):座位卡与大卡共用结构,亮度按卡型
+ *  (座位卡 0.7 / 大卡 0.6)。filter 为单属性,不能用「base 类 + 变体类」组合
+ *  (后者会整体覆盖前者),故以值共享。 */
+const deadPortraitFilter = (brightness: number) => `grayscale(1) brightness(${brightness})`;
+export const seatDeadPortraitFilter = deadPortraitFilter(0.7);
+export const largeCardDeadPortraitFilter = deadPortraitFilter(0.6);

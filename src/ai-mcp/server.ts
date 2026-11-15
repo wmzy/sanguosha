@@ -13,6 +13,7 @@
 //   play 仅在已启动后可用；lobby→playing 推进融入 runPlay 的 tick 循环（lobbyAdvancer），lobby 阶段阻塞等待而非立即返回。
 //   启动工具的 roomId 在 schema 层 required（joinRoom/spectateRoom），杜绝漏传静默建房的旧问题。
 import * as readline from 'node:readline';
+import { randomBytes } from 'node:crypto';
 import { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
 import {
   handleMcpRequest,
@@ -51,13 +52,8 @@ const MCP_AUTH = {
 const autoAccount = (): { username: string; password: string } => ({
   // username 上限 24 位:pid 最多 7 位数字,预留后缀空间
   username: `ai-${String(process.pid).slice(-6)}-${Math.random().toString(36).slice(2, 8)}`,
-  password: cryptoRandomHex(12),
+  password: randomBytes(12).toString('hex'),
 });
-function cryptoRandomHex(n: number): string {
-  const bytes = new Uint8Array(n);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-}
 
 function logErr(msg: string): void {
   process.stderr.write(`[sanguosha-mcp] ${msg}\n`);
@@ -125,7 +121,7 @@ async function main(): Promise<void> {
     });
     startedRole = 'host';
     logErr(`multiplayer room created: ${result.roomId} seat=${hgc.seatIndex} host=${result.isHost} minPlayers=${opts.minPlayers ?? maxPlayers}`);
-    // 房主建房后允许 timeoutSec 后续在 play 内通过 applyConfigUpdate 应用（已 ready 后服务端仍接受 updateConfig 在 lobby）。
+    // timeoutSec/name 在建房时经 buildRoomConfig 一并应用到房间配置。
   };
 
   // ── 启动工具：加入指定房间 ──
@@ -152,8 +148,8 @@ async function main(): Promise<void> {
   };
 
   // lobby 推进器：runPlay 在 lobby 阶段周期调用，全员就绪且房主时发一次 startGame。
-  // 非阻塞、幂等，替代原先 play 前单独阻塞 advanceToStart(5s) 的做法——推进融入
-  // runPlay 的 tick 循环，lobby 阶段持续阻塞等待 playing，避免 agent 高频轮询浪费 token。
+  // 非阻塞、幂等——推进融入 runPlay 的 tick 循环，lobby 阶段持续阻塞等待 playing，
+  // 避免立即返回导致 agent 高频轮询浪费 token。
   const lobbyAdvance = (): void => lobbyAdvanceImpl();
 
   const isStarted = (): boolean => startedRole !== null;

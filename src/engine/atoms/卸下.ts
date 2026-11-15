@@ -1,17 +1,9 @@
 // 卸下:玩家卸下指定槽位的装备,返回手牌
-// 副作用:清除武器攻击范围 vars(距离/出杀范围)。
+// 副作用:清除武器攻击范围 vars(距离/出杀范围,由 _helpers.clearEquipVars 统一实现,
+// 与 移出至暂存区 的武器移出共用)。
 // 进攻马/防御马的 vars 由马匹技能的 移除技能 hook 清理,不在此硬编码。
-import type { AtomDefinition, EquipSlot, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { broadcast, requirePlayer, viewPlayer } from './_helpers';
-import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
-
-/** 清除装备带来的 vars(仅武器范围;马匹由技能处理) */
-function clearEquipVars(state: GameState, playerIdx: number, slot: EquipSlot): void {
-  const vars = state.players[playerIdx].vars;
-  if (slot === '武器') {
-    delete vars[DISTANCE_ATTACK_RANGE_KEY];
-  }
-}
+import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { addCardToHand, broadcast, clearEquipVars, requirePlayer, viewPlayer } from './_helpers';
 
 export const 卸下: AtomDefinition<{
   player: number;
@@ -55,11 +47,7 @@ export const 卸下: AtomDefinition<{
     // apply 把卸下的牌返回手牌(player.hand.push(cardId)),applyView 必须镜像:
     // handCount + 1;可见时(owner 视角)把牌加回 hand 数组。
     if (cardId) {
-      p.handCount += 1;
-      if (p.hand) {
-        const card = view.cardMap[cardId];
-        if (card) p.hand.push(card);
-      }
+      addCardToHand(view, event.player as number, cardId);
     }
     // 武器卸下:清除 distanceVars.attackRange(马匹由 移除技能 atom 处理)
     if (slot === '武器' && p.distanceVars) {

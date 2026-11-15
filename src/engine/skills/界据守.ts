@@ -7,24 +7,28 @@
 //
 // 实现(基于标版据守):
 //   - use action:结束阶段发动 → 加翻面标签 + 摸 4 张 → 选一张手牌弃置/装备 → 标记已用。
-//   - 翻面标签触发下一回合跳过(机制与标版据守完全一致,before-hook 消费标签 + cancel 阶段)。
-//   - 弃置/装备交互:use execute 内嵌 请求回应(requestType='据守/弃牌'),
-//     玩家选一张手牌 → 若为装备牌则装备(含旧装备替换),否则弃置。
+//     前置校验/弃置装备步骤/respond 注册复用标版据守导出的共享核心
+//     (validateJushouUse/jushouDiscardOrEquip/registerJushouDiscardRespond),
+//     仅询问 requestType('界据守/弃牌')与弹窗标题前缀不同。
+//   - 翻面标签触发下一回合跳过(机制与悲歌/放逐一致,before-hook 消费标签 + cancel 阶段)。
 //   - 内部标签/localVars/requestType 键名保持原前缀 '据守/xxx'(不改为 '界据守/xxx')。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
-import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
-import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/skill';
-import { hasSkillModule } from './registry';
-import { firstCardId, slotOf, requireRequestType } from '../util/skillRuntime';
+import { markOncePerTurn } from '../rules/once-per-turn';
+import { registerAction, registerBeforeHook } from '../core/skill';
+import {
+  validateJushouUse,
+  jushouDiscardOrEquip,
+  registerJushouDiscardRespond,
+} from './据守';
 
 const SKIP_TAG = '据守/翻面';
 const SKIP_FLAG = '据守/skipAll';
 const USED_KEY = '据守/usedThisTurn';
 const DISCARD_RT = '界据守/弃牌';
-const DISCARD_CHOICE_KEY = '据守/discardChoice';
+const DISCARD_PROMPT_TITLE = '界据守:选择一张手牌弃置(装备牌将改为使用)';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -44,18 +48,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'use',
-    (state: GameState, _params: Record<string, Json>) => {
-      const myTurn = state.currentPlayerIndex === ownerId;
-      const inEndPhase = state.phase === '弃牌' || state.phase === '回合结束';
-      const free = !hasBlockingPending(state);
-      const self = state.players[ownerId];
-      const selfAlive = self?.alive === true;
-      // 已经翻面/已用过 → 不能再次发动
-      const notSkipped = !self.tags.includes(SKIP_TAG);
-      const notUsed = !usedThisTurn(state, ownerId, '据守');
-      const ok = myTurn && inEndPhase && free && selfAlive && notSkipped && notUsed;
-      return ok ? null : '现在不能发动据守';
-    },
+    (state: GameState, _params: Record<string, Json>) =>
+      validateJushouUse(state, ownerId, { skipTag: SKIP_TAG }),
     async (state: GameState, _params: Record<string, Json>) => {
       // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
       await markOncePerTurn(state, ownerId, '据守');
@@ -63,98 +57,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
       try {
         // 翻面:加标签(下一回合开始时被消费)
         await flipFaceDown(state, ownerId, '据守');
-        // 摸四张牌(界版变化:标版 3 → 界版 4)
+        // 摸四张牌,然后弃置一张手牌(若为装备牌则改为使用之)(标/界共享)
         await applyAtom(state, { type: '摸牌', player: ownerId, count: 4 });
-
-        // 界版新增:弃置一张手牌(若为装备牌则改为使用之)
-        const self = state.players[ownerId];
-        if (self.hand.length > 0) {
-          delete state.localVars[DISCARD_CHOICE_KEY];
-          await applyAtom(state, {
-            type: '请求回应',
-            requestType: DISCARD_RT,
-            target: ownerId,
-            prompt: {
-              type: 'useCard',
-              title: '界据守:选择一张手牌弃置(装备牌将改为使用)',
-              cardFilter: { filter: () => true, min: 1, max: 1 },
-            },
-            // 强制弃牌(摸四的代价,不可放弃):超时由下方兜底自动弃首张
-            mandatory: true,
-            timeout: 20,
-          });
-          let chosenId = state.localVars[DISCARD_CHOICE_KEY] as string | undefined;
-          delete state.localVars[DISCARD_CHOICE_KEY];
-          // 强制弃牌兜底:超时/空响应未选 → 自动弃手牌首张(不放弃弃牌义务)
-          if (!chosenId || !self.hand.includes(chosenId)) {
-            chosenId = self.hand[0];
-          }
-          if (chosenId && self.hand.includes(chosenId)) {
-            const card = state.cardMap[chosenId];
-            const slot = slotOf(card);
-            if (card?.type === '装备牌' && slot) {
-              // 装备牌:使用之(替换旧装备,逻辑同 装备通用)
-              const currentEquip = state.players[ownerId].equipment[slot];
-              if (currentEquip) {
-                const oldCard = state.cardMap[currentEquip];
-                if (oldCard?.name && hasSkillModule(oldCard.name)) {
-                  await applyAtom(state, {
-                    type: '移除技能',
-                    player: ownerId,
-                    skillId: oldCard.name,
-                  });
-                }
-                await applyAtom(state, { type: '卸下', player: ownerId, slot });
-                await applyAtom(state, {
-                  type: '移动牌',
-                  cardId: currentEquip,
-                  from: { zone: '手牌', player: ownerId },
-                  to: { zone: '弃牌堆' },
-                });
-              }
-              await applyAtom(state, { type: '装备', player: ownerId, cardId: chosenId });
-              if (card?.name && hasSkillModule(card.name)) {
-                await applyAtom(state, {
-                  type: '添加技能',
-                  player: ownerId,
-                  skillId: card.name,
-                });
-              }
-            } else {
-              // 非装备牌:弃置
-              await applyAtom(state, { type: '弃置', player: ownerId, cardIds: [chosenId], voluntary: true });
-            }
-          }
-        }
+        await jushouDiscardOrEquip(state, ownerId, DISCARD_RT, DISCARD_PROMPT_TITLE);
       } finally {
         await popFrame(state);
       }
     },
   );
 
-  // ── respond:玩家选择弃置/使用的手牌 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (s: GameState, _params: Record<string, Json>) => {
-      return requireRequestType(s, ownerId, [DISCARD_RT], {
-        wrongTypeError: '当前不是选牌窗口',
-        mismatchError: '当前不是据守弃牌窗口',
-      }).error;
-    },
-    async (s: GameState, params: Record<string, Json>) => {
-      // 客户端契约:mandatory 多选弃牌 UI 与 HeadlessGameClient 提交 {cardIds:[x]},
-      // 旧单发形状为 {cardId}。firstCardId 归一化双形状,且仅接受自己手牌中的牌(防注入他人牌);
-      // 非法形状不写 → use execute 走兜底弃首张。
-      const raw = firstCardId(params);
-      const self = s.players[ownerId];
-      if (raw !== undefined && self?.hand.includes(raw)) {
-        s.localVars[DISCARD_CHOICE_KEY] = raw;
-      }
-    },
-  );
+  // ── respond:玩家选择弃置/使用的手牌(标/界共享注册)──
+  registerJushouDiscardRespond(state, skill.id, ownerId, DISCARD_RT);
 
   // ── 下一回合跳过:阶段开始(准备) before-hook ────────────
   // 检测翻面标签 → 移除标签 + 设 skipAll 标志 + cancel(不进入准备阶段)

@@ -45,6 +45,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const unloads: Array<() => void> = [];
 
   // ─── after-hook:受到伤害后(华雄受伤后,按伤害牌颜色分支摸牌) ───
+  // 注:不用 registerOnDamagedAsTarget——耀武是锁定技,任何来源的伤害都触发
+  // (无来源闪电走"非红"分支华雄摸牌;自伤红牌来源=自己),该 helper 的
+  // `source===undefined||source===ownerId` 前导守卫会漏触发,故保留手写两行守卫。
   // 必须捕获 unloader 并在返回的清理函数中调用——引擎无自动 hook 清理机制,
   // 仅靠 onInit 返回的清理函数卸载 hook(unloadSkillInstance 只清 action,不清 hook)。
   // 否则技能被移除/重载时 hook 残留 → 重复触发(摸双倍牌)或已移除仍触发。

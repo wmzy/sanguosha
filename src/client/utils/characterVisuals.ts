@@ -4,6 +4,7 @@
 // 派生、立绘加载失败回退、身份章样式选择,收敛于此,组件不再各留副本。
 
 import type { SyntheticEvent } from 'react';
+import type { Faction } from '../../engine/types';
 import { FACTION_BG } from '../components/gameViewConstants';
 import { getCharacterMeta } from '../../engine/data/character-meta';
 import { getCharacterImage } from '../assets/imageAssets';
@@ -11,6 +12,12 @@ import { getCharacterImage } from '../assets/imageAssets';
 /** 未注册武将的势力回退(群)与势力色回退(紫) */
 export const DEFAULT_FACTION = '群';
 export const DEFAULT_FACTION_COLOR = '#8e44ad';
+
+/** 势力回退:缺省/未注册武将的势力按 '群' 展示(与 getCharacterCardVisuals 的
+ *  faction 回退同一口径;AwaitingPrompt 的化身选项卡等处直接消费)。 */
+export function fallbackFaction(faction?: Faction | null): Faction {
+  return faction ?? DEFAULT_FACTION;
+}
 
 export interface CharacterCardVisuals {
   /** 势力名(魏/蜀/吴/群),未注册武将回退 '群' */

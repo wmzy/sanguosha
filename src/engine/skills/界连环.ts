@@ -24,21 +24,21 @@
 //
 // 模式参考:标连环.ts(转化/重铸)、界火计.ts(覆盖 DEFAULT_SKILLS 中 card skill 的 use)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply'
+import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { recastCard } from '../flows/recast';
 import { setChain } from '../flows/face-down';
 import { registerAction, validateUseCard } from '../core/skill';
-import { engineCanPlayNow } from '../util/skillRuntime';
+import {
+  engineCanPlayNow,
+  mountTransformAction,
+  registerTransformAction,
+  type TransformActionOptions,
+} from '../util/skillRuntime';
 import { promptCancel } from '../flows/cancel';
 import { defaultPlayActive } from '../rules/action-active';
 
 const CHAIN_MARK = 'chained';
-
-/** 影子卡 id:${原id}#界连环(与标连环 ${原id}#连环 隔离) */
-function shadowIdOf(cardId: string): string {
-  return `${cardId}#界连环`;
-}
 
 /** 界庞统使用铁索连环的目标上限(标版 2,界版 +1 = 3) */
 const MAX_TARGETS = 3;
@@ -56,6 +56,41 @@ export function createSkill(id: string, ownerId: number): Skill {
       '你可以将一张梅花牌当【铁索连环】使用或重铸;你使用【铁索连环】可以多指定一个目标(至多3名)',
   };
 }
+
+/** transform 五件套工厂配置(梅花手牌 → 影子铁索连环;界版 targetFilter 上限 3)。 */
+const TRANSFORM_OPTIONS: TransformActionOptions = {
+  outputName: '铁索连环',
+  validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
+    const self = state.players[ownerId];
+    const selfAlive = self?.alive === true;
+    const cardId = params.cardId as string;
+    const cardIdOk = typeof cardId === 'string';
+    const card = cardIdOk ? state.cardMap[cardId] : undefined;
+    const cardInHand = cardIdOk && self.hand.includes(cardId);
+    const isClub = !!card && card.suit === '♣';
+    if (!selfAlive) return '你已死亡';
+    if (!cardIdOk || !cardInHand) return '牌不在手牌中';
+    if (!isClub) return '只能将梅花牌当铁索连环';
+    return null;
+  },
+  mount: {
+    label: '界连环',
+    style: 'primary',
+    prompt: {
+      type: 'useCardAndTarget',
+      title: '界连环:将一张梅花手牌当铁索连环使用(至多3名目标)',
+      cardFilter: { filter: (c: Card) => c.suit === '♣', min: 1, max: 1 },
+      // 界版目标上限 3(标版铁索连环 2)
+      targetFilter: { min: 1, max: MAX_TARGETS, allowSelf: true },
+    },
+    activeWhen: (ctx) => {
+      if (!defaultPlayActive(ctx)) return false;
+      const p = ctx.view.players[ctx.perspectiveIdx];
+      if (!p) return false;
+      return p.hand?.some((c) => c.suit === '♣') ?? false;
+    },
+  },
+};
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
@@ -87,41 +122,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── transform:梅花手牌 → 影子"铁索连环"(作为 preceding,主 action=铁索连环.use) ──
-  registerAction(state,
-  skill.id,
-  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
-    const self = state.players[ownerId];
-    const selfAlive = self?.alive === true;
-    const cardId = params.cardId as string;
-    const cardIdOk = typeof cardId === 'string';
-    const card = cardIdOk ? state.cardMap[cardId] : undefined;
-    const cardInHand = cardIdOk && self.hand.includes(cardId);
-    const isClub = !!card && card.suit === '♣';
-    if (!selfAlive) return '你已死亡';
-    if (!cardIdOk || !cardInHand) return '牌不在手牌中';
-    if (!isClub) return '只能将梅花牌当铁索连环';
-    return null;
-  },
-  async (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const shadowId = shadowIdOf(cardId);
-    await applyAtom(state, {
-      type: '当作',
-      player: ownerId,
-      cardIds: [cardId],
-      shadowId,
-      outputName: '铁索连环',
-    });
-  },
-  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-  (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const sId = shadowIdOf(cardId);
-    delete state.cardMap[sId];
-    const self = state.players[ownerId];
-    const idx = self.hand.indexOf(sId);
-    if (idx >= 0) self.hand[idx] = cardId;
-  },);
+  // 五件套由 skillRuntime 工厂统一实现;影子卡 id 后缀=技能 id '界连环'(与标连环
+  // `${原id}#连环` 隔离);validate 逐字保留原逐条件拒绝文案。
+  registerTransformAction(state, skill.id, ownerId, TRANSFORM_OPTIONS);
 
   // ─── use action:覆盖标版铁索连环.use,本座次走界版结算(目标上限 3) ───
   // 铁索连环在 DEFAULT_SKILLS 中先实例化标版铁索连环.use;此处 registerAction 覆盖之(同 key 覆盖)。
@@ -202,26 +205,9 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       return hasClub;
     },
   });
-  api.defineAction('transform', {
-    label: '界连环',
-    style: 'primary',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '界连环:将一张梅花手牌当铁索连环使用(至多3名目标)',
-      cardFilter: { filter: (c: Card) => c.suit === '♣', min: 1, max: 1 },
-      // 界版目标上限 3(标版铁索连环 2)
-      targetFilter: { min: 1, max: MAX_TARGETS, allowSelf: true },
-    },
-    // transform 字段:前端据此进入转化模式,组合 preceding=[界连环.transform]
-    // + 主 action=铁索连环.use(wrapperName='铁索连环')。缺失则前端无法发动。
-    transform: (card: Card) => ({ name: '铁索连环', sourceCardId: card.id, fromSkill: skill.id }),
-    activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
-      const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p) return false;
-      return p.hand?.some((c) => c.suit === '♣') ?? false;
-    },
-  });
+  // transform 声明由工厂统一构造(前端据此进入转化模式,组合 preceding=[界连环.transform]
+  // + 主 action=铁索连环.use(wrapperName='铁索连环'))。
+  mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
   return undefined;
 }
 

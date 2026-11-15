@@ -7,11 +7,13 @@
 // pendingRespondInfo 由 usePendingState memo 后从父组件传入,不再在此重复 resolve。
 import { useState, useEffect } from 'react';
 import * as styles from './gameViewStyles';
-import type { Card, Faction, PendingView } from '../../engine/types';
+import type { Card, PendingView } from '../../engine/types';
 import type { PendingRespondInfo } from '../utils/pendingRespond';
 import type { ProcessingPickState } from '../hooks/useProcessingPicks';
 import type { AutoSkipPrefs } from '../utils/autoSkip';
 import { getPendingRequestType } from '../utils/pendingRespond';
+import { countRespondableCards } from '../utils/gameViewHelpers';
+import { DEFAULT_FACTION_COLOR, fallbackFaction } from '../utils/characterVisuals';
 import { FACTION_BG } from './gameViewConstants';
 import { displaySkillName } from '../utils/skillDisplay';
 import { CardBack } from './CardBack';
@@ -32,6 +34,40 @@ export interface AwaitingPromptProps {
   autoSkipPrefs?: AutoSkipPrefs;
   /** 切换策略跳过开关(requestType) */
   onToggleAutoSkip?: (requestType: string) => void;
+}
+
+// ─── choosePlayer 单选/多选分支的共用渲染件(原两分支逐字重复)───
+
+/** candidates 为空时的「无可选目标」提示 */
+function NoCandidatesHint() {
+  return <span className={styles.promptDescInline}>无可选目标</span>;
+}
+
+/** 候选目标按钮:label 取座次名(投影缺失回退 P{idx});多选时选中态高亮 */
+function CandidateButton(props: {
+  seatIdx: number;
+  playerName?: string;
+  selected?: boolean;
+  onClick: () => void;
+}) {
+  const { seatIdx, playerName, selected, onClick } = props;
+  return (
+    <button
+      className={selected ? styles.promptBtnPrimary : styles.promptBtn}
+      onClick={onClick}
+    >
+      {playerName ?? `P${seatIdx}`}
+    </button>
+  );
+}
+
+/** min===0 时的「不选择」按钮:提交空 targets(与确认同为 respond) */
+function SkipChoiceButton(props: { onSkip: () => void }) {
+  return (
+    <button className={styles.promptBtn} onClick={props.onSkip}>
+      不选择
+    </button>
+  );
 }
 
 export function AwaitingPrompt(props: AwaitingPromptProps) {
@@ -226,8 +262,9 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                   ? // 武将牌面板:每张武将牌显示势力色底+武将名+技能列表
                     p.options.map((opt) => {
                       const cardData = characterCards[opt.value];
-                      const faction: Faction = cardData?.faction ?? '群';
-                      const factionColor = FACTION_BG[faction] || '#8e44ad';
+                      // 势力/势力色回退与座位卡共享 characterVisuals 的口径
+                      const faction = fallbackFaction(cardData?.faction);
+                      const factionColor = FACTION_BG[faction] || DEFAULT_FACTION_COLOR;
                       return (
                         <button
                           key={opt.value}
@@ -274,25 +311,17 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
             if (max <= 1) {
               return (
                 <div className={styles.promptActionsWrap}>
-                  {candidates.length === 0 && (
-                    <span className={styles.promptDescInline}>无可选目标</span>
-                  )}
+                  {candidates.length === 0 && <NoCandidatesHint />}
                   {candidates.map((t) => (
-                    <button
+                    <CandidateButton
                       key={t}
-                      className={styles.promptBtn}
+                      seatIdx={t}
+                      playerName={names[t]?.name}
                       onClick={() => send(skillId, 'respond', { target: t, targets: [t] })}
-                    >
-                      {names[t]?.name ?? `P${t}`}
-                    </button>
+                    />
                   ))}
                   {min === 0 && (
-                    <button
-                      className={styles.promptBtn}
-                      onClick={() => send(skillId, 'respond', { targets: [] })}
-                    >
-                      不选择
-                    </button>
+                    <SkipChoiceButton onSkip={() => send(skillId, 'respond', { targets: [] })} />
                   )}
                 </div>
               );
@@ -308,21 +337,16 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
             const canConfirm = multiSelect.length >= min && multiSelect.length <= max;
             return (
               <div className={styles.promptActionsWrap}>
-                {candidates.length === 0 && (
-                  <span className={styles.promptDescInline}>无可选目标</span>
-                )}
-                {candidates.map((t) => {
-                  const selected = multiSelect.includes(t);
-                  return (
-                    <button
-                      key={t}
-                      className={selected ? styles.promptBtnPrimary : styles.promptBtn}
-                      onClick={() => toggle(t)}
-                    >
-                      {names[t]?.name ?? `P${t}`}
-                    </button>
-                  );
-                })}
+                {candidates.length === 0 && <NoCandidatesHint />}
+                {candidates.map((t) => (
+                  <CandidateButton
+                    key={t}
+                    seatIdx={t}
+                    playerName={names[t]?.name}
+                    selected={multiSelect.includes(t)}
+                    onClick={() => toggle(t)}
+                  />
+                ))}
                 <button
                   className={canConfirm ? styles.promptBtnPrimary : styles.promptBtnDisabled}
                   disabled={!canConfirm}
@@ -331,12 +355,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                   确认({multiSelect.length}/{max})
                 </button>
                 {min === 0 && (
-                  <button
-                    className={styles.promptBtn}
-                    onClick={() => send(skillId, 'respond', { targets: [] })}
-                  >
-                    不选择
-                  </button>
+                  <SkipChoiceButton onSkip={() => send(skillId, 'respond', { targets: [] })} />
                 )}
               </div>
             );
@@ -344,7 +363,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
           // useCard / useCardAndTarget 类 pending:手牌区对可回应的牌(杀/闪/桃/酒)高亮。改为「先选牌再点打出」两步式
           // (避免误触直接出牌),出牌/不回应按钮在下方统一操作区(actionBar),此处仅显示文案提示。
           // useCardAndTarget(借刀杀人/出杀)还需选目标座次,提示文案区分。
-          const respondableCount = filterFn ? perspectiveHand.filter(filterFn).length : 0;
+          const respondableCount = filterFn ? countRespondableCards(perspectiveHand, filterFn) : 0;
           const needsTarget = pending.prompt.type === 'useCardAndTarget';
           return (
             <div className={styles.promptActions}>

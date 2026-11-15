@@ -9,6 +9,7 @@ import type {
   ActionPrompt,
   Card,
   CardWrapper,
+  ClientMessage,
   GameView,
   Json,
   DistributePrompt,
@@ -194,13 +195,64 @@ const CARD_DEFS_BY_NAME = new Map(
   [...基本牌列表, ...锦囊牌列表, ...装备牌列表].map((def) => [def.name, def]),
 );
 
-/** 把原料牌包装成产出牌(名 + 真实 type/subtype),供 findUseActionForCard 匹配同源 use action。 */
-export function asProducedCard(source: Card, outputName: string): Card {
+/** 把原料牌包装成产出牌(名 + 真实 type/subtype),供 findUseActionForCard 匹配同源
+ *  use action。仅 resolveProducedAction 内部消费,不导出。 */
+function asProducedCard(source: Card, outputName: string): Card {
   const def = CARD_DEFS_BY_NAME.get(outputName);
   return {
     ...source,
     name: outputName,
     ...(def ? { type: def.type, subtype: def.subtype } : {}),
+  };
+}
+
+/** 转化技提交的完整主消息(浏览器 handleTransformPlay 的 4 个 send 块与无头
+ *  buildTransformRespondAction/buildTransformUseAction,共 6 处装配的单一实现):
+ *  - 主 action:skillId = 产出牌名、actionType = 'use'(自由出牌)/'respond'(被询问
+ *    打出)、params.cardId = 影子卡 id(拼接契约见 buildShadowCardId);
+ *  - selfTarget 产出牌(桃/酒)预填 targets=[ownerId],调用方无需传目标;
+ *  - 其余需目标的产出牌由调用方传 targetIdx(浏览器手选目标);无头枚举不传,
+ *    targets 留给 agent 从 validTargets 补全;
+ *  - preceding = transform action 本体,单卡 {cardId} / 多卡 {cardIds}(选中顺序)。 */
+export function buildTransformSubmitMessage(opts: {
+  /** 产出牌名(主 action 的 skillId) */
+  wrapperName: string;
+  /** 主 action 类型:'use' = 自由出牌;'respond' = 被询问打出(无目标) */
+  actionType: 'use' | 'respond';
+  /** 提交座次(主 action 的 ownerId;selfTarget 预填的 targets 也用它) */
+  ownerId: number;
+  /** 转化技 skillId(preceding 的 skillId + 影子 id 后缀) */
+  skillId: string;
+  /** 转化 action 自己声明的 actionType(preceding 用) */
+  transformActionType: string;
+  /** 选中的原料牌 id(单卡 1 个/多卡 N 个,顺序 = 选中顺序) */
+  materialIds: string[];
+  /** 产出牌是否自动以自己为目标(桃/酒;即 playRules.selfTarget) */
+  selfTarget?: boolean;
+  /** 手选目标座次(产出牌需目标且已选;selfTarget 时忽略) */
+  targetIdx?: number;
+}): ClientMessage {
+  const params: Record<string, Json> = {
+    cardId: buildShadowCardId(opts.materialIds, opts.skillId),
+  };
+  if (opts.selfTarget) params.targets = [opts.ownerId];
+  else if (opts.targetIdx !== undefined) params.targets = [opts.targetIdx];
+  return {
+    skillId: opts.wrapperName,
+    actionType: opts.actionType,
+    ownerId: opts.ownerId,
+    params,
+    preceding: [
+      {
+        skillId: opts.skillId,
+        actionType: opts.transformActionType,
+        params:
+          opts.materialIds.length > 1
+            ? { cardIds: opts.materialIds }
+            : { cardId: opts.materialIds[0] },
+      },
+    ],
+    baseSeq: 0,
   };
 }
 
@@ -357,6 +409,40 @@ export function derivePlayRules(
   };
 }
 
+/** 「当前已选目标名列表」的单一口径(原三处手写:usePlayInteraction.isTargetable、
+ *  buildPlayParams、GameView 的 selectedTargetNames):
+ *  - 槽位(hasSlots,借刀杀人 A/B)或多目标(multiTarget,铁索连环/多目标杀):
+ *    优先多选集合 multiTargets,为空时回退 [target, killTarget] 过滤空值
+ *    (半选 A/B 时也能画出已选态——isTargetable 口径);
+ *  - 其余:单选 [target] 或空数组;
+ *  - 不走出牌选中态的模式(distribute 外部目标选择 / 回应窗口目标)由调用方经
+ *    overrideNames 优先提供(非 null 即整组采用,含空数组)。
+ *  多目标空集的回退是三处旧口径的统一:buildPlayParams 旧版直接给空数组、
+ *  GameView 旧版无回退,现统一按 isTargetable 口径回退(multiTarget 模式下
+ *  killTarget 恒为 null,实际取值不变)。 */
+export function selectedTargetNamesOf(
+  rules: PlayRules | null | undefined,
+  selected: {
+    /** 单选目标名 */
+    target: string | null;
+    /** 槽位 B 目标名(hasSlots) */
+    killTarget?: string | null;
+    /** 多目标/槽位已选集合 */
+    multiTargets?: string[];
+  },
+  overrideNames?: string[] | null,
+): string[] {
+  if (overrideNames) return overrideNames;
+  const killTarget = selected.killTarget ?? null;
+  const multiTargets = selected.multiTargets ?? [];
+  if (rules?.hasSlots || rules?.multiTarget) {
+    return multiTargets.length
+      ? multiTargets
+      : [selected.target, killTarget].filter((name): name is string => name !== null);
+  }
+  return selected.target ? [selected.target] : [];
+}
+
 /**
  * 构造出牌 action 的 params。
  * 由出牌规则(PlayRules,从 prompt 派生)决定 target/targets 字段；有序槽位统一 targets=[A,B]。
@@ -379,9 +465,11 @@ export function buildPlayParams(
   selectedMultiTargets: string[] = [],
   view?: GameView,
 ): Record<string, Json> | null {
-  const chosen = rules.hasSlots
-    ? selectedMultiTargets.length ? selectedMultiTargets : [selectedTarget, selectedKillTarget].filter((name): name is string => name !== null)
-    : rules.multiTarget ? selectedMultiTargets : selectedTarget ? [selectedTarget] : [];
+  const chosen = selectedTargetNamesOf(rules, {
+    target: selectedTarget,
+    killTarget: selectedKillTarget,
+    multiTargets: selectedMultiTargets,
+  });
   const indices = chosen.map((name) => players.findIndex((player) => player.name === name));
   if (rules.targetFilter && !rules.selfTarget && view &&
     !validateTargetSelection(view, perspectiveIdx, rules.targetFilter, indices, card)) return null;
@@ -598,6 +686,69 @@ export function effectiveTargetCard(
   return selectedCard && usingSelected
     ? { ...selectedCard, name: usedCardName ?? selectedCard.name }
     : undefined;
+}
+
+/** usedCardName 的浏览器判定(effectiveTargetCard 的第三参;原
+ *  usePlayInteraction.isTargetable 与 GameView.seatTargetInfo 两处逐字重复):
+ *  转化技优先取产出牌名(transformWrapperName,方向随选牌);普通出牌按
+ *  「use action 的 skillId === 选中牌名」认定选中牌即使用牌(杀本体);技能代价牌
+ *  (哪怕恰好是杀,如 离间 弃杀)→ null,不按使用牌解释。 */
+export function usedCardNameOf(
+  transformWrapperName: string | null | undefined,
+  selectedUseAction: SkillActionDef | undefined,
+  selectedCard: Card | null | undefined,
+): string | null {
+  return (
+    transformWrapperName ??
+    (selectedUseAction && selectedUseAction.skillId === selectedCard?.name
+      ? selectedCard.name
+      : null)
+  );
+}
+
+/** usedCardName 的消息侧变体(无头 availableActions 的目标校验,与浏览器
+ *  usedCardNameOf 同语义):主 action 带 preceding(转化提交)→ 产出牌名 =
+ *  主 action 技能名(武圣红牌当杀,原牌名不足为凭);无 preceding 且 牌名 ===
+ *  主 action 技能名 → 普通出牌(牌本体);其余(技能代价牌,哪怕恰好是杀)→ null,
+ *  不按使用牌解释(否则 离间 类 min=max=2 的目标上限会塌成杀的 1 被引擎拒)。 */
+export function usedCardNameOfMessage(
+  message: Pick<ClientMessage, 'skillId' | 'preceding'>,
+  source: Pick<Card, 'name'> | undefined,
+): string | null {
+  return message.preceding?.length
+    ? message.skillId
+    : source?.name === message.skillId
+      ? source.name
+      : null;
+}
+
+/** 目标约束的 card 参数(浏览器 isTargetable 与 GameView.seatTargetInfo 两处同源):
+ *  回应窗口(useCardAndTarget 型 pending,借刀杀人出杀)用正在打出的回应牌;
+ *  其余窗口走 effectiveTargetCard(选中牌 + 约束 + usedCardName 声明)。
+ *  @param respondWindow 调用方判定的回应窗口条件(各自基于 respondTargetFilter /
+ *         pending.prompt.type,语义等价)
+ *  @param respondCard   回应窗口正在打出的牌(未选则 undefined) */
+export function targetConstraintCard(
+  respondWindow: boolean,
+  respondCard: Card | null | undefined,
+  selectedCard: Card | null | undefined,
+  selectedTargetFilter: TargetFilter | null | undefined,
+  usedCardName: string | null | undefined,
+): Card | undefined {
+  return respondWindow
+    ? (respondCard ?? undefined)
+    : effectiveTargetCard(selectedCard, selectedTargetFilter, usedCardName);
+}
+
+/** 回应窗口手牌中可回应的张数(GameView 的 respondCandidateCount 与
+ *  AwaitingPrompt 的 respondableCount 同判据):按 pendingRespondInfo.cardFilter
+ *  过滤手牌计数。「无 filter(非卡牌回应)」的语义差异(null=未知 / 0=无)由
+ *  调用方保留。 */
+export function countRespondableCards(
+  hand: Card[],
+  filter: (card: Card) => boolean,
+): number {
+  return hand.filter(filter).length;
 }
 
 // ─── 出牌操作按钮可见性 ───

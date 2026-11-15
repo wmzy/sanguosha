@@ -14,6 +14,8 @@
 import type { AiViewSnapshot, AvailableAction } from '../client/headless/types';
 import type { Card, EquipSlot } from '../engine/types';
 import { STRONG_CHARACTERS } from '../engine/data/character-strength';
+import { discardKeepPriorityOf } from '../engine/atoms/请求回应';
+import { identityCamp } from '../engine/rules/camp';
 
 /** 单动作评分结果。 */
 export interface ScoredAction {
@@ -67,10 +69,12 @@ function isBlockingRespondToSelf(view: AiViewSnapshot): boolean {
 }
 
 /** 判断目标是否为盟友（基于身份）。
+ *  阵营归属单一来源:engine/rules/camp.ts 的 identityCamp(主公/忠臣→主公方,
+ *  反贼→反贼,内奸→内奸,未知→null);同阵营互为盟友。
  *  身份规则：
  *  - 主公/忠臣互为盟友（反贼/内奸是敌人）
  *  - 反贼互为盟友（主公/忠臣是敌人）
- *  - 内奸：所有人都是敌人（除自己）
+ *  - 内奸：所有人都是敌人（除自己）——须特判,阵营判定对 内奸-内奸 会误判同盟
  *  - 目标身份未知(undefined)时：保守视为非盟友
  *  - 自己的身份未知时：保守视为非盟友（即所有人都当敌人处理）
  */
@@ -78,16 +82,9 @@ function isAlly(myIdentity: string | undefined, targetIdentity: string | undefin
   if (!myIdentity || !targetIdentity) return false;
   // 内奸无盟友
   if (myIdentity === '内奸') return false;
-  // 同身份互为盟友（主公-主公/忠臣-忠臣/反贼-反贼）
-  if (myIdentity === targetIdentity) return true;
-  // 主公与忠臣互为盟友
-  if (
-    (myIdentity === '主公' && targetIdentity === '忠臣') ||
-    (myIdentity === '忠臣' && targetIdentity === '主公')
-  ) {
-    return true;
-  }
-  return false;
+  // 同阵营互为盟友(主公-忠臣同属主公方;未知身份经 identityCamp 得 null → 非盟友)
+  const myCamp = identityCamp(myIdentity);
+  return myCamp !== null && myCamp === identityCamp(targetIdentity);
 }
 
 /** 从 action.validTargets 中筛选敌方玩家（基于身份）。 */
@@ -162,7 +159,7 @@ export function countWuxieInHand(view: AiViewSnapshot): number {
 
 /** 无懈可击综合评分。
  *  维度：锦囊威胁等级 × 目标保护价值 × 阵营（自己/盟友/敌方）× 手牌无懈数 × 轮次。 */
-export function scoreWuxie(view: AiViewSnapshot, _action: AvailableAction): ScoredAction {
+function scoreWuxie(view: AiViewSnapshot, _action: AvailableAction): ScoredAction {
   const title = view.pending?.promptTitle ?? '';
   const threat = wuxieThreatLevel(title);
   const targetIdx = view.pending?.target ?? -1;
@@ -521,40 +518,10 @@ function scorePlay(view: AiViewSnapshot, action: AvailableAction): ScoredAction 
 
 /** 卡牌保留优先级（越高越保留，越低越优先弃）。
  *  用于弃牌阶段选牌：低分先弃。
- *  装备牌(type==='装备牌')最优先弃（多余装备）；桃/无懈/闪最该留。 */
+ *  单一来源:引擎 请求回应 atom 导出的 discardKeepPriorityOf(引擎超时兜底/
+ *  客户端弃牌预览同表),此处仅保留函数壳供本模块弃牌评分复用。 */
 function cardKeepPriority(card: Card): number {
-  if (card.type === '装备牌') return 30;
-  switch (card.name) {
-    case '桃':
-      return 100;
-    case '无懈可击':
-      return 90;
-    case '闪':
-      return 85;
-    case '无中生有':
-      return 78;
-    case '杀':
-      return 70;
-    case '顺手牵羊':
-    case '过河拆桥':
-      return 65;
-    case '乐不思蜀':
-    case '兵粮寸断':
-      return 60;
-    case '决斗':
-    case '借刀杀人':
-      return 55;
-    case '南蛮入侵':
-    case '万箭齐发':
-      return 50;
-    case '桃园结义':
-    case '五谷丰登':
-      return 45;
-    case '闪电':
-      return 35;
-    default:
-      return 40;
-  }
+  return discardKeepPriorityOf(card);
 }
 
 /** 从手牌中选出建议弃掉的 cardIds（按保留优先级从低到高取前 N 张）。 */

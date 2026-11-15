@@ -48,19 +48,19 @@ export async function destroyRoomCompletely(roomId: string): Promise<void> {
   // 1. 移除 session 记录 + fire-and-forget destroy
   destroySessionQuietly(roomId);
 
-  // 2. 清理玩家映射(leaveRoom 处理 room 内部状态)
+  // 2. 清理玩家映射(leaveRoom 处理 room 内部状态并解除 playerRoomMap)
   const room = getRoom(roomId);
   if (room) {
     for (const pid of [...room.players.keys()]) {
       leaveRoom(roomId, pid);
-      playerRoomMap.delete(pid);
     }
   }
 
   // 3. 删除 roomList 记录(幂等:leaveRoom 已删则 no-op)
   deleteRoom(roomId);
 
-  // 4. 兜底:清理任何指向该房间的残留映射(必须在 await 之前,保持同步语义)
+  // 4. 兜底:清理任何指向该房间的残留映射(绕过 room.ts 成员函数直写映射的
+  //    条目,如测试注入;必须在 await 之前,保持同步语义)
   for (const [pid, rid] of playerRoomMap) {
     if (rid === roomId) playerRoomMap.delete(pid);
   }

@@ -37,7 +37,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, askResponse, defineConfirmAction } from '../util/skillRuntime';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
 
@@ -117,11 +117,7 @@ async function runOptionKill(
   X: number,
 ): Promise<void> {
   // 法正选 Y (≠X 的存活角色,可为法正自己)
-  delete state.localVars[VICTIM_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: RT_VICTIM,
-    target: ownerId,
+  const Y = await askResponse<number>(state, RT_VICTIM, ownerId, {
     prompt: {
       type: 'choosePlayer',
       title: '眩惑:指定 X 出杀的目标 Y(可为法正自己)',
@@ -131,24 +127,20 @@ async function runOptionKill(
         target !== X && view.players[target]?.alive === true,
     },
     timeout: 15,
+    resultKey: VICTIM_KEY,
   });
-  const Y = state.localVars[VICTIM_KEY] as number;
   if (typeof Y !== 'number' || Y < 0 || !state.players[Y]?.alive) return;
 
   // X 选一张杀
-  delete state.localVars[SLASH_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: RT_SLASH,
-    target: X,
+  const slashId = await askResponse<string>(state, RT_SLASH, X, {
     prompt: {
       type: 'useCard',
       title: '眩惑:选择一张【杀】使用',
       cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
     },
     timeout: 15,
+    resultKey: SLASH_KEY,
   });
-  const slashId = state.localVars[SLASH_KEY] as string;
   if (typeof slashId !== 'string' || !state.players[X]?.hand.includes(slashId)) return;
 
   await runSlashResolution(state, X, Y, slashId);
@@ -164,13 +156,8 @@ async function runOptionGain(
   if (!xp || xp.hand.length < 2) return;
   for (let i = 0; i < 2; i++) {
     if (xp.hand.length === 0) break;
-    const rtKey = `${PICK_KEY}${i}`;
-    delete state.localVars[rtKey];
     const rt = i === 0 ? RT_PICK0 : RT_PICK1;
-    await applyAtom(state, {
-      type: '请求回应',
-      requestType: rt,
-      target: ownerId,
+    const picked = await askResponse<string | undefined>(state, rt, ownerId, {
       prompt: {
         type: 'pickTargetCard',
         title: `眩惑:观看 X 手牌,选第 ${i + 1} 张获得`,
@@ -184,8 +171,8 @@ async function runOptionGain(
         handCount: 0,
       },
       timeout: 20,
+      resultKey: `${PICK_KEY}${i}`,
     });
-    const picked = state.localVars[rtKey] as string | undefined;
     if (typeof picked === 'string' && xp.hand.includes(picked)) {
       await applyAtom(state, {
         type: '获得',
@@ -286,11 +273,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!triggered) return;
 
       // 2. 法正选目标 X
-      delete ctx.state.localVars[TARGET_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: RT_TARGET,
-        target: ownerId,
+      const X = await askResponse<number>(ctx.state, RT_TARGET, ownerId, {
         prompt: {
           type: 'choosePlayer',
           title: '眩惑:选择接收两张牌的角色',
@@ -300,16 +283,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
             target !== ownerId && view.players[target]?.alive === true,
         },
         timeout: 15,
+        resultKey: TARGET_KEY,
       });
-      const X = ctx.state.localVars[TARGET_KEY] as number;
       if (typeof X !== 'number' || X < 0 || !ctx.state.players[X]?.alive) return;
 
       // 3. 法正选 2 张手牌
-      delete ctx.state.localVars[CARDS_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: RT_CARDS,
-        target: ownerId,
+      const cards = await askResponse<string[] | undefined>(ctx.state, RT_CARDS, ownerId, {
         prompt: {
           type: 'distribute',
           mode: 'select',
@@ -319,8 +298,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           maxTotal: 2,
         },
         timeout: 20,
+        resultKey: CARDS_KEY,
       });
-      const cards = ctx.state.localVars[CARDS_KEY] as string[] | undefined;
       if (!Array.isArray(cards) || cards.length !== 2) return;
       const validCards = cards.filter((id) => self.hand.includes(id));
       if (validCards.length !== 2) return;
@@ -346,11 +325,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
         let choice: 'kill' | 'gain';
         if (optKill && optGain) {
-          delete ctx.state.localVars[XCHOICE_KEY];
-          await applyAtom(ctx.state, {
-            type: '请求回应',
-            requestType: RT_XCHOICE,
-            target: X,
+          const xc = await askResponse(ctx.state, RT_XCHOICE, X, {
             prompt: {
               type: 'confirm',
               title:
@@ -360,8 +335,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
             },
             defaultChoice: false,
             timeout: 15,
+            resultKey: XCHOICE_KEY,
           });
-          const xc = ctx.state.localVars[XCHOICE_KEY];
           choice = xc === 'kill' ? 'kill' : 'gain';
         } else {
           choice = optKill ? 'kill' : 'gain';

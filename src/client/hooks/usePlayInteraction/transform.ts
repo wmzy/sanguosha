@@ -23,13 +23,12 @@ import type {
   CardWrapper,
   EquipSlot,
   GameView,
-  Json,
   TargetFilter,
 } from '../../../engine/types';
 import type { SkillActionDef } from '../../skillActionRegistry';
 import type { PlayRules } from '../../utils/gameViewHelpers';
 import {
-  buildShadowCardId,
+  buildTransformSubmitMessage,
   comboSatisfied,
   isActiveAction,
   producedNameOf,
@@ -221,6 +220,24 @@ export function useTransformMode(p: TransformModeParams): TransformModeInteracti
   };
 }
 
+/** 转化提交的产出牌是否需手选目标(handleTransformPlay 与 transformSubmit 共用,
+ *  原两处逐字重复、后者多一层 !isRespondTransformContext 包装):
+ *  回应路径(isRespondPath,R.respond 无目标)恒不需;产出牌 use action 的目标语义
+ *  (playRules:酒无目标/桃 selfTarget/杀选目标)优先;无 playRules(产出牌无注册
+ *  use action)回退 transform 自身声明的 targetFilter;再无则视为需目标。 */
+function producedNeedsManualTarget(
+  playRules: PlayRules | null,
+  transformMode: TransformMode,
+  isRespondPath = false,
+): boolean {
+  if (isRespondPath) return false;
+  return playRules
+    ? playRules.needsTarget && !playRules.selfTarget
+    : transformMode.targetFilter
+      ? transformMode.targetFilter.max >= 1
+      : true;
+}
+
 export interface TransformSubmitParams {
   transformMode: TransformMode | null;
   setTransformMode: Dispatch<SetStateAction<TransformMode | null>>;
@@ -294,89 +311,56 @@ export function useTransformSubmit(p: TransformSubmitParams): TransformSubmitInt
   const handleTransformPlay = useCallback(
     (targetName: string) => {
       if (!transformMode) return;
-      // 回应路径(被要求打出某牌):转化后按 R.respond 打出,无目标
-      // (询问杀→武圣/丈八蛇矛;询问闪→倾国/龙胆;广播无懈→看破)
       if (!transformWrapperName) return;
-      if (isRespondTransformContext && transformWrapperName === pendingRequestedName) {
+      /** 原料选中集守卫(回应/出牌 × 单/多卡四分支同判据):多卡 = FIFO 数量区间 +
+       *  组合约束;单卡 = 选中牌须仍在手牌。不满足返回 null(不发消息,也不清模式)。 */
+      const materialIdsOf = (): string[] | null => {
         if (transformMode.minCards > 1) {
-          // 多卡转化(丈八蛇矛):2 张手牌当杀打出
           const ids = transformMode.selectedCardIds;
-          if (ids.length < transformMode.minCards || ids.length > transformMode.maxCards) return;
-          if (!transformComboOk(ids)) return; // 组合约束(同花色)不满足 → 不提交
-          const shadowCardId = buildShadowCardId(ids, transformMode.skillId);
-          send(transformWrapperName, 'respond', { cardId: shadowCardId }, [
-            {
-              skillId: transformMode.skillId,
-              actionType: transformMode.actionType,
-              params: { cardIds: ids },
-            },
-          ]);
-          setTransformMode(null);
-          setSelectedCardId(null);
-          setSelectedTarget(null);
-          return;
+          if (ids.length < transformMode.minCards || ids.length > transformMode.maxCards) return null;
+          return transformComboOk(ids) ? ids : null; // 组合约束(同花色)不满足 → 不提交
         }
-        if (!selectedCardId) return;
-        const targetCard = perspectiveHand.find((c) => c.id === selectedCardId);
-        if (!targetCard) return;
-        const shadowCardId = buildShadowCardId(selectedCardId, transformMode.skillId);
-        send(transformWrapperName, 'respond', { cardId: shadowCardId }, [
-          {
-            skillId: transformMode.skillId,
-            actionType: transformMode.actionType,
-            params: { cardId: selectedCardId },
-          },
-        ]);
-        setTransformMode(null);
-        setSelectedCardId(null);
-        setSelectedTarget(null);
-        return;
-      }
-      // 自由出牌门(与 transformSubmit/CenterActionBar「使用」按钮同源):产出牌 use action
-      // 不 active 时直接 return 不发消息——Enter 与按钮两条提交路径判定必须同源。
-      if (!(selectedActive || isRespondTransformContext)) return;
-      // 目标语义由产出牌自己的 use action 决定(playRules 来自 selectedUseAction):
-      // 酒(useCard,无目标)/桃(selfTarget,自动以自己为目标)/杀(攻击范围内选目标)。
-      // 沿用 transform action 自己的 targetFilter 会把「对他人」的目标塞给 酒/桃 → 引擎恒拒。
-      const needsManualTarget = playRules
-        ? playRules.needsTarget && !playRules.selfTarget
-        : transformMode.targetFilter
-          ? transformMode.targetFilter.max >= 1
-          : true;
-      const idx = needsManualTarget ? nameToIndex(targetName) : -1;
-      if (needsManualTarget && idx < 0) return;
-
-      if (transformMode.minCards > 1) {
-        const ids = transformMode.selectedCardIds;
-        if (ids.length < transformMode.minCards || ids.length > transformMode.maxCards) return;
-        if (!transformComboOk(ids)) return; // 组合约束(同花色)不满足 → 不提交
-        const shadowCardId = buildShadowCardId(ids, transformMode.skillId);
-        const mainParams: Record<string, Json> = { cardId: shadowCardId };
-        if (playRules?.selfTarget) mainParams.targets = [perspectiveIdx];
-        else if (needsManualTarget) mainParams.targets = [idx];
-        send(transformWrapperName, 'use', mainParams, [
-          {
-            skillId: transformMode.skillId,
-            actionType: transformMode.actionType,
-            params: { cardIds: ids },
-          },
-        ]);
-      } else {
-        if (!selectedCardId) return;
-        const targetCard = perspectiveHand.find((c) => c.id === selectedCardId);
-        if (!targetCard) return;
-        const shadowCardId = buildShadowCardId(selectedCardId, transformMode.skillId);
-        const mainParams: Record<string, Json> = { cardId: shadowCardId };
-        if (playRules?.selfTarget) mainParams.targets = [perspectiveIdx];
-        else if (needsManualTarget) mainParams.targets = [idx];
-        send(transformWrapperName, 'use', mainParams, [
-          {
-            skillId: transformMode.skillId,
-            actionType: transformMode.actionType,
-            params: { cardId: selectedCardId },
-          },
-        ]);
-      }
+        if (!selectedCardId) return null;
+        return perspectiveHand.some((c) => c.id === selectedCardId) ? [selectedCardId] : null;
+      };
+      const common = {
+        wrapperName: transformWrapperName,
+        ownerId: perspectiveIdx,
+        skillId: transformMode.skillId,
+        transformActionType: transformMode.actionType,
+      };
+      // 主消息装配(与无头枚举共享 buildTransformSubmitMessage):
+      //   - 回应路径(被要求打出某牌,询问杀→武圣/丈八蛇矛;询问闪→倾国/龙胆;广播
+      //     无懈→看破):按 R.respond 打出,无目标;
+      //   - 自由出牌路径:自由出牌门(与 transformSubmit/CenterActionBar「使用」按钮
+      //     同源,Enter 与按钮两条提交路径判定必须同源)→ 手选目标 → 提交。
+      //     目标语义由产出牌自己的 use action 决定(playRules 来自 selectedUseAction):
+      //     酒(useCard,无目标)/桃(selfTarget,自动以自己为目标)/杀(攻击范围内选
+      //     目标)。沿用 transform action 自己的 targetFilter 会把「对他人」的目标塞给
+      //     酒/桃 → 引擎恒拒。
+      const message = (() => {
+        if (isRespondTransformContext && transformWrapperName === pendingRequestedName) {
+          const materialIds = materialIdsOf();
+          if (!materialIds) return null;
+          return buildTransformSubmitMessage({ ...common, actionType: 'respond', materialIds });
+        }
+        if (!(selectedActive || isRespondTransformContext)) return null;
+        const needsManualTarget = producedNeedsManualTarget(playRules, transformMode);
+        const idx = needsManualTarget ? nameToIndex(targetName) : -1;
+        if (needsManualTarget && idx < 0) return null;
+        const materialIds = materialIdsOf();
+        if (!materialIds) return null;
+        return buildTransformSubmitMessage({
+          ...common,
+          actionType: 'use',
+          materialIds,
+          selfTarget: !!playRules?.selfTarget,
+          ...(needsManualTarget ? { targetIdx: idx } : {}),
+        });
+      })();
+      if (!message) return;
+      send(message.skillId, message.actionType, message.params, message.preceding);
+      // 提交成功的统一收尾:退出转化模式 + 清空选中的牌/目标(原 4 个 send 块各自三连重置)
       setTransformMode(null);
       setSelectedCardId(null);
       setSelectedTarget(null);
@@ -412,14 +396,9 @@ export function useTransformSubmit(p: TransformSubmitParams): TransformSubmitInt
           : [];
     const enough = ids.length >= transformMode.minCards && ids.length <= transformMode.maxCards;
     const comboOk = transformComboOk(ids);
-    // 目标语义由产出牌的 use action 决定(酒无目标 / 桃 selfTarget / 杀 选目标)
-    const needsTarget =
-      !isRespondTransformContext &&
-      (playRules
-        ? playRules.needsTarget && !playRules.selfTarget
-        : transformMode.targetFilter
-          ? transformMode.targetFilter.max >= 1
-          : true);
+    // 目标语义由产出牌的 use action 决定(酒无目标 / 桃 selfTarget / 杀 选目标);
+    // 判据与 handleTransformPlay 共享 producedNeedsManualTarget
+    const needsTarget = producedNeedsManualTarget(playRules, transformMode, isRespondTransformContext);
     // 产出牌门(与 CenterActionBar「使用」按钮同源):产出牌 use action 不 active 时
     // 不得提交——满血时界龙胆→桃方向按钮本就不亮,Enter 热键只看 canSubmit,也不得能发。
     const producedUsable = selectedActive || isRespondTransformContext;

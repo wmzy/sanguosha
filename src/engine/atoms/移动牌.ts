@@ -6,19 +6,7 @@ import type {
   ViewEvent,
   Card,
 } from '../types';
-import { broadcast, viewPlayer, type PlayerViewEntry } from './_helpers';
-
-/** 从 view 中指定玩家的手牌移除一张:handCount-1(下限 0)+ 按 cardId 精确过滤 hand。
- *  必须用 cardId 精确移除单张,不能用 name/suit/rank 过滤——
- *  标准牌堆中同名同花色同点数的牌有多张(如 杀♠7 有 4 张),
- *  按 name/suit/rank 会误删所有重复牌,导致 hand.length < handCount。
- *  cardId 为空(falsy)时只减计数、不动 hand(与原各调用点守卫一致)。 */
-function removeCardFromHand(p: PlayerViewEntry, cardId: string | undefined): void {
-  p.handCount = Math.max(0, p.handCount - 1);
-  if (cardId && p.hand) {
-    p.hand = p.hand.filter((c: Card) => c.id !== cardId);
-  }
-}
+import { addCardToHand, broadcast, resolveDiscardEntry, removeCardFromHand, viewPlayer } from './_helpers';
 
 export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: ZoneLoc }> = {
   type: '移动牌',
@@ -54,18 +42,13 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     } else if (atom.to.zone === '牌堆') {
       state.zones.deck.push(atom.cardId);
     } else if (atom.to.zone === '弃牌堆') {
-      // 结算临时牌(八卦阵/八阵虚拟闪):销毁而非入弃牌堆——它是凭空生成的标记,
-      // 入堆会让牌库永久多一张假闪,重洗后可被玩家摸起。
-      // 影子卡牌还原:转化牌(武圣红牌当杀)入弃牌堆时,用原卡替换
-      const card = state.cardMap[atom.cardId];
-      if (card?.ephemeral) {
-        delete state.cardMap[atom.cardId];
-      } else if (card?.shadowOf) {
-        state.zones.discardPile.push(card.shadowOf);
-        delete state.cardMap[atom.cardId]; // 删除影子,原卡 cardMap[shadowOf] 仍在
-      } else {
-        state.zones.discardPile.push(atom.cardId);
-      }
+      // 牌入堆单点裁决(_helpers.resolveDiscardEntry):
+      //   - 结算临时牌(八卦阵/八阵虚拟闪)销毁不入堆——凭空生成的标记,
+      //     入堆会让牌库永久多一张假闪,重洗后可被玩家摸起;
+      //   - 影子卡牌(转化牌,如武圣红牌当杀)还原为原卡入堆;
+      //   - 普通牌原样入堆。
+      const entry = resolveDiscardEntry(state, atom.cardId);
+      if (entry !== null) state.zones.discardPile.push(entry);
     } else if (atom.to.zone === '处理区') {
       const frame = state.settlementStack[state.settlementStack.length - 1];
       if (frame) frame.cards.push(atom.cardId);
@@ -211,14 +194,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
           }
         }
         if (to?.zone === '手牌' && to?.player !== undefined) {
-          const toP = viewPlayer(view, to.player);
-          if (toP) {
-            toP.handCount += 1;
-            if (cardId && toP.hand) {
-              const card = view.cardMap[cardId];
-              if (card) toP.hand.push(card);
-            }
-          }
+          addCardToHand(view, to.player, cardId);
         }
         break;
       }

@@ -14,7 +14,7 @@
 //   且后续假牌分支可直接用「移动牌」(弃牌堆→质疑者手牌)取回,无需新造"取回扣牌"atom。
 //   成功(真牌/无人质疑)分支牌留在弃牌堆(即"已使用"),假牌分支牌被质疑者取走(弃牌堆-1)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent, Card } from '../types';
-import { requirePlayer, viewPlayer } from './_helpers';
+import { removeCardFromHand, requirePlayer, resolveDiscardEntry, viewPlayer } from './_helpers';
 
 export const 扣牌: AtomDefinition<{
   player: number;
@@ -31,9 +31,12 @@ export const 扣牌: AtomDefinition<{
   },
   apply(state, atom) {
     const p = state.players[atom.player];
-    // 手牌 → 弃牌堆(面朝下:身份不下发,仅数量)
+    // 手牌 → 弃牌堆(面朝下:身份不下发,仅数量)。
+    // 入堆经 resolveDiscardEntry 单点(影子卡还原原卡/临时牌销毁),面朝下语义不变——
+    // 弃牌堆在 view 中仅投影数量,入堆的是原卡还是影子 id 对其他玩家不可见。
     p.hand = p.hand.filter((id) => id !== atom.cardId);
-    state.zones.discardPile.push(atom.cardId);
+    const entry = resolveDiscardEntry(state, atom.cardId);
+    if (entry !== null) state.zones.discardPile.push(entry);
     // 记录扣牌与声明,供蛊惑后续阶段读取
     state.localVars['蛊惑/扣牌'] = atom.cardId;
     state.localVars['蛊惑/声明'] = atom.declaredName;
@@ -64,13 +67,7 @@ export const 扣牌: AtomDefinition<{
   applyView(view, event) {
     // 手牌 -1(扣牌者);若当前视角是扣牌者,精确移除 cardId
     const p = viewPlayer(view, event.player as number);
-    if (p) {
-      p.handCount = Math.max(0, p.handCount - 1);
-      const cardId = event.cardId as string | undefined;
-      if (cardId && p.hand) {
-        p.hand = p.hand.filter((c: Card) => c.id !== cardId);
-      }
-    }
+    if (p) removeCardFromHand(p, event.cardId as string | undefined);
     // 弃牌堆 +1(面朝下:仅数量,不下发牌面)
     if (view.zones) view.zones.discardPileCount += 1;
   },

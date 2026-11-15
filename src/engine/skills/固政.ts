@@ -19,11 +19,14 @@
 //   - 每回合限一次:每个其他角色的弃牌阶段只有一个,自然满足。
 //   - 仅弃牌阶段弃置的牌计入("该角色弃置的牌");非弃牌阶段的弃置(制衡/寒冰剑等)被
 //     state.phase!=='弃牌' 过滤。
+//
+// 本文件同时导出 runGuzhengFlow(固政族发动流程:确认→选一张交还→获得其余),
+// 界固政 复用之(界版"获得其余"改为询问,经 restMode:'ask' 注入)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const CONFIRM_REQUEST = '固政/确认';
@@ -33,6 +36,123 @@ const PICK_KEY = '固政/所选牌';
 /** localVars key 前缀:固政/弃牌/<player> = 该玩家本弃牌阶段弃置的 cardIds */
 function discardKey(player: number): string {
   return `固政/弃牌/${player}`;
+}
+
+/** 固政族发动流程差异参数。 */
+export interface GuzhengFlowOptions {
+  /** 技能名(结算帧标签/询问文案前缀;标 '固政' / 界 '界固政') */
+  skillName: string;
+  confirmRequest: string;
+  confirmKey: string;
+  pickRequest: string;
+  pickKey: string;
+  /** 选牌询问标题 */
+  pickTitle: string;
+  /** 获得其余弃牌模式:'always' = 必得(标) / 'ask' = 询问(界,需 restRequest/restKey) */
+  restMode: 'always' | 'ask';
+  restRequest?: string;
+  restKey?: string;
+}
+
+/**
+ * 固政族发动流程(标/界共用;调用方已完成触发判定):
+ *   确认发动 → 选一张牌交还该角色(仅一张时自动选定)→ (必得 | 询问)获得其余弃牌。
+ * 询问 requestType/localVars 键按版本注入,键空间互不串扰。
+ */
+export async function runGuzhengFlow(
+  st: GameState,
+  ownerId: number,
+  player: number,
+  cardIds: string[],
+  opts: GuzhengFlowOptions,
+): Promise<void> {
+  await pushFrame(st, opts.skillName, ownerId, { target: player, cardIds: [...cardIds] });
+
+  // ── 第一步:是否发动 ──
+  const confirmed = await askConfirm(st, opts.confirmRequest, ownerId, {
+    confirmedKey: opts.confirmKey,
+    title: `是否发动${opts.skillName}?(${st.players[player]?.name ?? ''} 弃置了 ${cardIds.length} 张牌)`,
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
+    defaultChoice: false,
+    timeout: 30,
+  });
+  if (!confirmed) {
+    await popFrame(st);
+    return;
+  }
+
+  // ── 第二步:选择一张牌交还该角色 ──
+  // 仅在弃牌堆中仍然存在的牌中选择(防御性:理论上不会有牌被移走)
+  const available = cardIds.filter((id) => st.zones.discardPile.includes(id));
+  if (available.length === 0) {
+    // 只剩零张可用:跳过(理论上不发生)
+    await popFrame(st);
+    return;
+  }
+  let chosen: string;
+  if (available.length === 1) {
+    // 只有一张:自动选定
+    chosen = available[0];
+  } else {
+    delete st.localVars[opts.pickKey];
+    await applyAtom(st, {
+      type: '请求回应',
+      requestType: opts.pickRequest,
+      target: ownerId,
+      prompt: {
+        type: 'pickProcessingCard',
+        title: opts.pickTitle,
+        cards: available.map((id) => {
+          const c = st.cardMap[id];
+          return { cardId: id, cardName: c?.name ?? '?', suit: c?.suit ?? '', rank: c?.rank ?? '' };
+        }),
+      },
+      defaultChoice: available[0],
+      timeout: 30,
+    });
+    const picked = st.localVars[opts.pickKey] as string | undefined;
+    chosen = picked && available.includes(picked) ? picked : available[0];
+  }
+
+  // 所选牌 弃牌堆 → 该角色手牌
+  await applyAtom(st, {
+    type: '移动牌',
+    cardId: chosen,
+    from: { zone: '弃牌堆' },
+    to: { zone: '手牌', player },
+  });
+
+  // ── 第三步:获得其余 ──
+  const rest = available.filter((id) => id !== chosen);
+  if (rest.length > 0) {
+    if (opts.restMode === 'ask') {
+      // 界版:是否获得其余(可选)
+      const getRest = await askConfirm(st, opts.restRequest!, ownerId, {
+        confirmedKey: opts.restKey!,
+        title: `是否获得其余 ${rest.length} 张牌?`,
+        confirmLabel: '获得',
+        cancelLabel: '不获得',
+        defaultChoice: false,
+        timeout: 30,
+      });
+      if (!getRest) {
+        await popFrame(st);
+        return;
+      }
+    }
+    // 其余牌 弃牌堆 → 自己手牌
+    for (const id of rest) {
+      await applyAtom(st, {
+        type: '移动牌',
+        cardId: id,
+        from: { zone: '弃牌堆' },
+        to: { zone: '手牌', player: ownerId },
+      });
+    }
+  }
+
+  await popFrame(st);
 }
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -80,81 +200,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // 自己须存活
       if (!st.players[ownerId]?.alive) return;
 
-      await pushFrame(st, '固政', ownerId, { target: player, cardIds: [...cardIds] });
-
-      // ── 第一步:是否发动固政 ──
-      delete st.localVars[CONFIRM_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: CONFIRM_REQUEST,
-        target: ownerId,
-        prompt: {
-          type: 'confirm',
-          title: `是否发动固政?(${st.players[player]?.name ?? ''} 弃置了 ${cardIds.length} 张牌)`,
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-        },
-        defaultChoice: false,
-        timeout: 30,
+      // 发动流程:确认 → 选一张返回该角色 → 必得其余(标版)
+      await runGuzhengFlow(st, ownerId, player, cardIds, {
+        skillName: '固政',
+        confirmRequest: CONFIRM_REQUEST,
+        confirmKey: CONFIRM_KEY,
+        pickRequest: PICK_REQUEST,
+        pickKey: PICK_KEY,
+        pickTitle: '固政:选择一张牌返回其手牌(其余你将获得)',
+        restMode: 'always',
       });
-      const confirmed = st.localVars[CONFIRM_KEY] === true;
-      if (!confirmed) {
-        await popFrame(st);
-        return;
-      }
-
-      // ── 第二步:选择一张牌返回该角色 ──
-      // 仅在弃牌堆中仍然存在的牌中选择(防御性:理论上不会有牌被移走)
-      const available = cardIds.filter((id) => st.zones.discardPile.includes(id));
-      let chosen: string;
-      if (available.length <= 1) {
-        // 只有一张(或已被移走):自动选定唯一一张。若无可用牌则跳过(理论上不发生)
-        if (available.length === 0) {
-          await popFrame(st);
-          return;
-        }
-        chosen = available[0];
-      } else {
-        delete st.localVars[PICK_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: PICK_REQUEST,
-          target: ownerId,
-          prompt: {
-            type: 'pickProcessingCard',
-            title: '固政:选择一张牌返回其手牌(其余你将获得)',
-            cards: available.map((id) => {
-              const c = st.cardMap[id];
-              return { cardId: id, cardName: c?.name ?? '?', suit: c?.suit ?? '', rank: c?.rank ?? '' };
-            }),
-          },
-          defaultChoice: available[0],
-          timeout: 30,
-        });
-        const picked = st.localVars[PICK_KEY] as string | undefined;
-        chosen = picked && available.includes(picked) ? picked : available[0];
-      }
-
-      // ── 第三步:返回所选牌 + 获得其余 ──
-      const rest = available.filter((id) => id !== chosen);
-      // 所选牌 弃牌堆 → 该角色手牌
-      await applyAtom(st, {
-        type: '移动牌',
-        cardId: chosen,
-        from: { zone: '弃牌堆' },
-        to: { zone: '手牌', player },
-      });
-      // 其余牌 弃牌堆 → 自己手牌
-      for (const id of rest) {
-        await applyAtom(st, {
-          type: '移动牌',
-          cardId: id,
-          from: { zone: '弃牌堆' },
-          to: { zone: '手牌', player: ownerId },
-        });
-      }
-
-      await popFrame(st);
     },
   );
 

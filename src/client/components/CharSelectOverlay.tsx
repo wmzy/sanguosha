@@ -13,6 +13,7 @@
 
 import { useState, useEffect, type ReactNode } from 'react';
 import { css, cx } from '@linaria/core';
+import type { Faction } from '../../engine/types';
 import { FACTION_BG, IDENTITY_COLORS } from './gameViewConstants';
 import { CountdownBar } from './CountdownBar';
 import { getSkillDescription } from '../../engine/skills/lifecycle';
@@ -20,6 +21,7 @@ import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { SkillTag } from './SkillTooltip';
 import { getCharacterImage } from '../assets/imageAssets';
 import { displaySkillName } from '../utils/skillDisplay';
+import { DEFAULT_FACTION_COLOR, fallbackFaction, hideImgOnError } from '../utils/characterVisuals';
 
 export interface CharSelectOverlayCandidate {
   name: string;
@@ -30,7 +32,7 @@ export interface CharSelectOverlayCandidate {
 }
 
 export interface CharacterMeta {
-  faction: string;
+  faction: Faction;
   maxHealth: number;
 }
 
@@ -111,19 +113,20 @@ function useCharSelectFilter(
   })();
 
   // 势力 chips 选项:固定主五项 + 候选中实际出现的其他势力(如 '神')动态补充,
-  // 避免硬编码遗漏冷门势力。势力缺失时回退 '群',与卡片渲染的回退口径一致。
+  // 避免硬编码遗漏冷门势力。势力缺失时回退 '群'(fallbackFaction),
+  // 与卡片渲染的回退口径一致。
   const factionOptions = (() => {
     const base = ['全部', '魏', '蜀', '吴', '群'];
     const extra = new Set<string>();
     for (const ch of candidates) {
-      const f = getCharacterMeta(ch.name)?.faction ?? '群';
+      const f = fallbackFaction(getCharacterMeta(ch.name)?.faction);
       if (!base.includes(f)) extra.add(f);
     }
     return [...base, ...extra];
   })();
 
   const visibleGroups = groups.filter((versions) => {
-    const faction = getCharacterMeta(versions[0].name)?.faction ?? '群';
+    const faction = fallbackFaction(getCharacterMeta(versions[0].name)?.faction);
     if (factionFilter !== '全部' && faction !== factionFilter) return false;
     const kw = searchText.trim();
     if (
@@ -153,8 +156,79 @@ interface CharCandidateCardProps {
   onClick: () => void;
 }
 
+/** 候选卡外壳 props:选中/灰化/冻结态、势力色、立绘与交互统一由外壳承担;
+ *  卡面内容(势力印章/体力点/竖排名/技能 chips/版本徽章)由 children 注入。 */
+interface CandidateCardShellProps {
+  /** 势力(决定卡底势力色;调用方先用 fallbackFaction 回退) */
+  faction: string;
+  /** 立绘 URL;null 不渲染 <img>(保留势力色底) */
+  charImg: string | null;
+  /** 选中/已提交拾取 → 金框 + ▼ */
+  isSelected: boolean;
+  /** 已提交后其余卡灰化降透明 */
+  isLockedOut: boolean;
+  /** 已提交锁定态(禁止再选) */
+  isFrozen: boolean;
+  /** 单版本/展开卡点选(已提交守卫由调用方负责) */
+  onClick?: () => void;
+  /** 折叠组 hover 展开(仅未提交时由调用方触发) */
+  onMouseEnter?: () => void;
+  /** 渲染 data-char-card(可点选候选卡的 e2e/测试选择器) */
+  markCandidate?: boolean;
+  /** 折叠多版本组 baseId,渲染 data-multi-group=<baseId>(e2e/测试选择器) */
+  multiGroupBaseId?: string;
+  children: ReactNode;
+}
+
+/** 候选卡外壳:选中/灰化/冻结态 + 势力色底 + 立绘(加载失败走
+ *  characterVisuals.hideImgOnError 隐藏,保留势力色底回退)。单版本/多版本组
+ *  展开卡(CharCandidateCard)与折叠多版本组(下方渲染分支)共用。 */
+function CandidateCardShell({
+  faction,
+  charImg,
+  isSelected,
+  isLockedOut,
+  isFrozen,
+  onClick,
+  onMouseEnter,
+  markCandidate,
+  multiGroupBaseId,
+  children,
+}: CandidateCardShellProps) {
+  return (
+    <div
+      className={cx(
+        candidateCard,
+        isSelected && candidateCardSelected,
+        isLockedOut && candidateCardLockedOut,
+        isFrozen && candidateCardFrozen,
+      )}
+      style={
+        { '--faction-color': FACTION_BG[faction] ?? DEFAULT_FACTION_COLOR } as React.CSSProperties
+      }
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      data-char-card={markCandidate ? true : undefined}
+      data-multi-group={multiGroupBaseId}
+    >
+      {charImg && (
+        <img
+          className={candidatePortraitImg}
+          src={charImg}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={hideImgOnError}
+        />
+      )}
+      {children}
+    </div>
+  );
+}
+
 /** 单张候选武将卡(单版本 / 多版本组展开态共用):
- *  竖版立绘填满 + 左上势力印章 + 右上体力点 + 左缘竖排名 + 底部技能 chips。 */
+ *  竖版立绘填满 + 左上势力印章 + 右上体力点 + 左缘竖排名 + 底部技能 chips;
+ *  卡壳(状态样式/势力色/立绘)由 CandidateCardShell 承担。 */
 function CharCandidateCard({
   ch,
   getCharacterMeta,
@@ -165,33 +239,19 @@ function CharCandidateCard({
   onClick,
 }: CharCandidateCardProps) {
   const meta = getCharacterMeta(ch.name);
-  const faction = meta?.faction ?? '群';
+  const faction = fallbackFaction(meta?.faction);
   const maxHealth = meta?.maxHealth ?? 4;
   const charImg = getCharacterImage(ch.name);
   return (
-    <div
-      className={cx(
-        candidateCard,
-        (isSelected || isSubmittedPick) && candidateCardSelected,
-        isLockedOut && candidateCardLockedOut,
-        isFrozen && candidateCardFrozen,
-      )}
-      style={{ '--faction-color': FACTION_BG[faction] || '#333' } as React.CSSProperties}
+    <CandidateCardShell
+      faction={faction}
+      charImg={charImg}
+      isSelected={isSelected || isSubmittedPick}
+      isLockedOut={isLockedOut}
+      isFrozen={isFrozen}
       onClick={onClick}
-      data-char-card
+      markCandidate
     >
-      {charImg && (
-        <img
-          className={candidatePortraitImg}
-          src={charImg}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-          }}
-        />
-      )}
       {/* 左上势力印章:势力色底 + 金边金字 */}
       <div className={factionSeal}>{faction}</div>
       {/* 右上体力点:数量 = 体力上限 */}
@@ -215,7 +275,7 @@ function CharCandidateCard({
           </SkillTag>
         ))}
       </div>
-    </div>
+    </CandidateCardShell>
   );
 }
 
@@ -369,37 +429,21 @@ export function CharSelectOverlay({
                   const isSubmittedPick =
                     submittedChar !== null && versions.some((v) => v.name === submittedChar);
                   const meta = getCharacterMeta(versions[0].name);
-                  const faction = meta?.faction ?? '群';
+                  const faction = fallbackFaction(meta?.faction);
                   const charImg = getCharacterImage(versions[0].name);
                   return (
-                    <div
+                    <CandidateCardShell
                       key={baseId}
-                      data-multi-group={baseId}
-                      className={cx(
-                        candidateCard,
-                        (isSelected || isSubmittedPick) && candidateCardSelected,
-                        submittedChar !== null && !isSubmittedPick && candidateCardLockedOut,
-                        submittedChar !== null && candidateCardFrozen,
-                      )}
-                      style={
-                        { '--faction-color': FACTION_BG[faction] || '#333' } as React.CSSProperties
-                      }
+                      faction={faction}
+                      charImg={charImg}
+                      isSelected={isSelected || isSubmittedPick}
+                      isLockedOut={submittedChar !== null && !isSubmittedPick}
+                      isFrozen={submittedChar !== null}
+                      multiGroupBaseId={baseId}
                       onMouseEnter={() => {
                         if (submittedChar === null) setHoveredGroupBaseId(baseId);
                       }}
                     >
-                      {charImg && (
-                        <img
-                          className={candidatePortraitImg}
-                          src={charImg}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      )}
                       {/* 右上版本徽章:标/界小标签(折叠态无体力点,不冲突) */}
                       <div className={variantBadge}>
                         {versions.map((v) => (
@@ -419,7 +463,7 @@ export function CharSelectOverlay({
                       <div className={candidateMeta}>
                         <span className={skillChip}>hover 展开选版本</span>
                       </div>
-                    </div>
+                    </CandidateCardShell>
                   );
                 }
 

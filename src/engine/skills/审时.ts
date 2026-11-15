@@ -31,7 +31,7 @@ import { runDamageFlow } from '../flows/damage';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
-import { askConfirm, defineConfirmAction, normalizeCardIds } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, normalizeCardIds, registerOnDamagedAsTarget } from '../util/skillRuntime';
 import { SHENSHI_STATE_VIEW_KEY } from '../rules/vars-keys';
 import { projectTurnUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
@@ -245,13 +245,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     },
   );
 
-  // ── 阴:被动 after-hook on '受到伤害后' ──
-  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.target !== ownerId) return;
-    if ((atom.amount ?? 0) <= 0) return;
-    const source = atom.source;
-    if (source === ownerId) return; // 仅"其他角色";无来源(source<0)→ players[source] 为空 → 下条拦
+  // ── 阴:被动 after-hook on '受到伤害后'(前导守卫经 registerOnDamagedAsTarget)──
+  // 等价性:原手写守卫未拦 source===undefined,但 source 运行时恒为 number
+  // (无来源伤害=TARGET_SYSTEM=-1,types/state.ts),undefined 分支实际不存在;
+  // 系统来源(负数)仍经下方 players[source] 空值拦,行为不变。
+  registerOnDamagedAsTarget(state, skill.id, ownerId, async (ctx) => {
+    const source = ctx.atom.source; // 守卫已保证:其他角色造成(非自己)
     if (getState(ctx.state, ownerId) !== '阴') return; // 仅阴状态
     if (!ctx.state.players[ownerId]?.alive) return;
     const sourcePlayer = ctx.state.players[source];

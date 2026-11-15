@@ -4,9 +4,10 @@
 // 模块 F 迁移(出牌流程重设计.md):afterApply 为来自手牌的弃牌发出「移动到目标区域后」
 // 时机标记(reason='弃置',to='弃牌堆'),为连营/落英/屯田等「失去牌」技能提供统一 hook 点。
 // ZoneLoc 不含「装备」区域,装备/判定区弃置不发标记——失去牌类技能主要关心手牌。
-// 本 atom 的 apply + view 事件保持不变(含信息分级),时机标记仅为额外 hook 注册点。
+// 本 atom 的 view 事件保持不变(含信息分级);apply 的入堆路径经 resolveDiscardEntry
+// 单点裁决(影子卡还原/临时牌销毁),时机标记仅为额外 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { broadcast, requirePlayer, viewPlayer } from './_helpers';
+import { broadcast, removeCardsFromHand, requirePlayer, resolveDiscardEntry, viewPlayer } from './_helpers';
 import { applyAtom } from '../core/apply';
 
 /** localVars key:本次弃置中来自手牌的 cardId(afterApply 发时机标记用)。
@@ -30,7 +31,12 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[]; volunta
       if (id && !discardSet.has(id)) equipment[slot] = id;
     }
     player.equipment = equipment;
-    state.zones.discardPile.push(...atom.cardIds);
+    // 牌入堆经 resolveDiscardEntry 单点:影子卡(转化牌)还原原卡、结算临时牌销毁,
+    // 普通牌原样入堆——影子 id 不得直接进弃牌堆(cardMap 外 id,重洗后投影漂移)。
+    for (const cardId of atom.cardIds) {
+      const entry = resolveDiscardEntry(state, cardId);
+      if (entry !== null) state.zones.discardPile.push(entry);
+    }
   },
   /** 模块 F:为来自手牌的弃牌逐张发出「移动到目标区域后」时机标记(reason='弃置')。
    *  标记为事件型(无副作用、无 view),不改变本 atom 的视图/状态语义。 */
@@ -86,12 +92,10 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[]; volunta
       }
     }
     p.equipment = equipment;
-    // 手牌:只减在 hand 区域的牌(判定区牌不在 hand/equip,不应减 handCount)
-    const handRemoved = cardIds.filter((id) => zones[id] === 'hand').length;
-    p.handCount = Math.max(0, p.handCount - handRemoved);
-    if (p.hand && handRemoved > 0) {
-      p.hand = p.hand.filter((c) => !discardSet.has(c.id));
-    }
+    // 手牌:只移除在 hand 区域的牌(判定区牌不在 hand/equip,不应减 handCount)。
+    // 传入 hand 区子集,数量按其长度递减;数组过滤按集合匹配,与全量 discardSet 等价
+    // (手牌数组不含判定区/装备区的 id)。
+    removeCardsFromHand(p, cardIds.filter((id) => zones[id] === 'hand'));
     if (view.zones) {
       view.zones.discardPileCount += cardIds.length;
     }

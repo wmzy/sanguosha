@@ -21,6 +21,7 @@ import { GameSession } from '../session';
 import { gameSessions } from '../registry';
 import {
   broadcastRoomState,
+  notifyRoom,
   optString,
   readJsonBody,
   requireRoomMember,
@@ -101,8 +102,7 @@ export function applyGameRoutes(app: Hono): void {
 
     const room = getRoom(roomId);
     if (room) {
-      broadcastMessage(room, { type: 'player_ready', playerId });
-      broadcastRoomState(room);
+      notifyRoom(room, { type: 'player_ready', playerId });
     }
     return c.json({ success: true });
   });
@@ -186,12 +186,8 @@ export function applyGameRoutes(app: Hono): void {
   // 时,任何知道受害者 userId 者(历史条目公开)可替其出牌/回应。
   app.post('/api/rooms/:id/action', async (c) => {
     const roomId = c.req.param('id');
-    const rawValue: unknown = await c.req.json().catch(() => ({}));
-    const raw =
-      typeof rawValue === 'object' && rawValue !== null && !Array.isArray(rawValue)
-        ? (rawValue as Record<string, unknown>)
-        : {};
-    let playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    const raw = await readJsonBody(c);
+    let playerId = optString(raw.playerId);
     const action = raw.action;
     if (!playerId || !isRestAction(action)) return c.json({ error: '缺少 playerId 或 action', code: 'INVALID_ACTION' }, 400);
 

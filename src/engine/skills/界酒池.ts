@@ -21,9 +21,13 @@
 //   - "酒杀造成伤害"= 酒/nextKillDamageBonus mark 被消耗(由 酒.ts before-hook on 造成伤害 触发)
 //   - turn.vars['崩坏/disabled'] 随「回合结束」atom 自动清空(语义贴合"本回合")
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction, registerAfterHook, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
-import { applyAtom } from '../core/apply';
+import { registerAfterHook, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
+import {
+  mountTransformAction,
+  registerTransformAction,
+  type TransformActionOptions,
+} from '../util/skillRuntime';
 
 const DISABLE_BENGHUAI_VAR = '崩坏/disabled';
 /** 豁免酒使用方法Ⅰ每回合限一次的 tag(本技能"无次数限制")。酒.ts 的 canUseWine/activeWhen 检查此 tag。 */
@@ -39,24 +43,11 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 影子卡 id:${原id}#界酒池(与标版酒池隔离) */
-function shadowIdOf(cardId: string): string {
-  return `${cardId}#界酒池`;
-}
-
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
-
-  // "你使用【酒】无次数限制":给 owner 加豁免 tag(同奇才/无距离限制 的持久 tag 模式),
-  // 供 酒.ts 的 canUseWine/activeWhen 跳过每回合限一次校验。
-  const self0 = state.players[ownerId];
-  if (self0 && !self0.tags.includes(WINE_UNLIMITED_TAG)) self0.tags.push(WINE_UNLIMITED_TAG);
-
-  // transform action:把黑桃手牌转化为影子"酒"(新建 Card 实体,shadowOf 指向原卡)。
-  // 作为 preceding 在 酒.use 之前执行。酒.validate 读 cardMap[影子id] 看到"酒"。
-  registerAction(state,
-  skill.id,
-  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+/** transform 五件套工厂配置(黑桃手牌 → 影子酒;影子 id 后缀=技能 id '界酒池',
+ *  与标版酒池 `${原id}#酒池` 隔离)。 */
+const TRANSFORM_OPTIONS: TransformActionOptions = {
+  outputName: '酒',
+  validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
     // 通用合法条件:自己回合 + 无 pending + 存活 + 手牌 + 黑桃
     const myTurn = state.currentPlayerIndex === ownerId;
     const free = !hasBlockingPending(state);
@@ -70,27 +61,35 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const ok = myTurn && free && selfAlive && cardInHand && isSpade;
     return ok ? null : '现在不能使用界酒池';
   },
-  async (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const shadowId = shadowIdOf(cardId);
-    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-    await applyAtom(state, {
-      type: '当作',
-      player: ownerId,
-      cardIds: [cardId],
-      shadowId,
-      outputName: '酒',
-    });
+  mount: {
+    label: '界酒池',
+    style: 'passive',
+    prompt: {
+      type: 'useCard',
+      title: '选择一张黑桃手牌当酒使用(无次数限制;酒杀造成伤害后本回合崩坏失效)',
+      cardFilter: { filter: (c: Card) => c.suit === '♠', min: 1, max: 1 },
+    },
+    activeWhen: (ctx) => {
+      if (!defaultPlayActive(ctx)) return false;
+      const p = ctx.view.players[ctx.perspectiveIdx];
+      if (!p) return false;
+      return p.hand?.some((c) => c.suit === '♠') ?? false;
+    },
   },
-  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-  (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const sId = shadowIdOf(cardId);
-    delete state.cardMap[sId];
-    const self = state.players[ownerId];
-    const idx = self.hand.indexOf(sId);
-    if (idx >= 0) self.hand[idx] = cardId;
-  },);
+};
+
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+
+  // "你使用【酒】无次数限制":给 owner 加豁免 tag(同奇才/无距离限制 的持久 tag 模式),
+  // 供 酒.ts 的 canUseWine/activeWhen 跳过每回合限一次校验。
+  const self0 = state.players[ownerId];
+  if (self0 && !self0.tags.includes(WINE_UNLIMITED_TAG)) self0.tags.push(WINE_UNLIMITED_TAG);
+
+  // transform action:把黑桃手牌转化为影子"酒"(新建 Card 实体,shadowOf 指向原卡)。
+  // 作为 preceding 在 酒.use 之前执行。酒.validate 读 cardMap[影子id] 看到"酒"。
+  // 五件套(影子 id 后缀=技能 id '界酒池'、当作、rollback、defineAction)由工厂统一实现。
+  registerTransformAction(state, skill.id, ownerId, TRANSFORM_OPTIONS);
 
   // ── after-hook on '去标记':酒/nextKillDamageBonus 被消耗(酒增伤生效)
   //    → 设 turn.vars['崩坏/disabled']=true,本回合崩坏失效。
@@ -117,23 +116,7 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   // 前端:界酒池是转化技,defineAction 声明黑桃手牌。
   // 前端 UI 流程:选黑桃手牌 → 点界酒池 → 提交 preceding=[界酒池.transform] + 主 action=酒.use。
   // 酒.use 自带 selfTarget:true(对自己使用),无需额外选目标。
-  api.defineAction('transform', {
-    label: '界酒池',
-    style: 'passive',
-    prompt: {
-      type: 'useCard',
-      title: '选择一张黑桃手牌当酒使用(无次数限制;酒杀造成伤害后本回合崩坏失效)',
-      cardFilter: { filter: (c: Card) => c.suit === '♠', min: 1, max: 1 },
-    },
-    transform: (card: Card) => ({ name: '酒', sourceCardId: card.id, fromSkill: skill.id }),
-    activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
-      const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p) return false;
-      return p.hand?.some((c) => c.suit === '♠') ?? false;
-    },
-  });
-  return;
+  mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

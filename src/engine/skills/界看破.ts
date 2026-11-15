@@ -12,7 +12,8 @@
 //
 // 模型:
 //   ① transform action(preceding,界看破.transform):黑色牌(手牌或装备)→
-//        卸下(若装备)→ 当作 → 影子无懈。同标版看破 transform,但允许装备区。
+//        卸下(若装备,工厂 includeEquipment 维度)→ 当作 → 影子无懈。
+//        五件套由 skillRuntime 工厂统一实现(影子 id 后缀=技能 id '界看破')。
 //   ② respond action(覆盖标版无懈可击.respond,仅本座次):本座次发出的无懈
 //        (界看破转化或实际无懈牌)一律传 skipCancelQuery=true → 不开反无懈窗口。
 //        官方:"你的【无懈可击】不能被响应"——涵盖所有来源的无懈,不限转化。
@@ -25,10 +26,15 @@
 //   对无懈自身跳过 cancel(反无懈)询问 → 无懈必然生效(不被反无懈)。
 //   询问抵消 close-reopen 循环:respond 设 已回应=true,无懈 resolve 设下层帧 cancelled=true →
 //   循环检测到已抵消即退出(无新窗口)。
-import type { Card, EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, findPendingSlot } from '../core/skill';
-import { applyAtom } from '../core/apply';
 import { runUseFlow } from './cards/use-card';
+import {
+  hasNullifyWindow,
+  mountTransformAction,
+  registerTransformAction,
+  type TransformActionOptions,
+} from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -39,33 +45,13 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 影子卡 id:${原id}#界看破 */
-function shadowIdOf(cardId: string): string {
-  return `${cardId}#界看破`;
-}
-
-/** 当前是否存在无懈可击广播窗口(玩家可回应) */
-function hasNullifyWindow(state: GameState, playerId: number): boolean {
-  for (const slot of state.pendingSlots.values()) {
-    const atom = slot.atom as { type?: string; requestType?: string; target?: number };
-    if (atom.type !== '请求回应') continue;
-    if (atom.requestType !== '无懈可击') continue;
-    // 广播型(target<0)或精确指向本玩家
-    if (typeof atom.target === 'number' && (atom.target < 0 || atom.target === playerId))
-      return true;
-  }
-  return false;
-}
-
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
-
-  // ─── transform action:黑色牌(手牌或装备)→ 影子无懈 ─────────────
-  // 作为 preceding 在 无懈可击.respond(本座次被覆盖)之前执行。
-  registerAction(state,
-  skill.id,
-  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
-    // 界看破不受自己回合限制(无懈可击任意时机可打),但需有无懈窗口且无其他阻塞
+const OPTIONS: TransformActionOptions = {
+  outputName: '无懈可击',
+  // 界版"黑色牌"包括装备区:转化时先卸下到手牌再「当作」(工厂 includeEquipment 维度;
+  // rollback 还原槽位与武器距离 vars)
+  includeEquipment: true,
+  // 界看破不受自己回合限制(无懈可击任意时机可打),但需有无懈窗口且无其他阻塞
+  validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
     const self = state.players[ownerId];
     if (!self?.alive) return '玩家不存在或已死亡';
     const cardId = params.cardId as string;
@@ -90,44 +76,40 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const ok = (cardInHand || cardInEquip) && isBlack && hasWindow && !blockedByOther;
     return ok ? null : '现在不能使用界看破';
   },
-  async (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const shadowId = shadowIdOf(cardId);
-    const self = state.players[ownerId];
-    // 装备区黑色牌:先卸下到手牌(产生 ViewEvent,清除装备 vars),再走当作。
-    const equipSlotEntry = Object.entries(self.equipment).find(([, id]) => id === cardId);
-    if (equipSlotEntry) {
-      const slot = equipSlotEntry[0] as EquipSlot;
-      params['_origSlot'] = slot;
-      await applyAtom(state, { type: '卸下', player: ownerId, slot });
-    }
-    await applyAtom(state, {
-      type: '当作',
-      player: ownerId,
-      cardIds: [cardId],
-      shadowId,
-      outputName: '无懈可击',
-    });
+  mount: {
+    label: '界看破',
+    style: 'passive',
+    prompt: {
+      type: 'useCard',
+      title: '选择一张黑色牌(手牌或装备)当无懈可击使用',
+      cardFilter: { filter: (c: Card) => c.color === '黑', min: 1, max: 1 },
+    },
+    activeWhen: (ctx) => {
+      const view = ctx.view;
+      const pending = view.pending;
+      if (!pending) return false;
+      // 无懈可击广播窗口:requestType='无懈可击'
+      const atom = pending.atom as { type?: string; requestType?: string };
+      if (atom.type !== '请求回应' || atom.requestType !== '无懈可击') return false;
+      const p = view.players[ctx.perspectiveIdx];
+      if (!p) return false;
+      // 界版:黑色牌包括手牌和装备区
+      const hasBlackInHand = p.hand?.some((c) => c.color === '黑') ?? false;
+      const hasBlackEquip = Object.values(p.equipment ?? {}).some((id) => {
+        const card = id ? ctx.view.cardMap[id] : undefined;
+        return card?.color === '黑';
+      });
+      return hasBlackInHand || hasBlackEquip;
+    },
   },
-  // rollback:主 action validate 失败时,撤销转化(删影子,牌还原,清标记)
-  (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const sId = shadowIdOf(cardId);
-    const self = state.players[ownerId];
-    const origSlot = params['_origSlot'] as EquipSlot | undefined;
-    delete state.cardMap[sId];
-    const idx = self.hand.indexOf(sId);
-    if (idx >= 0) {
-      if (origSlot) {
-        // 原是装备牌:从手牌移除影子,还原装备槽位
-        self.hand.splice(idx, 1);
-        self.equipment[origSlot] = cardId;
-      } else {
-        // 原是手牌:影子替换回原卡
-        self.hand[idx] = cardId;
-      }
-    }
-  },);
+};
+
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+
+  // ─── transform action:黑色牌(手牌或装备)→ 影子无懈 ─────────────
+  // 作为 preceding 在 无懈可击.respond(本座次被覆盖)之前执行。
+  registerTransformAction(state, skill.id, ownerId, OPTIONS);
 
   // ─── respond override:覆盖标版无懈可击.respond,本座次走界版规则 ──
   // 界看破转化的无懈:不可被响应（runUseFlow + skipCancelQuery=true）。
@@ -171,39 +153,7 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   // 前端 UI 流程:无懈可击窗口期间 → 选黑牌 → 点界看破按钮 →
   // 提交 preceding=[界看破.transform] + 主 action=无懈可击.respond(影子cardId)。
   // (主 action skillId 由 transform.name='无懈可击' 决定,后端无懈.respond 已被本座次界版覆盖。)
-  api.defineAction('transform', {
-    label: '界看破',
-    style: 'passive',
-    prompt: {
-      type: 'useCard',
-      title: '选择一张黑色牌(手牌或装备)当无懈可击使用',
-      cardFilter: { filter: (c: Card) => c.color === '黑', min: 1, max: 1 },
-    },
-    transform: (card: Card) => ({
-      name: '无懈可击',
-      sourceCardId: card.id,
-      fromSkill: skill.id,
-    }),
-    activeWhen: (ctx) => {
-      const view = ctx.view;
-      const pending = view.pending;
-      if (!pending) return false;
-      // 无懈可击广播窗口:requestType='无懈可击'
-      const atom = pending.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应' || atom.requestType !== '无懈可击') return false;
-      const p = view.players[ctx.perspectiveIdx];
-      if (!p) return false;
-      // 界版:黑色牌包括手牌和装备区
-      const hasBlackInHand = p.hand?.some((c) => c.color === '黑') ?? false;
-      const hasBlackEquip = Object.values(p.equipment ?? {}).some((id) => {
-        const card = id ? ctx.view.cardMap[id] : undefined;
-        return card?.color === '黑';
-      });
-      return hasBlackInHand || hasBlackEquip;
-    },
-  });
-
-  return;
+  mountTransformAction(api, skill.id, OPTIONS);
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

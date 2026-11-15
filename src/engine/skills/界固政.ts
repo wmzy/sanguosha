@@ -12,10 +12,9 @@
 // 实现机制:
 //   1. 弃置 afterHook:其他角色(player≠ownerId)弃置时,累加 cardIds 到 localVars(按玩家分桶)。
 //      若本阶段尚未触发过 且 累计 ≥2 张 且 自己存活 → 进入发动流程,并立即置位「本阶段已触发」。
-//   2. 发动流程(三步询问):
-//      a. 请求回应(界固政/确认):是否发动 → confirmed
-//      b. 若确认:请求回应(界固政/选牌):选一张交给该角色 → 弃牌堆→该角色手牌
-//      c. 请求回应(界固政/获其余):是否获得其余 → 可选,确认则 弃牌堆→自己手牌
+//   2. 发动流程(确认 → 选一张交给该角色 → 询问获其余)复用标版固政导出的
+//      runGuzhengFlow(差异经 restMode:'ask' 注入;询问 requestType/localVars 键按
+//      '界固政/…' 前缀隔离,与标版互不串扰)。
 //   3. 阶段结束 afterHook:清空本技能所有 localVars(累加桶 + 已触发标记),为下一阶段重置。
 //   4. respond action:处理三步回应(按当前 pending requestType 分支)。
 //
@@ -26,10 +25,9 @@
 //   - 仅在仍位于弃牌堆的牌中选取(防御性:理论上不会有牌被中途移走)。
 //   - 自己不存活则不触发;目标(弃牌者)死亡仍可正常结算(牌已入弃牌堆)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply'
-import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { requireRequestType } from '../util/skillRuntime';
+import { runGuzhengFlow } from './固政';
 import type { SkillModule } from '../types';
 
 const SKILL_NAME = '界固政';
@@ -90,89 +88,18 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const player = atom.player;
     const cardIds = [...accumulated];
 
-    await pushFrame(st, SKILL_NAME, ownerId, { target: player, cardIds });
-
-    // ── 第一步:是否发动界固政 ──
-    const confirmed = await askConfirm(st, CONFIRM_REQUEST, ownerId, {
-      confirmedKey: CONFIRM_KEY,
-      title: `是否发动界固政?(${st.players[player]?.name ?? ''} 弃置了 ${cardIds.length} 张牌)`,
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-      defaultChoice: false,
-      timeout: 30,
+    // 发动流程:确认 → 选一张交给该角色 → 询问获得其余(界版可选)
+    await runGuzhengFlow(st, ownerId, player, cardIds, {
+      skillName: SKILL_NAME,
+      confirmRequest: CONFIRM_REQUEST,
+      confirmKey: CONFIRM_KEY,
+      pickRequest: PICK_REQUEST,
+      pickKey: PICK_KEY,
+      pickTitle: '界固政:选择一张牌交给该角色(其余你可获得)',
+      restMode: 'ask',
+      restRequest: REST_REQUEST,
+      restKey: REST_KEY,
     });
-    if (!confirmed) {
-      await popFrame(st);
-      return;
-    }
-
-    // ── 第二步:选择一张牌交给该角色 ──
-    const available = cardIds.filter((id) => st.zones.discardPile.includes(id));
-    if (available.length === 0) {
-      // 理论上不发生(刚弃入弃牌堆);防御性退出
-      await popFrame(st);
-      return;
-    }
-    let chosen: string;
-    if (available.length === 1) {
-      chosen = available[0];
-    } else {
-      delete st.localVars[PICK_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: PICK_REQUEST,
-        target: ownerId,
-        prompt: {
-          type: 'pickProcessingCard',
-          title: '界固政:选择一张牌交给该角色(其余你可获得)',
-          cards: available.map((id) => {
-            const c = st.cardMap[id];
-            return {
-              cardId: id,
-              cardName: c?.name ?? '?',
-              suit: c?.suit ?? '',
-              rank: c?.rank ?? '',
-            };
-          }),
-        },
-        defaultChoice: available[0],
-        timeout: 30,
-      });
-      const picked = st.localVars[PICK_KEY] as string | undefined;
-      chosen = picked && available.includes(picked) ? picked : available[0];
-    }
-    // 所选牌 弃牌堆 → 该角色手牌(交给)
-    await applyAtom(st, {
-      type: '移动牌',
-      cardId: chosen,
-      from: { zone: '弃牌堆' },
-      to: { zone: '手牌', player },
-    });
-
-    // ── 第三步:是否获得其余(可选)──
-    const rest = available.filter((id) => id !== chosen);
-    if (rest.length > 0) {
-      const getRest = await askConfirm(st, REST_REQUEST, ownerId, {
-        confirmedKey: REST_KEY,
-        title: `是否获得其余 ${rest.length} 张牌?`,
-        confirmLabel: '获得',
-        cancelLabel: '不获得',
-        defaultChoice: false,
-        timeout: 30,
-      });
-      if (getRest) {
-        for (const id of rest) {
-          await applyAtom(st, {
-            type: '移动牌',
-            cardId: id,
-            from: { zone: '弃牌堆' },
-            to: { zone: '手牌', player: ownerId },
-          });
-        }
-      }
-    }
-
-    await popFrame(st);
   });
 
   // ── 阶段结束 afterHook:清空本阶段 localVars,为下一阶段重置 ──

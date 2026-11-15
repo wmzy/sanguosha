@@ -148,6 +148,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 造成伤害 after:曹植受伤后,若背面朝上 → 询问是否翻回正面 ──
+  // 注:不用 registerOnDamagedAsTarget——酒诗不限伤害来源(无来源闪电/自伤也触发
+  // 翻回询问),该 helper 的 `source===undefined||source===ownerId` 前导守卫会漏触发,
+  // 故保留手写两行守卫(target/amount)。
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;

@@ -1,4 +1,5 @@
-// 覆盖层与信息面板样式:Debug 面板 + 日志面板 + 选将等待遮罩 + 已选武将卡 + Debug 快照。
+// 覆盖层与信息面板样式:Debug 面板 + 选将等待遮罩 + 已选武将卡 + Debug 快照。
+// (游戏日志/聊天已整合进 InfoDock,样式内联于该组件;原底部 GameLog 面板样式已删。)
 
 import { css } from '@linaria/core';
 
@@ -38,54 +39,6 @@ export const debugPlayer = css`
 export const debugDead = css`
   text-decoration: line-through;
   opacity: 0.5;
-`;
-
-// ─── Log panel ───
-export const logPanel = css`
-  margin-top: 12px;
-  border: 1px solid #333;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.2);
-`;
-export const logSummary = css`
-  padding: 8px 12px;
-  cursor: pointer;
-  color: #888;
-  font-size: 12px;
-`;
-export const logContent = css`
-  padding: 8px 12px;
-  font-size: 12px;
-  color: #aaa;
-  max-height: 200px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column-reverse;
-`;
-export const logEmpty = css`
-  color: #555;
-  font-style: italic;
-  text-align: center;
-`;
-export const logEntry = css`
-  display: flex;
-  gap: 8px;
-  padding: 2px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-`;
-export const logTime = css`
-  color: #666;
-  min-width: 40px;
-  flex-shrink: 0;
-`;
-export const logPlayer = css`
-  color: #3498db;
-  font-weight: bold;
-  min-width: 40px;
-  flex-shrink: 0;
-`;
-export const logText = css`
-  color: #ccc;
 `;
 
 // ─── 选将等待遮罩(并行选将:当前视角玩家已选完但其他人还在选)───

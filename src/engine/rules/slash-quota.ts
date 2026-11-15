@@ -30,13 +30,6 @@ import { setTurnUsage, projectTurnUsage } from './turn-usage';
 import { getSlashQuotaUsed, getSlashExtraUsed, slashQuotaUsedKey, slashExtraUsedKey, slashExtraKey, slashUnlimitedKey, slashBlockedKey, SLASH_USED_COUNT_KEY } from './vars-keys';
 
 /**
- * view 侧"已出杀次数"投影 key(由「回合用量」atom 同步到 view.turnUsage)。
- * 历史上也是 state 计数 vars key;模块 K 拆分后 state 改用 杀/quotaUsed/<座次> + 杀/extraUsed/<座次>,
- * 本常量保留为 view 投影 key(viewSlashUsed / 前端 turnUsage 消费),值 = slashUsed() 合计。
- */
-export const SLASH_USED_VAR = SLASH_USED_COUNT_KEY;
-
-/**
  * 额定上限提供者:返回该来源设定的额定上限值。
  * 返回 0 或负数表示"无额定贡献"(不覆盖基础 1);返回正数表示"额定设为该值"(取最大)。
  */

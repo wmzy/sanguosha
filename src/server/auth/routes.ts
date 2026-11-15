@@ -20,15 +20,10 @@ import {
 import { getGithubConfig, generateState, exchangeCodeForProfile, isGithubEnabled } from './github';
 import { extractSessionToken, SESSION_COOKIE } from './guard';
 import { applyDisplayName } from '../room';
-import type { PublicUser } from './store';
 
 const log = createLogger('auth-routes');
 
 /** 认证端点限流:见 applyAuthRoutes 内分级配置。 */
-
-function sanitizeUser(u: PublicUser): PublicUser {
-  return u;
-}
 
 export function applyAuthRoutes(app: Hono): void {
   const auth = new Hono();
@@ -68,7 +63,7 @@ export function applyAuthRoutes(app: Hono): void {
     setSessionCookie(c, session.token, session.expiresAt);
     // token 同时放响应体:程序化客户端(HGC/MCP)无 Cookie 存储,走 Bearer。
     // token 泄露面与 Cookie 等价,不下发哈希等敏感字段。
-    return c.json({ user: sanitizeUser(result.user), token: session.token, expiresAt: session.expiresAt });
+    return c.json({ user: result.user, token: session.token, expiresAt: session.expiresAt });
   });
 
   // ── 登录(用户名/密码) ──
@@ -81,7 +76,7 @@ export function applyAuthRoutes(app: Hono): void {
     const session = await createSession(result.user.id);
     if (!session) return c.json({ error: '服务暂不可用' }, 503);
     setSessionCookie(c, session.token, session.expiresAt);
-    return c.json({ user: sanitizeUser(result.user), token: session.token, expiresAt: session.expiresAt });
+    return c.json({ user: result.user, token: session.token, expiresAt: session.expiresAt });
   });
 
   // ── 当前用户 ──
@@ -112,7 +107,7 @@ export function applyAuthRoutes(app: Hono): void {
     const updated = await updateDisplayName(me.id, displayName);
     if (!updated) return c.json({ error: '昵称不合法(1-24位,不含空格)' }, 400);
     applyDisplayName(me.id, updated.displayName);
-    return c.json({ user: sanitizeUser(updated) });
+    return c.json({ user: updated });
   });
 
   // ── 修改密码 ──
@@ -124,7 +119,7 @@ export function applyAuthRoutes(app: Hono): void {
     const newPassword = typeof raw.newPassword === 'string' ? raw.newPassword : '';
     const result = await changePassword(me.id, oldPassword, newPassword);
     if (!result.ok) return c.json({ error: result.error }, 400);
-    return c.json({ user: sanitizeUser(result.user) });
+    return c.json({ user: result.user });
   });
 
   // ── GitHub OAuth:跳转授权页 ──

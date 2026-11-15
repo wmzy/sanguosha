@@ -469,18 +469,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const card = state.cardMap[cardId];
         if (!card) return '牌不存在';
         if (card.name !== cardName) return `不是${cardName}`;
-        // 兼容 target(单数) → targets(数组)
-        if (!Array.isArray(params.targets) && typeof params.target === 'number') {
-          params.targets = [params.target];
-        }
+        // target/targets 两种 wire 形状已由 core/index.ts dispatch 入口统一归一
+        // (normalizeMessageTargetShape,含 preceding),此处直接读取 targets。
         return validateCardUse(state, ownerId, params, cardName);
       },
       async (state: GameState, params: Record<string, Json>) => {
         const cardId = params.cardId as string;
-        // 兼容 target(单数) → targets(数组)
-        if (!Array.isArray(params.targets) && typeof params.target === 'number') {
-          params.targets = [params.target];
-        }
+        // target/targets 形状归一同上:dispatch 入口已统一,此处不再补齐。
         // preUse 钩子：双目标牌（借刀杀人）提取 killTarget 存入 localVars，返回真实 targets。
         let targets = effect.preUse
           ? effect.preUse(state, ownerId, params)

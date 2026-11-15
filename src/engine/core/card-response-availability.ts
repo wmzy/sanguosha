@@ -38,6 +38,15 @@ export const SILENT_RESPONSE_PROMPT: ActionPrompt = {
   cancelLabel: '',
 };
 
+/** 卡牌询问型 atom type → 询问的响应牌名(询问杀→杀 / 询问闪→闪)。
+ *  唯一登记点:atoms/_helpers 的 makeCardAskAtom 工厂按映射表生成两种 atom,
+ *  本文件 resolveCardResponseFilter 按它还原「匹配响应牌」判定——两处共用同一表,
+ *  新增同类 atom(如未来的询问桃)只改这一处。 */
+export const ASK_CARD_NAME: Readonly<Record<string, string>> = {
+  询问杀: '杀',
+  询问闪: '闪',
+};
+
 /** target 是否拥有「不依赖字面响应牌」的替代回应能力。有则必须走正常询问(skip/silent 会错误剥夺技能)。
  *  - before-hook 型(八卦阵/八阵):检查 target 自己注册在 atomType 上的 before-hook(自动检测)。
  *    攻击方拥有的 hook(界潜袭/义绝)ownerId≠target,正确排除(且它们 cancel 在 preResolve 之前处理)。
@@ -109,8 +118,8 @@ export function evaluateCardResponseForTarget(
  *  非卡牌回应型 / 广播(target<0)/ 强制弃牌(mandatory)返回 null。
  *  供 buildView 等持有完整 slot.atom 的调用方使用。 */
 function resolveCardResponseFilter(atom: Atom): ((card: Card) => boolean) | null {
-  if (atom.type === '询问闪') return (c) => c.name === '闪';
-  if (atom.type === '询问杀') return (c) => c.name === '杀';
+  const askName = ASK_CARD_NAME[atom.type];
+  if (askName !== undefined) return (c) => c.name === askName;
   if (atom.type === '请求回应') {
     if ((atom as { mandatory?: boolean }).mandatory === true) return null;
     const prompt = (atom as { prompt?: ActionPrompt }).prompt;
@@ -151,19 +160,6 @@ export function getCardResponseMode(state: GameState, atom: Atom): CardResponseM
   const avail = evaluateCardResponse(state, atom);
   if (!avail) return 'normal';
   return resolveCardResponseMode(avail);
-}
-
-/** 给定 atomType + target + 匹配 filter,得到门控后的回应模式(供 atom 的 toViewEvents 使用)。
- *  target 有替代回应能力(转化/转交/判定防御技/救援转化技)时返回 'normal'(不剥夺其技能)。 */
-export function evaluateCardResponseModeForTarget(
-  state: GameState,
-  atomType: string,
-  target: number,
-  filter: (card: Card) => boolean,
-  requestType?: string,
-): CardResponseMode {
-  if (hasAlternativeResponse(state, atomType, target, requestType)) return 'normal';
-  return resolveCardResponseMode(evaluateCardResponseForTarget(state, target, filter));
 }
 
 /** 给定 atomType + target + 匹配 filter,得到门控后的 preResolve 结果(供 atom 的 preResolve 使用)。

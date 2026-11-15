@@ -11,8 +11,10 @@
 //   - transform action: 入参 cardId(原牌)+ outputName(目标牌名)
 //   - validate: 自己回合 + 出牌阶段 + 无 pending + 限一次/回合 + outputName 合法 +
 //     outputName 不在本轮已用牌名集合 + 原牌在手牌
-//   - execute: 当作 atom 创建影子卡(shadowId=${cardId}#界矫诏),手牌中 id 替换为影子 id
-//   - rollback: 主 action validate 失败时撤销转化(删影子,手牌还原)
+//   - execute: 当作 atom 创建影子卡(shadowId=${cardId}#界矫诏,工厂 registerTransformAction
+//     统一构造;限一次标记在 beforeExecute 同步设 vars)
+//   - rollback: 主 action validate 失败时撤销转化(工厂删影子 + extraRollback 清限一次标记,
+//     手牌由 dispatch 快照还原)
 //   - 限一次: player.vars['界矫诏/usedThisTurn'](后缀 /usedThisTurn 由「回合结束」atom 自动清空)
 //   - 本轮已用牌名: state.localVars['界矫诏/已用牌名'](string[],本轮范围)
 //     配合 state.localVars['界矫诏/lastRound'] 记录上次重置轮次,新轮重置为空数组
@@ -24,14 +26,19 @@
 //
 // 待澄清: 文档未说明"修改矫诏"(殚心)对矫诏的具体效果,故本实现按文档逐字:
 //   矫诏效果恒为基础版本,殚心仅做计数(见 界殚心.ts)。
-import type { ActionContext, Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply';
+import type { ActionContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { setPlayerVarUsage } from '../rules/turn-usage';
-import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
+import { registerAfterHook, hasBlockingPending } from '../core/skill';
+import { usedThisTurn as usedOncePerTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
 import { getCardEffect } from './cards';
 import { TRANSFORM_ACTION_PREFIX } from '../util/declaredActionType';
 import { NORMAL_TRICK_NAMES } from '../util/non-delay-tricks';
+import {
+  mountTransformAction,
+  registerTransformAction,
+  type TransformActionOptions,
+} from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界矫诏';
@@ -62,11 +69,6 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 影子卡 id: ${原id}#界矫诏 */
-function shadowIdOf(cardId: string): string {
-  return `${cardId}#${SKILL_ID}`;
-}
-
 /** 本轮已用牌名集合(读取时自动按 round 重置)。 */
 function readUsedNames(state: GameState): string[] {
   const currentRound = state.turn.round;
@@ -89,9 +91,60 @@ function markUsedName(state: GameState, name: string): void {
   }
 }
 
-/** 本回合是否已用过矫诏。 */
-function usedThisTurn(state: GameState, ownerId: number): boolean {
-  return !!state.players[ownerId]?.vars[USED_KEY];
+/** 本回合是否已用过矫诏(rules/once-per-turn 共享版,键 = `${SKILL_ID}/usedThisTurn`)。 */
+function usedJiaozhaoThisTurn(state: GameState, ownerId: number): boolean {
+  return usedOncePerTurn(state, ownerId, SKILL_ID);
+}
+
+/** 每个声明牌名的 transform 五件套工厂配置(actionType=`transform:<牌名>`)。 */
+function transformOptionsFor(outputName: string): TransformActionOptions {
+  return {
+    outputName,
+    actionType: `${TRANSFORM_ACTION_PREFIX}${outputName}`,
+    validate: (st: GameState, ownerId: number, params: Record<string, Json>): string | null => {
+      if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
+      if (st.phase !== '出牌') return '只能在出牌阶段发动';
+      if (hasBlockingPending(st)) return '当前有未完成的询问';
+      if (usedJiaozhaoThisTurn(st, ownerId)) return '本回合已使用过矫诏';
+      const self = st.players[ownerId];
+      if (!self?.alive) return '玩家不存在或已死亡';
+
+      const cardId = params.cardId as string | undefined;
+      if (typeof cardId !== 'string') return '需要选择一张牌';
+      if (!self.hand.includes(cardId)) return '牌不在手牌中';
+      const used = readUsedNames(st);
+      if (used.includes(outputName)) return `本轮已有角色使用过【${outputName}】`;
+      return null;
+    },
+    // 限一次标记:同步设 vars(防 dispatch 重入)+ 回合用量 atom 投影 view(前端禁用按钮)。
+    // 必须在第一个 await 之前设置(见制衡.ts 注释);setPlayerVarUsage 内部先写 vars 再 await。
+    beforeExecute: async (st: GameState, ownerId: number) => {
+      await setPlayerVarUsage(st, ownerId, USED_KEY, true);
+    },
+    // rollback 追加:撤销限一次标记(transform 失败 → 矫诏算作未用;
+    // 删影子/手牌还原由工厂 + dispatch 快照处理)
+    extraRollback: (st: GameState, ownerId: number) => {
+      delete st.players[ownerId]?.vars[USED_KEY];
+    },
+    // 每个声明牌名一个 action(与客户端按钮一一对应):点哪个按钮 = 声明哪张牌,
+    // 产出牌名由 transform 回调固定返回该牌名。仅当本轮该牌名尚未被使用过时激活
+    // (与后端 validate 的「本轮已有角色使用过【X】」同源,避免按钮点了被拒)。
+    // (旧实现只有一个无 transform 回调的 'transform' action,浏览器提交缺 outputName、
+    //  无头枚举直接跳过 → 该技能在任何真实客户端都不可发动。)
+    mount: {
+      label: `${DISPLAY_NAME}·${outputName}`,
+      style: 'primary',
+      prompt: {
+        type: 'useCard',
+        title: `矫诏:将一张牌当【${outputName}】使用`,
+        description: '出牌阶段限一次;转化后按声明的牌正常结算',
+        cardFilter: { filter: () => true, min: 1, max: 1 },
+      },
+      // 本轮已用牌名集合是引擎侧 localVars(未投影到 view),故 activeWhen 无法按牌名禁用;
+      // 已用牌名的重复声明由后端 validate 拒绝(`本轮已有角色使用过【X】`)。
+      activeWhen: nameActiveWhen(outputName),
+    },
+  };
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
@@ -99,58 +152,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── transform action: 把手牌转化为影子"声明的牌"(新建 Card 实体,shadowOf 指向原卡)。
   //    作为 preceding 在 <outputName>.use 之前执行。<outputName>.validate 读 cardMap[影子id] 通过。
-  const registerTransform = (outputName: string): (() => void) =>
-    registerAction(
-      state,
-      skill.id,
-      ownerId,
-      `${TRANSFORM_ACTION_PREFIX}${outputName}`,
-      (st: GameState, params: Record<string, Json>): string | null => {
-        if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-        if (st.phase !== '出牌') return '只能在出牌阶段发动';
-        if (hasBlockingPending(st)) return '当前有未完成的询问';
-        if (usedThisTurn(st, ownerId)) return '本回合已使用过矫诏';
-        const self = st.players[ownerId];
-        if (!self?.alive) return '玩家不存在或已死亡';
-
-        const cardId = params.cardId as string | undefined;
-        if (typeof cardId !== 'string') return '需要选择一张牌';
-        if (!self.hand.includes(cardId)) return '牌不在手牌中';
-        const used = readUsedNames(st);
-        if (used.includes(outputName)) return `本轮已有角色使用过【${outputName}】`;
-        return null;
-      },
-      async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        const cardId = params.cardId as string;
-        const shadowId = shadowIdOf(cardId);
-
-        // 限一次标记:同步设 vars(防 dispatch 重入)+ 回合用量 atom 投影 view(前端禁用按钮)。
-        // 必须在第一个 await 之前设置(见制衡.ts 注释);setPlayerVarUsage 内部先写 vars 再 await。
-        await setPlayerVarUsage(st, ownerId, USED_KEY, true);
-
-        // 创建影子卡(原卡仍在 cardMap,shadowOf 指向原卡;原卡花色/颜色继承)
-        await applyAtom(st, {
-          type: '当作',
-          player: ownerId,
-          cardIds: [cardId],
-          shadowId,
-          outputName,
-        });
-      },
-      // rollback: 主 action validate 失败时撤销转化(删影子,手牌还原 + 清限一次标记)
-      (st: GameState, params: Record<string, Json>): void => {
-        const cardId = params.cardId as string;
-        const sId = shadowIdOf(cardId);
-        delete st.cardMap[sId];
-        const self = st.players[ownerId];
-        const idx = self.hand.indexOf(sId);
-        if (idx >= 0) self.hand[idx] = cardId;
-        // 撤销限一次标记(transform 失败 → 矫诏算作未用)
-        delete self.vars[USED_KEY];
-      },
-    );
-  // 每个声明牌名注册一个 transform action(与客户端按钮一一对应)
-  const unregTransforms = [...ALLOWED_NAMES].map(registerTransform);
+  //    五件套(影子 id 后缀=技能 id '界矫诏'、当作、rollback、defineAction)由工厂统一实现;
+  //    每个声明牌名一个 action(actionType=`transform:<牌名>`,与客户端按钮一一对应)。
+  const unregTransforms = [...ALLOWED_NAMES].map((outputName) =>
+    registerTransformAction(state, skill.id, ownerId, transformOptionsFor(outputName)),
+  );
 
   // ── 「结算帧入栈」after hook: 任何玩家 push 任何 frame(skillId 为基本/普通锦囊)时
   //    自动追加到本轮已用牌名集合。同一 frame 多次触发(Set 语义)不会重复。
@@ -177,45 +183,25 @@ function declaredUsable(ctx: ActionContext, name: string): boolean {
   return !effect.activeWhen || effect.activeWhen(ctx);
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  // 每个声明牌名一个 action(与后端 `transform:<牌名>` 一一对应):点哪个按钮 = 声明哪张牌,
-  // 产出牌名由 transform 回调固定返回该牌名。仅当本轮该牌名尚未被使用过时激活
-  // (与后端 validate 的「本轮已有角色使用过【X】」同源,避免按钮点了被拒)。
-  // (旧实现只有一个无 transform 回调的 'transform' action,浏览器提交缺 outputName、
-  //  无头枚举直接跳过 → 该技能在任何真实客户端都不可发动。)
-  const activeWhen = (ctx: ActionContext) => {
-    if (!defaultPlayActive(ctx)) return false;
-    const p = ctx.view.players[ctx.perspectiveIdx];
-    if (!p) return false;
-    if (p.turnUsage?.[USED_KEY]) return false; // 本回合已用过
-    return (p.handCount ?? 0) > 0;
-  };
-  // 声明牌名的按钮还需该牌此刻可用(与无头枚举/后端 validate 同源):
-  // 如【桃】需自己已受伤,未受伤时点了会走到死路(产出牌 use action 未激活)。
-  const nameActiveWhen =
-    (name: string) =>
-    (ctx: ActionContext): boolean =>
-      activeWhen(ctx) && declaredUsable(ctx, name);
+/** 基础激活:出牌阶段 + 本回合未用过矫诏 + 有手牌(onMount activeWhen 与工厂 mount 共用)。 */
+function baseActiveWhen(ctx: ActionContext): boolean {
+  if (!defaultPlayActive(ctx)) return false;
+  const p = ctx.view.players[ctx.perspectiveIdx];
+  if (!p) return false;
+  if (p.turnUsage?.[USED_KEY]) return false; // 本回合已用过
+  return (p.handCount ?? 0) > 0;
+}
 
+/** 声明牌名的按钮还需该牌此刻可用(与无头枚举/后端 validate 同源):
+ *  如【桃】需自己已受伤,未受伤时点了会走到死路(产出牌 use action 未激活)。 */
+function nameActiveWhen(name: string): (ctx: ActionContext) => boolean {
+  return (ctx: ActionContext): boolean => baseActiveWhen(ctx) && declaredUsable(ctx, name);
+}
+
+export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
+  // 每个声明牌名一个 action(与后端 `transform:<牌名>` 一一对应),onMount 声明由工厂统一构造。
   for (const outputName of ALLOWED_NAMES) {
-    api.defineAction(`${TRANSFORM_ACTION_PREFIX}${outputName}`, {
-      label: `${DISPLAY_NAME}·${outputName}`,
-      style: 'primary',
-      prompt: {
-        type: 'useCard',
-        title: `矫诏:将一张牌当【${outputName}】使用`,
-        description: '出牌阶段限一次;转化后按声明的牌正常结算',
-        cardFilter: { filter: () => true, min: 1, max: 1 },
-      },
-      transform: (card: Card) => ({
-        name: outputName,
-        sourceCardId: card.id,
-        fromSkill: SKILL_ID,
-      }),
-      // 本轮已用牌名集合是引擎侧 localVars(未投影到 view),故此处无法按牌名禁用;
-      // 已用牌名的重复声明由后端 validate 拒绝(`本轮已有角色使用过【X】`)。
-      activeWhen: nameActiveWhen(outputName),
-    });
+    mountTransformAction(api, skill.id, transformOptionsFor(outputName));
   }
   return undefined;
 }

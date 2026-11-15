@@ -6,6 +6,7 @@ import type { Context } from 'hono';
 import {
   broadcastMessage,
   buildRoomState,
+  checkRoomPassword,
   findRoomByPlayerId,
   getRoom,
   isRoomMember,
@@ -15,7 +16,7 @@ import {
 } from '../room';
 import { requireUser, resolveRoomActor } from '../auth/guard';
 import type { PublicUser } from '../auth/store';
-import { playerRoomMap } from '../registry';
+import type { ServerMessage } from '../protocol';
 import type { ConnectionSink } from '../connection';
 
 /** 读取 JSON body;缺失/解析失败回退空对象(与原 rest.ts 各路由内联写法一致)。 */
@@ -36,6 +37,33 @@ export function authRequired(c: Context): Response {
 /** 广播 room_state 给房间内所有连接。 */
 export function broadcastRoomState(room: Room): void {
   broadcastMessage(room, buildRoomState(room));
+}
+
+/** 路由成功路径的标准尾奏：先广播事件消息，再广播 room_state。
+ *  excludeId 语义同 broadcastMessage（事件消息排除该成员，room_state 仍全员）。 */
+export function notifyRoom(room: Room, message: ServerMessage, excludeId?: string): void {
+  broadcastMessage(room, message, excludeId);
+  broadcastRoomState(room);
+}
+
+/** 进房密码校验（玩家/旁观加入路由共用）。
+ *  无密码房间恒过；exempt=true 时跳过（已是本房成员的重连/刷新，豁免条件由
+ *  调用方判定）。有密码且校验失败 → 统一 403 响应；放行返回 null。 */
+export async function requireRoomPassword(
+  c: Context,
+  room: Room,
+  password: unknown,
+  exempt = false,
+): Promise<Response | null> {
+  if (!room.passwordHash || exempt) return null;
+  const plain = typeof password === 'string' ? password : '';
+  const ok = await checkRoomPassword(room, plain);
+  return ok ? null : c.json({ error: '房间密码错误', code: 'ROOM_PASSWORD_REQUIRED' }, 403);
+}
+
+/** 解析 body.targetSeat；缺失/类型不符回退 -1（调用方按 <0 回 400）。 */
+export function parseTargetSeat(raw: Record<string, unknown>): number {
+  return typeof raw.targetSeat === 'number' ? raw.targetSeat : -1;
 }
 
 /** 创建 null sink（REST 入口无活跃连接时占位）。 */
@@ -138,5 +166,5 @@ export function detachFromOtherRooms(
   } else {
     leaveRoom(existingRoom.id, playerId);
   }
-  playerRoomMap.delete(playerId);
+  // playerRoomMap 由 leaveRoom/removeSpectator 内部解除
 }

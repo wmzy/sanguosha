@@ -16,7 +16,8 @@
 //       depth 变化即视为新批次,计数重置(避免跨批次误累加)。
 //     - 计数达到 2 触发并清零(同批次内多次达到仅触发一次)。
 //   effect B(受伤触发):
-//     - after-hook on 造成伤害(target=ownerId, source 存活, amount>0)
+//     - after-hook on 受到伤害后(前导守卫经 registerOnDamagedAsTarget:target=ownerId,
+//       source 存活, amount>0)
 //     - 询问法正是否发动 → 询问来源 confirm(交红牌 vs 失体力)
 //       · 来源无红色手牌 → 强制失去1点体力(无选择)
 //       · 来源有红色手牌 → 来源选 1(交红牌,再 useCard 选具体卡)或 2(失体力)
@@ -36,9 +37,9 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { pushFrame, popFrame } from '../core/frame';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerOnDamagedAsTarget, registerRespondForAllSeats } from '../util/skillRuntime';
 
 const SKILL_ID = '界恩怨';
 const DISPLAY_NAME = '恩怨';
@@ -160,15 +161,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── 所有座次统一注册一个 respond(同 (skillId, ownerId, actionType) 只能一个 entry)──
   //    · 法正座次:confirm A / confirm B(法正是否发动)
   //    · 所有座次(含法正):来源选交牌/失体力 + 选红牌(每个座次都可能成为来源)──
-  for (const p of state.players) {
-    const seatId = p.index;
-    const isOwner = seatId === ownerId;
-    const u = registerAction(
+  //    多座次广播注册经 registerRespondForAllSeats 统一封装。
+  unloaders.push(
+    ...registerRespondForAllSeats(
       state,
       skill.id,
-      seatId,
-      'respond',
-      (s) => {
+      (s: GameState, seatId: number): string | null => {
+        const isOwner = seatId === ownerId;
         const slot = s.pendingSlots.get(seatId);
         if (slot?.atom.type !== '请求回应') return '当前不需要回应';
         const rt = (slot.atom as unknown as { requestType?: string }).requestType ?? '';
@@ -178,7 +177,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (sourceRTs.includes(rt)) return null;
         return '当前不是恩怨询问';
       },
-      async (s, params) => {
+      async (s: GameState, seatId: number, params: Record<string, Json>): Promise<void> => {
         const slot = s.pendingSlots.get(seatId);
         const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
         if (rt === RT_A_CONFIRM) {
@@ -193,9 +192,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           s.localVars[B_CARD_KEY] = cardId;
         }
       },
-    );
-    unloaders.push(u);
-  }
+    ),
+  );
 
   // ── effect A: 获得牌后 hook(获得/给予/移动牌) ──
   const gainHook = async (ctx: AtomAfterContext<AtomOfName<'获得' | '给予' | '移动牌'>>): Promise<void> => {
@@ -226,13 +224,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   registerAfterHook(state, skill.id, ownerId, '给予', gainHook);
   registerAfterHook(state, skill.id, ownerId, '移动牌', gainHook);
 
-  // ── effect B: 受到伤害后 hook ──
-  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.target !== ownerId) return;
-    if ((atom.amount ?? 0) <= 0) return;
-    if (atom.source === undefined || atom.source === ownerId) return;
-    const sourceIdx = atom.source;
+  // ── effect B: 受到伤害后 hook(前导守卫经 registerOnDamagedAsTarget)──
+  registerOnDamagedAsTarget(state, skill.id, ownerId, async (ctx) => {
+    const sourceIdx = ctx.atom.source;
     const sourcePlayer = ctx.state.players[sourceIdx];
     if (!sourcePlayer?.alive) return;
 

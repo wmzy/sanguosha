@@ -17,35 +17,44 @@
 //   按花色执行 → 比较判定牌与弃置牌的花色/点数 → 移动牌(弃牌堆→手牌)获得对应牌。
 //
 // 关键点:
-//   - 触发对象是「任一角色」受杀伤害(不限于界蔡文姬本人);界蔡文姬须存活且有手牌
-//     ("若你有牌"=有手牌,与标版一致;后续弃牌步骤本身要求手牌)。
-//   - 判定牌花色+点数+cardId 经 判定牌生效后 after-hook(judgeType='界悲歌')捕获,存 localVars.
+//   - 触发守卫/花色主效果/判定牌捕获 hook/翻面跳过 hooks 复用标版悲歌导出的共享核心
+//     (beigeDamageTarget/applyBeigeSuitEffect/registerBeigeJudgeCaptureHook/
+//     registerBeigeFlipSkipHooks),仅 judgeType/翻面 reason 前缀不同('界悲歌',
+//     标签 '界悲歌/翻面' 与标版 '悲歌/翻面' 隔离)。
+//   - 花色主效果的 ♣/♠ 分支因来源缺失/死亡提前终止时,奖励阶段不继续
+//     (applyBeigeSuitEffect 返回 false,与原内联实现的提前 return 一致)。
 //   - 判定牌和弃置牌都进弃牌堆后,通过 移动牌(弃牌堆→手牌) 获得(无需延迟拿取——
 //     runJudgeFlow 收尾在判定牌生效后 hook 之后才把判定牌入弃牌堆,
 //     而本技能的比较/拿取发生在造成伤害 after hook 内,那时判定流程早已完整结算)。
-//   - ♠ 翻面复用据守/放逐/悲歌的标签+阶段 hook 机制(tag 名独立为 '界悲歌/翻面')。
 //   - 界悲歌的非系统 after-hook 先于系统规则濒死检查执行:♥ 回血可在求桃前救活濒死角色。
 //   - 无次数限制。
 import type {
   Card,
   FrontendAPI,
   GameState,
-  HookResult,
   Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply'
-import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
-import { flipFaceDown, flipFaceUp } from '../flows/face-down';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { runJudgeFlow } from '../flows/judge';
+import { registerAction, registerAfterHook } from '../core/skill';
+import {
+  requireRequestType,
+  askConfirm,
+  askResponse,
+  currentRequestType,
+} from '../util/skillRuntime';
+import {
+  beigeDamageTarget,
+  applyBeigeSuitEffect,
+  registerBeigeJudgeCaptureHook,
+  registerBeigeFlipSkipHooks,
+} from './悲歌';
 
 const START_RT = '界悲歌/chooseStart';
 const DISCARD_RT = '界悲歌/chooseDiscard';
 const START_KEY = '界悲歌/start';
 const DISCARD_CARD_KEY = '界悲歌/discardCard';
-const SKIP_TAG = '界悲歌/翻面';
-const SKIP_FLAG = '界悲歌/skipAll';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -81,8 +90,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as { requestType?: string }).requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === START_RT) {
         // confirm:true=发动;false/undefined=不发动
         st.localVars[START_KEY] = params.choice === true;
@@ -93,33 +101,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 判定牌生效后 after hook:捕获判定牌花色+点数+cardId(仍在结算帧牌区顶,尚未入弃牌堆)──
-  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.judgeType !== '界悲歌') return;
-    const judgeCardId = currentJudgeCardId(ctx.state);
-    const judgeCard = judgeCardId ? ctx.state.cardMap[judgeCardId] : undefined;
-    if (!judgeCard) return;
-  });
+  // ── 判定牌生效后 after hook:捕获判定牌花色+点数+cardId(标/界共享,judgeType='界悲歌')──
+  registerBeigeJudgeCaptureHook(state, skill.id, ownerId, '界悲歌');
 
   // ── 造成伤害 after hook:界悲歌主逻辑 ──
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
-    if ((atom.amount ?? 0) <= 0) return;
-    const targetIdx = atom.target;
+    const targetIdx = beigeDamageTarget(ctx.state, ownerId, atom);
     if (targetIdx === undefined) return;
-    if (!ctx.state.players[targetIdx]?.alive) return;
-
-    // 必须是【杀】造成的伤害(含武圣等转化杀——影子卡 name 仍为 '杀')
-    const cardId = atom.cardId;
-    if (!cardId) return;
-    const dmgCard = ctx.state.cardMap[cardId];
-    if (dmgCard?.name !== '杀') return;
-
-    // 界蔡文姬须存活且有手牌("若你有牌"=有手牌,与标版一致)
-    const self = ctx.state.players[ownerId];
-    if (!self?.alive) return;
-    if (self.hand.length === 0) return;
 
     // 询问是否发动界悲歌(不发动=不判定)
     const start = await askConfirm(ctx.state, START_RT, ownerId, {
@@ -146,11 +135,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 询问是否弃一张牌(可选,目的是触发"花色/点数相同"奖励)
     let discardCardId: string | undefined;
     if (ctx.state.players[ownerId].hand.length > 0) {
-      delete ctx.state.localVars[DISCARD_CARD_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: DISCARD_RT,
-        target: ownerId,
+      discardCardId = await askResponse<string>(ctx.state, DISCARD_RT, ownerId, {
+        resultKey: DISCARD_CARD_KEY,
         prompt: {
           type: 'useCard',
           title: '界悲歌:是否弃置一张牌?(花色同获判定牌,点数同获弃置牌)',
@@ -158,46 +144,20 @@ export function onInit(skill: Skill, state: GameState): () => void {
         },
         timeout: 15,
       });
-      discardCardId = ctx.state.localVars[DISCARD_CARD_KEY] as string | undefined;
-      delete ctx.state.localVars[DISCARD_CARD_KEY];
       if (typeof discardCardId === 'string') {
         // 弃置代价
         await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [discardCardId], voluntary: true });
       }
     }
 
-    // 按判定花色执行主效果(同标版)
-    if (suit === '♥') {
-      // 受伤角色回复 1 点体力
-      if (ctx.state.players[targetIdx]?.alive) {
-        await applyAtom(ctx.state, { type: '回复体力', target: targetIdx, amount: 1 });
-      }
-    } else if (suit === '♦') {
-      // 受伤角色摸两张牌
-      await applyAtom(ctx.state, { type: '摸牌', player: targetIdx, count: 2 });
-    } else if (suit === '♣') {
-      // 伤害来源弃置两张牌(手牌不足则全弃)
-      if (sourceIdx === undefined) return;
-      const source = ctx.state.players[sourceIdx];
-      if (!source?.alive) return;
-      const toDiscard = source.hand.slice(0, Math.min(2, source.hand.length));
-      if (toDiscard.length > 0) {
-        await applyAtom(ctx.state, { type: '弃置', player: sourceIdx, cardIds: toDiscard });
-      }
-    } else if (suit === '♠') {
-      // 伤害来源武将牌翻面
-      if (sourceIdx === undefined) return;
-      const source = ctx.state.players[sourceIdx];
-      if (!source?.alive) return;
-      // 翻面须经 flipFaceDown,以补发「翻面后」时机(解围等 /翻面 hook 消费者依赖此事件)
-      await flipFaceDown(ctx.state, sourceIdx, '界悲歌');
-    }
+    // 按判定花色执行主效果(标/界共享;false=♣/♠ 因来源缺失/死亡提前终止,奖励不继续)
+    const proceeded = await applyBeigeSuitEffect(ctx.state, targetIdx, sourceIdx, suit, '界悲歌');
 
     // 奖励:若弃置了牌,比较花色/点数获得对应牌(判定牌与弃置牌此时都在弃牌堆)
     // 防御:判定牌/弃置牌可能在奖励结算前被其他技能从弃牌堆取走
     //   (如落英/界落英抢夺被弃置的梅花牌),须校验仍在弃牌堆再移动,否则 移动牌
     //   会盲取(弃牌堆 filter 为 no-op + 手牌 push)导致该牌同时出现在多人手牌中。
-    if (typeof discardCardId === 'string' && judgeCardId) {
+    if (proceeded && typeof discardCardId === 'string' && judgeCardId) {
       const judgeCard = ctx.state.cardMap[judgeCardId];
       const discardCard = ctx.state.cardMap[discardCardId];
       if (judgeCard && discardCard) {
@@ -223,59 +183,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
   });
 
-  // ── 阶段开始 before hook:检测翻面标签 → 启动跳过(手法同据守/放逐/悲歌,tag 独立)──
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '阶段开始',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      const player = atom.player;
-      if (player === undefined) return;
-      const p = ctx.state.players[player];
-      if (!p) return;
-
-      // 入口:准备阶段开始 + 该玩家有翻面标签 → 启动跳过
-      if (atom.phase === '准备' && p.tags.includes(SKIP_TAG)) {
-        // 翻回正面须经 flipFaceUp,以补发「翻面后」时机(与翻面对称)
-        await flipFaceUp(ctx.state, player, '界悲歌');
-        ctx.state.localVars[SKIP_FLAG] = player;
-        return { kind: 'cancel' };
-      }
-
-      // skipAll 标志存在时,取消该玩家所有其他阶段
-      if (ctx.state.localVars[SKIP_FLAG] === player) {
-        return { kind: 'cancel' };
-      }
-    },
-  );
-
-  // ── 阶段结束 before hook:skipAll → 主动推进回合 ──
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '阶段结束',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段结束') return;
-      const player = atom.player;
-      if (player === undefined) return;
-      if (ctx.state.localVars[SKIP_FLAG] !== player) return;
-
-      delete ctx.state.localVars[SKIP_FLAG];
-      // 亲自执行 end-turn 序列(含 回合结束后):回合推进 beginTurn 挂在 回合结束后 的 after-hook
-      await applyAtom(ctx.state, { type: '清过期标记', player });
-      await applyAtom(ctx.state, { type: '下一玩家' });
-      const turnEnded = await applyAtom(ctx.state, { type: '回合结束', player });
-      if (turnEnded) {
-        await applyAtom(ctx.state, { type: '回合结束后', player });
-      }
-      return { kind: 'cancel' };
-    },
-  );
+  // ── 翻面跳过 hooks(标/界共享,tag 前缀 '界悲歌')──
+  registerBeigeFlipSkipHooks(state, skill.id, ownerId, '界悲歌');
 
   return () => {};
 }

@@ -26,13 +26,11 @@ import {
   getChatHistory,
   resetChatUsage,
   buildRoomState,
-  getPlayerSeat,
   moveSeat,
   requestSeatSwap,
   respondSeatSwap,
   kickPlayer,
   ensureSeatOnReconnect,
-  SEAT_SWAP_TIMEOUT_MS,
 } from '../../src/server/room';
 import { normalizeRoomConfig, DEFAULT_ROOM_CONFIG } from '../../src/server/protocol';
 import { resolveTimeoutMs } from '../../src/engine/core/timeout';
@@ -1059,14 +1057,6 @@ describe('座位管理', () => {
     expect((state as { playerIds: string[] }).playerIds).toEqual(['p2', 'host']);
   });
 
-  it('getPlayerSeat 返回正确座次', () => {
-    const room = createRoom('房间', 4, 'host', createMockSink());
-    joinRoom(room.id, 'p2', createMockSink());
-    expect(getPlayerSeat(room, 'host')).toBe(0);
-    expect(getPlayerSeat(room, 'p2')).toBe(1);
-    expect(getPlayerSeat(room, 'nonexistent')).toBe(-1);
-  });
-
   it('moveSeat 移动到空座位', () => {
     const room = createRoom('房间', 4, 'host', createMockSink());
     joinRoom(room.id, 'p2', createMockSink());
@@ -1208,10 +1198,6 @@ describe('座位交换流程', () => {
     expect(room.pendingSeatSwaps.size).toBe(1);
     const pending = room.pendingSeatSwaps.get('host');
     expect(pending?.targetSeat).toBe(2);
-  });
-
-  it('SEAT_SWAP_TIMEOUT_MS 为 15 秒', () => {
-    expect(SEAT_SWAP_TIMEOUT_MS).toBe(15_000);
   });
 });
 

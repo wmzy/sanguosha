@@ -7,11 +7,17 @@
 //   validate 检查 requestType='无懈可击' 且 card.name==='无懈可击' → 通过。
 //   无懈可击技能零感知看破——它看到的永远是 cardMap 里的"无懈可击"。
 //
-// 关键:看破不受自己回合限制(无懈可击任意时机可打)。activeWhen 检测无懈可击
-// 广播窗口(requestType='无懈可击',target<0)且有黑牌。
+// 五件套(影子 id 后缀=技能 id '看破'、当作、rollback、defineAction)由
+// skillRuntime 工厂统一实现。看破不受自己回合限制(无懈可击任意时机可打),
+// 故不走工厂默认时机维度——自定义 validate 逐字保留无懈窗口(共享 hasNullifyWindow)
+// 与阻塞检查;activeWhen 检测无懈可击广播窗口且有黑牌。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction } from '../core/skill';
-import { applyAtom } from '../core/apply';
+import {
+  hasNullifyWindow,
+  mountTransformAction,
+  registerTransformAction,
+  type TransformActionOptions,
+} from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -22,31 +28,10 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 影子卡 id:${原id}#看破 */
-function shadowIdOf(cardId: string): string {
-  return `${cardId}#看破`;
-}
-
-/** 当前是否存在无懈可击广播窗口(玩家可回应) */
-function hasNullifyWindow(state: GameState, playerId: number): boolean {
-  for (const slot of state.pendingSlots.values()) {
-    const atom = slot.atom as { type?: string; requestType?: string; target?: number };
-    if (atom.type !== '请求回应') continue;
-    if (atom.requestType !== '无懈可击') continue;
-    // 广播型(target<0)或精确指向本玩家
-    if (typeof atom.target === 'number' && (atom.target < 0 || atom.target === playerId)) return true;
-  }
-  return false;
-}
-
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
-  // transform action:把黑色手牌转化为影子"无懈可击"。
-  // 作为 preceding 在 无懈可击.respond 之前执行。
-  registerAction(state,
-  skill.id,
-  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
-    // 看破不受自己回合限制(无懈可击任意时机可打),但需有无懈窗口且无其他阻塞
+const OPTIONS: TransformActionOptions = {
+  outputName: '无懈可击',
+  // 看破不受自己回合限制(无懈可击任意时机可打),但需有无懈窗口且无其他阻塞
+  validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
     const self = state.players[ownerId];
     if (!self?.alive) return '玩家不存在或已死亡';
     const cardId = params.cardId as string;
@@ -69,31 +54,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const ok = cardInHand && isBlack && hasWindow && !blockedByOther;
     return ok ? null : '现在不能使用看破';
   },
-  async (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const shadowId = shadowIdOf(cardId);
-    await applyAtom(state, {
-      type: '当作',
-      player: ownerId,
-      cardIds: [cardId],
-      shadowId,
-      outputName: '无懈可击',
-    });
-  },
-  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-  (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const sId = shadowIdOf(cardId);
-    delete state.cardMap[sId];
-    const self = state.players[ownerId];
-    const idx = self.hand.indexOf(sId);
-    if (idx >= 0) self.hand[idx] = cardId;
-  },);
-  return () => {};
-}
-
-export function onMount(skill: Skill, api: FrontendAPI): void {
-  api.defineAction('transform', {
+  mount: {
     label: '看破',
     style: 'passive',
     prompt: {
@@ -101,11 +62,6 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
       title: '选择一张黑色牌当无懈可击使用',
       cardFilter: { filter: (c: Card) => c.color === '黑', min: 1, max: 1 },
     },
-    transform: (card: Card) => ({
-      name: '无懈可击',
-      sourceCardId: card.id,
-      fromSkill: skill.id,
-    }),
     activeWhen: (ctx) => {
       const view = ctx.view;
       const pending = view.pending;
@@ -117,8 +73,18 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
       if (!p) return false;
       return p.hand?.some((c) => c.color === '黑') ?? false;
     },
-  });
-  return;
+  },
+};
+
+export function onInit(skill: Skill, state: GameState): () => void {
+  // transform action:把黑色手牌转化为影子"无懈可击"。
+  // 作为 preceding 在 无懈可击.respond 之前执行。
+  registerTransformAction(state, skill.id, skill.ownerId, OPTIONS);
+  return () => {};
+}
+
+export function onMount(skill: Skill, api: FrontendAPI): void {
+  mountTransformAction(api, skill.id, OPTIONS);
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

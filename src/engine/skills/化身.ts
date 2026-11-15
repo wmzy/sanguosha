@@ -56,7 +56,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
 import { getCharacterMeta } from '../data/character-meta';
 import { HUASHEN_POOL_KEY as POOL_KEY, getHuashenPool } from '../rules/vars-keys';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, askResponse, defineConfirmAction } from '../util/skillRuntime';
 
 // ── 角色分派 ──
 const JIE_CHAR = '界左慈';
@@ -385,11 +385,7 @@ async function offerJieTurnAction(state: GameState, ownerId: number): Promise<vo
   const pool = getHuashenPool(player.vars);
   if (!pool || pool.length < 2) return; // 不足两张:无法替换也无法移去,跳过
 
-  delete state.localVars[ACTION_CHOICE_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: ACTION_REQUEST,
-    target: ownerId,
+  const action = await askResponse(state, ACTION_REQUEST, ownerId, {
     prompt: {
       type: 'chooseOption',
       title: '化身:选择行动',
@@ -399,11 +395,10 @@ async function offerJieTurnAction(state: GameState, ownerId: number): Promise<vo
         { value: String(ACTION_SKIP), label: '不操作' },
       ],
     },
-    defaultChoice: String(ACTION_SKIP) as unknown as Json,
+    defaultChoice: String(ACTION_SKIP),
     timeout: 30,
+    resultKey: ACTION_CHOICE_KEY,
   });
-  const action = state.localVars[ACTION_CHOICE_KEY];
-  delete state.localVars[ACTION_CHOICE_KEY];
   if (action === ACTION_REPLACE) {
     await doReplace(state, ownerId);
   } else if (action === ACTION_SWAP) {
@@ -453,11 +448,7 @@ async function doSwap(state: GameState, ownerId: number): Promise<void> {
   const litIdx = (player.vars[LIT_KEY] as number | undefined) ?? 0;
   const maxRemovable = Math.min(2, pool.length - 1); // 保留展示牌
 
-  delete state.localVars[SWAP_COUNT_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: SWAP_COUNT_REQUEST,
-    target: ownerId,
+  const rawCount = await askResponse(state, SWAP_COUNT_REQUEST, ownerId, {
     prompt: {
       type: 'chooseOption',
       title: '化身:移去几张化身牌并获得等量新的?',
@@ -466,11 +457,10 @@ async function doSwap(state: GameState, ownerId: number): Promise<void> {
         label: `移去 ${i + 1} 张并获得 ${i + 1} 张新的（展示牌保留）`,
       })),
     },
-    defaultChoice: '1' as unknown as Json,
+    defaultChoice: '1',
     timeout: 30,
+    resultKey: SWAP_COUNT_KEY,
   });
-  const rawCount = state.localVars[SWAP_COUNT_KEY];
-  delete state.localVars[SWAP_COUNT_KEY];
   if (typeof rawCount !== 'number') return;
   const count = Math.min(rawCount, maxRemovable);
   if (count < 1) return;
@@ -510,7 +500,6 @@ async function askSelectCharacter(
   pool: string[],
   usableIndices: number[],
 ): Promise<number> {
-  delete state.localVars[CHARACTER_CHOICE_KEY];
   const characterCards: Record<string, { faction: Faction; skills: string[] }> = {};
   for (const i of usableIndices) {
     const meta = getCharacterMeta(pool[i]);
@@ -519,21 +508,17 @@ async function askSelectCharacter(
       skills: getUsableSkills(pool[i]),
     };
   }
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: CHARACTER_REQUEST,
-    target: ownerId,
+  const chosen = await askResponse<string | undefined>(state, CHARACTER_REQUEST, ownerId, {
     prompt: {
       type: 'chooseOption',
       title: '化身:选择一张化身牌',
       options: usableIndices.map((i) => ({ value: pool[i], label: pool[i] })),
       characterCards,
     },
-    defaultChoice: pool[usableIndices[0]] as unknown as Json,
+    defaultChoice: pool[usableIndices[0]],
     timeout: 30,
+    resultKey: CHARACTER_CHOICE_KEY,
   });
-  const chosen = state.localVars[CHARACTER_CHOICE_KEY] as string | undefined;
-  delete state.localVars[CHARACTER_CHOICE_KEY];
   return chosen ? pool.indexOf(chosen) : -1;
 }
 
@@ -551,23 +536,18 @@ async function askSelectSkill(
   if (usable.length === 0) return undefined;
   if (usable.length === 1) return usable[0];
 
-  delete state.localVars[SELECTED_KEY];
+  // 候选技能列表暂存 localVars(respond validate 校验用;respond execute 读后删)
   state.localVars[CANDIDATES_KEY(ownerId)] = usable;
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: SKILL_REQUEST,
-    target: ownerId,
+  let selected = await askResponse<string | undefined>(state, SKILL_REQUEST, ownerId, {
     prompt: {
       type: 'chooseOption',
       title: `化身:从「${litChar}」选择一个技能`,
       options: usable.map((s) => ({ value: s, label: s })),
     },
-    defaultChoice: usable[0] as unknown as Json,
+    defaultChoice: usable[0],
     timeout: 30,
+    resultKey: SELECTED_KEY,
   });
-
-  let selected = state.localVars[SELECTED_KEY] as string | undefined;
-  delete state.localVars[SELECTED_KEY];
   if (!selected || !usable.includes(selected)) selected = usable[0];
   return selected;
 }

@@ -10,7 +10,7 @@
 // - 每房间保留最新 MAX_ENTRIES_PER_ROOM 条(含录像文件),超出裁剪最旧并删其录像文件。
 // - 房间销毁走 deleteRoomHistory 整目录删除(teardown.destroyRoomCompletely 统一调用);
 //   启动时 sweepOrphanHistory 清理上次进程崩溃遗留的孤儿目录(快速房不恢复,历史无主)。
-// - roomId 来自 URL 参数,统一过 SAFE_ROOM_ID 校验,防路径穿越。
+// - roomId/entryId 白名单统一走 safeId.ts(isSafeRoomId/isSafeId),防路径穿越。
 //
 // 录像组装(buildReplayFile)复用客户端 ReplayRecorder:逐座次喂入
 // 「开局基线视图 + eventsForViewer 差量事件」,保证与本地录制文件格式完全一致,
@@ -21,7 +21,7 @@ import { join, resolve } from 'node:path';
 import { createLogger } from './logger';
 import { register as registerLifecycle } from './resourceRegistry';
 import { createRoomSerialChain } from './serialChain';
-import { isSafeRoomId } from './safeId';
+import { isSafeRoomId, isSafeId } from './safeId';
 import { ReplayRecorder } from '../client/replay/recorder';
 import { eventsForViewer } from '../engine/view/events-for-viewer';
 import type { ReplayFile, ReplayMeta, SeatDelta } from '../client/replay/types';
@@ -36,9 +36,6 @@ export const HISTORY_DIR = process.env.SGS_HISTORY_DIR
 
 /** 每房间保留的历史条数上限(含录像文件),防止磁盘无限增长 */
 export const MAX_ENTRIES_PER_ROOM = 20;
-
-/** roomId 白名单:统一走 safeId.ts 单一来源(拒绝路径穿越/特殊字符) */
-const SAFE_ENTRY_ID = /^[A-Za-z0-9_-]+$/;
 
 /** roomId → 条目列表(时间升序,最新在末尾)。懒加载缓存 */
 const cache = new Map<string, GameHistoryEntry[]>();
@@ -237,7 +234,7 @@ export async function listGameHistory(roomId: string): Promise<GameHistoryEntry[
 
 /** 读取单局录像。文件缺失/格式不符 → null。 */
 export async function getGameReplay(roomId: string, entryId: string): Promise<ReplayFile | null> {
-  if (!isSafeRoomId(roomId) || !SAFE_ENTRY_ID.test(entryId)) return null;
+  if (!isSafeRoomId(roomId) || !isSafeId(entryId)) return null;
   try {
     const raw = await readFile(replayPath(roomId, entryId), 'utf8');
     const parsed: unknown = JSON.parse(raw);
@@ -285,7 +282,7 @@ export function filterReplayForViewer(file: ReplayFile, seat: number | null): Re
 
 /** 删除单条历史(含录像文件)。返回条目是否存在。 */
 export async function deleteGameHistoryEntry(roomId: string, entryId: string): Promise<boolean> {
-  if (!isSafeRoomId(roomId) || !SAFE_ENTRY_ID.test(entryId)) return false;
+  if (!isSafeRoomId(roomId) || !isSafeId(entryId)) return false;
   return writeChain.enqueue(roomId, async () => {
     const entries = await readIndexFromDisk(roomId);
     const next = entries.filter((e) => e.id !== entryId);

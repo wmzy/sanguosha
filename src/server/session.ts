@@ -45,6 +45,15 @@ function computeSeatRotation(seed: number, n: number): number {
   return createRng(seed + 7919).nextInt(n);
 }
 
+/** viewer 座次有效性(玩家/旁观者两处循环与重连视图恢复共用)。
+ *  strict=true(玩家座次):要求 0 ≤ viewer < len;
+ *  strict=false(旁观者):viewer=-1(无授权公开视图)亦有效,仅拒绝
+ *  「≥0 且越界」的失效授权(与原各处内联判定逐字等价)。 */
+function isValidViewer(viewer: number | undefined, len: number, strict = false): boolean {
+  if (viewer === undefined) return false;
+  return strict ? viewer >= 0 && viewer < len : !(viewer >= 0 && viewer >= len);
+}
+
 /** 默认武将列表:使用引擎全量武将(allCharacters),供选将池使用。
  *  skills 字段来自武将数据(供选将 UI 显示);选完后只实例化引擎默认技能(见 系统规则·选将)。 */
 const CHARACTERS: Array<{ name: string; skills: string[] }> = allCharacters.map((c) => ({
@@ -404,12 +413,17 @@ export class GameSession {
     return true;
   }
 
-  private handleGameOver(winner?: number): void {
-    // 标记游戏结束:拦截后续 onStateChange 广播与 handleAction。
-    // 所有触发 gameOver 的路径(onStateChange/startGame/恢复)统一在此设值。
+  /** 终局统一收尾(正常终局与全员掉线中断共用):标记 gameOverHandled
+   *  (拦截后续 onStateChange 广播与 handleAction)→ 房间置「已结束」→ 记录历史
+   *  → 广播 gameOver。
+   *  reason: 历史条目中断原因('正常'终局 / '中断'=全员掉线宽限超时)。
+   *  skipHistoryIfHandled: 已收尾过则跳过历史记录(endDueToDisconnect 在正常
+   *  终局之后触发时不重复记条目,等价于原「已在 handleGameOver 记录过的不再重复记」)。 */
+  private handleGameOver(winner?: number, reason: '正常' | '中断' = '正常', skipHistoryIfHandled = false): void {
+    const alreadyHandled = this.gameOverHandled;
     this.gameOverHandled = true;
     setRoomStatus(this.room.id, '已结束');
-    this.recordGameHistory(winner, '正常');
+    if (!skipHistoryIfHandled || !alreadyHandled) this.recordGameHistory(winner, reason);
     this.broadcast({ type: 'gameOver', winner: winner !== undefined ? String(winner) : '无人' });
   }
 
@@ -569,14 +583,14 @@ export class GameSession {
     const state = this.state;
 
     for (const [playerId, viewer] of this.playerNames) {
-      if (viewer < 0 || viewer >= state.players.length) continue;
+      if (!isValidViewer(viewer, state.players.length, /* strict */ true)) continue;
       this.sendViewToConn(playerId, viewer, state);
     }
 
     // 旁观者：viewer 来自 viewGrants（授权座次），无授权则为 -1（公开视图）
     for (const [spectatorId] of this.room.spectators) {
       const viewer = this.room.viewGrants.get(spectatorId) ?? -1;
-      if (viewer >= 0 && viewer >= state.players.length) continue;
+      if (!isValidViewer(viewer, state.players.length)) continue;
       this.sendViewToConn(spectatorId, viewer, state);
     }
 
@@ -666,22 +680,45 @@ export class GameSession {
   private sendInitialViewToPlayer(playerId: string): void {
     if (!this.state) return;
     const viewer = this.playerNames.get(playerId);
-    if (viewer === undefined || viewer < 0 || viewer >= this.state.players.length) return;
+    if (viewer === undefined || !isValidViewer(viewer, this.state.players.length, /* strict */ true))
+      return;
     this.sendBaseline(playerId, viewer, this.state);
+  }
+
+  /** 玩家重连(reconnectPlayer)与旁观者接入(sendSpectatorInitialView)的共用
+   *  视图恢复:canServeDifferential 且座次合格 → 差量补发 eventsForViewer;
+   *  否则发全量 baseline;最后标记 baselineSent(后续广播走增量)。
+   *  strictSeat=true(玩家):差量与 baseline 都要求座次严格有效;viewer 缺失
+   *  (未入座)时不发送任何视图,仅标记 baselineSent(与既有 reconnectPlayer 行为一致)。
+   *  strictSeat=false(旁观者):viewer=-1 公开视图既可差量也可全量。 */
+  private resumeConnection(
+    connId: string,
+    viewer: number | undefined,
+    lastSeq: number,
+    strictSeat: boolean,
+  ): void {
+    const state = this.state;
+    if (!state) return;
+    if (viewer === undefined) {
+      this.baselineSent.add(connId);
+      return;
+    }
+    const seatOk = isValidViewer(viewer, state.players.length, /* strict */ true);
+    const eligible = !strictSeat || seatOk;
+    if (this.canServeDifferential(lastSeq) && eligible) {
+      this.sendEventEnvelopes(connId, viewer, state, eventsForViewer(state, viewer, lastSeq));
+    } else if (eligible) {
+      this.sendBaseline(connId, viewer, state);
+    }
+    this.baselineSent.add(connId);
   }
 
   /** 旁观者连接 SSE：若游戏进行中则发送 initialView(或小差量补发)。 */
   sendSpectatorInitialView(spectatorId: string, lastSeq = 0): void {
     if (!this.state) return;
     const viewer = this.room.viewGrants.get(spectatorId) ?? -1;
-    if (viewer >= 0 && viewer >= this.state.players.length) return;
-    const state = this.state;
-    if (this.canServeDifferential(lastSeq)) {
-      this.sendEventEnvelopes(spectatorId, viewer, state, eventsForViewer(state, viewer, lastSeq));
-    } else {
-      this.sendBaseline(spectatorId, viewer, state);
-    }
-    this.baselineSent.add(spectatorId);
+    if (!isValidViewer(viewer, this.state.players.length)) return;
+    this.resumeConnection(spectatorId, viewer, lastSeq, /* strictSeat */ false);
   }
 
   /** 清除旁观者 baseline，强制下次 broadcastNewState 重发 initialView。
@@ -748,11 +785,10 @@ export class GameSession {
         return idx !== undefined ? (state?.players[idx]?.name ?? id) : id;
       })
       .join('、');
-    setRoomStatus(this.room.id, '已结束');
-    // 记录中断历史(已在 handleGameOver 记录过的不再重复记)
-    if (!this.gameOverHandled) this.recordGameHistory(undefined, '中断');
     this.broadcast({ type: 'error', message: `${names} 在重连宽限期内未恢复,游戏结束` });
-    this.broadcast({ type: 'gameOver', winner: '无人' });
+    // 终局收尾复用 handleGameOver(置已结束+历史+gameOver);中断历史只在
+    // 正常终局未记录过时补记(正常终局后全员掉线的宽限超时不重复记)。
+    this.handleGameOver(undefined, '中断', /* skipHistoryIfHandled */ true);
     // 必须 destroy 以清理 idle timer，否则定时器会通过 onStateChange 自循环
     void this.destroy().catch((err) => {
       this.logger.err('destroy after disconnect failed', err);
@@ -771,12 +807,12 @@ export class GameSession {
     );
   }
 
-  /** 玩家重连:恢复座位并发送当前完整 state(或小差量补发)。
-   *  multiplayer 模式:新 WS 连接的 playerId 与断线前不同(服务端 onOpen 自动生成),
-   *  需通过 previousPlayerId 迁移座次映射(旧 playerId → 新 playerId)。
-   *  debug 模式:不传 previousPlayerId,assignDebugSeat 已完成座次分配。
-   *  lastSeq 来自 SSE Last-Event-ID(经 epoch 校验):窗口内差量补发 event,
-   *  否则发 initialView 全量快照。 */
+  /** 玩家重连:恢复座位、注册 sink 并发送当前完整 state(或小差量补发)。
+ *  multiplayer 模式:新 WS 连接的 playerId 与断线前不同(服务端 onOpen 自动生成),
+ *  需通过 previousPlayerId 迁移座次映射(旧 playerId → 新 playerId)。
+ *  debug 模式:不传 previousPlayerId,assignDebugSeat 已完成座次分配。
+ *  lastSeq 来自 SSE Last-Event-ID(经 epoch 校验):窗口内差量补发 event,
+ *  否则发 initialView 全量快照(视图恢复经 resumeConnection,与旁观者接入共用)。 */
   reconnectPlayer(
     playerId: string,
     sink: import('./connection').ConnectionSink,
@@ -799,19 +835,12 @@ export class GameSession {
 
     this.clearGraceTimer();
     this.disconnectedAt.delete(playerId);
+    // sink 注册的所有者:对局进行中的 SSE 重连由本方法统一注册
+    // (sse.ts playerRole.registerSink 在该阶段让渡,避免双写);大厅阶段的
+    // 连接注册仍归 registerSink。直连调用方(测试/REST)也由此获得 sink 绑定。
     this.room.players.set(playerId, sink);
-    const viewer = this.playerNames.get(playerId);
-    const differential =
-      this.canServeDifferential(lastSeq) &&
-      viewer !== undefined &&
-      viewer >= 0 &&
-      viewer < this.state.players.length;
-    if (differential) {
-      this.sendEventEnvelopes(playerId, viewer, this.state, eventsForViewer(this.state, viewer, lastSeq));
-    } else {
-      this.sendInitialViewToPlayer(playerId);
-    }
-    this.baselineSent.add(playerId);
+    // 座次有效 + 差量窗口内 → 差量补发;否则全量 initialView(共用 resumeConnection)
+    this.resumeConnection(playerId, this.playerNames.get(playerId), lastSeq, /* strictSeat */ true);
     // initialView/diff 已覆盖到当前 seq,不需要补推差量。
     // 同步水位标记,避免后续 broadcastNewState 重发已含在 initialView 中的事件。
     this.lastBroadcastSeq = Math.max(this.lastBroadcastSeq, this.state.seq);

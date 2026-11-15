@@ -22,7 +22,7 @@ import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
 import type { GameView as EngineGameView, Card, Json, ViewEvent } from '../../engine/types';
 import { getAtomDef } from '../../engine/core/atom';
-import { DISCARD_KEEP_PRIORITY } from '../../engine/atoms/请求回应';
+import { discardKeepPriorityOf } from '../../engine/atoms/请求回应';
 import { CountdownBar } from './CountdownBar';
 import { DEFAULT_COUNTDOWN_TOTAL_MS, useCountdownSeconds } from '../hooks/useCountdown';
 import { viewSlashMax, viewSlashUsed } from '../../engine/rules/action-active';
@@ -51,10 +51,13 @@ import { GameViewProvider, type GameViewCtxValue } from './GameViewCtx';
 import {
   canShowCancelSelectionButton,
   canShowEndTurnButton,
-  effectiveTargetCard,
+  countRespondableCards,
   findUseActionForCard,
   hasUseEntry,
   isActiveAction,
+  selectedTargetNamesOf,
+  targetConstraintCard,
+  usedCardNameOf,
 } from '../utils/gameViewHelpers';
 import { displaySkillName } from '../utils/skillDisplay';
 
@@ -387,8 +390,10 @@ export function GameViewComponentImpl({
 
   // ─── 弃牌超时兜底预览(镜像引擎 请求回应.onTimeout 的保留优先级排序)───
   // 引擎权威兜底(src/engine/atoms/请求回应.ts,requestType==='__弃牌' 分支)把手牌按
-  // 保留优先级降序排列后取前 excess 张——低价值先弃,与手牌位置无关:
-  //   桃:0 杀:1 闪:2 无懈可击:3,其余 9(该表为引擎内联字面量,未导出,此处按字面同步)
+  // 保留优先级升序排列后取前 excess 张——低价值先弃,与手牌位置无关:
+  //   桃:100 无懈可击:90 闪:85 无中生有:78 杀:70 …闪电:35 装备牌:30,
+  //   未列出的牌 40(该表由引擎导出,经上方 import 的 discardKeepPriorityOf 引入,
+  //   预览与引擎兜底同源,无字面漂移)
   // 预览必须同一排序,否则最后 5 秒高亮的牌与实际自动弃置的牌不一致(标错牌)。
   // 已选满 min 时不预览(走确认分支)。
   const countdownSec = useCountdownSeconds(deadline);
@@ -397,7 +402,7 @@ export function GameViewComponentImpl({
     if (countdownSec == null || countdownSec > 5) return null;
     if (selectedForDiscard.length >= discardMin) return null;
     const sorted = [...perspectiveHand].sort(
-      (a, b) => (DISCARD_KEEP_PRIORITY[b.name] ?? 9) - (DISCARD_KEEP_PRIORITY[a.name] ?? 9),
+      (a, b) => discardKeepPriorityOf(a) - discardKeepPriorityOf(b),
     );
     return new Set(sorted.slice(0, discardMin).map((c) => c.id));
   }, [
@@ -420,19 +425,19 @@ export function GameViewComponentImpl({
       if (!player.alive) return { distance, reason: '已阵亡' };
       if (isTargetable(idx)) return { distance, reason: null };
       if (idx === perspectiveIdx) return { distance, reason: '不能选择自己' };
-      // 「正在使用的牌」与 usePlayInteraction.isTargetable 同源:effectiveTargetCard
-      // 只认显式 usedCardName(转化技传产出牌名 transformWrapperName;普通出牌按
-      // 「use action 的 skillId === 选中牌名」认定),不凭「牌名===杀」猜——技能代价
-      // 牌恰好是杀(离间)或转化原料是杀(龙胆 杀→闪)时旧判据会误报攻击范围。
-      // 回应窗口(useCardAndTarget 型 pending,借刀杀人)用正在打出的回应牌。
+      // 「正在使用的牌」与 usePlayInteraction.isTargetable 同源:usedCardName 判定与
+      // 回应窗口 ternary 收敛为 gameViewHelpers 的 usedCardNameOf / targetConstraintCard
+      // (不凭「牌名===杀」猜——技能代价牌恰好是杀(离间)或转化原料是杀(龙胆 杀→闪)
+      // 时旧判据会误报攻击范围;回应窗口(useCardAndTarget 型 pending,借刀杀人)用
+      // 正在打出的回应牌)。
       const respondWindow = isMyAwaiting && pending?.prompt?.type === 'useCardAndTarget';
-      const usedCardName = transformWrapperName
-        ?? (selectedUseAction && selectedUseAction.skillId === selectedCard?.name
-          ? selectedCard.name
-          : null);
-      const usingCard = respondWindow
-        ? perspectiveHand.find((c) => c.id === selectedRespondCardId)
-        : effectiveTargetCard(selectedCard, selectedTargetFilter, usedCardName);
+      const usingCard = targetConstraintCard(
+        respondWindow,
+        perspectiveHand.find((c) => c.id === selectedRespondCardId),
+        selectedCard,
+        selectedTargetFilter,
+        usedCardNameOf(transformWrapperName, selectedUseAction, selectedCard),
+      );
       // 攻击范围与引擎/无头枚举同源走 viewCanAttack(含攻击范围豁免),替代手写
       // distance > attackRange 比较;range 仅用于提示文案(与 viewCanAttack 内部同式)。
       if (usingCard?.name === '杀' && !viewCanAttack(view.players, view.cardMap, perspectiveIdx, idx)) {
@@ -509,10 +514,12 @@ export function GameViewComponentImpl({
     (pending?.prompt?.type === 'useCard' || pending?.prompt?.type === 'useCardAndTarget');
 
   // ─── 回应窗口候选数(0 时动作条显示「一键不回应」,替代置灰的「打出」)───
-  // 注意必须在 isRespondPending 定义之后(同源计算条件)。
+  // 注意必须在 isRespondPending 定义之后(同源计算条件)。计数与 AwaitingPrompt 的
+  // respondableCount 共享 countRespondableCards;无 filter(非卡牌回应)时保持 null
+  // (未知),与 AwaitingPrompt 的 0(无)语义由调用方区分。
   const respondCandidateCount = useMemo(() => {
     if (!isRespondPending || !pendingRespondInfo?.cardFilter) return null;
-    return perspectiveHand.filter(pendingRespondInfo.cardFilter).length;
+    return countRespondableCards(perspectiveHand, pendingRespondInfo.cardFilter);
   }, [isRespondPending, pendingRespondInfo, perspectiveHand]);
   const showCenterActionBar =
     isRespondPending ||
@@ -715,21 +722,29 @@ export function GameViewComponentImpl({
                       skillTargetMode
                     }
                     selectedTargetNames={
-                      isDistributeActive && activeDistribute?.externalTargetSelection
-                        ? distTargetName
-                          ? [distTargetName]
-                          : []
-                        : playRules?.hasSlots
-                          ? [selectedTarget, selectedKillTarget].filter((n): n is string => !!n)
-                          : playRules?.multiTarget
-                            ? selectedMultiTargets
+                      // 独立选中态(distribute 外部目标/回应窗口目标)经 overrideNames
+                      // 优先提供,其余走出牌选中态统一口径 selectedTargetNamesOf
+                      // (与 isTargetable/buildPlayParams 同源)。优先级与原实现一致:
+                      // distribute > playRules 槽位/多目标 > 回应窗口 > 单目标。
+                      selectedTargetNamesOf(
+                        playRules,
+                        {
+                          target: selectedTarget,
+                          killTarget: selectedKillTarget,
+                          multiTargets: selectedMultiTargets,
+                        },
+                        isDistributeActive && activeDistribute?.externalTargetSelection
+                          ? distTargetName
+                            ? [distTargetName]
+                            : []
+                          : playRules?.hasSlots || playRules?.multiTarget
+                            ? null
                             : respondNeedsTarget
                               ? respondTargetName
                                 ? [respondTargetName]
                                 : []
-                              : selectedTarget
-                                ? [selectedTarget]
-                                : []
+                              : null,
+                      )
                     }
                     isTargetable={isTargetable}
                     seatTargetInfo={seatTargetInfo}

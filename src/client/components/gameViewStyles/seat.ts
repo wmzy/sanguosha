@@ -4,8 +4,12 @@
 //   - 大卡(自己)可点选/被选为目标态(GameView 底栏 PlayerCardLarge 外层复用)
 //   - 处理区标签(ZoneInfoBar)+ 动画状态类(GameView/PlayerCardLarge/GameHeader)
 //   - 体力漂浮数字基座+变体(座位卡/大卡共用,渲染层见 utils/HpFloatNumber)
+// 座位卡与角色大卡(actionBar.ts)的同语言成对样式(身份章/名牌徽章/竖排武将名/
+// 技能标签/判定行/体力数字/体力珠列/手牌角标)以本文件为单一来源:逐字同的族由
+// actionBar 别名复用,参数有差的族共享本文件 base + 大卡侧变体(见各段注释)。
 
 import { css } from '@linaria/core';
+import { identityStampPalette, seatDeadPortraitFilter } from './tokens';
 
 // ─── Seating — arc layout ───
 // 占满 battleField,座位环绕中央,中央留出处理区位置
@@ -281,7 +285,8 @@ export const seatNamePlateActive = css`
   box-shadow: 0 0 8px rgba(255, 205, 92, 0.22);
 `;
 // 身份小方章 base:主公金/忠臣蓝/反贼红/内奸紫;未揭示时暗章「暗」
-// (身份→样式映射的共享逻辑见 utils/characterVisuals 的 identityStampClass)
+// (身份→样式映射的共享逻辑见 utils/characterVisuals 的 identityStampClass;
+//  色板单一来源 tokens.identityStampPalette,大卡 playerCardStamp* 系列直接复用本组类)
 export const seatIdentityStamp = css`
   flex-shrink: 0;
   min-width: 22px;
@@ -295,20 +300,20 @@ export const seatIdentityStamp = css`
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 `;
 export const seatIdentityLord = css`
-  background: #d4a017;
-  color: #3a2400;
+  background: ${identityStampPalette.lord.background};
+  color: ${identityStampPalette.lord.color};
 `;
 export const seatIdentityLoyalist = css`
-  background: #3f6fb5;
-  color: #fff;
+  background: ${identityStampPalette.loyalist.background};
+  color: ${identityStampPalette.loyalist.color};
 `;
 export const seatIdentityRebel = css`
-  background: #b03a30;
-  color: #fff;
+  background: ${identityStampPalette.rebel.background};
+  color: ${identityStampPalette.rebel.color};
 `;
 export const seatIdentityRenegade = css`
-  background: #8e5aa8;
-  color: #fff;
+  background: ${identityStampPalette.renegade.background};
+  color: ${identityStampPalette.renegade.color};
 `;
 export const seatIdentityHidden = css`
   background: #4a463d;
@@ -337,7 +342,7 @@ export const seatName = css`
   color: rgba(255, 255, 255, 0.92);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 `;
-// 名牌右侧徽章组
+// 名牌右侧徽章组(大卡 playerCardBadges 复用)
 export const seatBadgeGroup = css`
   display: flex;
   align-items: center;
@@ -362,8 +367,9 @@ export const turnBadge = css`
   font-weight: bold;
   line-height: 1.5;
 `;
-// 连环徽章:铁灰底 + 铁链图标,标示横置(铁索连环)状态
-export const chainBadge = css`
+/** 连环徽章 base:铁灰底 + 铁链图标,标示横置(铁索连环)状态;座位卡/大卡共用,
+ *  大卡版(playerCardBadgeChain)无 text-shadow,座位卡版由下方变体补上。 */
+export const chainBadgeBase = css`
   display: inline-flex;
   align-items: center;
   background: linear-gradient(135deg, #6b8294, #9bb3c4);
@@ -374,8 +380,12 @@ export const chainBadge = css`
   color: #fff;
   font-weight: bold;
   line-height: 1.5;
+`;
+// 座位卡版:叠加铁链文字阴影
+const chainBadgeShadow = css`
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 `;
+export const chainBadge = `${chainBadgeBase} ${chainBadgeShadow}`;
 // 离线角标:灰底,标示该玩家 SSE 已断开(重连宽限期内)
 export const offlineBadge = css`
   background: #7a7a7a;
@@ -489,8 +499,10 @@ export const seatCharImg = css`
   object-fit: cover;
   object-position: center top;
 `;
+// 死亡:立绘 grayscale + 压亮 0.7(大卡 0.6 见 actionBar playerCardPortraitDead;
+// 滤镜值单一来源 tokens.seatDeadPortraitFilter)
 export const seatCharImgDead = css`
-  filter: grayscale(1) brightness(0.7);
+  filter: ${seatDeadPortraitFilter};
 `;
 // 横置(铁索):立绘铁灰冷色调(降饱和压亮),与边框 chainPulse 呼应
 export const seatCharImgChained = css`
@@ -550,7 +562,7 @@ export const seatFactionStamp = css`
   color: #f0d78a;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.7);
 `;
-// 竖排武将名:vertical-rl + upright,金白粗体带深色描边
+// 竖排武将名:vertical-rl + upright,金白粗体带深色描边(大卡 playerCardChar 复用)
 export const seatCharName = css`
   flex: 1 1 auto;
   min-height: 0;
@@ -567,24 +579,27 @@ export const seatCharName = css`
     0 1px 2px rgba(0, 0, 0, 0.9),
     0 -1px 2px rgba(0, 0, 0, 0.9);
 `;
-// 竖带底部体力数字(当前体力):红色粗体;伤害/回复红/绿闪烁挂在此处
-export const seatHpNumber = css`
+/** 竖带底部体力数字 base(当前体力):红色粗体,伤害/回复红/绿闪烁挂在此处。
+ *  座位卡/大卡共用排版;字号按卡型:座位卡 16px(seatHpNumber)/大卡 17px
+ *  (actionBar playerCardHpNumber)。 */
+export const hpNumberBase = css`
   flex-shrink: 0;
   display: inline-block;
   line-height: 1;
-  font-size: 16px;
   font-weight: 900;
   color: #ff5f52;
   text-shadow:
     0 1px 2px rgba(0, 0, 0, 0.85),
     0 0 6px rgba(255, 60, 40, 0.45);
 `;
-// 手牌数角标:卡内右下角小暗章「🂠 N」
-export const seatHandBadge = css`
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  z-index: 3;
+// 座位卡变体:16px 小号
+const seatHpNumberSize = css`
+  font-size: 16px;
+`;
+export const seatHpNumber = `${hpNumberBase} ${seatHpNumberSize}`;
+/** 手牌数角标 base:「🂠 N」小暗章。座位卡(卡内右下角绝对定位)与大卡
+ *  (底部紧凑区内右对齐,actionBar playerCardHandChip)共用。 */
+export const handBadgeBase = css`
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -598,6 +613,14 @@ export const seatHandBadge = css`
   line-height: 1.4;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 `;
+// 座位卡变体:卡内右下角(title 保留完整手牌信息)
+const seatHandBadgePos = css`
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  z-index: 3;
+`;
+export const seatHandBadge = `${handBadgeBase} ${seatHandBadgePos}`;
 // 死亡印章:旋转红字方印盖在卡面(立绘同时 grayscale)
 // 有身份时两行「身份/阵亡」(对齐官方「反贼/阵亡」印),无身份时单字「亡」
 export const seatDeadStamp = css`
@@ -628,20 +651,25 @@ export const seatDeadStamp = css`
     white-space: nowrap;
   }
 `;
-// 右缘体力珠列:垂直排列,骑在卡右边框上(right: -5px = 半珠宽);z-index 与大卡珠列分层。
-// 珠体 span、分色与尺寸缩放统一由共享组件 HpBeadColumn 渲染(满珠/空珠样式为大卡共用的
-// gameViewStyles playerCardHpBeadFull/playerCardHpBeadEmpty,分色经 --bead-* 变量注入)。
-export const seatHpBeadCol = css`
+/** 右缘体力珠列 base:垂直排列,骑在卡右边框上(right: -5px = 半珠宽);z-index
+ *  按卡型分层(座位卡 4 / 大卡 5)。珠体 span、分色与尺寸缩放统一由共享组件
+ *  HpBeadColumn 渲染(满珠/空珠样式为大卡共用的 gameViewStyles
+ *  playerCardHpBeadFull/playerCardHpBeadEmpty,分色经 --bead-* 变量注入)。 */
+export const hpBeadColBase = css`
   position: absolute;
   right: -5px;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 4;
   display: flex;
   flex-direction: column;
   align-items: center;
   pointer-events: none;
 `;
+// 座位卡变体:z-index 4(低于大卡文字层)
+const seatHpBeadColZ = css`
+  z-index: 4;
+`;
+export const seatHpBeadCol = `${hpBeadColBase} ${seatHpBeadColZ}`;
 // 卡下小标签行容器
 export const seatLabelCol = css`
   display: flex;
@@ -669,7 +697,7 @@ export const equipRow = css`
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   }
 `;
-// 判定行(延时锦囊):紫边 chip
+// 判定行(延时锦囊):紫边 chip(大卡 playerCardJudgeRow/Label/Tag 复用)
 export const judgeRow = css`
   display: flex;
   flex-wrap: wrap;
@@ -694,7 +722,7 @@ export const judgeTag = css`
   font-weight: bold;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
 `;
-// 技能 chips:暗底金字小圆角
+// 技能 chips:暗底金字小圆角(大卡 playerCardSkillTag 复用)
 export const skillRow = css`
   display: flex;
   flex-wrap: wrap;

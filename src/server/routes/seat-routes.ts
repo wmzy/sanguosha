@@ -2,8 +2,10 @@
 // 路由路径/方法/校验顺序/响应形状与拆分前完全一致。
 
 import type { Hono } from 'hono';
-import { moveSeat, requestSeatSwap, respondSeatSwap, broadcastMessage } from '../room';
+import { moveSeat, requestSeatSwap, respondSeatSwap } from '../room';
 import {
+  notifyRoom,
+  parseTargetSeat,
   broadcastRoomState,
   optString,
   readJsonBody,
@@ -16,7 +18,7 @@ export function applySeatRoutes(app: Hono): void {
   app.post('/api/rooms/:id/seat', async (c) => {
     const roomId = c.req.param('id');
     const raw = await readJsonBody(c);
-    const targetSeat = typeof raw.targetSeat === 'number' ? raw.targetSeat : -1;
+    const targetSeat = parseTargetSeat(raw);
     if (targetSeat < 0) return c.json({ error: '缺少 targetSeat' }, 400);
     // 非调试房间:身份取会话 userId,防伪造他人移座
     const resolved = await resolvePlayerOrRespond(c, roomId, optString(raw.playerId));
@@ -34,7 +36,7 @@ export function applySeatRoutes(app: Hono): void {
   app.post('/api/rooms/:id/seat-swap/request', async (c) => {
     const roomId = c.req.param('id');
     const raw = await readJsonBody(c);
-    const targetSeat = typeof raw.targetSeat === 'number' ? raw.targetSeat : -1;
+    const targetSeat = parseTargetSeat(raw);
     if (targetSeat < 0) return c.json({ error: '缺少 targetSeat' }, 400);
     // 非调试房间:发起者身份取会话 userId,防以他人名义发起换座请求
     const resolved = await resolvePlayerOrRespond(c, roomId, optString(raw.playerId));
@@ -44,7 +46,7 @@ export function applySeatRoutes(app: Hono): void {
     const result = requestSeatSwap(roomId, requesterId, targetSeat);
     if (!result) return c.json({ error: '无法发起交换请求' }, 400);
 
-    broadcastMessage(result.room, {
+    notifyRoom(result.room, {
       type: 'seat_swap_request',
       requesterId,
       requesterSeat: result.requesterSeat,
@@ -52,7 +54,6 @@ export function applySeatRoutes(app: Hono): void {
       targetPlayerId: result.targetPlayerId,
       expiresAt: result.expiresAt,
     });
-    broadcastRoomState(result.room);
     return c.json({ success: true, expiresAt: result.expiresAt });
   });
 
@@ -71,13 +72,12 @@ export function applySeatRoutes(app: Hono): void {
     const result = respondSeatSwap(roomId, responderId, requesterId, accept);
     if (!result) return c.json({ error: '交换请求无效或已过期' }, 400);
 
-    broadcastMessage(result.room, {
+    notifyRoom(result.room, {
       type: 'seat_swap_result',
       success: result.swapped,
       requesterId,
       responderId,
     });
-    broadcastRoomState(result.room);
     return c.json({ success: true, swapped: result.swapped });
   });
 }

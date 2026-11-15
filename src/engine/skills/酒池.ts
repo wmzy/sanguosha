@@ -8,9 +8,13 @@
 // 描述:"你可以将一张黑桃手牌当【酒】使用。" 黑桃 = ♠(仅黑桃,非黑色)。
 // 无次数限制。
 import type { Card, GameState, Json, Skill, FrontendAPI } from '../types';
-import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
-import { applyAtom } from '../core/apply';
+import { hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
+import {
+  mountTransformAction,
+  registerTransformAction,
+  type TransformActionOptions,
+} from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -21,18 +25,10 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 影子卡 id:${原id}#酒池 */
-function shadowIdOf(cardId: string): string {
-  return `${cardId}#酒池`;
-}
-
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
-  // transform action:把黑桃手牌转化为影子"酒"(新建 Card 实体,shadowOf 指向原卡)。
-  // 作为 preceding 在 酒.use 之前执行。酒.validate 读 cardMap[影子id] 看到"酒"。
-  registerAction(state,
-  skill.id,
-  ownerId, 'transform', (state: GameState, params: Record<string, Json>) => {
+/** transform 五件套工厂配置(黑桃手牌 → 影子酒)。 */
+const TRANSFORM_OPTIONS: TransformActionOptions = {
+  outputName: '酒',
+  validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
     // 通用合法条件:自己回合 + 无 pending + 存活 + 手牌 + 黑桃
     const myTurn = state.currentPlayerIndex === ownerId;
     const free = !hasBlockingPending(state);
@@ -62,36 +58,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     const ok = (myTurn && free && selfAlive) || (selfAlive && askedPeach);
     return cardInHand && isSpade && ok ? null : '现在不能使用酒池';
   },
-  async (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const shadowId = shadowIdOf(cardId);
-    // 通过 atom 走完整 pipeline(产生 ViewEvent,保证 processedView 同步)
-    await applyAtom(state, {
-      type: '当作',
-      player: ownerId,
-      cardIds: [cardId],
-      shadowId,
-      outputName: '酒',
-    });
-  },
-  // rollback:主 action validate 失败时,撤销转化(删影子,手牌还原)
-  (state: GameState, params: Record<string, Json>) => {
-    const cardId = params.cardId as string;
-    const sId = shadowIdOf(cardId);
-    delete state.cardMap[sId];
-    const self = state.players[ownerId];
-    const idx = self.hand.indexOf(sId);
-    if (idx >= 0) self.hand[idx] = cardId;
-  },);
-  const unloadDecl = declareAlternativeResponse(state, ownerId, '请求回应', '桃/求桃');
-  return () => { unloadDecl(); };
-}
-
-export function onMount(skill: Skill, api: FrontendAPI): void {
-  // 前端:酒池是转化技,defineAction 声明黑桃手牌。
-  // 前端 UI 流程:选黑桃手牌 → 点酒池 → 提交 preceding=[酒池.transform] + 主 action=酒.use。
-  // 酒.use 自带 selfTarget:true(对自己使用),无需额外选目标。
-  api.defineAction('transform', {
+  mount: {
     label: '酒池',
     style: 'passive',
     prompt: {
@@ -99,7 +66,6 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
       title: '选择一张黑桃手牌当酒使用',
       cardFilter: { filter: (c: Card) => c.suit === '♠', min: 1, max: 1 },
     },
-    transform: (card: Card) => ({ name: '酒', sourceCardId: card.id, fromSkill: skill.id }),
     activeWhen: (ctx) => {
       const p = ctx.view.players[ctx.perspectiveIdx];
       if (!p) return false;
@@ -119,8 +85,24 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
         p.health <= 0
       );
     },
-  });
-  return;
+  },
+};
+
+export function onInit(skill: Skill, state: GameState): () => void {
+  const ownerId = skill.ownerId;
+  // transform action:把黑桃手牌转化为影子"酒"(新建 Card 实体,shadowOf 指向原卡)。
+  // 作为 preceding 在 酒.use 之前执行。酒.validate 读 cardMap[影子id] 看到"酒"。
+  // 五件套(影子 id 后缀=技能 id '酒池'、当作、rollback、defineAction)由工厂统一实现。
+  registerTransformAction(state, skill.id, ownerId, TRANSFORM_OPTIONS);
+  const unloadDecl = declareAlternativeResponse(state, ownerId, '请求回应', '桃/求桃');
+  return () => { unloadDecl(); };
+}
+
+export function onMount(skill: Skill, api: FrontendAPI): void {
+  // 前端:酒池是转化技,defineAction 声明黑桃手牌。
+  // 前端 UI 流程:选黑桃手牌 → 点酒池 → 提交 preceding=[酒池.transform] + 主 action=酒.use。
+  // 酒.use 自带 selfTarget:true(对自己使用),无需额外选目标。
+  mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

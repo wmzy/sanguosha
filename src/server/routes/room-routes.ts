@@ -13,7 +13,8 @@ import {
   broadcastMessage,
   updateConfig,
   kickPlayer,
-  checkRoomPassword,
+  isRoomFull,
+  bindPlayerRoom,
   notifyRoomChanged,
 } from '../room';
 import { destroyRoomCompletely } from '../teardown';
@@ -21,7 +22,7 @@ import { hashPassword } from '../auth/password';
 import { requireUser } from '../auth/guard';
 import { normalizeRoomConfig, type RoomConfig } from '../protocol';
 import { GameSession } from '../session';
-import { gameSessions, playerRoomMap } from '../registry';
+import { gameSessions } from '../registry';
 import { createLogger } from '../logger';
 import { generatePlayerId } from '../utils';
 import { sseStreamHandler } from '../sse';
@@ -30,9 +31,11 @@ import {
   broadcastRoomState,
   detachFromOtherRooms,
   nullSink,
+  notifyRoom,
   optString,
   readJsonBody,
   requireHost,
+  requireRoomPassword,
   requireSessionHost,
   resolveActorOr401,
   resolvePlayerOrRespond,
@@ -111,7 +114,7 @@ export function applyRoomRoutes(app: Hono): void {
         passwordHash,
         user.displayName,
       );
-      playerRoomMap.set(user.id, room.id);
+      // createRoom 内部绑定 host 的 playerRoomMap 映射
       return c.json({ roomId: room.id, playerId: user.id, playerName: user.displayName });
     } catch (err) {
       log.error('创建房间失败', { error: String(err) });
@@ -140,7 +143,7 @@ export function applyRoomRoutes(app: Hono): void {
     // 断线重连：玩家已在 seats 中但 SSE 断开，允许在任何状态下重连（含游戏进行中）
     // SSE handler 会直接设置 room.players 并调用 reconnectPlayer 恢复游戏视图
     if (room.seats.includes(playerId)) {
-      playerRoomMap.set(playerId, id);
+      bindPlayerRoom(playerId, id);
       return c.json({ roomId: id, playerId, playerName: user.displayName });
     }
 
@@ -150,24 +153,20 @@ export function applyRoomRoutes(app: Hono): void {
       return c.json({ error: '游戏已开始' }, 400);
 
     // 有密码房间:验证进房密码(成员重连/已在房间已在上方豁免)
-    if (room.passwordHash) {
-      const password = typeof raw.password === 'string' ? raw.password : '';
-      const ok = await checkRoomPassword(room, password);
-      if (!ok) return c.json({ error: '房间密码错误', code: 'ROOM_PASSWORD_REQUIRED' }, 403);
-    }
+    const forbidden = await requireRoomPassword(c, room, raw.password);
+    if (forbidden) return forbidden;
 
-    if (room.players.size >= room.maxPlayers) return c.json({ error: '房间已满' }, 400);
+    // 容量预检与 joinRoom/switchRole 同源(已占座位数,防幽灵连接误判满员)
+    if (isRoomFull(room)) return c.json({ error: '房间已满' }, 400);
 
     // 清理旧房间关联（跨房间切换时离开旧房间;同房重连不清理）
     detachFromOtherRooms(playerId, id);
 
-    // 加入房间（null sink 占位，SSE 连接时替换）
+    // 加入房间（null sink 占位，SSE 连接时替换;joinRoom 内部绑定 playerRoomMap）
     const joined = joinRoom(id, playerId, nullSink(), user.displayName);
     if (!joined) return c.json({ error: '加入失败' }, 400);
-    playerRoomMap.set(playerId, id);
 
-    broadcastMessage(room, { type: 'player_joined', playerId }, playerId);
-    broadcastRoomState(room);
+    notifyRoom(room, { type: 'player_joined', playerId }, playerId);
 
     return c.json({ roomId: id, playerId, playerName: user.displayName });
   });
@@ -194,8 +193,8 @@ export function applyRoomRoutes(app: Hono): void {
         playerId = typeof raw.playerId === 'string' && raw.playerId.trim()
           ? raw.playerId.trim()
           : generatePlayerId();
+        // joinDebugRoom 内部绑定 playerRoomMap
         joinDebugRoom(room.id, playerId, nullSink());
-        playerRoomMap.set(playerId, room.id);
         seatIndex = session.assignDebugSeat(playerId);
       }
 
@@ -225,14 +224,13 @@ export function applyRoomRoutes(app: Hono): void {
     // 清理旧房间关联(调试房重进连本房残留一并清理,靠 joinDebugRoom 重新占座)
     detachFromOtherRooms(playerId);
 
+    // joinDebugRoom 内部绑定 joiner 的映射并解除被顶替连接的映射
     const joined = joinDebugRoom(roomId, playerId, nullSink());
     if (!joined) return c.json({ error: '加入调试房间失败' }, 400);
-    playerRoomMap.set(playerId, roomId);
 
     // 刷新重连复用座次
     if (joined.replacedPlayerId) {
       session.evictDebugPlayer(joined.replacedPlayerId);
-      playerRoomMap.delete(joined.replacedPlayerId);
     }
 
     const seatIndex = session.assignDebugSeat(playerId);
@@ -262,7 +260,7 @@ export function applyRoomRoutes(app: Hono): void {
     const isNormal = roomBefore?.roomType === 'normal';
 
     const leftRoom = leaveRoom(roomId, playerId);
-    playerRoomMap.delete(playerId);
+    // leaveRoom 内部解除 playerRoomMap 映射
 
     if (leftRoom) {
       broadcastMessage(leftRoom, { type: 'player_left', playerId });
@@ -304,11 +302,10 @@ export function applyRoomRoutes(app: Hono): void {
         /* */
       }
     }
-    playerRoomMap.delete(targetPlayerId);
+    // kickPlayer 内部解除被踢成员的 playerRoomMap 映射
 
     // 广播给其余成员：等同离开 + 更新房间状态
-    broadcastMessage(result.room, { type: 'player_left', playerId: targetPlayerId });
-    broadcastRoomState(result.room);
+    notifyRoom(result.room, { type: 'player_left', playerId: targetPlayerId });
     return c.json({ success: true });
   });
 
@@ -330,8 +327,7 @@ export function applyRoomRoutes(app: Hono): void {
 
     const room = getRoom(roomId);
     if (room) {
-      broadcastMessage(room, { type: 'room_config', config: room.config });
-      broadcastRoomState(room);
+      notifyRoom(room, { type: 'room_config', config: room.config });
     }
     return c.json({ config: updated });
   });

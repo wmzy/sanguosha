@@ -29,8 +29,7 @@
 //     谦逊 source===target(自己选自己的牌);破军 source≠target(徐盛选目标牌)。
 //   - varsKey: 暂存键名,由调用方技能自行定义(如 '界破军/移出'),归还方须用同一键。
 import type { AtomDefinition, Card, EquipSlot, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { requirePlayer, viewPlayer } from './_helpers';
-import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
+import { clearEquipVars, removeCardsFromHand, requirePlayer, viewPlayer } from './_helpers';
 
 export const 移出至暂存区: AtomDefinition<{
   source: number;
@@ -66,10 +65,8 @@ export const 移出至暂存区: AtomDefinition<{
       const id = target.equipment[slot];
       if (id && removeSet.has(id)) {
         delete target.equipment[slot];
-        // 武器:清距离 vars(与 卸下 atom 一致)
-        if (slot === '武器') {
-          delete target.vars[DISTANCE_ATTACK_RANGE_KEY];
-        }
+        // 武器:清距离 vars(与 卸下 atom 一致,共享 clearEquipVars)
+        clearEquipVars(state, atom.target, slot);
       }
     }
     // 追加到 vars[varsKey]
@@ -129,18 +126,14 @@ export const 移出至暂存区: AtomDefinition<{
   applyView(view: GameView, event: ViewEvent) {
     const p = viewPlayer(view, event.target as number);
     if (!p) return;
-    // 手牌:handCount 减
+    // 手牌:owner 视图按 handIds 精确移除(handCount 同步 -N);
+    // others 视图无 handIds,仅按事件携带的 handCount 减计数
     const handIds = event.handIds as string[] | undefined;
-    const handCount = handIds
-      ? handIds.length
-      : ((event.handCount as number) ?? 0);
-    if (handCount > 0) {
-      p.handCount = Math.max(0, p.handCount - handCount);
-    }
-    // 手牌:owner 视图按 cardIds 精确移除(若 handIds 提供)
-    if (handIds && p.hand) {
-      const removeSet = new Set(handIds);
-      p.hand = p.hand.filter((c: Card) => !removeSet.has(c.id));
+    if (handIds && handIds.length > 0) {
+      removeCardsFromHand(p, handIds);
+    } else {
+      const n = (event.handCount as number) ?? 0;
+      if (n > 0) p.handCount = Math.max(0, p.handCount - n);
     }
     // 装备槽:清除
     const equipEntries = event.equipEntries as

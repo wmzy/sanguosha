@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Card, GameView, PendingView, TargetFilter } from '../../../engine/types';
 import type { PendingRespondInfo } from '../../utils/pendingRespond';
 import { toggleTargetSelection, validateTargetSelection } from '../../../engine/rules/target-selection';
+import { SKIP_ACTION_TYPE, SKIP_SKILL_ID } from '../../utils/skipMessage';
 import type { PlaySend } from './common';
 
 export interface RespondInteractionParams {
@@ -134,7 +135,7 @@ export function useRespondInteraction(p: RespondInteractionParams): RespondInter
         }
       } else if (pendingTargetIdx < 0) {
         // 广播型 pending(无懈可击):发 skip 让服务端累计,全员 skip 时提前结束窗口
-        send('__skip', 'skip', {});
+        send(SKIP_SKILL_ID, SKIP_ACTION_TYPE, {});
         markBroadcastSkipped(broadcastKey);
       } else {
         send(info.skillId, 'respond', {});

@@ -22,7 +22,7 @@ import { pickRandom } from '../util/rng';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
 
 const SUIT_REQUEST = '反间/选花色';
 const SUIT_KEY = '反间/suit';
@@ -124,31 +124,24 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // ── respond:目标选花色(注册到每个座次,目标可能是任意玩家)──
   // dispatch 按 (skillId, ownerId, actionType) 查;各座次用独立闭包绑定 seatId,
   // 以 skillId='反间' 隔离,不与其他技能 respond 冲突。
-  const unloaders: Array<() => void> = [];
-  for (const p of state.players) {
-    const seatId = p.index;
-    const u = registerAction(
-      state,
-      skill.id,
-      seatId,
-      'respond',
-      (st: GameState, params: Record<string, Json>) => {
-        const check = requireRequestType(st, seatId, [SUIT_REQUEST], {
-          mismatchError: '当前不是反间选花色',
-        });
-        if (check.error) return check.error;
-        const suit = params.suit;
-        if (typeof suit !== 'string' || !(SUITS as readonly string[]).includes(suit)) {
-          return '需要选择 ♠/♥/♣/♦ 中的一种花色';
-        }
-        return null;
-      },
-      async (st: GameState, params: Record<string, Json>) => {
-        st.localVars[SUIT_KEY] = params.suit;
-      },
-    );
-    unloaders.push(u);
-  }
+  const unloaders = registerRespondForAllSeats(
+    state,
+    skill.id,
+    (st: GameState, seatId: number, params: Record<string, Json>) => {
+      const check = requireRequestType(st, seatId, [SUIT_REQUEST], {
+        mismatchError: '当前不是反间选花色',
+      });
+      if (check.error) return check.error;
+      const suit = params.suit;
+      if (typeof suit !== 'string' || !(SUITS as readonly string[]).includes(suit)) {
+        return '需要选择 ♠/♥/♣/♦ 中的一种花色';
+      }
+      return null;
+    },
+    async (st: GameState, _seatId: number, params: Record<string, Json>) => {
+      st.localVars[SUIT_KEY] = params.suit;
+    },
+  );
 
   return () => {
     unloaders.forEach((u) => u());

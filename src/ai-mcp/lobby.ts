@@ -17,54 +17,9 @@ export interface LobbyOpts {
   config?: RoomConfig;
   /** 玩家 id：给定则采用，否则服务端自动生成 */
   playerId?: string;
-  /** 等待全员就绪的超时(ms)，默认 300000 (5min) */
-  readyTimeoutMs?: number;
 }
 
-export interface LobbyResult {
-  roomId: string;
-  playerId: string;
-  /** 是否房主 */
-  isHost: boolean;
-  /** 实际座次数 */
-  playerCount: number;
-  /** 'playing'=已开局；'lobby'=超时仍未开局 */
-  phase: 'playing' | 'lobby';
-}
-
-const DEFAULT_READY_TIMEOUT_MS = 300_000;
 const TICK_MS = 50;
-
-/**
- * 若 fields 中的 RoomConfig 字段与当前房间配置不同，发送 updateConfig 更新。
- * 仅在 lobby 阶段有效（服务端 updateConfig 要求 status='等待中'）。
- * 以 hgc.roomState?.config 为基线增量覆盖，未变化的字段保留原值。
- * 返回 true 表示有变更并已发送。
- */
-export async function applyConfigUpdate(
-  hgc: HeadlessGameClient,
-  fields: { timeoutSec?: number; name?: string },
-): Promise<boolean> {
-  const current = hgc.roomState?.config;
-  if (!current) return false;
-  const next: RoomConfig = { ...current };
-  let changed = false;
-  if (fields.timeoutSec !== undefined && fields.timeoutSec !== current.timeoutSec) {
-    // Infinity/负数 → 0(无限)
-    next.timeoutSec = !Number.isFinite(fields.timeoutSec) || fields.timeoutSec < 0
-      ? 0
-      : fields.timeoutSec;
-    changed = true;
-  }
-  if (fields.name !== undefined && fields.name !== current.name) {
-    next.name = fields.name;
-    changed = true;
-  }
-  if (changed) {
-    await hgc.sendUpdateConfig(next);
-  }
-  return changed;
-}
 
 /** 判定全员就绪：readyPlayers 集合 === playerIds 集合，且至少 minPlayers 人。
  *  minPlayers 仅用于「等齐开局」：AI 编排/多进程演示必须等全部座位到齐，
@@ -80,7 +35,7 @@ function isAllReady(hgc: HeadlessGameClient, minPlayers = 2): boolean {
 /**
  * 建/加入房间并发送 ready（不等全员就绪）。
  * 用于 multiplayer 分阶段编排：首次只到 ready，立即返回 lobby + roomId，
- * 供房主把房间码分享给他人；他人加入后再用 advanceToStart 推进开局。
+ * 供房主把房间码分享给他人；他人加入后再用 createLobbyAdvancer 推进开局。
  */
 export async function joinAndReady(
   hgc: HeadlessGameClient,
@@ -113,28 +68,6 @@ function isPlaying(hgc: HeadlessGameClient): boolean {
   return hgc.phase === 'playing';
 }
 
-/**
- * 等待全员就绪并推进开局（房主 sendStartGame；非房主仅等待）。
- * 超时静默返回 false。返回 true 表示已进入 playing。
- * 幂等：可重复调用，已在 playing 时直接返回 true。
- */
-export async function advanceToStart(
-  hgc: HeadlessGameClient,
-  readyTimeoutMs?: number,
-): Promise<boolean> {
-  if (isPlaying(hgc)) return true;
-  const readyDeadline = Date.now() + (readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS);
-  await waitFor(() => isAllReady(hgc), readyDeadline, '等待全员就绪超时', false);
-  if (!isAllReady(hgc)) return false;
-  const rs = hgc.roomState;
-  if (rs?.hostId === hgc.playerId) {
-    hgc.sendStartGame();
-  }
-  const startDeadline = Date.now() + 15_000;
-  await waitFor(() => isPlaying(hgc), startDeadline, '开局超时', false);
-  return isPlaying(hgc);
-}
-
 export interface LobbyAdvancerOpts {
   /** 开局所需的最少玩家数。默认 2；AI 编排应传房间满员数，等齐再开局。 */
   minPlayers?: number;
@@ -164,78 +97,6 @@ export function createLobbyAdvancer(
     if (rs?.hostId && rs.hostId === hgc.playerId) {
       void hgc.sendStartGame();
     }
-  };
-}
-
-/**
- * 加入房间并推进到开局。
- * create 模式：建房→准备→等待他人加入并就绪→房主开局。
- * join 模式：加入→准备→等待房主开局。
- * 返回时 phase 应为 'playing'（已开局）；超时则 phase='lobby'。
- */
-export async function joinAndStartRoom(
-  hgc: HeadlessGameClient,
-  opts: LobbyOpts,
-): Promise<LobbyResult> {
-  // 1. 建/加入房间
-  if (opts.mode === 'create') {
-    await hgc.createRoom(
-      opts.name ?? `房间${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
-      opts.maxPlayers ?? 2,
-      opts.config,
-      opts.playerId,
-    );
-  } else {
-    if (!opts.roomId) throw new Error('join 模式需要 roomId');
-    await hgc.joinRoom(opts.roomId, opts.playerId);
-  }
-
-  // 2. 等 room_joined（playerId 就绪）
-  const joinDeadline = Date.now() + 10_000;
-  await waitFor(() => hgc.playerId !== null, joinDeadline, '加入房间超时');
-
-  // 3. 准备
-  hgc.sendReady();
-
-  // 4. 等待全员就绪(超时静默返回 lobby,由调用方决定后续)
-  const readyDeadline = Date.now() + (opts.readyTimeoutMs ?? DEFAULT_READY_TIMEOUT_MS);
-  await waitFor(() => isAllReady(hgc), readyDeadline, '等待全员就绪超时', false);
-  if (!isAllReady(hgc)) {
-    return {
-      roomId: hgc.roomId ?? '',
-      playerId: hgc.playerId ?? '',
-      isHost: hgc.roomState?.hostId === hgc.playerId,
-      playerCount: hgc.roomState?.playerIds.length ?? 0,
-      phase: 'lobby',
-    };
-  }
-
-  // 5. 房主开局；非房主等开局
-  const rs = hgc.roomState;
-  const isHost = rs?.hostId === hgc.playerId;
-  if (isHost) {
-    hgc.sendStartGame();
-  }
-
-  // 6. 等开局（phase→playing）
-  const startDeadline = Date.now() + 15_000;
-  await waitFor(
-    () => hgc.phase === 'playing',
-    startDeadline,
-    '开局超时',
-    // 超时不抛错：返回 lobby 状态，让调用方决定
-    false,
-  );
-
-  const finalRs = hgc.roomState;
-  const roomId = hgc.roomId ?? '';
-  const playerId = hgc.playerId ?? '';
-  return {
-    roomId,
-    playerId,
-    isHost,
-    playerCount: finalRs?.playerIds.length ?? 0,
-    phase: hgc.phase === 'playing' ? 'playing' : 'lobby',
   };
 }
 

@@ -8,7 +8,6 @@
 //   5. 消耗优先扣额定(quota 满后扣 extra)
 //   6. 连弩式无限:canSlash 恒真
 //   7. 卸载提供者:slashMax 回落
-//   8. 向后兼容:SLASH_USED_VAR 仍为 view 投影 key
 import { describe, it, expect } from 'vitest';
 import { createGameState } from '../../src/engine/types';
 import type { GameState } from '../../src/engine/types';
@@ -25,7 +24,6 @@ import {
   slashUsed,
   canSlash,
   incSlashUsed,
-  SLASH_USED_VAR,
 } from '../../src/engine/rules/slash-quota';
 
 function makeState(): GameState {
@@ -288,12 +286,6 @@ describe('模块 K:杀次数三层计数模型', () => {
       expect(slashQuotaMax(s, 0)).toBe(3);
       u2();
       expect(slashQuotaMax(s, 0)).toBe(3);
-    });
-  });
-
-  describe('向后兼容', () => {
-    it('SLASH_USED_VAR 仍导出为 view 投影 key("杀/usedCount")', () => {
-      expect(SLASH_USED_VAR).toBe('杀/usedCount');
     });
   });
 });

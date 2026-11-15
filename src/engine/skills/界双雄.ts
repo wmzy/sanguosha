@@ -231,6 +231,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   });
 
   // ── 造成伤害 after-hook:target=ownerId 且 amount>0 → 记伤害牌 id ──
+  // 注:不用 registerOnDamagedAsTarget——双雄记牌不限伤害来源(任何带 cardId 的伤害,
+  // 含系统来源/自伤都要记,结束阶段才能正确获得),该 helper 的
+  // `source===undefined||source===ownerId` 前导守卫会漏记,故保留手写两行守卫。
   registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;

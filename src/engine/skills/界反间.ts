@@ -19,7 +19,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { requireRequestType, askConfirm, registerRespondForAllSeats } from '../util/skillRuntime';
 
 /** 目标二选一请求类型。 */
 const CHOICE_REQUEST = '界反间/choice';
@@ -119,29 +119,22 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // ── respond:目标二选一(注册到每个座次,目标可能是任意玩家)──
   // dispatch 按 (skillId, ownerId, actionType) 查;各座次用独立闭包绑定 seatId,
   // 以 skillId='界反间' 隔离,不与其他技能 respond 冲突。
-  const unloaders: Array<() => void> = [];
-  for (const p of state.players) {
-    const seatId = p.index;
-    const u = registerAction(
-      state,
-      skill.id,
-      seatId,
-      'respond',
-      (st: GameState, params: Record<string, Json>) => {
-        const check = requireRequestType(st, seatId, [CHOICE_REQUEST], {
-          mismatchError: '当前不是反间二选一',
-        });
-        if (check.error) return check.error;
-        // choice 必须是布尔(前端 confirm prompt 提交 choice:true/false)
-        if (typeof params.choice !== 'boolean') return '需要选择一项';
-        return null;
-      },
-      async (st: GameState, params: Record<string, Json>) => {
-        st.localVars[CHOICE_KEY] = params.choice === true;
-      },
-    );
-    unloaders.push(u);
-  }
+  const unloaders = registerRespondForAllSeats(
+    state,
+    skill.id,
+    (st: GameState, seatId: number, params: Record<string, Json>) => {
+      const check = requireRequestType(st, seatId, [CHOICE_REQUEST], {
+        mismatchError: '当前不是反间二选一',
+      });
+      if (check.error) return check.error;
+      // choice 必须是布尔(前端 confirm prompt 提交 choice:true/false)
+      if (typeof params.choice !== 'boolean') return '需要选择一项';
+      return null;
+    },
+    async (st: GameState, _seatId: number, params: Record<string, Json>) => {
+      st.localVars[CHOICE_KEY] = params.choice === true;
+    },
+  );
 
   return () => {
     unloaders.forEach((u) => u());

@@ -7,7 +7,7 @@
 // outputName 决定转化后的牌名。rollback(删影子/还原卡)由调用方技能回调负责,本 atom 不处理。
 import type { AtomDefinition, Card, ViewEventSplit, ViewEvent } from '../types';
 import type { Color } from '../../engine/types';
-import { requirePlayer, viewPlayer } from './_helpers';
+import { removeCardsFromHand, requirePlayer, viewPlayer } from './_helpers';
 import { 基本牌列表, 锦囊牌列表, 装备牌列表 } from '../data/card-defs';
 
 /** 牌名→类型映射(从卡牌定义派生,数据驱动,不硬编码牌名)。
@@ -114,8 +114,6 @@ export const 当作: AtomDefinition<{
     const count = (ev.count as number | undefined) ?? cardIds?.length ?? 1;
     const outputName = typeof ev.outputName === 'string' ? ev.outputName : '杀';
 
-    p.handCount = Math.max(0, p.handCount - (count - 1));
-
     if (cardIds && shadowId && p.hand) {
       let shadowCard = view.cardMap[shadowId];
       if (!shadowCard) {
@@ -134,9 +132,13 @@ export const 当作: AtomDefinition<{
         if (outputDamageType) shadowCard.damageType = outputDamageType;
         view.cardMap[shadowId] = shadowCard;
       }
-      const idSet = new Set(cardIds);
-      p.hand = p.hand.filter((c) => !idSet.has(c.id));
+      // 转化净效果 = N 张原牌出、1 张影子进:分解为「集合移除 -N」+「影子回填 +1」
+      removeCardsFromHand(p, cardIds);
       p.hand.push(shadowCard);
+      p.handCount += 1;
+    } else {
+      // others 视角(无 cardIds / hand 不可见):只按净额 -(count-1) 调计数
+      p.handCount = Math.max(0, p.handCount - (count - 1));
     }
   },
   toViewLog(event) {

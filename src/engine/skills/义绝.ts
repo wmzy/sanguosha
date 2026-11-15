@@ -37,7 +37,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { registerSuppressionProvider } from '../core/skill-suppression';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, askResponse } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 /** 请求类型:目标展示一张手牌。 */
@@ -149,26 +149,20 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             c !== null,
         );
 
-      delete st.localVars[REVEAL_KEY];
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: REVEAL_REQUEST,
-        target,
+      // 读取目标的选择(超时兜底:选目标手牌第一张,不放弃展示机会)
+      let revealedId = await askResponse<string | undefined>(st, REVEAL_REQUEST, target, {
         prompt: {
           type: 'pickProcessingCard',
           title: '义绝:选择一张手牌展示',
           cards,
         },
         timeout: 30,
+        resultKey: REVEAL_KEY,
       });
-
-      // 读取目标的选择(超时兜底:选目标手牌第一张,不放弃展示机会)
-      let revealedId = st.localVars[REVEAL_KEY] as string | undefined;
       const targetHand = st.players[target]?.hand ?? [];
       if (!revealedId || !targetHand.includes(revealedId)) {
         revealedId = targetHand[0];
       }
-      delete st.localVars[REVEAL_KEY];
 
       const revealedCard = revealedId ? st.cardMap[revealedId] : undefined;
       if (!revealedCard) {

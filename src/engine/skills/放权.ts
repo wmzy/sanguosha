@@ -28,7 +28,8 @@ import type {
 import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAction, registerBeforeHook } from '../core/skill';
-import { askConfirm, defineConfirmAction, registerPhaseStartHook } from '../util/skillRuntime';
+import { projectTurnUsage } from '../rules/turn-usage';
+import { askConfirm, askResponse, defineConfirmAction, registerPhaseStartHook } from '../util/skillRuntime';
 
 const TRIGGER_RT = '放权/trigger';
 const DISCARD_RT = '放权/discard';
@@ -48,7 +49,7 @@ async function clearPerTurnState(state: GameState): Promise<void> {
     p.marks = p.marks.filter((m) => m.duration !== 'turn');
     for (const key of Object.keys(p.vars)) {
       if (key.endsWith('/usedThisTurn') || key.endsWith('/healed') || key.endsWith('/givenCount')) {
-        await applyAtom(state, { type: '回合用量', player: p.index, key, value: null });
+        await projectTurnUsage(state, p.index, key, null);
       }
     }
     p.vars = Object.fromEntries(
@@ -163,31 +164,22 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
         // 请求弃一张手牌:必须支付,未支付(无手牌/超时/不回应)则不发动额外回合
         if (self.hand.length === 0) return; // 无手牌无法支付代价 → 不发动,放行正常回合结束
-        delete st.localVars[DISCARD_CARD_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: DISCARD_RT,
-          target: ownerId,
+        const discardCardId = await askResponse<string | undefined>(st, DISCARD_RT, ownerId, {
           prompt: {
             type: 'useCard',
             title: '放权:弃置一张手牌',
             cardFilter: { filter: () => true, min: 1, max: 1 },
           },
           timeout: 15,
+          resultKey: DISCARD_CARD_KEY,
         });
-        const discardCardId = st.localVars[DISCARD_CARD_KEY] as string | undefined;
-        delete st.localVars[DISCARD_CARD_KEY];
         if (!discardCardId || !self.hand.includes(discardCardId)) {
           return; // 超时/不回应 → 未支付代价,不发动额外回合,放行正常回合结束
         }
         await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [discardCardId], voluntary: true });
 
         // 请求选额外回合目标(排除自己、排除死亡)
-        delete st.localVars[EXTRA_TARGET_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: CHOOSE_TARGET_RT,
-          target: ownerId,
+        const extraTarget = await askResponse<number | undefined>(st, CHOOSE_TARGET_RT, ownerId, {
           prompt: {
             type: 'choosePlayer',
             title: '放权:选择一名其他角色进行一个额外回合',
@@ -197,8 +189,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
               target !== ownerId && view.players[target]?.alive === true,
           },
           timeout: 15,
+          resultKey: EXTRA_TARGET_KEY,
         });
-        const extraTarget = st.localVars[EXTRA_TARGET_KEY] as number | undefined;
         if (
           typeof extraTarget !== 'number' ||
           extraTarget === ownerId ||
@@ -208,7 +200,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           return;
         }
 
-        // 记录正常下家(currentPlayerIndex 已被 end action 的 下一玩家 推进到正常下家)
+        // 记录正常下家(currentPlayerIndex 已被 end action 的 下一玩家 推进到正常下家)。
+        // askResponse 读后已删 EXTRA_TARGET_KEY,此处重写以供「情况2」识别额外目标。
         const originalNext = st.currentPlayerIndex;
         st.localVars[EXTRA_TARGET_KEY] = extraTarget;
         st.localVars[ORIGINAL_NEXT_KEY] = originalNext;

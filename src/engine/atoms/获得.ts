@@ -5,7 +5,7 @@
 // 时机标记(reason='获得'),为失去牌类技能提供统一 hook 点。ZoneLoc 不含「装备」区域,
 // 从装备区获得不发标记。本 atom 的 apply + view 事件保持不变(含信息分级)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { requirePlayer, viewPlayer } from './_helpers';
+import { addCardToHand, removeCardFromHand, requirePlayer, viewPlayer } from './_helpers';
 import { applyAtom } from '../core/apply';
 
 /** localVars key:本次获得是否来自 from 玩家的手牌(afterApply 发时机标记用) */
@@ -87,13 +87,9 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
   },
   applyView(view, event) {
     const cardId = event.cardId as string | undefined;
-    const p = viewPlayer(view, event.player as number);
-    if (!p) return;
-    p.handCount += 1;
-    if (cardId && p.hand) {
-      const card = view.cardMap[cardId];
-      if (card) p.hand.push(card);
-    }
+    // 获得者不在 view 中时整体跳过(from 玩家的对称移除也不做,与原实现一致)
+    if (!viewPlayer(view, event.player as number)) return;
+    addCardToHand(view, event.player as number, cardId);
     // from 玩家:手牌/装备移除(与 apply 对称)
     const from = event.from as number | undefined;
     const fromZone = event.fromZone as 'hand' | 'equipment' | undefined;
@@ -108,11 +104,8 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
           }
           fromP.equipment = equipment;
         } else {
-          // 从手牌移除:handCount - 1;可见时同步 hand 数组
-          fromP.handCount = Math.max(0, fromP.handCount - 1);
-          if (cardId && fromP.hand) {
-            fromP.hand = fromP.hand.filter((c) => c.id !== cardId);
-          }
+          // 从手牌移除(handCount - 1;可见时同步 hand 数组)
+          removeCardFromHand(fromP, cardId);
         }
       }
     }

@@ -1,21 +1,26 @@
 // 刚烈(夏侯惇·被动技):当你受到伤害后,你可以进行一次判定,
 // 若结果不为红桃,则伤害来源选择一项:弃置两张手牌,或受到 1 点伤害。
 //
-// 模式 A(被动触发):after hook 挂在「造成伤害」。
-//   造成伤害(target=自己, source 存活) → 判定 → 非红桃 → 来源二选一。
+// 模式 A(被动触发):after hook 挂在「受到伤害后」。
+//   受到伤害(target=自己, source 存活) → 判定 → 非红桃 → 来源二选一。
+//   前导守卫(target/amount/source 四查)由 skillRuntime 的 registerOnDamagedAsTarget 封装。
 //
 // 关键点:
 //   - 来源选择需要来源玩家 respond,而刚烈只注册在夏侯惇座次。
 //     引擎 dispatch 按 (skillId, message.ownerId, actionType) 精确查 action,
 //     因此把 'respond' action 注册到每个座次(以 skillId='刚烈' 隔离,不与他技冲突)。
-//   - 判定结果通过「判定牌生效后」after hook 在判定牌生效后捕获花色,存 localVars.
+//   - 判定结果由 runJudgeFlow 直接返回(不再经全局临时变量/判定牌生效后 hook 捕获)。
 //   - 来源手牌不足两张时只能选择受到伤害(规则 FAQ)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import {
+  askConfirm,
+  defineConfirmAction,
+  registerOnDamagedAsTarget,
+  registerRespondForAllSeats,
+} from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '刚烈/confirm';
 const CHOOSE_REQUEST = '刚烈/choose';
@@ -35,49 +40,39 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── respond:伤害来源二选一(弃两张手牌 / 受 1 点伤害)──
   // 注册到每个座次:来源可能是任意玩家,dispatch 按 (skillId, ownerId, actionType) 查。
   // 各座次用独立闭包绑定 seatId;以 skillId='刚烈' 隔离,不与其他技能 respond 冲突。
-  const unloaders: Array<() => void> = [];
-  for (const p of state.players) {
-    const seatId = p.index;
-    const isOwner = seatId === ownerId;
-    const u = registerAction(
-      state,
-      skill.id,
-      seatId,
-      'respond',
-      (st: GameState, _params: Record<string, Json>) => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as Record<string, unknown>;
-        if (atom['type'] !== '请求回应') return '当前不需要回应';
-        const requestType = atom['requestType'] as string;
-        if (requestType === CHOOSE_REQUEST) return null; // 来源二选一
-        if (isOwner && requestType === CONFIRM_REQUEST) return null; // 是否发动
-        return '当前不是刚烈回应';
-      },
-      async (st: GameState, params: Record<string, Json>) => {
-        const slot = st.pendingSlots.get(seatId);
-        const requestType = (slot?.atom as Record<string, unknown> | undefined)?.['requestType'] as
-          | string
-          | undefined;
-        if (requestType === CONFIRM_REQUEST) {
-          st.localVars['刚烈/confirmed'] = params.choice === true;
-        } else {
-          // CHOOSE_REQUEST: choice=true → 弃两张手牌;choice=false/缺省 → 受 1 点伤害
-          st.localVars['刚烈/choice'] = params.choice === true ? 'discard' : 'damage';
-        }
-      },
-    );
-    unloaders.push(u);
-  }
+  const unloaders = registerRespondForAllSeats(
+    state,
+    skill.id,
+    (st: GameState, seatId: number, _params: Record<string, Json>) => {
+      const isOwner = seatId === ownerId;
+      const slot = st.pendingSlots.get(seatId);
+      if (!slot) return '当前不需要回应';
+      const atom = slot.atom as Record<string, unknown>;
+      if (atom['type'] !== '请求回应') return '当前不需要回应';
+      const requestType = atom['requestType'] as string;
+      if (requestType === CHOOSE_REQUEST) return null; // 来源二选一
+      if (isOwner && requestType === CONFIRM_REQUEST) return null; // 是否发动
+      return '当前不是刚烈回应';
+    },
+    async (st: GameState, seatId: number, params: Record<string, Json>) => {
+      const slot = st.pendingSlots.get(seatId);
+      const requestType = (slot?.atom as Record<string, unknown> | undefined)?.['requestType'] as
+        | string
+        | undefined;
+      if (requestType === CONFIRM_REQUEST) {
+        st.localVars['刚烈/confirmed'] = params.choice === true;
+      } else {
+        // CHOOSE_REQUEST: choice=true → 弃两张手牌;choice=false/缺省 → 受 1 点伤害
+        st.localVars['刚烈/choice'] = params.choice === true ? 'discard' : 'damage';
+      }
+    },
+  );
 
   // 判定结果由 runJudgeFlow 直接返回；不再通过全局临时变量捕获。
-  // ── 造成伤害 after hook:刚烈主逻辑 ──
-  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.target !== ownerId) return;
-    if ((atom.amount ?? 0) <= 0) return;
-    if (atom.source === undefined || atom.source === ownerId) return;
-    const sourceIdx = atom.source;
+  // ── 受到伤害后 after hook:刚烈主逻辑(前导守卫由 registerOnDamagedAsTarget 封装:
+  //    target=自己 + amount>0 + 有来源且非自伤)──
+  registerOnDamagedAsTarget(state, skill.id, ownerId, async (ctx) => {
+    const sourceIdx = ctx.atom.source;
     const sourcePlayer = ctx.state.players[sourceIdx];
     if (!sourcePlayer?.alive) return; // 来源必须存活(FAQ)
 

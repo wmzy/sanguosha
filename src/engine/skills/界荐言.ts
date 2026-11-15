@@ -32,8 +32,9 @@ import { getGender } from '../data/character-meta';
 import { defaultPlayActive } from '../rules/action-active';
 import type { GameView } from '../types';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, askResponse } from '../util/skillRuntime';
 import { setPlayerVarUsage } from '../rules/turn-usage';
+import { usedThisTurn as usedOncePerTurn } from '../rules/once-per-turn';
 
 const SKILL_ID = '界荐言';
 const DISPLAY_NAME = '荐言';
@@ -81,9 +82,9 @@ function isMaleAlive(state: GameState, target: number): boolean {
   return getGender(p.character) === '男';
 }
 
-/** 本回合是否已用过荐言 */
+/** 本回合是否已用过荐言(rules/once-per-turn 共享版,键 = `${SKILL_ID}/usedThisTurn`) */
 function usedThisTurn(state: GameState, ownerId: number): boolean {
-  return !!state.players[ownerId]?.vars[USED_KEY];
+  return usedOncePerTurn(state, ownerId, SKILL_ID);
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
@@ -159,11 +160,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       try {
         // 1. 询问声明
-        delete st.localVars[DECLARATION_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: DECLARE_RT,
-          target: ownerId,
+        const rawDeclaration = await askResponse<Json>(st, DECLARE_RT, ownerId, {
           prompt: {
             type: 'chooseOption',
             title: '荐言:声明一种牌的类别(基本牌/锦囊牌/装备牌)或颜色(红/黑)',
@@ -173,19 +170,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           },
           defaultChoice: '基本牌',
           timeout: 30,
+          resultKey: DECLARATION_KEY,
         });
-        const rawDeclaration = st.localVars[DECLARATION_KEY];
         const declaration: Declaration = isValidDeclaration(rawDeclaration)
           ? rawDeclaration
           : '基本牌'; // 超时/非法 → 默认基本牌(不放弃使用机会)
-        delete st.localVars[DECLARATION_KEY];
 
         // 2. 询问目标(男性角色)
-        delete st.localVars[TARGET_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: TARGET_RT,
-          target: ownerId,
+        const target = await askResponse<number | undefined>(st, TARGET_RT, ownerId, {
           prompt: {
             type: 'choosePlayer',
             title: '荐言:选择一名男性角色获得匹配的牌',
@@ -195,9 +187,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
               isMaleAlive(st, t),
           },
           timeout: 20,
+          resultKey: TARGET_KEY,
         });
-        const target = st.localVars[TARGET_KEY] as number | undefined;
-        delete st.localVars[TARGET_KEY];
         if (typeof target !== 'number' || !isMaleAlive(st, target)) {
           // 无有效目标:荐言失效(已限一次,不再触发)
           return;

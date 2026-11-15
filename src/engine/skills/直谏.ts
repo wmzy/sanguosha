@@ -10,116 +10,170 @@
 //   - 装备 atom 的 validate 要求 cardId 在目标手牌中,故先把装备牌移动牌到目标手牌再装备。
 //   - 装备到"他人"而非自己:不能复用 装备通用.use(它绑定 ownerId),这里手动复刻
 //     装备通用的 装备+添加技能 序列(目标=target)。
-//   - 不得替换原装备:validate 检查目标对应 slot 为空。
 //   - 无次数限制。
+//
+// 本文件同时导出 createZhijianSkill 工厂(直谏族共享实现),界直谏 复用之,
+// 仅注入 名称/描述/文案/可否替换原装备 差异参数。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply'
+import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { hasSkillModule } from './registry';
-import type { SkillModule } from '../types';
 import { slotOf } from '../util/skillRuntime';
 
-export function createSkill(id: string, ownerId: number): Skill {
+/** 直谏族(主动技)差异参数 */
+export interface ZhijianOptions {
+  /** Skill.name(标 '直谏' / 界 '界直谏') */
+  name: string;
+  description: string;
+  /** 技能 id('直谏'/'界直谏'):frame 名 + 自指错误文案 */
+  skillId: string;
+  /** onMount 按钮文案 */
+  mountLabel: string;
+  /** onMount 弹窗标题 */
+  mountTitle: string;
+  /** 界版:可替换原装备(栏位已有装备时先弃置原装备再装新装备);
+   *  标版"不得替换"——validate 要求目标对应栏位为空。 */
+  allowReplace?: boolean;
+}
+
+/** 直谏族共享实现:标版直谏与界直谏的 装备流程 逐字一致;
+ *  界版仅放宽"栏位必须为空"为"可替换"(替换序列与 装备通用 一致)。 */
+export function createZhijianSkill(opts: ZhijianOptions) {
   return {
-    id,
-    ownerId,
-    name: '直谏',
-    description: '出牌阶段:将一张装备牌置于一名其他角色的空装备区,然后摸一张牌',
+    createSkill(id: string, ownerId: number): Skill {
+      return {
+        id,
+        ownerId,
+        name: opts.name,
+        description: opts.description,
+      };
+    },
+
+    onInit(skill: Skill, state: GameState): (() => void) | undefined {
+      const ownerId = skill.ownerId;
+
+      registerAction(
+        state,
+        skill.id,
+        ownerId,
+        'use',
+        (st: GameState, params: Record<string, Json>) => {
+          // 通用合法条件
+          if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
+          if (st.phase !== '出牌') return '只能在出牌阶段使用';
+          if (hasBlockingPending(st)) return '当前有未完成的询问';
+          const self = st.players[ownerId];
+          if (!self?.alive) return '你已死亡';
+
+          // 参数:cardId + target(targets[0] 或 target)
+          if (typeof params.cardId !== 'string') return '需要选择一张装备牌';
+          if (!self.hand.includes(params.cardId)) return '牌不在手牌中';
+          const card = st.cardMap[params.cardId];
+          if (card?.type !== '装备牌') return '只能使用装备牌';
+          const slot = slotOf(card);
+          if (!slot) return '无效的装备牌';
+
+          const target =
+            Array.isArray(params.targets) && typeof params.targets[0] === 'number'
+              ? params.targets[0]
+              : typeof params.target === 'number'
+                ? params.target
+                : undefined;
+          if (target === undefined) return '需要指定一名目标';
+          if (target === ownerId) return `不能对自己使用${opts.skillId}`;
+          const targetPlayer = st.players[target];
+          if (!targetPlayer?.alive) return '目标不合法';
+
+          // 标版:不得替换原装备——目标对应栏位必须为空(界版可替换,不检查)
+          if (!opts.allowReplace && targetPlayer.equipment[slot]) {
+            return '目标该装备栏位已有装备,不得替换';
+          }
+
+          return null;
+        },
+        async (st: GameState, params: Record<string, Json>) => {
+          const cardId = params.cardId as string;
+          const target =
+            Array.isArray(params.targets) && typeof params.targets[0] === 'number'
+              ? params.targets[0]
+              : (params.target as number);
+          const card = st.cardMap[cardId];
+
+          await pushFrame(st, opts.skillId, ownerId, { ...params });
+          // 1. 把装备牌交到目标手中(装备 atom 要求 cardId 在目标手牌中)
+          await applyAtom(st, {
+            type: '移动牌',
+            cardId,
+            from: { zone: '手牌', player: ownerId },
+            to: { zone: '手牌', player: target },
+          });
+          // 2. 界版:若目标对应栏位已有装备 → 替换:移除旧装备技能 → 卸下 → 旧装备入弃牌堆
+          //    (与 装备通用 替换语义一致;会触发目标"失去装备"类技能如枭姬,属预期)
+          if (opts.allowReplace) {
+            const slot = slotOf(card)!;
+            const currentEquip = st.players[target].equipment[slot];
+            if (currentEquip) {
+              const oldCard = st.cardMap[currentEquip];
+              if (oldCard?.name && hasSkillModule(oldCard.name)) {
+                await applyAtom(st, { type: '移除技能', player: target, skillId: oldCard.name });
+              }
+              await applyAtom(st, { type: '卸下', player: target, slot });
+              await applyAtom(st, {
+                type: '移动牌',
+                cardId: currentEquip,
+                from: { zone: '手牌', player: target },
+                to: { zone: '弃牌堆' },
+              });
+            }
+          }
+          // 3. 装备到目标(从目标手牌移入目标装备区)
+          await applyAtom(st, { type: '装备', player: target, cardId });
+          // 4. 若装备自带技能(以 card.name 作 skillId),动态挂载(与 装备通用 一致)
+          if (card?.name && hasSkillModule(card.name)) {
+            await applyAtom(st, { type: '添加技能', player: target, skillId: card.name });
+          }
+          // 5. 摸一张牌
+          await applyAtom(st, { type: '摸牌', player: ownerId, count: 1 });
+          await popFrame(st);
+        },
+      );
+
+      return () => {};
+    },
+
+    onMount(_skill: Skill, api: FrontendAPI): (() => void) | undefined {
+      api.defineAction('use', {
+        label: opts.mountLabel,
+        style: 'primary',
+        prompt: {
+          type: 'useCardAndTarget',
+          title: opts.mountTitle,
+          cardFilter: { filter: (c) => c.type === '装备牌', min: 1, max: 1 },
+          targetFilter: {
+            min: 1,
+            max: 1,
+            filter: (view, target) => {
+              const me = view.viewer;
+              if (target === me) return false;
+              return view.players[target]?.alive === true;
+            },
+          },
+        },
+      });
+      return () => {};
+    },
   };
 }
 
-export function onInit(skill: Skill, state: GameState): (() => void) | void {
-  const ownerId = skill.ownerId;
+const OPTIONS: ZhijianOptions = {
+  name: '直谏',
+  description: '出牌阶段:将一张装备牌置于一名其他角色的空装备区,然后摸一张牌',
+  skillId: '直谏',
+  mountLabel: '直谏',
+  mountTitle: '直谏:将一张装备牌置于一名其他角色的空装备区',
+};
 
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'use',
-    (st: GameState, params: Record<string, Json>) => {
-      // 通用合法条件
-      if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
-      if (st.phase !== '出牌') return '只能在出牌阶段使用';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
-      const self = st.players[ownerId];
-      if (!self?.alive) return '你已死亡';
+export const { createSkill, onInit, onMount } = createZhijianSkill(OPTIONS);
 
-      // 参数:cardId + target(targets[0] 或 target)
-      if (typeof params.cardId !== 'string') return '需要选择一张装备牌';
-      if (!self.hand.includes(params.cardId)) return '牌不在手牌中';
-      const card = st.cardMap[params.cardId];
-      if (card?.type !== '装备牌') return '只能使用装备牌';
-      const slot = slotOf(card);
-      if (!slot) return '无效的装备牌';
-
-      const target =
-        Array.isArray(params.targets) && typeof params.targets[0] === 'number'
-          ? (params.targets[0])
-          : typeof params.target === 'number'
-            ? (params.target)
-            : undefined;
-      if (target === undefined) return '需要指定一名目标';
-      if (target === ownerId) return '不能对自己使用直谏';
-      const targetPlayer = st.players[target];
-      if (!targetPlayer?.alive) return '目标不合法';
-
-      // 不得替换原装备:目标对应栏位必须为空
-      if (targetPlayer.equipment[slot]) return '目标该装备栏位已有装备,不得替换';
-
-      return null;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      const cardId = params.cardId as string;
-      const target =
-        Array.isArray(params.targets) && typeof params.targets[0] === 'number'
-          ? (params.targets[0])
-          : (params.target as number);
-      const card = st.cardMap[cardId];
-
-      await pushFrame(st, '直谏', ownerId, { ...params });
-      // 1. 把装备牌交到目标手中(装备 atom 要求 cardId 在目标手牌中)
-      await applyAtom(st, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: ownerId },
-        to: { zone: '手牌', player: target },
-      });
-      // 2. 装备到目标(从目标手牌移入目标装备区)
-      await applyAtom(st, { type: '装备', player: target, cardId });
-      // 3. 若装备自带技能(以 card.name 作 skillId),动态挂载(与 装备通用 一致)
-      if (card?.name && hasSkillModule(card.name)) {
-        await applyAtom(st, { type: '添加技能', player: target, skillId: card.name });
-      }
-      // 4. 摸一张牌
-      await applyAtom(st, { type: '摸牌', player: ownerId, count: 1 });
-      await popFrame(st);
-    },
-  );
-  return () => {};
-}
-
-export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
-    label: '直谏',
-    style: 'primary',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '直谏:将一张装备牌置于一名其他角色的空装备区',
-      cardFilter: { filter: (c) => c.type === '装备牌', min: 1, max: 1 },
-      targetFilter: {
-        min: 1,
-        max: 1,
-        filter: (view, target) => {
-          const me = view.viewer;
-          if (target === me) return false;
-          return view.players[target]?.alive === true;
-        },
-      },
-    },
-  });
-  return () => {};
-}
-
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

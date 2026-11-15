@@ -13,6 +13,7 @@ import { applyServerMessage, mergeRoomConfig } from './viewMaintainer';
 import { enumerateAvailableActions, appendRespondActions } from './availableActions';
 import { resolvePendingRespond } from '../utils/pendingRespond';
 import { decideAutoSkip, DEFAULT_PREFS, type AutoSkipPrefs } from '../utils/autoSkip';
+import { buildSkipMessage, SKIP_SKILL_ID } from '../utils/skipMessage';
 import { getActionsForPlayer, registerSkillActions } from '../skillActionRegistry';
 import type { ClientPhase, HeadlessCallbacks, AvailableAction, RoomState, ReconnectState } from './types';
 
@@ -639,7 +640,7 @@ export class HeadlessGameClient {
     this._lastActionRejected = false;
     // 阻塞型 pending 期间 respond 携带 pendingSeq（当前窗口 seq），非阻塞（出牌窗口）不带
     const pending = this._view?.pending;
-    if (action.skillId === '__skip' && pending && pending.target < 0) {
+    if (action.skillId === SKIP_SKILL_ID && pending && pending.target < 0) {
       this._skippedBroadcastDeadline = pending.deadline ?? -1;
     }
     const pendingSeq = pending?.isBlocking ? this._lastSeq : undefined;
@@ -715,24 +716,12 @@ export class HeadlessGameClient {
     const pending = this._view?.pending;
     // 广播型 pending（无懈可击等）：发 skip 而非 respond
     if (pending && pending.target < 0) {
-      this.sendAction({
-        skillId: '__skip',
-        actionType: 'skip',
-        ownerId: this._seatIndex,
-        params: {},
-        baseSeq: 0,
-      });
+      this.sendAction(buildSkipMessage(this._seatIndex));
       return;
     }
     // 阻塞型 pending（询问闪/弃牌等）：也发 skip 触发超时
     if (pending && pending.isBlocking !== false) {
-      this.sendAction({
-        skillId: '__skip',
-        actionType: 'skip',
-        ownerId: this._seatIndex,
-        params: {},
-        baseSeq: 0,
-      });
+      this.sendAction(buildSkipMessage(this._seatIndex));
       return;
     }
     // 非阻塞型 pending（出牌窗口）：旧逻辑保留（发 respond 会被 reject，但出牌窗口不应调 pass）

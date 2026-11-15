@@ -46,11 +46,15 @@ import {
   isActiveAction,
   isFreePlayWindow,
   extractCardFilter,
+  getTargetFilter,
+  getSelfTarget,
   ownEquipCards,
   choosePlayerCandidates,
   selectTargetCandidates,
   distributeAllocateCandidates,
-  effectiveTargetCard,
+  selectedTargetNamesOf,
+  targetConstraintCard,
+  usedCardNameOf,
   promptTargetBounds,
 } from '../utils/gameViewHelpers';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
@@ -428,16 +432,16 @@ export function usePlayInteraction(
     }
     return findUseActionForCard(skillActions, selectedCard);
   })();
-  const selectedTargetFilter =
-    selectedUseAction?.prompt.type === 'useCardAndTarget'
-      ? selectedUseAction.prompt.targetFilter
-      : null;
+  // targetFilter/selfTarget 提取与无头枚举(buildCardPlaySkeleton)共享
+  // getTargetFilter/getSelfTarget(selectedUseAction 的 prompt 恒为
+  // useCard/useCardAndTarget——findUseActionForCard/altActionOverride 都经
+  // extractCardFilter 匹配,产出牌 use action 亦然)。
+  const selectedTargetFilter = selectedUseAction
+    ? getTargetFilter(selectedUseAction.prompt)
+    : null;
 
   const playRules = selectedUseAction
-    ? derivePlayRules(
-        selectedTargetFilter,
-        selectedUseAction.prompt.type === 'useCardAndTarget' && selectedUseAction.prompt.selfTarget,
-      )
+    ? derivePlayRules(selectedTargetFilter, getSelfTarget(selectedUseAction.prompt))
     : null;
   const selectedActive = selectedUseAction
     ? isActiveAction(selectedUseAction, { view, perspectiveIdx })
@@ -456,11 +460,10 @@ export function usePlayInteraction(
   const playButtonState = (() => {
     if (!selectedCardId) return null;
     const card = perspectiveHand.find((c) => c.id === selectedCardId);
-    if (!card || !selectedUseAction) return null;
-    const rules = derivePlayRules(
-      selectedTargetFilter,
-      selectedUseAction.prompt.type === 'useCardAndTarget' && selectedUseAction.prompt.selfTarget,
-    );
+    if (!card || !selectedUseAction || !playRules) return null;
+    // rules 与上方 playRules 同源派生(selectedUseAction 非 null ⇒ playRules 非 null),
+    // 不再重复 derivePlayRules
+    const rules = playRules;
     let canPlay: boolean;
     let targetLabel: string;
     if (rules.hasSlots) {
@@ -585,22 +588,23 @@ export function usePlayInteraction(
       }
       const tf = isMyAwaiting && respondTargetFilter ? respondTargetFilter : selectedTargetFilter;
       if (!tf) return !!view.players[i]?.alive;
-      const names = playRules?.hasSlots || playRules?.multiTarget
-        ? selectedMultiTargets.length ? selectedMultiTargets : [selectedTarget, selectedKillTarget].filter((name): name is string => name !== null)
-        : selectedTarget ? [selectedTarget] : [];
+      const names = selectedTargetNamesOf(playRules, {
+        target: selectedTarget,
+        killTarget: selectedKillTarget,
+        multiTargets: selectedMultiTargets,
+      });
       const selected = isMyAwaiting && respondTargetFilter ? respondTargets : names.map((name) => view.players.findIndex((player) => player.name === name));
       if (selected.includes(i)) return true;
       // 目标约束的 card 参数与无头枚举共享 effectiveTargetCard(杀的动态目标上限
-      // 只对「正在使用的牌」生效,代价牌不算,判据见该函数);回应窗口用的则是
-      // 正在打出的牌(respondCard)。usedCardName:转化技传产出牌名;普通出牌
-      // 按「use action 的 skillId 就是选中牌名」认定选中牌为使用牌;代价牌 null。
-      const usedCardName = transformWrapperName
-        ?? (selectedUseAction && selectedUseAction.skillId === selectedCard?.name
-          ? selectedCard.name
-          : null);
-      const card = isMyAwaiting && respondTargetFilter
-        ? respondCard
-        : effectiveTargetCard(selectedCard, selectedTargetFilter, usedCardName);
+      // 只对「正在使用的牌」生效,代价牌不算):usedCardName 判定与回应窗口 ternary
+      // 均与 GameView.seatTargetInfo 共享 usedCardNameOf / targetConstraintCard。
+      const card = targetConstraintCard(
+        isMyAwaiting && !!respondTargetFilter,
+        respondCard,
+        selectedCard,
+        selectedTargetFilter,
+        usedCardNameOf(transformWrapperName, selectedUseAction, selectedCard),
+      );
       const { max } = targetSelectionBounds(view, perspectiveIdx, tf, card);
       const prefix = !tf.slots?.length && max === 1 ? [] : selected;
       return prefix.length < max && targetCandidates(view, perspectiveIdx, tf, prefix, card).includes(i);
@@ -654,10 +658,9 @@ export function usePlayInteraction(
     if (!card || !selectedUseAction) return;
     // use action 不 active 时不出(如满血时桃、杀超上限)
     if (!selectedActive) return;
-    const rules = derivePlayRules(
-      selectedTargetFilter,
-      selectedUseAction.prompt.type === 'useCardAndTarget' && selectedUseAction.prompt.selfTarget,
-    );
+    // rules 与上方 playRules 同源派生,不再重复 derivePlayRules
+    if (!playRules) return;
+    const rules = playRules;
     const params = buildPlayParams(
       view.players,
       perspectiveIdx,
@@ -677,7 +680,7 @@ export function usePlayInteraction(
     perspectiveHand,
     selectedUseAction,
     selectedActive,
-    selectedTargetFilter,
+    playRules,
     view.players,
     perspectiveIdx,
     selectedTarget,
@@ -917,9 +920,11 @@ export function usePlayInteraction(
       if (!isMyTurn) return;
       const useAction = findUseActionForCard(skillActions, card);
       if (!useAction || !isActiveAction(useAction, { view, perspectiveIdx })) return;
+      // 双击的牌未必是 selectedCardId(click-click 双 toggle 后常已清空),不能复用
+      // 上方 playRules;targetFilter/selfTarget 提取与其余派生共享 getTargetFilter/getSelfTarget。
       const rules = derivePlayRules(
-        useAction.prompt.type === 'useCardAndTarget' ? useAction.prompt.targetFilter : null,
-        useAction.prompt.type === 'useCardAndTarget' && !!useAction.prompt.selfTarget,
+        getTargetFilter(useAction.prompt),
+        getSelfTarget(useAction.prompt),
       );
       if (rules.needsTarget && !rules.selfTarget) {
         // 需目标:选中交给「点目标/出牌按钮」路径

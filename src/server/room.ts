@@ -6,6 +6,10 @@ import { DEFAULT_ROOM_CONFIG, normalizeRoomConfig } from './protocol';
 import { createRng } from '../engine/util/rng';
 import { register } from './resourceRegistry';
 import { verifyPassword } from './auth/password';
+// 注意:本模块与 registry.ts 构成模块环(registry 顶层调用 setSessionChecker,
+// 本模块的成员函数维护 registry 导出的 playerRoomMap)。sessionChecker 因此
+// 改存函数对象属性(见下方),避免 room.ts 先被求值时的 TDZ 崩溃。
+import { playerRoomMap } from './registry';
 
 export interface Room {
   id: string;
@@ -76,7 +80,7 @@ function clampPlayers(n: number): number {
 }
 
 /** 座位交换请求超时(ms) */
-export const SEAT_SWAP_TIMEOUT_MS = 15_000;
+const SEAT_SWAP_TIMEOUT_MS = 15_000;
 
 /** 构造 room_state ServerMessage（集中一处，避免 rest.ts/sse.ts 重复构造）。 */
 export function buildRoomState(room: Room): ServerMessage {
@@ -101,11 +105,6 @@ export function buildRoomState(room: Room): ServerMessage {
     ),
     hasPassword: room.passwordHash !== null,
   };
-}
-
-/** 获取玩家当前座次下标（-1=不在座位表中）。 */
-export function getPlayerSeat(room: Room, playerId: string): number {
-  return room.seats.indexOf(playerId);
 }
 
 /** 校验进房密码。无密码房间恒过;有密码房间需明文匹配(scrypt,timingSafeEqual)。 */
@@ -206,6 +205,7 @@ export function createRoom(
     playerNames: hostName ? new Map([[hostId, hostName]]) : new Map(),
   });
   roomChangeHandler?.(room, 'create');
+  bindPlayerRoom(hostId, room.id);
   return room;
 }
 
@@ -227,6 +227,29 @@ function occupiedSeatCount(room: Room): number {
   let n = 0;
   for (const s of room.seats) if (s !== null) n++;
   return n;
+}
+
+/** 房间是否已满（权威容量判定：已占座位数 ≥ maxPlayers，见 occupiedSeatCount）。
+ *  REST /join 预检与 joinRoom/switchRole 的容量判断共用此判据。 */
+export function isRoomFull(room: Room): boolean {
+  return occupiedSeatCount(room) >= room.maxPlayers;
+}
+
+// ── 玩家→房间映射（playerRoomMap 唯一写入口）──
+// 映射本体在 registry.ts(供测试与跨模块读取);全部写入收敛到这两个助手,
+// 并由成员变更函数(createRoom/joinRoom/joinDebugRoom/leaveRoom/
+// joinAsSpectator/removeSpectator/switchRole/kickPlayer)自动维护。
+// 路由/SSE 仅在绕过成员函数直改名单的场景(如 SSE registerSink 重挂连接)
+// 显式调用,禁止再手工 set/delete(不变量单点维护)。
+
+/** 记录玩家当前所在房间（加入/入座/转身份成功时由成员函数调用）。 */
+export function bindPlayerRoom(playerId: string, roomId: string): void {
+  playerRoomMap.set(playerId, roomId);
+}
+
+/** 清除玩家的房间映射（离开/被踢/断线清理时由成员函数调用）。 */
+export function unbindPlayerRoom(playerId: string): void {
+  playerRoomMap.delete(playerId);
 }
 
 /** 清理该 playerId 的旁观者身份（spectators/viewGrants/pendingViewRequests）。
@@ -292,25 +315,19 @@ export function joinRoom(
 
   // 如果玩家已在 seats 中（SSE 断开重连时 seats 残留），复用已有座位
   const existingSeat = room.seats.indexOf(playerId);
-  if (existingSeat >= 0) {
-    room.players.set(playerId, sink);
-    // 身份互斥：复用座位时清理可能残留的旁观者身份
-    clearSpectatorMembership(room, playerId);
-    // 重新入会成为正式成员，撤销可能残留的断线宽限条目
-    room.recentlyLeft.delete(playerId);
-    return room;
-  }
+  // 新玩家加入：检查人数上限（用已占座位数，与客户端 playerCount 一致；
+  // 复用座位者原本就占座，不受容量约束）
+  if (existingSeat < 0 && isRoomFull(room)) return null;
 
-  // 新玩家加入：检查人数上限（用已占座位数，与客户端 playerCount 一致）
-  if (occupiedSeatCount(room) >= room.maxPlayers) return null;
-
+  // 复用座位与新入座共用的成员登记（两条路径仅座位来源不同）
   room.players.set(playerId, sink);
-  // 身份互斥：加入玩家前清理可能残留的旁观者身份（如刷新前是旁观者）
+  // 身份互斥：清理可能残留的旁观者身份（如刷新前是旁观者/复用座位时的残留）
   clearSpectatorMembership(room, playerId);
   // 重新入会成为正式成员，撤销可能残留的断线宽限条目
   room.recentlyLeft.delete(playerId);
-  // 分配首个空座位
-  assignSeat(room, playerId);
+  bindPlayerRoom(playerId, room.id);
+  // 新入座：分配首个空座位
+  if (existingSeat < 0) assignSeat(room, playerId);
   return room;
 }
 
@@ -364,9 +381,10 @@ export function joinDebugRoom(
     if (replacedPlayerId === undefined) return null;
     const oldSink = room.players.get(replacedPlayerId);
     room.players.delete(replacedPlayerId);
-    // 清理被踢玩家的座位
+    // 清理被踢玩家的座位与房间映射
     const replacedSeat = room.seats.indexOf(replacedPlayerId);
     if (replacedSeat >= 0) room.seats[replacedSeat] = null;
+    unbindPlayerRoom(replacedPlayerId);
     try {
       oldSink?.close();
     } catch {
@@ -375,6 +393,7 @@ export function joinDebugRoom(
   }
 
   room.players.set(playerId, sink);
+  bindPlayerRoom(playerId, room.id);
   // 复用已有座位或分配首个空座位（防止重复入座）
   const existingDebugSeat = room.seats.indexOf(playerId);
   if (existingDebugSeat >= 0) {
@@ -393,6 +412,9 @@ export function leaveRoom(
   reason: 'disconnect' | 'explicit' = 'explicit',
 ): Room | null {
   const room = roomList.get(roomId);
+  // 解除房间映射与房间存在性/成员身份无关(此前所有调用方都在 leaveRoom 后
+  // 无条件 delete;跨房误调/房间已自动销毁同样解除映射)
+  unbindPlayerRoom(playerId);
   if (!room) return null;
 
   removePlayerMembership(room, playerId);
@@ -456,6 +478,7 @@ export function kickPlayer(
     clearSpectatorMembership(room, targetPlayerId);
   }
   room.playerNames.delete(targetPlayerId);
+  unbindPlayerRoom(targetPlayerId);
 
   roomChangeHandler?.(room, 'update');
   return { room, kickedSink };
@@ -644,12 +667,24 @@ export function broadcastMessage(room: Room, message: ServerMessage, excludeId?:
 }
 
 // session 活跃检查器:由 app.ts 注册(避免 room.ts 直接依赖 app.ts 的 gameSessions)。
-let sessionChecker: ((roomId: string) => boolean) | null = null;
-export function setSessionChecker(fn: ((roomId: string) => boolean) | null): void {
-  sessionChecker = fn;
+// 检查器挂在 setSessionChecker 函数对象的属性上而非模块级 let:room.ts 为维护
+// playerRoomMap 引用了 registry.ts,而 registry.ts 顶层又调用 setSessionChecker,
+// 两模块构成环。当 room.ts 先进入求值(如测试直接 import room.ts)时,registry
+// 的顶层调用先于本模块函数体执行,模块级 let 届时处于暂时性死区,赋值会抛
+// ReferenceError;函数声明在模块实例化阶段即完整创建,其属性读写不受求值顺序
+// 影响,两个方向都安全。
+type SessionChecker = (roomId: string) => boolean;
+/** setSessionChecker 的函数对象形状（registered = 已注册检查器槽位）。 */
+interface SessionCheckerSlot {
+  (fn: SessionChecker | null): void;
+  registered?: SessionChecker | null;
+}
+export function setSessionChecker(fn: SessionChecker | null): void {
+  (setSessionChecker as SessionCheckerSlot).registered = fn;
 }
 function hasSession(roomId: string): boolean {
-  return sessionChecker ? sessionChecker(roomId) : true;
+  const checker = (setSessionChecker as SessionCheckerSlot).registered;
+  return checker ? checker(roomId) : true;
 }
 
 // 房间变更通知器:由 roomStore 注册,持久化普通房间元数据。
@@ -805,6 +840,7 @@ export function joinAsSpectator(
   if (displayName) room.playerNames.set(spectatorId, displayName);
   // 重新入房成为正式旁观，撤销可能残留的断线宽限条目
   room.recentlyLeft.delete(spectatorId);
+  bindPlayerRoom(spectatorId, room.id);
   return room;
 }
 
@@ -816,6 +852,8 @@ export function removeSpectator(
   reason: 'disconnect' | 'explicit' = 'explicit',
 ): Room | null {
   const room = roomList.get(roomId);
+  // 同 leaveRoom:解除映射与房间存在性无关(调用方此前无条件 delete)
+  unbindPlayerRoom(spectatorId);
   if (!room) return null;
   clearSpectatorMembership(room, spectatorId);
   // 仍在座位上(身份互斥的另一半不存在,防御性判断)则保留;否则彻底清除
@@ -846,6 +884,7 @@ export function switchRole(
     // 完整移除玩家身份（players/seats/ready/交换请求）
     removePlayerMembership(room, playerId);
     room.spectators.set(playerId, sink);
+    bindPlayerRoom(playerId, room.id);
     // 房主切旁观仍保留 hostId（管理权限不变）
     return { room, success: true };
   } else {
@@ -854,7 +893,7 @@ export function switchRole(
     if (!sink) return { room, success: false };
     // 容量判断用已占座位数（与客户端 playerCount 一致）。
     // 用 players.size 会因幽灵连接/断线残留误判满员。
-    if (occupiedSeatCount(room) >= room.maxPlayers) return { room, success: false };
+    if (isRoomFull(room)) return { room, success: false };
     // 指定座位时校验：必须有效且为空
     if (seat !== undefined) {
       if (seat < 0 || seat >= room.seats.length || room.seats[seat] !== null) {
@@ -863,6 +902,7 @@ export function switchRole(
     }
     clearSpectatorMembership(room, playerId);
     room.players.set(playerId, sink);
+    bindPlayerRoom(playerId, room.id);
     // 占据指定座位（或首个空座位）
     assignSeat(room, playerId, seat);
     return { room, success: true };

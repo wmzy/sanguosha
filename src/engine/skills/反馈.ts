@@ -1,7 +1,7 @@
 // 反馈(司马懿·被动技):当你受到伤害后,你可以获得伤害来源的一张牌。
 //
 // 实现(被动 after-hook + 两步 respond):
-//   造成伤害 after-hook(target===ownerId, source 存活):
+//   受到伤害后 after-hook(前导守卫经 registerOnDamagedAsTarget;来源存活):
 //     1. 询问是否发动(请求回应 requestType='反馈/confirm',confirm prompt)
 //     2. confirm 后弹选牌面板(请求回应 requestType='反馈/选牌',pickTargetCard prompt):
 //        使用者从来源区域选一张牌获得(手牌盲选 / 装备明选)。经典规则不含判定区。
@@ -14,10 +14,10 @@
 //   - 选牌面板逻辑与过河拆桥/顺手牵羊共用(见 ../pick-card-panel.ts);反馈为 obtain 模式,
 //     includeJudge=false(经典规则仅手牌+装备)。
 import type { FrontendAPI, Skill } from '../types';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAction } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerOnDamagedAsTarget } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -77,11 +77,9 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
     },
   );
 
-  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
+  // 前导守卫(target===ownerId / amount>0 / 来源存在且非自己)经 registerOnDamagedAsTarget 统一封装
+  registerOnDamagedAsTarget(state, skill.id, ownerId, async (ctx) => {
     const atom = ctx.atom;
-    if (atom.target !== ownerId) return;
-    if ((atom.amount ?? 0) <= 0) return;
-    if (atom.source === undefined || atom.source === ownerId) return;
     const sourcePlayer = ctx.state.players[atom.source];
     if (!sourcePlayer?.alive) return;
     // 反馈(经典):仅手牌+装备,不含判定区

@@ -10,7 +10,10 @@
 //
 // 距离规则:
 //   - 默认:目标须在距离 1 以内(与兵粮寸断一致)
-//   - 放松:目标手牌数 >= 徐晃手牌数 → 无距离限制
+//   - 放松判据按版本注入(标:目标手牌数 >= 徐晃手牌数 / 界:本回合未造成过伤害)
+//
+// 本文件同时导出 createDuanliangSkill 工厂(断粮族共享实现),界断粮 复用之,
+// 仅注入 距离放松判据(引擎侧 + view 侧同源)与本回合伤害追踪 hook 差异。
 import type { Card, GameView, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
@@ -29,119 +32,155 @@ function isDuanliangCard(card: Card | undefined): boolean {
   return card.type === '基本牌' || card.type === '装备牌';
 }
 
-export function createSkill(id: string, ownerId: number): Skill {
-  return {
-    id,
-    ownerId,
-    name: '断粮',
-    description: '将一张黑色基本牌或装备牌当【兵粮寸断】使用;对手牌数不小于你的角色无距离限制',
-  };
+/** 断粮族差异参数。 */
+export interface DuanliangOptions {
+  /** 技能 id(标 '断粮' / 界 '界断粮'):Skill.name、结算帧标签、validate 收尾文案、按钮 label */
+  skillId: string;
+  description: string;
+  mountTitle: string;
+  /** 引擎侧距离放松判据(true = 对该目标无距离限制) */
+  rangeRelaxed: (state: GameState, ownerId: number, target: number) => boolean;
+  /** view 侧距离放松判据(targetFilter 用,与 rangeRelaxed 同源投影) */
+  rangeRelaxedView: (view: GameView, me: number, t: number) => boolean;
+  /** 界版附加注册(造成伤害 after-hook 标记本回合已伤害);unloader 由调用方自理 */
+  extraInit?: (state: GameState, skillId: string, ownerId: number) => void;
 }
 
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
+/** 断粮族共享实现:转化范围/校验/execute/onMount 逐字一致,仅距离放松判据不同。 */
+export function createDuanliangSkill(opts: DuanliangOptions) {
+  function createSkill(id: string, ownerId: number): Skill {
+    return {
+      id,
+      ownerId,
+      name: opts.skillId,
+      description: opts.description,
+    };
+  }
 
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'use',
-    (state: GameState, params: Record<string, Json>): string | null => {
-      const self = state.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
-      if (typeof params.cardId !== 'string') return '需要选择一张牌';
-      if (typeof params.target !== 'number') return '需要选择目标';
-      if (!self.hand.includes(params.cardId)) return '牌不在手牌中';
-      if (!isDuanliangCard(state.cardMap[params.cardId])) return '需要黑色基本牌或装备牌';
-      const target = params.target;
-      if (target === ownerId) return '不能对自己使用';
-      const targetPlayer = state.players[target];
-      if (!targetPlayer?.alive) return '目标不存在或已死亡';
-      // 目标判定区已有兵粮寸断时不可使用(与兵粮寸断自身规则一致)
-      if (targetPlayer.pendingTricks.some((t) => t.name === TRICK_NAME))
-        return '目标判定区已有兵粮寸断';
+  function onInit(skill: Skill, state: GameState): () => void {
+    const ownerId = skill.ownerId;
+    opts.extraInit?.(state, skill.id, ownerId);
 
-      // 距离规则:默认 ≤1;目标手牌数 >= 自己手牌数时无距离限制
-      const handGeq = targetPlayer.hand.length >= self.hand.length;
-      const inRange = handGeq || effectiveDistance(state, ownerId, target) <= 1;
+    registerAction(
+      state,
+      skill.id,
+      ownerId,
+      'use',
+      (state: GameState, params: Record<string, Json>): string | null => {
+        const self = state.players[ownerId];
+        if (!self?.alive) return '玩家不存在或已死亡';
+        if (typeof params.cardId !== 'string') return '需要选择一张牌';
+        if (typeof params.target !== 'number') return '需要选择目标';
+        if (!self.hand.includes(params.cardId)) return '牌不在手牌中';
+        if (!isDuanliangCard(state.cardMap[params.cardId]))
+          return '需要黑色基本牌或装备牌';
+        const target = params.target;
+        if (target === ownerId) return '不能对自己使用';
+        const targetPlayer = state.players[target];
+        if (!targetPlayer?.alive) return '目标不存在或已死亡';
+        // 目标判定区已有兵粮寸断时不可使用(与兵粮寸断自身规则一致)
+        if (targetPlayer.pendingTricks.some((t) => t.name === TRICK_NAME))
+          return '目标判定区已有兵粮寸断';
 
-      // 时机(自己回合+出牌阶段+无阻塞,存活已由上方早退校验)由 engineCanPlayNow 统一判定
-      const ok = engineCanPlayNow(state, ownerId) && inRange;
-      return ok ? null : '断粮使用条件不满足';
-    },
-    async (state: GameState, params: Record<string, Json>): Promise<void> => {
-      const from = ownerId;
-      const cardId = params.cardId as string;
-      const target = params.target as number;
-      await pushFrame(state, '断粮', from, { ...params });
+        // 距离规则:版本各自放松判据,否则须 ≤1
+        const inRange =
+          opts.rangeRelaxed(state, ownerId, target) ||
+          effectiveDistance(state, ownerId, target) <= 1;
 
-      // 卡牌进处理区(打出)
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
+        // 时机(自己回合+出牌阶段+无阻塞,存活已由上方早退校验)由 engineCanPlayNow 统一判定
+        const ok = engineCanPlayNow(state, ownerId) && inRange;
+        return ok ? null : `${opts.skillId}使用条件不满足`;
+      },
+      async (state: GameState, params: Record<string, Json>): Promise<void> => {
+        const from = ownerId;
+        const cardId = params.cardId as string;
+        const target = params.target as number;
+        await pushFrame(state, opts.skillId, from, { ...params });
 
-      // 放置延时锦囊:复用现有 兵粮寸断 的判定/跳过摸牌 hooks
-      const trickCard: Card = state.cardMap[cardId] ?? {
-        id: cardId,
-        name: TRICK_NAME,
-        suit: '♣',
-        color: '黑',
-        rank: 'A',
-        type: '锦囊牌',
-      };
-      await applyAtom(state, {
-        type: '添加延时锦囊',
-        player: target,
-        trick: { name: TRICK_NAME, source: from, card: trickCard },
-      });
+        // 卡牌进处理区(打出)
+        await applyAtom(state, {
+          type: '移动牌',
+          cardId,
+          from: { zone: '手牌', player: from },
+          to: { zone: '处理区' },
+        });
 
-      // 使用卡进弃牌堆
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
+        // 放置延时锦囊:复用现有 兵粮寸断 的判定/跳过摸牌 hooks
+        const trickCard: Card = state.cardMap[cardId] ?? {
+          id: cardId,
+          name: TRICK_NAME,
+          suit: '♣',
+          color: '黑',
+          rank: 'A',
+          type: '锦囊牌',
+        };
+        await applyAtom(state, {
+          type: '添加延时锦囊',
+          player: target,
+          trick: { name: TRICK_NAME, source: from, card: trickCard },
+        });
 
-      await popFrame(state);
-    },
-  );
+        // 使用卡进弃牌堆
+        await applyAtom(state, {
+          type: '移动牌',
+          cardId,
+          from: { zone: '处理区' },
+          to: { zone: '弃牌堆' },
+        });
 
-  return () => {};
-}
+        await popFrame(state);
+      },
+    );
 
-export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
-    label: '断粮',
-    style: 'danger',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '断粮:将黑色基本牌/装备牌当兵粮寸断使用',
-      cardFilter: { filter: (c: Card) => isDuanliangCard(c), min: 1, max: 1 },
-      targetFilter: {
-        min: 1,
-        max: 1,
-        // 距离放松:目标手牌数 >= 自己 → 无限制;否则 ≤1
-        filter: (view: GameView, t: number) => {
-          const me = view.currentPlayerIndex;
-          if (t === me) return false;
-          const tp = view.players[t];
-          if (!tp) return false;
-          if (tp.alive === false) return false;
-          const myHand = view.players[me]?.handCount ?? 0;
-          if ((tp.handCount ?? 0) >= myHand) return true; // 无距离限制
-          return viewEffectiveDistance(view.players, me, t) <= 1;
+    return () => {};
+  }
+
+  function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
+    api.defineAction('use', {
+      label: opts.skillId,
+      style: 'danger',
+      prompt: {
+        type: 'useCardAndTarget',
+        title: opts.mountTitle,
+        cardFilter: { filter: (c: Card) => isDuanliangCard(c), min: 1, max: 1 },
+        targetFilter: {
+          min: 1,
+          max: 1,
+          // 距离放松:版本各自判据(与引擎 rangeRelaxed 同源投影),否则 ≤1
+          filter: (view: GameView, t: number) => {
+            const me = view.currentPlayerIndex;
+            if (t === me) return false;
+            const tp = view.players[t];
+            if (!tp) return false;
+            if (tp.alive === false) return false;
+            if (opts.rangeRelaxedView(view, me, t)) return true; // 无距离限制
+            return viewEffectiveDistance(view.players, me, t) <= 1;
+          },
         },
       },
-    },
-    activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
-      const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p) return false;
-      return (p.hand?.some((c) => isDuanliangCard(c)) ?? false);
-    },
-  });
+      activeWhen: (ctx) => {
+        if (!defaultPlayActive(ctx)) return false;
+        const p = ctx.view.players[ctx.perspectiveIdx];
+        if (!p) return false;
+        return (p.hand?.some((c) => isDuanliangCard(c)) ?? false);
+      },
+    });
+  }
+
+  return { createSkill, onInit, onMount };
 }
+
+const OPTIONS: DuanliangOptions = {
+  skillId: '断粮',
+  description: '将一张黑色基本牌或装备牌当【兵粮寸断】使用;对手牌数不小于你的角色无距离限制',
+  mountTitle: '断粮:将黑色基本牌/装备牌当兵粮寸断使用',
+  // 距离放松:目标手牌数 >= 自己 → 无限制
+  rangeRelaxed: (state, ownerId, target) =>
+    (state.players[target]?.hand.length ?? 0) >= (state.players[ownerId]?.hand.length ?? 0),
+  rangeRelaxedView: (view, me, t) => {
+    const myHand = view.players[me]?.handCount ?? 0;
+    return (view.players[t]?.handCount ?? 0) >= myHand;
+  },
+};
+
+export const { createSkill, onInit, onMount } = createDuanliangSkill(OPTIONS);

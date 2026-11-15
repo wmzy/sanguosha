@@ -5,18 +5,22 @@
 // 实现:
 //   - before hook 挂在「阶段开始」:判定/摸牌/出牌/弃牌 阶段开始时询问是否发动。
 //     发动则选弃牌 + 跳过当前阶段(阶段结束 推进 + cancel)。
-//   - 跳过摸牌:发动后询问选择 1-2 名有手牌的其他角色,各获得其一张随机手牌(不展示,与突袭一致)。
-//   - 跳过出牌:发动后询问源玩家+源牌+目标玩家,通过 移动牌 atom 完成场上牌移动。
+//   - 跳过摸牌:发动后询问选择 1-2 名有手牌的其他角色,各获得其一张随机手牌
+//     (不展示,复用 突袭.ts 的 tuxiStealCards)。
+//   - 跳过出牌:发动后询问源玩家+源牌+目标玩家,经 flows/field-card.ts 的
+//     moveFieldCard 完成场上牌移动。
 //   - 跳过判定/弃牌:仅弃牌 + 跳过,无附加效果。
 //
 // 标/界共享:可跳阶段守卫、询问/弃牌骨架、跳阶段收尾、摸牌偷牌与出牌移动附加效果、
-//   respond 处理均由本文件导出,界巧变.ts 导入复用。requestType / localVars key /
-//   询问标题均以技能名(巧变|界巧变)为前缀派生,两版行为逐字一致。
+//   respond 处理由本文件导出,界巧变.ts 导入复用;场上牌枚举/移动
+//   (fieldCardIds/moveFieldCard)由 flows/field-card.ts 提供(与解围共用)。
+//   requestType / localVars key / 询问标题均以技能名(巧变|界巧变)为前缀派生,
+//   两版行为逐字一致。
 //
 // 关键点:
 //   - 每个阶段独立发动,无次数限制(只要每阶段有手牌可弃)
-//   - 出牌阶段移动的牌支持:手牌/装备/判定区 → 手牌/装备
-//     (装备→装备 需 slot 不冲突;判定区→手牌 视为"移回手牌")
+//   - 出牌阶段移动的牌支持 手牌/装备/判定区 → 目标手牌(判定区牌经
+//     移除延时锦囊 + obtainJudgeZoneCard,实体牌归属见 core/judge-zone.ts)
 import type {
   AtomBeforeContext,
   AtomOfName,
@@ -32,7 +36,8 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
-import { pickRandom } from '../util/rng';
+import { fieldCardIds, moveFieldCard } from '../flows/field-card';
+import { tuxiStealCards } from './突袭';
 import { defineConfirmAction, firstCardId } from '../util/skillRuntime';
 
 const SKILL_NAME = '巧变';
@@ -50,64 +55,8 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 取玩家"场上"的牌(手牌+装备+判定区)——用于出牌阶段移动的源牌选择 */
-function fieldCardIds(state: GameState, player: number): string[] {
-  const p = state.players[player];
-  if (!p) return [];
-  const hand = [...p.hand];
-  const equip = Object.values(p.equipment).filter((id): id is string => !!id);
-  const judge = p.pendingTricks.map((t) => t.card.id);
-  return [...hand, ...equip, ...judge];
-}
-
-/**
- * 把 srcPlayer 场上的 srcCardId 移动到 destPlayer 场上。
- * 自动按 srcCardId 所在区域 + 目标位置选择合适的转移方式:
- *   - 装备牌且目标装备槽空闲 → 直接移到目标装备区(通过 移动牌 + 装备 atom)
- *   - 否则统一移到目标手牌(包括判定区牌移回手牌)
- */
-async function moveFieldCard(
-  state: GameState,
-  srcPlayer: number,
-  srcCardId: string,
-  destPlayer: number,
-): Promise<void> {
-  if (srcPlayer === destPlayer) return; // 同一玩家:无意义
-  const srcP = state.players[srcPlayer];
-  if (!srcP) return;
-  const card = state.cardMap[srcCardId];
-  if (!card) return;
-
-  // 判定区牌:先从判定区移除,再以 获得方式给目标(此时不在 hand/equip,filter no-op)
-  const judgeTrick = srcP.pendingTricks.find((t) => t.card.id === srcCardId);
-  if (judgeTrick) {
-    await applyAtom(state, {
-      type: '移除延时锦囊',
-      player: srcPlayer,
-      trickName: judgeTrick.name,
-    });
-    await applyAtom(state, {
-      type: '获得',
-      player: destPlayer,
-      cardId: srcCardId,
-      from: srcPlayer,
-    });
-    return;
-  }
-
-  // 装备牌:目标对应装备槽空闲 → 通过 移动牌(手牌区)转移到目标手牌(简化:
-  //   不直接换装备槽,因 装备 atom 会触发技能加载等副作用,且目标可能已有同槽装备)。
-  //   实际规则允许换装备,这里统一进目标手牌(规则 FAQ:任意合法位置,手牌是合法位置)。
-  // 手牌/装备 → 目标手牌(获得 atom 自动处理 hand/equip 的 filter)
-  await applyAtom(state, {
-    type: '获得',
-    player: destPlayer,
-    cardId: srcCardId,
-    from: srcPlayer,
-  });
-}
-
 // ── 标/界巧变共享(界巧变.ts 导入复用) ─────────────────────────
+// 场上牌枚举/移动(fieldCardIds/moveFieldCard)上提至 flows/field-card.ts(与解围共用)。
 
 /**
  * 「阶段开始」before hook 通用守卫:是自己回合的可跳过阶段(判定/摸牌/出牌/弃牌)、
@@ -235,18 +184,8 @@ async function stealHandCardOnSkipDraw(
     });
     const targets = (ctx.state.localVars[stealTargetsKey] as number[] | undefined) ?? [];
     delete ctx.state.localVars[stealTargetsKey];
-    for (const t of targets.slice(0, 2)) {
-      const target = ctx.state.players[t];
-      if (!target?.alive || target.hand.length === 0) continue;
-      // 手牌不公开:盲取一张随机手牌(与突袭一致,不展示)
-      const cardId = pickRandom(ctx.state, target.hand)!;
-      await applyAtom(ctx.state, {
-        type: '获得',
-        player: ownerId,
-        cardId,
-        from: t,
-      });
-    }
+    // 各获得一张随机手牌(不展示):与突袭同一偷牌实现
+    await tuxiStealCards(ctx.state, ownerId, targets.slice(0, 2));
   }
 }
 

@@ -2,7 +2,8 @@
 //   (X 为你已损失体力值),然后该角色将其武将牌翻面。
 //
 // 模式 A(被动触发):after hook 挂在「受到伤害后」。
-//   受到伤害(target=自己) → 询问发动 → 选目标 → 该目标摸 X 张(X=已损失体力) → 翻面。
+//   受到伤害(target=自己) → 询问发动 → 选目标 → 摸 X 张(X=已损失体力) → 翻面。
+//   (结算语序按版本注入:标版先摸后翻 / 界版先翻后摸,官方语序)
 //
 // 翻面实现(同据守的手法,但标签名独立,与据守互不干扰):
 //   - 加标签 `放逐/翻面` 到目标(下一回合开始时消费)
@@ -20,186 +21,222 @@
 //     一次清全部 /翻面 标签,双翻无法对消)
 //   - 翻面 hook 注册在曹丕座次,但 hook 对所有玩家的阶段 atom 触发,callback 内
 //     检查目标 player 是否有翻面标签。曹丕存活期内有效。
+//
+// 本文件同时导出 createFangzhuSkill 工厂(放逐族共享实现),界放逐 复用之,
+// 仅注入 技能名/描述/询问 requestType(界放逐/…)/文案/结算语序 差异;
+// localVars 确认与目标键、翻面标签 '放逐/翻面' 与标版共用——同一角色只会拥有一版放逐。
 import type {
   FrontendAPI,
   GameState,
+  GameView,
   HookResult,
   Json,
   Skill,
-  GameView,
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, askResponse, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
-const CONFIRM_RT = '放逐/confirm';
-const TARGET_RT = '放逐/target';
+// 放逐族共享键(localVars/标签):确认与目标结果、翻面标签、跳过标志
 const CONFIRMED_KEY = '放逐/confirmed';
 const TARGET_KEY = '放逐/target';
 const SKIP_TAG = '放逐/翻面';
 const SKIP_FLAG = '放逐/skipAll';
 
-export function createSkill(id: string, ownerId: number): Skill {
-  return {
-    id,
-    ownerId,
-    name: '放逐',
-    description: '受到伤害后,令一名其他角色摸 X 张牌(X=已损失体力)并翻面',
-  };
+/** 放逐族差异参数。 */
+export interface FangzhuOptions {
+  /** 技能名(Skill.name / 询问文案前缀;标 '放逐' / 界 '界放逐') */
+  name: string;
+  description: string;
+  /** 询问 requestType(键空间按版本隔离:标 '放逐/confirm' / 界 '界放逐/confirm') */
+  confirmRt: string;
+  targetRt: string;
+  /** 发动确认标题(lostHealth = 已损失体力值 X) */
+  confirmTitle: (lostHealth: number) => string;
+  /** 选目标询问标题 */
+  chooseTitle: string;
+  /** 结算语序:true = 先摸牌后翻面(标)/ false = 先翻面后摸牌(界,官方语序) */
+  drawFirst: boolean;
+  /** onMount confirm 按钮(label/title) */
+  mountLabel: string;
+  mountTitle: string;
 }
 
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
+/** 放逐族共享实现:标放逐与界放逐机制同构,仅 文案/RT/语序 不同。 */
+export function createFangzhuSkill(opts: FangzhuOptions) {
+  function createSkill(id: string, ownerId: number): Skill {
+    return {
+      id,
+      ownerId,
+      name: opts.name,
+      description: opts.description,
+    };
+  }
 
-  // ── respond:曹丕回应放逐的确认 + 目标选择 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      return requireRequestType(st, ownerId, [CONFIRM_RT, TARGET_RT], {
-        mismatchError: '当前不是放逐询问',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
-      if (rt === CONFIRM_RT) {
-        st.localVars[CONFIRMED_KEY] = params.choice === true;
-      } else if (rt === TARGET_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? (params.target) : undefined);
-        if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
-      }
-    },
-  );
+  function onInit(skill: Skill, state: GameState): () => void {
+    const ownerId = skill.ownerId;
 
-  // ── 受到伤害后 after:曹丕受伤后,选目标 + 摸 X 张 + 翻面 ──
-  registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.target !== ownerId) return;
-    if ((atom.amount ?? 0) <= 0) return;
-    const self = ctx.state.players[ownerId];
-    if (!self?.alive) return;
-
-    // X = 已损失体力值
-    const lostHealth = self.maxHealth - getHealthValue(self);
-    if (lostHealth <= 0) return; // 满血时 X=0,放逐无意义
-
-    // 必须有其他存活角色可选
-    const hasOtherAlive = ctx.state.players.some(
-      (p) => p.alive && p.index !== ownerId,
+    // ── respond:曹丕回应放逐的确认 + 目标选择 ──
+    registerAction(
+      state,
+      skill.id,
+      ownerId,
+      'respond',
+      (st: GameState, _params: Record<string, Json>) => {
+        return requireRequestType(st, ownerId, [opts.confirmRt, opts.targetRt], {
+          mismatchError: '当前不是放逐询问',
+        }).error;
+      },
+      async (st: GameState, params: Record<string, Json>) => {
+        const slot = st.pendingSlots.get(ownerId);
+        const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+        if (rt === opts.confirmRt) {
+          st.localVars[CONFIRMED_KEY] = params.choice === true;
+        } else if (rt === opts.targetRt) {
+          const t =
+            (params.targets as number[] | undefined)?.[0] ??
+            (typeof params.target === 'number' ? (params.target) : undefined);
+          if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
+        }
+      },
     );
-    if (!hasOtherAlive) return;
 
-    // 询问是否发动
-    delete ctx.state.localVars[CONFIRMED_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CONFIRM_RT,
-      target: ownerId,
-      prompt: {
-        type: 'confirm',
-        title: `是否发动放逐?(令一名其他角色摸 ${lostHealth} 张牌并翻面)`,
+    // ── 受到伤害后 after:曹丕受伤后,选目标 → 摸 X 张 + 翻面(语序按版本注入)──
+    registerAfterHook(state, skill.id, ownerId, '受到伤害后', async (ctx) => {
+      const atom = ctx.atom;
+      if (atom.target !== ownerId) return;
+      if ((atom.amount ?? 0) <= 0) return;
+      const self = ctx.state.players[ownerId];
+      if (!self?.alive) return;
+
+      // X = 已损失体力值
+      const lostHealth = self.maxHealth - getHealthValue(self);
+      if (lostHealth <= 0) return; // 满血时 X=0,放逐无意义
+
+      // 必须有其他存活角色可选
+      const hasOtherAlive = ctx.state.players.some(
+        (p) => p.alive && p.index !== ownerId,
+      );
+      if (!hasOtherAlive) return;
+
+      // 询问是否发动
+      const confirmed = await askConfirm(ctx.state, opts.confirmRt, ownerId, {
+        confirmedKey: CONFIRMED_KEY,
+        title: opts.confirmTitle(lostHealth),
         confirmLabel: '发动',
         cancelLabel: '不发动',
-      },
-      defaultChoice: false,
-      timeout: 10,
-    });
-    if (!ctx.state.localVars[CONFIRMED_KEY]) return;
+        defaultChoice: false,
+        timeout: 10,
+      });
+      if (!confirmed) return;
 
-    // 选目标(其他存活角色)
-    delete ctx.state.localVars[TARGET_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: TARGET_RT,
-      target: ownerId,
-      prompt: {
-        type: 'choosePlayer',
-        title: '放逐:选择一名其他角色(摸牌并翻面)',
-        min: 1,
-        max: 1,
-        filter: (_view: GameView, t: number) =>
-          t !== ownerId && ctx.state.players[t]?.alive === true,
-      },
-      timeout: 15,
-    });
-    const target = ctx.state.localVars[TARGET_KEY] as number | undefined;
-    delete ctx.state.localVars[TARGET_KEY];
-    if (typeof target !== 'number') return;
-    if (!ctx.state.players[target]?.alive) return;
+      // 选目标(其他存活角色)
+      const target = await askResponse<number>(ctx.state, opts.targetRt, ownerId, {
+        resultKey: TARGET_KEY,
+        prompt: {
+          type: 'choosePlayer',
+          title: opts.chooseTitle,
+          min: 1,
+          max: 1,
+          filter: (_view: GameView, t: number) =>
+            t !== ownerId && ctx.state.players[t]?.alive === true,
+        },
+        timeout: 15,
+      });
+      if (typeof target !== 'number') return;
+      if (!ctx.state.players[target]?.alive) return;
 
-    // 摸 X 张牌
-    await applyAtom(ctx.state, { type: '摸牌', player: target, count: lostHealth });
-    // 翻面:加标签(下一回合开始时消费)
-    await flipFaceDown(ctx.state, target, '放逐');
-  });
-
-  // ── 阶段开始 before hook:检测翻面标签 → 启动跳过 ──
-  // 注册在曹丕座次,但对所有玩家的 阶段开始 atom 触发(callback 内按 player 检查)
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '阶段开始',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      const player = atom.player;
-      if (player === undefined) return;
-      const p = ctx.state.players[player];
-      if (!p) return;
-
-      // 入口:准备阶段开始 + 该玩家有翻面标签 → 启动跳过
-      if (atom.phase === '准备' && p.tags.includes(SKIP_TAG)) {
-        await flipFaceUp(ctx.state, player, '放逐');
-        ctx.state.localVars[SKIP_FLAG] = player;
-        return { kind: 'cancel' };
+      if (opts.drawFirst) {
+        // 摸 X 张牌 → 翻面(标版语序)
+        await applyAtom(ctx.state, { type: '摸牌', player: target, count: lostHealth });
+        // 翻面:加标签(下一回合开始时消费)
+        await flipFaceDown(ctx.state, target, '放逐');
+      } else {
+        // 翻面 → 摸 X 张牌(界版官方语序:「令一名其他角色翻面,并令其摸X张牌」)
+        await flipFaceDown(ctx.state, target, '放逐');
+        await applyAtom(ctx.state, { type: '摸牌', player: target, count: lostHealth });
       }
+    });
 
-      // skipAll 标志存在时,取消该玩家所有其他阶段(防 phase-end after-hook 推进)
-      if (ctx.state.localVars[SKIP_FLAG] === player) {
+    // ── 阶段开始 before hook:检测翻面标签 → 启动跳过 ──
+    // 注册在曹丕座次,但对所有玩家的 阶段开始 atom 触发(callback 内按 player 检查)
+    registerBeforeHook(
+      state,
+      skill.id,
+      ownerId,
+      '阶段开始',
+      async (ctx): Promise<HookResult | void> => {
+        const atom = ctx.atom;
+        if (atom.type !== '阶段开始') return;
+        const player = atom.player;
+        if (player === undefined) return;
+        const p = ctx.state.players[player];
+        if (!p) return;
+
+        // 入口:准备阶段开始 + 该玩家有翻面标签 → 启动跳过
+        if (atom.phase === '准备' && p.tags.includes(SKIP_TAG)) {
+          await flipFaceUp(ctx.state, player, '放逐');
+          ctx.state.localVars[SKIP_FLAG] = player;
+          return { kind: 'cancel' };
+        }
+
+        // skipAll 标志存在时,取消该玩家所有其他阶段(防 phase-end after-hook 推进)
+        if (ctx.state.localVars[SKIP_FLAG] === player) {
+          return { kind: 'cancel' };
+        }
+      },
+    );
+
+    // ── 阶段结束 before hook:skipAll → 主动推进回合 ──
+    registerBeforeHook(
+      state,
+      skill.id,
+      ownerId,
+      '阶段结束',
+      async (ctx): Promise<HookResult | void> => {
+        const atom = ctx.atom;
+        if (atom.type !== '阶段结束') return;
+        const player = atom.player;
+        if (player === undefined) return;
+        if (ctx.state.localVars[SKIP_FLAG] !== player) return;
+
+        // 清除 skipAll 标志
+        delete ctx.state.localVars[SKIP_FLAG];
+
+        // 亲自执行 end-turn 序列(与 回合管理.end action 一致,但跳过了被 cancel 的阶段)
+        await performSkipTurn(ctx.state, player);
+
         return { kind: 'cancel' };
-      }
-    },
-  );
+      },
+    );
 
-  // ── 阶段结束 before hook:skipAll → 主动推进回合 ──
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '阶段结束',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段结束') return;
-      const player = atom.player;
-      if (player === undefined) return;
-      if (ctx.state.localVars[SKIP_FLAG] !== player) return;
+    return () => {};
+  }
 
-      // 清除 skipAll 标志
-      delete ctx.state.localVars[SKIP_FLAG];
+  function onMount(_skill: Skill, api: FrontendAPI): void {
+    defineConfirmAction(api, 'respond', {
+      label: opts.mountLabel,
+      title: opts.mountTitle,
+    });
+  }
 
-      // 亲自执行 end-turn 序列(与 回合管理.end action 一致,但跳过了被 cancel 的阶段)
-      await performSkipTurn(ctx.state, player);
-
-      return { kind: 'cancel' };
-    },
-  );
-
-  return () => {};
+  return { createSkill, onInit, onMount };
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '放逐',
-    title: '是否发动放逐?',
-  });
-}
+const OPTIONS: FangzhuOptions = {
+  name: '放逐',
+  description: '受到伤害后,令一名其他角色摸 X 张牌(X=已损失体力)并翻面',
+  confirmRt: '放逐/confirm',
+  targetRt: '放逐/target',
+  confirmTitle: (lostHealth) => `是否发动放逐?(令一名其他角色摸 ${lostHealth} 张牌并翻面)`,
+  chooseTitle: '放逐:选择一名其他角色(摸牌并翻面)',
+  drawFirst: true,
+  mountLabel: '放逐',
+  mountTitle: '是否发动放逐?',
+};
+
+export const { createSkill, onInit, onMount } = createFangzhuSkill(OPTIONS);
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
