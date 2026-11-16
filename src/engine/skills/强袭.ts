@@ -24,7 +24,8 @@ import { popFrame, pushFrame } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { defaultPlayActive } from '../rules/action-active';
 import { setPlayerVarUsage } from '../rules/turn-usage';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const MAX_USES = 2;
@@ -45,9 +46,6 @@ export interface QiangxiOptions {
   /** 体力代价结算(标:失去体力 atom / 界:runDamageFlow 自伤,触发反馈/奸雄等) */
   payHpCost: (st: GameState, from: number) => Promise<void>;
   /** validate 文案(标/界历史措辞不同,逐字保留) */
-  phaseError: string;
-  blockingError: string;
-  deadError: string;
   costParamError: string;
 }
 
@@ -94,12 +92,10 @@ export function createQiangxiSkill(opts: QiangxiOptions) {
       ownerId,
       'use',
       (st: GameState, params: Record<string, Json>) => {
-        if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-        if (st.phase !== '出牌') return opts.phaseError;
-        if (hasBlockingPending(st)) return opts.blockingError;
+        const playError = engineCanPlayNowReason(st, ownerId);
+        if (playError) return playError;
         if (usesThisTurn(st, ownerId) >= MAX_USES) return '本阶段强袭已达上限(2次)';
         const self = st.players[ownerId];
-        if (!self?.alive) return opts.deadError;
 
         const cost = params.cost;
         if (cost !== opts.hpCostToken && cost !== 'discard') return opts.costParamError;
@@ -226,9 +222,6 @@ const OPTIONS: QiangxiOptions = {
   payHpCost: async (st, from) => {
     await applyAtom(st, { type: '失去体力', target: from, amount: 1 });
   },
-  phaseError: '不是出牌阶段',
-  blockingError: '当前有未回应的询问',
-  deadError: '已死亡',
   costParamError: 'cost 必须为 hp 或 discard',
 };
 

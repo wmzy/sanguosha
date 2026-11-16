@@ -20,7 +20,7 @@
 //
 // 注意:牌堆顶 = zones.deck 末尾元素,与「摸牌」语义一致(slice(-n)/pop)。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { broadcast, requirePlayer } from './_helpers';
+import { broadcast, requirePlayer, resolveDiscardEntry } from './_helpers';
 import { drawFromTop, peekTop } from '../core/deck';
 
 export const 置创牌: AtomDefinition<{
@@ -47,8 +47,9 @@ export const 置创牌: AtomDefinition<{
     // 判定点数是否与已有创牌重复(在追加前比较)
     const duplicate = rank !== undefined && list.some((id) => state.cardMap[id]?.rank === rank);
     if (duplicate) {
-      // 点数重复:移去此牌(进弃牌堆),不置于武将牌上
-      state.zones.discardPile.push(cardId);
+      // 点数重复:移去此牌(进弃牌堆,经 resolveDiscardEntry 单点),不置于武将牌上
+      const entry = resolveDiscardEntry(state, cardId);
+      if (entry !== null) state.zones.discardPile.push(entry);
     } else {
       list.push(cardId);
       player.vars[varsKey] = list;

@@ -13,6 +13,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -33,12 +34,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     'use',
     (state: GameState, params: Record<string, Json>) => {
       // 出牌阶段基本条件
-      if (state.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (state.phase !== '出牌') return '不是出牌阶段';
+      const playError = engineCanPlayNowReason(state, ownerId);
+      if (playError) return playError;
       if (usedThisTurn(state, ownerId, '青囊')) return '本回合已使用过青囊';
       const self = state.players[ownerId];
-      if (!self) return 'player not found';
-      if (!self.alive) return '你已死亡';
       // 弃置一张手牌(任意手牌)
       const cardId = params.cardId as string | undefined;
       if (!cardId) return 'cardId required';

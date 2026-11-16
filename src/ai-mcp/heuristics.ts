@@ -116,7 +116,7 @@ function roundModifier(view: AiViewSnapshot): number {
  *  - medium：南蛮入侵/万箭齐发（群体，视存活人数）= 60
  *  - low：桃园结义/五谷丰登/无中生有（一般不无懈）= 40
  *  - 未知：medium = 60 */
-export function wuxieThreatLevel(title: string): {
+function wuxieThreatLevel(title: string): {
   level: 'critical' | 'high' | 'medium' | 'low';
   score: number;
 } {
@@ -138,7 +138,7 @@ export function wuxieThreatLevel(title: string): {
 /** 被指定目标的"保护价值"评分（0-100）。
  *  综合目标血量（残血更需要保护）、手牌数（多牌被顺拆损失大）、武将强度。
  *  注：阵营归属（盟友/敌方）由调用方判断，本函数只评估目标本身的价值。 */
-export function wuxieTargetValue(view: AiViewSnapshot, targetIdx: number): number {
+function wuxieTargetValue(view: AiViewSnapshot, targetIdx: number): number {
   const target = view.players[targetIdx];
   if (!target) return 50;
   let value = 50;
@@ -153,7 +153,7 @@ export function wuxieTargetValue(view: AiViewSnapshot, targetIdx: number): numbe
 }
 
 /** 自己手牌中【无懈可击】的数量（仅 viewer 手牌可见）。 */
-export function countWuxieInHand(view: AiViewSnapshot): number {
+function countWuxieInHand(view: AiViewSnapshot): number {
   return selfOf(view)?.hand?.filter((c) => c.name === '无懈可击').length ?? 0;
 }
 
@@ -516,19 +516,13 @@ function scorePlay(view: AiViewSnapshot, action: AvailableAction): ScoredAction 
 // discard 类（弃牌阶段）
 // ────────────────────────────────────────────────────────────────
 
-/** 卡牌保留优先级（越高越保留，越低越优先弃）。
- *  用于弃牌阶段选牌：低分先弃。
- *  单一来源:引擎 请求回应 atom 导出的 discardKeepPriorityOf(引擎超时兜底/
- *  客户端弃牌预览同表),此处仅保留函数壳供本模块弃牌评分复用。 */
-function cardKeepPriority(card: Card): number {
-  return discardKeepPriorityOf(card);
-}
-
-/** 从手牌中选出建议弃掉的 cardIds（按保留优先级从低到高取前 N 张）。 */
+/** 从手牌中选出建议弃掉的 cardIds（按保留优先级从低到高取前 N 张）。
+ *  保留优先级单一来源：引擎 请求回应 atom 的 discardKeepPriorityOf
+ *  （引擎超时兜底 / 客户端弃牌预览与本模块弃牌评分三方同表）。 */
 function suggestDiscardCards(hand: Card[], count: number): string[] {
   if (count <= 0 || hand.length === 0) return [];
   return [...hand]
-    .sort((a, b) => cardKeepPriority(a) - cardKeepPriority(b))
+    .sort((a, b) => discardKeepPriorityOf(a) - discardKeepPriorityOf(b))
     .slice(0, count)
     .map((c) => c.id);
 }
@@ -552,7 +546,7 @@ function scoreDiscard(view: AiViewSnapshot, action: AvailableAction): ScoredActi
       .filter(Boolean) as Card[];
     if (selectedCards.length > 0) {
       const avgPriority =
-        selectedCards.reduce((s, c) => s + cardKeepPriority(c), 0) / selectedCards.length;
+        selectedCards.reduce((s, c) => s + discardKeepPriorityOf(c), 0) / selectedCards.length;
       // 弃了高价值牌则降分
       if (avgPriority >= 80) {
         return {
@@ -691,17 +685,4 @@ export function pickBestAction(
   if (actions.length === 0) return null;
   const ranked = rankActions(view, actions);
   return withDefaultTargets(ranked[0]);
-}
-
-/**
- * 为调试/日志：返回带评分与理由的完整列表（已排序）。
- */
-export function scoreAll(
-  view: AiViewSnapshot,
-  actions: AvailableAction[],
-): Array<{ action: AvailableAction; score: number; reason: string }> {
-  return rankActions(view, actions).map((a) => {
-    const s = scoreAction(view, a);
-    return { action: a, score: s.score, reason: s.reason };
-  });
 }

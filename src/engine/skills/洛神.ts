@@ -15,7 +15,7 @@
 // 本文件同时导出 createLuoshenSkill 工厂(洛神族共享实现),界洛神 复用之,
 // 仅注入 名称/描述/询问 requestType/手牌上限豁免 差异参数(确认键 '洛神/confirmed'
 // 与 judgeType '洛神' 两版共享——标/界甄姬只会拥有一版洛神)。
-import type { FrontendAPI, Skill, GameState, Card } from '../types';
+import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
@@ -37,11 +37,6 @@ export interface LuoshenOptions {
   onJudgeCardGained?: (state: GameState, cardId: string) => void;
   /** 界版附加初始化(手牌上限豁免 provider),返回 unloader。 */
   extraInit?: (state: GameState, ownerId: number) => () => void;
-}
-
-/** 判定牌是否为黑色(黑桃 ♠ 或梅花 ♣) */
-function isBlack(card: Card | undefined): boolean {
-  return !!card && (card.suit === '♠' || card.suit === '♣');
 }
 
 /** 洛神族共享实现:标版洛神与界洛神的判定主循环逐字一致;
@@ -126,9 +121,7 @@ export function createLuoshenSkill(opts: LuoshenOptions) {
           // def.afterHooks 把判定牌移入弃牌堆。
           const judgeCardId = await runJudgeFlow(ctx.state, ownerId, '洛神');
           const result =
-            judgeCardId && ctx.state.cardMap[judgeCardId] && isBlack(ctx.state.cardMap[judgeCardId])
-              ? 'black'
-              : 'red';
+            judgeCardId && ctx.state.cardMap[judgeCardId]?.color === '黑' ? 'black' : 'red';
 
           if (result !== 'black' || !judgeCardId) break; // 红色或异常:退出
 

@@ -10,6 +10,6 @@ export {
   buildView,
   fireTimeout,
   checkGameOver,
-  whenEngineIdle,
+  whenIdle,
 } from './core';
 export type { GameConfig } from './core';

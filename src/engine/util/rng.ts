@@ -47,3 +47,20 @@ export function pickRandom<T>(state: GameState, arr: readonly T[]): T | undefine
   state.rngSeed = rng.getState();
   return picked;
 }
+
+/**
+ * Fisher–Yates 洗牌(泛型,返回新数组,不改入参)。
+ * 三处洗牌样板的单点收敛(core/deck.ts 构造期 Card[]、atoms/重洗 与 摸牌.planDraw
+ * 的 zones string[])——此前三份逐行同构的 inline 循环,签名取「copy + 交换」语义
+ * (与原三处的 `[...src]` 后交换完全一致,RNG 消耗序列不变)。
+ * RNG 由调用方传入:各调用点保持自己的 createRng(state.rngSeed) → 使用 →
+ * 写回 state.rngSeed = rng.getState() 语义,不隐式读写 state。
+ */
+export function shuffle<T>(items: readonly T[], rng: Rng): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = rng.nextInt(i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}

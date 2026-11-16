@@ -1,15 +1,7 @@
 // tests/ai-mcp/heuristics.test.ts
 // 启发式策略评分器测试。纯函数，直接构造 AiViewSnapshot / AvailableAction fixtures。
 import { describe, it, expect } from 'vitest';
-import {
-  scoreAction,
-  rankActions,
-  pickBestAction,
-  scoreAll,
-  wuxieThreatLevel,
-  wuxieTargetValue,
-  countWuxieInHand,
-} from '../../src/ai-mcp/heuristics';
+import { scoreAction, rankActions, pickBestAction } from '../../src/ai-mcp/heuristics';
 import type { AiViewSnapshot, AvailableAction } from '../../src/client/headless/types';
 import type { Card } from '../../src/engine/types';
 
@@ -333,55 +325,93 @@ describe('respond 类评分', () => {
     expect(reason).toContain('自保');
   });
 
-  // ── 直接测试导出的辅助函数 ──
+  // ── 辅助函数经 scoreAction 间接覆盖（wuxieThreatLevel/wuxieTargetValue/
+  //    countWuxieInHand 未导出，断言走 respond 无懈可击公共入口透传的分数与理由）──
 
-  it('wuxieThreatLevel 按牌名分类威胁等级', () => {
-    expect(wuxieThreatLevel('顺手牵羊').level).toBe('critical');
-    expect(wuxieThreatLevel('过河拆桥').score).toBe(90);
-    expect(wuxieThreatLevel('乐不思蜀').level).toBe('critical');
-    expect(wuxieThreatLevel('借刀杀人').level).toBe('high');
-    expect(wuxieThreatLevel('火攻').score).toBe(75);
-    expect(wuxieThreatLevel('南蛮入侵').level).toBe('medium');
-    expect(wuxieThreatLevel('万箭齐发').score).toBe(60);
-    expect(wuxieThreatLevel('桃园结义').level).toBe('low');
-    expect(wuxieThreatLevel('五谷丰登').score).toBe(40);
-    expect(wuxieThreatLevel('某未知锦囊').level).toBe('medium');
+  it('威胁等级按牌名分类（广播型无懈评分=威胁分，理由透传等级）', () => {
+    // round=3 → 轮次修正 0；3 人存活 → 南蛮/万箭不减 15；score = 威胁分原值
+    const cases: Array<[cardName: string, score: number, level: string]> = [
+      ['顺手牵羊', 90, 'critical'],
+      ['过河拆桥', 90, 'critical'],
+      ['乐不思蜀', 90, 'critical'],
+      ['借刀杀人', 75, 'high'],
+      ['火攻', 75, 'high'],
+      ['南蛮入侵', 60, 'medium'],
+      ['万箭齐发', 60, 'medium'],
+      ['桃园结义', 40, 'low'],
+      ['五谷丰登', 40, 'low'],
+      ['某未知锦囊', 60, 'medium'],
+    ];
+    for (const [cardName, expectedScore, level] of cases) {
+      const view = makeView({
+        turn: { round: 3 },
+        players: [
+          makePlayer({ index: 0, name: 'P0' }),
+          makePlayer({ index: 1, name: 'P1' }),
+          makePlayer({ index: 2, name: 'P2' }),
+        ],
+        pending: {
+          target: -1,
+          isBlocking: false,
+          promptTitle: `是否打出无懈可击(${cardName})`,
+          requestType: '',
+        },
+      });
+      const { score, reason } = scoreAction(view, respondAction('无懈可击'));
+      expect(score, cardName).toBe(expectedScore);
+      expect(reason, cardName).toContain(`威胁${level}`);
+    }
   });
 
-  it('wuxieTargetValue 残血+多牌+核心武将 → 高保护价值', () => {
+  it('保护价值：残血+多牌+核心武将 → 价值90（盟友分支理由透传）', () => {
+    const wuxie1 = makeCard({ id: 'wx1', name: '无懈可击', type: '锦囊牌' });
+    const wuxie2 = makeCard({ id: 'wx2', name: '无懈可击', type: '锦囊牌' });
     const view = makeView({
+      turn: { round: 3 },
       players: [
-        makePlayer({ index: 0, name: 'P0' }),
+        makePlayer({ index: 0, name: 'P0', identity: '反贼', handCount: 2, hand: [wuxie1, wuxie2] }),
         makePlayer({
           index: 1,
           name: 'P1',
+          identity: '反贼',
           health: 1,
           maxHealth: 4,
           handCount: 5,
           character: '孙权',
         }),
+        makePlayer({ index: 2, name: 'P2', identity: '主公' }),
       ],
+      pending: { target: 1, isBlocking: false, promptTitle: '是否打出无懈可击(顺手牵羊)', requestType: '' },
     });
-    // 50 + 残血20 + 多牌10 + 核心10 = 90
-    expect(wuxieTargetValue(view, 1)).toBe(90);
+    const { score, reason } = scoreAction(view, respondAction('无懈可击', wuxie1));
+    // 目标价值 50+残血20+多牌10+核心10=90；(威胁90+价值90)/2=90；2张无懈无修正；第3轮无修正
+    expect(score).toBe(90);
+    expect(reason).toContain('价值90');
   });
 
-  it('countWuxieInHand 统计手牌中无懈可击数量', () => {
-    const view = makeView({
-      players: [
-        makePlayer({
-          index: 0,
-          name: 'P0',
-          hand: [
-            makeCard({ id: 'wx1', name: '无懈可击', type: '锦囊牌' }),
-            makeCard({ id: 'k', name: '杀' }),
-            makeCard({ id: 'wx2', name: '无懈可击', type: '锦囊牌' }),
-          ],
-        }),
-        makePlayer({ index: 1, name: 'P1' }),
-      ],
-    });
-    expect(countWuxieInHand(view)).toBe(2);
+  it('手牌无懈计数只数【无懈可击】（混入杀不计，经手牌修正-5透传）', () => {
+    const wuxie = makeCard({ id: 'wx', name: '无懈可击', type: '锦囊牌' });
+    const wuxie2 = makeCard({ id: 'wx2', name: '无懈可击', type: '锦囊牌' });
+    const kill = makeCard({ id: 'k', name: '杀' });
+    const base = {
+      turn: { round: 3 },
+      pending: { target: 1, isBlocking: false, promptTitle: '是否打出无懈可击(借刀杀人)', requestType: '' },
+    };
+    const viewWith = (hand: Card[]) =>
+      makeView({
+        ...base,
+        players: [
+          makePlayer({ index: 0, name: 'P0', identity: '反贼', handCount: hand.length, hand }),
+          makePlayer({ index: 1, name: 'P1', identity: '反贼', health: 4, maxHealth: 4, handCount: 1 }),
+          makePlayer({ index: 2, name: 'P2', identity: '主公' }),
+        ],
+      });
+    // 1 张无懈混 1 张杀：只数无懈=1 → 修正-5 = 63（若把杀也计入则=2 → 68，断言即失效）
+    const withKill = scoreAction(viewWith([wuxie, kill]), respondAction('无懈可击', wuxie)).score;
+    // 2 张无懈：=2 → 无修正 = 68
+    const twoWuxie = scoreAction(viewWith([wuxie, wuxie2]), respondAction('无懈可击', wuxie)).score;
+    expect(withKill).toBe(63); // (75+60)/2=68，-5
+    expect(twoWuxie).toBe(68);
   });
 });
 
@@ -754,7 +784,7 @@ describe('discard / selectChar 类评分', () => {
   });
 });
 
-// ── rankActions / pickBestAction / scoreAll ─────────────────────────
+// ── rankActions / pickBestAction ────────────────────────────────────
 
 describe('rankActions / pickBestAction', () => {
   it('按评分降序排序（respond 救命 > play > skip）', () => {
@@ -847,16 +877,17 @@ describe('rankActions / pickBestAction', () => {
     expect(pickBestAction(view, [])).toBeNull();
   });
 
-  it('scoreAll 返回排序的带理由列表', () => {
+  it('rankActions + scoreAction 组合得到排序的带理由列表（排序分+理由+动作同源）', () => {
     const view = makeView();
     const actions: AvailableAction[] = [
       playAction(makeCard({ id: 'tao', name: '桃' })),        // 10
       playAction(makeCard({ id: 'kill', name: '杀' }), [1]),  // 72
     ];
-    const all = scoreAll(view, actions);
+    const all = rankActions(view, actions).map((action) => ({ action, ...scoreAction(view, action) }));
     expect(all).toHaveLength(2);
     expect(all[0].score).toBeGreaterThanOrEqual(all[1].score);
     expect(all[0].action.message.skillId).toBe('杀');
+    expect(all[0].score).toBe(72);
     expect(all[0].reason).toContain('杀');
   });
 });

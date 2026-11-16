@@ -28,9 +28,10 @@
 //   矫诏效果恒为基础版本,殚心仅做计数(见 界殚心.ts)。
 import type { ActionContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { setPlayerVarUsage } from '../rules/turn-usage';
-import { registerAfterHook, hasBlockingPending } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import { usedThisTurn as usedOncePerTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
 import { getCardEffect } from './cards';
 import { TRANSFORM_ACTION_PREFIX } from '../util/declaredActionType';
 import { NORMAL_TRICK_NAMES } from '../util/non-delay-tricks';
@@ -102,12 +103,10 @@ function transformOptionsFor(outputName: string): TransformActionOptions {
     outputName,
     actionType: `${TRANSFORM_ACTION_PREFIX}${outputName}`,
     validate: (st: GameState, ownerId: number, params: Record<string, Json>): string | null => {
-      if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (st.phase !== '出牌') return '只能在出牌阶段发动';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       if (usedJiaozhaoThisTurn(st, ownerId)) return '本回合已使用过矫诏';
       const self = st.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
 
       const cardId = params.cardId as string | undefined;
       if (typeof cardId !== 'string') return '需要选择一张牌';

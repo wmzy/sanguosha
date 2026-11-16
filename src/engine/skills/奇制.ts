@@ -30,6 +30,7 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { QIZHI_COUNT_KEY as COUNT_VAR, PICK_RESULT_KEY, getQizhiCount } from '../rules/vars-keys';
 import { currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { hasDiscardableCards } from '../util/player-query';
 
 const SKILL_ID = '奇制';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -46,13 +47,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     name: SKILL_ID,
     description: '回合内使用非装备牌指定目标后,可弃置另一名角色一张牌并令其摸一张牌',
   };
-}
-
-/** 玩家区域(手牌+装备)是否有牌可被弃 */
-function hasDiscardableCards(player: GameState['players'][number]): boolean {
-  if (!player) return false;
-  if (player.hand.length > 0) return true;
-  return Object.values(player.equipment).some((id) => typeof id === 'string');
 }
 
 /** 是否存在可被弃牌的其他角色(存活、非自己、有牌) */

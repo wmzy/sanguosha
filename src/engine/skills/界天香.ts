@@ -14,6 +14,7 @@
 // 与标版共用 天香.ts 的参数化实现。
 import type { FrontendAPI, GameState, PlayerState, Skill } from '../types';
 import { registerTianxiangWiring, mountTianxiangRespondAction, type TianxiangVariant } from './天香';
+import { ownsCard } from '../util/player-query';
 
 /** 界版:红桃牌可在手牌或装备区。返回玩家拥有的所有 cardId(手牌 + 装备区)。 */
 function getOwnedCardIds(self: PlayerState): string[] {
@@ -21,12 +22,6 @@ function getOwnedCardIds(self: PlayerState): string[] {
     (id): id is string => typeof id === 'string',
   );
   return [...self.hand, ...equipIds];
-}
-
-/** 玩家是否持有某张牌(手牌或装备区)。 */
-function ownsCard(self: PlayerState, cardId: string): boolean {
-  if (self.hand.includes(cardId)) return true;
-  return Object.values(self.equipment).some((id) => id === cardId);
 }
 
 /** 界天香差异配置(共享实现见 天香.ts)。 */

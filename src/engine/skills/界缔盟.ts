@@ -22,7 +22,6 @@
 // 完成弃牌(与截辎「额外摸牌阶段」改用 before-hook 同因)。
 //
 // 命名:文件名/loader key/character name = '界缔盟';内部 Skill.name = '缔盟'。
-import type { GameState } from '../types';
 import { registerBeforeHook } from '../core/skill';
 import {
   createDimengSkill,
@@ -30,6 +29,7 @@ import {
   askMandatoryDiscard,
   type DimengOptions,
 } from './缔盟';
+import { totalCardCount } from '../util/player-query';
 import type { SkillModule } from '../types';
 
 const DISCARD_RT = '界缔盟/discard';
@@ -38,17 +38,6 @@ const DISCARD_KEY = '界缔盟/discardCards';
 const PENDING_DISCARD_KEY = '界缔盟/待弃数';
 /** localVars: 出牌阶段结束时弃牌的归属者(鲁肃座次) */
 const PENDING_OWNER_KEY = '界缔盟/待弃归属';
-
-/** 鲁肃的总牌数(手牌+装备) */
-function totalCardCount(state: GameState, player: number): number {
-  const p = state.players[player];
-  if (!p) return 0;
-  const handCount = p.hand.length;
-  const equipCount = Object.values(p.equipment).filter(
-    (id): id is string => typeof id === 'string',
-  ).length;
-  return handCount + equipCount;
-}
 
 const OPTIONS: DimengOptions = {
   skillKey: '界缔盟',
@@ -60,7 +49,7 @@ const OPTIONS: DimengOptions = {
   strictDiscardRespond: false,
   resolveAfterTargets: async (st, ownerId, A, B, diff, _discardRt, _discardKey) => {
     // 前置条件:两者手牌数差 ≤ 鲁肃的牌数(手牌+装备)
-    const myCards = totalCardCount(st, ownerId);
+    const myCards = totalCardCount(st.players[ownerId]);
     if (diff > myCards) return; // 差值超过鲁肃牌数,不执行
 
     // 界版:先交换手牌(不等弃牌)

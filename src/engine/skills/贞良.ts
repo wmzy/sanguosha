@@ -31,9 +31,9 @@ import { inAttackRange } from '../rules/distance';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
 import { viewCanAttack } from '../rules/viewDistance';
-import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { REN_MARK_ID, getRenColor } from './明任';
-import { askConfirm, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, requireRequestType, defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
 import { projectTurnUsage } from '../rules/turn-usage';
 
 const SKILL_ID = '贞良';
@@ -129,12 +129,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>): string | null => {
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       const self = st.players[ownerId];
-      if (!self) return 'player not found';
-      if (!self.alive) return '你已死亡';
-      if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
-      if (st.phase !== '出牌') return '只能在出牌阶段使用';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
       if (usedThisTurn(st, ownerId, SKILL_ID)) return '本回合已使用过贞良';
       if (getState(st, ownerId) !== '阳') return '当前为阴状态,无法发动阳';
       // 须有任
@@ -289,7 +286,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
         min: 1,
         max: 1,
         filter: (view: GameView, t: number) =>
-          viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
+          viewCanAttack(view.players, view.currentPlayerIndex, t),
       },
     },
     activeWhen: (ctx) => {

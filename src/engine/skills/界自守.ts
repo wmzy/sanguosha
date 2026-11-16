@@ -35,6 +35,7 @@ import {
 } from '../core/skill';
 import type { SkillModule } from '../types';
 import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { countFactions } from '../util/player-query';
 
 const DISPLAY_NAME = '自守';
 
@@ -60,16 +61,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '摸牌阶段可多摸X张(X为全场势力数);若本回合对其他角色造成过伤害,结束阶段弃X张',
   };
-}
-
-/** 计算全场存活玩家的不同势力数(X)。 */
-function countFactions(state: GameState): number {
-  const factions = new Set<string>();
-  for (const p of state.players) {
-    if (!p.alive) continue;
-    if (p.faction) factions.add(p.faction);
-  }
-  return factions.size;
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

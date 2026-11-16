@@ -27,14 +27,13 @@ import { popFrame, pushFrame } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import {
   registerAction,
-  hasBlockingPending,
 } from '../core/skill';
 import { hasSkillModule } from './registry';
 import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive } from '../rules/action-active';
 import type { SkillModule } from '../types';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
 
 const SKILL_ID = '界献州';
 const DISPLAY_NAME = '献州';
@@ -87,11 +86,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>) => {
-      if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (st.phase !== '出牌') return '只能在出牌阶段发动';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       const self = st.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
       if (self.vars[USED_KEY]) return '献州已使用过(限定技)';
       if (equippedCardIds(st, ownerId).length === 0) return '装备区无牌,无法发动';
       const target = params.target;
@@ -166,7 +163,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
                 if (t === target) return false;
                 const tp = view.players.find((pl) => pl.index === t);
                 if (!tp || tp.alive === false) return false;
-                return viewCanAttack(view.players, view.cardMap, target, t);
+                return viewCanAttack(view.players, target, t);
               },
             },
           },

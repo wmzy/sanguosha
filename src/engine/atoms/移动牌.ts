@@ -6,7 +6,7 @@ import type {
   ViewEvent,
   Card,
 } from '../types';
-import { addCardToHand, broadcast, resolveDiscardEntry, removeCardFromHand, viewPlayer } from './_helpers';
+import { addCardToHand, applyDrawEvent, broadcast, resolveDiscardEntry, removeCardFromHand, viewPlayer } from './_helpers';
 
 export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: ZoneLoc }> = {
   type: '移动牌',
@@ -173,12 +173,8 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
         break;
       }
       case '摸牌': {
-        const count = (event.count as number) ?? 1;
-        p.handCount += count;
-        if (event.cards && p.hand) {
-          p.hand.push(...(event.cards as Card[]));
-        }
-        if (view.zones) view.zones.deckCount = Math.max(0, view.zones.deckCount - count);
+        // 牌堆→手牌的摸牌投影,与 摸牌 atom 的 applyView 共用单点
+        applyDrawEvent(view, event);
         break;
       }
       default: {

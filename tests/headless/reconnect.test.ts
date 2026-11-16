@@ -106,9 +106,9 @@ describe('HeadlessGameClient 重连机制 (SSE)', () => {
   // ── 断线检测 ──
 
   it('SSE onerror 后映射为 reconnecting', async () => {
-    const states: Array<{ state: ReconnectState; attempt: number }> = [];
+    const states: ReconnectState[] = [];
     const hgc = new HeadlessGameClient('http://test', {
-      onReconnectStateChange: (state, attempt) => states.push({ state, attempt }),
+      onReconnectStateChange: (state) => states.push(state),
     });
 
     await hgc.joinRoom('ROOM', 'P1');
@@ -120,7 +120,8 @@ describe('HeadlessGameClient 重连机制 (SSE)', () => {
     createdES[0].fireError();
 
     expect(hgc.reconnectState).toBe('reconnecting');
-    expect(states).toContainEqual({ state: 'reconnecting', attempt: 1 });
+    expect(hgc.isReconnecting).toBe(true);
+    expect(states).toContain('reconnecting');
   });
 
   // ── EventSource 自动恢复 ──

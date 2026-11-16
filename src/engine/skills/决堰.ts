@@ -37,6 +37,7 @@ import {
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerSlashExtraProvider, projectSlashExtra } from '../rules/slash-quota';
 import { registerDistanceExemptor } from '../rules/distance';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
 import { setTurnVarUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
 import { handLimitBonusKey, getHandLimitBonus, JUEYAN_MOUNT_VIEW_KEY } from '../rules/vars-keys';
@@ -76,13 +77,6 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 玩家某栏是否已全部废除(栏内所有槽都标记废除) */
-export function isSlotGroupAbolished(state: GameState, player: number, group: string): boolean {
-  const slots = SLOT_GROUPS[group];
-  if (!slots) return false;
-  return slots.every((s) => state.players[player]?.vars[ABOLISH_PREFIX + s]);
-}
-
 /** 检查玩家某栏是否还有未废除的槽(可被决堰废除) */
 function canAbolishGroup(state: GameState, player: number, group: string): boolean {
   const slots = SLOT_GROUPS[group];
@@ -101,11 +95,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>): string | null => {
-      if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (st.phase !== '出牌') return '只能在出牌阶段发动';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       if (usedThisTurn(st, ownerId, SKILL_NAME)) return '本回合已使用过决堰';
-      const self = st.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
       // 栏名:前端 chooseOption 传 option,测试/直接 dispatch 传 slot
       const group = (params.slot as string) ?? (params.option as string);
       if (typeof group !== 'string' || !SLOT_CHOICES.includes(group as (typeof SLOT_CHOICES)[number])) {

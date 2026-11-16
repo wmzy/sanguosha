@@ -29,6 +29,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction } from '../core/skill';
 import { engineCanPlayNow } from '../util/skillRuntime';
+import { ownsCard } from '../util/player-query';
 
 const TRICK_NAME = '乐不思蜀';
 
@@ -61,9 +62,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       const cardId = params.cardId;
       // 方块牌可在手牌或装备区(描述:有方块牌——手牌或装备区的牌)
-      const cardInHand = self.hand.includes(cardId);
-      const cardInEquip = Object.values(self.equipment).some((id) => id === cardId);
-      if (!cardInHand && !cardInEquip) return '牌不在手牌或装备区';
+      if (!ownsCard(self, cardId)) return '牌不在手牌或装备区';
       if (!isGuoseCard(state.cardMap[cardId])) return '需要一张方块牌';
 
       // 目标:兼容 target(number) 与 targets(number[]) 两种提交形式(与乐不思蜀一致)

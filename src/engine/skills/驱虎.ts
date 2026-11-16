@@ -18,7 +18,7 @@ import { askRankCardAndCompare } from '../flows/rank';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -39,11 +39,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'use',
     (state: GameState, params: Record<string, Json>) => {
-      if (state.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (state.phase !== '出牌') return '只能在出牌阶段发动';
+      const playError = engineCanPlayNowReason(state, ownerId);
+      if (playError) return playError;
       if (usedThisTurn(state, ownerId, '驱虎')) return '本回合已使用过驱虎';
       const self = state.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
       const cardId = params.cardId as string;
       if (typeof cardId !== 'string') return '需要选择拼点牌';
       if (!self.hand.includes(cardId)) return '拼点牌不在手牌中';

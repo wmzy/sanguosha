@@ -32,7 +32,8 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { hasSkillModule } from './registry';
-import { firstCardId, slotOf, requireRequestType } from '../util/skillRuntime';
+import { firstCardId, requireRequestType } from '../util/skillRuntime';
+import { slotOf } from '../util/equip-slot';
 
 const USED_KEY = '据守/usedThisTurn';
 const DISCARD_RT = '据守/弃牌';

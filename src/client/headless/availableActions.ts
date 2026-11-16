@@ -33,6 +33,7 @@ import {
   choosePlayerCandidates,
   selectTargetCandidates,
   promptTargetBounds,
+  choosePlayerAsTargetFilter,
   isTriggerablePromptType,
   distributeAllocateCandidates,
   effectiveTargetCard,
@@ -48,7 +49,11 @@ import {
   getPendingRequestedName,
 } from '../utils/pendingRespond';
 import { viewSlashTargetMax } from '../../engine/rules/action-active';
-import { resolveTargetSelection, validateTargetSelection } from '../../engine/rules/target-selection';
+import {
+  resolveTargetSelection,
+  validateTargetSelection,
+  type TargetSelection,
+} from '../../engine/rules/target-selection';
 
 /** 计算 useCardAndTarget 的合法目标列表。
  *  默认排除自己；targetFilter.allowSelf=true（铁索连环含自己）时纳入自己。
@@ -113,8 +118,43 @@ function samplePlayParams(
     : (built ?? { cardId: card.id });
 }
 
+/** 目标型 action 的收尾(原 enumerateAvailableActions 尾部 flatMap 的单一实现,
+ *  现下沉到各产出点就地调用一次,不再事后重算/覆盖上游 validTargets):
+ *  - card-aware resolveTargetSelection:必选目标不可满足/槽位无解 → null,上游跳过;
+ *  - 消息已带的 targets 合法则保留,否则回填最小合法组合(AvailableAction 的
+ *    「最小合法消息可直接提交」契约);
+ *  - targetSelection 契约 + minTarget/maxTarget 投影(杀的动态目标上限经 card 生效)。
+ *  @param card    目标约束的 use 牌(代价牌/非使用牌传 undefined,见 effectiveTargetCard)
+ *  @param current 消息里已携带的 targets */
+function finalizeTargetContract(
+  view: GameView,
+  seatIndex: number,
+  filter: TargetFilter,
+  card: Card | undefined,
+  current: number[],
+): {
+  targets: number[];
+  targetSelection: TargetSelection;
+  minTarget?: number;
+  maxTarget: number;
+} | null {
+  const resolved = resolveTargetSelection(view, seatIndex, filter, card);
+  if (!resolved.targets) return null;
+  const targets = validateTargetSelection(view, seatIndex, filter, current, card)
+    ? current
+    : resolved.targets;
+  const { min, max } = resolved.contract;
+  return {
+    targets,
+    targetSelection: resolved.contract,
+    ...(min !== 1 ? { minTarget: min } : {}),
+    maxTarget: max,
+  };
+}
+
 /** 出牌/替代出法共享的单卡 action 骨架(两枚举分支原为镜像手写):
- *  目标规则派生 → 合法目标计算 → 需要目标但无合法目标(如距离不够)跳过 → 示例 message。
+ *  目标规则派生 → 合法目标计算 → 需要目标但无合法目标(如距离不够)跳过 → 目标收尾
+ *  (预填最小合法 targets + targetSelection 契约)→ 示例 message。
  *  返回 null 表示该(牌,action)组合不可出。 */
 function buildCardPlaySkeleton(
   view: GameView,
@@ -126,6 +166,9 @@ function buildCardPlaySkeleton(
   validTargets: number[];
   bounds: { minTarget?: number; maxTarget?: number };
   rules: PlayRules;
+  /** 展开进 AvailableAction 的目标投影(targetSelection 契约 + 收尾后的
+   *  minTarget/maxTarget,置于 bounds/slashMax 之后即为最终权威值)。 */
+  targetProjection: Partial<Pick<AvailableAction, 'targetSelection' | 'minTarget' | 'maxTarget'>>;
 } | null {
   const targetFilter = getTargetFilter(action.prompt);
   const rules = derivePlayRules(targetFilter, getSelfTarget(action.prompt));
@@ -133,17 +176,37 @@ function buildCardPlaySkeleton(
   const validTargets = computeValidTargets(view, seatIndex, targetFilter, rules);
   // 需要目标但无合法目标(如距离不够),跳过此牌
   if (rules.needsTarget && !rules.selfTarget && validTargets.length === 0) return null;
+  const message: EngineClientMessage = {
+    skillId: action.skillId,
+    actionType: action.actionType,
+    ownerId: seatIndex,
+    params: samplePlayParams(view, seatIndex, card, rules),
+    baseSeq: 0,
+  };
+  const targetProjection: Partial<Pick<AvailableAction, 'targetSelection' | 'minTarget' | 'maxTarget'>> = {};
+  // 目标收尾(原尾部 flatMap 下沉,算一次):需要目标的 useCardAndTarget/selectTarget
+  // 型动作。use 牌约束:主出牌的 skillId===牌名 → 选中牌即使用牌(杀本体,动态上限
+  // 生效);替代出法(义绝/断粮,skillId≠牌名)的选中牌是代价牌 → undefined。
+  if (rules.needsTarget && targetFilter) {
+    const fin = finalizeTargetContract(
+      view,
+      seatIndex,
+      targetFilter,
+      effectiveTargetCard(card, targetFilter, usedCardNameOfMessage(message, card)),
+      [],
+    );
+    if (!fin) return null;
+    message.params = { ...message.params, targets: fin.targets };
+    targetProjection.targetSelection = fin.targetSelection;
+    if (fin.minTarget !== undefined) targetProjection.minTarget = fin.minTarget;
+    targetProjection.maxTarget = fin.maxTarget;
+  }
   return {
-    message: {
-      skillId: action.skillId,
-      actionType: action.actionType,
-      ownerId: seatIndex,
-      params: samplePlayParams(view, seatIndex, card, rules),
-      baseSeq: 0,
-    },
+    message,
     validTargets,
     bounds: targetBoundsOf(action.prompt, rules),
     rules,
+    targetProjection,
   };
 }
 
@@ -178,6 +241,7 @@ function enumeratePlayActions(
       category: 'play',
       ...skeleton.bounds,
       ...(slashMax !== undefined ? { maxTarget: slashMax } : {}),
+      ...skeleton.targetProjection,
     });
   }
   return result;
@@ -266,31 +330,53 @@ function buildTransformUseAction(
   if (cardRules.needsTarget && !cardRules.selfTarget && validTargets.length === 0) return null;
   const ids = materials.map((c) => c.id);
   const desc = materials.map((c) => `${c.suit}${c.rank}`).join('+');
+  // 消息装配(影子 id/preceding/selfTarget 预填 targets=[自己])与浏览器
+  // handleTransformPlay 共享 buildTransformSubmitMessage;targets 留给 agent
+  // 从 validTargets 补全,不传 targetIdx。
+  const message = buildTransformSubmitMessage({
+    wrapperName,
+    actionType: 'use',
+    ownerId: seatIndex,
+    skillId: action.skillId,
+    transformActionType: action.actionType,
+    materialIds: ids,
+    selfTarget: cardRules.selfTarget,
+  });
   // 目标数边界与 promptTargetBounds 同源:产出牌 use action 的 prompt(无注册时
   // 回退 transform 自身 prompt),>1 才输出的投影格式见 targetBoundsOf。
   const bounds = targetBoundsOf((gate.produced ?? action).prompt, cardRules);
   const slashMax = slashTargetMaxOf(view, seatIndex, { name: wrapperName }, cardRules);
+  // 目标收尾(原尾部 flatMap 下沉,算一次):产出牌需目标时,use 牌约束 =
+  // 「首张原料牌 + 产出牌名」(影子 id 不在 cardMap,以原料代位——与浏览器
+  // targetConstraintCard 的转化分支同源),预填最小合法 targets + 契约。
+  let targetProjection: Partial<Pick<AvailableAction, 'targetSelection' | 'minTarget' | 'maxTarget'>> = {};
+  if (cardRules.needsTarget && cardTargetFilter) {
+    const fin = finalizeTargetContract(
+      view,
+      seatIndex,
+      cardTargetFilter,
+      effectiveTargetCard(materials[0], cardTargetFilter, usedCardNameOfMessage(message, undefined)),
+      [],
+    );
+    if (!fin) return null;
+    message.params = { ...message.params, targets: fin.targets };
+    targetProjection = {
+      targetSelection: fin.targetSelection,
+      ...(fin.minTarget !== undefined ? { minTarget: fin.minTarget } : {}),
+      maxTarget: fin.maxTarget,
+    };
+  }
   return {
     description:
       wrapperName === '杀' && slashMax && slashMax > 1
         ? `${action.skillId}转化【${wrapperName}】(${desc}) (最多${slashMax}目标)`
         : `${action.skillId}转化【${wrapperName}】(${desc})`,
-    // 消息装配(影子 id/preceding/selfTarget 预填 targets=[自己])与浏览器
-    // handleTransformPlay 共享 buildTransformSubmitMessage;targets 留给 agent
-    // 从 validTargets 补全,不传 targetIdx。
-    message: buildTransformSubmitMessage({
-      wrapperName,
-      actionType: 'use',
-      ownerId: seatIndex,
-      skillId: action.skillId,
-      transformActionType: action.actionType,
-      materialIds: ids,
-      selfTarget: cardRules.selfTarget,
-    }),
+    message,
     validTargets,
     category: 'transform',
     ...bounds,
     ...(slashMax !== undefined ? { maxTarget: slashMax } : {}),
+    ...targetProjection,
   };
 }
 
@@ -477,6 +563,7 @@ function enumerateAltActions(
         validTargets: skeleton.validTargets,
         category: 'play',
         ...skeleton.bounds,
+        ...skeleton.targetProjection,
       });
     }
   }
@@ -606,6 +693,18 @@ function enumeratePromptActions(
     }
     if (validTargets.length === 0) continue;
 
+    // 目标收尾(原尾部 flatMap 下沉,算一次):choosePlayer → TargetFilter 的形状
+    // 映射共享 choosePlayerAsTargetFilter(此前为尾部 flatMap 手写);selectTarget/
+    // choosePlayer 的变体代价牌不作 use 牌解释(card=undefined,不套 杀 的动态上限)。
+    // 退化声明(无 slots 且 max===0)不收尾,与 needsTarget 判据一致。
+    const targetFilter = prompt.type === 'choosePlayer'
+      ? choosePlayerAsTargetFilter(prompt)
+      : prompt.targetFilter;
+    const fin = (targetFilter.slots?.length || targetFilter.max > 0)
+      ? finalizeTargetContract(view, seatIndex, targetFilter, undefined, [])
+      : null;
+    if ((targetFilter.slots?.length || targetFilter.max > 0) && !fin) continue;
+
     // paramVariants(强袭代价 等):每个变体一个 action;缺省单个无额外参数的变体。
     // 变体声明的代价牌(强袭·弃武器):按「每个候选牌 × 每个合法目标」展开并预填 cardId,
     // 否则 agent 提交缺 cardId 被引擎恒拒「弃武器需要 cardId」(浏览器侧同源:选中武器牌后提交)。
@@ -625,20 +724,27 @@ function enumeratePromptActions(
       forEachVariantCostCard(variants, (variant, costCard) => {
         const suffix = variant.label ? `(${variant.label})` : '';
         const cardSuffix = costCard ? `(${costCard.suit}${costCard.rank})` : '';
-        result.push(describeMultiSelectAction(
-          {
-            description: `发动【${action.label}】${suffix}${cardSuffix}(选 ${multiMin}${max > multiMin ? `-${max}` : ''} 个目标)`,
-            skillId: action.skillId,
-            actionType: 'use',
-            ownerId: seatIndex,
-            category: 'play',
-          },
-          validTargets,
-          multiMin,
-          max,
-          // targets 留空由 agent 从 validTargets 中选 minTarget..maxTarget 个填入
-          { ...variant.params, ...(costCard ? { cardId: costCard.id } : {}) },
-        ));
+        result.push({
+          ...describeMultiSelectAction(
+            {
+              description: `发动【${action.label}】${suffix}${cardSuffix}(选 ${multiMin}${max > multiMin ? `-${max}` : ''} 个目标)`,
+              skillId: action.skillId,
+              actionType: 'use',
+              ownerId: seatIndex,
+              category: 'play',
+            },
+            validTargets,
+            multiMin,
+            max,
+            // targets 由收尾回填最小合法组合(可提交的默认值),agent 可改
+            { ...variant.params, ...(costCard ? { cardId: costCard.id } : {}), ...(fin ? { targets: fin.targets } : {}) },
+          ),
+          ...(fin ? {
+            targetSelection: fin.targetSelection,
+            ...(fin.minTarget !== undefined ? { minTarget: fin.minTarget } : {}),
+            maxTarget: fin.maxTarget,
+          } : {}),
+        });
       });
       continue;
     }
@@ -663,6 +769,12 @@ function enumeratePromptActions(
           },
           validTargets: [t],
           category: 'play',
+          // 契约投影(收尾已算:[t] 经上游候选筛选恒合法,targets 无需逐目标重算)
+          ...(fin ? {
+            targetSelection: fin.targetSelection,
+            ...(fin.minTarget !== undefined ? { minTarget: fin.minTarget } : {}),
+            maxTarget: fin.maxTarget,
+          } : {}),
         });
       });
     }
@@ -706,50 +818,10 @@ export function enumerateAvailableActions(
       category: 'play',
     });
   }
-  return actions.flatMap((action) => {
-    const message = action.message;
-    const definition = skillActions.find((entry) =>
-      entry.skillId === message.skillId && entry.actionType === message.actionType) ??
-      (message.actionType === 'use' ? skillActions.find((entry) =>
-        entry.skillId === message.preceding?.[0]?.skillId && entry.actionType === message.preceding?.[0]?.actionType) : undefined);
-    const prompt = definition?.prompt;
-    if (!prompt || (prompt.type !== 'useCardAndTarget' && prompt.type !== 'selectTarget' && prompt.type !== 'choosePlayer'))
-      return [action];
-    if (prompt.type === 'useCardAndTarget' && prompt.selfTarget) return [action];
-    const filter: TargetFilter = prompt.type === 'choosePlayer'
-      ? { min: prompt.min, max: prompt.max, allowSelf: true, candidates: prompt.candidates, filter: prompt.filter }
-      : prompt.targetFilter;
-    if (!filter.slots?.length && filter.max === 0) return [action];
-    const id = message.params.cardId;
-    const material = message.preceding?.[0]?.params;
-    const materialId = material?.cardId ?? (Array.isArray(material?.cardIds) ? material.cardIds[0] : undefined);
-    const source = typeof id === 'string' ? view.cardMap[id] : undefined;
-    const ingredient = typeof materialId === 'string' ? view.cardMap[materialId] : undefined;
-    // 「选中牌是否按杀的动态目标上限解释」与浏览器 isTargetable 共享 effectiveTargetCard:
-    // 选中牌 = 主 action 的牌(source)∪ 转化原料(ingredient)。usedCardName 判定
-    // (有 preceding → 产出牌名 = 主 action 技能名;牌名 === skillId → 普通出牌的
-    // 牌本体;其余技能代价牌 → null)收敛为 gameViewHelpers 的 usedCardNameOfMessage。
-    const card = effectiveTargetCard(
-      source ?? ingredient,
-      filter,
-      usedCardNameOfMessage(message, source),
-    );
-    const resolved = resolveTargetSelection(view, seatIndex, filter, card);
-    if (!resolved.targets) return [];
-    const current = Array.isArray(message.params.targets) ? message.params.targets as number[] : [];
-    const targets = validateTargetSelection(view, seatIndex, filter, current, card)
-      ? current : resolved.targets;
-    const params = { ...message.params, targets };
-    if ('target' in params) params.target = targets[0];
-    return [{
-      ...action,
-      message: { ...message, params },
-      validTargets: resolved.contract.candidates,
-      targetSelection: resolved.contract,
-      ...(resolved.contract.min !== 1 ? { minTarget: resolved.contract.min } : {}),
-      maxTarget: resolved.contract.max,
-    }];
-  });
+  // 注:useCardAndTarget/selectTarget/choosePlayer 的目标收尾(重算目标 + 预填
+  // targets + targetSelection 契约)已在各产出点(出牌骨架/转化 use/prompt 枚举)
+  // 就地完成——此前这里是统一 flatMap 事后重算并覆盖上游 validTargets,双算易漂移。
+  return actions;
 }
 
 // ─── pending 驱动的回应动作枚举(自 HeadlessGameClient 迁入) ───
@@ -770,6 +842,27 @@ export function appendRespondActions(
   actionSeat: number,
 ): void {
   const ownerId = actionSeat;
+  /** respond 消息骨架(本函数 ~17 处 actionType:'respond' 字面量收敛):
+   *  ownerId 即本枚举视角,baseSeq 占位 0(发送层覆写真实序号)。 */
+  const respondMsg = (skillId: string, params: Record<string, Json>): EngineClientMessage => ({
+    skillId,
+    actionType: 'respond',
+    ownerId,
+    params,
+    baseSeq: 0,
+  });
+  /** 弃牌类动作的共享构造(__弃牌 与 强制弃牌 两分支同构):预填「前 minCount 张」
+   *  作为可执行默认值,agent 可直接提交;需要优化时再改 cardIds。skillId:
+   *  __弃牌 恒 系统规则;强制弃牌由 resolvePendingRespond 推导(英魂 等)。 */
+  const pushDiscardAction = (skillId: string, baseIds: string[], minCount: number, label: string): void => {
+    const discardIds = baseIds.slice(0, Math.max(minCount, 1));
+    out.push({
+      description: `${label}（默认选前 ${discardIds.length} 张，可改 cardIds）`,
+      message: respondMsg(skillId, { cardIds: discardIds }),
+      validTargets: [],
+      category: 'discard',
+    });
+  };
     const pending = view.pending!;
     // 卡牌回应 silent 模式(target 有手牌但无匹配牌):target 不被询问。
     // 不为该 pending 生成任何 skip/respond action,让短延时 slot 自然超时
@@ -824,13 +917,7 @@ export function appendRespondActions(
       for (const eq of (pickPrompt.equipment ?? [])) {
         out.push({
           description: `${verb}【${eq.cardName}】(装备)`,
-          message: {
-            skillId: pickSkillId,
-            actionType: 'respond',
-            ownerId,
-            params: { zone: 'equipment', cardId: eq.cardId },
-            baseSeq: 0,
-          },
+          message: respondMsg(pickSkillId, { zone: 'equipment', cardId: eq.cardId }),
           validTargets: [],
           category: 'respond',
         });
@@ -839,29 +926,19 @@ export function appendRespondActions(
       for (const j of (pickPrompt.judge ?? [])) {
         out.push({
           description: `${verb}【${j.cardName}】(判定区)`,
-          message: {
-            skillId: pickSkillId,
-            actionType: 'respond',
-            ownerId,
-            params: { zone: 'judge', cardId: j.cardId },
-            baseSeq: 0,
-          },
+          message: respondMsg(pickSkillId, { zone: 'judge', cardId: j.cardId }),
           validTargets: [],
           category: 'respond',
         });
       }
-      // 手牌（盲选：按位置选）
+      // 手牌（盲选：目标手牌对 responder 不可见,但按位置选取是合法动作——
+      // 此前只枚举 handIndex 0,AI 第 2+ 张永远选不到。逐位置枚举 0..handCount-1,
+      // 与浏览器/引擎接受任意 handIndex 的盲选契约一致)
       const handCount = pickPrompt.handCount ?? targetPlayer?.handCount ?? 0;
-      if (handCount > 0) {
+      for (let i = 0; i < handCount; i++) {
         out.push({
-          description: `${verb}手牌（第1张）`,
-          message: {
-            skillId: pickSkillId,
-            actionType: 'respond',
-            ownerId,
-            params: { zone: 'hand', handIndex: 0 },
-            baseSeq: 0,
-          },
+          description: `${verb}手牌（第${i + 1}张）`,
+          message: respondMsg(pickSkillId, { zone: 'hand', handIndex: i }),
           validTargets: [],
           category: 'respond',
         });
@@ -876,13 +953,7 @@ export function appendRespondActions(
       for (const c of (pickPrompt.cards ?? [])) {
         out.push({
           description: `选【${c.cardName} ${c.suit}${c.rank}】`,
-          message: {
-            skillId: pickSkillId,
-            actionType: 'respond',
-            ownerId,
-            params: { cardId: c.cardId },
-            baseSeq: 0,
-          },
+          message: respondMsg(pickSkillId, { cardId: c.cardId }),
           validTargets: [],
           category: 'respond',
         });
@@ -890,23 +961,10 @@ export function appendRespondActions(
       return;
     }
     // 弃牌阶段：引擎注册 系统规则:respond，validate 要求 params.cardIds。
-    // 预填「前 N 张」作为可执行默认值，agent 可直接提交；需要优化时再改 cardIds。
     if (reqType === '__弃牌') {
       const minCount = pending.prompt?.type === 'useCard' ? pending.prompt.cardFilter.min : 1;
       const me = view.players[ownerId];
-      const discardIds = (me?.hand ?? []).slice(0, Math.max(minCount, 1)).map((c) => c.id);
-      out.push({
-        description: `弃牌（默认选前 ${discardIds.length} 张，可改 cardIds）`,
-        message: {
-          skillId: '系统规则',
-          actionType: 'respond',
-          ownerId,
-          params: { cardIds: discardIds },
-          baseSeq: 0,
-        },
-        validTargets: [],
-        category: 'discard',
-      });
+      pushDiscardAction('系统规则', (me?.hand ?? []).map((c) => c.id), minCount, '弃牌');
       return;
     }
     // 强制型弃牌(英魂等):mandatory=true + useCard prompt。与 __弃牌 同构,
@@ -918,19 +976,7 @@ export function appendRespondActions(
       const me = view.players[ownerId];
       const candidates = pending.prompt.cardFilter.candidates;
       const baseIds = candidates ? [...candidates] : (me?.hand ?? []).map((c) => c.id);
-      const discardIds = baseIds.slice(0, Math.max(minCount, 1));
-      out.push({
-        description: `强制弃牌（默认选前 ${discardIds.length} 张，可改 cardIds）`,
-        message: {
-          skillId: minfo?.skillId ?? '系统规则',
-          actionType: 'respond',
-          ownerId,
-          params: { cardIds: discardIds },
-          baseSeq: 0,
-        },
-        validTargets: [],
-        category: 'discard',
-      });
+      pushDiscardAction(minfo?.skillId ?? '系统规则', baseIds, minCount, '强制弃牌');
       return;
     }
     // 通用回应（出闪/出杀/确认发动等）
@@ -949,13 +995,7 @@ export function appendRespondActions(
           for (const t of validTargets) {
             out.push({
               description: `${choosePrompt.title ?? info.skillId} → ${view.players[t]?.name ?? `P${t}`}`,
-              message: {
-                skillId: info.skillId,
-                actionType: 'respond',
-                ownerId,
-                params: { target: t, targets: [t] },
-                baseSeq: 0,
-              },
+              message: respondMsg(info.skillId, { target: t, targets: [t] }),
               validTargets: [t],
               category: 'respond',
             });
@@ -963,13 +1003,7 @@ export function appendRespondActions(
           if (min === 0) {
             out.push({
               description: `${choosePrompt.title ?? info.skillId} → 不选择`,
-              message: {
-                skillId: info.skillId,
-                actionType: 'respond',
-                ownerId,
-                params: { targets: [] },
-                baseSeq: 0,
-              },
+              message: respondMsg(info.skillId, { targets: [] }),
               validTargets: [],
               category: 'skip',
             });
@@ -999,13 +1033,7 @@ export function appendRespondActions(
         for (const opt of p.options) {
           out.push({
             description: opt.label,
-            message: {
-              skillId: info.skillId,
-              actionType: 'respond',
-              ownerId,
-              params: { option: opt.value },
-              baseSeq: 0,
-            },
+            message: respondMsg(info.skillId, { option: opt.value }),
             validTargets: [],
             category: 'respond',
           });
@@ -1032,13 +1060,7 @@ export function appendRespondActions(
             const observed = distPrompt.cardIds ?? [];
             out.push({
               description: `发动【${info.skillId}】（观星：全部留在牌堆顶，保持原顺序）`,
-              message: {
-                skillId: info.skillId,
-                actionType: 'respond',
-                ownerId,
-                params: { top: [...observed].reverse(), bottom: [] },
-                baseSeq: 0,
-              },
+              message: respondMsg(info.skillId, { top: [...observed].reverse(), bottom: [] }),
               validTargets: [],
               category: 'distribute',
             });
@@ -1054,14 +1076,8 @@ export function appendRespondActions(
               description: `发动【${info.skillId}】（选 ${minTotal} 张${
                 distPrompt.source === 'handAndEquip' ? '手牌或装备' : '手牌'
               }弃置）`,
-              message: {
-                skillId: info.skillId,
-                actionType: 'respond',
-                ownerId,
-                // 预填可执行的下限选择，避免 agent 原样提交空 cardIds 被拒。
-                params: { cardIds: candidateIds.slice(0, Math.max(minTotal, 1)) },
-                baseSeq: 0,
-              },
+              // 预填可执行的下限选择，避免 agent 原样提交空 cardIds 被拒。
+              message: respondMsg(info.skillId, { cardIds: candidateIds.slice(0, Math.max(minTotal, 1)) }),
               validTargets: [],
               category: 'distribute',
             });
@@ -1071,13 +1087,7 @@ export function appendRespondActions(
           // allocate 模式（遗计/界遗计 分配 等）：params.allocation 由 agent 补全。
           out.push({
             description: `发动【${info.skillId}】（分配牌给目标，需填 allocation）`,
-            message: {
-              skillId: info.skillId,
-              actionType: 'respond',
-              ownerId,
-              params: { allocation: [] },
-              baseSeq: 0,
-            },
+            message: respondMsg(info.skillId, { allocation: [] }),
             validTargets: [],
             category: 'distribute',
           });
@@ -1127,13 +1137,7 @@ export function appendRespondActions(
           if (prompt.targetFilter.min > 0 && !resolved.targets) continue;
           out.push({
             description: `回应【${info.skillId}】(${card.suit}${card.rank})`,
-            message: {
-              skillId: info.skillId,
-              actionType: 'respond',
-              ownerId,
-              params: { cardId: card.id, ...targetParams },
-              baseSeq: 0,
-            },
+            message: respondMsg(info.skillId, { cardId: card.id, ...targetParams }),
             validTargets: resolved.contract.candidates,
             targetSelection: resolved.contract,
             category: 'respond',
@@ -1158,26 +1162,14 @@ export function appendRespondActions(
         if (pending.prompt.confirmDisabled !== true) {
           out.push({
             description: `${confirmLabel}【${info.skillId}】`,
-            message: {
-              skillId: info.skillId,
-              actionType: 'respond',
-              ownerId,
-              params: { choice: true },
-              baseSeq: 0,
-            },
+            message: respondMsg(info.skillId, { choice: true }),
             validTargets: [],
             category: 'respond',
           });
         }
         out.push({
           description: `${cancelLabel}`,
-          message: {
-            skillId: info.skillId,
-            actionType: 'respond',
-            ownerId,
-            params: { choice: false },
-            baseSeq: 0,
-          },
+          message: respondMsg(info.skillId, { choice: false }),
           validTargets: [],
           category: 'skip',
         });
@@ -1190,13 +1182,7 @@ export function appendRespondActions(
           const rescueSkill = info.rescueSkillForCard?.(card);
           out.push({
             description: `回应【${rescueSkill ?? info.skillId}】(${card.suit}${card.rank})`,
-            message: {
-              skillId: rescueSkill ?? info.skillId,
-              actionType: 'respond',
-              ownerId,
-              params: { cardId: card.id },
-              baseSeq: 0,
-            },
+            message: respondMsg(rescueSkill ?? info.skillId, { cardId: card.id }),
             validTargets: [],
             category: 'respond',
           });
@@ -1215,13 +1201,7 @@ export function appendRespondActions(
         // 兜底（choosePlayer 等）：空 params，agent 需自行补全 targets
         out.push({
           description: `回应【${info.skillId}】`,
-          message: {
-            skillId: info.skillId,
-            actionType: 'respond',
-            ownerId,
-            params: {},
-            baseSeq: 0,
-          },
+          message: respondMsg(info.skillId, {}),
           validTargets: [],
           category: 'respond',
         });

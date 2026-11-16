@@ -41,7 +41,8 @@ import type {
 import { applyAtom } from '../core/apply';
 import { setPlayerVarUsage } from '../rules/turn-usage';
 import { askRankCard, runRankCompareFlow } from '../flows/rank';
-import { askConfirm, defineConfirmAction, runVirtualSlash } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { runVirtualSlash } from './cards/_virtualSlash';
 import {
   registerAction,
   registerAfterHook,

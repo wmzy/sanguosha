@@ -19,17 +19,12 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../core/skill';
 import { getGender } from '../data/character-meta';
+import { registerAction } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
+import { isMaleAlive } from '../util/player-query';
 import type { SkillModule } from '../types';
-
-/** 校验某座次是否为男性存活角色 */
-function isMaleAlive(state: GameState, target: number): boolean {
-  const p = state.players[target];
-  if (!p?.alive) return false;
-  return getGender(p.character) === '男';
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -49,11 +44,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>) => {
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       const self = st.players[ownerId];
-      if (!self?.alive) return '角色不可用';
-      if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
-      if (st.phase !== '出牌') return '只能在出牌阶段使用';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
       if (usedThisTurn(st, ownerId, '离间')) return '本回合已使用过离间';
 
       // cardId:被弃置的牌(手牌或装备)

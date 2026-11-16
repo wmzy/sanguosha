@@ -8,6 +8,9 @@
 //     前端组合:preceding=[连环.transform] + 主 action=铁索连环.use。
 //     铁索连环.use 零感知连环——它看到的是 cardMap 里的一张"铁索连环"。
 //     五件套由 skillRuntime 工厂统一实现(模式参考 武圣.ts)。
+//
+// 共享导出:registerRecycleAction —— 「弃一张符合谓词的手牌,摸一张牌」的重铸注册
+//   工厂,连环(梅花)/界连环(梅花)/界燕语(【杀】)三份同构注册的单一实现。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { popFrame, pushFrame } from '../core/frame';
 import { recastCard } from '../flows/recast';
@@ -27,6 +30,54 @@ export function createSkill(id: string, ownerId: number): Skill {
     name: '连环',
     description: '你可以将一张梅花手牌当【铁索连环】使用或重铸',
   };
+}
+
+/** recycle(重铸)注册参数:三处同构注册(连环/界连环 的梅花、界燕语 的【杀】)
+ *  的差异全部经此注入;validate 分支顺序与错误文案、pushFrame→recastCard→popFrame
+ *  的 atom 序列逐字保留各版现状。 */
+export interface RecycleActionOptions {
+  /** 技能实例 id(registerAction 注册键:'连环'/'界连环'/'界燕语') */
+  skillId: string;
+  /** 技能拥有者座次 */
+  ownerId: number;
+  /** pushFrame 帧名(结算帧名,日志可见:'连环'/'界连环'/'界燕语') */
+  frameName: string;
+  /** 重铸牌判定(梅花:card.suit==='♣' / 界燕语:card.name==='杀') */
+  isEligible: (card: Card | undefined) => boolean;
+  /** validate 拒绝文案(逐字保留各版:'…手中梅花牌' / '…手中【杀】') */
+  rejectMessage: string;
+  /** 追加进结算帧 params 的额外字段(界燕语 的 recycle:true 日志标记;缺省无) */
+  extraFrameParams?: Record<string, Json>;
+}
+
+/** 注册 recycle(重铸):出牌阶段弃一张符合 isEligible 的手牌,摸一张牌。
+ *  历史行为:各版均不持有 unloader,本工厂同样不返回(保持卸载语义不变)。 */
+export function registerRecycleAction(state: GameState, options: RecycleActionOptions): void {
+  const { skillId, ownerId, frameName, isEligible, rejectMessage, extraFrameParams } = options;
+  registerAction(
+    state,
+    skillId,
+    ownerId,
+    'recycle',
+    (state: GameState, params: Record<string, Json>) => {
+      const self = state.players[ownerId];
+      const cardId = params.cardId as string;
+      const cardIdOk = typeof cardId === 'string';
+      const card = cardIdOk ? state.cardMap[cardId] : undefined;
+      const cardInHand = cardIdOk && self.hand.includes(cardId);
+      const cardOk = isEligible(card);
+      // 时机四合一(自己回合+出牌阶段+无阻塞+存活)由 engineCanPlayNow 统一判定
+      const ok = engineCanPlayNow(state, ownerId) && cardInHand && cardOk;
+      return ok ? null : rejectMessage;
+    },
+    async (state: GameState, params: Record<string, Json>) => {
+      const from = ownerId;
+      const cardId = params.cardId as string;
+      await pushFrame(state, frameName, from, { ...params, ...extraFrameParams });
+      await recastCard(state, from, cardId);
+      await popFrame(state);
+    },
+  );
 }
 
 /** transform 五件套工厂配置(梅花手牌 → 影子铁索连环)。 */
@@ -66,31 +117,14 @@ const TRANSFORM_OPTIONS: TransformActionOptions = {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // ── recycle:弃一张梅花手牌,摸一张牌(铁索连环的重铸效果)──
-  registerAction(
-    state,
-    skill.id,
+  // ── recycle:弃一张梅花手牌,摸一张牌(铁索连环的重铸效果;共享工厂)──
+  registerRecycleAction(state, {
+    skillId: skill.id,
     ownerId,
-    'recycle',
-    (state: GameState, params: Record<string, Json>) => {
-      const self = state.players[ownerId];
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const isClub = !!card && card.suit === '♣';
-      // 时机四合一(自己回合+出牌阶段+无阻塞+存活)由 engineCanPlayNow 统一判定
-      const ok = engineCanPlayNow(state, ownerId) && cardInHand && isClub;
-      return ok ? null : '现在不能重铸(需出牌阶段、手中梅花牌)';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
-      const cardId = params.cardId as string;
-      await pushFrame(state, '连环', from, { ...params });
-      await recastCard(state, from, cardId);
-      await popFrame(state);
-    },
-  );
+    frameName: '连环',
+    isEligible: (card) => !!card && card.suit === '♣',
+    rejectMessage: '现在不能重铸(需出牌阶段、手中梅花牌)',
+  });
 
   // ── transform:梅花手牌 → 影子"铁索连环"(作为 preceding,主 action=铁索连环.use) ──
   // 五件套(影子 id 后缀=技能 id '连环'、当作、rollback、defineAction)由工厂统一实现;

@@ -69,10 +69,6 @@ export function isSkillModuleRegistered(id: string): boolean {
   return moduleOverrides.has(id) || hasSkillModule(id);
 }
 
-export function getCachedSkillModule(id: string): SkillModule | undefined {
-  return moduleCache.get(id);
-}
-
 // ─── 技能描述查询(静态数据,前端 tooltip / MCP 工具共享) ─────────
 // createSkill 返回的 description 不依赖 ownerId(每个技能固定文案),
 // 故用 ownerId=0 取一次并缓存,供前端 hover tip 与 MCP getSkillInfo 复用,
@@ -163,7 +159,7 @@ export async function instantiateSkill(
       typeof unload === 'function' ? unload : () => {},
     );
   }
-  // 写入 isLocked 元数据供 skill-suppression 查询（替代旧 getCachedSkillModule 反射查询）。
+  // 写入 isLocked 元数据供 skill-suppression 查询。
   setSkillLocked(state, skillId, skill.isLocked ?? false);
   return skill;
 }

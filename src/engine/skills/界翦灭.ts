@@ -33,10 +33,10 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { requireRequestType, askConfirm, engineCanPlayNowReason } from '../util/skillRuntime';
 
 const SKILL_ID = '界翦灭';
 const DISPLAY_NAME = '翦灭';
@@ -72,12 +72,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>) => {
-      if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (st.phase !== '出牌') return '只能在出牌阶段发动';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       if (usedThisTurn(st, ownerId, SKILL_ID)) return '本回合已使用过翦灭';
       const self = st.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
       if (self.hand.length === 0) return '你需要有手牌才能发动翦灭';
 
       const target = params.target as number;

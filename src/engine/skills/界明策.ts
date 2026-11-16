@@ -37,10 +37,12 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { askConfirm, runVirtualSlash } from '../util/skillRuntime';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { askConfirm, engineCanPlayNowReason } from '../util/skillRuntime';
+import { runVirtualSlash } from './cards/_virtualSlash';
+import { registerAction } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../rules/once-per-turn';
+import { isSlashCard, ownsCard } from '../util/player-query';
 
 const SKILL_ID = '界明策';
 const DISPLAY_NAME = '明策';
@@ -58,11 +60,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '出牌阶段限一次:交给一名其他角色一张杀或装备牌,其选择一项:①视为对你指定的另一名角色出杀(若造成伤害,执行另一项);②你与其各摸一张牌',
   };
-}
-
-/** 判定一张卡是否为【杀】(含影子杀——name 即为 '杀') */
-function isSlashCard(card: Card | undefined): boolean {
-  return !!card && card.name === '杀';
 }
 
 /** 判定一张卡是否为装备牌 */
@@ -92,12 +89,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       ownerId,
       'use',
       (st: GameState, params: Record<string, Json>): string | null => {
-        if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
-        if (st.phase !== '出牌') return '只能在出牌阶段使用';
-        if (hasBlockingPending(st)) return '当前有未完成的询问';
+        const playError = engineCanPlayNowReason(st, ownerId);
+        if (playError) return playError;
         if (usedThisTurn(st, ownerId, SKILL_ID)) return '本回合已使用过明策';
         const self = st.players[ownerId];
-        if (!self?.alive) return '角色不可用';
 
         // cardId:要给出的杀或装备牌
         const cardId = params.cardId as string | undefined;
@@ -107,9 +102,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           return '只能给出杀或装备牌';
         }
         // cardId 来源:手牌或自己的装备区
-        const inHand = self.hand.includes(cardId);
-        const inEquip = Object.values(self.equipment).includes(cardId);
-        if (!inHand && !inEquip) return '牌不在你的手牌或装备区';
+        if (!ownsCard(self, cardId)) return '牌不在你的手牌或装备区';
 
         // targets:两名不同的其他存活角色 [target, killTarget]
         // target = 被给牌者;killTarget = 选项 1 中被杀的目标(可为 owner 自己)

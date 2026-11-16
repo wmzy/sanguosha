@@ -10,7 +10,7 @@ import '../../src/engine/atoms';
 import { GameSession } from '../../src/server/session';
 import { deletePersistedRoom } from '../../src/server/persistence';
 import { createSnapshot, patchSnapshotDescription } from '../../src/server/snapshot';
-import { addRoom, deleteRoom } from '../../src/server/room';
+import { createRoomShell, deleteRoom } from '../../src/server/room';
 import { readFile, rm, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Room } from '../../src/server/room';
@@ -23,26 +23,20 @@ const SNAPSHOT_DIR = join(process.cwd(), 'data', 'snapshots');
 const trackedRoomIds: string[] = [];
 
 function makeRoom(isDebug = true): Room {
-  const room: Room = {
-    id: `snap-test-${Math.random().toString(36).slice(2, 8)}`,
-    name: '快照测试房',
-    maxPlayers: 4,
-    players: new Map(),
-    isDebug,
-    createdAt: Date.now(),
-    status: '进行中',
-    config: { name: '测试', timeoutSec: 30, charPool: 'all', handSize: 4 },
-    spectators: new Map(),
-    viewGrants: new Map(),
-    pendingViewRequests: new Map(),
-    seats: [null, null, null, null],
-    playerNames: new Map(),
-    passwordHash: null,
-    roomType: 'quick',
-    chatUsage: new Map(),
-    chatHistory: [],
-    pendingSeatSwaps: new Map(),
-  } as unknown as Room;
+  // createRoomShell 等价构造并注册进内存房间表(原为手工对象 + addRoom 旁路);
+  // 需要模拟"房间已回收"的用例自行 deleteRoom 移出内存表。
+  const room = createRoomShell(
+    {
+      name: '快照测试房',
+      maxPlayers: 4,
+      hostId: null,
+      // 刻意保留原手工构造的部分 config(缺 chat/gameMode),运行时语义不变
+      config: { name: '测试', timeoutSec: 30, charPool: 'all', handSize: 4 } as Room['config'],
+      roomType: 'quick',
+      isDebug,
+    },
+    { status: '进行中' },
+  );
   trackedRoomIds.push(room.id);
   return room;
 }
@@ -61,13 +55,13 @@ async function readSnapshot(snapshotId: string): Promise<unknown> {
 describe('debug 快照功能', () => {
   afterEach(async () => {
     // 清理持久化房间文件 + 测试快照目录
-    await Promise.all(
-      trackedRoomIds.splice(0).map((id) => deletePersistedRoom(id).catch(() => {})),
-    );
+    const ids = trackedRoomIds.splice(0);
+    await Promise.all(ids.map((id) => deletePersistedRoom(id).catch(() => {})));
     try {
       const entries = await readdir(SNAPSHOT_DIR).catch(() => []);
       for (const e of entries) {
-        if (e.includes('snap-test-')) {
+        // snapshotId 形如 `${timestampId()}-${roomId}`,按本文件创建的房间 id 匹配
+        if (ids.some((id) => e.includes(id))) {
           await rm(join(SNAPSHOT_DIR, e), { recursive: true });
         }
       }
@@ -166,8 +160,7 @@ describe('debug 快照功能', () => {
 
   it('追加描述:PATCH 后 meta.description 更新', async () => {
     const room = makeRoom(true);
-    // 鉴权要求目标快照属于存活的 debug 房:必须注册进内存房间表
-    addRoom(room);
+    // 鉴权要求目标快照属于存活的 debug 房:makeRoom 经 createRoomShell 已注册进内存房间表
     const session = new GameSession(room, true, 42);
     try {
       await session.startGame(4);
@@ -195,6 +188,8 @@ describe('debug 快照功能', () => {
 
   it('追加描述:房间已回收(不在内存)→ 快照转只读返回 403', async () => {
     const room = makeRoom(true);
+    // 模拟房间已被回收:移出内存房间表(getRoom 返回 null)
+    deleteRoom(room.id);
     const session = new GameSession(room, true, 42);
     await session.startGame(4);
     const state = getState(session);
@@ -207,7 +202,6 @@ describe('debug 快照功能', () => {
       frontendViews: {},
     });
     const snapshotId = (result as { snapshotId: string }).snapshotId;
-    // 故意不 addRoom:getRoom 返回 null,模拟房间已被回收
     const patchResult = await patchSnapshotDescription(snapshotId, '越权修改');
     expect((patchResult as { status?: number }).status).toBe(403);
 

@@ -12,105 +12,142 @@
 //
 // 主公判定:ownerId === 0(参考激将/若愚的主公判定约定)。
 // 限一次:player.vars['黄天/usedThisTurn'](后缀约定,回合结束 atom 自动清空)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+//
+// 本文件同时导出 createHuangtianSkill 工厂(黄天族共享实现),界黄天 复用之,
+// 仅注入 技能id/描述/文案/可交牌谓词 差异参数(标=闪/闪电;界=闪或黑桃手牌)。
+import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import { engineCanPlayNow } from '../util/skillRuntime';
 
-/** 判断一张牌是否为黄天可交的牌(闪或闪电) */
-function isGiveableCard(state: GameState, cardId: string): boolean {
-  const name = state.cardMap[cardId]?.name;
-  return name === '闪' || name === '闪电';
+/** 黄天族(主公技)差异参数 */
+export interface HuangtianOptions {
+  /** 技能 id:限一次 vars 键与错误文案前缀(标 '黄天' / 界 '界黄天') */
+  skillId: string;
+  /** Skill.name 与按钮文案(标 '黄天';界版 '黄天' 为 OL 官方技能名,区别于技能 id。默认 = skillId) */
+  displayName?: string;
+  /** createSkill 描述 */
+  description: string;
+  /** 「非主公不可用」错误文案(标 '黄天为主公技,张角非主公' / 界 '界黄天为主公技,界张角非主公') */
+  lordOnlyError: string;
+  /** 可交牌描述(错误文案/弹窗标题共用:标 '【闪】或【闪电】' / 界 '【闪】或黑桃手牌') */
+  cardDesc: string;
+  /** 一张牌是否可交(标:闪/闪电;界:闪或黑桃手牌)。引擎侧按 cardMap 查,前端侧用于
+   *  cardFilter 与手牌渲染过滤,同一谓词双端同源。 */
+  isGiveableCard: (card: Card | undefined) => boolean;
 }
 
-export function createSkill(id: string, ownerId: number): Skill {
+/** 黄天族共享实现:标版黄天与界黄天的 注册循环/validate/execute/onMount 逐字一致,
+ *  仅 可交牌谓词 与 名称/文案 差异经参数注入。 */
+export function createHuangtianSkill(opts: HuangtianOptions) {
+  const skillId = opts.skillId;
+  const displayName = opts.displayName ?? skillId;
+
+  /** 判断一张牌是否为本技能可交的牌(引擎侧按 cardMap 查) */
+  function isGiveableCard(state: GameState, cardId: string): boolean {
+    const card = state.cardMap[cardId];
+    return !!card && opts.isGiveableCard(card);
+  }
+
   return {
-    id,
-    ownerId,
-    name: '黄天',
-    description: '主公技:其他群势力角色可在出牌阶段将一张【闪】或【闪电】交给你',
+    createSkill(id: string, ownerId: number): Skill {
+      return {
+        id,
+        ownerId,
+        name: displayName,
+        description: opts.description,
+      };
+    },
+
+    onInit(skill: Skill, state: GameState): (() => void) | undefined {
+      const ownerId = skill.ownerId;
+
+      // ── 为每个群势力盟友(非张角)注册 use action ──
+      for (const p of state.players) {
+        const allyIdx = p.index;
+        if (allyIdx === ownerId) continue;
+        if (p.faction !== '群') continue;
+
+        registerAction(
+          state,
+          skill.id,
+          allyIdx,
+          'use',
+          (st: GameState, params: Record<string, Json>): string | null => {
+            // 主公技:仅张角为主公(ownerId===0)时可用
+            if (ownerId !== 0) return opts.lordOnlyError;
+            const lord = st.players[ownerId];
+            if (!lord?.alive) return '主公不存在或已死亡';
+
+            const self = st.players[allyIdx];
+            if (!self?.alive) return '已死亡';
+            // 自己回合 + 出牌阶段 + 无阻塞 pending(存活已由上方早退校验)→ engineCanPlayNow
+            if (!engineCanPlayNow(st, allyIdx)) return `现在不能使用${skillId}`;
+
+            // 每回合限一次
+            if (usedThisTurn(st, allyIdx, skillId)) return `本回合已使用过${skillId}`;
+
+            // 牌校验:可交的牌,且在手牌中
+            const cardId = params.cardId as string | undefined;
+            if (typeof cardId !== 'string') return '请选择一张牌';
+            if (!self.hand.includes(cardId)) return '牌不在手牌中';
+            if (!isGiveableCard(st, cardId)) return `${skillId}只能交出${opts.cardDesc}`;
+            return null;
+          },
+          async (st: GameState, params: Record<string, Json>): Promise<void> => {
+            const cardId = params.cardId as string;
+            // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+            await markOncePerTurn(st, allyIdx, skillId);
+            // 移动牌:盟友手牌 → 张角手牌
+            await applyAtom(st, {
+              type: '移动牌',
+              cardId,
+              from: { zone: '手牌', player: allyIdx },
+              to: { zone: '手牌', player: ownerId },
+            });
+          },
+        );
+      }
+
+      return () => {};
+    },
+
+    onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
+      const ownerId = skill.ownerId;
+      // 盟友的主动交牌 action。势力(群)与主公检查由后端 validate 处理
+      // (GameView 不暴露 faction,activeWhen 仅做能力范围内的 UI 过滤)。
+      api.defineAction('use', {
+        label: displayName,
+        style: 'primary',
+        prompt: {
+          type: 'useCard',
+          title: `${skillId}:交出一张${opts.cardDesc}给主公`,
+          cardFilter: {
+            filter: (c) => opts.isGiveableCard(c),
+            min: 1,
+            max: 1,
+          },
+        },
+        activeWhen: (ctx) =>
+          // 主公本人不应发动黄天(黄天是其他群势力角色交给主公的技能)
+          ctx.perspectiveIdx !== ownerId &&
+          activeUnlessUsedThisTurn(skillId)(ctx) &&
+          // 手中有可交的牌时才渲染
+          ctx.view.players[ctx.perspectiveIdx]?.hand?.some((c) => opts.isGiveableCard(c)) === true,
+      });
+    },
   };
 }
 
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
+const OPTIONS: HuangtianOptions = {
+  skillId: '黄天',
+  description: '主公技:其他群势力角色可在出牌阶段将一张【闪】或【闪电】交给你',
+  lordOnlyError: '黄天为主公技,张角非主公',
+  cardDesc: '【闪】或【闪电】',
+  isGiveableCard: (c) => c?.name === '闪' || c?.name === '闪电',
+};
 
-  // ── 为每个群势力盟友(非张角)注册 use action ──
-  for (const p of state.players) {
-    const allyIdx = p.index;
-    if (allyIdx === ownerId) continue;
-    if (p.faction !== '群') continue;
-
-    registerAction(
-      state,
-      skill.id,
-      allyIdx,
-      'use',
-      (st: GameState, params: Record<string, Json>): string | null => {
-        // 主公技:仅张角为主公(ownerId===0)时可用
-        if (ownerId !== 0) return '黄天为主公技,张角非主公';
-        const lord = st.players[ownerId];
-        if (!lord?.alive) return '主公不存在或已死亡';
-
-        const self = st.players[allyIdx];
-        if (!self?.alive) return '已死亡';
-        // 自己回合 + 出牌阶段 + 无阻塞 pending(存活已由上方早退校验)→ engineCanPlayNow
-        if (!engineCanPlayNow(st, allyIdx)) return '现在不能使用黄天';
-
-        // 每回合限一次
-        if (usedThisTurn(st, allyIdx, '黄天')) return '本回合已使用过黄天';
-
-        // 牌校验:闪或闪电,且在手牌中
-        const cardId = params.cardId as string | undefined;
-        if (typeof cardId !== 'string') return '请选择一张牌';
-        if (!self.hand.includes(cardId)) return '牌不在手牌中';
-        if (!isGiveableCard(st, cardId)) return '黄天只能交出【闪】或【闪电】';
-        return null;
-      },
-      async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        const cardId = params.cardId as string;
-        // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
-        await markOncePerTurn(st, allyIdx, '黄天');
-        // 移动牌:盟友手牌 → 张角手牌
-        await applyAtom(st, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '手牌', player: allyIdx },
-          to: { zone: '手牌', player: ownerId },
-        });
-      },
-    );
-  }
-
-  return () => {};
-}
-
-export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  const ownerId = skill.ownerId;
-  // 盟友的主动交牌 action。势力(群)与主公检查由后端 validate 处理
-  // (GameView 不暴露 faction,activeWhen 仅做能力范围内的 UI 过滤)。
-  api.defineAction('use', {
-    label: '黄天',
-    style: 'primary',
-    prompt: {
-      type: 'useCard',
-      title: '黄天:交出一张【闪】或【闪电】给主公',
-      cardFilter: {
-        filter: (c) => c.name === '闪' || c.name === '闪电',
-        min: 1,
-        max: 1,
-      },
-    },
-    activeWhen: (ctx) =>
-      // 主公本人不应发动黄天(黄天是其他群势力角色交给主公的技能)
-      ctx.perspectiveIdx !== ownerId &&
-      activeUnlessUsedThisTurn('黄天')(ctx) &&
-      // 手中有可交的牌时才渲染
-      ctx.view.players[ctx.perspectiveIdx]?.hand?.some(
-        (c) => c.name === '闪' || c.name === '闪电',
-      ) === true,
-  });
-}
+export const { createSkill, onInit, onMount } = createHuangtianSkill(OPTIONS);
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

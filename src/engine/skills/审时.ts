@@ -30,8 +30,8 @@ import { popFrame, pushFrame } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
-import { askConfirm, defineConfirmAction, normalizeCardIds, registerOnDamagedAsTarget } from '../util/skillRuntime';
+import { registerAction, registerAfterHook } from '../core/skill';
+import { askConfirm, defineConfirmAction, normalizeCardIds, registerOnDamagedAsTarget, engineCanPlayNowReason } from '../util/skillRuntime';
 import { SHENSHI_STATE_VIEW_KEY } from '../rules/vars-keys';
 import { projectTurnUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
@@ -162,12 +162,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>) => {
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       const self = st.players[ownerId];
-      if (!self) return 'player not found';
-      if (!self.alive) return '你已死亡';
-      if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
-      if (st.phase !== '出牌') return '只能在出牌阶段使用';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
       if (usedThisTurn(st, ownerId, SKILL_ID)) return '本回合已使用过审时';
       if (getState(st, ownerId) !== '阳') return '当前为阴状态,无法发动阳';
       if (self.hand.length === 0) return '需要有手牌才能发动审时';

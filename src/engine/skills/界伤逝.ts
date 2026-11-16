@@ -37,22 +37,15 @@
 //     故无重入。
 //   - 春华在自己的回合内反复触发是合法的(例如连出两张牌,每张都触发一次)。
 import type { FrontendAPI, GameState, Skill } from '../types';
-import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { getCardEffect } from '../skills/cards';
 import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { lostHealth } from '../util/player-query';
 
 const CONFIRM_RT = '界伤逝/confirm';
 const CONFIRM_KEY = '伤逝/confirmed';
-
-/** 已损失体力值 X = max(0, maxHealth - health)。 */
-function lostHealth(state: GameState, ownerId: number): number {
-  const p = state.players[ownerId];
-  if (!p) return 0;
-  return Math.max(0, p.maxHealth - getHealthValue(p));
-}
 
 /** 检查并可能触发伤逝:手牌 < X 时询问,确认则摸至 X 张。 */
 async function checkTrigger(state: GameState, ownerId: number): Promise<void> {

@@ -118,7 +118,7 @@ const TRANSFORM_OPTIONS: TransformActionOptions = {
         max: 1,
         // 攻击范围检查(转化出的杀同样需距离):filter 仅为前端 UI 提示,后端 杀.use 权威校验
         filter: (view: GameView, t: number) =>
-          viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
+          viewCanAttack(view.players, view.currentPlayerIndex, t),
       },
     },
     activeWhen: (ctx) => {

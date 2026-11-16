@@ -29,8 +29,8 @@ import {
 import type { ServerMessage, DeadlineInfo } from './protocol';
 import type { Room } from './room';
 import { createLogger } from './logger';
-import { setRoomStatus, occupiedSeatEntries } from './room';
-import { sendSafe, broadcastToRoom } from './connection';
+import { setRoomStatus, occupiedSeatEntries, broadcastMessage } from './room';
+import { sendSafe } from './connection';
 import { saveRoom, deletePersistedRoom } from './persistence';
 import { appendEventJournal, resetEventJournal } from './eventJournal';
 import { appendGameHistory, buildHistoryEntry, buildReplayFile } from './gameHistory';
@@ -54,30 +54,31 @@ function isValidViewer(viewer: number | undefined, len: number, strict = false):
   return strict ? viewer >= 0 && viewer < len : !(viewer >= 0 && viewer >= len);
 }
 
+/** 武将投影为「名字 + 技能名列表」摘要(选将池用):所有将池预设共用的单一构造,
+ *  避免各预设/常量各自重复同一段 map。 */
+function projectCharacters(chars: typeof allCharacters): Array<{ name: string; skills: string[] }> {
+  return chars.map((c) => ({ name: c.name, skills: c.skills.map((s) => s.name) }));
+}
+
 /** 默认武将列表:使用引擎全量武将(allCharacters),供选将池使用。
  *  skills 字段来自武将数据(供选将 UI 显示);选完后只实例化引擎默认技能(见 系统规则·选将)。 */
-const CHARACTERS: Array<{ name: string; skills: string[] }> = allCharacters.map((c) => ({
-  name: c.name,
-  skills: c.skills.map((s) => s.name),
-}));
+const CHARACTERS = projectCharacters(allCharacters);
 
 /** 将池预设解析:按预设裁剪武将列表。
  *  - 'standard':标准经典(各势力前 8 名),约 32 人
  *  - 'extended':扩展(标准 + 剩余),约全量
  *  - 'all':全量(60 人) */
 function resolveCharPool(preset: string): Array<{ name: string; skills: string[] }> {
-  const toList = (chars: typeof allCharacters) =>
-    chars.map((c) => ({ name: c.name, skills: c.skills.map((s) => s.name) }));
   if (preset === 'standard') {
     // 各势力取前 8 个经典武将
     return [
-      ...toList(weiCharacters.slice(0, 8)),
-      ...toList(shuCharacters.slice(0, 8)),
-      ...toList(wuCharacters.slice(0, 8)),
-      ...toList(qunCharacters.slice(0, 8)),
+      ...projectCharacters(weiCharacters.slice(0, 8)),
+      ...projectCharacters(shuCharacters.slice(0, 8)),
+      ...projectCharacters(wuCharacters.slice(0, 8)),
+      ...projectCharacters(qunCharacters.slice(0, 8)),
     ];
   }
-  // extended / all 均为全量(当前数据集即扩展版;后续数据扩充时细化 extended)
+  // extended 暂同 all(当前数据集即全量),后续将池细化时在此分流
   return CHARACTERS;
 }
 
@@ -99,7 +100,8 @@ export class GameSession {
   private actionLog: ActionLogEntry[] = [];
   private room: Room;
   private debug: boolean;
-  private playerNames = new Map<string, number>();
+  /** playerId → 游戏座次下标(引擎玩家下标);与 room.playerNames(playerId→昵称)同名不同义,故更名区分。 */
+  private playerSeatIndex = new Map<string, number>();
   private disconnectedAt = new Map<string, number>();
   private graceTimer: ReturnType<typeof setTimeout> | null = null;
   private lastActivityAt = Date.now();
@@ -266,7 +268,7 @@ export class GameSession {
    *  到同一座次互相覆盖(handleAction 静默丢弃被顶者的操作),另一座次无人控制。 */
   private syncSeatMappings(n: number, offset: number): void {
     for (const { playerId, seat } of occupiedSeatEntries(this.room, n, offset)) {
-      this.playerNames.set(playerId, seat);
+      this.playerSeatIndex.set(playerId, seat);
     }
   }
 
@@ -343,18 +345,18 @@ export class GameSession {
   assignDebugSeat(playerId: string): number {
     if (!this.debug) return 0;
     // 已分配过则直接返回
-    const existing = this.playerNames.get(playerId);
+    const existing = this.playerSeatIndex.get(playerId);
     if (existing !== undefined) return existing;
     // 找到下一个未占用的座次(上限为房间 maxPlayers)
-    const used = new Set([...this.playerNames.values()]);
+    const used = new Set([...this.playerSeatIndex.values()]);
     for (let i = 0; i < this.maxPlayers; i++) {
       if (!used.has(i)) {
-        this.playerNames.set(playerId, i);
+        this.playerSeatIndex.set(playerId, i);
         return i;
       }
     }
     // 全部占用 → 观察者
-    this.playerNames.set(playerId, 0);
+    this.playerSeatIndex.set(playerId, 0);
     return 0;
   }
 
@@ -362,7 +364,7 @@ export class GameSession {
     if (this.destroyed || !this.state || this.gameOverHandled) return;
     // debug 模式:允许以任意角色名发 action
     // 非 debug 模式:校验 ownerId 必须匹配预期玩家
-    const expectedIndex = this.playerNames.get(playerId);
+    const expectedIndex = this.playerSeatIndex.get(playerId);
     if (expectedIndex === undefined && !this.debug) return;
     // debug 模式不校验 ownerId——单人控制所有角色
     // 非 debug 模式:校验 ownerId
@@ -395,7 +397,7 @@ export class GameSession {
    */
   handleReorderHand(playerId: string, order: string[]): boolean {
     if (this.destroyed || !this.state || !Array.isArray(order)) return false;
-    const playerIndex = this.playerNames.get(playerId);
+    const playerIndex = this.playerSeatIndex.get(playerId);
     if (playerIndex === undefined) return false;
     const player = this.state.players[playerIndex];
     if (order.length !== player?.hand.length) return false;
@@ -424,7 +426,7 @@ export class GameSession {
     this.gameOverHandled = true;
     setRoomStatus(this.room.id, '已结束');
     if (!skipHistoryIfHandled || !alreadyHandled) this.recordGameHistory(winner, reason);
-    this.broadcast({ type: 'gameOver', winner: winner !== undefined ? String(winner) : '无人' });
+    broadcastMessage(this.room, { type: 'gameOver', winner: winner !== undefined ? String(winner) : '无人' });
   }
 
   /** 延迟捕获录像基线:仅在「所有玩家 character 已就绪」且「尚未捕获」时执行。
@@ -456,13 +458,13 @@ export class GameSession {
 
   /** 游戏结束记录房间历史:结果条目 + 全座次录像,fire-and-forget 落盘。
    *  winner=胜方座次(undefined=平局);reason '中断'=全员掉线宽限超时。
-   *  座次→playerId 反查自 playerNames(记录真实连接身份,而非引擎生成的 P0/P1)。 */
+   *  座次→playerId 反查自 playerSeatIndex(记录真实连接身份,而非引擎生成的 P0/P1)。 */
   private recordGameHistory(winner: number | undefined, reason: '正常' | '中断'): void {
     const state = this.state;
     if (!state || state.players.length === 0) return;
     try {
       const seatPlayerIds = state.players.map((p) => {
-        for (const [pid, seat] of this.playerNames) {
+        for (const [pid, seat] of this.playerSeatIndex) {
           if (seat === p.index) return pid;
         }
         return p.name;
@@ -519,7 +521,7 @@ export class GameSession {
       this.logger.err('resetToLobby: deletePersistedRoom failed', err);
     });
     // 通知所有连接:游戏已重置,客户端清除 gameOver/gameStarted/views
-    this.broadcast({ type: 'game_reset' });
+    broadcastMessage(this.room, { type: 'game_reset' });
   }
 
   /**
@@ -582,7 +584,7 @@ export class GameSession {
     if (!this.state) return;
     const state = this.state;
 
-    for (const [playerId, viewer] of this.playerNames) {
+    for (const [playerId, viewer] of this.playerSeatIndex) {
       if (!isValidViewer(viewer, state.players.length, /* strict */ true)) continue;
       this.sendViewToConn(playerId, viewer, state);
     }
@@ -679,7 +681,7 @@ export class GameSession {
    */
   private sendInitialViewToPlayer(playerId: string): void {
     if (!this.state) return;
-    const viewer = this.playerNames.get(playerId);
+    const viewer = this.playerSeatIndex.get(playerId);
     if (viewer === undefined || !isValidViewer(viewer, this.state.players.length, /* strict */ true))
       return;
     this.sendBaseline(playerId, viewer, this.state);
@@ -738,9 +740,9 @@ export class GameSession {
     if (this.graceTimer === null && this.allPlayersDisconnected()) {
       this.graceTimer = setTimeout(() => this.endDueToDisconnect(), RECONNECT_GRACE_MS);
     }
-    // seatIndex = 游戏 view 的 player 下标(playerNames 语义),供前端定位离线座位
-    const seatIndex = this.playerNames.get(playerId) ?? -1;
-    this.broadcast({
+    // seatIndex = 游戏 view 的 player 下标(playerSeatIndex 语义),供前端定位离线座位
+    const seatIndex = this.playerSeatIndex.get(playerId) ?? -1;
+    broadcastMessage(this.room, {
       type: 'player_disconnected',
       playerId,
       seatIndex,
@@ -757,7 +759,7 @@ export class GameSession {
   /** debug 模式清理 playerId 的所有映射。deleteFromRoom=false 用于刷新重连
    *  (room.players 已由调用方处理)。 */
   private clearDebugPlayer(playerId: string, deleteFromRoom = true): void {
-    this.playerNames.delete(playerId);
+    this.playerSeatIndex.delete(playerId);
     this.baselineSent.delete(playerId);
     this.lastSentDeadline.delete(playerId);
     if (deleteFromRoom) {
@@ -766,12 +768,12 @@ export class GameSession {
   }
 
 /** 判断是否所有玩家都已断线。
- *  用 playerNames.size(座次总数)而非 room.players.size:因为 sse.ts 的 onAbort
+ *  用 playerSeatIndex.size(座次总数)而非 room.players.size:因为 sse.ts 的 onAbort
  *  会先 room.players.delete(playerId) 再调 handleDisconnect,此时 room.players 已缩小,
  *  最后一人断线时 room.players.size=0 会误判为「无玩家」而非「全员断线」。 */
   private allPlayersDisconnected(): boolean {
-    if (this.playerNames.size === 0) return false;
-    return this.disconnectedAt.size >= this.playerNames.size;
+    if (this.playerSeatIndex.size === 0) return false;
+    return this.disconnectedAt.size >= this.playerSeatIndex.size;
   }
 
   private endDueToDisconnect(): void {
@@ -781,11 +783,11 @@ export class GameSession {
     const state = this.state;
     const names = still
       .map((id) => {
-        const idx = this.playerNames.get(id);
+        const idx = this.playerSeatIndex.get(id);
         return idx !== undefined ? (state?.players[idx]?.name ?? id) : id;
       })
       .join('、');
-    this.broadcast({ type: 'error', message: `${names} 在重连宽限期内未恢复,游戏结束` });
+    broadcastMessage(this.room, { type: 'error', message: `${names} 在重连宽限期内未恢复,游戏结束` });
     // 终局收尾复用 handleGameOver(置已结束+历史+gameOver);中断历史只在
     // 正常终局未记录过时补记(正常终局后全员掉线的宽限超时不重复记)。
     this.handleGameOver(undefined, '中断', /* skipHistoryIfHandled */ true);
@@ -823,10 +825,10 @@ export class GameSession {
 
     // multiplayer 模式:迁移 playerId 映射
     if (previousPlayerId && previousPlayerId !== playerId) {
-      const seatIndex = this.playerNames.get(previousPlayerId);
+      const seatIndex = this.playerSeatIndex.get(previousPlayerId);
       if (seatIndex === undefined) return false; // 旧 playerId 已不存在(可能已超时清理)
-      this.playerNames.delete(previousPlayerId);
-      this.playerNames.set(playerId, seatIndex);
+      this.playerSeatIndex.delete(previousPlayerId);
+      this.playerSeatIndex.set(playerId, seatIndex);
       this.baselineSent.delete(previousPlayerId);
       this.lastSentDeadline.delete(previousPlayerId);
       this.disconnectedAt.delete(previousPlayerId);
@@ -840,12 +842,12 @@ export class GameSession {
     // 连接注册仍归 registerSink。直连调用方(测试/REST)也由此获得 sink 绑定。
     this.room.players.set(playerId, sink);
     // 座次有效 + 差量窗口内 → 差量补发;否则全量 initialView(共用 resumeConnection)
-    this.resumeConnection(playerId, this.playerNames.get(playerId), lastSeq, /* strictSeat */ true);
+    this.resumeConnection(playerId, this.playerSeatIndex.get(playerId), lastSeq, /* strictSeat */ true);
     // initialView/diff 已覆盖到当前 seq,不需要补推差量。
     // 同步水位标记,避免后续 broadcastNewState 重发已含在 initialView 中的事件。
     this.lastBroadcastSeq = Math.max(this.lastBroadcastSeq, this.state.seq);
-    const reconSeatIndex = this.playerNames.get(playerId) ?? -1;
-    this.broadcast({ type: 'player_reconnected', playerId, seatIndex: reconSeatIndex });
+    const reconSeatIndex = this.playerSeatIndex.get(playerId) ?? -1;
+    broadcastMessage(this.room, { type: 'player_reconnected', playerId, seatIndex: reconSeatIndex });
     return true;
   }
 
@@ -870,8 +872,9 @@ export class GameSession {
     return this.destroyed;
   }
 
-  getPlayerName(playerId: string): number | undefined {
-    return this.playerNames.get(playerId);
+  /** playerId 的游戏座次下标(未入座返回 undefined)。 */
+  getSeatOf(playerId: string): number | undefined {
+    return this.playerSeatIndex.get(playerId);
   }
 
   getState(): GameState | null {
@@ -938,11 +941,5 @@ export class GameSession {
     const sink = this.room.players.get(playerId) ?? this.room.spectators.get(playerId);
     if (!sink) return;
     sendSafe(sink, message, `sendToPlayer failed for ${playerId}`);
-  }
-
-  private broadcast(message: ServerMessage): void {
-    broadcastToRoom(this.room, message, (_id, role) =>
-      role === 'player' ? 'broadcast send failed' : 'broadcast send to spectator failed',
-    );
   }
 }

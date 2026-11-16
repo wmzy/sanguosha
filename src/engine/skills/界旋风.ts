@@ -48,6 +48,7 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
 import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { hasDiscardableCards } from '../util/player-query';
 
 const _SKILL_ID = '界旋风';
 const DISPLAY_NAME = '旋风';
@@ -74,13 +75,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '失去装备区里的牌,或一次性失去至少两张牌后,可依次弃置至多两名其他角色共计至多两张牌',
   };
-}
-
-/** 玩家区域(手牌+装备)是否有牌可被弃 */
-function hasDiscardableCards(player: GameState['players'][number]): boolean {
-  if (!player) return false;
-  if (player.hand.length > 0) return true;
-  return Object.values(player.equipment).some((id) => typeof id === 'string');
 }
 
 /** 是否存在可被弃牌的其他角色(存活、非自己、有牌) */

@@ -35,9 +35,9 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { defineConfirmAction, requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
 
 const SKILL_ID = '界灭计';
 const DISPLAY_NAME = '灭计';
@@ -76,12 +76,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       ownerId,
       'use',
       (st: GameState, params: Record<string, Json>): string | null => {
-        if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-        if (st.phase !== '出牌') return '只能在出牌阶段发动';
-        if (hasBlockingPending(st)) return '当前有未完成的询问';
+        const playError = engineCanPlayNowReason(st, ownerId);
+        if (playError) return playError;
         if (usedThisTurn(st, ownerId, SKILL_ID)) return '本回合已使用过灭计';
         const self = st.players[ownerId];
-        if (!self?.alive) return '玩家不存在或已死亡';
 
         const cardId = params.cardId as string | undefined;
         if (typeof cardId !== 'string') return '请选择一张锦囊牌';

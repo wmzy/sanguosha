@@ -33,6 +33,7 @@ import { registerBeforeHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import type { SkillModule } from '../types';
 import { getHandLimitBonus } from '../rules/vars-keys';
+import { countFactions } from '../util/player-query';
 
 const DISPLAY_NAME = '宗室';
 
@@ -48,16 +49,6 @@ export function createSkill(id: string, ownerId: number): Skill {
       '锁定技:手牌上限+X(X为全场势力数);其他角色对你造成伤害时,防止此伤害改为令其摸一张牌,每种势力限一次',
     isLocked: true,
   };
-}
-
-/** 计算全场存活玩家的不同势力数(X)。 */
-function countFactions(state: GameState): number {
-  const factions = new Set<string>();
-  for (const p of state.players) {
-    if (!p.alive) continue;
-    if (p.faction) factions.add(p.faction);
-  }
-  return factions.size;
 }
 
 /** 检查某势力是否已用过本技防伤。 */

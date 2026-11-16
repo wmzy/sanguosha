@@ -59,6 +59,7 @@ import { slashUnlimitedKey } from '../rules/vars-keys';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import { registerDistanceExemptor } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 import { getHandLimitBonus, XIANZHEN_WIN_TARGET_VIEW_KEY } from '../rules/vars-keys';
 
@@ -147,11 +148,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>): string | null => {
-      if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (st.phase !== '出牌') return '只能在出牌阶段发动';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       if (usedThisTurn(st, ownerId, SKILL_ID)) return '本回合已使用过陷阵';
       const self = st.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
       const cardId = params.cardId as string;
       if (typeof cardId !== 'string') return '需要选择一张拼点牌';
       if (!self.hand.includes(cardId)) return '拼点牌不在手牌中';

@@ -37,7 +37,9 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
-import { slotOf, requireRequestType, askConfirm } from '../util/skillRuntime';
+import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { slotOf } from '../util/equip-slot';
+import { findNextAlive } from '../util/player-query';
 
 const _SKILL_ID = '界直言';
 const DISPLAY_NAME = '直言';
@@ -45,17 +47,6 @@ const CONFIRM_RT = '界直言/confirm';
 const TARGET_RT = '界直言/target';
 const CONFIRM_KEY = '界直言/confirmed';
 const TARGET_KEY = '界直言/target';
-
-/** 从 fromIndex 之后找下一个存活玩家索引;全死亡时返回 fromIndex */
-function findNextAlive(state: { players: { alive: boolean }[] }, fromIndex: number): number {
-  const n = state.players.length;
-  for (let i = 1; i <= n; i++) {
-    // 逆时针 = 座次递减(与回合推进方向一致)
-    const idx = (fromIndex - i + n) % n;
-    if (state.players[idx]?.alive) return idx;
-  }
-  return fromIndex;
-}
 
 /** candidate 是否为 target 的上家(下一个存活玩家 === target) */
 function isUpstreamOf(state: GameState, candidate: number, target: number): boolean {

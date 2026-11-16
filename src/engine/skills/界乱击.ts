@@ -37,11 +37,11 @@
 // 命名:文件名/loader key/character skill name 均为 '界乱击'(避开标乱击冲突);
 //   内部 Skill.name = '乱击'(OL 官方技能名,玩家可见)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import { applyAtom } from '../core/apply';
 import { runUseFlow, chargeOnSettle } from './cards/use-card';
 import { defaultPlayActive } from '../rules/action-active';
-import { requireRequestType, registerTransformAction, mountTransformAction, type TransformActionOptions } from '../util/skillRuntime';
+import { requireRequestType, registerTransformAction, mountTransformAction, engineCanPlayNowReason, type TransformActionOptions } from '../util/skillRuntime';
 
 const SKILL_ID = '界乱击';
 const DISPLAY_NAME = '乱击';
@@ -120,11 +120,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     (state: GameState, params: Record<string, Json>) => {
       // 校验同标版万箭齐发.use:自己回合 + 出牌阶段 + 无阻塞 pending + 存活 +
       // 手牌中存在万箭齐发(含影子卡)。万箭齐发本无目标参数(targets 由本流程自动计算)。
-      if (state.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (state.phase !== '出牌') return '不是出牌阶段';
-      if (hasBlockingPending(state)) return '当前有等待响应';
+      const playError = engineCanPlayNowReason(state, ownerId);
+      if (playError) return playError;
       const self = state.players[ownerId];
-      if (!self?.alive) return '你已死亡';
       const cardId = params.cardId as string;
       if (typeof cardId !== 'string') return 'cardId required';
       if (!self.hand.includes(cardId)) return '牌不在手牌中';

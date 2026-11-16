@@ -58,7 +58,7 @@ export async function requireRoomPassword(
   if (!room.passwordHash || exempt) return null;
   const plain = typeof password === 'string' ? password : '';
   const ok = await checkRoomPassword(room, plain);
-  return ok ? null : c.json({ error: '房间密码错误', code: 'ROOM_PASSWORD_REQUIRED' }, 403);
+  return ok ? null : c.json({ error: '房间密码错误', code: 'ROOM_PASSWORD_INVALID' }, 403);
 }
 
 /** 解析 body.targetSeat；缺失/类型不符回退 -1（调用方按 <0 回 400）。 */
@@ -90,7 +90,8 @@ export async function resolveActorOr401(
 
 /** 路由 playerId 解析(ready/config/换座族):非调试房取会话 userId
  *  (body.playerId 忽略);调试房/房间不存在回退 bodyPlayerId。
- *  未登录回 401(无 code,与该族原路由一致);回退身份缺失回 400「缺少 playerId」。 */
+ *  未登录回 401(带 AUTH_REQUIRED code,与 authRequired 一致);
+ *  回退身份缺失回 400「缺少 playerId」。 */
 export async function resolvePlayerOrRespond(
   c: Context,
   roomId: string,
@@ -102,7 +103,9 @@ export async function resolvePlayerOrRespond(
     { requireAuth: !!room && !room.isDebug, rejectMissingBodyId: true },
     bodyPlayerId,
   );
-  if (actor.error === 'unauthenticated') return { response: c.json({ error: '请先登录' }, 401) };
+  if (actor.error === 'unauthenticated') {
+    return { response: c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401) };
+  }
   if (actor.error) return { response: c.json({ error: '缺少 playerId' }, 400) };
   return { playerId: actor.playerId };
 }
@@ -151,6 +154,8 @@ export function requireHost(
 }
 
 /** 清理玩家在其他房间的残留成员身份(跨房间切换),并清除房间映射。
+ *  所在房间经 findRoomByPlayerId 查 playerRoomMap(含成员身份校验与残留懒清理),
+ *  不再线性扫描房间表。
  *  exceptRoomId: 该房间本身不清理(同房重连/就地转换);缺省 = 全部清理(调试房重进)。
  *  spectatorAware: true 时旧房间若为旁观身份走 removeSpectator(旁观者加入路由),
  *  否则统一 leaveRoom。 */

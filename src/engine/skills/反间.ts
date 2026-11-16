@@ -20,9 +20,9 @@ import { popFrame, pushFrame } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { pickRandom } from '../util/rng';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
+import { requireRequestType, registerRespondForAllSeats, engineCanPlayNowReason } from '../util/skillRuntime';
 
 const SUIT_REQUEST = '反间/选花色';
 const SUIT_KEY = '反间/suit';
@@ -49,12 +49,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>) => {
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       const self = st.players[ownerId];
-      if (!self) return 'player not found';
-      if (!self.alive) return '你已死亡';
-      if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
-      if (st.phase !== '出牌') return '只能在出牌阶段使用';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
       if (usedThisTurn(st, ownerId, '反间')) return '本回合已使用过反间';
       if (self.hand.length === 0) return '需要有手牌才能发动反间';
       const targets = params.targets as number[] | undefined;

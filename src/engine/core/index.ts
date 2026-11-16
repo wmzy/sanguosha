@@ -27,7 +27,7 @@ import {
 
 // 规则包(游戏模式)动态加载:core 不静态依赖任何具体模式规则(ADR 0029)。
 import { loadRuleset } from '../rules/registry';
-import type { GameMode } from '../rules/types';
+import type { GameMode, RulesetModule } from '../rules/types';
 
 export interface GameConfig {
   characters: Array<{ name: string; skills: string[] }>;
@@ -48,13 +48,28 @@ export function resolveGameMode(state: GameState): GameMode {
   return state.config?.mode ?? '身份局';
 }
 
+/** 装载 state 当前模式规则包并(默认)跑 onInit:resolveGameMode + loadRuleset +
+ *  onInit 三连原在 checkGameOver/bootstrap/registerSkillsFromState 重复 → 收敛单点。
+ *  - onInit 注册系统规则全局 hooks(添加/移除技能/弃置/濒死检查)+ 每座次 选将/弃牌
+ *    respond action;checkGameOver 只做只读判定,传 { onInit: false } 跳过。
+ *  - bootstrap 的模式取 gameConfig 优先:调用方先把 gameConfig.mode 持久化进
+ *    state.config 再调本函数(注入 使用牌/打出牌 的差异保留在各调用点)。 */
+async function loadCurrentRuleset(
+  state: GameState,
+  opts: { onInit?: boolean } = {},
+): Promise<RulesetModule> {
+  const ruleset = await loadRuleset(resolveGameMode(state));
+  if (opts.onInit !== false) ruleset.onInit(state);
+  return ruleset;
+}
+
 /** 检查游戏是否结束。基于 state.config.mode 加载对应规则包判定(默认身份局)。
  *  异步(动态 import):session 在 onStateChange 中 await。具体判定逻辑见
  *  rules/身份局.ts(身份局与 1v1 共用)——core 层不再内嵌模式规则(ADR 0029)。 */
 export async function checkGameOver(
   state: GameState,
 ): Promise<{ gameOver: boolean; winner?: number }> {
-  const ruleset = await loadRuleset(resolveGameMode(state));
+  const ruleset = await loadCurrentRuleset(state, { onInit: false });
   return ruleset.checkGameOver(state);
 }
 export function create(gameConfig: GameConfig): GameState {
@@ -134,8 +149,7 @@ export async function bootstrap(state: GameState, gameConfig: GameConfig): Promi
   // 开局 execute/checkGameOver 均从 state.config.mode 解析(快照恢复同样依赖)。
   const mode = gameConfig.mode ?? resolveGameMode(state);
   state.config = { ...state.config, mode };
-  const ruleset = await loadRuleset(mode);
-  ruleset.onInit(state);
+  await loadCurrentRuleset(state);
   // 酒增伤/延时锦囊判定/连环传导 全局 hooks 由 使用牌 skill 的 onInit 注册
   // (首次实例化时注册,后续座次跳过)
   // dispatch 后 await settle:等开局 execute 挂起(选将 slot 创建)再返回。
@@ -173,8 +187,7 @@ export async function registerSkillsFromState(state: GameState): Promise<void> {
   await registerSkills(state);
   // 注册规则包全局 hooks + 为每个玩家注册选将/弃牌 respond action(与 bootstrap 一致)。
   // 模式取 state.config(测试构造的 state 未走 create 时缺省身份局)。
-  const ruleset = await loadRuleset(resolveGameMode(state));
-  ruleset.onInit(state);
+  await loadCurrentRuleset(state);
   // 酒增伤/延时锦囊判定/连环传导 全局 hooks 由 使用牌 skill 的 onInit 注册
   // (registerSkills 内部按座次逐个实例化,首次实例化的座次负责注册)
 }
@@ -483,10 +496,9 @@ export async function dispatch(
 /**
  * 稳定点(测试/AI 等待用):等价于旧的「等到 execute 挂起或跑完」,但不轮询。
  * 所有 active run 都已完成或重新挂到 PendingSlot 上时 resolve。
+ * (原纯别名 whenEngineIdle 已删,直接导出 run-tracker 本名。)
  */
-export function whenEngineIdle(state: GameState): Promise<void> {
-  return whenIdle(state);
-}
+export { whenIdle };
 
 /**
  * 构造指定 viewer 视角的 GameView。

@@ -29,7 +29,8 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
-import { slotOf, requireRequestType, askConfirm, normalizeCardIds } from '../util/skillRuntime';
+import { requireRequestType, askConfirm, normalizeCardIds } from '../util/skillRuntime';
+import { slotOf } from '../util/equip-slot';
 
 /** owner.vars key:箜声牌 cardId 列表(与良姻共享) */
 const KONGSHENG_KEY = '箜声/牌';

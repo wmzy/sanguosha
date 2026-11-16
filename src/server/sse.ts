@@ -167,7 +167,7 @@ function playerRole(
     joinedMessage: () => {
       let seatIndex: number | undefined;
       if (session) {
-        const existingSeat = session.getPlayerName(playerId);
+        const existingSeat = session.getSeatOf(playerId);
         if (existingSeat !== undefined) {
           seatIndex = existingSeat;
         } else if (room.isDebug) {

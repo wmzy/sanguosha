@@ -17,9 +17,10 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import { hasSkillModule } from './registry';
-import { slotOf } from '../util/skillRuntime';
+import { slotOf } from '../util/equip-slot';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
 
 /** 直谏族(主动技)差异参数 */
 export interface ZhijianOptions {
@@ -60,11 +61,9 @@ export function createZhijianSkill(opts: ZhijianOptions) {
         'use',
         (st: GameState, params: Record<string, Json>) => {
           // 通用合法条件
-          if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
-          if (st.phase !== '出牌') return '只能在出牌阶段使用';
-          if (hasBlockingPending(st)) return '当前有未完成的询问';
+          const playError = engineCanPlayNowReason(st, ownerId);
+          if (playError) return playError;
           const self = st.players[ownerId];
-          if (!self?.alive) return '你已死亡';
 
           // 参数:cardId + target(targets[0] 或 target)
           if (typeof params.cardId !== 'string') return '需要选择一张装备牌';

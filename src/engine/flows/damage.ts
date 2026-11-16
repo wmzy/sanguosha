@@ -13,11 +13,29 @@
 //   state.localVars[DAMAGE_AMOUNT_KEY],编排函数在 applyAtom 返回后读取该值作为后续伤害值。
 //   cancel 语义:伤害结算开始时 cancel → 跳过整个伤害流程;受到伤害时 cancel → 防止伤害,
 //   跳到伤害结算结束时(仍发 结束时/结束后 时机,amount=0)。
-import type { GameState } from '../types';
+import type { AtomOfName, GameState } from '../types';
 import type { DamageType } from '../types';
 import { applyAtom } from '../core/apply';
 import { runDecreaseLifeFlow } from './life';
 import { DAMAGE_AMOUNT_KEY, DAMAGE_SOURCE_KEY } from '../atoms/damage-timing';
+
+/** 伤害时机 atom(前三个时机的 amount 可被 hook modify)。 */
+type DamageTimingAtom =
+  | AtomOfName<'伤害结算开始时'>
+  | AtomOfName<'造成伤害时'>
+  | AtomOfName<'受到伤害时'>;
+
+/** 时机1-3 的 amount 中继四连(原各时机手写样板):回写 localVars → applyAtom →
+ *  读回折叠后的 amount(hook 的 afterApply 把终值写回 DAMAGE_AMOUNT_KEY)。
+ *  返回 [applyAtom 结果(false=被 cancel), 折叠后 amount];时机4-8 不做中继。 */
+async function relayDamageAmount(
+  state: GameState,
+  atom: DamageTimingAtom,
+): Promise<[boolean, number]> {
+  state.localVars[DAMAGE_AMOUNT_KEY] = atom.amount;
+  const ok = await applyAtom(state, atom);
+  return [ok, state.localVars[DAMAGE_AMOUNT_KEY]];
+}
 
 /** 伤害结算编排函数——对齐 damage.md 8 时机。
  *
@@ -42,28 +60,24 @@ export async function runDamageFlow(
   let amount = baseAmount;
 
   // 时机1:伤害结算开始时(绝情 cancel / 狂风大雾修正)
-  state.localVars[DAMAGE_AMOUNT_KEY] = amount;
-  const startResult = await applyAtom(state, {
+  const [startOk, startAmount] = await relayDamageAmount(state, {
     type: '伤害结算开始时', source, target, amount, cardId, damageType,
   });
-  if (!startResult) return; // 被 cancel(绝情)→ 跳过整个伤害流程
-  amount = state.localVars[DAMAGE_AMOUNT_KEY];
+  if (!startOk) return; // 被 cancel(绝情)→ 跳过整个伤害流程
+  amount = startAmount;
   source = state.localVars[DAMAGE_SOURCE_KEY] as number;
 
   // 时机2:造成伤害时(来源方加伤:裸衣/古锭刀/暗箭/酒)
-  state.localVars[DAMAGE_AMOUNT_KEY] = amount;
-  await applyAtom(state, {
+  [, amount] = await relayDamageAmount(state, {
     type: '造成伤害时', source, target, amount, cardId, damageType,
   });
-  amount = state.localVars[DAMAGE_AMOUNT_KEY];
 
   // 时机3:受到伤害时(目标方减伤/防止:藤甲/白银狮子/天香/名士)
-  state.localVars[DAMAGE_AMOUNT_KEY] = amount;
-  const sufferResult = await applyAtom(state, {
+  const [sufferOk, sufferAmount] = await relayDamageAmount(state, {
     type: '受到伤害时', source, target, amount, cardId, damageType,
   });
-  amount = state.localVars[DAMAGE_AMOUNT_KEY];
-  if (!sufferResult || amount <= 0) {
+  amount = sufferAmount;
+  if (!sufferOk || amount <= 0) {
     // cancel(完全防止)或 amount 经 modify 折叠为 0(伤害减为0即防止全部伤害):
     // 视为来源未造成过伤害、目标角色也未受到过伤害,
     // 跳过 造成/受到伤害后 与扣减,直接进入 伤害结算结束时/后(amount=0)。

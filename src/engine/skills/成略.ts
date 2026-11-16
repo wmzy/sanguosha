@@ -38,10 +38,10 @@ import { popFrame, pushFrame } from '../core/frame';
 import {
   registerAction,
   registerAfterHook,
-  hasBlockingPending,
 } from '../core/skill';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
 import {
   registerSlashExemptor,
 } from '../rules/slash-quota';
@@ -160,12 +160,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, _params: Record<string, Json>): string | null => {
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       const self = st.players[ownerId];
-      if (!self) return 'player not found';
-      if (!self.alive) return '你已死亡';
-      if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
-      if (st.phase !== '出牌') return '只能在出牌阶段使用';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
       if (usedThisTurn(st, ownerId, SKILL_ID)) return '本回合已使用过成略';
       // 弃置前置:摸牌后须能弃出指定张数。
       //   阳:摸1弃2 → 当前手牌 +1 ≥ 2 → 手牌 ≥ 1

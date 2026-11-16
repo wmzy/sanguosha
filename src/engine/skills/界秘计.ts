@@ -30,10 +30,10 @@ import type {
   Skill,
   SkillModule,
 } from '../types';
-import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { askConfirm, normalizeCardIds, requireRequestType } from '../util/skillRuntime';
+import { lostHealth } from '../util/player-query';
 import { mijiPendingKey, getMijiPending } from '../rules/vars-keys';
 
 const _SKILL_ID = '界秘计';
@@ -52,13 +52,6 @@ const CONFIRM_KEY = '界秘计/confirmed';
 const GIVE_CONFIRM_KEY = '界秘计/giveConfirmed';
 const GIVE_TARGET_KEY = '界秘计/giveTarget';
 const GIVE_CARDS_KEY = '界秘计/giveCards';
-
-/** 已损失体力值 = maxHealth - currentHealth(≥0) */
-function lostHealth(state: GameState, ownerId: number): number {
-  const p = state.players[ownerId];
-  if (!p) return 0;
-  return Math.max(0, p.maxHealth - getHealthValue(p));
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

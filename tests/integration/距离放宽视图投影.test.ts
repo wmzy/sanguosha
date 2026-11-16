@@ -57,7 +57,7 @@ function expectDistanceViewAgreesWithEngine(state: GameState, from: number, to: 
     viewEffectiveDistance(view.players, from, to),
     `view 距离应为 ${String(effectiveDistance(state, from, to))}`,
   ).toBe(effectiveDistance(state, from, to));
-  expect(viewCanAttack(view.players, view.cardMap, from, to), 'view 应允许对该目标出杀').toBe(
+  expect(viewCanAttack(view.players, from, to), 'view 应允许对该目标出杀').toBe(
     inAttackRange(state, from, to),
   );
 }

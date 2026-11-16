@@ -26,15 +26,14 @@
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame, frameCards } from '../core/frame';
-import { recastCard } from '../flows/recast';
 import { setChain } from '../flows/face-down';
 import { registerAction, validateUseCard } from '../core/skill';
 import {
-  engineCanPlayNow,
   mountTransformAction,
   registerTransformAction,
   type TransformActionOptions,
 } from '../util/skillRuntime';
+import { registerRecycleAction } from './连环';
 import { promptCancel } from '../flows/cancel';
 import { defaultPlayActive } from '../rules/action-active';
 
@@ -95,31 +94,14 @@ const TRANSFORM_OPTIONS: TransformActionOptions = {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // ── recycle:弃一张梅花手牌,摸一张牌(铁索连环的重铸效果)──
-  registerAction(
-    state,
-    skill.id,
+  // ── recycle:弃一张梅花手牌,摸一张牌(铁索连环的重铸效果;共享工厂见 连环.ts)──
+  registerRecycleAction(state, {
+    skillId: skill.id,
     ownerId,
-    'recycle',
-    (state: GameState, params: Record<string, Json>) => {
-      const self = state.players[ownerId];
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? state.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const isClub = !!card && card.suit === '♣';
-      // 时机四合一(自己回合+出牌阶段+无阻塞+存活)由 engineCanPlayNow 统一判定
-      const ok = engineCanPlayNow(state, ownerId) && cardInHand && isClub;
-      return ok ? null : '现在不能重铸(需出牌阶段、手中梅花牌)';
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
-      const cardId = params.cardId as string;
-      await pushFrame(state, '界连环', from, { ...params });
-      await recastCard(state, from, cardId);
-      await popFrame(state);
-    },
-  );
+    frameName: '界连环',
+    isEligible: (card) => !!card && card.suit === '♣',
+    rejectMessage: '现在不能重铸(需出牌阶段、手中梅花牌)',
+  });
 
   // ── transform:梅花手牌 → 影子"铁索连环"(作为 preceding,主 action=铁索连环.use) ──
   // 五件套由 skillRuntime 工厂统一实现;影子卡 id 后缀=技能 id '界连环'(与标连环

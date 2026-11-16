@@ -25,7 +25,6 @@
 
 import type { Card, Suit, Rank, CardType, CardSubType, TrickSubType, DamageType, GameState } from '../types';
 import { suitColor } from '../types';
-import type { Rng } from '../util/rng';
 import { 装备牌列表 } from '../data/card-defs/equipment';
 import { getCardDescription } from '../data/card-defs/description';
 
@@ -287,15 +286,6 @@ export function createStandardDeck(): Card[] {
     deck.push(card);
   }
   return deck;
-}
-
-export function shuffle(deck: Card[], rng: Rng): Card[] {
-  const result = [...deck];
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = rng.nextInt(i + 1);
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
 }
 
 // ─── zones.deck 顶牌访问(牌堆顶 = 末尾,见 引擎架构.md 方向约定) ────────

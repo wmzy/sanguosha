@@ -51,7 +51,6 @@ import { GameViewProvider, type GameViewCtxValue } from './GameViewCtx';
 import {
   canShowCancelSelectionButton,
   canShowEndTurnButton,
-  countRespondableCards,
   findUseActionForCard,
   hasUseEntry,
   isActiveAction,
@@ -440,7 +439,7 @@ export function GameViewComponentImpl({
       );
       // 攻击范围与引擎/无头枚举同源走 viewCanAttack(含攻击范围豁免),替代手写
       // distance > attackRange 比较;range 仅用于提示文案(与 viewCanAttack 内部同式)。
-      if (usingCard?.name === '杀' && !viewCanAttack(view.players, view.cardMap, perspectiveIdx, idx)) {
+      if (usingCard?.name === '杀' && !viewCanAttack(view.players, perspectiveIdx, idx)) {
         const range = view.players[perspectiveIdx]?.distanceVars?.attackRange ?? 1;
         return { distance, reason: `距离 ${distance}，超出攻击范围 ${range}` };
       }
@@ -515,11 +514,11 @@ export function GameViewComponentImpl({
 
   // ─── 回应窗口候选数(0 时动作条显示「一键不回应」,替代置灰的「打出」)───
   // 注意必须在 isRespondPending 定义之后(同源计算条件)。计数与 AwaitingPrompt 的
-  // respondableCount 共享 countRespondableCards;无 filter(非卡牌回应)时保持 null
-  // (未知),与 AwaitingPrompt 的 0(无)语义由调用方区分。
+  // respondableCount 同判据(按 cardFilter 过滤手牌计数);无 filter(非卡牌回应)时
+  // 保持 null(未知),与 AwaitingPrompt 的 0(无)语义由调用方区分。
   const respondCandidateCount = useMemo(() => {
     if (!isRespondPending || !pendingRespondInfo?.cardFilter) return null;
-    return countRespondableCards(perspectiveHand, pendingRespondInfo.cardFilter);
+    return perspectiveHand.filter(pendingRespondInfo.cardFilter).length;
   }, [isRespondPending, pendingRespondInfo, perspectiveHand]);
   const showCenterActionBar =
     isRespondPending ||

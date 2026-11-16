@@ -33,7 +33,6 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import {
   registerAction,
-  hasBlockingPending,
 } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
@@ -43,7 +42,8 @@ import { setPlayerVarUsage, projectTurnUsage } from '../rules/turn-usage';
 import { usedThisTurn as usedOncePerTurn } from '../rules/once-per-turn';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY, GONGQI_ACTIVE_VIEW_KEY, SLASH_EXEMPT_SUIT_KEY } from '../rules/vars-keys';
-import { askConfirm, askResponse } from '../util/skillRuntime';
+import { askConfirm, askResponse, engineCanPlayNowReason } from '../util/skillRuntime';
+import { hasDiscardableCards } from '../util/player-query';
 
 const SKILL_ID = '界弓骑';
 const DISPLAY_NAME = '弓骑';
@@ -77,13 +77,6 @@ export function createSkill(id: string, ownerId: number): Skill {
 /** 判断玩家本回合是否已发动过弓骑(rules/once-per-turn 共享版,键 = `${SKILL_ID}/usedThisTurn`) */
 function usedThisTurn(state: GameState, ownerId: number): boolean {
   return usedOncePerTurn(state, ownerId, SKILL_ID);
-}
-
-/** 玩家区域(手牌+装备)是否有牌可被弃 */
-function hasDiscardableCards(player: GameState['players'][number]): boolean {
-  if (!player) return false;
-  if (player.hand.length > 0) return true;
-  return Object.values(player.equipment).some((id) => typeof id === 'string');
 }
 
 /** 是否存在可被弃牌的其他角色(存活、非自己、有牌) */
@@ -126,12 +119,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>): string | null => {
-      if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (st.phase !== '出牌') return '只能在出牌阶段发动';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       if (usedThisTurn(st, ownerId)) return '本回合已发动过弓骑';
       const self = st.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
 
       const cardId = params.cardId as string | undefined;
       if (typeof cardId !== 'string') return '需要选择一张要弃置的手牌';

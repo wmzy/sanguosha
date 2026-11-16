@@ -1263,12 +1263,13 @@ describe('踢出玩家', () => {
 
     const result = kickPlayer(room.id, 'host', 'p2');
 
-    expect(result).not.toBeNull();
-    expect(result!.kickedSink).toBe(p2Sink);
-    expect(result!.room.players.has('p2')).toBe(false);
-    expect(result!.room.seats).toEqual(['host', null, null, null]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return; // 判别联合收窄
+    expect(result.kickedSink).toBe(p2Sink);
+    expect(result.room.players.has('p2')).toBe(false);
+    expect(result.room.seats).toEqual(['host', null, null, null]);
     // 房主仍在
-    expect(result!.room.hostId).toBe('host');
+    expect(result.room.hostId).toBe('host');
   });
 
   it('踢出玩家时清除其准备状态', () => {
@@ -1292,8 +1293,9 @@ describe('踢出玩家', () => {
 
     const result = kickPlayer(room.id, 'host', 'spec1');
 
-    expect(result).not.toBeNull();
-    expect(result!.kickedSink).toBe(specSink);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return; // 判别联合收窄
+    expect(result.kickedSink).toBe(specSink);
     expect(room.spectators.has('spec1')).toBe(false);
     expect(room.viewGrants.has('spec1')).toBe(false);
     expect(room.pendingViewRequests.has('spec1')).toBe(false);
@@ -1319,8 +1321,9 @@ describe('踢出玩家', () => {
 
     const result = kickPlayer(room.id, 'host', 'p2');
 
-    expect(result).not.toBeNull();
-    expect(result!.room.hostId).toBe('host');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return; // 判别联合收窄
+    expect(result.room.hostId).toBe('host');
     // 房间仍在列表中（未被销毁）
     expect(getRoom(room.id)).not.toBeNull();
   });
@@ -1331,7 +1334,7 @@ describe('踢出玩家', () => {
 
     const result = kickPlayer(room.id, 'p2', 'host');
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'notHost' });
     expect(room.players.has('host')).toBe(true);
   });
 
@@ -1340,7 +1343,7 @@ describe('踢出玩家', () => {
 
     const result = kickPlayer(room.id, 'host', 'host');
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'selfKick' });
     expect(room.players.has('host')).toBe(true);
   });
 
@@ -1351,16 +1354,16 @@ describe('踢出玩家', () => {
 
     const result = kickPlayer(room.id, 'host', 'p2');
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'notWaiting' });
     expect(room.players.has('p2')).toBe(true);
   });
 
-  it('踢出不在房间中的目标返回 null', () => {
+  it('踢出不在房间中的目标失败(targetNotInRoom)', () => {
     const room = createRoom('房间', 4, 'host', createMockSink());
 
     const result = kickPlayer(room.id, 'host', 'ghost');
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'targetNotInRoom' });
   });
 
   it('调试房间（无房主）不允许踢人', () => {
@@ -1369,12 +1372,12 @@ describe('踢出玩家', () => {
 
     const result = kickPlayer(room.id, 'p1', 'p2');
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'notHost' });
   });
 
-  it('房间不存在时返回 null', () => {
+  it('房间不存在时返回失败原因', () => {
     const result = kickPlayer('NOPE', 'host', 'p2');
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'roomNotFound' });
   });
 });
 

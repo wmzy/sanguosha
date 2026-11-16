@@ -1149,8 +1149,8 @@ describe('HeadlessGameClient.getAvailableActions() — pickTargetCard pending', 
 
     const actions = hgc.getAvailableActions();
     const respondActions = actions.filter((a) => a.category === 'respond');
-    // 2 装备 + 1 判定 + 1 手牌盲选 = 4 个动作
-    expect(respondActions).toHaveLength(4);
+    // 2 装备 + 1 判定 + 3 手牌盲选(每个 handIndex 一个动作) = 6 个动作
+    expect(respondActions).toHaveLength(6);
 
     // 装备动作：zone=equipment, cardId 正确
     const equipActions = respondActions.filter((a) => a.message.params.zone === 'equipment');
@@ -1163,10 +1163,10 @@ describe('HeadlessGameClient.getAvailableActions() — pickTargetCard pending', 
     expect(judgeActions).toHaveLength(1);
     expect(judgeActions[0].message.params.cardId).toBe('judge-1');
 
-    // 手牌盲选动作：zone=hand, handIndex=0
+    // 手牌盲选动作：zone=hand,枚举全部 handIndex(与浏览器/引擎盲选契约一致)
     const handActions = respondActions.filter((a) => a.message.params.zone === 'hand');
-    expect(handActions).toHaveLength(1);
-    expect(handActions[0].message.params.handIndex).toBe(0);
+    expect(handActions).toHaveLength(3);
+    expect(handActions.map((a) => a.message.params.handIndex)).toEqual([0, 1, 2]);
   });
 
   it('pickTargetCard：只有手牌时生成手牌盲选动作', () => {
@@ -1192,9 +1192,9 @@ describe('HeadlessGameClient.getAvailableActions() — pickTargetCard pending', 
 
     const actions = hgc.getAvailableActions();
     const respondActions = actions.filter((a) => a.category === 'respond');
-    expect(respondActions).toHaveLength(1);
-    expect(respondActions[0].message.params.zone).toBe('hand');
-    expect(respondActions[0].message.params.handIndex).toBe(0);
+    expect(respondActions).toHaveLength(2);
+    expect(respondActions.map((a) => a.message.params.zone)).toEqual(['hand', 'hand']);
+    expect(respondActions.map((a) => a.message.params.handIndex)).toEqual([0, 1]);
   });
 
   it('pickTargetCard：无牌可选时不生成 respond 动作', () => {
@@ -1555,7 +1555,9 @@ describe('enumerateAvailableActions:非 useCard 型主动技', () => {
     expect(picked.map((a) => a.message.params.target)).toEqual([1, 2]);
     // 反间读 params.targets、激将读 params.target → 两者都带上
     expect(picked[0].message.params.targets).toEqual([1]);
-    expect(picked[0].validTargets).toEqual([1, 2]);
+    // 单目标 prompt 型 action 各自带自己的目标(validTargets 与 target 一致)
+    expect(picked[0].validTargets).toEqual([1]);
+    expect(picked[1].validTargets).toEqual([2]);
   });
 
   it('selectTarget + paramVariants(强袭代价) → 变体×目标,params 含 cost', () => {

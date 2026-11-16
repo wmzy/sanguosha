@@ -589,10 +589,10 @@ describe('server/gameHistory session 集成(真实开局到结束)', () => {
       const slot = state.pendingSlots.get(target)!;
       const atom = slot.atom as { type?: string; target: number; candidates?: Array<{ name: string }> };
       if (atom.type !== '选将询问' || !atom.candidates) break;
-      // 反查座次 → playerId(非 debug session 校验 ownerId 匹配 playerNames 映射)
-      const playerNames = (session as unknown as { playerNames: Map<string, number> }).playerNames;
+      // 反查座次 → playerId(非 debug session 校验 ownerId 匹配 playerSeatIndex 映射)
+      const playerSeatIndex = (session as unknown as { playerSeatIndex: Map<string, number> }).playerSeatIndex;
       let pid = room.hostId!;
-      for (const [p, s] of playerNames) if (s === target) pid = p;
+      for (const [p, s] of playerSeatIndex) if (s === target) pid = p;
       await session.handleAction(pid, {
         skillId: '系统规则',
         actionType: '选将',

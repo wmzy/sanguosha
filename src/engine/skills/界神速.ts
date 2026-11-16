@@ -26,7 +26,8 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
-import { askConfirm, defineConfirmAction, runVirtualSlash } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { runVirtualSlash } from './cards/_virtualSlash';
 import {
   FLIP_TAG,
   SKIP_MO_TAG,

@@ -31,7 +31,6 @@ import type {
   Json,
   Skill,
 } from '../types';
-import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import {
@@ -39,10 +38,11 @@ import {
   markOncePerTurn,
   activeUnlessUsedThisTurn,
 } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
+import { lostHealth } from '../util/player-query';
 
 const SKILL_NAME = '界甘露';
 const DISPLAY_NAME = '甘露';
@@ -57,13 +57,6 @@ const EQUIP_SLOTS: EquipSlot[] = ['武器', '防具', '进攻马', '防御马', 
 function equipmentCount(state: GameState, idx: number): number {
   const eq = state.players[idx]?.equipment ?? {};
   return EQUIP_SLOTS.filter((s) => typeof eq[s] === 'string').length;
-}
-
-/** 已损失体力值。 */
-function lostHealth(state: GameState, idx: number): number {
-  const p = state.players[idx];
-  if (!p) return 0;
-  return Math.max(0, p.maxHealth - getHealthValue(p));
 }
 
 /** 列出玩家在某 slot 的装备 cardId(若有)。 */
@@ -152,12 +145,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, _params: Record<string, Json>): string | null => {
-      if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (st.phase !== '出牌') return '只能在出牌阶段发动';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       if (usedThisTurn(st, ownerId, SKILL_NAME)) return '本回合已使用过甘露';
-      const self = st.players[ownerId];
-      if (!self?.alive) return '角色不可用';
       // 至少两名存活角色(可含自己)有装备牌,否则交换无意义
       const aliveIdx = st.players.filter((p) => p.alive);
       if (aliveIdx.length < 2) return '需要至少两名存活角色';

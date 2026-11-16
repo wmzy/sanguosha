@@ -497,14 +497,30 @@ export function buildPlayParams(
     if (!selectedTarget) return null;
     const idx = players.findIndex((p) => p.name === selectedTarget);
     if (idx < 0) return null;
-    // 延时锦囊 validate 用单数 target;其他牌用 targets 数组
-    if (card.type === '锦囊牌' && card.trickSubtype === '延时锦囊') {
-      return { cardId: card.id, target: idx };
-    }
-    return { cardId: card.id, targets: [idx] };
+    // 延时锦囊 validate 用单数 target;其他牌用 targets 数组(targetShapeFor 单点分叉)
+    const params: Record<string, Json> = { cardId: card.id };
+    targetShapeFor(params, card, idx);
+    return params;
   }
   // 无目标牌(无中生有/桃园结义/装备等)
   return { cardId: card.id };
+}
+
+/** 单目标提交的目标形状分叉:延时锦囊 validate 读单数 target(引擎 use-card 的
+ *  delayed 分支按 target 路由),其余牌读 targets 数组。两处消费:buildPlayParams
+ *  的 needsTarget 分支与浏览器 handleSkillAction 的 useCardAndTarget 提交——
+ *  此前各手写一份形状判断,漂移会让延时锦囊以 targets 提交被引擎拒。
+ *  card 缺失(选中态与手牌瞬时脱钩)按「其余」处理。 */
+export function targetShapeFor(
+  params: Record<string, Json>,
+  card: Pick<Card, 'type' | 'trickSubtype'> | undefined,
+  idx: number,
+): void {
+  if (card?.type === '锦囊牌' && card.trickSubtype === '延时锦囊') {
+    params.target = idx;
+  } else {
+    params.targets = [idx];
+  }
 }
 
 // ─── distribute cardIds 解析 ───
@@ -648,6 +664,28 @@ export function selectTargetCandidates(
     .map((p) => p.index);
 }
 
+/** choosePlayer prompt → TargetFilter 的形状映射(引擎 target-selection 只认
+ *  TargetFilter):min/max/candidates/filter 平移,allowSelf 恒 true——候选是否含
+ *  自己由 candidates/filter 自身约束(引擎侧 choosePlayer 不排除自己),不在此
+ *  二次排除。消费方:无头 enumeratePromptActions 的目标收尾;promptTargetBounds
+ *  的 choosePlayer 分支亦经此单点取 min/max,避免两处映射漂移。 */
+export function choosePlayerAsTargetFilter(
+  prompt: {
+    min?: number;
+    max?: number;
+    candidates?: number[];
+    filter?: (view: GameView, target: number) => boolean;
+  },
+): TargetFilter {
+  return {
+    min: prompt.min ?? 1,
+    max: prompt.max ?? 1,
+    allowSelf: true,
+    candidates: prompt.candidates,
+    filter: prompt.filter,
+  };
+}
+
 /** 主动技目标数上下界:selectTarget/useCardAndTarget 读 targetFilter.min/max、
  *  choosePlayer 读 prompt.min/max,缺省均为 1(其余 prompt 类型亦 {1,1})。
  *  消费方:浏览器 handleTargetClick(单选点座位即提交)、handleSkillAction(未选目标
@@ -660,7 +698,9 @@ export function promptTargetBounds(prompt: ActionPrompt): { min: number; max: nu
     return { min: prompt.targetFilter.min ?? 1, max: prompt.targetFilter.max ?? 1 };
   }
   if (prompt.type === 'choosePlayer') {
-    return { min: prompt.min ?? 1, max: prompt.max ?? 1 };
+    // min/max 经 choosePlayerAsTargetFilter 单点映射(与无头目标收尾同一形状来源)
+    const { min, max } = choosePlayerAsTargetFilter(prompt);
+    return { min: min ?? 1, max: max ?? 1 };
   }
   return { min: 1, max: 1 };
 }
@@ -738,17 +778,6 @@ export function targetConstraintCard(
   return respondWindow
     ? (respondCard ?? undefined)
     : effectiveTargetCard(selectedCard, selectedTargetFilter, usedCardName);
-}
-
-/** 回应窗口手牌中可回应的张数(GameView 的 respondCandidateCount 与
- *  AwaitingPrompt 的 respondableCount 同判据):按 pendingRespondInfo.cardFilter
- *  过滤手牌计数。「无 filter(非卡牌回应)」的语义差异(null=未知 / 0=无)由
- *  调用方保留。 */
-export function countRespondableCards(
-  hand: Card[],
-  filter: (card: Card) => boolean,
-): number {
-  return hand.filter(filter).length;
 }
 
 // ─── 出牌操作按钮可见性 ───

@@ -15,7 +15,8 @@ import type {
 import { TARGET_SYSTEM } from '../types';
 import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 import { createRng } from '../util/rng';
-import { createStandardDeck, shuffle } from '../core/deck';
+import { createStandardDeck } from '../core/deck';
+import { shuffle } from '../util/rng';
 import { applyAtom } from '../core/apply'
 
 /** 默认通用技能列表 */

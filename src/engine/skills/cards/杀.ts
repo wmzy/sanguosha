@@ -109,7 +109,7 @@ export const slashEffect: CardEffect = {
       min: 1,
       max: 3,
       filter: (view: GameView, t: number) =>
-        viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
+        viewCanAttack(view.players, view.currentPlayerIndex, t),
     },
   },
   respondPrompt: {

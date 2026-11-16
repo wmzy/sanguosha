@@ -42,6 +42,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { totalCardCount } from '../util/player-query';
 
 const SKILL_ID = '界镇军';
 const DISPLAY_NAME = '镇军';
@@ -81,12 +82,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '准备阶段,弃置一名角色X张牌(X为其手牌数减体力值且至少为1),然后选择:1.你弃置等量非装备牌数的牌;2.结束阶段其摸等量非装备牌数的牌',
   };
-}
-
-/** 角色总牌数(手牌+装备区) */
-function totalCardCount(p: { hand: string[]; equipment: Record<string, string | undefined> }): number {
-  const equipCount = Object.values(p.equipment).filter((id): id is string => !!id).length;
-  return p.hand.length + equipCount;
 }
 
 /** 计算镇军 X 值:target.hand.length - target.health,最小 1 */

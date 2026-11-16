@@ -40,11 +40,13 @@ import type { GameView } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import { getGender } from '../data/character-meta';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
-import { slotOf } from '../util/skillRuntime';
+import { slotOf } from '../util/equip-slot';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
+import { isMaleAlive } from '../util/player-query';
 
 const SKILL_NAME = '界结姻';
 const USED_KEY = `${SKILL_NAME}/usedThisTurn`;
@@ -59,13 +61,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '出牌阶段限一次:选一名男性角色,弃一张手牌或置一张装备牌入其装备区,体力大者摸1张,小者回1点',
   };
-}
-
-/** 校验某座次是否为合法界结姻目标:存活 + 男性。 */
-function isMaleAlive(state: GameState, target: number): boolean {
-  const p = state.players[target];
-  if (!p?.alive) return false;
-  return getGender(p.character) === '男';
 }
 
 /** cardId 是否在 owner 装备区,返回所在栏位;不在返回 null。 */
@@ -116,11 +111,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>): string | null => {
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       const self = st.players[ownerId];
-      if (!self?.alive) return '角色不可用';
-      if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (st.phase !== '出牌') return '不是出牌阶段';
-      if (hasBlockingPending(st)) return '当前有未回应的询问';
       if (st.players[ownerId]?.vars[USED_KEY]) return '本回合已使用过界结姻';
 
       const resolved = resolveParams(params);

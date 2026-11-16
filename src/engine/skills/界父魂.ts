@@ -92,7 +92,7 @@ const TRANSFORM_OPTIONS: TransformActionOptions = {
         min: 1,
         max: 1,
         filter: (view: GameView, t: number) =>
-          viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
+          viewCanAttack(view.players, view.currentPlayerIndex, t),
       },
     },
     activeWhen: (ctx) => {
@@ -149,7 +149,7 @@ const GRANTED_OPTIONS: TransformActionOptions = {
         min: 1,
         max: 1,
         filter: (view: GameView, t: number) =>
-          viewCanAttack(view.players, view.cardMap, view.currentPlayerIndex, t),
+          viewCanAttack(view.players, view.currentPlayerIndex, t),
       },
     },
     activeWhen: (ctx) => {

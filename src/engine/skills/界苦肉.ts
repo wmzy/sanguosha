@@ -20,7 +20,8 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { activeUnlessUsedThisTurn, markOncePerTurn, usedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
-import { normalizeCardIds } from '../util/skillRuntime';
+import { normalizeCardIds, engineCanPlayNowReason } from '../util/skillRuntime';
+import { ownsCard } from '../util/player-query';
 import type { SkillModule } from '../types';
 
 /** skillId / loader key / once-per-turn key(与标苦肉隔离)。 */
@@ -46,20 +47,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'use',
     (state: GameState, params: Record<string, Json>) => {
-      if (state.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (state.phase !== '出牌') return '只能在出牌阶段发动';
+      const playError = engineCanPlayNowReason(state, ownerId);
+      if (playError) return playError;
       if (usedThisTurn(state, ownerId, SKILL_ID)) return '本回合已使用过苦肉';
       const self = state.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
       if (self.health <= 0) return '体力不足，无法发动苦肉';
       // 代价:弃置一张牌(手牌或装备)。兼容 cardIds 数组与单数 cardId。
       const cardIds = normalizeCardIds(params);
       if (cardIds.length === 0) return '需选择一张牌弃置';
       if (cardIds.length > 1) return '苦肉只能弃置一张牌';
       const cardId = cardIds[0];
-      const inHand = self.hand.includes(cardId);
-      const inEquip = Object.values(self.equipment).includes(cardId);
-      if (!inHand && !inEquip) return '牌不在手牌或装备区中';
+      if (!ownsCard(self, cardId)) return '牌不在手牌或装备区中';
       return null;
     },
     async (state: GameState, params: Record<string, Json>) => {

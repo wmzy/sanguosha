@@ -25,6 +25,7 @@ import { defaultPlayActive } from '../rules/action-active';
 import {
   registerTransformAction,
   mountTransformAction,
+  engineCanPlayNowReason,
   type TransformActionOptions,
 } from '../util/skillRuntime';
 import { DISTANCE_ATTACK_MOD_KEY } from '../rules/vars-keys';
@@ -52,11 +53,10 @@ const OPTIONS: TransformActionOptions = {
   paramKey: 'markId',
   // validate 全量自定义:急袭逐条件独立拒绝文案
   validate: (st, ownerId, params): string | null => {
-    // 自己回合 + 出牌阶段 + 无阻塞 pending
-    if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-    if (st.phase !== '出牌') return '只能在出牌阶段发动';
+    // 自己回合 + 出牌阶段 + 无阻塞 pending + 存活
+    const playError = engineCanPlayNowReason(st, ownerId);
+    if (playError) return playError;
     const self = st.players[ownerId];
-    if (!self?.alive) return '玩家不存在或已死亡';
 
     // 选定的田 markId
     const markId = params.markId as string;

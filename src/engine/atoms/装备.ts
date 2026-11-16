@@ -5,24 +5,8 @@
 // 对应 卸下 atom 负责清除武器范围;马匹 vars 由技能卸载清理。
 import type { AtomDefinition, EquipSlot, GameState, ViewEventSplit, ViewEvent } from '../types';
 import { broadcast, removeCardFromHand, requirePlayer, viewPlayer } from './_helpers';
+import { slotOf } from '../util/equip-slot';
 import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
-
-function inferSlot(cardType: string | undefined): EquipSlot | null {
-  switch (cardType) {
-    case '武器':
-      return '武器';
-    case '防具':
-      return '防具';
-    case '进攻马':
-      return '进攻马';
-    case '防御马':
-      return '防御马';
-    case '宝物':
-      return '宝物';
-    default:
-      return null;
-  }
-}
 
 /** 设装备带来的距离修正 vars(仅武器攻击范围;马匹由技能处理) */
 function applyEquipVars(
@@ -46,13 +30,13 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
     if (!p.hand.includes(atom.cardId)) return `card not in player's hand`;
     const card = state.cardMap[atom.cardId];
     if (!card) return `card ${atom.cardId} not found`;
-    const slot = inferSlot(card.subtype);
+    const slot = slotOf(card);
     if (!slot) return `card is not equipment`;
     return null;
   },
   apply(state, atom) {
     const card = state.cardMap[atom.cardId];
-    const slot = inferSlot(card.subtype)!;
+    const slot = slotOf(card)!;
     const player = state.players[atom.player];
     player.hand = player.hand.filter((id) => id !== atom.cardId);
     player.equipment[slot] = atom.cardId;
@@ -62,7 +46,7 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
   effect: { animation: 'glow', duration: 400 },
   toViewEvents(state, atom): ViewEventSplit {
     const card = state.cardMap[atom.cardId];
-    const slot = inferSlot(card.subtype)!;
+    const slot = slotOf(card)!;
     const view: ViewEvent = {
       type: '装备',
       player: atom.player,

@@ -259,9 +259,10 @@ export function useMultiplayerRoom(
         log.error('room op failed', { error: msg });
         showError(msg);
       },
-      onReconnectStateChange: (state: ReconnectState, attempt: number) => {
+      onReconnectStateChange: (state: ReconnectState) => {
         if (hgcRef.current !== hgc) return;
-        setReconnectAttempt(attempt);
+        // EventSource 自动重连不暴露尝试次数;ReconnectBanner 的「第 N 次」文案用 1/0 映射
+        setReconnectAttempt(state === 'reconnecting' ? 1 : 0);
         if (state === 'idle') setConnectionState('connected');
         else if (state === 'reconnecting') setConnectionState('reconnecting');
         else if (state === 'failed') setConnectionState('failed');

@@ -50,6 +50,7 @@ import { pushFrame, popFrame } from '../core/frame';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { totalCardCount, isSlashCardById } from '../util/player-query';
 
 const SKILL_ID = '界破军';
 const DISPLAY_NAME = '破军';
@@ -88,24 +89,12 @@ function equipCount(p: { equipment: Partial<Record<EquipSlot, string>> }): numbe
   return Object.values(p.equipment).filter((id): id is string => !!id).length;
 }
 
-/** 玩家"场上"的总牌数(手牌+装备) */
-function totalCardCount(p: { hand: string[]; equipment: Partial<Record<EquipSlot, string>> }): number {
-  return p.hand.length + equipCount(p);
-}
-
 /** 玩家所有可被破军的牌(手牌+装备),用于选牌面板展示 */
 function targetCardIds(p: { hand: string[]; equipment: Partial<Record<EquipSlot, string>> }): string[] {
   return [
     ...p.hand,
     ...Object.values(p.equipment).filter((id): id is string => !!id),
   ];
-}
-
-/** 判断 cardId 是否对应"杀"牌(转化杀的影子卡 name 也是'杀') */
-function isSlashCard(state: GameState, cardId: string | undefined): boolean {
-  if (!cardId) return false;
-  const card = state.cardMap[cardId];
-  return !!card && card.name === '杀';
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
@@ -170,7 +159,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const atom = ctx.atom;
     if (atom.type !== '指定目标') return;
     if (atom.source !== ownerId) return; // 徐盛使用的杀
-    if (!isSlashCard(ctx.state, atom.cardId)) return; // 仅杀触发
+    if (!isSlashCardById(ctx.state, atom.cardId)) return; // 仅杀触发
     const target = atom.target;
     if (typeof target !== 'number') return;
     const targetPlayer = ctx.state.players[target];
@@ -253,7 +242,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
       if (atom.source !== ownerId) return; // 徐盛造成的伤害
-      if (!isSlashCard(ctx.state, atom.cardId)) return; // 仅杀伤害
+      if (!isSlashCardById(ctx.state, atom.cardId)) return; // 仅杀伤害
       const target = atom.target;
       if (typeof target !== 'number') return;
       if (target === ownerId) return; // 自残不触发(理论上杀伤害来源是自己、目标是他人)

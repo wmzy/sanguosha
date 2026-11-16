@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import '../../src/engine/atoms';
 import { GameSession } from '../../src/server/session';
 import { deletePersistedRoom } from '../../src/server/persistence';
-import { joinDebugRoom, createDebugRoom, addRoom, type Room } from '../../src/server/room';
+import { joinDebugRoom, createDebugRoom, createRoomShell, type Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';
 import type { ServerMessage } from '../../src/server/protocol';
 import type { ConnectionSink } from '../../src/server/connection';
@@ -17,26 +17,19 @@ afterEach(async () => {
 });
 
 function makeRoom(): Room {
-  const room: Room = {
-    id: `test-${Math.random().toString(36).slice(2, 8)}`,
-    name: '测试',
-    maxPlayers: 4,
-    players: new Map(),
-    isDebug: true,
-    createdAt: Date.now(),
-    status: '进行中',
-    config: { name: '测试', charPool: 'all', handSize: 4 },
-    spectators: new Map(),
-    viewGrants: new Map(),
-    pendingViewRequests: new Map(),
-    seats: [null, null, null, null],
-    playerNames: new Map(),
-    passwordHash: null,
-    roomType: 'quick',
-    chatUsage: new Map(),
-    chatHistory: [],
-    pendingSeatSwaps: new Map(),
-  } as unknown as Room;
+  // createRoomShell 等价构造并注册进内存房间表(原为手工对象 + addRoom 旁路)
+  const room = createRoomShell(
+    {
+      name: '测试',
+      maxPlayers: 4,
+      hostId: null,
+      // 刻意保留原手工构造的部分 config(缺 timeoutSec/chat/gameMode),运行时语义不变
+      config: { name: '测试', charPool: 'all', handSize: 4 } as Room['config'],
+      roomType: 'quick',
+      isDebug: true,
+    },
+    { status: '进行中' },
+  );
   trackedRoomIds.push(room.id);
   return room;
 }
@@ -151,7 +144,7 @@ describe('重连 initialView', () => {
 
     const seqAtReconnect = state.seq;
     const fakeSink = new FakeSink();
-    (session as any).playerNames.set('p0', 0);
+    (session as any).playerSeatIndex.set('p0', 0);
     session.reconnectPlayer('p0', fakeSink, 0);
 
     // 应收到 initialView（全量状态）
@@ -180,7 +173,7 @@ describe('pending 倒计时下发', () => {
     expect(state.pendingSlots.size).toBeGreaterThan(0);
 
     const fakeSink = new FakeSink();
-    (session as any).playerNames.set('p0', 0);
+    (session as any).playerSeatIndex.set('p0', 0);
     // 注册 WS 到 room
     const room = (session as any).room as Room;
     room.players.set('p0', fakeSink);
@@ -211,7 +204,7 @@ describe('debug 房间刷新重连', () => {
   let room: Room;
   beforeEach(() => {
     room = createDebugRoom('测试刷新', 2);
-    addRoom(room);
+    // createDebugRoom/createRoomShell 已注册进内存房间表
     session = new GameSession(room, true, 42);
   });
 
@@ -282,7 +275,6 @@ describe('旁观者视图分发', () => {
     room.spectators = new Map();
     room.viewGrants = new Map();
     room.pendingViewRequests = new Map();
-    addRoom(room);
     session = new GameSession(room, true, 42);
   });
 

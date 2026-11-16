@@ -28,7 +28,8 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { pickRandom } from '../util/rng';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界除疠';
@@ -72,12 +73,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>): string | null => {
-      if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (st.phase !== '出牌') return '只能在出牌阶段发动';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       if (usedThisTurn(st, ownerId, SKILL_ID)) return '本回合已使用过除疠';
       const self = st.players[ownerId];
-      if (!self?.alive) return '角色不可用';
 
       // 自身弃一张:任意手牌或装备区
       const cardId = params.cardId as string | undefined;

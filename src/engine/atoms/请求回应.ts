@@ -10,7 +10,7 @@ import { handLimit } from '../rules/hand-limit';
 import { cardResponsePreResolveForTarget } from '../core/card-response-availability';
 
 /** 弃牌保留优先级表(值越大越优先保留,越低越优先被弃)。
- *  引擎超时自动弃置 / AI 启发式(heuristics.cardKeepPriority) / 客户端 GameView
+ *  引擎超时自动弃置 / AI 启发式(heuristics,经 discardKeepPriorityOf) / 客户端 GameView
  *  弃牌预览高亮三方共用同一排序(单一来源,低价值先弃,与手牌位置无关)。
  *  排序采纳 AI 策略:桃最保 → 无懈/闪/无中 → 杀 → 功能锦囊 → 闪电;
  *  装备牌经 discardKeepPriorityOf 的类型分支取 30(最先弃,名表无法枚举全部装备名)。 */
@@ -95,7 +95,7 @@ export const 请求回应: AtomDefinition<{
         // 超时自动弃牌：保留高价值牌（桃/无懈/闪/无中生有），弃掉低优先级牌
         // （装备/闪电/未列出锦囊）。避免盲弃末尾导致关键牌丢失。
         // 排序单一来源:DISCARD_KEEP_PRIORITY(升序取前 excess 张 = 保留优先级最低先弃),
-        // 与 AI 玩家弃牌策略(heuristics.cardKeepPriority)、客户端弃牌预览同表同向。
+        // 与 AI 玩家弃牌策略(heuristics 经 discardKeepPriorityOf)、客户端弃牌预览同表同向。
         const keepPriority = (id: string): number => {
           const card = state.cardMap[id];
           return card ? discardKeepPriorityOf(card) : DISCARD_KEEP_DEFAULT;

@@ -6,6 +6,7 @@
 //   - hookSilentView:标记型时机 atom 的「无 before-hook 则静默」视图工厂。
 //   - removeCardFromHand/removeCardsFromHand/addCardToHand:applyView 的手牌样板
 //     (handCount 计数 + hand 数组按 cardId 精确同步)。
+//   - applyDrawEvent:摸牌 ViewEvent 的 applyView 单点(摸牌 atom 与 移动牌「牌堆→手牌」共用)。
 //   - resolveDiscardEntry:牌入弃牌堆的单点裁决(临时牌销毁/影子卡还原/原样入堆)。
 //   - clearEquipVars:装备离身时清除武器距离 vars(卸下/移出至暂存区 共用)。
 //   - makeCardAskAtom:卡牌询问型等待 atom 工厂(询问杀/询问闪 逐行同构)。
@@ -109,6 +110,34 @@ export function addCardToHand(view: GameView, idx: number, cardId: string | unde
   if (cardId && p.hand) {
     const card = view.cardMap[cardId];
     if (card) p.hand.push(card);
+  }
+}
+
+/** 摸牌 ViewEvent 的 applyView 单点(摸牌 atom 与 移动牌「牌堆→手牌」路径共用):
+ *  handCount += count;可见视角(p.hand 存在)且事件带 cards 时追加进手牌数组;
+ *  deckCount 按摸入张数递减(下限 0)。reshuffled(摸牌 atom 牌堆不足重洗路径)时
+ *  牌堆/弃牌堆计数改用事件携带的权威值覆盖。玩家不在 view 中时整体 no-op。
+ *  count 缺省按 1 计(两处调用点的摸牌事件恒带 count;摸牌 atom validate 要求
+ *  count > 0,缺省分支实际不可达)。 */
+export function applyDrawEvent(view: GameView, event: ViewEvent): void {
+  const p = viewPlayer(view, event.player as number);
+  if (!p) return;
+  const count = (event.count as number) ?? 1;
+  p.handCount += count;
+  // owner 有 cards 字段,加入手牌;others 视角只有计数
+  if (event.cards && p.hand) {
+    p.hand.push(...(event.cards as Card[]));
+  }
+  if (view.zones) {
+    if (event.reshuffled) {
+      // 重洗:牌堆/弃牌堆计数用事件携带的权威值覆盖;newDeckCount 缺省时回退
+      // 「按摸入张数扣减」(deckCount 尚未修改,与旧实现逐字一致)
+      view.zones.deckCount =
+        (event.newDeckCount as number) ?? Math.max(0, view.zones.deckCount - count);
+      view.zones.discardPileCount = (event.newDiscardPileCount as number) ?? 0;
+    } else {
+      view.zones.deckCount = Math.max(0, view.zones.deckCount - count);
+    }
   }
 }
 

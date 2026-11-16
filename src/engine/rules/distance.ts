@@ -118,8 +118,9 @@ export function registerAttackRangeExemptor(
   state: GameState,
   ownerId: number,
   exemptor: AttackRangeExemptor,
-  /** 豁免归属技能名:仅用于 view 侧契约测试归因(工厂宿主文件替别的技能注册时必须传),
-   *  与 VIEW_DISTANCE_EXEMPTIONS 登记名一致;不参与运行时判定。 */
+  /** 豁免归属技能名:静态契约测试归因用(tests/engine/view-distance-sync.test.ts 扫描
+   *  调用点第 4 参字符串字面量做技能名归因;工厂宿主文件替别的技能注册时必须传),
+   *  与 VIEW_DISTANCE_EXEMPTIONS 登记名一致;不参与运行时判定,故函数体内不消费。 */
   skillId?: string,
 ): () => void {
   void skillId;
@@ -149,8 +150,9 @@ export function registerDistanceExemptor(
   state: GameState,
   ownerId: number,
   exemptor: DistanceExemptor,
-  /** 豁免归属技能名:仅用于 view 侧契约测试归因(工厂宿主文件替别的技能注册时必须传),
-   *  与 VIEW_DISTANCE_EXEMPTIONS 登记名一致;不参与运行时判定。 */
+  /** 豁免归属技能名:静态契约测试归因用(tests/engine/view-distance-sync.test.ts 扫描
+   *  调用点第 4 参字符串字面量做技能名归因;工厂宿主文件替别的技能注册时必须传),
+   *  与 VIEW_DISTANCE_EXEMPTIONS 登记名一致;不参与运行时判定,故函数体内不消费。 */
   skillId?: string,
 ): () => void {
   void skillId;

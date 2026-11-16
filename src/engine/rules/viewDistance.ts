@@ -33,8 +33,11 @@ function viewSeatDistance(
   const alive = players.filter((p) => p.alive);
   const n = alive.length;
   if (n <= 1) return 0;
-  const aliveFrom = alive.findIndex((p) => p.name === players[fromIdx]?.name);
-  const aliveTo = alive.findIndex((p) => p.name === players[toIdx]?.name);
+  // 座位定位按 p.index(座次),与引擎侧 rules/distance.ts 的 `p.index === from` 同构。
+  // 不能按 name 匹配:昵称可重名 → findIndex 撞到第一个同名者,距离算错
+  // (view 玩家条目由 projectPlayer 投影,恒携带 index)。
+  const aliveFrom = alive.findIndex((p) => p.index === fromIdx);
+  const aliveTo = alive.findIndex((p) => p.index === toIdx);
   if (aliveFrom < 0 || aliveTo < 0) return Infinity;
   const d = Math.abs(aliveFrom - aliveTo);
   return Math.min(d, n - d);
@@ -206,11 +209,9 @@ export function viewEffectiveDistance(
 /** GameView 上 from 是否能对 to 出杀(基于 from 的攻击范围,徒手默认 1) */
 export function viewCanAttack(
   players: GameView['players'],
-  cardMap: Record<string, unknown>,
   fromIdx: number,
   toIdx: number,
 ): boolean {
-  void cardMap; // 兼容既有调用签名,GameView 投影不需要 cardMap
   if (fromIdx === toIdx) return false;
   // 与引擎 inAttackRange 同构:攻击范围豁免直接放行;
   // 否则 effectiveDistance(含通用距离豁免)≤ 攻击范围。

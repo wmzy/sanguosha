@@ -15,7 +15,7 @@
 // 与 damage-timing / life-timing 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { broadcast, hookSilentView, requirePlayer, viewPlayer } from './_helpers';
+import { broadcast, hookSilentView, requirePlayer, resolveDiscardEntry, viewPlayer } from './_helpers';
 import { locateCard } from '../core/judge-zone';
 
 /** 死亡时机 atom 的公共形状(含可选 killer)。 */
@@ -101,12 +101,19 @@ export const 系统处理牌: AtomDefinition<{ player: number }> = {
     const p = state.players[atom.player];
     p.alive = false;
     // 死亡:手牌、装备和判定区延时锦囊进入弃牌堆(对齐 death.md Ⅰ.a「弃置死亡角色区域里所有的牌」)
-    for (const cardId of p.hand) state.zones.discardPile.push(cardId);
+    // 牌入堆经 resolveDiscardEntry 单点(与 弃置/扣牌/移动牌 同构):手牌可含转化影子卡
+    // (如武圣红牌当杀),直推会让弃牌堆出现 cardMap 查不到的影子 id(重洗后同牌两个实例);
+    // 影子卡还原原卡入堆,结算临时牌销毁。装备同理走单点(正常装备即原样入堆)。
+    for (const cardId of p.hand) {
+      const entry = resolveDiscardEntry(state, cardId);
+      if (entry !== null) state.zones.discardPile.push(entry);
+    }
     p.hand = [];
     for (const slot of Object.keys(p.equipment) as Array<keyof typeof p.equipment>) {
       const equipId = p.equipment[slot];
       if (equipId) {
-        state.zones.discardPile.push(equipId);
+        const entry = resolveDiscardEntry(state, equipId);
+        if (entry !== null) state.zones.discardPile.push(entry);
         delete p.equipment[slot];
       }
     }

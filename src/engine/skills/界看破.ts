@@ -35,6 +35,7 @@ import {
   registerTransformAction,
   type TransformActionOptions,
 } from '../util/skillRuntime';
+import { ownsCard } from '../util/player-query';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -57,9 +58,7 @@ const OPTIONS: TransformActionOptions = {
     const cardId = params.cardId as string;
     const cardIdOk = typeof cardId === 'string';
     const card = cardIdOk ? state.cardMap[cardId] : undefined;
-    const cardInHand = cardIdOk && self.hand.includes(cardId);
-    const cardInEquip =
-      cardIdOk && Object.values(self.equipment).some((id) => id === cardId);
+    const owned = cardIdOk && ownsCard(self, cardId);
     const isBlack = !!card && card.color === '黑';
     // 必须存在无懈可击窗口(否则转化出的无懈无处使用)
     const hasWindow = hasNullifyWindow(state, ownerId);
@@ -73,7 +72,7 @@ const OPTIONS: TransformActionOptions = {
       }
       return false;
     })();
-    const ok = (cardInHand || cardInEquip) && isBlack && hasWindow && !blockedByOther;
+    const ok = owned && isBlack && hasWindow && !blockedByOther;
     return ok ? null : '现在不能使用界看破';
   },
   mount: {

@@ -20,9 +20,9 @@ import type { FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { requireRequestType, defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
 
 /** 缔盟族差异参数。 */
 export interface DimengOptions {
@@ -138,12 +138,9 @@ export function createDimengSkill(opts: DimengOptions) {
         ownerId,
         'use',
         (st: GameState, _params: Record<string, Json>): string | null => {
-          if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-          if (st.phase !== '出牌') return '只能在出牌阶段发动';
-          if (hasBlockingPending(st)) return '当前有未完成的询问';
+          const playError = engineCanPlayNowReason(st, ownerId);
+          if (playError) return playError;
           if (usedThisTurn(st, ownerId, opts.skillKey)) return '本回合已使用过缔盟';
-          const self = st.players[ownerId];
-          if (!self?.alive) return '角色不可用';
           // 至少两名其他存活角色
           const others = st.players.filter((p) => p.alive && p.index !== ownerId);
           if (others.length < 2) return '需要至少两名其他角色';

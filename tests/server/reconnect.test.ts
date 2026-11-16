@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import '../../src/engine/atoms';
 import { GameSession, RECONNECT_GRACE_MS } from '../../src/server/session';
 import { deletePersistedRoom } from '../../src/server/persistence';
-import { addRoom, type Room } from '../../src/server/room';
+import { createRoomShell, type Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';
 import { gameSessions } from '../../src/server/registry';
 import type { ConnectionSink } from '../../src/server/connection';
@@ -24,32 +24,25 @@ afterEach(async () => {
 
 function makeMultiplayerRoom(playerIds: string[]): { room: Room; sinks: Map<string, FakeSink> } {
   const sinks = new Map<string, FakeSink>();
-  const room: Room = {
-    id: `mp-${Math.random().toString(36).slice(2, 8)}`,
-    name: '多人重连测试',
-    maxPlayers: playerIds.length,
-    players: new Map(),
-    status: '等待中',
-    hostId: playerIds[0],
-    readyPlayers: new Set(playerIds),
-    config: { name: '多人重连测试', timeoutSec: 30, charPool: 'all', handSize: 4 },
-    spectators: new Map(),
-    viewGrants: new Map(),
-    pendingViewRequests: new Map(),
-    roomType: 'quick',
-    chatUsage: new Map(),
-    chatHistory: [],
-    seats: playerIds.map((pid) => pid),
-    pendingSeatSwaps: new Map(),
-    passwordHash: null,
-    playerNames: new Map(playerIds.map((pid, i) => [pid, `玩家${i + 1}`])),
-  } as unknown as Room;
   for (const pid of playerIds) {
-    const sink = new FakeSink();
-    sinks.set(pid, sink);
-    room.players.set(pid, sink);
+    sinks.set(pid, new FakeSink());
   }
-  addRoom(room);
+  // createRoomShell 等价构造并注册进内存房间表(原为手工对象 + addRoom 旁路);
+  // seats 显式注入(全员按序占座),maxPlayers 走 overrides(信任注入值,不再 clamp)
+  const room = createRoomShell(
+    {
+      name: '多人重连测试',
+      maxPlayers: playerIds.length,
+      hostId: playerIds[0] ?? null,
+      players: sinks,
+      // 刻意保留原手工构造的部分 config(缺 chat/gameMode),运行时语义不变
+      config: { name: '多人重连测试', timeoutSec: 30, charPool: 'all', handSize: 4 } as Room['config'],
+      roomType: 'quick',
+      playerNames: new Map(playerIds.map((pid, i) => [pid, `玩家${i + 1}`])),
+    },
+    { maxPlayers: playerIds.length, seats: playerIds.map((pid) => pid) },
+  );
+  room.readyPlayers = new Set(playerIds);
   trackedRoomIds.push(room.id);
   return { room, sinks };
 }
@@ -71,8 +64,8 @@ function getState(session: GameSession) {
     .state;
 }
 
-function getPlayerNames(session: GameSession): Map<string, number> {
-  return (session as unknown as { playerNames: Map<string, number> }).playerNames;
+function getPlayerSeatIndex(session: GameSession): Map<string, number> {
+  return (session as unknown as { playerSeatIndex: Map<string, number> }).playerSeatIndex;
 }
 
 function getDisconnectedAt(session: GameSession): Map<string, number> {
@@ -204,7 +197,7 @@ describe('Session 重连 playerId 迁移 (multiplayer)', () => {
     for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
     await sleep(100);
 
-    const playerNames = getPlayerNames(session);
+    const playerNames = getPlayerSeatIndex(session);
     const oldSeat = playerNames.get('p1');
     expect(oldSeat).toBeDefined();
 
@@ -257,7 +250,7 @@ describe('Session 重连 playerId 迁移 (multiplayer)', () => {
     for (let i = 0; i < 300 && state.pendingSlots.size > 0; i++) await sleep(10);
     await sleep(100);
 
-    const playerNames = getPlayerNames(session);
+    const playerNames = getPlayerSeatIndex(session);
     const p1Seat = playerNames.get('p1')!;
 
     // 重连前:p1 在映射中,p1-new 不在
@@ -272,8 +265,8 @@ describe('Session 重连 playerId 迁移 (multiplayer)', () => {
     expect(playerNames.has('p1')).toBe(false);
     expect(playerNames.get('p1-new')).toBe(p1Seat);
 
-    // getPlayerName (公开 API) 也能正确返回
-    expect(session.getPlayerName('p1-new')).toBe(p1Seat);
+    // getSeatOf (公开 API) 也能正确返回
+    expect(session.getSeatOf('p1-new')).toBe(p1Seat);
   }, 15000);
 
   it('旧 playerId 不存在时 reconnectPlayer 返回 false', async () => {
@@ -437,7 +430,7 @@ describe('身份分配座次轮转 (multiplayer 非 debug)', () => {
       await session.startGame();
       const state = getState(session) as GameState;
       const offset = state.seatRotation;
-      const hostSeat = session.getPlayerName('host');
+      const hostSeat = session.getSeatOf('host');
       // 映射正确性:物理座位 0(房主) → 游戏座次 (0+offset)%n(seatRotation 在 startGame 同步设置)
       expect(hostSeat).toBe((0 + offset) % 4);
       // 等 bootstrap 异步推进到抽身份完成(主公身份就绪)
@@ -458,11 +451,11 @@ describe('身份分配座次轮转 (multiplayer 非 debug)', () => {
     const n = 4;
     const pids = ['h', 'a', 'b', 'c'];
     for (let i = 0; i < n; i++) {
-      expect(session.getPlayerName(pids[i])).toBe((i + offset) % n);
+      expect(session.getSeatOf(pids[i])).toBe((i + offset) % n);
     }
     // 主公(游戏座次 0)对应的物理座位 = (n-offset)%n,该玩家应映射到游戏座次 0
     const lordPhysSeat = (n - offset) % n;
-    expect(session.getPlayerName(pids[lordPhysSeat])).toBe(0);
+    expect(session.getSeatOf(pids[lordPhysSeat])).toBe(0);
   }, 15000);
 
   // 回归:seatDisplayNames 曾按 seats 序直接填写引擎玩家名,未跟随 +offset 映射旋转——
@@ -480,7 +473,7 @@ describe('身份分配座次轮转 (multiplayer 非 debug)', () => {
       if ((state.seatRotation ?? 0) === 0) continue; // 该 seed 无偏移,不覆盖目标分支
       covered = true;
       for (const pid of pids) {
-        const g = session.getPlayerName(pid)!;
+        const g = session.getSeatOf(pid)!;
         expect(state.players[g].name).toBe(room.playerNames.get(pid));
       }
     }
@@ -505,7 +498,7 @@ describe('身份分配座次轮转 (multiplayer 非 debug)', () => {
       // 映射必须按 seats(权威座位表)而非连接序
       for (let i = 0; i < n; i++) {
         const pid = room.seats[i]!;
-        expect(session.getPlayerName(pid)).toBe((i + offset) % n);
+        expect(session.getSeatOf(pid)).toBe((i + offset) % n);
         // 显示名与映射一致
         expect(state.players[(i + offset) % n].name).toBe(room.playerNames.get(pid));
       }
@@ -520,32 +513,25 @@ function makeMultiplayerRoomWithSeats(
 ): { room: Room; sinks: Map<string, FakeSink> } {
   const playerIds = seats.filter((s): s is string => s !== null);
   const sinks = new Map<string, FakeSink>();
-  const room: Room = {
-    id: `mp-${Math.random().toString(36).slice(2, 8)}`,
-    name: '空洞座位测试',
-    maxPlayers: seats.length,
-    players: new Map(),
-    status: '等待中',
-    hostId: playerIds[0],
-    readyPlayers: new Set(playerIds),
-    config: { name: '空洞座位测试', timeoutSec: 30, charPool: 'all', handSize: 4 },
-    spectators: new Map(),
-    viewGrants: new Map(),
-    pendingViewRequests: new Map(),
-    roomType: 'quick',
-    chatUsage: new Map(),
-    chatHistory: [],
-    seats: [...seats],
-    pendingSeatSwaps: new Map(),
-    passwordHash: null,
-    playerNames: new Map(playerIds.map((pid, i) => [pid, `玩家${i + 1}`])),
-  } as unknown as Room;
   for (const pid of playerIds) {
-    const sink = new FakeSink();
-    sinks.set(pid, sink);
-    room.players.set(pid, sink);
+    sinks.set(pid, new FakeSink());
   }
-  addRoom(room);
+  // createRoomShell 等价构造并注册进内存房间表;seats(含空洞)显式注入,
+  // maxPlayers 走 overrides(信任注入值,不再 clamp)
+  const room = createRoomShell(
+    {
+      name: '空洞座位测试',
+      maxPlayers: seats.length,
+      hostId: playerIds[0] ?? null,
+      players: sinks,
+      // 刻意保留原手工构造的部分 config(缺 chat/gameMode),运行时语义不变
+      config: { name: '空洞座位测试', timeoutSec: 30, charPool: 'all', handSize: 4 } as Room['config'],
+      roomType: 'quick',
+      playerNames: new Map(playerIds.map((pid, i) => [pid, `玩家${i + 1}`])),
+    },
+    { maxPlayers: seats.length, seats: [...seats] },
+  );
+  room.readyPlayers = new Set(playerIds);
   trackedRoomIds.push(room.id);
   return { room, sinks };
 }
@@ -576,7 +562,7 @@ describe('座位表空洞:占座序号映射 (multiplayer 非 debug)', () => {
         ['D', (2 + offset) % n],
       ];
       for (const [pid, seat] of expected) {
-        expect(session.getPlayerName(pid)).toBe(seat);
+        expect(session.getSeatOf(pid)).toBe(seat);
       }
       // 三个玩家映射互不相同(覆盖全部引擎座次,无空洞错位)
       expect(new Set(expected.map(([, seat]) => seat)).size).toBe(3);
@@ -600,11 +586,11 @@ describe('座位表空洞:占座序号映射 (multiplayer 非 debug)', () => {
       covered = true;
       // offset=0:占座序号即游戏座次 A→0/C→1/D→2。
       // 旧实现按物理下标:A→0%3=0,C→2%3=2,D→3%3=0 —— A 与 D 碰撞在座次 0,座次 1 无人控制
-      expect(session.getPlayerName('A')).toBe(0);
-      expect(session.getPlayerName('C')).toBe(1);
-      expect(session.getPlayerName('D')).toBe(2);
+      expect(session.getSeatOf('A')).toBe(0);
+      expect(session.getSeatOf('C')).toBe(1);
+      expect(session.getSeatOf('D')).toBe(2);
       for (const pid of ['A', 'C', 'D']) {
-        const g = session.getPlayerName(pid)!;
+        const g = session.getSeatOf(pid)!;
         expect(state.players[g].name).toBe(room.playerNames.get(pid));
       }
     }

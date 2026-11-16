@@ -179,7 +179,7 @@ describe('session:出牌阶段倒计时(pending slot 驱动)', () => {
     const playerId = 'p-test';
     const room = (session as unknown as { room: Room }).room;
     room.players.set(playerId, sink);
-    (session as unknown as { playerNames: Map<string, number> }).playerNames.set(playerId, 0);
+    (session as unknown as { playerSeatIndex: Map<string, number> }).playerSeatIndex.set(playerId, 0);
 
     // 模拟 出牌窗口 pending slot
     state.pendingSlots.set(0, {
@@ -266,11 +266,14 @@ describe('session:gameOver 后拦截后续广播(回归:主公阵亡后仍下发
   it('主公阵亡:广播 gameOver,且 gameOver 之后的 onStateChange 不再广播', async () => {
     const state = getState(session);
     const s = session as unknown as {
-      broadcast: (m: ServerMessage) => void;
       broadcastNewState: () => void;
       gameOverHandled: boolean;
     };
-    const broadcastSpy = vi.spyOn(s, 'broadcast');
+    // session.broadcast 私有包装已并入 room.broadcastMessage;经 FakeSink 观察真实下发
+    const sink = (session as unknown as { room: Room }).room.players.get(
+      'fake-player',
+    ) as FakeSink;
+    sink.messages.length = 0;
     const broadcastNewStateSpy = vi.spyOn(s, 'broadcastNewState');
 
     // 主公阵亡,触发 onStateChange(模拟 击杀 atom 末尾的 notifyStateChange)。
@@ -282,19 +285,19 @@ describe('session:gameOver 后拦截后续广播(回归:主公阵亡后仍下发
     }
 
     expect(s.gameOverHandled).toBe(true);
-    expect(broadcastSpy.mock.calls.some((c) => c[0].type === 'gameOver')).toBe(true);
+    expect(sink.messages.some((m) => m.type === 'gameOver')).toBe(true);
     // 本次 onStateChange 已广播了击杀事件本身
     expect(broadcastNewStateSpy).toHaveBeenCalled();
 
     // 模拟杀.execute finally 继续产生的后续 atom(移动牌/结算帧出栈/出牌窗口)
-    broadcastSpy.mockClear();
+    sink.messages.length = 0;
     broadcastNewStateSpy.mockClear();
     state.onStateChange!();
     state.onStateChange!();
 
     // gameOver 后的广播被拦截——不再下发出牌窗口等事件
     expect(broadcastNewStateSpy).not.toHaveBeenCalled();
-    expect(broadcastSpy).not.toHaveBeenCalled();
+    expect(sink.messages).toHaveLength(0);
   });
 
   it('游戏结束后 handleAction 被拒绝(不再 dispatch)', async () => {
@@ -482,7 +485,10 @@ describe('session.resetToLobby:游戏结束后重新进入准备阶段', () => {
     }
     expect(s.gameOverHandled).toBe(true);
 
-    const broadcastSpy = vi.spyOn(s, 'broadcast');
+    const sink = (session as unknown as { room: Room }).room.players.get(
+      'fake-player',
+    ) as FakeSink;
+    sink.messages.length = 0;
 
     // 再来一局:重置到准备阶段
     session.resetToLobby();
@@ -490,7 +496,7 @@ describe('session.resetToLobby:游戏结束后重新进入准备阶段', () => {
     expect(s.gameOverHandled).toBe(false);
     expect(s.room.readyPlayers.size).toBe(0);
     expect(getState(session)).toBeNull();
-    expect(broadcastSpy.mock.calls.some((c) => c[0].type === 'game_reset')).toBe(true);
+    expect(sink.messages.some((m) => m.type === 'game_reset')).toBe(true);
   });
 
   it('resetToLobby 后 gameOverHandled 清除,handleAction 不再被拦截', async () => {
@@ -521,11 +527,11 @@ import type { SSEStreamingApi } from 'hono/streaming';
 /** 固定局标识(测 gameStartedAt/eventEpoch 投影,避免依赖真实时钟) */
 const TEST_EPOCH = 1_720_000_000_000;
 
-/** 构造带重连所需私有状态的 session:state(2 人)+ playerNames('p1'→座次0) + eventEpoch */
+/** 构造带重连所需私有状态的 session:state(2 人)+ playerSeatIndex('p1'→座次0) + eventEpoch */
 function makeReconnectSession(): { session: GameSession; sink: FakeSink } {
   const session = new GameSession(makeRoom(), true, 42);
   setState(session, makeActState());
-  (session as unknown as { playerNames: Map<string, number> }).playerNames.set('p1', 0);
+  (session as unknown as { playerSeatIndex: Map<string, number> }).playerSeatIndex.set('p1', 0);
   (session as unknown as { gameStartedAt: number }).gameStartedAt = TEST_EPOCH;
   const sink = new FakeSink();
   return { session, sink };

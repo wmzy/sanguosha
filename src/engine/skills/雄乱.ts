@@ -31,15 +31,15 @@ import { popFrame, pushFrame } from '../core/frame';
 import {
   registerAction,
   registerBeforeHook,
-  hasBlockingPending,
 } from '../core/skill';
 import { registerSlashUnlimitedProvider, projectSlashUnlimited } from '../rules/slash-quota';
 import { projectTurnUsage } from '../rules/turn-usage';
 import { XIONGLUAN_TARGET_VIEW_KEY } from '../rules/vars-keys';
 import { registerDistanceExemptor } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
-import { slotOf } from '../util/skillRuntime';
+import { slotOf } from '../util/equip-slot';
 
 const SKILL_NAME = '雄乱';
 
@@ -90,11 +90,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>): string | null => {
-      if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (st.phase !== '出牌') return '只能在出牌阶段发动';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       if (st.players[ownerId]?.vars[USED_KEY]) return '雄乱已使用过(限定技)';
-      if (!st.players[ownerId]?.alive) return '玩家不存在或已死亡';
       // 目标:前端 selectTarget 传 target 或 targets[0]
       const target =
         (params.target as number | undefined) ??

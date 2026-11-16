@@ -205,7 +205,7 @@ export function createRoom(
     playerNames: hostName ? new Map([[hostId, hostName]]) : new Map(),
   });
   roomChangeHandler?.(room, 'create');
-  bindPlayerRoom(hostId, room.id);
+  bindPlayerRoom(hostId, room.id, 'player');
   return room;
 }
 
@@ -242,9 +242,17 @@ export function isRoomFull(room: Room): boolean {
 // 路由/SSE 仅在绕过成员函数直改名单的场景(如 SSE registerSink 重挂连接)
 // 显式调用,禁止再手工 set/delete(不变量单点维护)。
 
-/** 记录玩家当前所在房间（加入/入座/转身份成功时由成员函数调用）。 */
-export function bindPlayerRoom(playerId: string, roomId: string): void {
-  playerRoomMap.set(playerId, roomId);
+/** 记录玩家当前所在房间（加入/入座/转身份成功时由成员函数调用）。
+ *  role 省略时(sse.ts 重挂连接不区分身份)沿用同房既有身份,
+ *  避免旁观者的 SSE 重连把映射身份误记为玩家。 */
+export function bindPlayerRoom(
+  playerId: string,
+  roomId: string,
+  role?: 'player' | 'spectator',
+): void {
+  const previous = playerRoomMap.get(playerId);
+  const resolved = role ?? (previous?.roomId === roomId ? previous.role : 'player');
+  playerRoomMap.set(playerId, { roomId, role: resolved });
 }
 
 /** 清除玩家的房间映射（离开/被踢/断线清理时由成员函数调用）。 */
@@ -325,14 +333,10 @@ export function joinRoom(
   clearSpectatorMembership(room, playerId);
   // 重新入会成为正式成员，撤销可能残留的断线宽限条目
   room.recentlyLeft.delete(playerId);
-  bindPlayerRoom(playerId, room.id);
+  bindPlayerRoom(playerId, room.id, 'player');
   // 新入座：分配首个空座位
   if (existingSeat < 0) assignSeat(room, playerId);
   return room;
-}
-
-export function addRoom(room: Room): void {
-  roomList.set(room.id, room);
 }
 
 /** 从房间成员结构中移除一名玩家（players/seats/ready/交换请求）。
@@ -363,8 +367,9 @@ export interface JoinDebugResult {
 /** 调试玩家加入调试房间。
  *  Debug 模式为“一人多连接”:一个浏览器开 N 个 WS 连接,每个代表一个座次。
  *  刷新页面时旧 WS 的 TCP close 有延迟,新连接到达时房间可能已满。
- *  此时踢掉最早加入的连接(插入序 FIFO),让新连接复用其座次 ——
- *  符合“刷新后重新接管所有座次”的语义。 */
+ *  此时踢掉最早占座的连接(座位表下标序,正常流程下即加入序),让新连接复用
+ *  其座次 —— 符合“刷新后重新接管所有座次”的语义。判满与被替者都以权威
+ *  座位表为准,与 players 连接序解耦(幽灵连接不干扰 FIFO 顶替)。 */
 export function joinDebugRoom(
   roomId: string,
   playerId: string,
@@ -375,9 +380,9 @@ export function joinDebugRoom(
   if (room.players.has(playerId)) return null;
 
   let replacedPlayerId: string | undefined;
-  if (room.players.size >= room.maxPlayers) {
-    // 踢掉最早加入的连接,复用其座次
-    replacedPlayerId = room.players.keys().next().value;
+  if (isRoomFull(room)) {
+    // 踢掉最早占座的连接,复用其座次
+    replacedPlayerId = room.seats.find((s): s is string => s !== null);
     if (replacedPlayerId === undefined) return null;
     const oldSink = room.players.get(replacedPlayerId);
     room.players.delete(replacedPlayerId);
@@ -393,7 +398,7 @@ export function joinDebugRoom(
   }
 
   room.players.set(playerId, sink);
-  bindPlayerRoom(playerId, room.id);
+  bindPlayerRoom(playerId, room.id, 'player');
   // 复用已有座位或分配首个空座位（防止重复入座）
   const existingDebugSeat = room.seats.indexOf(playerId);
   if (existingDebugSeat >= 0) {
@@ -447,26 +452,40 @@ export function leaveRoom(
   return room;
 }
 
+/** 踢人失败原因(REST 层据此映射具体 400 文案)。 */
+export type KickFailureReason =
+  | 'roomNotFound'
+  | 'notWaiting'
+  | 'notHost'
+  | 'selfKick'
+  | 'targetNotInRoom';
+
+/** kickPlayer 结果:成功携带房间与被踢成员 sink;失败携带语义化原因。 */
+export type KickPlayerResult =
+  | { ok: true; room: Room; kickedSink: ConnectionSink | null }
+  | { ok: false; reason: KickFailureReason };
+
 /** 房主踢出指定成员（占座玩家或旁观者）。仅等待中允许。
  *  返回被踢成员的连接 sink（供调用方发送 player_kicked 后关闭）。
- *  校验失败返回 null：房间不存在 / 非等待中 / 调用者非房主 / 目标不在房间 / 踢自己。
+ *  失败返回 { ok:false, reason }:房间不存在 / 非等待中 / 调用者非房主 /
+ *  目标不在房间 / 踢自己。
  *  踢出后不转移房主、不销毁房间（房主仍在）。 */
 export function kickPlayer(
   roomId: string,
   hostId: string,
   targetPlayerId: string,
-): { room: Room; kickedSink: ConnectionSink | null } | null {
+): KickPlayerResult {
   const room = roomList.get(roomId);
-  if (!room) return null;
-  if (room.status !== '等待中') return null;
+  if (!room) return { ok: false, reason: 'roomNotFound' };
+  if (room.status !== '等待中') return { ok: false, reason: 'notWaiting' };
   // 仅房主可踢人（调试房间无房主，不允许踢人）
-  if (room.hostId === null || room.hostId !== hostId) return null;
+  if (room.hostId === null || room.hostId !== hostId) return { ok: false, reason: 'notHost' };
   // 不能踢自己
-  if (targetPlayerId === hostId) return null;
+  if (targetPlayerId === hostId) return { ok: false, reason: 'selfKick' };
 
   const isPlayer = room.players.has(targetPlayerId);
   const isSpectator = room.spectators.has(targetPlayerId);
-  if (!isPlayer && !isSpectator) return null;
+  if (!isPlayer && !isSpectator) return { ok: false, reason: 'targetNotInRoom' };
 
   const kickedSink = isPlayer
     ? (room.players.get(targetPlayerId) ?? null)
@@ -481,7 +500,7 @@ export function kickPlayer(
   unbindPlayerRoom(targetPlayerId);
 
   roomChangeHandler?.(room, 'update');
-  return { room, kickedSink };
+  return { ok: true, room, kickedSink };
 }
 
 /** 更新房间配置。仅房主可调用(调试房间无房主时任意座次可调用)。
@@ -496,10 +515,11 @@ export function updateConfig(roomId: string, config: unknown, playerId: string, 
   const normalized = normalizeRoomConfig(config);
   room.config = normalized;
   room.name = normalized.name;
-  // 更新最大人数:不得少于当前在线人数
+  // 更新最大人数:不得少于当前占座人数(占座数是权威口径;
+  // players.size 含幽灵连接,会把合法收缩误判为非法)
   if (maxPlayers !== undefined) {
     const clamped = clampPlayers(maxPlayers);
-    if (clamped < room.players.size) return null;
+    if (clamped < occupiedSeatCount(room)) return null;
     // 调整 seats 数组大小
     if (clamped > room.seats.length) {
       // 扩展:追加空座位
@@ -543,8 +563,15 @@ export function unsetReady(roomId: string, playerId: string): boolean {
 export function allReady(roomId: string): boolean {
   const room = roomList.get(roomId);
   if (!room) return false;
-  if (room.players.size < 2) return false;
-  return room.readyPlayers.size === room.players.size;
+  // 以权威座位表为口径:占座数 ≥ 2 且 readyPlayers 与占座集完全一致
+  // (每个占座玩家都已准备,且无多余条目)。此前按 players.size 比较,
+  // 幽灵连接(有连接无座次/断线残留)会卡死开局。
+  const occupied = room.seats.filter((s): s is string => s !== null);
+  if (occupied.length < 2) return false;
+  return (
+    room.readyPlayers.size === occupied.length &&
+    occupied.every((pid) => room.readyPlayers.has(pid))
+  );
 }
 
 export function setRoomStatus(roomId: string, status: Room['status']): void {
@@ -574,6 +601,29 @@ export function getAllRooms(): Room[] {
   return [...roomList.values()];
 }
 
+/** 房间对外信息投影(RoomInfo 单一来源):getRoomList 与
+ *  GET /api/rooms/:id 均由此派生,保证 playerCount 等口径一致。
+ *  playerCount = 已占座位数(权威口径,与客户端一致,见 occupiedSeatCount);
+ *  players.size 含幽灵连接/断线残留,不得用于对外计数。 */
+export function buildRoomInfo(room: Room): RoomInfo {
+  return {
+    id: room.id,
+    name: room.name,
+    playerCount: occupiedSeatCount(room),
+    maxPlayers: room.maxPlayers,
+    status: room.status,
+    hostId: room.hostId,
+    isDebug: room.isDebug === true,
+    roomType: room.roomType,
+    config: room.config,
+    spectatorCount: room.spectators.size,
+    // seats 在 SSE 断线后仍保留(仅 leaveRoom 清理),用于判断"玩家是否在房间中"
+    playerIds: room.seats.filter((s): s is string => s !== null),
+    hasPassword: room.passwordHash !== null,
+    playerNames: Object.fromEntries(room.playerNames),
+  };
+}
+
 export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
   const result: RoomInfo[] = [];
   for (const room of roomList.values()) {
@@ -586,38 +636,30 @@ export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
     // 无人可重连,不展示在列表中,避免用户看到无法进入的房间。
     // 普通房间不自动清理,必须保持可见以便房主管理。
     if (room.roomType !== 'normal' && room.status !== '等待中' && room.players.size === 0 && room.seats.every((s) => s === null)) continue;
-    result.push({
-      id: room.id,
-      name: room.name,
-      playerCount: room.players.size,
-      maxPlayers: room.maxPlayers,
-      status: room.status,
-      hostId: room.hostId,
-      isDebug: room.isDebug === true,
-      roomType: room.roomType,
-      config: room.config,
-      spectatorCount: room.spectators.size,
-      // seats 在 SSE 断线后仍保留(仅 leaveRoom 清理),用于判断"玩家是否在房间中"
-      playerIds: room.seats.filter((s): s is string => s !== null),
-      hasPassword: room.passwordHash !== null,
-      playerNames: Object.fromEntries(room.playerNames),
-    });
+    result.push(buildRoomInfo(room));
   }
   return result;
 }
 
+/** 按玩家查所在房间:查 playerRoomMap 后校验成员身份(房间仍存在且仍在
+ *  players/spectators 名单)。指向已销毁房间或身份已被清理的残留条目顺手
+ *  懒清理,保证 map 与房间名单不漂移(消灭线性扫描 + map 的双机制)。 */
 export function findRoomByPlayerId(playerId: string): Room | null {
-  for (const room of roomList.values()) {
-    if (room.players.has(playerId) || room.spectators.has(playerId)) return room;
+  const entry = playerRoomMap.get(playerId);
+  if (!entry) return null;
+  const room = roomList.get(entry.roomId);
+  if (!room || !(room.players.has(playerId) || room.spectators.has(playerId))) {
+    playerRoomMap.delete(playerId);
+    return null;
   }
-  return null;
+  return room;
 }
 
 /** SSE 重连补座次：等待中 + 非调试 + 玩家不在 seats + 有空座 → 补到首个空座。
  *  返回是否补了座(用于触发 room_state 广播)。
  *  修复服务器重启后 players 满 / seats 空的幽灵连接:正常流程先 joinRoom(分配座次)
  *  再连 SSE,但重启后 DB 不恢复 seats,客户端重连只走 SSE 时 players.set 却不分配座次,
- *  导致 joinRoom/switchRole 按 players.size 判满时锁死房间。 */
+ *  导致 joinRoom/switchRole 按占座数判满时错判房间状态。 */
 export function ensureSeatOnReconnect(room: Room, playerId: string): boolean {
   if (room.status !== '等待中' || room.isDebug) return false;
   if (room.seats.indexOf(playerId) >= 0) return false;
@@ -695,9 +737,11 @@ export function setRoomChangeHandler(
   roomChangeHandler = fn;
 }
 
-/** 外部直接改 Room 字段后(如 rest.ts 改 passwordHash)触发持久化/广播。 */
-export function notifyRoomChanged(room: Room, action: 'create' | 'update' | 'delete'): void {
-  roomChangeHandler?.(room, action);
+/** 设置/清除房间进房密码(哈希由调用方生成,room.passwordHash 永不存明文),
+ *  并触发持久化变更通知。房主/等待中校验由 REST 层完成。 */
+export function setRoomPassword(room: Room, passwordHash: string | null): void {
+  room.passwordHash = passwordHash;
+  roomChangeHandler?.(room, 'update');
 }
 
 /** 用户改名后同步所有房间内的显示名并广播 room_state(个人页改名 → 房间内实时生效)。 */
@@ -840,7 +884,7 @@ export function joinAsSpectator(
   if (displayName) room.playerNames.set(spectatorId, displayName);
   // 重新入房成为正式旁观，撤销可能残留的断线宽限条目
   room.recentlyLeft.delete(spectatorId);
-  bindPlayerRoom(spectatorId, room.id);
+  bindPlayerRoom(spectatorId, room.id, 'spectator');
   return room;
 }
 
@@ -884,7 +928,7 @@ export function switchRole(
     // 完整移除玩家身份（players/seats/ready/交换请求）
     removePlayerMembership(room, playerId);
     room.spectators.set(playerId, sink);
-    bindPlayerRoom(playerId, room.id);
+    bindPlayerRoom(playerId, room.id, 'spectator');
     // 房主切旁观仍保留 hostId（管理权限不变）
     return { room, success: true };
   } else {
@@ -902,7 +946,7 @@ export function switchRole(
     }
     clearSpectatorMembership(room, playerId);
     room.players.set(playerId, sink);
-    bindPlayerRoom(playerId, room.id);
+    bindPlayerRoom(playerId, room.id, 'player');
     // 占据指定座位（或首个空座位）
     assignSeat(room, playerId, seat);
     return { room, success: true };

@@ -17,7 +17,7 @@ import type { HookResult, Skill, GameState } from '../types';
 import { registerBeforeHook } from '../core/skill';
 import { ABOLISH_PREFIX } from './决堰';
 import type { SkillModule } from '../types';
-import { slotOf } from '../util/skillRuntime';
+import { slotOf } from '../util/equip-slot';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

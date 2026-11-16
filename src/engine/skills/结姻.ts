@@ -16,8 +16,9 @@ import type { GameState, FrontendAPI, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import { getGender } from '../data/character-meta';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -68,12 +69,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'use',
     (state: GameState, params: Record<string, Json>) => {
-      const self = state.players[ownerId];
-      if (!self?.alive) return '角色不可用';
       // 通用合法条件:自己回合 + 出牌阶段 + 无阻塞 pending
-      if (state.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (state.phase !== '出牌') return '不是出牌阶段';
-      if (hasBlockingPending(state)) return '当前有未回应的询问';
+      const playError = engineCanPlayNowReason(state, ownerId);
+      if (playError) return playError;
+      const self = state.players[ownerId];
       // 限一次/回合
       if (usedThisTurn(state, ownerId, '结姻')) return '本回合已使用过结姻';
       // 手牌不少于 2

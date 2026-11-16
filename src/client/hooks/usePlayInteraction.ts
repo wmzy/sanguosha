@@ -31,6 +31,7 @@ import type {
   Json,
   DistributePrompt,
   PendingView,
+  TargetFilter,
 } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import {
@@ -53,12 +54,14 @@ import {
   selectTargetCandidates,
   distributeAllocateCandidates,
   selectedTargetNamesOf,
+  effectiveTargetCard,
   targetConstraintCard,
+  targetShapeFor,
   usedCardNameOf,
   promptTargetBounds,
 } from '../utils/gameViewHelpers';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
-import { targetCandidates, targetSelectionBounds, toggleTargetSelection, validateTargetSelection } from '../../engine/rules/target-selection';
+import { targetCandidates, targetSelectionBounds, toggleTargetSelection } from '../../engine/rules/target-selection';
 import { useDiscardInteraction } from './usePlayInteraction/discard';
 import { useRespondInteraction } from './usePlayInteraction/respond';
 import {
@@ -255,6 +258,9 @@ export function usePlayInteraction(
   const [pendingSkillAction, setPendingSkillAction] = useState<{
     action: SkillActionDef;
     params: Record<string, Json>;
+    /** 进入选目标模式时已捕获的变体代价牌(强袭「先选武器→点按钮→选目标」顺序:
+     *  入口即清空 selectedCardId,提交时重填拿不到,须快照于此)。 */
+    cardId?: string;
   } | null>(null);
   const [selectedKillTarget, setSelectedKillTarget] = useState<string | null>(null);
   // 多目标(铁索连环 max>=2):点击目标累加为集合,与单选/槽位路径互斥
@@ -377,11 +383,9 @@ export function usePlayInteraction(
   } = distribute;
 
   // ─── state 重置 effects(外壳自有选中态;子 hook 的重置 effect 已随迁)───
+  // 换牌时清空槽位 B 目标与多目标集合(与 selectedKillTarget 同源,覆盖所有选牌/重置路径)
   useEffect(() => {
     setSelectedKillTarget(null);
-  }, [selectedCardId]);
-  // 换牌时清空多目标集合(与 selectedKillTarget 同源,覆盖所有选牌/重置路径)
-  useEffect(() => {
     setSelectedMultiTargets([]);
   }, [selectedCardId]);
 
@@ -461,37 +465,34 @@ export function usePlayInteraction(
     if (!selectedCardId) return null;
     const card = perspectiveHand.find((c) => c.id === selectedCardId);
     if (!card || !selectedUseAction || !playRules) return null;
-    // rules 与上方 playRules 同源派生(selectedUseAction 非 null ⇒ playRules 非 null),
-    // 不再重复 derivePlayRules
-    const rules = playRules;
-    let canPlay: boolean;
+    // 可提交性单判据:与 handlePlayCard 完全相同的 buildPlayParams(传 view 时内部
+    // 逐目标 validateTargetSelection)。此前这里另写一套 validate 手动校验,与提交
+    // 路径双轨,槽位/多目标的取参口径漂移即「按钮亮但提交被拒」。
+    const canPlay = buildPlayParams(
+      view.players,
+      perspectiveIdx,
+      card,
+      playRules,
+      selectedTarget,
+      selectedKillTarget,
+      selectedMultiTargets,
+      view,
+    ) !== null;
     let targetLabel: string;
-    if (rules.hasSlots) {
-      canPlay = !!selectedTarget && !!selectedKillTarget;
+    if (playRules.hasSlots) {
       targetLabel =
-        selectedTarget && selectedKillTarget
-          ? ` → A=${selectedTarget} B=${selectedKillTarget}`
-          : ' (请选 A/B 两个目标)';
-    } else if (rules.selfTarget) {
-      canPlay = true;
+        canPlay ? ` → A=${selectedTarget} B=${selectedKillTarget}` : ' (请选 A/B 两个目标)';
+    } else if (playRules.selfTarget) {
       targetLabel = '';
-    } else if (rules.multiTarget) {
-      const min = rules.targetFilter?.min ?? 1;
-      canPlay = selectedMultiTargets.length >= min;
+    } else if (playRules.multiTarget) {
       targetLabel =
         selectedMultiTargets.length > 0 ? ` → ${selectedMultiTargets.join('、')}` : ' (请选目标)';
     } else {
-      canPlay = !rules.needsTarget || !!selectedTarget;
       targetLabel = selectedTarget
         ? ` → ${selectedTarget}`
-        : rules.needsTarget
+        : playRules.needsTarget
           ? ' (请选目标)'
           : '';
-    }
-    if (rules.targetFilter && !rules.selfTarget) {
-      const names = rules.hasSlots || rules.multiTarget ? selectedMultiTargets : selectedTarget ? [selectedTarget] : [];
-      canPlay = validateTargetSelection(view, perspectiveIdx, rules.targetFilter,
-        names.map((name) => view.players.findIndex((player) => player.name === name)), card);
     }
     return { canPlay, targetLabel };
   })();
@@ -522,13 +523,14 @@ export function usePlayInteraction(
   /** 变体声明的额外代价牌(如强袭·弃武器需要一张武器牌)填入 params.cardId:
    *  优先当前选中的手牌(须满足变体 cardFilter),否则自己的装备区武器。
    *  装备区解析与无头枚举(costCardsOf/ownMaterialCards)共享 ownEquipCards。
-   *  PlayerCardLarge 传入的 extraParams 可能是副本,故变体定位先按引用、再按内容。 */
+   *  变体定位只按 params 引用:PlayerCardLarge 传入的 extraParams 即
+   *  prompt.paramVariants[i].params 本体(skillActionVariants 保留引用),本 hook 的
+   *  待定选目标模式也存该本体引用(见 handleSkillAction)——引用断链时不补 cardId,
+   *  由引擎 validate 显式拒绝(不再做 JSON.stringify 内容兜底)。 */
   const fillVariantCostCard = useCallback(
     (prompt: ActionPrompt, extra: Record<string, Json>, params: Record<string, Json>): void => {
       if (prompt.type !== 'selectTarget' || !prompt.paramVariants) return;
-      const variant =
-        prompt.paramVariants.find((v) => v.params === extra) ??
-        prompt.paramVariants.find((v) => JSON.stringify(v.params) === JSON.stringify(extra));
+      const variant = prompt.paramVariants.find((v) => v.params === extra);
       const filter = variant?.cardFilter;
       if (!filter || params.cardId !== undefined) return;
       const selected = selectedCardId
@@ -545,14 +547,20 @@ export function usePlayInteraction(
   /** 提交 selectTarget/choosePlayer 型主动技(目标名 → 座次)。
    *  单选(max<=1)技能在点座位时即提交;当前全部 selectTarget/choosePlayer 均 max:1,单选提交。
    *  target 与 targets 同时携带:反间/攻心/雄乱 读 targets(单选也须为长度 1 数组),
-   *  挑衅/强袭/激将 读 target。 */
+   *  挑衅/强袭/激将 读 target。
+   *  @param extra 变体 params 引用(paramVariants[i].params 本体,供 fillVariantCostCard
+   *         按引用定位变体) */
   const submitSkillTarget = useCallback(
-    (action: SkillActionDef, targetName: string, extra: Record<string, Json>) => {
+    (action: SkillActionDef, targetName: string, extra: Record<string, Json>, capturedCardId?: string) => {
       const idx = nameToIndex(targetName);
       if (idx < 0) return;
       const params: Record<string, Json> = { ...extra, target: idx, targets: [idx] };
       // 变体声明的代价牌(强袭·弃武器):提交时兜底补 params.cardId ——
-      // 覆盖「先点技能按钮、后选武器牌、再点目标」的顺序。
+      // 覆盖「先点技能按钮、后选武器牌、再点目标」的顺序;
+      // 「先选武器→点按钮」顺序下选中牌已被清空,用进入 pending 模式时的快照。
+      if (params.cardId === undefined && capturedCardId !== undefined) {
+        params.cardId = capturedCardId;
+      }
       fillVariantCostCard(action.prompt, extra, params);
       send(action.skillId, action.actionType, params);
       setSelectedTarget(null);
@@ -698,7 +706,12 @@ export function usePlayInteraction(
         const p = pendingSkillAction.action.prompt;
         const { max: maxTargets } = promptTargetBounds(p);
         if (maxTargets <= 1) {
-          submitSkillTarget(pendingSkillAction.action, name, pendingSkillAction.params);
+          submitSkillTarget(
+            pendingSkillAction.action,
+            name,
+            pendingSkillAction.params,
+            pendingSkillAction.cardId,
+          );
           return;
         }
       }
@@ -715,7 +728,14 @@ export function usePlayInteraction(
       }
       if (playRules?.targetFilter && (playRules.hasSlots || playRules.multiTarget)) {
         const current = selectedMultiTargets.map((target) => view.players.findIndex((player) => player.name === target));
-        const card = selectedCard ? { ...selectedCard, name: transformWrapperName ?? selectedCard.name } : undefined;
+        // use 牌约束与 isTargetable 同源(effectiveTargetCard):转化技取产出牌名
+        // (transformWrapperName 随选牌方向),普通出牌按「use action 的 skillId===
+        // 选中牌名」认定,技能代价牌不作使用牌解释 → undefined。
+        const card = effectiveTargetCard(
+          selectedCard,
+          selectedTargetFilter,
+          usedCardNameOf(transformWrapperName, selectedUseAction, selectedCard),
+        );
         const next = toggleTargetSelection(view, perspectiveIdx, playRules.targetFilter, current, idx, card);
         const names = next.map((target) => view.players[target].name);
         setSelectedMultiTargets(names);
@@ -737,6 +757,8 @@ export function usePlayInteraction(
       respondTargetFilter,
       toggleRespondSeatTarget,
       playRules,
+      selectedTargetFilter,
+      selectedUseAction,
       selectedMultiTargets,
       selectedCard,
       transformWrapperName,
@@ -755,23 +777,53 @@ export function usePlayInteraction(
       extraParams?: Record<string, Json>,
     ) => {
       const { skillId, actionType, prompt } = action;
-      const params: Record<string, Json> = { ...(extraParams ?? {}) };
+      // extra 保留变体 params 本体引用(供 fillVariantCostCard 按引用定位变体);
+      // params 是提交用的浅拷贝。
+      const extra = extraParams ?? {};
+      const params: Record<string, Json> = { ...extra };
+      /** 转化技进入选牌模式(useCard 与 useCardAndTarget 两分支同构):wrapperName 由
+       *  transform 对一张代表性匹配牌求值(无匹配牌时用技能名兜底),差异仅在目标
+       *  约束(useCardAndTarget 携带产出牌 targetFilter,useCard 无)。 */
+      const enterTransformMode = (
+        cardFilter: (card: Card) => boolean,
+        comboFilter: ((cards: Card[]) => boolean) | undefined,
+        minCards: number,
+        maxCards: number,
+        targetFilter?: TargetFilter,
+      ): void => {
+        const sample = perspectiveHand.find((c) => cardFilter(c));
+        setTransformMode({
+          skillId,
+          actionType,
+          cardFilter,
+          comboFilter,
+          transform: action.transform!,
+          wrapperName: sample ? action.transform!(sample).name : skillId,
+          minCards,
+          maxCards,
+          selectedCardIds: [],
+          ...(targetFilter ? { targetFilter } : {}),
+        });
+        setSelectedCardId(null);
+        setSelectedTarget(null);
+      };
       // 变体声明的代价牌(强袭·弃武器):点击变体按钮时已选中武器牌 → 立即带上 cardId
-      fillVariantCostCard(prompt, extraParams ?? {}, params);
+      fillVariantCostCard(prompt, extra, params);
       // selectTarget/choosePlayer 型主动技:需要目标。无目标时先进入选目标模式
       // (座位环按 prompt 的 targetFilter/filter 高亮),选好目标再点按钮提交——
       // 与出牌(选牌→选目标→出牌)同一交互范式。此前无目标直接 return,按钮点了没反应。
       if (prompt.type === 'selectTarget' || prompt.type === 'choosePlayer') {
         const { max: maxTargets } = promptTargetBounds(prompt);
         if (!selectedTarget) {
-          // 未选目标:进入选目标模式(座位环按 prompt 的 targetFilter/filter 高亮)
-          setPendingSkillAction({ action, params });
+          // 未选目标:进入选目标模式(存变体 params 引用,点座位提交时按它定位变体;
+          // cardId 为按钮点击时已填的代价牌快照——下方 setSelectedCardId(null) 后仍可提交)
+          setPendingSkillAction({ action, params: extra, cardId: params.cardId as string | undefined });
           setSelectedCardId(null);
           return;
         }
         if (maxTargets <= 1) {
           // 已选目标 + 单选技能:直接提交(与点座位即提交同一路径)
-          submitSkillTarget(action, selectedTarget, params);
+          submitSkillTarget(action, selectedTarget, extra);
           return;
         }
         setPendingSkillAction(null);
@@ -782,24 +834,12 @@ export function usePlayInteraction(
           // 转化技(倾国黑牌当闪/看破黑牌当无懈):进入转化选牌模式,而非直接提交 cardId——
           // 主 action 是转化后的牌名(闪/无懈可击),牌面由影子卡承载。
           if (action.transform) {
-            const minCards = prompt.cardFilter.min ?? 1;
-            const maxCards = prompt.cardFilter.max ?? 1;
-            const filter = prompt.cardFilter.filter;
-            // wrapperName 由 transform 对一张代表性匹配牌求值(无匹配牌时用技能名兜底)
-            const sample = filter ? perspectiveHand.find((c) => filter(c)) : perspectiveHand[0];
-            setTransformMode({
-              skillId,
-              actionType,
-              cardFilter: filter ?? (() => true),
-              comboFilter: prompt.cardFilter.comboFilter,
-              transform: action.transform,
-              wrapperName: sample ? action.transform(sample).name : skillId,
-              minCards,
-              maxCards,
-              selectedCardIds: [],
-            });
-            setSelectedCardId(null);
-            setSelectedTarget(null);
+            enterTransformMode(
+              prompt.cardFilter.filter ?? (() => true),
+              prompt.cardFilter.comboFilter,
+              prompt.cardFilter.min ?? 1,
+              prompt.cardFilter.max ?? 1,
+            );
             return;
           }
           if (!selectedCardId) return;
@@ -814,28 +854,15 @@ export function usePlayInteraction(
           params.targets = [params.target];
           break;
         case 'useCardAndTarget':
-          if (action.transform) {
-            if (prompt.cardFilter?.filter) {
-              const sample = perspectiveHand.find((c) => prompt.cardFilter.filter!(c));
-              const wrapperName = sample ? action.transform(sample).name : action.skillId;
-              const minCards = prompt.cardFilter.min ?? 1;
-              const maxCards = prompt.cardFilter.max ?? 1;
-              setTransformMode({
-                skillId,
-                actionType,
-                cardFilter: prompt.cardFilter.filter,
-                comboFilter: prompt.cardFilter.comboFilter,
-                transform: action.transform,
-                wrapperName,
-                minCards,
-                maxCards,
-                selectedCardIds: [],
-                targetFilter: prompt.targetFilter,
-              });
-              setSelectedCardId(null);
-              setSelectedTarget(null);
-              return;
-            }
+          if (action.transform && prompt.cardFilter?.filter) {
+            enterTransformMode(
+              prompt.cardFilter.filter,
+              prompt.cardFilter.comboFilter,
+              prompt.cardFilter.min ?? 1,
+              prompt.cardFilter.max ?? 1,
+              prompt.targetFilter,
+            );
+            return;
           }
           // 需要选中牌 + 目标。若已选牌但未选目标,设为 altActionOverride:
           // 后续选目标后,selectedUseAction 会走此 action 提交(handlePlayCard)。
@@ -849,17 +876,17 @@ export function usePlayInteraction(
             const idx = nameToIndex(selectedTarget);
             if (idx < 0) return;
             params.cardId = selectedCardId;
-            const trickCard = perspectiveHand.find((c) => c.id === selectedCardId);
-            if (trickCard?.type === '锦囊牌' && trickCard.trickSubtype === '延时锦囊') {
-              params.target = idx;
-            } else {
-              params.targets = [idx];
-            }
+            // 延时锦囊 validate 用单数 target;其他牌用 targets 数组(targetShapeFor 与
+            // buildPlayParams 单点同源)
+            targetShapeFor(params, selectedCard ?? undefined, idx);
           }
           break;
         case 'choosePlayer':
           if (!selectedTarget) return;
           params.target = nameToIndex(selectedTarget);
+          // targets 数组同时携带(与 selectTarget 分支同构):读 targets 的
+          // choosePlayer 引擎路径只发 target 会恒拒。
+          params.targets = [params.target];
           break;
         case 'distribute':
           setDistributeMode({ skillId, actionType, prompt });
@@ -887,6 +914,7 @@ export function usePlayInteraction(
       perspectiveHand,
       send,
       submitSkillTarget,
+      fillVariantCostCard,
       setTransformMode,
       setDistributeMode,
     ],

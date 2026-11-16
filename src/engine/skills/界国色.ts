@@ -28,9 +28,10 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
+import { ownsCard } from '../util/player-query';
 
 const TRICK_NAME = '乐不思蜀';
 
@@ -47,15 +48,6 @@ const TRICK_TARGET_KEY = '界国色/trickTarget';
 /** 界国色可用牌:方块(♦)牌(手牌或装备区) */
 function isGuoseCard(card: Card | undefined): boolean {
   return !!card && card.suit === '♦';
-}
-
-/** 玩家是否持有某张牌(手牌或装备区)。 */
-function ownsCard(
-  self: { hand: string[]; equipment: Partial<Record<string, EquipSlot | string>> },
-  cardId: string,
-): boolean {
-  if (self.hand.includes(cardId)) return true;
-  return Object.values(self.equipment).some((id) => id === cardId);
 }
 
 /** 场上是否存在乐不思蜀 */
@@ -83,12 +75,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, _params: Record<string, Json>): string | null => {
-      if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
-      if (st.phase !== '出牌') return '只能在出牌阶段使用';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       if (usedThisTurn(st, ownerId, '界国色')) return '本回合已使用过界国色';
       const self = st.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
       // 至少一张方片牌(手牌或装备区)
       const ownedIds = [
         ...self.hand,

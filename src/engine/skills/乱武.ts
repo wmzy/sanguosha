@@ -33,9 +33,9 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';
-import { askResponse, registerRespondForAllSeats } from '../util/skillRuntime';
+import { askResponse, registerRespondForAllSeats, engineCanPlayNowReason } from '../util/skillRuntime';
 
 const USED_KEY = '乱武/used';
 const CHOICE_VAR = '乱武/出杀';
@@ -70,11 +70,9 @@ export function nearestOthers(state: GameState, p: number): number[] {
 
 /** use action 前置校验(标/界逐字相同;限定技标记共享 player.vars['乱武/used'])。 */
 export function validateLuanwuUse(st: GameState, ownerId: number): string | null {
-  if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-  if (st.phase !== '出牌') return '只能在出牌阶段发动';
-  if (hasBlockingPending(st)) return '当前有未完成的询问';
+  const playError = engineCanPlayNowReason(st, ownerId);
+  if (playError) return playError;
   if (st.players[ownerId]?.vars[USED_KEY]) return '乱武已使用过(限定技)';
-  if (!st.players[ownerId]?.alive) return '玩家不存在或已死亡';
   // 至少需要 1 名其他存活角色才有意义
   const others = st.players.filter((p) => p.alive && p.index !== ownerId);
   if (others.length === 0) return '场上没有其他角色';

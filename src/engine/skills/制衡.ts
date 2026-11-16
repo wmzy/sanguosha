@@ -11,6 +11,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import { normalizeCardIds } from '../util/skillRuntime';
+import { ownsCard } from '../util/player-query';
 
 /** createZhihengSkill 可注入差异。 */
 export interface ZhihengOptions {
@@ -49,9 +50,7 @@ export function createZhihengSkill(opts: ZhihengOptions) {
         if (!self) return 'player not found';
         // 检查所有 cardId 在手牌或装备区中(手牌+装备均可弃)
         for (const cardId of cardIds) {
-          const inHand = self.hand.includes(cardId);
-          const inEquip = Object.values(self.equipment).includes(cardId);
-          if (!inHand && !inEquip) return '牌不在手牌或装备区中';
+          if (!ownsCard(self, cardId)) return '牌不在手牌或装备区中';
         }
         return null;
       },

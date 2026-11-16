@@ -4,7 +4,7 @@
 // 用 state.rngSeed 派生 RNG(推进后写回),保证重放确定性。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { broadcast } from './_helpers';
-import { createRng } from '../util/rng';
+import { createRng, shuffle } from '../util/rng';
 
 export const 重洗: AtomDefinition<Record<string, never>> = {
   type: '重洗',
@@ -13,13 +13,9 @@ export const 重洗: AtomDefinition<Record<string, never>> = {
     return null;
   },
   apply(state) {
-    const combined = [...state.zones.deck, ...state.zones.discardPile];
     const rng = createRng(state.rngSeed);
-    for (let i = combined.length - 1; i > 0; i--) {
-      const j = rng.nextInt(i + 1);
-      [combined[i], combined[j]] = [combined[j], combined[i]];
-    }
-    state.zones.deck = combined;
+    // Fisher–Yates 统一走 util/rng.shuffle(泛型 copy + 交换;RNG 消耗序列与原 inline 循环一致)
+    state.zones.deck = shuffle([...state.zones.deck, ...state.zones.discardPile], rng);
     state.zones.discardPile = [];
     state.rngSeed = rng.getState();
   },

@@ -19,10 +19,11 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界帷幕'(避开标帷幕冲突);
 //   内部 Skill.name = '帷幕'(OL 官方技能名,玩家可见)。
-import type { Card, HookResult, Skill, GameState } from '../types';
+import type { HookResult, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
 import { registerBeforeHook } from '../core/skill';
+import { isBlackTrick } from './帷幕';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界帷幕';
@@ -37,11 +38,6 @@ export function createSkill(id: string, ownerId: number): Skill {
       '锁定技,你不能成为黑色锦囊牌的目标;你防止回合内受到的伤害并摸所防止伤害值两倍数量的牌',
     isLocked: true,
   };
-}
-
-/** 判定一张卡是否为黑色锦囊牌 */
-function isBlackTrick(card: Card | undefined): boolean {
-  return !!card && card.type === '锦囊牌' && card.color === '黑';
 }
 
 /** 从顶帧 params 取锦囊卡 id(各锦囊 use execute pushFrame 时 params 携带 cardId) */

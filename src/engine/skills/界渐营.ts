@@ -27,7 +27,7 @@
 import type { ActionContext, Card, FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { setPlayerVarUsage } from '../rules/turn-usage';
-import { registerAfterHook, hasBlockingPending } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import { getCardEffect } from './cards';
 import { TRANSFORM_ACTION_PREFIX } from '../util/declaredActionType';
@@ -35,6 +35,7 @@ import type { SkillModule } from '../types';
 import {
   askConfirm,
   defineConfirmAction,
+  engineCanPlayNowReason,
   mountTransformAction,
   registerConfirmRespond,
   registerTransformAction,
@@ -130,11 +131,10 @@ function transformOptionsOf(outputName: string): TransformActionOptions {
     actionType: `${TRANSFORM_ACTION_PREFIX}${outputName}`,
     // validate 逐条件独立文案,故全量自定义
     validate: (st, ownerId, params): string | null => {
-      if (!inMyPlayPhase(st, ownerId)) return '只能在你的出牌阶段发动';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       if (transformUsed(st, ownerId)) return '本阶段渐营转化已用过';
       const self = st.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
       const cardId = params.cardId as string | undefined;
       if (typeof cardId !== 'string') return '需要选择一张牌';
       if (!self.hand.includes(cardId)) return '牌不在手牌中';

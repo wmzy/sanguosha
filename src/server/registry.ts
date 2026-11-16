@@ -9,8 +9,10 @@ import { register as registerLifecycle } from './resourceRegistry';
 // 游戏会话管理(进程级单例,按 roomId 索引)
 export const gameSessions = new Map<string, GameSession>();
 
-// 玩家到房间的映射(进程级单例)
-export const playerRoomMap = new Map<string, string>();
+// 玩家到房间的映射(进程级单例):playerId → { roomId, role }。
+// 全部写入收敛到 room.ts 的 bindPlayerRoom/unbindPlayerRoom(成员函数自动维护),
+// 查询走 room.ts 的 findRoomByPlayerId(map 查询 + 成员身份校验)。
+export const playerRoomMap = new Map<string, { roomId: string; role: 'player' | 'spectator' }>();
 
 registerLifecycle('gameSessions', gameSessions, () => {
   gameSessions.clear();

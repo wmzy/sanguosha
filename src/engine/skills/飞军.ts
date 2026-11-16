@@ -31,10 +31,10 @@ import type {
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
 import { BINGLUE_TARGETS_KEY, getBinglueTargets } from '../rules/vars-keys';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
 
 // 请求类型(requestType 前缀 = skillId,见 T1)
 const OPTION_RT = '飞军/option'; // owner:选择效果
@@ -93,12 +93,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>): string | null => {
-      if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
-      if (st.phase !== '出牌') return '只能在出牌阶段使用';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       if (usedThisTurn(st, ownerId, '飞军')) return '本回合已使用过飞军';
       const self = st.players[ownerId];
-      if (!self?.alive) return '你已死亡';
       const cardId = params.cardId as string | undefined;
       if (!cardId) return '请选择要弃置的牌';
       if (!self.hand.includes(cardId)) return '弃置的牌必须在手牌中';

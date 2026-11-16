@@ -68,7 +68,6 @@ export function isHookSuppressed(
 ): boolean {
   if (ownerId < 0) return false; // TARGET_SYSTEM / TARGET_BROADCAST
   // 锁定技/防具/武器(isLocked=true)永不压制——从实例化时写入的元数据查。
-  // 替代旧 getCachedSkillModule 反射查询(消除 core→lifecycle 数据依赖)。
   if (isSkillLocked(state, skillId)) return false;
   return suppressionRegistry.someAll(state, (fn) => fn(state, ownerId, skillId));
 }

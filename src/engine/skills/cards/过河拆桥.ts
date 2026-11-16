@@ -2,12 +2,13 @@
 //
 // resolve: 询问无懈可击 →（若未被抵消）弹选牌面板弃置目标一张牌。
 // target.kind='other': 任意其他角色（无距离限制）。
+// respond/resolve 走 cards/_pickPanel 共享实现（顺手牵羊同构，obtain/discard 差异注入）。
 
 import type { Card } from '../../types';
-import { runPickTargetCardPanel } from '../../flows/pick-card-panel';
-import type { CardEffect, ResolveCtx } from '../../types';
-import { PICK_RESULT_KEY } from '../../rules/vars-keys';
-import { requireRequestType } from '../../util/skillRuntime';
+import { createPickPanelResolve, createPickPanelRespond } from './_pickPanel';
+import type { CardEffect } from '../../types';
+
+const PICK_REQUEST_TYPE = '过河拆桥_选牌';
 
 /** 过河拆桥牌特有校验：目标有牌、非自己 */
 function canUseDismantle(
@@ -30,67 +31,23 @@ function canUseDismantle(
   return null;
 }
 
-/** 过河拆桥的结算：选牌面板(弃置) */
-async function resolveDismantle(ctx: ResolveCtx): Promise<void> {
-  const { state, source, target } = ctx;
-  // 无懈可击已由 runSettlementPhase 的「生效前」时机统一处理
-  const targetPlayer = state.players[target];
-  if (targetPlayer) {
-    await runPickTargetCardPanel(state, source, target, targetPlayer, {
-      mode: 'discard',
-      requestType: '过河拆桥_选牌',
-      title: '选择弃置的目标牌',
-    });
-  }
-}
-
 export const dismantleEffect: CardEffect = {
   timing: '出牌阶段',
   target: { kind: 'other', min: 1, max: 1 },
   canUse: canUseDismantle,
-  resolve: resolveDismantle,
+  resolve: createPickPanelResolve({
+    mode: 'discard',
+    requestType: PICK_REQUEST_TYPE,
+    title: '选择弃置的目标牌',
+  }),
   // 选牌 respond：使用者从目标区域选一张牌（requestType='过河拆桥_选牌'）。
   // 原逻辑来自 src/engine/skills/过河拆桥.ts 的 respond registerAction。
-  respond: {
-    validate: (state, ownerId, params) => {
-      const check = requireRequestType(state, ownerId, ['过河拆桥_选牌'], {
-        wrongTypeError: '当前不是选牌窗口',
-        mismatchError: '当前不是选牌窗口',
-      });
-      if (check.error) return check.error;
-      const atom = state.pendingSlots.get(ownerId)!.atom as {
-        prompt?: {
-          target?: number;
-          equipment?: Array<{ slot: string; cardId: string }>;
-        };
-      };
-      const zone = params.zone;
-      if (zone === 'equipment' || zone === 'judge') {
-        if (typeof params.cardId !== 'string') return 'cardId required';
-      } else if (zone === 'hand') {
-        if (typeof params.handIndex !== 'number') return 'handIndex required';
-      } else {
-        return 'zone required (equipment|judge|hand)';
-      }
-      // 通用校验:装备区选牌的 cardId 必须在面板提供的 equipment 列表中。
-      // 界奇才等保护技通过 before-hook 已从该列表过滤受保护装备(防具/宝物),
-      // 故受保护装备自然不可选——本处不感知具体保护技,实现解耦。
-      if (zone === 'equipment' && typeof params.cardId === 'string') {
-        const equipList = atom.prompt?.equipment;
-        if (equipList && !equipList.some((e) => e.cardId === params.cardId)) {
-          return '该装备不可选';
-        }
-      }
-      return null;
-    },
-    execute: async (state, _ownerId, params) => {
-      state.localVars[PICK_RESULT_KEY] = {
-        zone: params.zone,
-        cardId: params.cardId ?? null,
-        handIndex: params.handIndex ?? null,
-      };
-    },
-  },
+  // 装备候选校验开启:界奇才 before-hook 已从面板过滤受保护装备(防具/宝物),
+  // respond 层防绕过(见 cards/_pickPanel 文件头)。
+  respond: createPickPanelRespond({
+    requestType: PICK_REQUEST_TYPE,
+    validateEquipmentInPanel: true,
+  }),
   prompt: {
     type: 'useCardAndTarget',
     title: '过河拆桥',
@@ -100,4 +57,3 @@ export const dismantleEffect: CardEffect = {
   label: '过河拆桥',
   style: 'primary',
 };
-

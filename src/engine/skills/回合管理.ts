@@ -10,6 +10,7 @@ import { runDetached } from '../core/run-tracker';
 import { registerAction, registerAfterHook, hasBlockingPending } from '../core/skill';
 import { handLimit } from '../rules/hand-limit';
 import { isFaceDown, flipFaceUpAll } from '../flows/face-down';
+import { findNextAlive } from '../util/player-query';
 
 const PHASE_ORDER = ['准备', '判定', '摸牌', '出牌', '弃牌', '回合结束'] as const;
 
@@ -17,17 +18,6 @@ function nextPhase(current: string): string | null {
   const idx = PHASE_ORDER.indexOf(current as (typeof PHASE_ORDER)[number]);
   if (idx < 0 || idx >= PHASE_ORDER.length - 1) return null;
   return PHASE_ORDER[idx + 1];
-}
-
-/** 逆时针从 fromIndex 的下一位找第一个存活玩家;全死亡时返回 fromIndex。
- *  座次约定:索引递减 = 逆时针出牌方向(与 下一玩家 atom 一致)。 */
-function findNextAlive(state: { players: { alive: boolean }[] }, fromIndex: number): number {
-  const n = state.players.length;
-  for (let i = 1; i <= n; i++) {
-    const idx = (fromIndex - i + n) % n;
-    if (state.players[idx].alive) return idx;
-  }
-  return fromIndex;
 }
 
 /** 启动 player 的回合：回合开始 → 阶段开始/结束(准备)，触发阶段推进链。

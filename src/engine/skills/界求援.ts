@@ -24,7 +24,7 @@
 //       4b) 成为额外目标:虚拟杀(source → 该角色)。
 //
 //   - "成为额外目标"实现:用虚拟杀完整结算(指定目标→成为目标→检测有效性→询问闪→伤害/抵消)。
-//     镜像界仁德/界诛害的虚拟杀结算(util/skillRuntime.runVirtualSlash);不修改 杀 skill 文件。
+//     镜像界仁德/界诛害的虚拟杀结算(cards/_virtualSlash.runVirtualSlash);不修改 杀 skill 文件。
 //     AOE/火攻情形下"额外目标"语义弱化(AOE 已全员命中),虚拟杀仍能给该角色一次额外杀。
 //
 // 命名:文件名/loader key/character skill name = '界求援'(避标版冲突);
@@ -38,7 +38,8 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
-import { askConfirm, askResponse, defineConfirmAction, runVirtualSlash } from '../util/skillRuntime';
+import { askConfirm, askResponse, defineConfirmAction } from '../util/skillRuntime';
+import { runVirtualSlash } from './cards/_virtualSlash';
 import {
   registerAction,
   registerAfterHook,

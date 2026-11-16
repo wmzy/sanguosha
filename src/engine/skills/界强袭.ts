@@ -29,9 +29,6 @@ const OPTIONS: QiangxiOptions = {
   payHpCost: async (st, from) => {
     await runDamageFlow(st, from, from, 1);
   },
-  phaseError: '只能在出牌阶段发动',
-  blockingError: '当前有未完成的询问',
-  deadError: '玩家不存在或已死亡',
   costParamError: 'cost 必须为 damage 或 discard',
 };
 

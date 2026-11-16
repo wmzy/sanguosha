@@ -28,7 +28,8 @@ import { inAttackRange } from '../rules/distance';
 import { canSlash } from '../rules/slash-quota';
 import { usedThisTurn } from '../rules/once-per-turn';
 import { runUseFlow } from './cards/use-card';
-import { runVirtualSlash, requireRequestType } from '../util/skillRuntime';
+import { requireRequestType } from '../util/skillRuntime';
+import { runVirtualSlash } from './cards/_virtualSlash';
 import { createRendeSkill, type RendeOptions } from './仁德';
 import type { SkillModule } from '../types';
 

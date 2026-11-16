@@ -15,7 +15,7 @@
 //     与标版逐字共享。逼杀统一走 runUseFlow(damageType 由 cardMap 自动传导)。
 //   - 主循环结束后,若贾诩仍存活且有出杀次数剩余(canSlash),发起 choosePlayer 询问:
 //     目标为任意存活其他角色(targetFilter 不校验距离 → 无距离限制)。
-//     贾诩选目标 → 走 runVirtualSlash(共享虚拟杀结算,util/skillRuntime);
+//     贾诩选目标 → 走 runVirtualSlash(共享虚拟杀结算,cards/_virtualSlash);
 //     贾诩 pass / 超时 → 不视为使用杀。
 //   - 视为使用杀占出杀次数(由 runVirtualSlash 的 charge 计费负责)。
 //
@@ -24,7 +24,8 @@ import type { FrontendAPI, GameState, GameView, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
-import { runVirtualSlash, registerRespondForAllSeats, currentRequestType } from '../util/skillRuntime';
+import { registerRespondForAllSeats, currentRequestType } from '../util/skillRuntime';
+import { runVirtualSlash } from './cards/_virtualSlash';
 import { registerAction } from '../core/skill';
 import { canSlash } from '../rules/slash-quota';
 import type { SkillModule } from '../types';

@@ -27,13 +27,13 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import {
-  runVirtualSlash,
   requireRequestType,
   askConfirm,
   firstCardId,
   registerPhaseStartHook,
   defineConfirmAction,
 } from '../util/skillRuntime';
+import { runVirtualSlash } from './cards/_virtualSlash';
 import { skipPhase } from '../rules/skip-phase';
 
 const OPT1_TRIGGER_RT = '神速/opt1-trigger';

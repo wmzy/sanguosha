@@ -24,6 +24,7 @@ import { inAttackRange } from '../rules/distance';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { pickRandom } from '../util/rng';
 import { requireRequestType } from '../util/skillRuntime';
+import { hasDiscardableCards } from '../util/player-query';
 
 const CHOOSE_RT = '掣政/选目标';
 const CHOOSE_KEY = '掣政/所选目标';
@@ -48,14 +49,6 @@ function outOfRangeChars(state: GameState, ownerId: number): number[] {
     if (!inAttackRange(state, p.index, ownerId)) result.push(p.index);
   }
   return result;
-}
-
-/** 角色是否有任意牌(手牌或装备)可供弃置 */
-function hasAnyCard(state: GameState, idx: number): boolean {
-  const p = state.players[idx];
-  if (!p) return false;
-  if (p.hand.length > 0) return true;
-  return Object.values(p.equipment).some((id) => !!id);
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
@@ -97,7 +90,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // 不因个别角色无牌而缩小);可弃置目标从其中有牌者中选。
     const outRange = outOfRangeChars(st, ownerId);
     if (used >= outRange.length) return;
-    const targets = outRange.filter((t) => hasAnyCard(st, t));
+    const targets = outRange.filter((t) => hasDiscardableCards(st.players[t]));
     // 无有牌可弃的目标 → 无从执行惩罚,跳过
     if (targets.length === 0) return;
 

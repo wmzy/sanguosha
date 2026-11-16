@@ -82,8 +82,8 @@ describe('发牌可见性:玩家应看到自己的初始手牌', () => {
     const sink1 = new FakeSink();
     (session as any).room.players.set('p0', sink0);
     (session as any).room.players.set('p1', sink1);
-    (session as any).playerNames.set('p0', 0);
-    (session as any).playerNames.set('p1', 1);
+    (session as any).playerSeatIndex.set('p0', 0);
+    (session as any).playerSeatIndex.set('p1', 1);
 
     // 确定性驱动 bootstrap 完成(选将 → 发牌):
     // bootstrap 是 fire-and-forget,选将时序为「主公串行 + 非主公并行」,在 vitest

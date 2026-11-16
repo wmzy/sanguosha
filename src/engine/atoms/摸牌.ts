@@ -2,9 +2,9 @@
 // 摸牌:从牌堆顶抽 count 张到手牌。
 // 牌堆不足时,合并弃牌堆重洗补充(标准三国杀规则);牌堆+弃牌堆总数仍不足时,
 // 才算不合法(validate 报错)。
-import type { AtomDefinition, Card, ViewEventSplit, ViewEvent } from '../types';
-import { requirePlayer, viewPlayer } from './_helpers';
-import { createRng } from '../util/rng';
+import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
+import { applyDrawEvent, requirePlayer } from './_helpers';
+import { createRng, shuffle } from '../util/rng';
 
 interface DrawPlan {
   /** 实际将要摸入的 cardIds(已倒序:末尾对应最先摸) */
@@ -36,13 +36,10 @@ function planDraw(
       reshuffled: false,
     };
   }
-  // 牌堆不足:合并 deck + discardPile,Fisher–Yates 洗牌
-  const combined = [...state.zones.deck, ...state.zones.discardPile];
+  // 牌堆不足:合并 deck + discardPile,Fisher–Yates 洗牌(统一走 util/rng.shuffle,
+  // 同一 rng 实例消费后 getState 写回 —— RNG 消耗序列与原 inline 循环一致)
   const rng = createRng(state.rngSeed);
-  for (let i = combined.length - 1; i > 0; i--) {
-    const j = rng.nextInt(i + 1);
-    [combined[i], combined[j]] = [combined[j], combined[i]];
-  }
+  const combined = shuffle([...state.zones.deck, ...state.zones.discardPile], rng);
   return {
     drawn: fromBottom ? combined.slice(0, count) : combined.slice(-count).reverse(),
     newDeck: fromBottom ? combined.slice(count) : combined.slice(0, -count),
@@ -97,24 +94,9 @@ export const 摸牌: AtomDefinition<{ player: number; count: number; fromBottom?
     };
   },
   applyView(view, event) {
-    const p = viewPlayer(view, event.player as number);
-    if (!p) return;
-    const count = (event.count as number) ?? 0;
-    p.handCount += count;
-    // owner 有 cards 字段，加入手牌；others 没有
-    if (event.cards && p.hand) {
-      p.hand.push(...(event.cards as Card[]));
-    }
-    // zone 同步
-    if (view.zones) {
-      if (event.reshuffled) {
-        view.zones.deckCount =
-          (event.newDeckCount as number) ?? Math.max(0, view.zones.deckCount - count);
-        view.zones.discardPileCount = (event.newDiscardPileCount as number) ?? 0;
-      } else {
-        view.zones.deckCount = Math.max(0, view.zones.deckCount - count);
-      }
-    }
+    // 摸牌投影单点(与 移动牌「牌堆→手牌」路径共用):handCount/cards/deckCount,
+    // 含牌堆不足重洗路径的牌堆/弃牌堆计数覆盖。
+    applyDrawEvent(view, event);
   },
   toViewLog(event, viewer) {
     const count = event.count ?? 0;

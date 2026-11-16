@@ -33,6 +33,7 @@ import { applyAtom } from '../core/apply';
 import { flipFaceDown, flipFaceUp, isFaceDown, performSkipTurn } from '../flows/face-down';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
 import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
+import { countFactions } from '../util/player-query';
 
 const DISPLAY_NAME = '伏枥';
 
@@ -61,17 +62,7 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 计算全场存活玩家的不同势力数(X)。 */
-function countFactions(state: GameState): number {
-  const factions = new Set<string>();
-  for (const p of state.players) {
-    if (!p.alive) continue;
-    if (p.faction) factions.add(p.faction);
-  }
-  return factions.size;
-}
-
-export function onInit(skill: Skill, state: GameState): () => void {
+export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── respond:廖化回应是否发动伏枥 ──

@@ -27,14 +27,14 @@ import type { FrontendAPI, GameState, Json, Skill, Card } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { peekTop } from '../core/deck';
-import { registerAction, hasBlockingPending } from '../core/skill';
-import { getGender } from '../data/character-meta';
+import { registerAction } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import type { GameView } from '../types';
 import type { SkillModule } from '../types';
-import { requireRequestType, askResponse } from '../util/skillRuntime';
+import { requireRequestType, askResponse, engineCanPlayNowReason } from '../util/skillRuntime';
 import { setPlayerVarUsage } from '../rules/turn-usage';
 import { usedThisTurn as usedOncePerTurn } from '../rules/once-per-turn';
+import { isMaleAlive } from '../util/player-query';
 
 const SKILL_ID = '界荐言';
 const DISPLAY_NAME = '荐言';
@@ -73,13 +73,6 @@ function cardMatches(card: Card, declaration: Declaration): boolean {
   }
   // 颜色声明:红 / 黑(card.color 为 Color='红'|'黑'|'无色',与 declaration 字面量比较)
   return card.color === (declaration);
-}
-
-/** 校验某座次是否为男性存活角色 */
-function isMaleAlive(state: GameState, target: number): boolean {
-  const p = state.players[target];
-  if (!p?.alive) return false;
-  return getGender(p.character) === '男';
 }
 
 /** 本回合是否已用过荐言(rules/once-per-turn 共享版,键 = `${SKILL_ID}/usedThisTurn`) */
@@ -136,11 +129,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, _params: Record<string, Json>): string | null => {
-      const self = st.players[ownerId];
-      if (!self?.alive) return '角色不可用';
-      if (st.currentPlayerIndex !== ownerId) return '只能在你的回合使用';
-      if (st.phase !== '出牌') return '只能在出牌阶段使用';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       if (usedThisTurn(st, ownerId)) return '本回合已使用过荐言';
       // 必须有男性角色可选(包括自己——官方"选择一名男性角色"未限定"其他")
       const hasCandidate = st.players.some(

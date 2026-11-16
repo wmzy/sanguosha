@@ -59,10 +59,11 @@ export async function destroyRoomCompletely(roomId: string): Promise<void> {
   // 3. 删除 roomList 记录(幂等:leaveRoom 已删则 no-op)
   deleteRoom(roomId);
 
-  // 4. 兜底:清理任何指向该房间的残留映射(绕过 room.ts 成员函数直写映射的
-  //    条目,如测试注入;必须在 await 之前,保持同步语义)
-  for (const [pid, rid] of playerRoomMap) {
-    if (rid === roomId) playerRoomMap.delete(pid);
+  // 4. 兜底:清理任何指向该房间的残留映射(未走 leaveRoom 的旁观者成员、
+  //    绕过 room.ts 成员函数直写映射的条目,如测试注入;必须在 await 之前,
+  //    保持同步语义)
+  for (const [pid, entry] of playerRoomMap) {
+    if (entry.roomId === roomId) playerRoomMap.delete(pid);
   }
 
   // 5. 删除持久化文件

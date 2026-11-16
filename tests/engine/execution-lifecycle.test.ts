@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { dispatch, registerSkillsFromState, whenEngineIdle } from '../../src/engine/index';
+import { dispatch, registerSkillsFromState, whenIdle } from '../../src/engine/index';
 import { applyAtom } from '../../src/engine/core/apply';
 import { registerAction, registerAfterHook } from '../../src/engine/core/skill';
 import { runDetached } from '../../src/engine/core/run-tracker';
@@ -77,7 +77,7 @@ describe('consumer composition and execution lifecycle', () => {
     expect((state.pendingSlots.get(1)?.atom as { requestType: string }).requestType).toBe('second');
     await state.pendingSlots.get(1)!._fireTimeoutNow?.();
     // 超时 resolve 后父 run 继续推进到完成:等稳定点(不再依赖宏任务轮询)。
-    await whenEngineIdle(state);
+    await whenIdle(state);
     expect(state.atomStack).toEqual([]);
   });
 
@@ -108,7 +108,7 @@ describe('consumer composition and execution lifecycle', () => {
     });
     registerAction(state, '完成', 1, 'use', () => null, async () => {});
     // 让 detached 链挂到 slot 上;它自己必须仍占着一个 run,而不是借用别人的 credit。
-    await whenEngineIdle(state);
+    await whenIdle(state);
     await applyAtom(state, { type: '摸牌', player: 0, count: 1 });
     const result = await dispatch(state, { skillId: '完成', actionType: 'use', ownerId: 1, params: {}, baseSeq: state.seq });
     let settled = false;
@@ -119,11 +119,11 @@ describe('consumer composition and execution lifecycle', () => {
     expect(settled).toBe(false);
     release();
     expect(await result.settle).toBeUndefined();
-    await whenEngineIdle(state);
+    await whenIdle(state);
     // detached 链此刻仍挂在 出牌窗口 上(它自己的 run,与本 dispatch 的 settle 无关)。
     expect(state.atomStack.map((atom) => atom.type)).toEqual(['出牌窗口']);
     await state.pendingSlots.get(0)!._fireTimeoutNow?.();
-    await whenEngineIdle(state);
+    await whenIdle(state);
     expect(state.atomStack).toEqual([]);
   });
 });

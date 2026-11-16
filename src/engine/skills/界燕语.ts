@@ -27,18 +27,17 @@
 //   内部 Skill.name = '燕语'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
-import { popFrame, pushFrame } from '../core/frame';
-import { recastCard } from '../flows/recast';
 import {
   registerAction,
   registerAfterHook,
   registerBeforeHook,
 } from '../core/skill';
-import { askConfirm, defineConfirmAction, engineCanPlayNow } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, currentRequestType } from '../util/skillRuntime';
+import { isMaleAlive } from '../util/player-query';
 import { getGender } from '../data/character-meta';
 import { setPlayerVarUsage } from '../rules/turn-usage';
+import { registerRecycleAction } from './连环';
 import type { SkillModule } from '../types';
-import { currentRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界燕语';
 const DISPLAY_NAME = '燕语';
@@ -80,13 +79,6 @@ function inMyPlayPhase(state: GameState, ownerId: number): boolean {
   return state.currentPlayerIndex === ownerId && state.phase === '出牌';
 }
 
-/** 校验某座次是否为存活男性 */
-function isMaleAlive(state: GameState, target: number): boolean {
-  const p = state.players[target];
-  if (!p?.alive) return false;
-  return getGender(p.character) === '男';
-}
-
 function hasMaleAlive(state: GameState): boolean {
   return state.players.some((p) => p.alive && getGender(p.character) === '男');
 }
@@ -94,31 +86,15 @@ function hasMaleAlive(state: GameState): boolean {
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
-  // ── recycle:出牌阶段,弃一张手牌中的【杀】,摸一张牌(重铸) ──
-  registerAction(
-    state,
-    skill.id,
+  // ── recycle:出牌阶段,弃一张手牌中的【杀】,摸一张牌(重铸;共享工厂见 连环.ts) ──
+  registerRecycleAction(state, {
+    skillId: skill.id,
     ownerId,
-    'recycle',
-    (st: GameState, params: Record<string, Json>) => {
-      const self = st.players[ownerId];
-      const cardId = params.cardId as string;
-      const cardIdOk = typeof cardId === 'string';
-      const card = cardIdOk ? st.cardMap[cardId] : undefined;
-      const cardInHand = cardIdOk && self.hand.includes(cardId);
-      const isSha = !!card && card.name === '杀';
-      // 时机四合一(自己回合+出牌阶段+无阻塞+存活)由 engineCanPlayNow 统一判定
-      const ok = engineCanPlayNow(st, ownerId) && cardInHand && isSha;
-      return ok ? null : '现在不能重铸(需出牌阶段、手中【杀】)';
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
-      const cardId = params.cardId as string;
-      await pushFrame(st, SKILL_ID, from, { ...params, recycle: true });
-      await recastCard(st, from, cardId);
-      await popFrame(st);
-    },
-  );
+    frameName: SKILL_ID,
+    isEligible: (card) => !!card && card.name === '杀',
+    rejectMessage: '现在不能重铸(需出牌阶段、手中【杀】)',
+    extraFrameParams: { recycle: true },
+  });
 
   // ── respond:owner 在 confirm / target 询问下的回应 ──
   registerAction(

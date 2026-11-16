@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import '../../src/engine/atoms';
 import { GameSession } from '../../src/server/session';
-import { addRoom, deleteRoom, getAllRooms, getRoom, type Room } from '../../src/server/room';
+import { createRoomShell, deleteRoom, getAllRooms, getRoom, type Room } from '../../src/server/room';
 import { gameSessions, playerRoomMap } from '../../src/server/registry';
 import { cleanupIdleRooms, cleanupDisconnectedRooms, IDLE_ROOM_TTL_MS } from '../../src/server/cleanup';
 import { downgradeStaleNormalRooms } from '../../src/server/app';
@@ -28,30 +28,24 @@ class FakeSink implements ConnectionSink {
 }
 
 function makeRoom(playerIds: string[], roomType: 'normal' | 'quick' = 'quick'): Room {
-  const room: Room = {
-    id: `cleanup-${Math.random().toString(36).slice(2, 10)}`,
-    name: '清理测试',
-    maxPlayers: Math.max(playerIds.length, 2),
-    players: new Map(),
-    status: '已结束',
-    hostId: playerIds[0] ?? null,
-    readyPlayers: new Set(playerIds),
-    roomType,
-    isDebug: true,
-    config: { name: '清理测试', timeoutSec: 30, charPool: 'all', handSize: 4 },
-    spectators: new Map(),
-    viewGrants: new Map(),
-    pendingViewRequests: new Map(),
-    chatUsage: new Map(),
-    chatHistory: [],
-    seats: Array(Math.max(playerIds.length, 2)).fill(null),
-    pendingSeatSwaps: new Map(),
-    playerNames: new Map(playerIds.map((pid, i) => [pid, `玩家${i + 1}`])),
-  } as unknown as Room;
-  for (const pid of playerIds) {
-    room.players.set(pid, new FakeSink());
-  }
-  addRoom(room);
+  const maxPlayers = Math.max(playerIds.length, 2);
+  // createRoomShell 等价构造:players 有连接但 seats 全空(幽灵连接场景),
+  // 状态已结束,不经 addRoom 旁路即注册进内存房间表。
+  const room = createRoomShell(
+    {
+      name: '清理测试',
+      maxPlayers,
+      hostId: playerIds[0] ?? null,
+      players: new Map(playerIds.map((pid) => [pid, new FakeSink()])),
+      // 刻意保留原手工构造的部分 config(缺 chat/gameMode),运行时语义不变
+      config: { name: '清理测试', timeoutSec: 30, charPool: 'all', handSize: 4 } as Room['config'],
+      roomType,
+      isDebug: true,
+      playerNames: new Map(playerIds.map((pid, i) => [pid, `玩家${i + 1}`])),
+    },
+    { status: '已结束', maxPlayers, seats: Array(maxPlayers).fill(null) },
+  );
+  room.readyPlayers = new Set(playerIds);
   return room;
 }
 
@@ -125,7 +119,7 @@ describe('cleanupIdleRooms', () => {
     const room = makeRoom([]);
     const session = new GameSession(room, true, 42);
     gameSessions.set(room.id, session);
-    playerRoomMap.set('lonely', room.id);
+    playerRoomMap.set('lonely', { roomId: room.id, role: 'player' });
 
     cleanupIdleRooms(futureNow());
 
@@ -148,7 +142,7 @@ describe('cleanupIdleRooms', () => {
     const room = makeRoom([], 'normal');
     const session = new GameSession(room, true, 42);
     gameSessions.set(room.id, session);
-    playerRoomMap.set('normal-player', room.id);
+    playerRoomMap.set('normal-player', { roomId: room.id, role: 'player' });
 
     cleanupIdleRooms(futureNow());
 
@@ -163,8 +157,8 @@ describe('cleanupIdleRooms', () => {
     const room = makeRoom(['p1', 'p2'], 'normal');
     const session = new GameSession(room, true, 42);
     gameSessions.set(room.id, session);
-    playerRoomMap.set('p1', room.id);
-    playerRoomMap.set('p2', room.id);
+    playerRoomMap.set('p1', { roomId: room.id, role: 'player' });
+    playerRoomMap.set('p2', { roomId: room.id, role: 'player' });
     await session.destroy();
     // 模拟 endDueToDisconnect 遗留:room.players 仍有(已断线的)记录
     expect(room.players.size).toBe(2);

@@ -46,7 +46,7 @@ interface SkillRegistry {
   judgeModifiers: Map<number, AtomHookEntry>;
   instanceUnloads: Map<string, () => void>;
   /** 技能 isLocked 元数据(实例化时写入):skillId → isLocked。
-   *  供 skill-suppression 查询,替代旧 getCachedSkillModule 反射查询。 */
+   *  供 skill-suppression 查询(锁定技不受"非锁定技失效"影响)。 */
   lockedSkills: Map<string, boolean>;
   /** 替代回应能力声明表(技能就近注册)。 */
   altResponseDecls: AltResponseDecl[];

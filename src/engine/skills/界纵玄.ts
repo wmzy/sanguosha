@@ -23,6 +23,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { findNextAlive } from '../util/player-query';
 
 const SKILL_ID = '界纵玄';
 const DISPLAY_NAME = '纵玄';
@@ -37,17 +38,6 @@ const AGAIN_KEY = '界纵玄/again';
 /** turn.vars key 前缀:本回合上家弃牌触发已用过一次。实际 key 附 :ownerId 以
  *  支持同局多个界虞翻互不干扰(回合结束 atom 自动清空 turn.vars)。 */
 const UPSTREAM_TRIGGERED_PREFIX = '界纵玄/upstreamTriggeredThisTurn';
-
-/** 从 fromIndex 之后找下一个存活玩家索引;全死亡时返回 fromIndex */
-function findNextAlive(state: { players: { alive: boolean }[] }, fromIndex: number): number {
-  const n = state.players.length;
-  for (let i = 1; i <= n; i++) {
-    // 逆时针 = 座次递减(与回合推进方向一致)
-    const idx = (fromIndex - i + n) % n;
-    if (state.players[idx]?.alive) return idx;
-  }
-  return fromIndex;
-}
 
 /** candidate 是否为 target 的上家(下一个存活玩家 === target) */
 function isUpstreamOf(state: GameState, candidate: number, target: number): boolean {

@@ -3,9 +3,13 @@
 //   其他吴势力角色出牌阶段限一次，其可以与你拼点（你可以拒绝）：
 //   若其没赢，你可以获得两张拼点牌。
 //
-// 双向拼点(相对标制霸 src/engine/skills/制霸.ts,不修改标版):
+// 双向拼点(相对标制霸 src/engine/skills/制霸.ts):
 //   方向 A(同标制霸):其他吴势力角色在自己出牌阶段主动发起拼点;
 //     孙策觉醒后可拒绝;若发起方没赢,孙策可获得两张拼点牌。
+//     use/respond 注册与比点结算复用 ./制霸.ts 导出的共享工厂
+//     (registerZhibaAllyRankUse / registerZhibaRankRespond / resolveZhibaRankAfterCompare),
+//     界版差异(限一次键/帧名/requestType/获得文案/选拼点牌回应者范围)经
+//     ZhibaRankOptions 注入。
 //   方向 B(界新增):孙策在自己出牌阶段主动发起拼点(限一次,选一名其他吴势力角色);
 //     若发起方(孙策)没赢,孙策可获得两张拼点牌。
 //
@@ -34,10 +38,15 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
-import { engineCanPlayNow, askConfirm } from '../util/skillRuntime';
-import { getHunziAwakened } from '../rules/vars-keys';
+import { engineCanPlayNow } from '../util/skillRuntime';
 import { askRankCard, getCardValue } from '../flows/rank';
 import { isLordOwner } from '../rules/action-active';
+import {
+  registerZhibaAllyRankUse,
+  registerZhibaRankRespond,
+  resolveZhibaRankAfterCompare,
+  type ZhibaRankOptions,
+} from './制霸';
 
 const SKILL_ID = '界制霸';
 const DISPLAY_NAME = '制霸';
@@ -72,101 +81,24 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ════════════════════════════════════════════════════════════════
   // 方向 A:盟友(其他吴势力角色)在自己出牌阶段主动发起拼点(同标制霸)
+  // 注册流程与标版逐字同构,复用 ./制霸.ts 的共享工厂;界版差异
+  // (限一次键/帧名/requestType/获得文案/选拼点牌回应者范围)经 opts 注入。
   // ════════════════════════════════════════════════════════════════
-  for (const p of state.players) {
-    const allyIdx = p.index;
-    if (allyIdx === ownerId) continue;
-    if (p.faction !== '吴') continue;
-
-    const u = registerAction(
-      state,
-      skill.id,
-      allyIdx,
-      'use',
-      (st: GameState, params: Record<string, Json>): string | null => {
-        if (ownerId !== 0) return '制霸为主公技,孙策非主公';
-        const lord = st.players[ownerId];
-        if (!lord?.alive) return '主公不存在或已死亡';
-        if (lord.hand.length === 0) return '孙策没有手牌,无法拼点';
-
-        const self = st.players[allyIdx];
-        if (!self?.alive) return '已死亡';
-        // 自己回合 + 出牌阶段 + 无阻塞 pending(存活已由上方早退校验)→ engineCanPlayNow
-        if (!engineCanPlayNow(st, allyIdx)) return '现在不能使用制霸';
-        if (usedThisTurn(st, allyIdx, ALLY_USED)) return '本回合已使用过制霸';
-
-        const cardId = params.cardId as string | undefined;
-        if (typeof cardId !== 'string') return '请选择一张拼点牌';
-        if (!self.hand.includes(cardId)) return '拼点牌不在手牌中';
-        return null;
-      },
-      async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        const allyCardId = params.cardId as string;
-        await markOncePerTurn(st, allyIdx, ALLY_USED);
-        const lord = st.players[ownerId];
-
-        // 觉醒后可拒绝
-        if (getHunziAwakened(lord.vars)) {
-          const accept = await askConfirm(st, REFUSE_RT, ownerId, {
-            confirmedKey: REFUSE_KEY,
-            title: `${st.players[allyIdx].name} 欲与你制霸拼点,是否接受?`,
-            confirmLabel: '接受',
-            cancelLabel: '拒绝',
-            defaultChoice: true,
-            timeout: 20,
-          });
-          if (!accept) return; // 孙策拒绝
-        }
-
-        await pushFrame(st, SKILL_ID, allyIdx, { ...params });
-        try {
-          // 1) 盟友拼点牌 → 处理区(公开)
-          await applyAtom(st, {
-            type: '移动牌',
-            cardId: allyCardId,
-            from: { zone: '手牌', player: allyIdx },
-            to: { zone: '处理区' },
-          });
-
-          // 2) 询问孙策选拼点牌(询问封装于 flows/rank.askRankCard;
-          //    比点走本文件的 移动牌 流转,不用 runRankCompareFlow)
-          const lordCardId = await askRankCard(st, {
-            requestType: RESP_CARD_RT,
-            answerKey: RESP_CARD_KEY,
-            target: ownerId,
-            title: `制霸:与 ${st.players[allyIdx].name} 拼点,请出一张手牌`,
-            timeout: 30,
-          });
-          if (!lordCardId) {
-            await applyAtom(st, {
-              type: '移动牌',
-              cardId: allyCardId,
-              from: { zone: '处理区' },
-              to: { zone: '弃牌堆' },
-            });
-            return;
-          }
-
-          await applyAtom(st, {
-            type: '移动牌',
-            cardId: lordCardId,
-            from: { zone: '手牌', player: ownerId },
-            to: { zone: '处理区' },
-          });
-
-          // 3) 比点:发起方(盟友)严格大于孙策 = 盟友赢
-          const allyValue = getCardValue(st.cardMap[allyCardId]);
-          const lordValue = getCardValue(st.cardMap[lordCardId]);
-          const initiatorWon = allyValue > lordValue;
-
-          await resolveAfterCompare(st, ownerId, allyCardId, lordCardId, initiatorWon);
-        } finally {
-          await popFrame(st);
-        }
-      },
-    );
-    unloaders.push(u);
-  }
+  const rankOpts: ZhibaRankOptions = {
+    ownerId,
+    skillId: skill.id,
+    usedKey: ALLY_USED,
+    frameName: SKILL_ID,
+    refuseRT: REFUSE_RT,
+    refuseKey: REFUSE_KEY,
+    respCardRT: RESP_CARD_RT,
+    respCardKey: RESP_CARD_KEY,
+    takeRT: TAKE_RT,
+    takeKey: TAKE_KEY,
+    takeTitle: '制霸:对方拼点没赢,是否获得两张拼点牌?',
+    respCardLordOnly: false,
+  };
+  unloaders.push(...registerZhibaAllyRankUse(state, rankOpts));
 
   // ════════════════════════════════════════════════════════════════
   // 方向 B:孙策在自己出牌阶段主动发起拼点(界新增)
@@ -244,7 +176,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const targetValue = getCardValue(st.cardMap[targetCardId]);
         const initiatorWon = lordValue > targetValue;
 
-        await resolveAfterCompare(st, ownerId, lordCardId, targetCardId, initiatorWon);
+        await resolveZhibaRankAfterCompare(st, lordCardId, targetCardId, initiatorWon, rankOpts);
       } finally {
         await popFrame(st);
       }
@@ -253,99 +185,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   unloaders.push(uLord);
 
   // ════════════════════════════════════════════════════════════════
-  // respond(注册到所有玩家):拒绝 / 选拼点牌 / 获得确认
+  // respond(注册到所有玩家):拒绝 / 选拼点牌 / 获得确认(共享工厂)
   // dispatch 按 (skillId, ownerId, actionType) 查;以 requestType 区分三种询问。
+  // 界版差异:选拼点牌 RESP_CARD_RT 兼服务方向B(被拼点方由请求 target 决定,
+  // 可为孙策或目标盟友)→ rankOpts.respCardLordOnly=false。
   // ════════════════════════════════════════════════════════════════
-  for (const p of state.players) {
-    const seatId = p.index;
-    const u = registerAction(
-      state,
-      skill.id,
-      seatId,
-      'respond',
-      (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as Record<string, unknown>;
-        if (atom['type'] !== '请求回应') return '当前不需要回应';
-        const rt = atom['requestType'] as string;
-        // 拒绝/获得确认:仅孙策
-        if (rt === REFUSE_RT || rt === TAKE_RT) {
-          if (seatId !== ownerId) return '只有孙策可以回应';
-          return null;
-        }
-        // 选拼点牌:被拼点方(由请求 target 决定——孙策或目标盟友)
-        if (rt === RESP_CARD_RT) {
-          const cardId = params.cardId as string;
-          if (typeof cardId !== 'string') return '请选择一张拼点牌';
-          if (!st.players[seatId].hand.includes(cardId)) return '拼点牌不在手牌中';
-          return null;
-        }
-        return '当前不是制霸回应';
-      },
-      async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return;
-        const atom = slot.atom as Record<string, unknown>;
-        const rt = atom['requestType'] as string;
-        if (rt === REFUSE_RT) {
-          st.localVars[REFUSE_KEY] = params.choice === true || params.confirmed === true;
-        } else if (rt === RESP_CARD_RT) {
-          st.localVars[RESP_CARD_KEY] = params.cardId;
-        } else if (rt === TAKE_RT) {
-          st.localVars[TAKE_KEY] = params.choice === true || params.confirmed === true;
-        }
-      },
-    );
-    unloaders.push(u);
-  }
+  unloaders.push(...registerZhibaRankRespond(state, rankOpts));
 
   return () => {
     unloaders.forEach((u) => u());
   };
-}
-
-/**
- * 拼点比点后统一结算(两个方向共用):
- *   initiatorWon=true(发起方赢)→ 两张牌进弃牌堆
- *   initiatorWon=false(发起方没赢)→ 询问孙策是否获得两张拼点牌:
- *     获得 → 处理区→孙策手牌;不获得 → 处理区→弃牌堆
- */
-async function resolveAfterCompare(
-  state: GameState,
-  ownerId: number,
-  cardA: string,
-  cardB: string,
-  initiatorWon: boolean,
-): Promise<void> {
-  if (initiatorWon) {
-    for (const id of [cardA, cardB]) {
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId: id,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
-    }
-    return;
-  }
-  // 发起方没赢:询问孙策是否获得两张拼点牌
-  const take = await askConfirm(state, TAKE_RT, ownerId, {
-    confirmedKey: TAKE_KEY,
-    title: '制霸:对方拼点没赢,是否获得两张拼点牌?',
-    confirmLabel: '获得',
-    cancelLabel: '不获得',
-    defaultChoice: true,
-    timeout: 20,
-  });
-  for (const id of [cardA, cardB]) {
-    await applyAtom(state, {
-      type: '移动牌',
-      cardId: id,
-      from: { zone: '处理区' },
-      to: take ? { zone: '手牌', player: ownerId } : { zone: '弃牌堆' },
-    });
-  }
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {

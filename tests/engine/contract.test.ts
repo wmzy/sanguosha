@@ -131,6 +131,7 @@ describe('技能声明注册表 meta', () => {
       'vite-glob',
       'lifecycle',
       '系统规则',
+      '_guanxing',
     ]);
     const loaderOwnedCards = new Set(['use-card', 'play-card']);
     const skillsDir = resolve(engineRoot, 'skills');

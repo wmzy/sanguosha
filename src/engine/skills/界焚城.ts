@@ -40,9 +40,9 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
 
 const SKILL_ID = '界焚城';
 const DISPLAY_NAME = '焚城';
@@ -85,11 +85,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       ownerId,
       'use',
       (st: GameState, _params: Record<string, Json>): string | null => {
-        if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-        if (st.phase !== '出牌') return '只能在出牌阶段发动';
-        if (hasBlockingPending(st)) return '当前有未完成的询问';
+        const playError = engineCanPlayNowReason(st, ownerId);
+        if (playError) return playError;
         if (st.players[ownerId]?.vars[USED_KEY]) return '焚城已使用过(限定技)';
-        if (!st.players[ownerId]?.alive) return '玩家不存在或已死亡';
         const others = st.players.filter((p) => p.alive && p.index !== ownerId);
         if (others.length === 0) return '场上没有其他存活角色';
         return null;

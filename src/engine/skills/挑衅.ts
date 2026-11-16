@@ -35,6 +35,7 @@ import { registerAction, hasBlockingPending } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
 import { requireRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
+import { panelEquipmentAllowed } from './cards/_pickPanel';
 import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';
 import {
@@ -248,12 +249,9 @@ export function createTiaoxinSkill(opts: TiaoxinOptions) {
             const zone = params.zone;
             if (zone === 'equipment') {
               if (typeof params.cardId !== 'string') return 'cardId required';
-              // 界奇才 hook 可能已从 prompt.equipment 过滤受保护装备(防具/宝物)
-              const promptEquip = (
-                slot.atom as { prompt?: { equipment?: Array<{ cardId: string }> } }
-              )?.prompt?.equipment;
-              if (promptEquip && !promptEquip.some((e) => e.cardId === params.cardId))
-                return '该装备不可选';
+              // 界奇才 hook 可能已从 prompt.equipment 过滤受保护装备(防具/宝物);
+              // 判据与 过河拆桥/顺手牵羊 共源(cards/_pickPanel)
+              if (!panelEquipmentAllowed(slot.atom, params.cardId)) return '该装备不可选';
               if (!Object.values(vp.equipment).includes(params.cardId)) return '该牌不在目标装备区';
               return null;
             }
@@ -315,7 +313,7 @@ export function createTiaoxinSkill(opts: TiaoxinOptions) {
               if (t === me) return false;
               const tp = view.players[t];
               if (!tp || tp.alive === false) return false;
-              return viewCanAttack(view.players, view.cardMap, t, me);
+              return viewCanAttack(view.players, t, me);
             },
           },
         },

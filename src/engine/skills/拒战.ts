@@ -41,6 +41,7 @@ import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY, JUZHAN_STATE_VIEW_KEY } from '../rules/vars-keys';
 import { projectTurnUsage } from '../rules/turn-usage';
 import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { isSlashCardById } from '../util/player-query';
 
 const SKILL_ID = '拒战';
 /** 转换态 key(state:player.vars 跨回合持久,无 /usedThisTurn 后缀;view:经 回合用量 atom 投影 turnUsage)。
@@ -77,12 +78,6 @@ function addForbidden(state: GameState, from: number, to: number): void {
     arr.push({ from, to });
     state.turn.vars[FORBIDDEN_VAR] = arr;
   }
-}
-
-/** 判定当前结算牌是否为杀(cardId 对应卡牌名为"杀",含转化/虚拟杀)。 */
-function isSlashCard(state: GameState, cardId: string | undefined): boolean {
-  if (!cardId) return false;
-  return state.cardMap[cardId]?.name === '杀';
 }
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -172,7 +167,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (atom.target !== ownerId) return; // 严颜成为目标
     const source = atom.source;
     if (source === ownerId) return; // 仅"其他角色"
-    if (!isSlashCard(ctx.state, atom.cardId)) return; // 仅杀
+    if (!isSlashCardById(ctx.state, atom.cardId)) return; // 仅杀
     if (getState(ctx.state, ownerId) !== '阳') return; // 仅阳状态
     if (!ctx.state.players[ownerId]?.alive) return;
     if (!ctx.state.players[source]?.alive) return;
@@ -216,7 +211,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     const target = atom.target;
     if (typeof target !== 'number') return;
     if (target === ownerId) return; // 杀不可指定自己(防御)
-    if (!isSlashCard(ctx.state, atom.cardId)) return; // 仅杀
+    if (!isSlashCardById(ctx.state, atom.cardId)) return; // 仅杀
     if (getState(ctx.state, ownerId) !== '阴') return; // 仅阴状态
     if (!ctx.state.players[ownerId]?.alive) return;
     const targetPlayer = ctx.state.players[target];

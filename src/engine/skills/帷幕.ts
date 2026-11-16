@@ -22,8 +22,8 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 判定一张卡是否为黑色锦囊牌 */
-function isBlackTrick(card: Card | undefined): boolean {
+/** 判定一张卡是否为黑色锦囊牌(界帷幕 同判据复用) */
+export function isBlackTrick(card: Card | undefined): boolean {
   return !!card && card.type === '锦囊牌' && card.color === '黑';
 }
 

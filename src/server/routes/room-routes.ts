@@ -7,6 +7,7 @@ import {
   createDebugRoom,
   getRoom,
   getRoomList,
+  buildRoomInfo,
   leaveRoom,
   joinRoom,
   joinDebugRoom,
@@ -15,7 +16,8 @@ import {
   kickPlayer,
   isRoomFull,
   bindPlayerRoom,
-  notifyRoomChanged,
+  setRoomPassword,
+  type KickFailureReason,
 } from '../room';
 import { destroyRoomCompletely } from '../teardown';
 import { hashPassword } from '../auth/password';
@@ -55,12 +57,14 @@ export function applyRoomRoutes(app: Hono): void {
     const id = c.req.param('id');
     const room = getRoom(id);
     if (!room) return c.json({ error: '房间不存在' }, 404);
+    // 字段子集取自 buildRoomInfo(单一来源),playerCount 与房间列表同口径(占座数)
+    const info = buildRoomInfo(room);
     return c.json({
-      id: room.id,
-      name: room.name,
-      playerCount: room.players.size,
-      maxPlayers: room.maxPlayers,
-      status: room.status,
+      id: info.id,
+      name: info.name,
+      playerCount: info.playerCount,
+      maxPlayers: info.maxPlayers,
+      status: info.status,
     });
   });
 
@@ -143,7 +147,7 @@ export function applyRoomRoutes(app: Hono): void {
     // 断线重连：玩家已在 seats 中但 SSE 断开，允许在任何状态下重连（含游戏进行中）
     // SSE handler 会直接设置 room.players 并调用 reconnectPlayer 恢复游戏视图
     if (room.seats.includes(playerId)) {
-      bindPlayerRoom(playerId, id);
+      bindPlayerRoom(playerId, id, 'player');
       return c.json({ roomId: id, playerId, playerName: user.displayName });
     }
 
@@ -289,8 +293,16 @@ export function applyRoomRoutes(app: Hono): void {
     if (!playerId || !targetPlayerId) return c.json({ error: '缺少参数' }, 400);
 
     const result = kickPlayer(roomId, playerId, targetPlayerId);
-    if (!result) {
-      return c.json({ error: '无法踢出该玩家（仅房主可操作，或目标不在房间中）' }, 400);
+    if (!result.ok) {
+      // 仍是 400 + { error },文案按失败原因具体化(原为笼统折叠文案)
+      const messages: Record<KickFailureReason, string> = {
+        roomNotFound: '房间不存在',
+        notWaiting: '仅等待中可踢出玩家',
+        notHost: '只有房主可以踢出玩家',
+        selfKick: '不能踢出自己',
+        targetNotInRoom: '目标不在房间中',
+      };
+      return c.json({ error: messages[result.reason] }, 400);
     }
 
     // 先通知被踢玩家（让其显示「被移出」而非触发自动重连），再关闭其连接
@@ -354,8 +366,7 @@ export function applyRoomRoutes(app: Hono): void {
     if (rawPassword.length > 32) {
       return c.json({ error: '房间密码长度不能超过 32 位' }, 400);
     }
-    room.passwordHash = rawPassword ? await hashPassword(rawPassword) : null;
-    notifyRoomChanged(room, 'update');
+    setRoomPassword(room, rawPassword ? await hashPassword(rawPassword) : null);
     broadcastRoomState(room);
     return c.json({ success: true, hasPassword: room.passwordHash !== null });
   });

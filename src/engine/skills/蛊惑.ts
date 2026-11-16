@@ -41,7 +41,7 @@
 //            · 假 → 移动牌(扣牌 弃牌堆→质疑者手牌) → voided=true(作废)。
 //
 // 蛊惑-杀(use 声明杀,生效路径):扣牌留弃牌堆(不进处理区,避免 cardMap 暴露真身破坏隐藏信息),
-//   杀结算复用 skillRuntime.runVirtualSlash(时机 atom 序列与实体杀一致:成为目标→检测有效性→
+//   杀结算复用 cards/_virtualSlash.runVirtualSlash(时机 atom 序列与实体杀一致:成为目标→检测有效性→
 //   询问闪(promptCancel 统一闪清理)→被抵消/伤害;武器技/无双按杀帧 hook 生效)。
 //   虚拟杀经 physicalCard 借用扣牌花色/颜色/点数/伤害属性——仁王盾按物理花色判假杀,
 //   火杀保留火焰伤害;charge:true 计入出杀次数。
@@ -51,14 +51,15 @@
 import type { ActionContext, FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
-import { registerAction, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
+import { registerAction, declareAlternativeResponse } from '../core/skill';
 import { canSlash } from '../rules/slash-quota';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { usedThisTurnKey } from '../rules/vars-keys';
 import { viewCanAttack } from '../rules/viewDistance';
 import { viewCanSlash } from '../rules/action-active';
 import { USE_ACTION_PREFIX } from '../util/declaredActionType';
-import { runVirtualSlash, registerRespondForAllSeats } from '../util/skillRuntime';
+import { registerRespondForAllSeats, engineCanPlayNowReason } from '../util/skillRuntime';
+import { runVirtualSlash } from './cards/_virtualSlash';
 import { canUseSlash } from './cards/杀';
 
 const REQUEST_TYPE = '蛊惑/质疑';
@@ -266,12 +267,10 @@ export function registerGuEntries(
       ownerId,
       `${USE_ACTION_PREFIX}${declaredName}`,
       (st: GameState, params: Record<string, Json>): string | null => {
-        if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-        if (st.phase !== '出牌') return '只能在出牌阶段发动';
-        if (hasBlockingPending(st)) return '当前有未完成的询问';
+        const playError = engineCanPlayNowReason(st, ownerId);
+        if (playError) return playError;
         if (usedThisTurn(st, ownerId, deps.skillKey)) return '本回合已使用过蛊惑';
         const self = st.players[ownerId];
-        if (!self?.alive) return '玩家不存在或已死亡';
         const cardId = params.cardId as string | undefined;
         if (typeof cardId !== 'string' || !self.hand.includes(cardId)) return '请选择一张手牌';
         if (declaredName === '杀') {
@@ -450,7 +449,7 @@ export function mountGuActions(api: FrontendAPI, skillKey: string): (() => void)
       targetFilter: {
         min: 1,
         max: 1,
-        filter: (view, t) => viewCanAttack(view.players, view.cardMap, api.viewer, t),
+        filter: (view, t) => viewCanAttack(view.players, api.viewer, t),
       },
     },
     activeWhen: (ctx: ActionContext) =>

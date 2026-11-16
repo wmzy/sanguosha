@@ -28,7 +28,8 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
 import { setPlayerVarUsage } from '../rules/turn-usage';
-import { registerAction, hasBlockingPending } from '../core/skill';
+import { registerAction } from '../core/skill';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
 
@@ -62,12 +63,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'use',
     (st: GameState, params: Record<string, Json>): string | null => {
-      if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-      if (st.phase !== '出牌') return '只能在出牌阶段发动';
-      if (hasBlockingPending(st)) return '当前有未完成的询问';
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
       if (usesThisTurn(st, ownerId) >= MAX_USES) return '本阶段势斩已达上限(2次)';
-      const self = st.players[ownerId];
-      if (!self?.alive) return '玩家不存在或已死亡';
 
       const target = params.target;
       if (typeof target !== 'number') return '需要指定一名目标';

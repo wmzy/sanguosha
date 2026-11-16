@@ -12,7 +12,6 @@ import type { PendingRespondInfo } from '../utils/pendingRespond';
 import type { ProcessingPickState } from '../hooks/useProcessingPicks';
 import type { AutoSkipPrefs } from '../utils/autoSkip';
 import { getPendingRequestType } from '../utils/pendingRespond';
-import { countRespondableCards } from '../utils/gameViewHelpers';
 import { DEFAULT_FACTION_COLOR, fallbackFaction } from '../utils/characterVisuals';
 import { FACTION_BG } from './gameViewConstants';
 import { displaySkillName } from '../utils/skillDisplay';
@@ -363,7 +362,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
           // useCard / useCardAndTarget 类 pending:手牌区对可回应的牌(杀/闪/桃/酒)高亮。改为「先选牌再点打出」两步式
           // (避免误触直接出牌),出牌/不回应按钮在下方统一操作区(actionBar),此处仅显示文案提示。
           // useCardAndTarget(借刀杀人/出杀)还需选目标座次,提示文案区分。
-          const respondableCount = filterFn ? countRespondableCards(perspectiveHand, filterFn) : 0;
+          const respondableCount = filterFn ? perspectiveHand.filter(filterFn).length : 0;
           const needsTarget = pending.prompt.type === 'useCardAndTarget';
           return (
             <div className={styles.promptActions}>

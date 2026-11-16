@@ -38,10 +38,10 @@ import { projectTurnUsage } from '../rules/turn-usage';
 import {
   registerAction,
   registerBeforeHook,
-  hasBlockingPending,
 } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界解烦';
@@ -110,13 +110,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       ownerId,
       'use',
       (st: GameState, params: Record<string, Json>): string | null => {
-        if (st.currentPlayerIndex !== ownerId) return '不是你的回合';
-        if (st.phase !== '出牌') return '只能在出牌阶段发动';
-        if (hasBlockingPending(st)) return '当前有未完成的询问';
+        const playError = engineCanPlayNowReason(st, ownerId);
+        if (playError) return playError;
         if (st.players[ownerId]?.vars[USED_KEY] === true)
           return '解烦已发动过(限定技)';
-        const self = st.players[ownerId];
-        if (!self?.alive) return '玩家不存在或已死亡';
         const target = params.target as number | undefined;
         if (typeof target !== 'number') return '需要指定目标';
         if (!st.players[target]?.alive) return '目标不合法';

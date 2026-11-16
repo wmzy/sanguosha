@@ -868,7 +868,7 @@ describe('房间登录强制', () => {
       cardMap: { a: { id: 'a', name: '杀', suit: '♠', color: '黑', rank: 'A', type: '基本牌' }, b: { id: 'b', name: '闪', suit: '♥', color: '红', rank: '2', type: '基本牌' } },
     });
     (session as unknown as { state: typeof state }).state = state;
-    (session as unknown as { playerNames: Map<string, number> }).playerNames.set(host.userId, 0);
+    (session as unknown as { playerSeatIndex: Map<string, number> }).playerSeatIndex.set(host.userId, 0);
     const messages: import('../../src/server/protocol').ServerMessage[] = [];
     getRoom(roomId)!.players.set(host.userId, { send: (message) => messages.push(message), close() {}, isAlive: true });
     const before = [...state.players[0].hand];
@@ -1106,7 +1106,7 @@ describe('房间密码', () => {
       body: JSON.stringify({}),
     });
     expect(noPw.status).toBe(403);
-    expect(((await noPw.json()) as { code?: string }).code).toBe('ROOM_PASSWORD_REQUIRED');
+    expect(((await noPw.json()) as { code?: string }).code).toBe('ROOM_PASSWORD_INVALID');
 
     const wrongPw = await app.request(`/api/rooms/${locked.roomId}/join`, {
       method: 'POST',
