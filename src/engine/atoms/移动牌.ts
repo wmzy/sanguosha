@@ -6,7 +6,7 @@ import type {
   ViewEvent,
   Card,
 } from '../types';
-import { addCardToHand, applyDrawEvent, broadcast, resolveDiscardEntry, removeCardFromHand, viewPlayer } from './_helpers';
+import { addCardToHand, applyDrawEvent, broadcast, pushToDiscardPile, removeCardFromHand, viewPlayer } from './_helpers';
 
 export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: ZoneLoc }> = {
   type: '移动牌',
@@ -42,13 +42,8 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
     } else if (atom.to.zone === '牌堆') {
       state.zones.deck.push(atom.cardId);
     } else if (atom.to.zone === '弃牌堆') {
-      // 牌入堆单点裁决(_helpers.resolveDiscardEntry):
-      //   - 结算临时牌(八卦阵/八阵虚拟闪)销毁不入堆——凭空生成的标记,
-      //     入堆会让牌库永久多一张假闪,重洗后可被玩家摸起;
-      //   - 影子卡牌(转化牌,如武圣红牌当杀)还原为原卡入堆;
-      //   - 普通牌原样入堆。
-      const entry = resolveDiscardEntry(state, atom.cardId);
-      if (entry !== null) state.zones.discardPile.push(entry);
+      // 牌入堆单点裁决(临时牌销毁/影子卡还原/原样入堆,语义见 _helpers.pushToDiscardPile)
+      pushToDiscardPile(state, atom.cardId);
     } else if (atom.to.zone === '处理区') {
       const frame = state.settlementStack[state.settlementStack.length - 1];
       if (frame) frame.cards.push(atom.cardId);

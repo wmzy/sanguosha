@@ -18,7 +18,7 @@ import type { Room } from '../../src/server/room';
 
 const CHARACTERS = allCharacters.map((c) => ({
   name: c.name,
-  skills: c.skills.map((s) => s.name),
+  skills: [...c.skills],
 }));
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

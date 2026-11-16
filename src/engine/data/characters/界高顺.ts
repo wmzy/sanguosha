@@ -10,8 +10,5 @@ export const 界高顺 = {
   maxHealth: 4,
   gender: '男',
   faction: '群',
-  skills: [
-    { name: '界陷阵', path: '../../skills/界陷阵' },
-    { name: '界禁酒', path: '../../skills/界禁酒' },
-  ],
+  skills: ['界陷阵', '界禁酒'],
 };

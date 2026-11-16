@@ -38,7 +38,7 @@ function makePlayer(opts: { index: number; name: string }): PlayerState {
 
 const CHARACTERS: Array<{ name: string; skills: string[] }> = allCharacters.map((c) => ({
   name: c.name,
-  skills: c.skills.map((s) => s.name),
+  skills: [...c.skills],
 }));
 
 /** 处理所有选将 pending:对每个有选将 pending 的玩家,选第一个候选人 */

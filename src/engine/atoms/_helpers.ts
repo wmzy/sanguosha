@@ -8,6 +8,8 @@
 //     (handCount 计数 + hand 数组按 cardId 精确同步)。
 //   - applyDrawEvent:摸牌 ViewEvent 的 applyView 单点(摸牌 atom 与 移动牌「牌堆→手牌」共用)。
 //   - resolveDiscardEntry:牌入弃牌堆的单点裁决(临时牌销毁/影子卡还原/原样入堆)。
+//   - pushToDiscardPile:牌入弃牌堆的 apply 单点(裁决 + push 的两行组合)。
+//   - removeFromEquipment:装备区按谓词重建(apply/applyView 的「剔除被移走的装备槽」样板)。
 //   - clearEquipVars:装备离身时清除武器距离 vars(卸下/移出至暂存区 共用)。
 //   - makeCardAskAtom:卡牌询问型等待 atom 工厂(询问杀/询问闪 逐行同构)。
 import type {
@@ -149,7 +151,7 @@ export function applyDrawEvent(view: GameView, event: ViewEvent): void {
  *  - shadowOf(转化影子卡,如武圣红牌当杀):还原为原卡 id 入堆,影子条目删除
  *    (原卡 cardMap[shadowOf] 仍在);
  *  - 普通牌:原 id 入堆。
- *  所有「牌入弃牌堆」的 apply 路径(移动牌/弃置/扣牌)必须经此单点——
+ *  「牌入弃牌堆」的 apply 路径一律经 pushToDiscardPile(本函数 + push 的组合单点)——
  *  影子 id 直接入堆会让弃牌堆出现 cardMap 外的 id(重洗后 cardMap[id] 为 undefined,
  *  摸牌/视图投影随之漂移)。 */
 export function resolveDiscardEntry(state: GameState, cardId: string): string | null {
@@ -164,6 +166,38 @@ export function resolveDiscardEntry(state: GameState, cardId: string): string | 
     return originalId;
   }
   return cardId;
+}
+
+/** 牌入弃牌堆(state 侧单点):经 resolveDiscardEntry 裁决真实入堆 id 后 push,
+ *  裁决为 null(临时牌销毁)时不入堆。所有「牌入弃牌堆」的 apply 路径
+ *  (弃置/扣牌/归还暂存牌/移动牌/置创牌/系统处理牌)必须走本单点:
+ *  - 结算临时牌(八卦阵/八阵虚拟闪)是凭空生成的标记,直接入堆会让牌库永久
+ *    多一张假牌,重洗后可被玩家摸起——销毁不入堆;
+ *  - 转化影子卡(如武圣红牌当杀)还原为原卡 id 入堆——影子 id 直接入堆会让
+ *    弃牌堆出现 cardMap 查不到的 id(重洗后同牌两个实例,摸牌/视图投影漂移);
+ *  - 普通牌原样入堆。 */
+export function pushToDiscardPile(state: GameState, cardId: string): void {
+  const entry = resolveDiscardEntry(state, cardId);
+  if (entry !== null) state.zones.discardPile.push(entry);
+}
+
+// ── 装备区重建样板(apply 与 applyView 共用) ──
+
+/** 装备区按谓词重建(对齐 removeCardsFromHand 的集合过滤风格):
+ *  返回新 Record,仅保留「id 为真值且未被 shouldRemove 命中」的槽位,原对象不变。
+ *  falsy 槽位不保留(装备槽只可能「有 string id」或「键不存在」,无 null 值,
+ *  delete 循环与重建等价);键顺序保持原插入顺序。
+ *  仅做 Record 重建、不触碰 vars——武器离身需清距离 vars 的调用方(移出至暂存区)
+ *  另行调用 clearEquipVars。 */
+export function removeFromEquipment(
+  equipment: Partial<Record<EquipSlot, string>>,
+  shouldRemove: (id: string) => boolean,
+): Partial<Record<EquipSlot, string>> {
+  const kept: Record<string, string> = {};
+  for (const [slot, id] of Object.entries(equipment)) {
+    if (id && !shouldRemove(id)) kept[slot] = id;
+  }
+  return kept;
 }
 
 // ── 装备 vars 清理 ──

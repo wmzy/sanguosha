@@ -7,11 +7,10 @@
 //
 // 翻面实现(同据守的手法,但标签名独立,与据守互不干扰):
 //   - 加标签 `放逐/翻面` 到目标(下一回合开始时消费)
-//   - before hook 挂「阶段开始」:目标准备阶段开始 + 有翻面标签 → 移除标签 +
-//     设 skipAll 标志(localVars)+ cancel(不进入准备阶段)
-//   - before hook 挂「阶段开始」:skipAll 标志存在时 cancel 所有其他阶段
-//   - before hook 挂「阶段结束」:skipAll 标志 → 主动推进回合(清过期标记 +
-//     下一玩家 + 回合结束),避免 phase-end after-hook 推进产生幻影阶段链
+//   - 跳回合 hook 对复用 flows/face-down 的 registerFlipSkipTurnHooks:
+//     目标准备阶段开始 + 有翻面标签 → 移除标签 + 设 skipAll 标志 + cancel,
+//     skipAll 存续期间 cancel 其余所有阶段;阶段结束 hook 主动推进回合
+//     (避免 phase-end after-hook 推进产生幻影阶段链)
 //
 // 关键点:
 //   - X = maxHealth - health(已损失体力值),血越少摸牌越多
@@ -29,21 +28,20 @@ import type {
   FrontendAPI,
   GameState,
   GameView,
-  HookResult,
   Json,
   Skill,
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { flipFaceDown, registerFlipSkipTurnHooks } from '../flows/face-down';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { askConfirm, askResponse, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
-// 放逐族共享键(localVars/标签):确认与目标结果、翻面标签、跳过标志
+// 放逐族共享键(localVars):确认与目标结果
+// (翻面标签 '放逐/翻面' 与跳过标志 '放逐/skipAll' 由 face-down 通用版按 reason '放逐'
+//  构造,标/界放逐共用——同一角色只会拥有一版放逐)
 const CONFIRMED_KEY = '放逐/confirmed';
 const TARGET_KEY = '放逐/target';
-const SKIP_TAG = '放逐/翻面';
-const SKIP_FLAG = '放逐/skipAll';
 
 /** 放逐族差异参数。 */
 export interface FangzhuOptions {
@@ -160,57 +158,9 @@ export function createFangzhuSkill(opts: FangzhuOptions) {
       }
     });
 
-    // ── 阶段开始 before hook:检测翻面标签 → 启动跳过 ──
-    // 注册在曹丕座次,但对所有玩家的 阶段开始 atom 触发(callback 内按 player 检查)
-    registerBeforeHook(
-      state,
-      skill.id,
-      ownerId,
-      '阶段开始',
-      async (ctx): Promise<HookResult | void> => {
-        const atom = ctx.atom;
-        if (atom.type !== '阶段开始') return;
-        const player = atom.player;
-        if (player === undefined) return;
-        const p = ctx.state.players[player];
-        if (!p) return;
-
-        // 入口:准备阶段开始 + 该玩家有翻面标签 → 启动跳过
-        if (atom.phase === '准备' && p.tags.includes(SKIP_TAG)) {
-          await flipFaceUp(ctx.state, player, '放逐');
-          ctx.state.localVars[SKIP_FLAG] = player;
-          return { kind: 'cancel' };
-        }
-
-        // skipAll 标志存在时,取消该玩家所有其他阶段(防 phase-end after-hook 推进)
-        if (ctx.state.localVars[SKIP_FLAG] === player) {
-          return { kind: 'cancel' };
-        }
-      },
-    );
-
-    // ── 阶段结束 before hook:skipAll → 主动推进回合 ──
-    registerBeforeHook(
-      state,
-      skill.id,
-      ownerId,
-      '阶段结束',
-      async (ctx): Promise<HookResult | void> => {
-        const atom = ctx.atom;
-        if (atom.type !== '阶段结束') return;
-        const player = atom.player;
-        if (player === undefined) return;
-        if (ctx.state.localVars[SKIP_FLAG] !== player) return;
-
-        // 清除 skipAll 标志
-        delete ctx.state.localVars[SKIP_FLAG];
-
-        // 亲自执行 end-turn 序列(与 回合管理.end action 一致,但跳过了被 cancel 的阶段)
-        await performSkipTurn(ctx.state, player);
-
-        return { kind: 'cancel' };
-      },
-    );
+    // ── 翻面跳过 hooks(共用 face-down 通用版;放逐翻的是目标他人 → scope 'any',
+    //    注册在曹丕座次,但对所有玩家的阶段 atom 触发,callback 内按 player 检查)──
+    registerFlipSkipTurnHooks(state, skill.id, ownerId, '放逐', { scope: 'any' });
 
     return () => {};
   }

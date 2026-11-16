@@ -84,9 +84,6 @@ async function askAndGain(
   const self = state.players[ownerId];
   if (!self?.alive) return 0;
 
-  // 翻面增强:无距离限制且不能被响应(本实现无可观察行为,标版注释)
-  // const flipped = self.tags.some((t) => t.endsWith('/翻面'));
-
   const want = await askConfirm(state, CHOOSE_RT, ownerId, {
     confirmedKey: CHOICE_KEY,
     title: `落英:是否获得 ${clubCardIds.length} 张梅花牌?`,

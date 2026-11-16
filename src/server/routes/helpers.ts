@@ -18,6 +18,8 @@ import { requireUser, resolveRoomActor } from '../auth/guard';
 import type { PublicUser } from '../auth/store';
 import type { ServerMessage } from '../protocol';
 import type { ConnectionSink } from '../connection';
+import { gameSessions } from '../registry';
+import type { GameSession } from '../session';
 
 /** 读取 JSON body;缺失/解析失败回退空对象(与原 rest.ts 各路由内联写法一致)。 */
 export async function readJsonBody(c: Context): Promise<Record<string, unknown>> {
@@ -32,6 +34,13 @@ export function optString(value: unknown): string {
 /** 统一 401 未登录响应(文案与既有路由一致,带 AUTH_REQUIRED code)。 */
 export function authRequired(c: Context): Response {
   return c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401);
+}
+
+/** 房间存在性守卫:房间不存在时返回 404「房间不存在」,存在时返回房间本身。
+ *  返回值 instanceof Response 时调用方直接 return。
+ *  需要鉴权先于存在性检查的路由(join 族)应在 401 判定之后调用本守卫。 */
+export function requireRoom(c: Context, roomId: string): Room | Response {
+  return getRoom(roomId) ?? c.json({ error: '房间不存在' }, 404);
 }
 
 /** 广播 room_state 给房间内所有连接。 */
@@ -88,6 +97,26 @@ export async function resolveActorOr401(
   return actor.error ? { response: authRequired(c) } : { playerId: actor.playerId };
 }
 
+/** 对局会话操作者的共用前奏(action/reorder):会话不存在回 404「游戏会话不存在」;
+ *  否则解析操作者身份(非调试房取会话 userId,调试房回退 body.playerId——
+ *  信任 body.playerId 的安全问题见 game-routes 的 action 路由注释)并回填最终 playerId。
+ *  response 非空时调用方直接 `return xxx.response`。 */
+export async function resolveSessionActor(
+  c: Context,
+  roomId: string,
+  playerId: string,
+): Promise<
+  | { session: GameSession; playerId: string; response?: undefined }
+  | { session?: undefined; playerId?: undefined; response: Response }
+> {
+  const session = gameSessions.get(roomId);
+  if (!session) return { response: c.json({ error: '游戏会话不存在' }, 404) };
+  const room = getRoom(roomId);
+  const actor = await resolveActorOr401(c, !!room && !room.isDebug, playerId);
+  if (actor.response) return { response: actor.response };
+  return { session, playerId: actor.playerId };
+}
+
 /** 路由 playerId 解析(ready/config/换座族):非调试房取会话 userId
  *  (body.playerId 忽略);调试房/房间不存在回退 bodyPlayerId。
  *  未登录回 401(带 AUTH_REQUIRED code,与 authRequired 一致);
@@ -104,7 +133,7 @@ export async function resolvePlayerOrRespond(
     bodyPlayerId,
   );
   if (actor.error === 'unauthenticated') {
-    return { response: c.json({ error: '请先登录', code: 'AUTH_REQUIRED' }, 401) };
+    return { response: authRequired(c) };
   }
   if (actor.error) return { response: c.json({ error: '缺少 playerId' }, 400) };
   return { playerId: actor.playerId };

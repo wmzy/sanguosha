@@ -54,6 +54,17 @@ export function viewAskedKill(ctx: ActionContext): boolean {
   );
 }
 
+/** view 侧同源判定:当前视角是否被询问闪(onMount activeWhen 的防御向回应路径维度)。
+ *  「询问闪」均为直接询问,无 委托回应 变体(对比杀的 请求回应+requestType),故只查 atom.type。 */
+export function viewAskedDodge(ctx: ActionContext): boolean {
+  const slot = ctx.view.pending;
+  return (
+    !!slot &&
+    slot.target === ctx.perspectiveIdx &&
+    (slot.atom as { type?: string } | null)?.type === '询问闪'
+  );
+}
+
 // ────────────────────────── params 选牌读取归一 ──────────────────────────
 
 /**

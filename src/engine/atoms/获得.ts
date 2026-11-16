@@ -5,7 +5,7 @@
 // 时机标记(reason='获得'),为失去牌类技能提供统一 hook 点。ZoneLoc 不含「装备」区域,
 // 从装备区获得不发标记。本 atom 的 apply + view 事件保持不变(含信息分级)。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { addCardToHand, removeCardFromHand, requirePlayer, viewPlayer } from './_helpers';
+import { addCardToHand, removeCardFromHand, removeFromEquipment, requirePlayer, viewPlayer } from './_helpers';
 import { applyAtom } from '../core/apply';
 
 /** localVars key:本次获得是否来自 from 玩家的手牌(afterApply 发时机标记用) */
@@ -26,11 +26,7 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
       const fromP = state.players[atom.from];
       fromWasHand = fromP.hand.includes(atom.cardId);
       fromP.hand = fromP.hand.filter((id) => id !== atom.cardId);
-      const equipment: Record<string, string> = {};
-      for (const [slot, id] of Object.entries(fromP.equipment)) {
-        if (id && id !== atom.cardId) equipment[slot] = id;
-      }
-      fromP.equipment = equipment;
+      fromP.equipment = removeFromEquipment(fromP.equipment, (id) => id === atom.cardId);
     }
     state.localVars[FROM_HAND_KEY] = fromWasHand;
     state.players[atom.player].hand.push(atom.cardId);
@@ -98,11 +94,7 @@ export const 获得: AtomDefinition<{ player: number; cardId: string; from?: num
       if (fromP) {
         if (fromZone === 'equipment') {
           // 从装备区移除
-          const equipment: Partial<Record<string, string>> = {};
-          for (const [slot, id] of Object.entries(fromP.equipment)) {
-            if (id && id !== cardId) equipment[slot] = id;
-          }
-          fromP.equipment = equipment;
+          fromP.equipment = removeFromEquipment(fromP.equipment, (id) => id === cardId);
         } else {
           // 从手牌移除(handCount - 1;可见时同步 hand 数组)
           removeCardFromHand(fromP, cardId);

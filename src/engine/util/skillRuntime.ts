@@ -13,9 +13,9 @@
 //                  registerRespondForAllSeats);
 //   hooks.ts     — hook 守卫工厂(registerOnOwnSlashDodged/registerOnDamagedAsTarget/
 //                  registerPhaseStartHook);
-//   misc.ts      — 出牌时机判定(engineCanPlayNow/engineCanPlayNowReason)、被询问杀窗口
-//                  (isAskedKillSlot/viewAskedKill)、params 选牌归一(normalizeCardIds/
-//                  firstCardId)、confirm 型 defineAction(defineConfirmAction)。
+//   misc.ts      — 出牌时机判定(engineCanPlayNow/engineCanPlayNowReason)、被询问杀/闪窗口
+//                  (isAskedKillSlot/viewAskedKill/viewAskedDodge)、params 选牌归一
+//                  (normalizeCardIds/firstCardId)、confirm 型 defineAction(defineConfirmAction)。
 export * from './skillRuntime/transform';
 export * from './skillRuntime/respond';
 export * from './skillRuntime/hooks';

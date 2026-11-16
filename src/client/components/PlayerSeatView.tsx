@@ -15,20 +15,16 @@ import { getSkillDescription } from '../../engine/skills/lifecycle';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import type { HpChangeNumber } from '../hooks/useAnimationState';
 import { SkillTag } from './SkillTooltip';
-import { SUIT_COLOR, EQUIPMENT_SKILL_NAMES, EQUIP_SLOT_ICON } from './gameViewConstants';
+import { SUIT_COLOR, EQUIP_SLOT_ICON } from './gameViewConstants';
 import * as styles from './gameViewStyles';
 import { HpBeadColumn } from './HpBeadColumn';
-import { LORD_SKILLS } from '../../engine/data/character-meta';
-import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
-import { displaySkillName, groupDisplayMarks } from '../utils/skillDisplay';
+import { displaySkillName, groupDisplayMarks, visibleSkillsOf } from '../utils/skillDisplay';
 import {
   getCharacterCardVisuals,
   hideImgOnError,
   identityStampClass,
 } from '../utils/characterVisuals';
 import { HpFloatNumber } from '../utils/HpFloatNumber';
-
-const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
 
 export interface PlayerSeatProps {
   player: GameView['players'][number];
@@ -320,11 +316,8 @@ function SeatLabelRows({ player, view }: { player: PlayerSeatProps['player']; vi
       })()}
       {/* 技能 chips:暗底金字小圆角 */}
       {(() => {
-        const isLordSeat = player.identity === '主公';
-        const seatVisibleSkills = player.skills
-          .filter((s) => !DEFAULT_SKILLS.has(s))
-          .filter((s) => !EQUIPMENT_SKILL_NAMES.has(s))
-          .filter((s) => isLordSeat || !LORD_SKILLS.has(s));
+        // 过滤默认/装备技能;非主公隐藏主公技(共享逻辑见 utils/skillDisplay)
+        const seatVisibleSkills = visibleSkillsOf(player);
         if (seatVisibleSkills.length === 0) return null;
         return (
           <div className={styles.skillRow}>

@@ -21,7 +21,7 @@
 import type { GameView, PendingView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import type { PendingRespondInfo } from './pendingRespond';
-import { getPendingRequestType } from './pendingRespond';
+import { getPendingRequestType, respondCandidates } from './pendingRespond';
 import { isActiveAction } from './gameViewHelpers';
 
 // ─── 类型 ────────────────────────────────────────────────────
@@ -112,8 +112,12 @@ export function decideAutoSkip(input: AutoSkipInput): AutoSkipDecision {
 /**
  * 计算当前 viewer 是否能响应 pending(前端视角,含转化技)。
  *
- * - 非 useCard 类 prompt(confirm/choosePlayer/...):总有操作按钮 → true
- * - useCard 卡牌回应型:手牌有匹配字面牌 OR 有激活的转化技 transform action
+ * - 非 useCard 类 prompt(confirm/choosePlayer/useCardAndTarget/...):总有操作按钮 → true
+ * - useCard 卡牌回应型:共享候选集非空 OR 有激活的转化技 transform action。
+ *   候选判据与浏览器选牌/无头枚举共用 respondCandidates(单一口径):投影层
+ *   candidates(权威,可能含装备区牌)优先,否则 cardFilter 过滤手牌。
+ *   修复:旧实现 hand.some(cardFilter) 只认手牌——界鬼才只持可换判定牌的装备时
+ *   误判无法响应而代发 skip(空手牌时立即跳过,装备候选 UI 闪现即被跳)。
  *
  * 转化技(看破黑牌转无懈)通过 action.activeWhen 判断——其内部已检查
  * "无懈窗口 + 手牌有黑牌",故无需在此维护技能名单。
@@ -130,8 +134,8 @@ export function computeCanRespondForView(
   if (pending.prompt?.type !== 'useCard') return true;
   // useCard 卡牌回应型
   const hand = view.players[viewer]?.hand ?? [];
-  // 字面牌匹配
-  if (pendingRespondInfo?.cardFilter && hand.some(pendingRespondInfo.cardFilter)) return true;
+  // 字面/装备候选匹配(共享候选集)
+  if (respondCandidates(pendingRespondInfo, hand, view.cardMap).length > 0) return true;
   // 转化技 transform action(看破/武圣 等):activeWhen 判断激活
   const ctx = { view, perspectiveIdx: viewer };
   return skillActions.some(

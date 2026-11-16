@@ -17,7 +17,7 @@
 // 触发时机:具体技能(界破军/界谦逊)注册的 回合结束 after-hook 检测到
 //   对应 vars[varsKey] 非空时调用本 atom。
 import type { AtomDefinition, Card, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { broadcast, requirePlayer, resolveDiscardEntry, viewPlayer } from './_helpers';
+import { broadcast, pushToDiscardPile, requirePlayer, viewPlayer } from './_helpers';
 
 export const 归还暂存牌: AtomDefinition<{ player: number; varsKey: string }> = {
   type: '归还暂存牌',
@@ -34,11 +34,9 @@ export const 归还暂存牌: AtomDefinition<{ player: number; varsKey: string }
     const list = (player.vars[atom.varsKey] as string[] | undefined) ?? [];
     delete player.vars[atom.varsKey];
     if (!player.alive) {
-      // 死亡:归还的牌直接进弃牌堆(经 resolveDiscardEntry 单点——暂存牌取自手牌,
-      // 可能含转化影子卡,影子 id 不得直接入堆;普通牌原样入堆)
+      // 死亡:归还的牌直接进弃牌堆(单点入堆——暂存牌取自手牌,可能含转化影子卡)
       for (const id of list) {
-        const entry = resolveDiscardEntry(state, id);
-        if (entry !== null) state.zones.discardPile.push(entry);
+        pushToDiscardPile(state, id);
       }
       return;
     }

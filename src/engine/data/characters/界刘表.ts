@@ -6,8 +6,5 @@ export const 界刘表 = {
   maxHealth: 3,
   gender: '男',
   faction: '群',
-  skills: [
-    { name: '界自守', path: '../../skills/界自守' },
-    { name: '界宗室', path: '../../skills/界宗室' },
-  ],
+  skills: ['界自守', '界宗室'],
 };

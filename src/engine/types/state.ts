@@ -44,16 +44,16 @@ export type Json = string | number | boolean | null | Json[] | { [key: string]: 
 export type Card = {
   id: string;
   name: string;
-  suit: '♠' | '♥' | '♣' | '♦' | '';
+  suit: Suit | '';
   /** 颜色，独立于花色。转化合成卡(多张)为'无色'。 */
   color: Color;
   rank: string;
-  type: '基本牌' | '锦囊牌' | '装备牌';
+  type: CardType;
   subtype?: string;
   /** 卡牌描述 */
   description?: string;
   /** 锦囊子类型 */
-  trickSubtype?: '普通锦囊' | '延时锦囊' | '响应锦囊';
+  trickSubtype?: TrickSubType;
   /** 武器攻击范围(仅武器装备牌)。徒手默认 1,由 distance.ts 兜底 */
   range?: number;
   /** 伤害属性(仅杀牌/伤害锦囊有意义):火焰/雷电触发铁索连环传导 */

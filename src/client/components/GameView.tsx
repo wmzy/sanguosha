@@ -303,6 +303,8 @@ export function GameViewComponentImpl({
     playButtonState,
     selectedRespondCardId,
     respondTargetName,
+    respondCandidates,
+    respondCard,
     respondNeedsTarget,
     respondTargetReady,
     altActions,
@@ -335,7 +337,7 @@ export function GameViewComponentImpl({
 
   // ─── 手牌可选性判定(渲染循环与数字键快捷键共用)───
   // 与点击置灰严格同源:自由出牌 canPlay(无 use 入口/未激活的牌置灰)、respond 回应
-  // isAwaiting(cardFilter 排除的牌置灰)、弃牌 canDiscardClick(整手牌可选)。
+  // isAwaiting(候选集外的牌置灰)、弃牌 canDiscardClick(整手牌可选)。
   // 数字键 1-9 复用这三个判定,保证「点击置灰的牌数字键也无效果」。
   const canDiscardClick = isDiscardPhase && isPerspectiveAwaiting && canOperate;
   // canPlay 要求该牌有主动 use 入口,且(若有匹配的 use action)当前激活。
@@ -355,9 +357,15 @@ export function GameViewComponentImpl({
     },
     [isMyTurn, canOperate, skillActions, view, perspectiveIdx],
   );
+  // 回应候选与无头枚举共用 respondCandidates(经 usePlayInteraction 派生):
+  // 投影层 candidates(权威,可能含装备区牌)优先,否则 cardFilter 过滤手牌。
+  const respondCandidateIdSet = useMemo(
+    () => new Set(respondCandidates.map((c) => c.id)),
+    [respondCandidates],
+  );
   const isRespondableCard = useCallback(
-    (card: Card) => !isDistributeActive && isMyAwaiting && !!pendingRespondInfo?.cardFilter?.(card),
-    [isDistributeActive, isMyAwaiting, pendingRespondInfo],
+    (card: Card) => !isDistributeActive && isMyAwaiting && respondCandidateIdSet.has(card.id),
+    [isDistributeActive, isMyAwaiting, respondCandidateIdSet],
   );
 
   // ─── 不可用手牌的原因提示(出牌阶段置灰卡的 hover 说明,与 canPlayHandCard 同源)───
@@ -430,9 +438,11 @@ export function GameViewComponentImpl({
       // 时旧判据会误报攻击范围;回应窗口(useCardAndTarget 型 pending,借刀杀人)用
       // 正在打出的回应牌)。
       const respondWindow = isMyAwaiting && pending?.prompt?.type === 'useCardAndTarget';
+      // 回应窗口的打出牌(含装备区候选,如界天香弃红桃装备)直接用 respond 子 hook
+      // 派生的 respondCard(共享候选集内查找),不再局限于手牌。
       const usingCard = targetConstraintCard(
         respondWindow,
-        perspectiveHand.find((c) => c.id === selectedRespondCardId),
+        respondCard,
         selectedCard,
         selectedTargetFilter,
         usedCardNameOf(transformWrapperName, selectedUseAction, selectedCard),
@@ -453,8 +463,7 @@ export function GameViewComponentImpl({
       selectedUseAction,
       selectedTargetFilter,
       transformWrapperName,
-      selectedRespondCardId,
-      perspectiveHand,
+      respondCard,
       isMyAwaiting,
       pending,
     ],
@@ -475,6 +484,21 @@ export function GameViewComponentImpl({
     },
     [handleCardClick],
   );
+
+  // ─── 回应窗口的装备区候选(界天香弃红桃装备 / 界鬼才换判定牌)───
+  // 共享候选集 respondCandidates 中落在自己装备区槽位里的牌:EquipColumn 据此
+  // 点亮可点选(与手牌候选同一 handleCardClick 通道,点击走回应选中而非装备技能)。
+  // 非回应窗口/distribute 激活时为 null(装备区保持装备技能按钮语义)。
+  const respondCandidateEquipIds = useMemo(() => {
+    if (!isMyAwaiting || isDistributeActive) return null;
+    const equipIds = new Set(
+      Object.values(view.players[perspectiveIdx]?.equipment ?? {}).filter(
+        (id): id is string => typeof id === 'string',
+      ),
+    );
+    const ids = respondCandidates.filter((c) => equipIds.has(c.id)).map((c) => c.id);
+    return ids.length > 0 ? new Set(ids) : null;
+  }, [isMyAwaiting, isDistributeActive, view.players, perspectiveIdx, respondCandidates]);
 
   // 判定翻牌动画(effect.animation='flip', blockUntilDone)期间,延迟询问类 pending 渲染。
   // 否则玩家会在判定结果(八卦阵/乐不思蜀等翻牌)还没看清时就被弹出「是否出闪」打断。
@@ -513,13 +537,14 @@ export function GameViewComponentImpl({
     (pending?.prompt?.type === 'useCard' || pending?.prompt?.type === 'useCardAndTarget');
 
   // ─── 回应窗口候选数(0 时动作条显示「一键不回应」,替代置灰的「打出」)───
-  // 注意必须在 isRespondPending 定义之后(同源计算条件)。计数与 AwaitingPrompt 的
-  // respondableCount 同判据(按 cardFilter 过滤手牌计数);无 filter(非卡牌回应)时
+  // 注意必须在 isRespondPending 定义之后(同源计算条件)。计数用共享候选集
+  // respondCandidates(含装备区候选,界鬼才只持可换判定牌的装备时不误报 0),
+  // 与 AwaitingPrompt 的 respondableCount 同判据;无 filter(非卡牌回应)时
   // 保持 null(未知),与 AwaitingPrompt 的 0(无)语义由调用方区分。
   const respondCandidateCount = useMemo(() => {
     if (!isRespondPending || !pendingRespondInfo?.cardFilter) return null;
-    return perspectiveHand.filter(pendingRespondInfo.cardFilter).length;
-  }, [isRespondPending, pendingRespondInfo, perspectiveHand]);
+    return respondCandidates.length;
+  }, [isRespondPending, pendingRespondInfo, respondCandidates]);
   const showCenterActionBar =
     isRespondPending ||
     (canOperate && !!selectedActive && !!transformMode) ||
@@ -767,7 +792,7 @@ export function GameViewComponentImpl({
                             <AwaitingPrompt
                               pending={pending}
                               pendingTargetIdx={pendingTargetIdx}
-                              perspectiveHand={perspectiveHand}
+                              respondCandidates={respondCandidates}
                               pendingRespondInfo={pendingRespondInfo}
                               broadcastKey={broadcastKey}
                               skippedBroadcast={skippedBroadcast}
@@ -872,6 +897,8 @@ export function GameViewComponentImpl({
               distSelectedEquipIds={distSelected}
               isDistributeActive={isDistributeActive}
               onEquipCardClick={handleEquipCardClick}
+              respondCandidateEquipIds={respondCandidateEquipIds}
+              selectedRespondEquipId={selectedRespondCardId}
             />
 
             <HandArea

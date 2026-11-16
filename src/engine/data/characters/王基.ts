@@ -5,8 +5,5 @@ export const 王基 = {
   maxHealth: 3,
   gender: '男',
   faction: '魏',
-  skills: [
-    { name: '奇制', path: '../../skills/奇制' },
-    { name: '进趋', path: '../../skills/进趋' },
-  ],
+  skills: ['奇制', '进趋'],
 };

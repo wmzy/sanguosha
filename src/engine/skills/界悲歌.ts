@@ -17,10 +17,11 @@
 //   按花色执行 → 比较判定牌与弃置牌的花色/点数 → 移动牌(弃牌堆→手牌)获得对应牌。
 //
 // 关键点:
-//   - 触发守卫/花色主效果/判定牌捕获 hook/翻面跳过 hooks 复用标版悲歌导出的共享核心
-//     (beigeDamageTarget/applyBeigeSuitEffect/registerBeigeJudgeCaptureHook/
-//     registerBeigeFlipSkipHooks),仅 judgeType/翻面 reason 前缀不同('界悲歌',
-//     标签 '界悲歌/翻面' 与标版 '悲歌/翻面' 隔离)。
+//   - 触发守卫/花色主效果/判定牌捕获 hook 复用标版悲歌导出的共享核心
+//     (beigeDamageTarget/applyBeigeSuitEffect/registerBeigeJudgeCaptureHook);
+//     翻面跳过 hooks 两版均直接调 flows/face-down 的 registerFlipSkipTurnHooks
+//     (悲歌翻的是伤害来源 → scope 'any';本版 reason '界悲歌',标签 '界悲歌/翻面'
+//     与标版 '悲歌/翻面' 隔离)。
 //   - 花色主效果的 ♣/♠ 分支因来源缺失/死亡提前终止时,奖励阶段不继续
 //     (applyBeigeSuitEffect 返回 false,与原内联实现的提前 return 一致)。
 //   - 判定牌和弃置牌都进弃牌堆后,通过 移动牌(弃牌堆→手牌) 获得(无需延迟拿取——
@@ -37,6 +38,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { runJudgeFlow } from '../flows/judge';
+import { registerFlipSkipTurnHooks } from '../flows/face-down';
 import { registerAction, registerAfterHook } from '../core/skill';
 import {
   requireRequestType,
@@ -48,7 +50,6 @@ import {
   beigeDamageTarget,
   applyBeigeSuitEffect,
   registerBeigeJudgeCaptureHook,
-  registerBeigeFlipSkipHooks,
 } from './悲歌';
 
 const START_RT = '界悲歌/chooseStart';
@@ -183,8 +184,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     }
   });
 
-  // ── 翻面跳过 hooks(标/界共享,tag 前缀 '界悲歌')──
-  registerBeigeFlipSkipHooks(state, skill.id, ownerId, '界悲歌');
+  // ── 翻面跳过 hooks(共用 face-down 通用版;界悲歌翻的是伤害来源 → scope 'any')──
+  registerFlipSkipTurnHooks(state, skill.id, ownerId, '界悲歌', { scope: 'any' });
 
   return () => {};
 }

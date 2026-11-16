@@ -29,7 +29,7 @@
 //     谦逊 source===target(自己选自己的牌);破军 source≠target(徐盛选目标牌)。
 //   - varsKey: 暂存键名,由调用方技能自行定义(如 '界破军/移出'),归还方须用同一键。
 import type { AtomDefinition, Card, EquipSlot, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { clearEquipVars, removeCardsFromHand, requirePlayer, viewPlayer } from './_helpers';
+import { clearEquipVars, removeCardsFromHand, removeFromEquipment, requirePlayer, viewPlayer } from './_helpers';
 
 export const 移出至暂存区: AtomDefinition<{
   source: number;
@@ -60,15 +60,12 @@ export const 移出至暂存区: AtomDefinition<{
     const removeSet = new Set(atom.cardIds);
     // 手牌移除
     target.hand = target.hand.filter((id) => !removeSet.has(id));
-    // 装备区移除(逐槽检查)
+    // 装备区移除:被移出的槽位重建剔除;武器槽同步清距离 vars(与 卸下 一致,共享 clearEquipVars)
     for (const slot of Object.keys(target.equipment) as EquipSlot[]) {
       const id = target.equipment[slot];
-      if (id && removeSet.has(id)) {
-        delete target.equipment[slot];
-        // 武器:清距离 vars(与 卸下 atom 一致,共享 clearEquipVars)
-        clearEquipVars(state, atom.target, slot);
-      }
+      if (id && removeSet.has(id)) clearEquipVars(state, atom.target, slot);
     }
+    target.equipment = removeFromEquipment(target.equipment, (id) => removeSet.has(id));
     // 追加到 vars[varsKey]
     const list = (target.vars[atom.varsKey] as string[] | undefined) ?? [];
     for (const id of atom.cardIds) {

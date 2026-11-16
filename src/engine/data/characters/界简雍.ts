@@ -7,8 +7,5 @@ export const 界简雍 = {
   maxHealth: 3,
   gender: '男',
   faction: '蜀',
-  skills: [
-    { name: '界纵适', path: '../../skills/界纵适' },
-    { name: '界巧说', path: '../../skills/界巧说' },
-  ],
+  skills: ['界纵适', '界巧说'],
 };

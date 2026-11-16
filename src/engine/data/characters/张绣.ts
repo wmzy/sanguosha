@@ -8,8 +8,5 @@ export const 张绣 = {
   maxHealth: 4,
   gender: '男',
   faction: '群',
-  skills: [
-    { name: '雄乱', path: '../../skills/雄乱' },
-    { name: '从谏', path: '../../skills/从谏' },
-  ],
+  skills: ['雄乱', '从谏'],
 };

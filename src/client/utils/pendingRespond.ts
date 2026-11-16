@@ -7,7 +7,7 @@
 //   cardFilter 优先取 skillActionRegistry 里保留的函数引用(不走 WS JSON 序列化);
 //   registry 异步加载窗口期取不到时,从 atom 类型本地重建兜底。
 
-import type { Card, PendingView } from '../../engine/types';
+import type { Card, GameView, PendingView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { findActionAcrossOwners } from '../skillActionRegistry';
 
@@ -140,6 +140,11 @@ export function findRespondAction(
 export interface PendingRespondInfo {
   skillId: string;
   cardFilter?: (c: Card) => boolean;
+  /** 投影层下发的权威候选牌 id(cardFilter.candidates 的可序列化部分)。
+   *  可能含装备区牌(技能显式提供 candidates 时,如界天香弃红桃装备/界鬼才换判定牌)——
+   *  respondCandidates 据此返回跨区域候选,浏览器选牌与无头枚举共用。
+   *  求桃分支不置此字段(候选恒为手牌,cardFilter 已并入转化救援技并集,走手牌过滤路径)。 */
+  candidateIds?: string[];
   /** 求桃专用:按救援牌(桃/酒/急救红牌)找到对应的救援 skillId。
    *  非 null 时 handleRespond 优先用它路由,而非默认 skillId('桃')。 */
   rescueSkillForCard?: (c: Card) => string | undefined;
@@ -213,7 +218,13 @@ export function resolvePendingRespond(
   const candidates = readCardFilterCandidates(pending);
   if (candidates) {
     const set = new Set(candidates);
-    return { skillId, cardFilter: (c: Card) => set.has(c.id) };
+    return {
+      skillId,
+      // candidateIds 供 respondCandidates 解析跨区域候选(可能含装备区牌);
+      // cardFilter 仍是成员判断(filter 已在引擎进程内跑过,成员 ⟺ 在候选集中)。
+      candidateIds: candidates,
+      cardFilter: (c: Card) => set.has(c.id),
+    };
   }
 
   // 1. 优先:从 registry 取 cardFilter(函数引用保留)
@@ -224,4 +235,34 @@ export function resolvePendingRespond(
   const cardFilter = registryFilter ?? localFilter;
 
   return { skillId, cardFilter };
+}
+
+/** 回应窗口的可选牌(浏览器选牌/提交与无头枚举的单一候选口径):
+ *  - 投影层下发了 candidateIds(权威)→ 按 id 从 cardMap 解析,**不限定手牌**——
+ *    技能显式提供的候选可能含装备区牌(界天香弃红桃装备/界鬼才换判定牌),
+ *    限定手牌会让装备区候选被滤掉,玩家/AI 永远选不到(界天香只持红桃装备时卡死)。
+ *  - 否则 info.cardFilter 过滤手牌(求桃走此路径:候选恒手牌,cardFilter 已并入
+ *    急救等转化救援技并集)。
+ *  - 均无(防御:useCard/useCardAndTarget 的 cardFilter 结构上必填,实际不可达)→ 整手牌。
+ */
+export function respondCandidates(
+  info: PendingRespondInfo | null | undefined,
+  hand: Card[],
+  cardMap: GameView['cardMap'],
+): Card[] {
+  if (!info) return [];
+  if (info.candidateIds) {
+    return info.candidateIds
+      .map((id) => cardMap[id])
+      .filter((c): c is Card => !!c);
+  }
+  if (info.cardFilter) return hand.filter((c) => info.cardFilter!(c));
+  return hand;
+}
+
+/** 求桃路由:按救援牌解析 respond skillId(字面桃/酒 → 同名 CardEffect;
+ *  急救红牌等转化救援 → 对应技能),非求桃窗口或未命中 → info.skillId。
+ *  浏览器 handleRespond 与无头枚举共用(原先两处各自 `rescueSkill ?? info.skillId`)。 */
+export function rescueSkillFor(info: PendingRespondInfo, card: Card): string {
+  return info.rescueSkillForCard?.(card) ?? info.skillId;
 }

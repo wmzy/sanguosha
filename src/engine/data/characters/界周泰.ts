@@ -3,5 +3,5 @@ export const 界周泰 = {
   maxHealth: 4,
   gender: '男',
   faction: '吴',
-  skills: [{ name: '界不屈' }, { name: '奋激' }],
+  skills: ['界不屈', '奋激'],
 };

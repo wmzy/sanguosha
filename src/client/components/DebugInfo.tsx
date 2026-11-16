@@ -4,10 +4,7 @@
 // 由上层 debug 入口(DebugLobby)渲染,正式模式不出现。
 import * as styles from './gameViewStyles';
 import type { GameView, PendingView } from '../../engine/types';
-import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
-import { displaySkillName } from '../utils/skillDisplay';
-
-const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
+import { displaySkillName, visibleSkillsOf } from '../utils/skillDisplay';
 
 export interface DebugInfoProps {
   view: GameView;
@@ -35,24 +32,28 @@ export function DebugInfo({ view, perspectiveName, pending }: DebugInfoProps) {
         </div>
         <div>pending: {pending ? `${pending.prompt.title} → ${pending.target}` : 'none'}</div>
         <hr className={styles.debugHr} />
-        {view.players.map((p, i) => (
-          <div key={i} className={styles.debugPlayer}>
-            <span className={!p.alive ? styles.debugDead : undefined}>
-              {p.name}({p.character}) HP:{p.health}/{p.maxHealth}
-              {!p.alive && ' [阵亡]'}
-            </span>
-            <span> 手牌:{p.handCount}</span>
-            {Object.entries(p.equipment).map(([slot, cardId]) => (
-              <span key={slot}>
-                {' '}
-                [{slot}:{equipName(view.cardMap, cardId)}]
+        {view.players.map((p, i) => {
+          // 调试面板只滤默认技能(装备/主公技全部展示)
+          const skills = visibleSkillsOf(p, { equipment: false, lord: false });
+          return (
+            <div key={i} className={styles.debugPlayer}>
+              <span className={!p.alive ? styles.debugDead : undefined}>
+                {p.name}({p.character}) HP:{p.health}/{p.maxHealth}
+                {!p.alive && ' [阵亡]'}
               </span>
-            ))}
-            {p.skills.filter((s) => !DEFAULT_SKILLS.has(s)).length > 0 && (
-              <span> 技能:{p.skills.filter((s) => !DEFAULT_SKILLS.has(s)).map(displaySkillName).join(',')}</span>
-            )}
-          </div>
-        ))}
+              <span> 手牌:{p.handCount}</span>
+              {Object.entries(p.equipment).map(([slot, cardId]) => (
+                <span key={slot}>
+                  {' '}
+                  [{slot}:{equipName(view.cardMap, cardId)}]
+                </span>
+              ))}
+              {skills.length > 0 && (
+                <span> 技能:{skills.map(displaySkillName).join(',')}</span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </details>
   );

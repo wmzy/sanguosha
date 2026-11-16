@@ -4,10 +4,10 @@
 // 模块 F 迁移(出牌流程重设计.md):afterApply 为来自手牌的弃牌发出「移动到目标区域后」
 // 时机标记(reason='弃置',to='弃牌堆'),为连营/落英/屯田等「失去牌」技能提供统一 hook 点。
 // ZoneLoc 不含「装备」区域,装备/判定区弃置不发标记——失去牌类技能主要关心手牌。
-// 本 atom 的 view 事件保持不变(含信息分级);apply 的入堆路径经 resolveDiscardEntry
-// 单点裁决(影子卡还原/临时牌销毁),时机标记仅为额外 hook 注册点。
+// 本 atom 的 view 事件保持不变(含信息分级);apply 的入堆路径经 pushToDiscardPile
+// 单点裁决(临时牌销毁/影子卡还原,语义见 _helpers),时机标记仅为额外 hook 注册点。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { broadcast, removeCardsFromHand, requirePlayer, resolveDiscardEntry, viewPlayer } from './_helpers';
+import { broadcast, pushToDiscardPile, removeCardsFromHand, removeFromEquipment, requirePlayer, viewPlayer } from './_helpers';
 import { applyAtom } from '../core/apply';
 
 /** localVars key:本次弃置中来自手牌的 cardId(afterApply 发时机标记用)。
@@ -26,16 +26,9 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[]; volunta
     // 捕获本次弃置中来自手牌的 cardId(供 afterApply 发「移动到目标区域后」时机标记)
     state.localVars[MOVED_HAND_KEY] = atom.cardIds.filter((id) => player.hand.includes(id));
     player.hand = player.hand.filter((id) => !discardSet.has(id));
-    const equipment: Record<string, string> = {};
-    for (const [slot, id] of Object.entries(player.equipment)) {
-      if (id && !discardSet.has(id)) equipment[slot] = id;
-    }
-    player.equipment = equipment;
-    // 牌入堆经 resolveDiscardEntry 单点:影子卡(转化牌)还原原卡、结算临时牌销毁,
-    // 普通牌原样入堆——影子 id 不得直接进弃牌堆(cardMap 外 id,重洗后投影漂移)。
+    player.equipment = removeFromEquipment(player.equipment, (id) => discardSet.has(id));
     for (const cardId of atom.cardIds) {
-      const entry = resolveDiscardEntry(state, cardId);
-      if (entry !== null) state.zones.discardPile.push(entry);
+      pushToDiscardPile(state, cardId);
     }
   },
   /** 模块 F:为来自手牌的弃牌逐张发出「移动到目标区域后」时机标记(reason='弃置')。
@@ -83,15 +76,7 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[]; volunta
     const zones = (event.zones as Record<string, string>) ?? {};
     const discardSet = new Set(cardIds);
     // 装备区:清除被弃的装备(与 apply 对称)
-    const equipment: Partial<Record<string, string>> = {};
-    for (const [slot, id] of Object.entries(p.equipment)) {
-      if (id && discardSet.has(id)) {
-        // 装备在弃牌集中:不纳入 equipment
-      } else if (id) {
-        equipment[slot] = id;
-      }
-    }
-    p.equipment = equipment;
+    p.equipment = removeFromEquipment(p.equipment, (id) => discardSet.has(id));
     // 手牌:只移除在 hand 区域的牌(判定区牌不在 hand/equip,不应减 handCount)。
     // 传入 hand 区子集,数量按其长度递减;数组过滤按集合匹配,与全量 discardSet 等价
     // (手牌数组不含判定区/装备区的 id)。

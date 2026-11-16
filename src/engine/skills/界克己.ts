@@ -7,101 +7,22 @@
 //     (如响应延时锦囊/决斗/南蛮等)也会阻止克己——比官方更严格。
 //   - 界版严格按官方"出牌阶段内"判定:仅在「出牌」阶段(且为自己回合)使用/打出杀
 //     才计数;出牌阶段外打出杀不阻止克己。
-//   - 独立界版文件,不修改标 克己.ts。vars 键用 '界克己/' 前缀与标版隔离。
 //
-// 实现:
-//   1) 移动牌 after hook:监听【杀】从自己手牌进入处理区,且仅在「出牌」阶段记录。
-//      这同时覆盖「使用」(杀.use 主动出杀)与「打出」(杀.respond 应对决斗/南蛮入侵等)。
-//      命中后置 turn.vars['界克己/playedSlash'] = true;该 vars 随「回合结束」atom 自动清空,
-//      天然每回合重置。
-//   2) 阶段开始 before hook:弃牌阶段开始时,若本回合出牌阶段未出杀,询问是否发动界克己;
-//      确认 → 触发「阶段结束」(弃牌) 推进到回合结束,并 cancel 当前「阶段开始」(弃牌)。
-//   3) respond action:玩家确认/取消 → 写 localVars['界克己/confirmed']。
-import type {
-  FrontendAPI,
-  GameState,
-  HookResult,
-  Skill,
-} from '../types';
-import { applyAtom } from '../core/apply';
-import { registerAfterHook } from '../core/skill';
-import { askConfirm, defineConfirmAction, registerConfirmRespond, registerPhaseStartHook } from '../util/skillRuntime';
+// 实现/交互复用标版克己导出的 createKejiSkill 工厂,仅注入差异:
+//   - 键名按技能 id '界克己' 隔离(界克己/playedSlash、界克己/confirmed、界克己/confirm)。
+//   - onlyPlayPhase=true:移动牌 after hook 增设「出牌」阶段守卫(标版无此守卫)。
+import { createKejiSkill, type KejiOptions } from './克己';
+import type { SkillModule } from '../types';
 
-/** turn.vars key:本回合【出牌阶段】是否使用/打出过杀。
- *  随「回合结束」atom 的 state.turn.vars = {} 自动清空。 */
-const PLAYED_SLASH_VAR = '界克己/playedSlash';
-/** localVars key:界克己确认结果(respond 写,before 读) */
-const CONFIRMED_VAR = '界克己/confirmed';
-/** 请求回应 requestType */
-const CONFIRM_REQUEST = '界克己/confirm';
+const OPTIONS: KejiOptions = {
+  skillId: '界克己',
+  displayName: '界克己',
+  description: '若你未于本回合出牌阶段使用或打出过【杀】,你可以跳过弃牌阶段',
+  onlyPlayPhase: true,
+  confirmTitle: '界克己:本回合出牌阶段未出杀,是否跳过弃牌阶段?',
+};
 
-export function createSkill(id: string, ownerId: number): Skill {
-  return {
-    id,
-    ownerId,
-    name: '界克己',
-    description: '若你未于本回合出牌阶段使用或打出过【杀】,你可以跳过弃牌阶段',
-  };
-}
+export const { createSkill, onInit, onMount } = createKejiSkill(OPTIONS);
 
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
-
-  // ── respond:被询问「是否发动界克己」时回应,写 localVars 标记结果 ──
-  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_REQUEST, CONFIRMED_VAR, {
-    mismatchError: '当前不是界克己确认',
-  });
-
-  // ── 移动牌 after hook:检测自己在「出牌」阶段使用/打出的杀(手牌→处理区) ──
-  registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.from.zone !== '手牌' || atom.from.player !== ownerId) return;
-    if (atom.to.zone !== '处理区') return;
-    // 严格按官方"出牌阶段内"判定:仅在「出牌」阶段(自己回合)出杀才计数。
-    // 出牌阶段外打出杀(如响应他人回合内的决斗/南蛮)不计入,不阻止克己。
-    // (另一玩家回合内出杀本就不写入本玩家 vars——turn.vars 随其回合结束清空。)
-    if (ctx.state.phase !== '出牌') return;
-    const card = ctx.state.cardMap[atom.cardId];
-    if (card?.name === '杀') {
-      ctx.state.turn.vars[PLAYED_SLASH_VAR] = true;
-    }
-  });
-
-  // ── 阶段开始 before hook:弃牌阶段跳过 ──
-  registerPhaseStartHook(state, skill.id, ownerId, '弃牌', async (ctx): Promise<HookResult | void> => {
-    // 本回合【出牌阶段】使用或打出过杀 → 不满足发动条件
-    if (ctx.state.turn.vars[PLAYED_SLASH_VAR]) return;
-
-    // 询问是否发动界克己(跳过弃牌阶段)
-    // 玩家选不发动 / 超时(defaultChoice=false) → 不干预,正常进入弃牌阶段
-    const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {
-      confirmedKey: CONFIRMED_VAR,
-      title: '界克己:本回合出牌阶段未出杀,是否跳过弃牌阶段?',
-      confirmLabel: '跳过',
-      cancelLabel: '不跳过',
-      defaultChoice: false,
-      timeout: 15,
-    });
-    if (!confirmed) return;
-
-    // 跳过弃牌阶段:
-    //   1) 触发「阶段结束」(弃牌) → 回合管理 after hook 把阶段推进到「回合结束」
-    //   2) cancel 当前「阶段开始」(弃牌) —— state.phase 已是「回合结束」,
-    //      回合管理 阶段结束 after hook 检测 phase !== '弃牌' → 不创建弃牌 pending
-    await applyAtom(ctx.state, { type: '阶段结束', player: ownerId, phase: '弃牌' });
-    return { kind: 'cancel' };
-  });
-
-  return () => {};
-}
-
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '界克己',
-    title: '界克己:是否跳过弃牌阶段？',
-    confirmLabel: '跳过',
-    cancelLabel: '不跳过',
-  });
-}
-
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+const _skillModule: SkillModule = { createSkill, onInit, onMount };
+export default _skillModule;

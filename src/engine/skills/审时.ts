@@ -33,7 +33,7 @@ import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { askConfirm, defineConfirmAction, normalizeCardIds, registerOnDamagedAsTarget, engineCanPlayNowReason } from '../util/skillRuntime';
 import { SHENSHI_STATE_VIEW_KEY } from '../rules/vars-keys';
-import { projectTurnUsage } from '../rules/turn-usage';
+import { createYinYangState } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '审时';
@@ -54,13 +54,8 @@ const YANG_DEATH_TARGET_KEY = '审时/阳/致死目标结果';
 
 type YinTrack = Array<{ source: number; cardId: string }>;
 
-function getState(state: GameState, ownerId: number): '阳' | '阴' {
-  return state.players[ownerId]?.vars[STATE_KEY] === '阴' ? '阴' : '阳';
-}
-
-async function syncStateView(state: GameState, ownerId: number): Promise<void> {
-  await projectTurnUsage(state, ownerId, STATE_KEY, getState(state, ownerId));
-}
+/** 转换态读写(缺省 '阳';发动翻转后与拥有者「回合开始」重同步时投影 turnUsage)。 */
+const { getState, syncStateView } = createYinYangState(STATE_KEY);
 
 /** 手牌数最多的其他存活角色候选 */
 function maxHandOthers(state: GameState, ownerId: number): number[] {

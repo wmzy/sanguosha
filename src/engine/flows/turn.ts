@@ -5,10 +5,9 @@
 // 这些技能的内联 startTurn 实现完全一致（3 个 atom），合并为单一公共函数。
 //
 // 约束：本模块为纯重构，行为与原内联实现完全一致。
-//   各调用方在 startTurn 前自行 clearPerTurnState（cancel 回合结束后 atom.apply 不执行，
-//   需手动复刻其 per-turn 清理）。由于各技能 clearPerTurnState 清理的 vars 后缀集合
-//   存在差异（放权 较其余少清 /givenTargets），按模块 N「不改行为」约束，保留各文件
-//   本地 clearPerTurnState 实现，不并入本公共函数（否则会改动放权的可观察行为）。
+//   各调用方在 startTurn 前自行清理 per-turn 状态(cancel 回合结束后 atom.apply 不执行，
+//   需手动复刻其 per-turn 清理)：统一走 rules/turn-usage 的 clearPerTurnStateProjected
+//   （清 PER_TURN_SUFFIXES 后缀 vars + 逐 key 发 回合用量 null 清 turnUsage 视图键）。
 import type { GameState } from '../types';
 import { applyAtom } from '../core/apply';
 

@@ -24,10 +24,12 @@ import {
   notifyRoom,
   optString,
   readJsonBody,
+  requireRoom,
   requireRoomMember,
   requireSessionHost,
   resolveActorOr401,
   resolvePlayerOrRespond,
+  resolveSessionActor,
 } from './helpers';
 
 /** 校验 REST action 载荷结构(playerId 之外的完整形状)。 */
@@ -129,8 +131,8 @@ export function applyGameRoutes(app: Hono): void {
     const roomId = c.req.param('id');
     const raw = await readJsonBody(c);
 
-    const room = getRoom(roomId);
-    if (!room) return c.json({ error: '房间不存在' }, 404);
+    const room = requireRoom(c, roomId);
+    if (room instanceof Response) return room;
 
     // 非 debug 房间:身份取会话 userId(body.playerId 可伪造 hostId 绕过下方校验,
     // 强行在未全员准备时开局);调试房间任意座次可触发。
@@ -166,8 +168,8 @@ export function applyGameRoutes(app: Hono): void {
   // 否则任何人可对任意 roomId 重置他人正在进行的游戏。
   app.post('/api/rooms/:id/restart', async (c) => {
     const roomId = c.req.param('id');
-    const room = getRoom(roomId);
-    if (!room) return c.json({ error: '房间不存在' }, 404);
+    const room = requireRoom(c, roomId);
+    if (room instanceof Response) return room;
     const session = gameSessions.get(roomId);
     if (!session) return c.json({ error: '游戏会话不存在' }, 404);
 
@@ -187,20 +189,15 @@ export function applyGameRoutes(app: Hono): void {
   app.post('/api/rooms/:id/action', async (c) => {
     const roomId = c.req.param('id');
     const raw = await readJsonBody(c);
-    let playerId = optString(raw.playerId);
+    const bodyPlayerId = optString(raw.playerId);
     const action = raw.action;
-    if (!playerId || !isRestAction(action)) return c.json({ error: '缺少 playerId 或 action', code: 'INVALID_ACTION' }, 400);
+    if (!bodyPlayerId || !isRestAction(action)) return c.json({ error: '缺少 playerId 或 action', code: 'INVALID_ACTION' }, 400);
 
-    const session = gameSessions.get(roomId);
-    if (!session) return c.json({ error: '游戏会话不存在' }, 404);
-
-    const room = getRoom(roomId);
-    const actor = await resolveActorOr401(c, !!room && !room.isDebug, playerId);
-    if (actor.response) return actor.response;
-    playerId = actor.playerId;
+    const resolved = await resolveSessionActor(c, roomId, bodyPlayerId);
+    if (resolved.response) return resolved.response;
 
     // session.handleAction 内部处理 reject（通过 SSE 推 actionRejected）
-    await session.handleAction(playerId, action as never);
+    await resolved.session.handleAction(resolved.playerId, action as never);
     return c.json({ accepted: true });
   });
 
@@ -208,21 +205,16 @@ export function applyGameRoutes(app: Hono): void {
   app.post('/api/rooms/:id/reorder', async (c) => {
     const roomId = c.req.param('id');
     const raw = await readJsonBody(c);
-    let playerId = typeof raw.playerId === 'string' ? raw.playerId : '';
+    const bodyPlayerId = optString(raw.playerId);
     const order = raw.order;
-    if (!playerId || !Array.isArray(order) || !order.every((id) => typeof id === 'string')) {
+    if (!bodyPlayerId || !Array.isArray(order) || !order.every((id) => typeof id === 'string')) {
       return c.json({ error: '缺少参数或 order 必须是字符串数组', code: 'INVALID_REORDER' }, 400);
     }
 
-    const session = gameSessions.get(roomId);
-    if (!session) return c.json({ error: '游戏会话不存在' }, 404);
+    const resolved = await resolveSessionActor(c, roomId, bodyPlayerId);
+    if (resolved.response) return resolved.response;
 
-    const room = getRoom(roomId);
-    const actor = await resolveActorOr401(c, !!room && !room.isDebug, playerId);
-    if (actor.response) return actor.response;
-    playerId = actor.playerId;
-
-    const accepted = session.handleReorderHand(playerId, order);
+    const accepted = resolved.session.handleReorderHand(resolved.playerId, order);
     if (!accepted) {
       return c.json({ error: 'order 必须是当前手牌的完整排列', code: 'INVALID_REORDER' }, 400);
     }
@@ -235,8 +227,8 @@ export function applyGameRoutes(app: Hono): void {
     const raw = await readJsonBody(c);
     const text = typeof raw.text === 'string' ? raw.text : '';
 
-    const room = getRoom(roomId);
-    if (!room) return c.json({ error: '房间不存在' }, 404);
+    const room = requireRoom(c, roomId);
+    if (room instanceof Response) return room;
 
     // 身份解析:非调试房间一律取会话 userId(body.playerId 忽略,防冒充他人发言);
     // 调试房保持游客模型(query/body.playerId)。
@@ -268,8 +260,8 @@ export function applyGameRoutes(app: Hono): void {
   // 必须登录且为本房成员(玩家/旁观者),防止未登录者凭 roomId 拉取全部发言。
   app.get('/api/rooms/:id/chat/history', async (c) => {
     const roomId = c.req.param('id');
-    const room = getRoom(roomId);
-    if (!room) return c.json({ error: '房间不存在' }, 404);
+    const room = requireRoom(c, roomId);
+    if (room instanceof Response) return room;
     const member = await requireRoomMember(c, room, '仅房间成员可查看聊天记录');
     if (member.error) return member.error;
     return c.json(getChatHistory(roomId));

@@ -11,14 +11,11 @@ import type { ReactNode } from 'react';
 import type { GameView } from '../../engine/types';
 import { CountdownBar } from './CountdownBar';
 import { getCharacterCardVisuals, hideImgOnError } from '../utils/characterVisuals';
-import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 import { getSkillDescription } from '../../engine/skills/lifecycle';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import { SkillTag } from './SkillTooltip';
 import * as styles from './gameViewStyles';
-import { displaySkillName } from '../utils/skillDisplay';
-
-const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
+import { displaySkillName, visibleSkillsOf } from '../utils/skillDisplay';
 
 export interface CharSelectWaitingOverlayProps {
   view: GameView;
@@ -47,8 +44,9 @@ export function CharSelectWaitingOverlay({
   const me = view.players[perspectiveIdx];
   const selectedChar = me?.character ?? '';
   const { faction, factionColor, charImg, maxHealth } = getCharacterCardVisuals(selectedChar);
-  // player.skills 包含默认技能,只展示武将自身技能(过滤掉默认技能)
-  const charSkills = (me?.skills ?? []).filter((s) => !DEFAULT_SKILLS.has(s));
+  // player.skills 包含默认技能,只展示武将自身技能。选将期无装备技能、
+  // 主公技照常展示 → 关闭装备/主公技过滤(见 utils/skillDisplay)
+  const charSkills = visibleSkillsOf(me, { equipment: false, lord: false });
 
   return (
     <div className={styles.charSelectWaitingOverlay}>

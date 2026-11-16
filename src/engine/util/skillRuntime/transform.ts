@@ -108,6 +108,14 @@ export interface TransformActionOptions {
     ownerId: number,
     params: Record<string, Json>,
   ) => string | null;
+  /** 追加校验:在默认路径的 时机/存活/持牌/牌存在/cardPredicate 全部通过后调用,
+   *  返回拒绝文案或 null(多向转化技 龙胆/界龙胆 只保留方向(to)校验,不重写前置检查;
+   *  与 validate 互斥使用——validate 完全替换默认路径,不会再走 extraValidate)。 */
+  extraValidate?: (
+    state: GameState,
+    ownerId: number,
+    params: Record<string, Json>,
+  ) => string | null;
   /** 「当作」前的配对步骤(界渐营限次标记:「首个 await 之前设 vars」契约由此保证)。 */
   beforeExecute?: (
     state: GameState,
@@ -174,7 +182,8 @@ function refitEquipment(
  *
  * 默认实现:
  * - validate:时机(context 维度)+ 存活 + 持牌(可选含装备区)+ 牌存在 + cardPredicate,
- *   统一拒绝文案 invalidError;多卡形状错误用 needCardsError/'cardIds 必须为字符串'/'不能选择同一张牌'。
+ *   统一拒绝文案 invalidError;多卡形状错误用 needCardsError/'cardIds 必须为字符串'/'不能选择同一张牌';
+ *   全部通过后追加 extraValidate(多向转化技的方向校验)。
  * - execute:(includeEquipment 时先「卸下」并记 _origSlot/_unequipped)→ beforeExecute →
  *   「当作」(outputName/outputDamageType)→ afterExecute。
  * - rollback:删影子卡 + 装备槽位/距离 vars 还原 + extraRollback;不还原 hand/marks
@@ -224,7 +233,8 @@ export function registerTransformAction(
     const predicateOk =
       !cardIds || !opts.cardPredicate || opts.cardPredicate(st, ownerId, cardIds);
     const ok = contextOk && selfAlive && cardInZone && cardsExist && predicateOk;
-    return ok ? null : (opts.invalidError ?? '转化条件不满足');
+    if (!ok) return opts.invalidError ?? '转化条件不满足';
+    return opts.extraValidate?.(st, ownerId, params) ?? null;
   };
 
   const validateAction = (st: GameState, params: Record<string, Json>): string | null =>

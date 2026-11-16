@@ -57,7 +57,7 @@ function isValidViewer(viewer: number | undefined, len: number, strict = false):
 /** 武将投影为「名字 + 技能名列表」摘要(选将池用):所有将池预设共用的单一构造,
  *  避免各预设/常量各自重复同一段 map。 */
 function projectCharacters(chars: typeof allCharacters): Array<{ name: string; skills: string[] }> {
-  return chars.map((c) => ({ name: c.name, skills: c.skills.map((s) => s.name) }));
+  return chars.map((c) => ({ name: c.name, skills: [...c.skills] }));
 }
 
 /** 默认武将列表:使用引擎全量武将(allCharacters),供选将池使用。

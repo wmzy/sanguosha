@@ -31,6 +31,13 @@ import {
 import type { RoomConfig } from '../../../server/protocol';
 import type { RoomHistory } from '../../hooks/useRoomHistory';
 
+/** 复制按钮族:kind 对应 handleCopyRoomInfo 的复制内容,label 为默认文案 */
+const COPY_BUTTONS = [
+  { kind: 'code', label: '复制房间码' },
+  { kind: 'link', label: '复制邀请链接' },
+  { kind: 'spectate', label: '复制旁观链接' },
+] as const;
+
 interface WaitingStageProps {
   /** 对局历史(useRoomHistory 返回值,由页面持有传入) */
   history: RoomHistory;
@@ -94,6 +101,15 @@ export function WaitingStage({ history }: WaitingStageProps) {
   const spectatorCount = mp.roomState?.spectatorIds.length ?? 0;
   const pendingRequests = mp.roomState?.pendingViewRequests ?? {};
 
+  // 三枚复制按钮共用的内联变量(禁用态随 roomId 变化)
+  const copyBtnStyle = {
+    '--btn-bg': colors.bg.input,
+    '--btn-padding': '4px 14px',
+    '--btn-font-size': '12px',
+    '--btn-cursor': mp.roomId ? 'pointer' : 'not-allowed',
+    opacity: mp.roomId ? 1 : 0.6,
+  } as React.CSSProperties;
+
   return (
     <>
       <ReconnectBanner
@@ -113,48 +129,17 @@ export function WaitingStage({ history }: WaitingStageProps) {
             <div className={roomCodeLabel}>房间码（分享给其他玩家）</div>
             <div className={roomCode}>{mp.roomId ?? '加载中…'}</div>
             <div className={copyBtnRow}>
-              <button
-                className={btnStyle}
-                disabled={!mp.roomId}
-                onClick={() => void handleCopyRoomInfo('code')}
-                style={{
-                  '--btn-bg': colors.bg.input,
-                  '--btn-padding': '4px 14px',
-                  '--btn-font-size': '12px',
-                  '--btn-cursor': mp.roomId ? 'pointer' : 'not-allowed',
-                  opacity: mp.roomId ? 1 : 0.6,
-                } as React.CSSProperties}
-              >
-                {copiedKind === 'code' ? '✓ 已复制' : '复制房间码'}
-              </button>
-              <button
-                className={btnStyle}
-                disabled={!mp.roomId}
-                onClick={() => void handleCopyRoomInfo('link')}
-                style={{
-                  '--btn-bg': colors.bg.input,
-                  '--btn-padding': '4px 14px',
-                  '--btn-font-size': '12px',
-                  '--btn-cursor': mp.roomId ? 'pointer' : 'not-allowed',
-                  opacity: mp.roomId ? 1 : 0.6,
-                } as React.CSSProperties}
-              >
-                {copiedKind === 'link' ? '✓ 已复制' : '复制邀请链接'}
-              </button>
-              <button
-                className={btnStyle}
-                disabled={!mp.roomId}
-                onClick={() => void handleCopyRoomInfo('spectate')}
-                style={{
-                  '--btn-bg': colors.bg.input,
-                  '--btn-padding': '4px 14px',
-                  '--btn-font-size': '12px',
-                  '--btn-cursor': mp.roomId ? 'pointer' : 'not-allowed',
-                  opacity: mp.roomId ? 1 : 0.6,
-                } as React.CSSProperties}
-              >
-                {copiedKind === 'spectate' ? '✓ 已复制' : '复制旁观链接'}
-              </button>
+              {COPY_BUTTONS.map(({ kind, label }) => (
+                <button
+                  key={kind}
+                  className={btnStyle}
+                  disabled={!mp.roomId}
+                  onClick={() => void handleCopyRoomInfo(kind)}
+                  style={copyBtnStyle}
+                >
+                  {copiedKind === kind ? '✓ 已复制' : label}
+                </button>
+              ))}
             </div>
           </div>
           <div className={readyInfo}>

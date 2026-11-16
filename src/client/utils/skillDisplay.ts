@@ -1,4 +1,4 @@
-// src/client/utils/skillDisplay.ts — 技能名展示工具
+// src/client/utils/skillDisplay.ts — 技能名展示 + 技能可见性过滤工具
 //
 // 背景:界版本武将(如界周瑜、界孙策)的技能 id 带"界"前缀(如"界英姿""界制衡"),
 // 这些 id 是引擎路由 / skill registry / getSkillDescription 查询的 key,不能改。
@@ -10,7 +10,10 @@
 // 重要:此函数仅用于"展示文本"。所有按 id 查找描述/资源的逻辑(getSkillDescription、
 // registry、卡牌资源)必须继续使用原 id,不得传入去前缀后的名字。
 
-import type { Mark } from '../../engine/types';
+import type { GameView, Mark } from '../../engine/types';
+import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
+import { LORD_SKILLS } from '../../engine/data/character-meta';
+import { EQUIPMENT_SKILL_NAMES } from '../components/gameViewConstants';
 
 /**
  * 去掉技能展示名前导单个"界"字符(仅影响展示,不影响 id / 查找 key)。
@@ -24,6 +27,37 @@ import type { Mark } from '../../engine/types';
 export function displaySkillName(name: string): string {
   // 仅剥离前导单个"界";用 startsWith + slice 表意清晰,避免误伤中段"界"字。
   return name.startsWith('界') ? name.slice(1) : name;
+}
+
+// ─── 技能可见性过滤 ───────────────────────────────────────────────────────────
+// 四处渲染共享的过滤逻辑收敛于此:大卡(PlayerCardLarge)、座位卡(PlayerSeatView)、
+// 选将遮罩(CharSelectWaitingOverlay)、调试面板(DebugInfo)。
+
+const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
+
+/** visibleSkillsOf 的可选过滤开关。默认全开;只关心武将自身技能的场景
+ *  (选将遮罩/调试面板)显式传 false 退化为仅过滤默认技能。 */
+export interface VisibleSkillsOptions {
+  /** 过滤装备技能(装备技能在装备区展示,不重复进技能区)。默认 true。 */
+  equipment?: boolean;
+  /** 过滤主公技(非主公座位不可见主公技)。默认 true。 */
+  lord?: boolean;
+}
+
+/** 玩家技能可见性列表:过滤默认技能(选将占位);默认还滤去装备技能与
+ *  主公技(主公座位保留主公技)。player 为 undefined 时返回空数组
+ *  (选将未选/视角缺失)。 */
+export function visibleSkillsOf(
+  player: GameView['players'][number] | null | undefined,
+  { equipment = true, lord = true }: VisibleSkillsOptions = {},
+): string[] {
+  const isLordSeat = player?.identity === '主公';
+  return (player?.skills ?? []).filter(
+    (s) =>
+      !DEFAULT_SKILLS.has(s) &&
+      (!equipment || !EQUIPMENT_SKILL_NAMES.has(s)) &&
+      (!lord || isLordSeat || !LORD_SKILLS.has(s)),
+  );
 }
 
 /** 座位卡标记行徽章:聚合后的展示条目(key=组 key,label=徽章文案,title=tooltip 明细) */

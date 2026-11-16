@@ -12,7 +12,7 @@ import {
   deleteGameHistoryEntry,
   clearGameHistory,
 } from '../gameHistory';
-import { requireHost, requireRoomMember } from './helpers';
+import { requireHost, requireRoom, requireRoomMember } from './helpers';
 
 /** 注册对局历史/录像路由。 */
 export function applyHistoryRoutes(app: Hono): void {
@@ -69,8 +69,8 @@ export function applyHistoryRoutes(app: Hono): void {
   // DELETE /api/rooms/:id/history/:entryId — 房主删除单条历史(含录像文件)
   app.delete('/api/rooms/:id/history/:entryId', async (c) => {
     const roomId = c.req.param('id');
-    const room = getRoom(roomId);
-    if (!room) return c.json({ error: '房间不存在' }, 404);
+    const room = requireRoom(c, roomId);
+    if (room instanceof Response) return room;
     const playerId = await resolvePlayerIdFromBodyOrQuery(c, room);
     const forbidden = requireHost(c, room, playerId, '只有房主可以删除历史');
     if (forbidden) return forbidden;
@@ -83,8 +83,8 @@ export function applyHistoryRoutes(app: Hono): void {
   // DELETE /api/rooms/:id/history — 房主清空全部历史
   app.delete('/api/rooms/:id/history', async (c) => {
     const roomId = c.req.param('id');
-    const room = getRoom(roomId);
-    if (!room) return c.json({ error: '房间不存在' }, 404);
+    const room = requireRoom(c, roomId);
+    if (room instanceof Response) return room;
     const playerId = await resolvePlayerIdFromBodyOrQuery(c, room);
     const forbidden = requireHost(c, room, playerId, '只有房主可以清空历史');
     if (forbidden) return forbidden;

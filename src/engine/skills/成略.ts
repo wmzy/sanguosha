@@ -51,7 +51,7 @@ import {
 } from '../rules/distance';
 import type { SkillModule } from '../types';
 import { CHENGLUE_STATE_VIEW_KEY, CHENGLUE_SUITS_VIEW_KEY } from '../rules/vars-keys';
-import { projectTurnUsage, setTurnVarUsage } from '../rules/turn-usage';
+import { setTurnVarUsage, createYinYangState } from '../rules/turn-usage';
 import { projectSlashUnlimited } from '../rules/slash-quota';
 import { requireRequestType } from '../util/skillRuntime';
 
@@ -69,13 +69,8 @@ const DISCARD_KEY = '成略/discard结果';
 /** localVars key:本次成略需弃置的张数(供 respond validate 读取)。 */
 const DISCARD_COUNT_KEY = '成略/弃牌数';
 
-function getState(state: GameState, ownerId: number): '阳' | '阴' {
-  return state.players[ownerId]?.vars[STATE_KEY] === '阴' ? '阴' : '阳';
-}
-
-async function syncStateView(state: GameState, ownerId: number): Promise<void> {
-  await projectTurnUsage(state, ownerId, STATE_KEY, getState(state, ownerId));
-}
+/** 转换态读写(缺省 '阳';发动翻转后与拥有者「回合开始」重同步时投影 turnUsage)。 */
+const { getState, syncStateView } = createYinYangState(STATE_KEY);
 
 /** 判断 cardId 的花色是否在本回合成略弃置牌花色集合中。 */
 function suitInChenglue(state: GameState, cardId: string | undefined): boolean {

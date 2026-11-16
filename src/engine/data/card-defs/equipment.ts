@@ -1,203 +1,94 @@
 import type { CardDef } from '../../types';
 
-export const 诸葛连弩: CardDef = {
-  name: '诸葛连弩',
+/** 装备牌样板工厂:装备牌均无使用目标、无主动使用效果(效果由 skills/ 按 card.name 挂载),
+ *  故统一 targetFilter none + 空 sequence;武器 range/weaponEffect、防具 armorEffect、
+ *  诸葛连弩/方天画戟 的特有字段经 extra 传入。 */
+const equipCard = (
+  name: string,
+  subtype: CardDef['subtype'],
+  extra?: Partial<Omit<CardDef, 'name' | 'type' | 'subtype' | 'targetFilter' | 'effect'>>,
+): CardDef => ({
+  name,
   type: '装备牌',
-  subtype: '武器',
+  subtype,
   targetFilter: { type: 'none' },
   effect: { type: 'sequence', steps: [] },
+  ...extra,
+});
+
+export const 诸葛连弩: CardDef = equipCard('诸葛连弩', '武器', {
   range: 1,
   weaponEffect: { type: '诸葛连弩' },
   slashUnlimited: true,
-};
+});
 
-export const 青釭剑: CardDef = {
-  name: '青釭剑',
-  type: '装备牌',
-  subtype: '武器',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
+export const 青釭剑: CardDef = equipCard('青釭剑', '武器', {
   range: 2,
   weaponEffect: { type: '青釭剑' },
-};
+});
 
-export const 寒冰剑: CardDef = {
-  name: '寒冰剑',
-  type: '装备牌',
-  subtype: '武器',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
+export const 寒冰剑: CardDef = equipCard('寒冰剑', '武器', {
   range: 2,
   weaponEffect: { type: '寒冰剑' },
-};
+});
 
-export const 雌雄双股剑: CardDef = {
-  name: '雌雄双股剑',
-  type: '装备牌',
-  subtype: '武器',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
+export const 雌雄双股剑: CardDef = equipCard('雌雄双股剑', '武器', {
   range: 2,
   weaponEffect: { type: '雌雄双股剑' },
-};
+});
 
-export const 贯石斧: CardDef = {
-  name: '贯石斧',
-  type: '装备牌',
-  subtype: '武器',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
+export const 贯石斧: CardDef = equipCard('贯石斧', '武器', {
   range: 3,
   weaponEffect: { type: '贯石斧' },
-};
+});
 
-export const 青龙偃月刀: CardDef = {
-  name: '青龙偃月刀',
-  type: '装备牌',
-  subtype: '武器',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
+export const 青龙偃月刀: CardDef = equipCard('青龙偃月刀', '武器', {
   range: 3,
   weaponEffect: { type: '青龙偃月刀' },
-};
+});
 
-export const 丈八蛇矛: CardDef = {
-  name: '丈八蛇矛',
-  type: '装备牌',
-  subtype: '武器',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
-  range: 3,
-};
+export const 丈八蛇矛: CardDef = equipCard('丈八蛇矛', '武器', { range: 3 });
 
-export const 方天画戟: CardDef = {
-  name: '方天画戟',
-  type: '装备牌',
-  subtype: '武器',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
+export const 方天画戟: CardDef = equipCard('方天画戟', '武器', {
   range: 4,
   slashTargetBonusWhenLastCard: 3,
-};
+});
 
-export const 麒麟弓: CardDef = {
-  name: '麒麟弓',
-  type: '装备牌',
-  subtype: '武器',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
-  range: 5,
-};
+export const 麒麟弓: CardDef = equipCard('麒麟弓', '武器', { range: 5 });
 
-export const 八卦阵: CardDef = {
-  name: '八卦阵',
-  type: '装备牌',
-  subtype: '防具',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
+export const 八卦阵: CardDef = equipCard('八卦阵', '防具', {
   armorEffect: { type: '八卦阵' },
-};
+});
 
-export const 仁王盾: CardDef = {
-  name: '仁王盾',
-  type: '装备牌',
-  subtype: '防具',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
+export const 仁王盾: CardDef = equipCard('仁王盾', '防具', {
   armorEffect: { type: '仁王盾' },
-};
+});
 
 // ─── 军争篇装备牌 ──────────────────────────────────────────
 // 藤甲 / 白银狮子 / 古锭刀 / 朱雀羽扇 / 骅骝 的特殊技已在 engine/skills/ 中实现
 // (按 card.name 动态挂载),这里仅补 CardDef 声明,使牌堆能生成这些牌。
 // 骅骝 为防御马,距离修正技走 skills/马匹技能.ts 工厂(见 card-meta.ts)。
 
-export const 藤甲: CardDef = {
-  name: '藤甲',
-  type: '装备牌',
-  subtype: '防具',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
+export const 藤甲: CardDef = equipCard('藤甲', '防具', {
   armorEffect: { type: '藤甲' },
-};
+});
 
-export const 白银狮子: CardDef = {
-  name: '白银狮子',
-  type: '装备牌',
-  subtype: '防具',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
+export const 白银狮子: CardDef = equipCard('白银狮子', '防具', {
   armorEffect: { type: '白银狮子' },
-};
+});
 
-export const 古锭刀: CardDef = {
-  name: '古锭刀',
-  type: '装备牌',
-  subtype: '武器',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
-  range: 2,
-};
+export const 古锭刀: CardDef = equipCard('古锭刀', '武器', { range: 2 });
 
-export const 朱雀羽扇: CardDef = {
-  name: '朱雀羽扇',
-  type: '装备牌',
-  subtype: '武器',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
-  range: 4,
-};
+export const 朱雀羽扇: CardDef = equipCard('朱雀羽扇', '武器', { range: 4 });
 
-export const 骅骝: CardDef = {
-  name: '骅骝',
-  type: '装备牌',
-  subtype: '防御马',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
-};
+export const 骅骝: CardDef = equipCard('骅骝', '防御马');
 
-export const 赤兔: CardDef = {
-  name: '赤兔',
-  type: '装备牌',
-  subtype: '进攻马',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
-};
-export const 紫骍: CardDef = {
-  name: '紫骍',
-  type: '装备牌',
-  subtype: '进攻马',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
-};
-export const 大宛: CardDef = {
-  name: '大宛',
-  type: '装备牌',
-  subtype: '进攻马',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
-};
-export const 的卢: CardDef = {
-  name: '的卢',
-  type: '装备牌',
-  subtype: '防御马',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
-};
-export const 绝影: CardDef = {
-  name: '绝影',
-  type: '装备牌',
-  subtype: '防御马',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
-};
-export const 爪黄飞电: CardDef = {
-  name: '爪黄飞电',
-  type: '装备牌',
-  subtype: '防御马',
-  targetFilter: { type: 'none' },
-  effect: { type: 'sequence', steps: [] },
-};
+export const 赤兔: CardDef = equipCard('赤兔', '进攻马');
+export const 紫骍: CardDef = equipCard('紫骍', '进攻马');
+export const 大宛: CardDef = equipCard('大宛', '进攻马');
+export const 的卢: CardDef = equipCard('的卢', '防御马');
+export const 绝影: CardDef = equipCard('绝影', '防御马');
+export const 爪黄飞电: CardDef = equipCard('爪黄飞电', '防御马');
 
 export const 武器列表 = [
   诸葛连弩,

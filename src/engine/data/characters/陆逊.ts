@@ -3,8 +3,5 @@ export const 陆逊 = {
   maxHealth: 3,
   gender: '男',
   faction: '吴',
-  skills: [
-    { name: '谦逊', path: '../../skills/谦逊' },
-    { name: '连营', path: '../../skills/连营' },
-  ],
+  skills: ['谦逊', '连营'],
 };

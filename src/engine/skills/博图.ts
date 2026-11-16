@@ -10,14 +10,14 @@
 //   2. 每轮限X次:player.vars['博图/lastRound'] + ['博图/count']。
 //      轮次变化时重置 count;X = min(存活角色数, 3)。
 //   3. 额外回合:参考 界凿险/放权——回合结束 before-hook:cancel 正常回合结束 →
-//      手动 clearPerTurnState(否则 apply 不执行,状态残留)→ 亲自启动 ownerId 额外回合。
+//      手动 clearPerTurnStateProjected(否则 apply 不执行,状态残留)→ 亲自启动 ownerId 额外回合。
 //      before 先于 回合管理 after-hook(findNextAlive),cancel 后下家不启动。
 //      额外回合结束:count 已 +1,达 X 或不满足花色 → 不再 cancel → 正常推进座次。
 //
 // 关键点:
 //   - 主动询问:满足条件时询问吕蒙是否执行额外回合;确认才 cancel+启动。
 //   - 死亡/不满足条件 → 放行正常回合结束(不 cancel)。
-//   - clearPerTurnState 复刻「回合结束」atom 的 per-turn 清理(cancel 后 apply 不执行)。
+//   - clearPerTurnStateProjected 复刻「回合结束」atom 的 per-turn 清理(cancel 后 apply 不执行)。
 //   - 「置入弃牌堆」=本回合新进弃牌堆的牌,含使用/打出/弃置/拼点/被拆等所有路径。
 import type {
   FrontendAPI,
@@ -29,7 +29,7 @@ import { startTurn } from '../flows/turn';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
-import { clearPerTurnState } from '../rules/vars-keys';
+import { clearPerTurnStateProjected } from '../rules/turn-usage';
 
 const BASE_VAR = '博图/base'; // turn.vars:本回合弃牌堆基线长度
 const LAST_ROUND_KEY = '博图/lastRound'; // player.vars:计数所在轮次
@@ -122,12 +122,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       delete st.localVars[CONFIRMED_KEY];
       if (!confirmed) return; // 不发动 → 放行正常回合结束
 
-      // 计数 +1(永久 vars,不被 clearPerTurnState 清理)
+      // 计数 +1(永久 vars,不被 per-turn 清理波及)
       st.players[ownerId].vars[COUNT_KEY] = used + 1;
 
-      // cancel 回合结束后 → 亲自启动额外回合(clearPerTurnState 此处为幂等防御:
-      // 回合结束 atom 已在 回合结束后 之前 apply 清理过 per-turn 状态)
-      clearPerTurnState(st);
+      // cancel 回合结束后 → 亲自启动额外回合(clearPerTurnStateProjected 此处为幂等防御:
+      // 回合结束 atom 已在 回合结束后 之前 apply 清理过 per-turn 状态,无残留 key 时零 atom)
+      await clearPerTurnStateProjected(st);
       st.currentPlayerIndex = ownerId;
       await startTurn(st, ownerId);
 

@@ -4,8 +4,5 @@ export const 界诸葛亮 = {
   maxHealth: 3,
   gender: '男',
   faction: '蜀',
-  skills: [
-    { name: '界观星', path: '../../skills/界观星' },
-    { name: '界空城', path: '../../skills/界空城' },
-  ],
+  skills: ['界观星', '界空城'],
 };

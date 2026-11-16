@@ -17,23 +17,23 @@
 //   - 无次数限制。
 //
 // 本文件同时导出悲歌族共享核心(beigeDamageTarget/applyBeigeSuitEffect/
-// registerBeigeJudgeCaptureHook/registerBeigeFlipSkipHooks):标/界的触发守卫、
-// 花色主效果、判定牌捕获 hook 与翻面跳过 hooks 逐字相同,仅 judgeType/翻面 reason
-// 前缀不同('悲歌' vs '界悲歌',标签/标志键随之隔离)。界悲歌.ts 消费这些导出,
-// 只写"先判后弃+花色/点数奖励"差异段。
+// registerBeigeJudgeCaptureHook):标/界的触发守卫、花色主效果与判定牌捕获 hook
+// 逐字相同,仅 judgeType 不同('悲歌' vs '界悲歌')。界悲歌.ts 消费这些导出,
+// 只写"先判后弃+花色/点数奖励"差异段。翻面跳过 hooks 两版均直接调
+// flows/face-down 的 registerFlipSkipTurnHooks(悲歌翻的是伤害来源 → scope 'any',
+// 仅 reason 前缀不同,'悲歌' vs '界悲歌',标签/标志键随之隔离)。
 import type {
   AtomOfName,
   Card,
   FrontendAPI,
   GameState,
-  HookResult,
   Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
-import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { flipFaceDown, registerFlipSkipTurnHooks } from '../flows/face-down';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { requireRequestType, askResponse } from '../util/skillRuntime';
 
 const DISCARD_RT = '悲歌/discard';
@@ -138,73 +138,6 @@ export function registerBeigeJudgeCaptureHook(
   });
 }
 
-/**
- * 注册悲歌族翻面跳过 hooks(标/界逐字相同,仅 reason 前缀不同):
- *   - 阶段开始 before hook:准备阶段 + `${reason}/翻面` 标签 → 翻回正面、设
- *     `${reason}/skipAll` 标志并 cancel(不进入准备阶段);skipAll 标志存在时
- *     取消该玩家其余所有阶段;
- *   - 阶段结束 before hook:skipAll → 主动推进回合(performSkipTurn 的
- *     清过期标记→下一玩家→回合结束→回合结束后 序列)并 cancel。
- * 作用于任意持有该标签的玩家(悲歌翻的是伤害来源,不限于技能持有者本人)。
- * 标/界历史行为:不持有 unloader(保持原卸载语义不变)。
- */
-export function registerBeigeFlipSkipHooks(
-  state: GameState,
-  skillId: string,
-  ownerId: number,
-  reason: string,
-): void {
-  const SKIP_TAG = `${reason}/翻面`;
-  const SKIP_FLAG = `${reason}/skipAll`;
-
-  // ── 阶段开始 before hook:检测翻面标签 → 启动跳过 ──
-  registerBeforeHook(
-    state,
-    skillId,
-    ownerId,
-    '阶段开始',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      const player = atom.player;
-      if (player === undefined) return;
-      const p = ctx.state.players[player];
-      if (!p) return;
-
-      // 入口:准备阶段开始 + 该玩家有翻面标签 → 启动跳过
-      if (atom.phase === '准备' && p.tags.includes(SKIP_TAG)) {
-        await flipFaceUp(ctx.state, player, reason);
-        ctx.state.localVars[SKIP_FLAG] = player;
-        return { kind: 'cancel' };
-      }
-
-      // skipAll 标志存在时,取消该玩家所有其他阶段
-      if (ctx.state.localVars[SKIP_FLAG] === player) {
-        return { kind: 'cancel' };
-      }
-    },
-  );
-
-  // ── 阶段结束 before hook:skipAll → 主动推进回合 ──
-  registerBeforeHook(
-    state,
-    skillId,
-    ownerId,
-    '阶段结束',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段结束') return;
-      const player = atom.player;
-      if (player === undefined) return;
-      if (ctx.state.localVars[SKIP_FLAG] !== player) return;
-
-      delete ctx.state.localVars[SKIP_FLAG];
-      await performSkipTurn(ctx.state, player);
-      return { kind: 'cancel' };
-    },
-  );
-}
-
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
@@ -262,8 +195,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await applyBeigeSuitEffect(ctx.state, targetIdx, atom.source, suit, '悲歌');
   });
 
-  // ── 翻面跳过 hooks(标/界共享,tag 前缀 '悲歌')──
-  registerBeigeFlipSkipHooks(state, skill.id, ownerId, '悲歌');
+  // ── 翻面跳过 hooks(共用 face-down 通用版;悲歌翻的是伤害来源 → scope 'any')──
+  registerFlipSkipTurnHooks(state, skill.id, ownerId, '悲歌', { scope: 'any' });
 
   return () => {};
 }

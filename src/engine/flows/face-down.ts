@@ -5,6 +5,8 @@
 //   - 翻面     = 加 `${source}/翻面` 标签（下一回合准备阶段开始时被消费 → 跳过整回合）
 //   - 翻回正面 = 去该标签
 //   - 跳过整回合 = 清过期标记 → 下一玩家 → 回合结束（与 回合管理.end 尾段一致）
+//   - 翻面跳回合 hook 对 = registerFlipSkipTurnHooks（消费标签 → skipAll → 亲自推进回合，
+//     神速/界神速/悲歌/界悲歌/放逐/界放逐/界据守/界仁心/界伏枥 共用）
 //
 // 状态变更时机（模块 E）：实质操作后补发标记型 atom，提供统一的 hook 注册点：
 //   - flipFaceDown/flipFaceUp 在 加标签/去标签 后补发「翻面后」(faceDown=true/false)
@@ -13,11 +15,11 @@
 // 连环状态（横置的语义层）：CHAIN_MARK/isChained 是横置状态的查询面，
 //   registerChainConductionHook 是「连环状态 × 属性伤害」的传导行为——两者都与铁索连环牌
 //   解耦：任何途径置入连环状态（铁索连环牌、武将技能调 setChain）都受传导管辖。
-import type { GameState } from '../types';
+import type { GameState, HookResult } from '../types';
 import { TARGET_SYSTEM } from '../types';
 import { applyAtom } from '../core/apply';
 import { runDamageFlow } from './damage';
-import { registerAfterHook } from '../core/skill';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
 
 /** 连环（横置）状态的 mark id。 */
 export const CHAIN_MARK = 'chained';
@@ -141,4 +143,98 @@ export async function performSkipTurn(
   if (ended) {
     await applyAtom(state, { type: '回合结束后', player });
   }
+}
+
+/** registerFlipSkipTurnHooks 的差异参数。 */
+export interface FlipSkipTurnOptions {
+  /** 作用范围:'self' = 仅技能持有者本人的阶段 atom(神速/界据守/界仁心/界伏枥——
+   *  翻的是自己);'any' = 任意持有 `${reason}/翻面` 标签的玩家(悲歌/放逐——翻的是
+   *  伤害来源等他人)。默认 'self'。 */
+  scope?: 'self' | 'any';
+  /** 消费翻面标签时是否走 flipFaceUp(去标签 + 补发「翻面后」时机,faceDown=false,
+   *  解围等 /翻面 hook 消费者依赖此事件)。默认 true;神速族历史上加/去标签都用
+   *  裸 atom(两侧均不补发「翻面后」),传 false 保持事件序列不变。 */
+  emitFaceUpEvent?: boolean;
+}
+
+/** 注册「翻面 → 跳过整个下一回合」的一对 before-hook(神速/悲歌/放逐/界据守/界仁心/
+ *  界伏枥 等共用):
+ *  ① 阶段开始:准备阶段命中 `${reason}/翻面` 标签 → 去标签 + 设 `${reason}/skipAll`
+ *     标志 + cancel;skipAll 存续期间取消该玩家其余所有阶段(防止 phase-end
+ *     after-hook 推进产生副作用)。
+ *  ② 阶段结束:清除标志并亲自执行 end-turn 序列(performSkipTurn),cancel 阶段结束
+ *     原子以防幻影阶段链。
+ *  hook 以 (skillId, ownerId) 身份注册,历史行为:不持有 unloader(保持各技能原有的
+ *  卸载语义)。 */
+export function registerFlipSkipTurnHooks(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  reason: string,
+  opts?: FlipSkipTurnOptions,
+): void {
+  const scope = opts?.scope ?? 'self';
+  const emitFaceUpEvent = opts?.emitFaceUpEvent ?? true;
+  const SKIP_TAG = `${reason}/翻面`;
+  const SKIP_FLAG = `${reason}/skipAll`;
+
+  /** 解析本次阶段 atom 的作用玩家:self=仅 ownerId 本人;any=atom.player(须存在)。 */
+  const resolvePlayer = (atomPlayer: number | undefined): number | undefined =>
+    scope === 'self' ? (atomPlayer === ownerId ? ownerId : undefined) : atomPlayer;
+
+  // ── 阶段开始 before hook:检测翻面标签 → 启动跳过 ──
+  registerBeforeHook(
+    state,
+    skillId,
+    ownerId,
+    '阶段开始',
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
+      if (atom.type !== '阶段开始') return;
+      const player = resolvePlayer(atom.player);
+      if (player === undefined) return;
+      const p = ctx.state.players[player];
+      if (!p) return;
+
+      // 入口:准备阶段开始 + 该玩家有翻面标签 → 启动跳过
+      if (atom.phase === '准备' && p.tags.includes(SKIP_TAG)) {
+        if (emitFaceUpEvent) {
+          await flipFaceUp(ctx.state, player, reason);
+        } else {
+          await applyAtom(ctx.state, { type: '去标签', player, tag: SKIP_TAG });
+        }
+        ctx.state.localVars[SKIP_FLAG] = player;
+        return { kind: 'cancel' };
+      }
+
+      // skipAll 标志存在时,取消该玩家所有其他阶段(防止 phase-end after-hook 推进产生副作用)
+      if (ctx.state.localVars[SKIP_FLAG] === player) {
+        return { kind: 'cancel' };
+      }
+    },
+  );
+
+  // ── 阶段结束 before hook:skipAll → 主动推进回合 ──
+  registerBeforeHook(
+    state,
+    skillId,
+    ownerId,
+    '阶段结束',
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
+      if (atom.type !== '阶段结束') return;
+      const player = resolvePlayer(atom.player);
+      if (player === undefined) return;
+      if (ctx.state.localVars[SKIP_FLAG] !== player) return;
+
+      // 清除 skipAll 标志(后续不再 skip)
+      delete ctx.state.localVars[SKIP_FLAG];
+
+      // 亲自执行 end-turn 序列:清过期标记 → 下一玩家 → 回合结束 → 回合结束后
+      // (回合推进 beginTurn 挂在 回合结束后 的 after-hook,故须发出否则下一家不启动)
+      await performSkipTurn(ctx.state, player);
+
+      return { kind: 'cancel' };
+    },
+  );
 }

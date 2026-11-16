@@ -34,7 +34,7 @@ import { viewCanAttack } from '../rules/viewDistance';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { REN_MARK_ID, getRenColor } from './明任';
 import { askConfirm, requireRequestType, defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
-import { projectTurnUsage } from '../rules/turn-usage';
+import { createYinYangState } from '../rules/turn-usage';
 
 const SKILL_ID = '贞良';
 /** 转换态 key(state:player.vars 跨回合持久;view:经 回合用量 atom 投影 turnUsage)。
@@ -50,14 +50,8 @@ const USED_COLORS_KEY = '贞良/阴/usedColors';
 
 type ColorMap = Record<string, Color>;
 
-function getState(state: GameState, ownerId: number): '阳' | '阴' {
-  return state.players[ownerId]?.vars[STATE_KEY] === '阴' ? '阴' : '阳';
-}
-
-async function syncStateView(state: GameState, ownerId: number): Promise<void> {
-  // state 真相在 player.vars(跨回合持久),此处仅把转换态投影到 view.turnUsage
-  await projectTurnUsage(state, ownerId, STATE_KEY, getState(state, ownerId));
-}
+/** 转换态读写(缺省 '阳';发动翻转后与拥有者「回合开始」重同步时投影 turnUsage)。 */
+const { getState, syncStateView } = createYinYangState(STATE_KEY);
 
 /** 记录卢植使用/打出的一张牌 id 及其颜色(若已记录则不覆盖)。 */
 function recordUsedCard(state: GameState, cardId: string): void {

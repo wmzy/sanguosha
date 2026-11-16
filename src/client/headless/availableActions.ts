@@ -47,6 +47,8 @@ import {
   getPendingRequestType,
   requestTypeFirstSegment,
   getPendingRequestedName,
+  respondCandidates,
+  rescueSkillFor,
 } from '../utils/pendingRespond';
 import { viewSlashTargetMax } from '../../engine/rules/action-active';
 import {
@@ -1114,21 +1116,9 @@ export function appendRespondActions(
       if (!isAskType && pending.prompt?.type === 'useCardAndTarget') {
         const prompt = pending.prompt;
         const me = view.players[ownerId];
-        // 可选牌:优先用投影层下发的 candidates(权威,跨进程),否则用 info.cardFilter 过滤手牌
-        const candidateIds = prompt.cardFilter.candidates;
-        let candidates: Card[];
-        if (candidateIds) {
-          // candidates 是权威候选(可能含装备区等非手牌来源,如界天香弃红桃装备)。
-          // 按 id 从 cardMap 取 Card,不限定于 me.hand —— 否则装备区候选被滤掉,
-          // AI 永远无法选装备弃牌(界天香只持红桃装备时触发后卡死/超时)。
-          candidates = candidateIds
-            .map((id) => view.cardMap[id])
-            .filter((c): c is Card => !!c);
-        } else if (info.cardFilter) {
-          candidates = me?.hand?.filter((c) => info.cardFilter!(c)) ?? [];
-        } else {
-          candidates = me?.hand ?? [];
-        }
+        // 候选口径与浏览器共用 respondCandidates:投影层 candidates(权威,可能含
+        // 装备区牌,如界天香弃红桃装备)优先;否则 info.cardFilter 过滤手牌。
+        const candidates = respondCandidates(info, me?.hand ?? [], view.cardMap);
         for (const card of candidates) {
           const resolved = resolveTargetSelection(view, ownerId, prompt.targetFilter, card);
           const targetParams: Record<string, Json> = resolved.targets
@@ -1175,14 +1165,17 @@ export function appendRespondActions(
         });
       } else if (info.cardFilter) {
         // 需要选牌（杀/闪等）：为每张可出的牌生成独立 respond action（带 cardId）
-        // 求桃救援（rescueSkillForCard）：桃/酒/急救红牌各自走对应技能 respond
+        // 求桃救援（rescueSkillFor）：桃/酒/急救红牌各自走对应技能 respond
         const me = view.players[ownerId];
-        const candidates = me?.hand?.filter((c) => info.cardFilter!(c)) ?? [];
+        // 候选口径与浏览器/useCardAndTarget 分支共用 respondCandidates:
+        // candidates(权威)存在时含装备区牌(界鬼才换判定牌的手牌+装备候选),
+        // 否则 info.cardFilter 过滤手牌(求桃:字面桃/酒 ∪ 急救等转化救援并集)。
+        const candidates = respondCandidates(info, me?.hand ?? [], view.cardMap);
         for (const card of candidates) {
-          const rescueSkill = info.rescueSkillForCard?.(card);
+          const rescueSkill = rescueSkillFor(info, card);
           out.push({
-            description: `回应【${rescueSkill ?? info.skillId}】(${card.suit}${card.rank})`,
-            message: respondMsg(rescueSkill ?? info.skillId, { cardId: card.id }),
+            description: `回应【${rescueSkill}】(${card.suit}${card.rank})`,
+            message: respondMsg(rescueSkill, { cardId: card.id }),
             validTargets: [],
             category: 'respond',
           });

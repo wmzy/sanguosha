@@ -10,8 +10,12 @@
 // 读取 getBoundingClientRect 取屏幕坐标。锚点不存在时降级到视口估算位置。
 //
 // keyframe `flyCardMove` 定义在 src/client/animations.css(全局)。
+// 浮动 div 骨架(定位/--fly-dx/dy/animationend+超时兜底移除)与明牌两行子元素
+// 由 flyCardOverlay 基座提供。
 
-import { SUIT_COLOR } from '../components/gameViewConstants';
+import { createFaceLines, spawnFlyContainer, type FlyCardFace } from './flyCardOverlay';
+
+export type { FlyCardFace };
 
 // ─── 浮动卡牌视觉常量 ───
 const CARD_W = 46;
@@ -19,7 +23,6 @@ const CARD_H = 64;
 /** 多张牌横排时的重叠步进(每张右移这么多的可见宽度) */
 const CARD_STEP = 22;
 const FLY_DURATION_MS = 840;
-const FLY_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
 // 明牌配色
 const FACE_BG = 'rgba(22,33,62,0.96)';
@@ -29,13 +32,6 @@ const FACE_SHADOW = '0 0 12px rgba(58,90,140,0.5)';
 const BACK_BG = 'linear-gradient(135deg, #1e2d4a 0%, #0d1525 100%)';
 const BACK_BORDER = '#2c4068';
 const BACK_PATTERN = '✦';
-
-/** 单张牌的牌面信息(明牌时使用);为 null 表示该位置扣置 */
-export interface FlyCardFace {
-  name: string;
-  suit: string;
-  rank: string;
-}
 
 /** 动画锚点:定位起止区域的 DOM 元素 */
 export type AnchorTarget =
@@ -104,9 +100,12 @@ function containerWidth(count: number): number {
   return CARD_W + (count - 1) * CARD_STEP;
 }
 
+// 明牌两行排版(小卡多张横排,字号缩小);花色着色由基座的 createFaceLines 统一处理
+const FACE_NAME_CSS = 'font-size: 12px; font-weight: bold; line-height: 1.2; text-align: center; padding: 0 2px;';
+const FACE_SUIT_CSS = 'font-size: 10px; margin-top: 2px;';
+
 /** 渲染单张明牌子元素 */
 function createFaceCard(face: FlyCardFace): HTMLElement {
-  const suitColor = SUIT_COLOR[face.suit] ?? '#ccc';
   const el = document.createElement('div');
   el.style.cssText = `
     position: absolute; width: ${CARD_W}px; height: ${CARD_H}px;
@@ -115,14 +114,7 @@ function createFaceCard(face: FlyCardFace): HTMLElement {
     display: flex; flex-direction: column; justify-content: center; align-items: center;
     box-shadow: ${FACE_SHADOW};
   `;
-  const name = document.createElement('div');
-  name.style.cssText = `font-size: 12px; font-weight: bold; color: ${suitColor}; line-height: 1.2; text-align: center; padding: 0 2px;`;
-  name.textContent = face.name;
-  const suit = document.createElement('div');
-  suit.style.cssText = `font-size: 10px; color: ${suitColor}; margin-top: 2px;`;
-  suit.textContent = `${face.suit}${face.rank}`;
-  el.appendChild(name);
-  el.appendChild(suit);
+  for (const line of createFaceLines(face, FACE_NAME_CSS, FACE_SUIT_CSS)) el.appendChild(line);
   return el;
 }
 
@@ -164,41 +156,28 @@ export function flyCards(
   const fromRect = resolveAnchor(from) ?? fallbackRect(from);
   const toRect = resolveAnchor(to) ?? fallbackRect(to);
 
-  const flyDx = toRect.cx - fromRect.cx;
-  const flyDy = toRect.cy - fromRect.cy;
-
   const cWidth = containerWidth(total);
-  // 容器左上角:使容器中心对齐起点中心
-  const left = fromRect.cx - cWidth / 2;
-  const top = fromRect.cy - CARD_H / 2;
-
-  const container = document.createElement('div');
-  container.style.cssText = `
-    position: fixed; left: ${left}px; top: ${top}px;
-    width: ${cWidth}px; height: ${CARD_H}px;
-    pointer-events: none; z-index: 9998;
-    --fly-dx: ${flyDx}px; --fly-dy: ${flyDy}px;
-    animation: flyCardMove ${FLY_DURATION_MS}ms ${FLY_EASING} forwards;
-  `;
 
   // 逐张摆放牌:明牌用 faces[i],超出 faces 长度或 null 的位置渲染牌背
+  const cards: HTMLElement[] = [];
   for (let i = 0; i < total; i++) {
     const face = faces[i];
     const cardEl = face ? createFaceCard(face) : createBackCard();
     cardEl.style.left = `${i * CARD_STEP}px`;
-    container.appendChild(cardEl);
+    cards.push(cardEl);
   }
 
-  // data-fly-card:标记瞬时飞行动画元素(与 cardFlyAnimation 一致),供测试 afterEach 清理。
-  container.setAttribute('data-fly-card', '');
-  document.body.appendChild(container);
-  let removed = false;
-  const remove = () => {
-    if (removed) return;
-    removed = true;
-    container.remove();
-  };
-  container.addEventListener('animationend', remove);
-  // 安全兜底:若 animationend 未触发(如标签页隐藏),超时后强制移除
-  setTimeout(remove, FLY_DURATION_MS + 300);
+  // 容器左上角取「使容器中心对齐起点中心」;位移量 = 终点中心 - 起点中心
+  spawnFlyContainer({
+    left: fromRect.cx - cWidth / 2,
+    top: fromRect.cy - CARD_H / 2,
+    width: cWidth,
+    height: CARD_H,
+    dx: toRect.cx - fromRect.cx,
+    dy: toRect.cy - fromRect.cy,
+    zIndex: 9998,
+    animationName: 'flyCardMove',
+    durationMs: FLY_DURATION_MS,
+    children: cards,
+  });
 }

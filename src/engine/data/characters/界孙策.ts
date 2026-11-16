@@ -7,9 +7,5 @@ export const 界孙策 = {
   maxHealth: 4,
   gender: '男',
   faction: '吴',
-  skills: [
-    { name: '界激昂', path: '../../skills/界激昂' },
-    { name: '界魂姿', path: '../../skills/界魂姿' },
-    { name: '界制霸', path: '../../skills/界制霸' },
-  ],
+  skills: ['界激昂', '界魂姿', '界制霸'],
 };

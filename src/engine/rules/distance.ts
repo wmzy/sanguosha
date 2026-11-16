@@ -120,7 +120,8 @@ export function registerAttackRangeExemptor(
   exemptor: AttackRangeExemptor,
   /** 豁免归属技能名:静态契约测试归因用(tests/engine/view-distance-sync.test.ts 扫描
    *  调用点第 4 参字符串字面量做技能名归因;工厂宿主文件替别的技能注册时必须传),
-   *  与 VIEW_DISTANCE_EXEMPTIONS 登记名一致;不参与运行时判定,故函数体内不消费。 */
+   *  与 VIEW_DISTANCE_EXEMPTIONS 登记名一致;不参与运行时判定,故函数体内不消费。
+   *  该参数有存活调用方(skills/武圣.ts 工厂替界武圣传 '界武圣',供上述归因),勿删。 */
   skillId?: string,
 ): () => void {
   void skillId;
@@ -152,7 +153,8 @@ export function registerDistanceExemptor(
   exemptor: DistanceExemptor,
   /** 豁免归属技能名:静态契约测试归因用(tests/engine/view-distance-sync.test.ts 扫描
    *  调用点第 4 参字符串字面量做技能名归因;工厂宿主文件替别的技能注册时必须传),
-   *  与 VIEW_DISTANCE_EXEMPTIONS 登记名一致;不参与运行时判定,故函数体内不消费。 */
+   *  与 VIEW_DISTANCE_EXEMPTIONS 登记名一致;不参与运行时判定,故函数体内不消费。
+   *  该参数有存活调用方(skills/武圣.ts 工厂替界武圣传 '界武圣',供上述归因),勿删。 */
   skillId?: string,
 ): () => void {
   void skillId;

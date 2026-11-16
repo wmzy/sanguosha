@@ -7,8 +7,5 @@ export const 袁术 = {
   maxHealth: 4,
   gender: '男',
   faction: '群',
-  skills: [
-    { name: '庸肆', path: '../../skills/庸肆' },
-    { name: '伪帝', path: '../../skills/伪帝' },
-  ],
+  skills: ['庸肆', '伪帝'],
 };

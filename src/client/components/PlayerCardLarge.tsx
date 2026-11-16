@@ -18,15 +18,13 @@ import {
   skillActionVariants,
   hasBlockingPending,
 } from '../utils/gameViewHelpers';
-import { SUIT_COLOR, EQUIPMENT_SKILL_NAMES } from './gameViewConstants';
-import { LORD_SKILLS } from '../../engine/data/character-meta';
+import { SUIT_COLOR } from './gameViewConstants';
 import { getSkillDescription } from '../../engine/skills/lifecycle';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import type { HpChangeNumber } from '../hooks/useAnimationState';
 import { SkillTag } from './SkillTooltip';
-import { DEFAULT_SKILLS as ENGINE_DEFAULT_SKILLS } from '../../engine/atoms/选将';
 import { playerVisibleEqual } from '../utils/memo';
-import { displaySkillName } from '../utils/skillDisplay';
+import { displaySkillName, visibleSkillsOf } from '../utils/skillDisplay';
 import {
   getCharacterCardVisuals,
   hideImgOnError,
@@ -34,8 +32,6 @@ import {
 } from '../utils/characterVisuals';
 import { HpFloatNumber } from '../utils/HpFloatNumber';
 import { useGameView } from './GameViewCtx';
-
-const DEFAULT_SKILLS = new Set(ENGINE_DEFAULT_SKILLS);
 
 export interface PlayerCardLargeProps {
   /** viewer 座次(用于显示「我」徽章) */
@@ -95,14 +91,8 @@ export function PlayerCardLargeImpl({
   // 势力信息(与座位卡/选将遮罩共享派生,见 utils/characterVisuals)
   const { factionColor, charImg } = getCharacterCardVisuals(p.character);
   const identity = p.identity;
-  const isLordSeat = identity === '主公';
-  // 技能列表(过滤默认技能与装备技能;非主公隐藏主公技)
-  const visibleSkills = p.skills.filter(
-    (s) =>
-      !DEFAULT_SKILLS.has(s) &&
-      !EQUIPMENT_SKILL_NAMES.has(s) &&
-      (isLordSeat || !LORD_SKILLS.has(s)),
-  );
+  // 技能列表(过滤默认技能与装备技能;非主公隐藏主公技,见 utils/skillDisplay)
+  const visibleSkills = visibleSkillsOf(p);
   // 主动技(confirm/choosePlayer/selectTarget/转化类/distribute)渲染为可点按钮。
   // 白名单与无头枚举共享 isTriggerablePromptType:selectTarget 型(挑衅/反间/强袭/
   // 攻心/雄乱/界翦灭/界势斩/界解烦/界献州)此前被漏掉 → 整类技能在浏览器里无按钮、

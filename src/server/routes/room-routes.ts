@@ -37,6 +37,7 @@ import {
   optString,
   readJsonBody,
   requireHost,
+  requireRoom,
   requireRoomPassword,
   requireSessionHost,
   resolveActorOr401,
@@ -55,8 +56,8 @@ export function applyRoomRoutes(app: Hono): void {
 
   app.get('/api/rooms/:id', (c) => {
     const id = c.req.param('id');
-    const room = getRoom(id);
-    if (!room) return c.json({ error: '房间不存在' }, 404);
+    const room = requireRoom(c, id);
+    if (room instanceof Response) return room;
     // 字段子集取自 buildRoomInfo(单一来源),playerCount 与房间列表同口径(占座数)
     const info = buildRoomInfo(room);
     return c.json({
@@ -128,14 +129,14 @@ export function applyRoomRoutes(app: Hono): void {
 
   app.post('/api/rooms/:id/join', async (c) => {
     const id = c.req.param('id');
-    const room = getRoom(id);
 
     const raw = await readJsonBody(c);
 
     // 普通房间必须登录(先于房间存在性检查:鉴权语义优先);playerId 一律取会话 userId
     const user = await requireUser(c);
     if (!user) return authRequired(c);
-    if (!room) return c.json({ error: '房间不存在' }, 404);
+    const room = requireRoom(c, id);
+    if (room instanceof Response) return room;
     if (room.isDebug) return c.json({ error: '调试房间请使用调试入口' }, 400);
     const playerId = user.id;
 
@@ -349,8 +350,8 @@ export function applyRoomRoutes(app: Hono): void {
   // 修改后已入房成员不受影响,仅约束后续加入者。
   app.put('/api/rooms/:id/password', async (c) => {
     const roomId = c.req.param('id');
-    const room = getRoom(roomId);
-    if (!room) return c.json({ error: '房间不存在' }, 404);
+    const room = requireRoom(c, roomId);
+    if (room instanceof Response) return room;
 
     const raw = await readJsonBody(c);
     // 非调试房间:房主身份由会话决定

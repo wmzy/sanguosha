@@ -25,7 +25,7 @@ interface Props {
   pending: PendingView | null;
   /** respond 窗口(打出/不回应)是否激活 */
   isRespondPending: boolean;
-  /** 手牌中可回应牌张数;0 时显示「无牌可出 · 不回应」一键按钮,null=未知(无 filter) */
+  /** 可回应牌张数(共享候选集,含装备区候选);0 时显示「无牌可出 · 不回应」一键按钮,null=未知(无 filter) */
   respondCandidateCount?: number | null;
   /** 是否显示「取消选择」 */
   showCancelSelection: boolean;

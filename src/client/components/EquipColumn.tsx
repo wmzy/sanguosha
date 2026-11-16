@@ -37,8 +37,13 @@ export interface EquipColumnProps {
   distSelectedEquipIds?: Set<string> | null;
   /** distribute 是否激活(决定装备区是否可点选) */
   isDistributeActive?: boolean;
-  /** 点击装备区卡牌(distribute 选装备时触发) */
+  /** 点击装备区卡牌(distribute 选装备 / 回应窗口选装备候选时触发) */
   onEquipCardClick?: (cardId: string) => void;
+  /** 回应窗口可作为候选的装备 cardId 集合(界天香弃红桃装备/界鬼才换判定牌);
+   *  null = 非回应选牌窗口(装备区保持装备技能按钮语义) */
+  respondCandidateEquipIds?: Set<string> | null;
+  /** 回应窗口已选中的装备 cardId(与手牌 selectedRespondCardId 同源) */
+  selectedRespondEquipId?: string | null;
 }
 
 /** 内部 memo impl 的 props(含从 context 转发下来的共享字段)。 */
@@ -63,11 +68,17 @@ export function EquipColumnImpl({
   distSelectedEquipIds,
   isDistributeActive,
   onEquipCardClick,
+  respondCandidateEquipIds,
+  selectedRespondEquipId,
 }: EquipColumnImplProps) {
   useSkillDescReady();
   const p = view.players[perspectiveIdx];
   if (!p) return null;
 
+  // 回应选牌窗口(distribute 同构):装备区整体切到「选牌候选」语义,抑制技能触发,
+  // 避免候选装备的技能按钮抢占点击(候选牌点击走 onEquipCardClick → handleCardClick
+  // 的回应选中分支)。
+  const inRespondPick = respondCandidateEquipIds != null;
   const equipSkillActions = skillActions.filter((a) => EQUIPMENT_SKILL_NAMES.has(a.skillId));
   const actionCtx = { view, perspectiveIdx };
   const activeSkillByEquipName = new Map<string, SkillActionDef>();
@@ -91,17 +102,24 @@ export function EquipColumnImpl({
     const name = card?.name ?? id;
     // distribute 激活时:装备只作选牌候选,抑制技能触发(避免制衡选牌误弹装备技能
     // confirm 弹窗,如寒冰剑的 respond-confirm action 无 activeWhen 在出牌阶段被判 active)。
+    // 回应选牌窗口(界天香/界鬼才)同理抑制,装备技能按钮让位给候选点选。
     const rawSkill = activeSkillByEquipName.get(name);
-    const activeSkill = isDistributeActive ? undefined : rawSkill;
+    const activeSkill = (isDistributeActive || inRespondPick) ? undefined : rawSkill;
     const isDistCandidate = !!isDistributeActive && !!distCandidateEquipIds?.has(id);
     const isDistSelected = !!distSelectedEquipIds?.has(id);
-    const clickable = !!activeSkill || isDistCandidate;
+    const isRespondCandidate = inRespondPick && !!respondCandidateEquipIds?.has(id);
+    const isRespondSelected = selectedRespondEquipId === id;
+    const clickable = !!activeSkill || isDistCandidate || isRespondCandidate;
     const handleClick = activeSkill
       ? () => onSkillAction(activeSkill)
-      : isDistCandidate
+      : isDistCandidate || isRespondCandidate
         ? () => onEquipCardClick?.(id)
         : undefined;
-    const stateHint = activeSkill ? ' · 可发动' : isDistCandidate ? ' · 可选中' : '';
+    const stateHint = activeSkill
+      ? ' · 可发动'
+      : isDistCandidate || isRespondCandidate
+        ? ' · 可选中'
+        : '';
     const equipDesc = EQUIPMENT_SKILL_NAMES.has(name) ? getSkillDescription(name) : undefined;
     const head = `${name}(${slot})${stateHint}`;
     const tooltipText = equipDesc ? `${head}\n${equipDesc}` : head;
@@ -114,6 +132,8 @@ export function EquipColumnImpl({
         activeSkill={activeSkill}
         isDistCandidate={isDistCandidate}
         isDistSelected={isDistSelected}
+        isRespondCandidate={isRespondCandidate}
+        isRespondSelected={isRespondSelected}
         clickable={clickable}
         handleClick={handleClick}
       />
@@ -144,6 +164,8 @@ function EquipItem({
   activeSkill,
   isDistCandidate,
   isDistSelected,
+  isRespondCandidate,
+  isRespondSelected,
   clickable,
   handleClick,
 }: {
@@ -153,6 +175,10 @@ function EquipItem({
   activeSkill: SkillActionDef | undefined;
   isDistCandidate: boolean;
   isDistSelected: boolean;
+  /** 回应窗口:该装备是回应候选(界天香弃红桃装备/界鬼才换判定牌),可点击选中 */
+  isRespondCandidate: boolean;
+  /** 回应窗口:该装备已被选为回应牌(与手牌回应选中同源) */
+  isRespondSelected: boolean;
   clickable: boolean;
   handleClick: (() => void) | undefined;
 }) {
@@ -167,6 +193,8 @@ function EquipItem({
           activeSkill && styles.equipSkillActive,
           isDistCandidate && styles.equipDistCandidate,
           isDistSelected && styles.equipSelected,
+          isRespondCandidate && styles.equipRespondCandidate,
+          isRespondSelected && styles.equipRespondSelected,
         )}
         role={clickable ? 'button' : undefined}
         onClick={handleClick}
@@ -217,7 +245,13 @@ function equipColumnPropsEqual(prev: EquipColumnImplProps, next: EquipColumnImpl
     prev.isDistributeActive === next.isDistributeActive &&
     shallowSetEqual(prev.distCandidateEquipIds ?? new Set(), next.distCandidateEquipIds ?? new Set()) &&
     shallowSetEqual(prev.distSelectedEquipIds ?? new Set(), next.distSelectedEquipIds ?? new Set()) &&
-    prev.view.phase === next.view.phase
+    prev.view.phase === next.view.phase &&
+    // 回应窗口装备候选(界天香/界鬼才):候选集合或选中牌变化须重渲染
+    shallowSetEqual(
+      prev.respondCandidateEquipIds ?? new Set(),
+      next.respondCandidateEquipIds ?? new Set(),
+    ) &&
+    prev.selectedRespondEquipId === next.selectedRespondEquipId
   );
 }
 

@@ -24,6 +24,19 @@ import {
   slashExtraKey,
 } from './vars-keys';
 
+/** 按 p.index(座次)定位玩家条目——本文件唯一定位入口。
+ *  view.players 由 projectPlayer 按座次投影(buildView 的 players.map((_p, i) => projectPlayer(...))),
+ *  恒满足 players[i].index === i,故与数组下标等价(该前提由 tests/engine/distance-parity.test.ts
+ *  断言锁定);仍统一按 index 查找而非裸下标,与 viewSeatDistance 同一约定——调用方传入的
+ *  一律是座次号,避免「豁免表按下标、座位距离按 index」两套定位并存漂移。
+ *  n ≤ 8 的 find 开销可忽略,豁免表无需再建 index→数组位映射。 */
+function playerBySeat(
+  players: GameView['players'],
+  idx: number,
+): GameView['players'][number] | undefined {
+  return players.find((p) => p.index === idx);
+}
+
 /** GameView 上 from 到 to 的环形座位距离(只算存活玩家;仅本文件消费) */
 function viewSeatDistance(
   players: GameView['players'],
@@ -92,47 +105,47 @@ const VIEW_DISTANCE_EXEMPTIONS: readonly ViewDistanceExemption[] = [
     // 引擎侧同时注册 AttackRangeExemptor(杀)与 DistanceExemptor(顺手牵羊/兵粮寸断)。
     source: '成略',
     kinds: ['distance', 'attackRange'],
-    matches: (players, fromIdx) => !!players[fromIdx]?.turnUsage?.[CHENGLUE_SUITS_VIEW_KEY],
+    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[CHENGLUE_SUITS_VIEW_KEY],
   },
   {
     // 决堰(界姜维):坐骑栏效果——本回合使用牌无距离限制 → 距离视为 1。
     source: '决堰',
     kinds: ['distance'],
-    matches: (players, fromIdx) => !!players[fromIdx]?.turnUsage?.[JUEYAN_MOUNT_VIEW_KEY],
+    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[JUEYAN_MOUNT_VIEW_KEY],
   },
   {
     // 往烈(界朱然):本回合使用的首张牌无距离限制 → 距离视为 1。
     source: '往烈',
     kinds: ['distance'],
-    matches: (players, fromIdx) => !!players[fromIdx]?.turnUsage?.[WANGLIE_FIRST_VIEW_KEY],
+    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[WANGLIE_FIRST_VIEW_KEY],
   },
   {
     // 雄乱(界吕布):本回合对其使用牌无距离限制(值=目标座次)。
     source: '雄乱',
     kinds: ['distance'],
     matches: (players, fromIdx, toIdx) =>
-      players[fromIdx]?.turnUsage?.[XIONGLUAN_TARGET_VIEW_KEY] === toIdx,
+      playerBySeat(players, fromIdx)?.turnUsage?.[XIONGLUAN_TARGET_VIEW_KEY] === toIdx,
   },
   {
     // 天义(太史慈):拼点赢后本回合攻击范围无限(值=发起者座次)。仅覆盖杀(攻击范围豁免)。
     source: '天义',
     kinds: ['attackRange'],
     matches: (players, fromIdx) =>
-      players[fromIdx]?.turnUsage?.[TIANYI_WIN_VIEW_KEY] === fromIdx,
+      playerBySeat(players, fromIdx)?.turnUsage?.[TIANYI_WIN_VIEW_KEY] === fromIdx,
   },
   {
     // 诈降(界黄盖):失去体力后本回合【红色杀】无距离限制。turnUsage 由回合用量 atom 同步。
     // 宽松放行(UI 提示);后端 杀.validate 按卡色严格校验(仅红杀放行)。
     source: '诈降',
     kinds: ['attackRange'],
-    matches: (players, fromIdx) => !!players[fromIdx]?.turnUsage?.[slashExtraKey('诈降')],
+    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[slashExtraKey('诈降')],
   },
   {
     // 界武圣(界关羽):你使用的方片【杀】无距离限制。
     // 宽松放行(所有目标可点);后端 杀.validate 按花色严格校验(仅方片杀放行)。
     source: '界武圣',
     kinds: ['attackRange'],
-    matches: (players, fromIdx) => !!players[fromIdx]?.skills?.includes('界武圣'),
+    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.skills?.includes('界武圣'),
   },
   {
     // 界烈弓(界黄忠):你【杀】的攻击范围为此杀点数(max(武器范围, 杀点数))。
@@ -140,21 +153,21 @@ const VIEW_DISTANCE_EXEMPTIONS: readonly ViewDistanceExemption[] = [
     // 严格校验(仅 effectiveDistance ≤ 杀点数 的目标放行)。
     source: '界烈弓',
     kinds: ['attackRange'],
-    matches: (players, fromIdx) => !!players[fromIdx]?.skills?.includes('界烈弓'),
+    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.skills?.includes('界烈弓'),
   },
   {
     // 界将驰(界曹彰)选项②:本回合使用【杀】无距离限制。turnUsage 由回合用量 atom 同步;
     // 激活时前端宽松放行(UI 提示),后端 杀.validate 严格校验。
     source: '界将驰',
     kinds: ['attackRange'],
-    matches: (players, fromIdx) => !!players[fromIdx]?.turnUsage?.[JIANGCHI_CHOICE2_VIEW_KEY],
+    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[JIANGCHI_CHOICE2_VIEW_KEY],
   },
   {
     // 界弓骑(界韩当):弃牌后本回合攻击范围无限。turnUsage 由 回合用量 atom 同步;
     // 激活时前端宽松放行(UI 提示),后端 distance.ts inAttackRange 严格校验。
     source: '界弓骑',
     kinds: ['attackRange'],
-    matches: (players, fromIdx) => !!players[fromIdx]?.turnUsage?.[GONGQI_ACTIVE_VIEW_KEY],
+    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[GONGQI_ACTIVE_VIEW_KEY],
   },
   {
     // 当先(界廖化):额外出牌阶段获得的该张杀无距离限制。turnUsage 由 回合用量 atom 同步;
@@ -162,7 +175,7 @@ const VIEW_DISTANCE_EXEMPTIONS: readonly ViewDistanceExemption[] = [
     // 严格校验(仅该张杀放行)。
     source: '界当先',
     kinds: ['attackRange'],
-    matches: (players, fromIdx) => !!players[fromIdx]?.turnUsage?.[DANGXIAN_NO_RANGE_VIEW_KEY],
+    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[DANGXIAN_NO_RANGE_VIEW_KEY],
   },
 ];
 
@@ -197,8 +210,8 @@ export function viewEffectiveDistance(
   // 豁免器命中视为距离 1(可被所有距离检查放行)。
   if (viewDistanceExempted(players, fromIdx, toIdx)) return 1;
   let dist = viewSeatDistance(players, fromIdx, toIdx);
-  const fromP = players[fromIdx];
-  const toP = players[toIdx];
+  const fromP = playerBySeat(players, fromIdx);
+  const toP = playerBySeat(players, toIdx);
   // 进攻修正:缩短距离(进攻马/马术等)
   dist -= fromP?.distanceVars?.attackMod ?? 0;
   // 防御修正:增加距离(防御马等)
@@ -216,6 +229,6 @@ export function viewCanAttack(
   // 与引擎 inAttackRange 同构:攻击范围豁免直接放行;
   // 否则 effectiveDistance(含通用距离豁免)≤ 攻击范围。
   if (viewAttackRangeExempted(players, fromIdx, toIdx)) return true;
-  const range = players[fromIdx]?.distanceVars?.attackRange ?? 1;
+  const range = playerBySeat(players, fromIdx)?.distanceVars?.attackRange ?? 1;
   return viewEffectiveDistance(players, fromIdx, toIdx) <= range;
 }

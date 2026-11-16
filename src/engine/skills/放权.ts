@@ -13,7 +13,7 @@
 //
 //   额外回合机制完全在放权技能内部实现,不修改 回合管理.ts:
 //   cancel 掉 回合结束 atom 后其 apply 与 after-hook(回合管理的 findNextAlive)都不执行,
-//   故需手动复刻 回合结束 的 per-turn 清理(见 clearPerTurnState)。
+//   故需手动复刻 回合结束 的 per-turn 清理(见 rules/turn-usage 的 clearPerTurnStateProjected)。
 //
 // 跳过出牌阶段手法同神速/巧变:applyAtom(阶段结束, 出牌) 推进到弃牌,
 //   再 return {kind:'cancel'} 取消本次 阶段开始(出牌)。
@@ -28,7 +28,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAction, registerBeforeHook } from '../core/skill';
-import { projectTurnUsage } from '../rules/turn-usage';
+import { clearPerTurnStateProjected } from '../rules/turn-usage';
 import { askConfirm, askResponse, defineConfirmAction, registerPhaseStartHook } from '../util/skillRuntime';
 
 const TRIGGER_RT = '放权/trigger';
@@ -39,26 +39,6 @@ const ACTIVE_KEY = '放权/active';
 const DISCARD_CARD_KEY = '放权/discardCard';
 const EXTRA_TARGET_KEY = '放权/extraTarget';
 const ORIGINAL_NEXT_KEY = '放权/originalNext';
-
-/** 复刻「回合结束」atom 的 per-turn 清理(cancel 回合结束后 atom.apply 不执行,需手动清理)。
- *  清空 turn.vars、清所有玩家 duration='turn' 标记、清 /usedThisTurn|/healed|/givenCount vars。
- *  marks 多数由 end action 的 清过期标记 已清(仅结束玩家),此处补全所有玩家以保持与 atom 一致。 */
-async function clearPerTurnState(state: GameState): Promise<void> {
-  state.turn.vars = {};
-  for (const p of state.players) {
-    p.marks = p.marks.filter((m) => m.duration !== 'turn');
-    for (const key of Object.keys(p.vars)) {
-      if (key.endsWith('/usedThisTurn') || key.endsWith('/healed') || key.endsWith('/givenCount')) {
-        await projectTurnUsage(state, p.index, key, null);
-      }
-    }
-    p.vars = Object.fromEntries(
-      Object.entries(p.vars).filter(
-        ([k]) => !k.endsWith('/usedThisTurn') && !k.endsWith('/healed') && !k.endsWith('/givenCount'),
-      ),
-    );
-  }
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -206,8 +186,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
         st.localVars[EXTRA_TARGET_KEY] = extraTarget;
         st.localVars[ORIGINAL_NEXT_KEY] = originalNext;
 
-        // cancel 回合结束 → 手动清理 per-turn 状态(否则 apply 不执行,状态残留)
-        await clearPerTurnState(st);
+        // cancel 回合结束 → 手动清理 per-turn 状态(否则 apply 不执行,状态残留);
+        // 逐 key 投影 null 清漏增量视图 turnUsage(见 clearPerTurnStateProjected)
+        await clearPerTurnStateProjected(st);
 
         // 亲自启动额外目标的回合(嵌套:其 end action → 回合结束(extraTarget) → 触发情况2)
         st.currentPlayerIndex = extraTarget;
@@ -227,8 +208,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           return; // 异常:无正常下家,放行
         }
 
-        // cancel 回合结束 → 手动清理 per-turn 状态
-        await clearPerTurnState(st);
+        // cancel 回合结束 → 手动清理 per-turn 状态(逐 key 投影,同情况1)
+        await clearPerTurnStateProjected(st);
 
         // 亲自启动正常下家的回合(恢复正常座次顺序)。
         // originalNext 回合结束后,其 回合结束 before-hook 标记已清 → 放行 →

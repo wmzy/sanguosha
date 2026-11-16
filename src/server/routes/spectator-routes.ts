@@ -3,7 +3,6 @@
 
 import type { Context, Hono } from 'hono';
 import {
-  getRoom,
   joinAsSpectator,
   switchRole,
   requestView,
@@ -24,6 +23,7 @@ import {
   optString,
   parseTargetSeat,
   readJsonBody,
+  requireRoom,
   requireRoomPassword,
   resolvePlayerOrRespond,
 } from './helpers';
@@ -87,14 +87,14 @@ export function applySpectatorRoutes(app: Hono): void {
   // POST /api/rooms/:id/join-spectator — 以旁观者身份加入房间
   app.post('/api/rooms/:id/join-spectator', async (c) => {
     const roomId = c.req.param('id');
-    const room = getRoom(roomId);
 
     const raw = await readJsonBody(c);
 
     // 旁观同样需要登录(需求:旁观也要登录后才能进房间查看;鉴权先于存在性检查)
     const user = await requireUser(c);
     if (!user) return authRequired(c);
-    if (!room) return c.json({ error: '房间不存在' }, 404);
+    const room = requireRoom(c, roomId);
+    if (room instanceof Response) return room;
     const spectatorId = user.id;
 
     // 有密码房间:旁观同样需要密码;已是本房旁观者(spectators 含该 id,重连/刷新)豁免

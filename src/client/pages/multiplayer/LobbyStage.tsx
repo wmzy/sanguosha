@@ -1,11 +1,11 @@
 // src/client/pages/multiplayer/LobbyStage.tsx
 // lobby 阶段:顶栏 + 创建/加入/旁观三表单 + 房间列表(RoomListPanel)。
 // 表单 state、房间列表拉取/删除、创建/加入/旁观 handler 全部收在本组件;房间数据走 MultiplayerRoomCtx。
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { css, cx } from '@linaria/core';
 import { RoomListPanel } from '../../components/RoomListPanel';
-import { apiFetch, ApiError } from '../../api/client';
+import { useRoomList } from '../../hooks/useRoomList';
 import { inputStyle } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
 import { PasswordPromptDialog } from './PasswordPromptDialog';
@@ -27,7 +27,7 @@ import {
   lobbySide,
   GAME_MODE_OPTIONS,
 } from './multiplayerStyles';
-import type { RoomInfo, RoomConfig } from '../../../server/protocol';
+import type { RoomConfig } from '../../../server/protocol';
 import type { GameMode } from '../../../engine/rules/types';
 
 /* ── 表单主按钮:与全站幽灵药丸体系同语言 ── */
@@ -84,42 +84,12 @@ export function LobbyStage() {
   const [joinCode, setJoinCode] = useState('');
   const [spectateCode, setSpectateCode] = useState('');
 
-  // lobby 阶段房间列表(参考 DebugLobby)
-  const [rooms, setRooms] = useState<RoomInfo[]>([]);
-
-  const fetchRooms = useCallback(async () => {
-    try {
-      const list = await apiFetch<RoomInfo[]>('/api/rooms?type=multiplayer');
-      setRooms(list);
-    } catch (err) {
-      // 静默失败，不干扰用户主流程
-      if (err instanceof ApiError) {
-        console.warn('获取房间列表失败', err.status, err.body);
-      }
-    }
-  }, []);
-
-  // 进入 lobby 时加载房间列表，并每 5s 自动刷新：
-  // 演示时 AI 房间往往在页面打开之后才创建，只能手刷会让观众错过开局。
-  useEffect(() => {
-    void fetchRooms();
-    const timer = setInterval(() => void fetchRooms(), 5000);
-    return () => clearInterval(timer);
-  }, [fetchRooms]);
-
-  // 删除房间(参考 DebugLobby 的 handleDeleteDebugRoom)
-  const handleDeleteRoom = useCallback(
-    (roomId: string) => {
-      apiFetch<void>(`/api/rooms/${roomId}`, { method: 'DELETE' })
-        .then(() => fetchRooms())
-        .catch((err) => {
-          if (err instanceof ApiError) {
-            console.warn('删除房间失败', err.status, err.body);
-          }
-        });
-    },
-    [fetchRooms],
-  );
+  // lobby 阶段房间列表:拉取/删除共用 useRoomList,每 5s 自动刷新——
+  // 演示时 AI 房间往往在页面打开之后才创建,只能手刷会让观众错过开局。
+  // 失败静默 warn(缺省语义),不干扰用户主流程。
+  const { rooms, refresh: fetchRooms, removeRoom: handleDeleteRoom } = useRoomList('multiplayer', {
+    pollIntervalMs: 5000,
+  });
 
   const handleCreate = () => {
     // 1v1 固定两人;身份局沿用所选人数。config 传部分字段,服务端 normalizeRoomConfig 补全。

@@ -25,6 +25,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook } from '../core/skill';
+import { registerFlipSkipTurnHooks } from '../flows/face-down';
 import { skipPhase } from '../rules/skip-phase';
 import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
 import { runVirtualSlash } from './cards/_virtualSlash';
@@ -32,7 +33,6 @@ import {
   FLIP_TAG,
   SKIP_MO_TAG,
   SKIP_PLAY_TAG,
-  registerShensuFlipTurnHooks,
   registerShensuTagSkipHook,
   shensuPhaseEntry,
 } from './神速';
@@ -274,8 +274,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── 跳过弃牌阶段:有标签 → skip ────────────────────
   registerShensuTagSkipHook(state, skill.id, ownerId, '弃牌', SKIP_DISCARD_TAG);
 
-  // ── 翻面:下一回合跳过整回合(机制同据守/放逐) ────────────────
-  registerShensuFlipTurnHooks(state, skill.id, ownerId);
+  // ── 翻面:下一回合跳过整回合(共用 face-down 通用版 hook 对;键沿用标版 '神速/' 前缀,
+  //    加/去标签均不补发「翻面后」,emitFaceUpEvent:false 保持事件序列)──
+  registerFlipSkipTurnHooks(state, skill.id, ownerId, '神速', { emitFaceUpEvent: false });
 
   return () => {};
 }

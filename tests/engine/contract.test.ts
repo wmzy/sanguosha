@@ -3,7 +3,7 @@
 // 反向检查暂不做(等 PR-A:给所有 backend-only skill 补 onMount 之后)。
 //
 // 另含技能声明注册表(registry)的 meta-tests:取代旧 skills/index.ts 手写 loader 表后,
-// 声明(武将 path/装备卡名/系统/衍生表)与磁盘文件的对应关系由此兜底,防止漂移。
+// 声明(武将技名/装备卡名/系统/衍生表)与磁盘文件的对应关系由此兜底,防止漂移。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readdirSync, existsSync, statSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';

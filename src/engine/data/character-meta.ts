@@ -52,7 +52,7 @@ interface CharacterSource {
   faction: Faction;
   maxHealth: number;
   gender: Gender;
-  skills: Array<{ name: string }>;
+  skills: string[];
   isLord?: boolean;
 }
 
@@ -66,7 +66,7 @@ const META: ReadonlyMap<string, CharacterMeta> = new Map(
         faction: src.faction,
         maxHealth: src.maxHealth,
         gender: src.gender,
-        skills: src.skills.map((s) => s.name),
+        skills: [...src.skills],
         isLord: src.isLord === true || LORD_CANDIDATES.includes(getCharacterBaseId(src.name)),
       } satisfies CharacterMeta,
     ];

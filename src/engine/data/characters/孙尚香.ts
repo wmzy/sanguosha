@@ -3,8 +3,5 @@ export const 孙尚香 = {
   maxHealth: 3,
   gender: '女',
   faction: '吴',
-  skills: [
-    { name: '结姻', path: '../../skills/结姻' },
-    { name: '枭姬', path: '../../skills/枭姬' },
-  ],
+  skills: ['结姻', '枭姬'],
 };

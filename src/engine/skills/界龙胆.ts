@@ -20,13 +20,16 @@
 // transform validate 不限定回合/阶段:由主 action(杀.use/桃.use/酒.use/respond 等)校验。
 //
 // 五件套(影子 id 后缀=技能 id '界龙胆'、当作、rollback、defineAction)由 skillRuntime 工厂
-// 统一实现;四向转化用 outputNameOf 按原卡名定向,validate 逐字保留 to 校验。
+// 统一实现;四向转化用 outputNameOf 按原卡名定向,方向(to)校验经 extraValidate 追加
+// (基础检查走工厂默认路径)。
 import type { Card, GameView, GameState, Json, Skill, FrontendAPI } from '../types';
 import { declareAlternativeResponse } from '../core/skill';
 import { viewCanSlash, defaultPlayActive } from '../rules/action-active';
 import {
   mountTransformAction,
   registerTransformAction,
+  viewAskedDodge,
+  viewAskedKill,
   type TransformActionOptions,
 } from '../util/skillRuntime';
 
@@ -53,15 +56,12 @@ const TRANSFORM_OPTIONS: TransformActionOptions = {
   // 占位:实际产出牌名由 outputNameOf 按原卡名推导
   outputName: '杀',
   outputNameOf: (sourceCardName: string) => TRANSFORM_MAP[sourceCardName],
-  validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
-    const self = state.players[ownerId];
-    const selfAlive = self?.alive === true;
+  // 不限时机:时机由主 action(杀.use/桃.use/酒.use/respond 等)校验
+  context: 'any',
+  // 方向(to)校验:基础检查(存活/持牌/牌存在)由工厂默认路径负责
+  extraValidate: (state: GameState, _ownerId: number, params: Record<string, Json>) => {
     const cardId = params.cardId as string;
-    const cardIdOk = typeof cardId === 'string';
-    const card = cardIdOk ? state.cardMap[cardId] : undefined;
-    const cardInHand = cardIdOk && self.hand.includes(cardId);
-    if (!selfAlive) return '你已死亡';
-    if (!cardIdOk || !cardInHand) return '牌不在手牌中';
+    const card = typeof cardId === 'string' ? state.cardMap[cardId] : undefined;
     // 推导/校验 to:to 缺省时按原卡名推导;给定时须与原卡名的映射一致
     const expectedTo = card ? TRANSFORM_MAP[card.name] : undefined;
     const to = (params.to as string | undefined) ?? expectedTo;
@@ -106,19 +106,10 @@ const TRANSFORM_OPTIONS: TransformActionOptions = {
         if (has('酒') && p.health < p.maxHealth) return true;
         if (has('桃')) return true;
       }
-      // 路径②:被询问闪(防御向,杀→闪)/被询问杀(进攻向 respond,闪→杀)
-      const slot = ctx.view.pending;
-      const askedDodge =
-        !!slot &&
-        (slot.atom as { type?: string }).type === '询问闪' &&
-        slot.target === ctx.perspectiveIdx;
-      if (askedDodge && has('杀')) return true;
-      // 被询问杀(决斗/南蛮入侵等):可把闪当杀打出
-      const askedKill =
-        !!slot &&
-        (slot.atom as { type?: string }).type === '询问杀' &&
-        slot.target === ctx.perspectiveIdx;
-      if (askedKill && has('闪')) return true;
+      // 路径②:被询问闪(防御向,杀→闪)/被询问杀(进攻向 respond,闪→杀——含激将/挑衅等
+      // 委托回应窗口,viewAskedKill 与引擎 askedKillPendingFor 同源)
+      if (viewAskedDodge(ctx) && has('杀')) return true;
+      if (viewAskedKill(ctx) && has('闪')) return true;
       return false;
     },
   },

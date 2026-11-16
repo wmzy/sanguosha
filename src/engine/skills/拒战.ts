@@ -39,7 +39,7 @@ import { registerAction, registerAfterHook, registerBeforeHook } from '../core/s
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY, JUZHAN_STATE_VIEW_KEY } from '../rules/vars-keys';
-import { projectTurnUsage } from '../rules/turn-usage';
+import { createYinYangState } from '../rules/turn-usage';
 import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import { isSlashCardById } from '../util/player-query';
 
@@ -59,13 +59,8 @@ const YIN_CONFIRMED_KEY = '拒战/阴/confirmed';
 
 type ForbiddenPair = { from: number; to: number };
 
-function getState(state: GameState, ownerId: number): '阳' | '阴' {
-  return state.players[ownerId]?.vars[STATE_KEY] === '阴' ? '阴' : '阳';
-}
-
-async function syncStateView(state: GameState, ownerId: number): Promise<void> {
-  await projectTurnUsage(state, ownerId, STATE_KEY, getState(state, ownerId));
-}
+/** 转换态读写(缺省 '阳';发动翻转后与拥有者「回合开始」重同步时投影 turnUsage)。 */
+const { getState, syncStateView } = createYinYangState(STATE_KEY);
 
 function isForbidden(state: GameState, from: number, to: number): boolean {
   const arr = state.turn.vars[FORBIDDEN_VAR] as ForbiddenPair[] | undefined;

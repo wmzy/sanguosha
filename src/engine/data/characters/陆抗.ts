@@ -7,9 +7,5 @@ export const 陆抗 = {
   maxHealth: 4,
   gender: '男',
   faction: '吴',
-  skills: [
-    { name: '谦节', path: '../../skills/谦节' },
-    { name: '决堰', path: '../../skills/决堰' },
-    { name: '破势', path: '../../skills/破势' },
-  ],
+  skills: ['谦节', '决堰', '破势'],
 };

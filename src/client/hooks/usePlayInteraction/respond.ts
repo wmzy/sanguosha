@@ -8,9 +8,10 @@
 //   - 回应窗口的点牌、双击、点目标分支(外壳 dispatcher 委托)
 // 与出牌阶段 selectedTarget/selectedUseAction 是两套独立交互,互不复用。
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Card, GameView, PendingView, TargetFilter } from '../../../engine/types';
 import type { PendingRespondInfo } from '../../utils/pendingRespond';
+import { rescueSkillFor, respondCandidates } from '../../utils/pendingRespond';
 import { toggleTargetSelection, validateTargetSelection } from '../../../engine/rules/target-selection';
 import { SKIP_ACTION_TYPE, SKIP_SKILL_ID } from '../../utils/skipMessage';
 import type { PlaySend } from './common';
@@ -45,10 +46,13 @@ export interface RespondInteraction {
   /** useCardAndTarget 类回应(借刀杀人/出杀)选中的目标座次 name;非此模式为 null */
   respondTargetName: string | null;
   respondTargets: number[];
-  /** respond 模式目标过滤(pending.prompt.targetFilter 投影;非 useCardAndTarget 回应为 null) */
+  /** respond 目标过滤(pending.prompt.targetFilter 投影;非 useCardAndTarget 回应为 null) */
   respondTargetFilter: TargetFilter | null;
   /** 当前回应是否需要选目标(useCardAndTarget 且非 selfTarget) */
   respondNeedsTarget: boolean;
+  /** 回应窗口可选牌(与无头枚举共用 respondCandidates 单一口径:投影层 candidates
+   *  权威、可能含装备区牌,否则 cardFilter 过滤手牌)。渲染高亮/计数/装备区候选均用它。 */
+  respondCandidates: Card[];
   /** 选中的回应牌(校验目标约束的 card 参数) */
   respondCard: Card | undefined;
   /** respond 目标是否已满足(选了牌 + 选了目标) */
@@ -104,7 +108,14 @@ export function useRespondInteraction(p: RespondInteractionParams): RespondInter
       : null;
   const respondNeedsTarget =
     isMyAwaiting && pending?.prompt?.type === 'useCardAndTarget' && !pending.prompt.selfTarget;
-  const respondCard = perspectiveHand.find((card) => card.id === selectedRespondCardId);
+  // 回应候选(与无头枚举共用 respondCandidates 单一口径):投影层 candidates(权威,
+  // 可能含装备区牌,如界天香弃红桃装备/界鬼才换判定牌)优先;否则 cardFilter 过滤手牌。
+  const candidateCards = useMemo(
+    () => respondCandidates(pendingRespondInfo, perspectiveHand, view.cardMap),
+    [pendingRespondInfo, perspectiveHand, view.cardMap],
+  );
+  const candidateIds = useMemo(() => new Set(candidateCards.map((c) => c.id)), [candidateCards]);
+  const respondCard = candidateCards.find((card) => card.id === selectedRespondCardId);
   const respondTargetReady = !respondNeedsTarget || (!!respondTargetFilter &&
     validateTargetSelection(view, perspectiveIdx, respondTargetFilter, respondTargets, respondCard));
   const respondTargetName =
@@ -121,17 +132,18 @@ export function useRespondInteraction(p: RespondInteractionParams): RespondInter
       const info = pendingRespondInfo;
       if (!info) return;
       if (cardId) {
-        const card = perspectiveHand.find((c) => c.id === cardId);
+        // 候选集内查找(含装备区候选牌,如界天香弃红桃装备/界鬼才换判定牌);
+        // 不再限定手牌——玩家只持红桃装备无红桃手牌时也能提交。
+        const card = candidateCards.find((c) => c.id === cardId);
         if (!card) return;
-        if (info.cardFilter && !info.cardFilter(card)) return;
-        // 求桃:按救援牌路由到对应技能(桃/酒/急救);其他回应用默认 skillId
-        const rescueSkill = info.rescueSkillForCard?.(card);
+        // 求桃:按救援牌路由到对应技能(桃/酒/急救,与无头枚举共用 rescueSkillFor)
+        const rescueSkill = rescueSkillFor(info, card);
         // useCardAndTarget 类回应：目标数组经共享约束解释器校验并原样提交。
         if (respondNeedsTarget && respondTargetFilter) {
           if (!validateTargetSelection(view, perspectiveIdx, respondTargetFilter, respondTargets, card)) return;
-          send(rescueSkill ?? info.skillId, 'respond', { cardId, targets: respondTargets });
+          send(rescueSkill, 'respond', { cardId, targets: respondTargets });
         } else {
-          send(rescueSkill ?? info.skillId, 'respond', { cardId });
+          send(rescueSkill, 'respond', { cardId });
         }
       } else if (pendingTargetIdx < 0) {
         // 广播型 pending(无懈可击):发 skip 让服务端累计,全员 skip 时提前结束窗口
@@ -145,7 +157,7 @@ export function useRespondInteraction(p: RespondInteractionParams): RespondInter
       pending,
       isDiscardPhase,
       discardRespond,
-      perspectiveHand,
+      candidateCards,
       pendingRespondInfo,
       respondNeedsTarget,
       respondTargetFilter,
@@ -177,16 +189,16 @@ export function useRespondInteraction(p: RespondInteractionParams): RespondInter
 
   /** 回应窗口点牌(外壳 handleCardClick 的回应分支原样搬入):
    *  点牌只选中(高亮),不直接出牌;再点同一张取消选中。
-   *  真正出牌由「打出」按钮(handlePlayRespond)触发,避免误触。求桃/无懈可击同此路径。 */
+   *  真正出牌由「打出」按钮(handlePlayRespond)触发,避免误触。求桃/无懈可击同此路径。
+   *  资格判定用共享候选集(candidateIds):candidates 含装备区牌时,装备区点击
+   *  (EquipColumn → onEquipCardClick → 外壳 handleCardClick)也走本分支。 */
   const handleCardClick = useCallback(
     (card: Card) => {
-      if (pendingRespondInfo?.cardFilter) {
-        if (pendingRespondInfo.cardFilter(card)) {
-          setSelectedRespondCardId((prev) => (prev === card.id ? null : card.id));
-        }
+      if (candidateIds.has(card.id)) {
+        setSelectedRespondCardId((prev) => (prev === card.id ? null : card.id));
       }
     },
-    [pendingRespondInfo],
+    [candidateIds],
   );
 
   /** 回应窗口双击(外壳 handleCardDoubleClick 的回应分支原样搬入):
@@ -194,7 +206,7 @@ export function useRespondInteraction(p: RespondInteractionParams): RespondInter
    *  转化回应路径的拦截由外壳 `if (transformMode) return` 承担。 */
   const handleCardDoubleClick = useCallback(
     (card: Card) => {
-      if (!pendingRespondInfo?.cardFilter?.(card)) return;
+      if (!candidateIds.has(card.id)) return;
       if (respondNeedsTarget) {
         setSelectedRespondCardId(card.id);
         return;
@@ -202,7 +214,7 @@ export function useRespondInteraction(p: RespondInteractionParams): RespondInter
       setSelectedRespondCardId(null);
       handleRespond(card.id);
     },
-    [pendingRespondInfo, respondNeedsTarget, handleRespond],
+    [candidateIds, respondNeedsTarget, handleRespond],
   );
 
   /** 回应窗口点座位(外壳 handleTargetClick 的回应分支原样搬入):
@@ -224,6 +236,7 @@ export function useRespondInteraction(p: RespondInteractionParams): RespondInter
     respondTargets,
     respondTargetFilter,
     respondNeedsTarget,
+    respondCandidates: candidateCards,
     respondCard,
     respondTargetReady,
     handleRespond,

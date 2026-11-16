@@ -25,7 +25,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerBeforeHook } from '../core/skill';
+import { registerAction } from '../core/skill';
+import { registerFlipSkipTurnHooks } from '../flows/face-down';
 import {
   requireRequestType,
   askConfirm,
@@ -47,7 +48,6 @@ const OPT3_TARGET_RT = '神速/opt3-target';
 export const SKIP_MO_TAG = '神速/跳过摸牌';
 export const SKIP_PLAY_TAG = '神速/跳过出牌';
 export const FLIP_TAG = '神速/翻面'; // 翻面标签(下一回合被消费,跳过整回合)
-const SKIP_FLAG = '神速/skipAll'; // 翻面生效时跳过整回合的标志(localVars)
 // per-turn 标记(后缀 /usedThisTurn 由 回合结束 atom 自动清理)
 const OPT1_USED_KEY = '神速/opt1/usedThisTurn';
 const OPT2_USED_KEY = '神速/opt2/usedThisTurn';
@@ -107,69 +107,6 @@ export function registerShensuTagSkipHook(
       if (!self?.tags.includes(tag)) return;
       // 标签型跳过:去标签 + 阶段结束(当前阶段) + cancel
       return skipPhase(ctx.state, ctx.atom, tag);
-    },
-  );
-}
-
-/** 注册「翻面:跳过整个下一回合」的一对 before-hook(机制同据守/放逐):
- *  ① 阶段开始:准备阶段命中翻面标签 → 去标签 + 设 skipAll 标志 + cancel;
- *     skipAll 存续期间取消其余所有阶段(防止 phase-end after-hook 推进产生副作用)。
- *  ② 阶段结束(准备):清除标志并亲自执行 end-turn 序列(清过期标记 → 下一玩家 →
- *     回合结束 → 回合结束后),cancel 阶段结束原子以防幻影阶段链。 */
-export function registerShensuFlipTurnHooks(
-  state: GameState,
-  skillId: string,
-  ownerId: number,
-): void {
-  registerBeforeHook(
-    state,
-    skillId,
-    ownerId,
-    '阶段开始',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段开始') return;
-      if (atom.player !== ownerId) return;
-      const self = ctx.state.players[ownerId];
-
-      // 入口:准备阶段开始 + 翻面标签 → 启动跳过
-      if (atom.phase === '准备' && self?.tags.includes(FLIP_TAG)) {
-        await applyAtom(ctx.state, { type: '去标签', player: ownerId, tag: FLIP_TAG });
-        ctx.state.localVars[SKIP_FLAG] = ownerId;
-        return { kind: 'cancel' };
-      }
-
-      // skipAll 标志存在时,取消所有其他阶段(防止 phase-end after-hook 推进产生副作用)
-      if (ctx.state.localVars[SKIP_FLAG] === ownerId) {
-        return { kind: 'cancel' };
-      }
-    },
-  );
-
-  registerBeforeHook(
-    state,
-    skillId,
-    ownerId,
-    '阶段结束',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.type !== '阶段结束') return;
-      if (atom.player !== ownerId) return;
-      if (ctx.state.localVars[SKIP_FLAG] !== ownerId) return;
-
-      // 清除 skipAll 标志(后续不再 skip)
-      delete ctx.state.localVars[SKIP_FLAG];
-
-      // 亲自执行 end-turn 序列:清过期标记 → 下一玩家 → 回合结束 → 回合结束后
-      // (回合推进 beginTurn 挂在 回合结束后 的 after-hook,故须发出否则下一家不启动)
-      await applyAtom(ctx.state, { type: '清过期标记', player: ownerId });
-      await applyAtom(ctx.state, { type: '下一玩家' });
-      const turnEnded = await applyAtom(ctx.state, { type: '回合结束', player: ownerId });
-      if (turnEnded) {
-        await applyAtom(ctx.state, { type: '回合结束后', player: ownerId });
-      }
-
-      return { kind: 'cancel' };
     },
   );
 }
@@ -427,8 +364,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     { requireCurrentPlayer: true },
   );
 
-  // ── 翻面:下一回合跳过整回合(机制同据守/放逐) ────────────────
-  registerShensuFlipTurnHooks(state, skill.id, ownerId);
+  // ── 翻面:下一回合跳过整回合(共用 face-down 通用版 hook 对) ──
+  // 神速族历史上加/去标签均用裸 atom(不补发「翻面后」),emitFaceUpEvent:false 保持事件序列
+  registerFlipSkipTurnHooks(state, skill.id, ownerId, '神速', { emitFaceUpEvent: false });
 
   return () => {};
 }

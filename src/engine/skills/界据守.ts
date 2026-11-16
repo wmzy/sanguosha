@@ -15,9 +15,9 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
+import { flipFaceDown, registerFlipSkipTurnHooks } from '../flows/face-down';
 import { markOncePerTurn } from '../rules/once-per-turn';
-import { registerAction, registerBeforeHook } from '../core/skill';
+import { registerAction } from '../core/skill';
 import {
   validateJushouUse,
   jushouDiscardOrEquip,
@@ -25,7 +25,6 @@ import {
 } from './据守';
 
 const SKIP_TAG = '据守/翻面';
-const SKIP_FLAG = '据守/skipAll';
 const USED_KEY = '据守/usedThisTurn';
 const DISCARD_RT = '界据守/弃牌';
 const DISCARD_PROMPT_TITLE = '界据守:选择一张手牌弃置(装备牌将改为使用)';
@@ -69,42 +68,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── respond:玩家选择弃置/使用的手牌(标/界共享注册)──
   registerJushouDiscardRespond(state, skill.id, ownerId, DISCARD_RT);
 
-  // ── 下一回合跳过:阶段开始(准备) before-hook ────────────
-  // 检测翻面标签 → 移除标签 + 设 skipAll 标志 + cancel(不进入准备阶段)
-  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.type !== '阶段开始') return;
-    if (atom.player !== ownerId) return;
-    const self = ctx.state.players[ownerId];
-
-    // 入口:准备阶段开始 + 翻面标签 → 启动跳过
-    if (atom.phase === '准备' && self?.tags.includes(SKIP_TAG)) {
-      await flipFaceUp(ctx.state, ownerId, '据守');
-      ctx.state.localVars[SKIP_FLAG] = ownerId;
-      return { kind: 'cancel' };
-    }
-
-    // skipAll 标志存在时,取消所有其他阶段(防止 phase-end after-hook 推进产生副作用)
-    if (ctx.state.localVars[SKIP_FLAG] === ownerId) {
-      return { kind: 'cancel' };
-    }
-  });
-
-  // ── 阶段结束(准备) before-hook:skipAll 标志 → 主动推进回合 ──
-  registerBeforeHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.type !== '阶段结束') return;
-    if (atom.player !== ownerId) return;
-    if (ctx.state.localVars[SKIP_FLAG] !== ownerId) return;
-
-    // 清除 skipAll 标志(后续不再 skip)
-    delete ctx.state.localVars[SKIP_FLAG];
-
-    // 亲自执行 end-turn 序列:清过期标记 → 下一玩家 → 回合结束
-    await performSkipTurn(ctx.state, ownerId);
-
-    return { kind: 'cancel' };
-  });
+  // ── 下一回合跳过:共用 face-down 通用版 hook 对(准备阶段消费翻面标签 + skipAll,
+  //    阶段结束(准备) before-hook 主动推进回合) ────────────────
+  registerFlipSkipTurnHooks(state, skill.id, ownerId, '据守');
 
   return () => {};
 }

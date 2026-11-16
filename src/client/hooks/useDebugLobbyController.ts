@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { storeSession, clearSession } from '../utils/debugSession';
 import { apiFetch, ApiError } from '../api/client';
 import { isRoomNotFound } from '../utils/roomErrors';
+import { useRoomList } from './useRoomList';
 import type { RoomInfo } from '../../server/protocol';
 
 export interface DebugLobbyController {
@@ -44,24 +45,20 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
   const navigate = useNavigate();
 
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
-  const [debugRooms, setDebugRooms] = useState<RoomInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [playerCount, setPlayerCount] = useState(5);
   const [isCreating, setIsCreating] = useState(false);
 
-  const fetchRooms = useCallback(async () => {
-    try {
-      const rooms = await apiFetch<RoomInfo[]>('/api/rooms?type=debug');
-      setDebugRooms(rooms);
-    } catch (err) {
-      showErrorFor(err, '获取房间列表失败', setError);
-    }
-  }, []);
-
-  // 初始加载房间列表
-  useEffect(() => {
-    void fetchRooms();
-  }, [fetchRooms]);
+  // 房间列表:拉取/删除共用 useRoomList(仅挂载拉取一次);失败走错误横幅
+  // (showErrorFor:ApiError 取服务端文案,非 ApiError 用兜底文案,3s 自动清除)。
+  const {
+    rooms: debugRooms,
+    refresh: refreshRoomList,
+    removeRoom: handleDeleteDebugRoom,
+  } = useRoomList('debug', {
+    onError: (operation, err) =>
+      showErrorFor(err, operation === 'fetch' ? '获取房间列表失败' : '删除失败', setError),
+  });
 
   // initialRoomId:从 URL 进入时自动加入指定房间,并从房间信息恢复 playerCount。
   // 刷新后 playerCount 会重置为默认值(5),若实际房间是 3 人,会创建错误数量的连接。
@@ -83,10 +80,6 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
         navigate('/debug', { replace: true });
       });
   }, [initialRoomId, navigate]);
-
-  const refreshRoomList = useCallback(() => {
-    void fetchRooms();
-  }, [fetchRooms]);
 
   const handleCreateDebugRoom = useCallback(async () => {
     if (isCreating) return;
@@ -141,15 +134,6 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     setActiveRoomId(roomId);
     navigate(`/debug/${roomId}`, { replace: true });
   }, [navigate]);
-
-  const handleDeleteDebugRoom = useCallback(
-    (roomId: string) => {
-      apiFetch<void>(`/api/rooms/${roomId}`, { method: 'DELETE' })
-        .then(() => fetchRooms())
-        .catch((err) => showErrorFor(err, '删除失败', setError));
-    },
-    [fetchRooms],
-  );
 
   const handleExit = useCallback(() => {
     handleDeleteRoom();

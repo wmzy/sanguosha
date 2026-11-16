@@ -16,7 +16,7 @@
 //
 //   额外回合机制完全在放权技能内部实现,不修改 回合管理.ts:
 //   cancel 掉 回合结束 atom 后其 apply 与 after-hook(回合管理的 findNextAlive)都不执行,
-//   故需手动复刻 回合结束 的 per-turn 清理(见 clearPerTurnState)。
+//   故需手动复刻 回合结束 的 per-turn 清理(见 rules/turn-usage 的 clearPerTurnStateProjected)。
 //
 // 跳过出牌阶段手法同神速/巧变:applyAtom(阶段结束, 出牌) 推进到弃牌,
 //   再 return {kind:'cancel'} 取消本次 阶段开始(出牌)。
@@ -33,7 +33,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAction, registerBeforeHook } from '../core/skill';
-import { clearPerTurnState } from '../rules/vars-keys';
+import { clearPerTurnStateProjected } from '../rules/turn-usage';
 import { askConfirm, defineConfirmAction, registerPhaseStartHook } from '../util/skillRuntime';
 
 // requestType 前缀必须等于技能 id('界放权'):前端 resolvePendingRespond 按
@@ -50,8 +50,9 @@ const EXTRA_TARGET_KEY = '放权/extraTarget';
 const ORIGINAL_NEXT_KEY = '放权/originalNext';
 
 /** 复刻「回合结束」atom 的 per-turn 清理(cancel 回合结束后 atom.apply 不执行,需手动清理):
- *  统一走 rules/vars-keys 的 clearPerTurnState(清空 turn.vars、清所有玩家 duration='turn' 标记、
- *  清 PER_TURN_SUFFIXES 后缀 vars;幂等,重复执行无副作用)。
+ *  统一走 rules/turn-usage 的 clearPerTurnStateProjected(基于 vars-keys 的 clearPerTurnState:
+ *  清空 turn.vars、清所有玩家 duration='turn' 标记、清 PER_TURN_SUFFIXES 后缀 vars;
+ *  并逐 key 发 回合用量 null 清 turnUsage 视图键——与权威 回合结束 atom 对齐)。
  *  marks 多数由 end action 的 清过期标记 已清(仅结束玩家),此处补全所有玩家以保持与 atom 一致。
  *  注意:不清理 state.localVars(放权内部标记 extraTarget/originalNext 须跨清理存活)。 */
 
@@ -227,8 +228,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const originalNext = st.currentPlayerIndex;
         st.localVars[ORIGINAL_NEXT_KEY] = originalNext;
 
-        // cancel 回合结束 → 手动清理 per-turn 状态(否则 apply 不执行,状态残留)
-        clearPerTurnState(st);
+        // cancel 回合结束 → 手动清理 per-turn 状态(否则 apply 不执行,状态残留);
+        // 投影版顺带发 回合用量 null 清 turnUsage 视图键(与权威 回合结束 atom 对齐)
+        await clearPerTurnStateProjected(st);
 
         // 亲自启动额外目标的回合(嵌套:其 end action → 回合结束(extraTarget) → 触发情况2)
         st.currentPlayerIndex = extraTarget;
@@ -248,8 +250,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           return; // 异常:无正常下家,放行
         }
 
-        // cancel 回合结束 → 手动清理 per-turn 状态
-        clearPerTurnState(st);
+        // cancel 回合结束 → 手动清理 per-turn 状态(投影版,含 turnUsage 视图键清理)
+        await clearPerTurnStateProjected(st);
 
         // 亲自启动正常下家的回合(恢复正常座次顺序)。
         // originalNext 回合结束后,其 回合结束 before-hook 标记已清 → 放行 →

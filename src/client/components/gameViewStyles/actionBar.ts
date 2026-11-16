@@ -150,6 +150,25 @@ export const equipSelected = css`
   background: rgba(${greenSelectedColors.rgb}, 0.16);
   box-shadow: 0 0 10px rgba(${greenSelectedColors.rgb}, 0.55);
 `;
+// 装备卡片:回应窗口候选态(金色高亮,与手牌 handCardRespondable 同色 #ffd700,
+// 光晕/背景挡位按装备卡尺寸微调;界天香弃红桃装备/界鬼才换判定牌)
+export const equipRespondCandidate = css`
+  cursor: pointer;
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.08);
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.35);
+  &:hover {
+    background: rgba(255, 215, 0, 0.18);
+  }
+`;
+// 装备卡片:回应窗口已选中态(向右偏移 + 绿色高亮,与手牌 handCardRespondSelected /
+// equipSelected 同构;色系 tokens.greenSelectedColors)
+export const equipRespondSelected = css`
+  transform: translateX(8px);
+  border-color: ${greenSelectedColors.border};
+  background: rgba(${greenSelectedColors.rgb}, 0.22);
+  box-shadow: 0 0 12px rgba(${greenSelectedColors.rgb}, 0.5);
+`;
 // 装备卡片:可发动技能徽标(靠右)
 export const equipSkillBadge = css`
   margin-left: auto;

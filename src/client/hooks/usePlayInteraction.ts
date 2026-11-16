@@ -152,6 +152,11 @@ export interface PlayInteractionResult {
   /** useCardAndTarget 类回应(借刀杀人/出杀)选中的目标座次 name;非此模式为 null */
   respondTargetName: string | null;
   respondTargets: number[];
+  /** 回应窗口可选牌(与无头枚举共用 respondCandidates 单一口径;可能含装备区牌,
+   *  供 GameView 的候选计数/装备区高亮与 AwaitingPrompt 可选数文案使用) */
+  respondCandidates: Card[];
+  /** 当前选中的回应牌(候选集内按 id 解析;未选中为 undefined;可能来自装备区) */
+  respondCard: Card | undefined;
   /** 当前回应是否需要选目标(useCardAndTarget 且非 selfTarget) */
   respondNeedsTarget: boolean;
   /** respond 目标是否已满足(选了牌 + 选了目标) */
@@ -322,6 +327,7 @@ export function usePlayInteraction(
     respondTargets,
     respondTargetFilter,
     respondNeedsTarget,
+    respondCandidates,
     respondCard,
     respondTargetReady,
     handleRespond,
@@ -1067,6 +1073,8 @@ export function usePlayInteraction(
     selectedRespondCardId,
     respondTargetName,
     respondTargets,
+    respondCandidates,
+    respondCard,
     respondNeedsTarget,
     respondTargetReady,
     altActions,

@@ -3,8 +3,5 @@ export const 诸葛亮 = {
   maxHealth: 3,
   gender: '男',
   faction: '蜀',
-  skills: [
-    { name: '观星', path: '../../skills/观星' },
-    { name: '空城', path: '../../skills/空城' },
-  ],
+  skills: ['观星', '空城'],
 };

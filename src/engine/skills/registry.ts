@@ -6,7 +6,7 @@
 // 模块形状/skills 目录反向覆盖)。
 //
 // 声明来源(四类,详见下方各常量):
-//   1. 武将技  data/characters/*.ts 的 skills: [{ name, path? }]
+//   1. 武将技  data/characters/*.ts 的 skills: string[](技能名即模块文件名 skills/<技能名>.ts)
 //   2. 装备技  data/card-defs/equipment.ts 的 装备牌列表(卡名即 skillId)+ 马匹例外表
 //   3. 系统技  SYSTEM_SKILL_SPECS(与 atoms/选将.ts DEFAULT_SKILLS 的一致性由 meta-test 保证)
 //   4. 衍生技  DERIVED_SKILL_SPECS(运行时由其他技能通过 添加技能 atom 动态授予)
@@ -22,15 +22,10 @@
 import { allCharacters } from '../data/characters/index';
 import { 装备牌列表, EQUIPMENT_SKILL_MODULE_SPECS } from '../data/card-defs/equipment';
 
-/** 武将技能声明的字段形态(data/characters/*.ts 的 skills 数组元素) */
-interface CharacterSkillRef {
-  name: string;
-  path?: string;
-}
-
+/** 武将技能声明的字段形态(data/characters/*.ts 的 skills 数组:技能名列表) */
 interface CharacterSource {
   name: string;
-  skills: CharacterSkillRef[];
+  skills: string[];
 }
 
 /** 系统技能:不属于任何武将/装备,每局由 bootstrap/开局流程注册。
@@ -58,18 +53,9 @@ const DERIVED_SKILL_SPECS: Readonly<Record<string, string>> = {
   攻心: 'skills/攻心',
 };
 
-/** path 缺省规则:技能名即模块文件名(skills/<name>.ts)。 */
+/** 模块 spec 规则:技能名即模块文件名(skills/<name>.ts)。 */
 function defaultSpec(skillId: string): string {
   return `skills/${skillId}`;
-}
-
-/** spec 归一化为引擎根相对路径(如 'skills/龙胆')。
- *  武将文件里的 path 相对武将文件本身(保持 IDE 可跳转的语义);
- *  data/characters/*.ts 深度固定,前导 '../../' 直达引擎根,
- *  故剥掉前导 '../' 序列即得引擎根相对 spec。
- *  path 深度写错由 meta-test 的磁盘存在性校验兜底。 */
-function normalizeSpec(spec: string): string {
-  return spec.replace(/^(?:\.\.\/)+/, '');
 }
 
 /**
@@ -81,8 +67,7 @@ function normalizeSpec(spec: string): string {
 export function buildSkillModuleSpecs(): ReadonlyMap<string, string> {
   const specs = new Map<string, string>();
 
-  const add = (id: string, rawSpec: string, source: string) => {
-    const spec = normalizeSpec(rawSpec);
+  const add = (id: string, spec: string, source: string) => {
     const existing = specs.get(id);
     if (existing !== undefined && existing !== spec) {
       throw new Error(
@@ -93,8 +78,8 @@ export function buildSkillModuleSpecs(): ReadonlyMap<string, string> {
   };
 
   for (const ch of allCharacters as CharacterSource[]) {
-    for (const ref of ch.skills) {
-      add(ref.name, ref.path ?? defaultSpec(ref.name), `武将 ${ch.name}`);
+    for (const skillId of ch.skills) {
+      add(skillId, defaultSpec(skillId), `武将 ${ch.name}`);
     }
   }
 

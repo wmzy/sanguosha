@@ -127,6 +127,21 @@ export interface MultiplayerRoomOpts {
   forceSpectate?: boolean;
 }
 
+/**
+ * resetRoomState 的重置语义(六处本地状态重置入口的真实差异,不得强行统一):
+ * - { kind: 'join' }:重新发起加入(createRoom/joinRoom/joinAsSpectator 前)——
+ *   清错误、密码弹窗、房间快照与旁观标志;asSpectator 例外(旁观标志由 spectate
+ *   命令 effect 立即置位,不必先清)。保留聊天/播放(同房间重试不闪空)。
+ * - { kind: 'round' }:game_reset 再来一局——清对局视图、结算、聊天、播放与
+ *   离线座次;保留房间快照与身份(配置/准备状态跨局沿用)。
+ * - { kind: 'leave' }:离开房间(主动退出/被踢)——回大厅并清房间身份、房间快照、
+ *   对局状态与座位交换请求;播放仅清队列(出牌历史不动,与原实现一致)。
+ */
+type RoomResetOpts =
+  | { kind: 'join'; asSpectator?: boolean }
+  | { kind: 'round' }
+  | { kind: 'leave' };
+
 export function useMultiplayerRoom(
   initialRoomId?: string,
   opts: MultiplayerRoomOpts = {},
@@ -214,6 +229,37 @@ export function useMultiplayerRoom(
     skipEvents,
   } = useHgcPlayback({ compact: hgcIsSpectator });
 
+  /** 六处入口(game_reset/player_kicked/create/join/leave/spectate)共用的本地状态重置。 */
+  const resetRoomState = useCallback((opts: RoomResetOpts) => {
+    // 所有入口共通:丢弃上一局视图与结算
+    setView(null);
+    setGameOver(null);
+    switch (opts.kind) {
+      case 'join':
+        setError(null);
+        setPasswordPrompt(null);
+        setRoomState(null);
+        if (!opts.asSpectator) setHgcIsSpectator(false);
+        break;
+      case 'round':
+        setStage('waiting');
+        setChatMessages([]);
+        resetPlayback();
+        setDisconnectedSeats(new Set());
+        break;
+      case 'leave':
+        setStage('lobby');
+        setRoomId(null);
+        setRoomState(null);
+        setHgcIsSpectator(false);
+        setChatMessages([]);
+        setIncomingSeatSwap(null);
+        playbackRef.current.reset(0);
+        setDisconnectedSeats(new Set());
+        break;
+    }
+  }, [resetPlayback]);
+
   const serverUrl = window.location.origin;
 
   const isHost = roomState?.hostId === playerId && playerId !== null;
@@ -294,13 +340,7 @@ export function useMultiplayerRoom(
           setDisconnectedSeats(new Set());
         }
         if (msg.type === 'game_reset') {
-          setGameOver(null);
-          setView(null);
-
-          setStage('waiting');
-          setChatMessages([]);
-          resetPlayback();
-          setDisconnectedSeats(new Set());
+          resetRoomState({ kind: 'round' });
         }
         if (msg.type === 'event' && msg.view) {
           // 事件播放:他人出牌/判定翻牌等中央动效(供 GameViewComponent 中央展示)
@@ -326,16 +366,7 @@ export function useMultiplayerRoom(
         if (msg.type === 'player_kicked' && msg.playerId === hgc.playerId) {
           hgc.disconnect();
           setCommand({ type: 'idle' });
-          setStage('lobby');
-          setRoomId(null);
-          setRoomState(null);
-          setHgcIsSpectator(false);
-          setView(null);
-          setGameOver(null);
-          setChatMessages([]);
-          setIncomingSeatSwap(null);
-          playbackRef.current.reset(0);
-          setDisconnectedSeats(new Set());
+          resetRoomState({ kind: 'leave' });
           // 持久提示(不自动消失):先清掉可能在途的自动消失计时器,避免旧 timer 提前清掉它
           clearErrorTimer();
           setError('你已被房主移出房间');
@@ -368,6 +399,36 @@ export function useMultiplayerRoom(
     });
     hgcRef.current = hgc;
 
+    /** 错误 toast + 回大厅(join/create 失败的公共收尾)。 */
+    const errorToLobby = (msg: string) => {
+      clearErrorTimer();
+      setError(msg);
+      setStage('lobby');
+    };
+    /**
+     * join/spectate 两条加入路径的公共失败处理链:
+     * 403 → 密码弹窗回大厅;其余(房间不存在/已开局/满员等)交各路径决策(onFailure)。
+     */
+    const handleJoinError = (
+      err: unknown,
+      join: { label: string; roomId: string; mode: 'join' | 'spectate'; password?: string },
+      onFailure: (err: unknown, msg: string) => void,
+    ) => {
+      if (hgcRef.current !== hgc) return;
+      const status = (err as { status?: number })?.status;
+      const msg = normalizeHgcError(err);
+      log.error(join.label, { status, error: msg });
+      // 有密码房间且未携带/密码错误 → 弹密码输入框,确认后带密码重试。
+      // autoJoin(URL 直达)/手动 join/旁观加入都走此路径;仅 403(密码错误)触发,
+      // 其他失败(游戏已开始/房间已满)维持各路径原有降级逻辑。
+      if (status === 403) {
+        setPasswordPrompt({ roomId: join.roomId, mode: join.mode, error: join.password ? '密码错误，请重试' : null });
+        setStage('lobby');
+        return;
+      }
+      onFailure(err, msg);
+    };
+
     // 按命令执行(连接命令在 HGC 内部排队,open 后 flush)
     // playerId 不再本地传:服务端从会话(Cookie)解析 userId,body.playerId 已被忽略
     if (command.type === 'create') {
@@ -380,9 +441,7 @@ export function useMultiplayerRoom(
           if (hgcRef.current !== hgc) return;
           const msg = normalizeHgcError(err);
           log.error('createRoom failed', { error: msg });
-          clearErrorTimer();
-          setError(msg);
-          setStage('lobby');
+          errorToLobby(msg);
         })
         .finally(() => {
           // 创建 settle(成功进入 waiting / 失败回 lobby)后解除按钮禁用。
@@ -391,55 +450,32 @@ export function useMultiplayerRoom(
         });
       setStage('waiting');
     } else if (command.type === 'join' || command.type === 'autoJoin') {
-      hgc.joinRoom(command.roomId, undefined, command.password).catch((err) => {
-        if (hgcRef.current !== hgc) return;
-        const status = (err as { status?: number })?.status;
-        const msg = normalizeHgcError(err);
-        log.error('joinRoom failed', { status, error: msg });
-        // 有密码房间且未携带/密码错误 → 弹密码输入框,确认后带密码重试。
-        // autoJoin(URL 直达)与手动 join 都走此路径;仅 403(密码错误)触发,
-        // 其他失败(游戏已开始/房间已满)维持原有降级逻辑。
-        if (status === 403) {
-          setPasswordPrompt({ roomId: command.roomId, mode: 'join', error: command.password ? '密码错误，请重试' : null });
-          setStage('lobby');
-          return;
-        }
-        // URL 直达(/play/:roomId)时:
-        // 房间不存在(404) → notFound。
-        // 其他失败(游戏已开始/房间已满)→ 自动降级为旁观者加入。
-        // 理由:URL 直达的核心诉求是"进入房间";无法以玩家身份进入时,旁观是
-        // 唯一可行的进入方式。这也修复了"先旁观再刷新反复回到错误页"的死循环
-        // (刷新只触发 autoJoin 玩家加入,旁观状态不会被 URL 记住)。
-        // 旁观加入无人数上限,不会因容量失败(仅 404)。
-        if (command.type === 'autoJoin') {
-          if (isRoomNotFound(err)) setNotFound(true);
-          else setCommand({ type: 'spectate', roomId: command.roomId });
-        } else {
-          clearErrorTimer();
-          setError(msg);
-          setStage('lobby');
-        }
-      });
+      hgc.joinRoom(command.roomId, undefined, command.password).catch((err) =>
+        handleJoinError(
+          err,
+          { label: 'joinRoom failed', roomId: command.roomId, mode: 'join', password: command.password },
+          command.type === 'autoJoin'
+            ? // URL 直达(/play/:roomId)时:
+              // 房间不存在(404) → notFound。
+              // 其他失败(游戏已开始/房间已满)→ 自动降级为旁观者加入。
+              // 理由:URL 直达的核心诉求是"进入房间";无法以玩家身份进入时,旁观是
+              // 唯一可行的进入方式。这也修复了"先旁观再刷新反复回到错误页"的死循环
+              // (刷新只触发 autoJoin 玩家加入,旁观状态不会被 URL 记住)。
+              // 旁观加入无人数上限,不会因容量失败(仅 404)。
+              (e) => (isRoomNotFound(e) ? setNotFound(true) : setCommand({ type: 'spectate', roomId: command.roomId }))
+            : (_, msg) => errorToLobby(msg),
+        ),
+      );
       setStage('waiting');
     } else if (command.type === 'spectate') {
       setSpectatorFlag(true);
-      hgc.joinAsSpectator(command.roomId, undefined, command.password).catch((err) => {
-        if (hgcRef.current !== hgc) return;
-        const status = (err as { status?: number })?.status;
-        const msg = normalizeHgcError(err);
-        log.error('joinAsSpectator failed', { status, error: msg });
-        if (status === 403) {
-          setPasswordPrompt({ roomId: command.roomId, mode: 'spectate', error: command.password ? '密码错误，请重试' : null });
-          setStage('lobby');
-          return;
-        }
-        if (isRoomNotFound(err)) setNotFound(true);
-        else {
-          clearErrorTimer();
-          setError(msg);
-          setStage('lobby');
-        }
-      });
+      hgc.joinAsSpectator(command.roomId, undefined, command.password).catch((err) =>
+        handleJoinError(
+          err,
+          { label: 'joinAsSpectator failed', roomId: command.roomId, mode: 'spectate', password: command.password },
+          (e, msg) => (isRoomNotFound(e) ? setNotFound(true) : errorToLobby(msg)),
+        ),
+      );
       setStage('spectating');
     }
 
@@ -451,15 +487,10 @@ export function useMultiplayerRoom(
       }
       hgcRef.current = null;
     };
-  }, [command, serverUrl]);
+  }, [command, serverUrl, resetRoomState]);
 
   const createRoom = useCallback((name: string, maxPlayers: number, config?: RoomConfig, roomType?: 'normal' | 'quick', password?: string) => {
-    setError(null);
-    setGameOver(null);
-    setView(null);
-    setPasswordPrompt(null);
-    setRoomState(null);
-    setHgcIsSpectator(false);
+    resetRoomState({ kind: 'join' });
     setIsCreating(true);
     setCommand({
       type: 'create',
@@ -470,18 +501,13 @@ export function useMultiplayerRoom(
       password,
     });
     log.info('createRoom', { name, maxPlayers, roomType });
-  }, []);
+  }, [resetRoomState]);
 
   const joinRoom = useCallback((targetRoomId: string, password?: string) => {
-    setError(null);
-    setGameOver(null);
-    setView(null);
-    setPasswordPrompt(null);
-    setRoomState(null);
-    setHgcIsSpectator(false);
+    resetRoomState({ kind: 'join' });
     setCommand({ type: 'join', roomId: targetRoomId, password });
     log.info('joinRoom', { roomId: targetRoomId });
-  }, []);
+  }, [resetRoomState]);
 
   const toggleReady = useCallback(() => {
     const hgc = hgcRef.current;
@@ -509,21 +535,11 @@ export function useMultiplayerRoom(
 
   const leaveRoom = useCallback(() => {
     setCommand({ type: 'idle' });
-    setStage('lobby');
     setNotFound(false);
     setIsCreating(false);
     setPasswordPrompt(null);
-    setRoomId(null);
-    setRoomState(null);
-    setHgcIsSpectator(false);
-    setView(null);
-    setGameOver(null);
-
-    setChatMessages([]);
-    setIncomingSeatSwap(null);
-    playbackRef.current.reset(0);
-    setDisconnectedSeats(new Set());
-  }, []);
+    resetRoomState({ kind: 'leave' });
+  }, [resetRoomState]);
 
   const sendAction = useCallback((action: ActionMsg) => {
     const hgc = hgcRef.current;
@@ -557,14 +573,10 @@ export function useMultiplayerRoom(
   // ── 旁观者方法 ──
 
   const joinAsSpectator = useCallback((targetRoomId: string, password?: string) => {
-    setError(null);
-    setGameOver(null);
-    setView(null);
-    setPasswordPrompt(null);
-    setRoomState(null);
+    resetRoomState({ kind: 'join', asSpectator: true });
     setCommand({ type: 'spectate', roomId: targetRoomId, password });
     log.info('joinAsSpectator', { roomId: targetRoomId });
-  }, []);
+  }, [resetRoomState]);
 
   // ── 房间密码弹窗 ──
 
@@ -582,104 +594,88 @@ export function useMultiplayerRoom(
     setStage('lobby');
   }, []);
 
+  /**
+   * 房间操作 REST POST 统一封装:JSON body + 失败日志。
+   * 操作结果经 SSE(room_state/role_changed 等)广播同步,默认失败仅 log.error;
+   * 需要向用户提示的调用(switchRole)传 onErr 追加 UI 反馈。
+   */
+  const postRoomApi = useCallback((
+    path: string,
+    body: Record<string, unknown>,
+    errLabel: string,
+    onErr?: (err: unknown) => void,
+  ) => {
+    apiFetch<void>(`/api/rooms/${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).catch((err) => {
+      log.error(errLabel, { error: String(err) });
+      onErr?.(err);
+    });
+  }, []);
+
   const switchRole = useCallback((role: 'player' | 'spectator', seat?: number) => {
     const hgc = hgcRef.current;
     if (!hgc?.roomId || !hgc.playerId) return;
     const payload: Record<string, unknown> = { playerId: hgc.playerId, role };
     if (seat !== undefined) payload.seat = seat;
-    apiFetch<void>(`/api/rooms/${hgc.roomId}/switch-role`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    }).catch((err) => {
-      log.error('switchRole failed', { error: String(err) });
+    postRoomApi(`${hgc.roomId}/switch-role`, payload, 'switchRole failed', (err) => {
       const body = (err as { body?: { error?: string } }).body;
       showError(body?.error ?? (role === 'spectator' ? '切换为旁观者失败' : '加入游戏失败（房间可能已满）'));
     });
-  }, []);
+  }, [postRoomApi, showError]);
 
   const requestView = useCallback((targetSeat: number) => {
     const hgc = hgcRef.current;
     if (!hgc?.roomId || !hgc.playerId) return;
-    apiFetch<void>(`/api/rooms/${hgc.roomId}/request-view`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ spectatorId: hgc.playerId, targetSeat }),
-    }).catch((err) => log.error('requestView failed', { error: String(err) }));
-  }, []);
+    postRoomApi(`${hgc.roomId}/request-view`, { spectatorId: hgc.playerId, targetSeat }, 'requestView failed');
+  }, [postRoomApi]);
 
   const approveView = useCallback((spectatorId: string, targetSeat: number) => {
     const hgc = hgcRef.current;
     if (!hgc?.roomId || !hgc.playerId) return;
-    apiFetch<void>(`/api/rooms/${hgc.roomId}/approve-view`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ spectatorId, targetSeat }),
-    }).catch((err) => log.error('approveView failed', { error: String(err) }));
-  }, []);
+    postRoomApi(`${hgc.roomId}/approve-view`, { spectatorId, targetSeat }, 'approveView failed');
+  }, [postRoomApi]);
 
   const rejectView = useCallback((spectatorId: string) => {
     const hgc = hgcRef.current;
     if (!hgc?.roomId) return;
-    apiFetch<void>(`/api/rooms/${hgc.roomId}/reject-view`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ spectatorId }),
-    }).catch((err) => log.error('rejectView failed', { error: String(err) }));
-  }, []);
+    postRoomApi(`${hgc.roomId}/reject-view`, { spectatorId }, 'rejectView failed');
+  }, [postRoomApi]);
 
   const revokeView = useCallback((spectatorId: string) => {
     const hgc = hgcRef.current;
     if (!hgc?.roomId) return;
-    apiFetch<void>(`/api/rooms/${hgc.roomId}/revoke-view`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ spectatorId }),
-    }).catch((err) => log.error('revokeView failed', { error: String(err) }));
-  }, []);
+    postRoomApi(`${hgc.roomId}/revoke-view`, { spectatorId }, 'revokeView failed');
+  }, [postRoomApi]);
 
   // ── 座位操作 ──
 
   const moveSeat = useCallback((targetSeat: number) => {
     const hgc = hgcRef.current;
     if (!hgc?.roomId || !hgc.playerId) return;
-    apiFetch<void>(`/api/rooms/${hgc.roomId}/seat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: hgc.playerId, targetSeat }),
-    }).catch((err) => log.error('moveSeat failed', { error: String(err) }));
-  }, []);
+    postRoomApi(`${hgc.roomId}/seat`, { playerId: hgc.playerId, targetSeat }, 'moveSeat failed');
+  }, [postRoomApi]);
 
   const requestSeatSwap = useCallback((targetSeat: number) => {
     const hgc = hgcRef.current;
     if (!hgc?.roomId || !hgc.playerId) return;
-    apiFetch<void>(`/api/rooms/${hgc.roomId}/seat-swap/request`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: hgc.playerId, targetSeat }),
-    }).catch((err) => log.error('requestSeatSwap failed', { error: String(err) }));
-  }, []);
+    postRoomApi(`${hgc.roomId}/seat-swap/request`, { playerId: hgc.playerId, targetSeat }, 'requestSeatSwap failed');
+  }, [postRoomApi]);
 
   const respondSeatSwap = useCallback((requesterId: string, accept: boolean) => {
     const hgc = hgcRef.current;
     if (!hgc?.roomId || !hgc.playerId) return;
-    apiFetch<void>(`/api/rooms/${hgc.roomId}/seat-swap/respond`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: hgc.playerId, requesterId, accept }),
-    }).catch((err) => log.error('respondSeatSwap failed', { error: String(err) }));
+    postRoomApi(`${hgc.roomId}/seat-swap/respond`, { playerId: hgc.playerId, requesterId, accept }, 'respondSeatSwap failed');
     setIncomingSeatSwap(null);
-  }, []);
+  }, [postRoomApi]);
 
   const kickPlayer = useCallback((targetPlayerId: string) => {
     const hgc = hgcRef.current;
     if (!hgc?.roomId || !hgc.playerId) return;
-    apiFetch<void>(`/api/rooms/${hgc.roomId}/kick`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId: hgc.playerId, targetPlayerId }),
-    }).catch((err) => log.error('kickPlayer failed', { error: String(err) }));
-  }, []);
+    postRoomApi(`${hgc.roomId}/kick`, { playerId: hgc.playerId, targetPlayerId }, 'kickPlayer failed');
+  }, [postRoomApi]);
 
   return {
     stage,

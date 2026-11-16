@@ -7,8 +7,5 @@ export const 界鲁肃 = {
   maxHealth: 3,
   gender: '男',
   faction: '吴',
-  skills: [
-    { name: '界好施', path: '../../skills/界好施' },
-    { name: '界缔盟', path: '../../skills/界缔盟' },
-  ],
+  skills: ['界好施', '界缔盟'],
 };

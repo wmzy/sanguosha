@@ -1,6 +1,6 @@
 import type { AtomOfName, GameState, Json, TurnUsageAuthority } from '../types';
 import { applyAtom } from '../core/apply';
-import { viewMirrorKey } from './vars-keys';
+import { viewMirrorKey, clearPerTurnState, PER_TURN_SUFFIXES } from './vars-keys';
 
 type Usage = Omit<AtomOfName<'回合用量'>, 'type' | 'player'>;
 
@@ -94,4 +94,43 @@ export async function setTurnVarUsage(
 ): Promise<void> {
   state.turn.vars[key] = value;
   await applyAtom(state, { type: '回合用量', player, key, value });
+}
+
+// ────────────────────────── 参数化 key 的通用发射器(静态契约豁免层) ──────────────────────────
+// 由 turnUsage 投影 key 静态契约(tests/engine/turnUsage-projection-meta.test.ts)约束:
+// 参数化 key 的投影发射必须住在本层(本文件豁免);其余文件的 key 表达式必须是
+// vars-keys 注册表常量/工厂或技能名模板,函数参数名作 key 会被判违规。
+// 消费方:createYinYangState — 阴阳转换技(审时/成略/拒战/贞良);
+//         clearPerTurnStateProjected — 放权(cancel 回合结束路径)。
+
+/** 阴阳转换技(审时/成略/拒战/贞良)的转换态读写工厂。
+ *  state 真相在 player.vars(跨回合持久,缺省 '阳'),此处仅把转换态投影到 view.turnUsage:
+ *  getState 读权威值;syncStateView 在发动翻转后与拥有者「回合开始」重同步时调用。
+ *  key 须由调用方以注册表常量(审时/成略/拒战)或本文件局部字面量(贞良)声明后传入。 */
+export function createYinYangState(stateKey: string): {
+  getState: (state: GameState, ownerId: number) => '阳' | '阴';
+  syncStateView: (state: GameState, ownerId: number) => Promise<void>;
+} {
+  const getState = (state: GameState, ownerId: number): '阳' | '阴' =>
+    state.players[ownerId]?.vars[stateKey] === '阴' ? '阴' : '阳';
+  const syncStateView = async (state: GameState, ownerId: number): Promise<void> => {
+    await projectTurnUsage(state, ownerId, stateKey, getState(state, ownerId));
+  };
+  return { getState, syncStateView };
+}
+
+/** per-turn 清理的投影版:先按 PER_TURN_SUFFIXES 逐 key 投影 null,再复用 vars-keys 的
+ *  clearPerTurnState(清 turn.vars、duration='turn' 标记、后缀 vars——本身不产生 atom)。
+ *  消费方:放权 cancel 回合结束路径——cancel 后 回合结束.applyView 不执行,增量视图的
+ *  turnUsage 只能靠「回合用量」atom 逐 key 清漏;权威「回合结束」atom 靠自身 applyView
+ *  整体清空,不走本入口。atom 序列与放权此前的本地实现逐 atom 一致:玩家序 × key 插入序。 */
+export async function clearPerTurnStateProjected(state: GameState): Promise<void> {
+  for (const p of state.players) {
+    for (const key of Object.keys(p.vars)) {
+      if (PER_TURN_SUFFIXES.some((suffix) => key.endsWith(suffix))) {
+        await projectTurnUsage(state, p.index, key, null);
+      }
+    }
+  }
+  clearPerTurnState(state);
 }

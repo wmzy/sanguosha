@@ -5,5 +5,5 @@ export const 界孙坚 = {
   maxHealth: 4,
   gender: '男',
   faction: '吴',
-  skills: [{ name: '英魂' }, { name: '武烈' }],
+  skills: ['英魂', '武烈'],
 };

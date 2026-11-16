@@ -11,7 +11,7 @@ import { allCharacters } from '../../src/engine/data/characters';
 
 const CHARACTERS = allCharacters.map((c) => ({
   name: c.name,
-  skills: c.skills.map((s) => s.name),
+  skills: [...c.skills],
 }));
 
 function makePlayer(index: number, name: string) {

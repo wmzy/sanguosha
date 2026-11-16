@@ -27,13 +27,12 @@
 import type {
   FrontendAPI,
   GameState,
-  HookResult,
   Json,
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { flipFaceDown, flipFaceUp, performSkipTurn } from '../flows/face-down';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { flipFaceDown, registerFlipSkipTurnHooks } from '../flows/face-down';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
@@ -43,10 +42,6 @@ const DISPLAY_NAME = '仁心';
 const CONFIRMED_KEY = '仁心/confirmed';
 /** localVars 键:玩家弃置的装备牌 cardId */
 const CARD_CHOICE_KEY = '仁心/cardChoice';
-/** player.tags 键:翻面标签(下一回合开始时消费) */
-const FLIP_TAG = '仁心/翻面';
-/** localVars 键:skip-all 标志(值为玩家座次) */
-const SKIP_FLAG = '仁心/skipAll';
 
 /** 装备牌判定 */
 function isEquipmentCard(card: { type?: string } | undefined): boolean {
@@ -192,47 +187,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     await applyAtom(ctx.state, { type: '回复体力', target, amount });
   });
 
-  // ── 翻面:下一回合跳过(机制同据守/放逐/神速) ────────────────
-  // 检测翻面标签 → 移除标签 + 设 skipAll 标志 + cancel(不进入准备阶段)
-  registerBeforeHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.type !== '阶段开始') return;
-    if (atom.player !== ownerId) return;
-    const self = ctx.state.players[ownerId];
-
-    // 入口:准备阶段开始 + 翻面标签 → 启动跳过
-    if (atom.phase === '准备' && self?.tags.includes(FLIP_TAG)) {
-      await flipFaceUp(ctx.state, ownerId, '仁心');
-      ctx.state.localVars[SKIP_FLAG] = ownerId;
-      const result: HookResult = { kind: 'cancel' };
-      return result;
-    }
-
-    // skipAll 标志存在时,取消所有其他阶段(防止 phase-end after-hook 推进产生副作用)
-    if (ctx.state.localVars[SKIP_FLAG] === ownerId) {
-      const result: HookResult = { kind: 'cancel' };
-      return result;
-    }
-  });
-
-  // ── 翻面:阶段结束(准备) before-hook,主动推进回合 ────────
-  // skipAll 标志存在时:清除标志 + 亲自执行 end-turn 序列把回合交给下家。
-  // (与据守/神速一致:cancel 阶段结束原子以防 phase-end after-hook 推进产生幻影阶段链)
-  registerBeforeHook(state, skill.id, ownerId, '阶段结束', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.type !== '阶段结束') return;
-    if (atom.player !== ownerId) return;
-    if (ctx.state.localVars[SKIP_FLAG] !== ownerId) return;
-
-    // 清除 skipAll 标志(后续不再 skip)
-    delete ctx.state.localVars[SKIP_FLAG];
-
-    // 亲自执行 end-turn 序列:清过期标记 → 下一玩家 → 回合结束
-    await performSkipTurn(ctx.state, ownerId);
-
-    const result: HookResult = { kind: 'cancel' };
-    return result;
-  });
+  // ── 翻面:下一回合跳过(共用 face-down 通用版 hook 对,机制同据守/放逐/神速)──
+  registerFlipSkipTurnHooks(state, skill.id, ownerId, '仁心');
 
   return () => {};
 }

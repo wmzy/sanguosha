@@ -58,7 +58,7 @@ import { usedThisTurnKey } from '../rules/vars-keys';
 import { viewCanAttack } from '../rules/viewDistance';
 import { viewCanSlash } from '../rules/action-active';
 import { USE_ACTION_PREFIX } from '../util/declaredActionType';
-import { registerRespondForAllSeats, engineCanPlayNowReason } from '../util/skillRuntime';
+import { registerRespondForAllSeats, engineCanPlayNowReason, viewAskedDodge } from '../util/skillRuntime';
 import { runVirtualSlash } from './cards/_virtualSlash';
 import { canUseSlash } from './cards/杀';
 
@@ -544,11 +544,7 @@ function dodgeActive(ctx: ActionContext, skillKey: string): boolean {
   if (!p) return false;
   if (p.turnUsage?.[usedThisTurnKey(skillKey)]) return false;
   if ((p.hand?.length ?? 0) === 0) return false;
-  const pending = view.pending;
-  return (
-    pending?.target === perspectiveIdx &&
-    (pending.atom as { type?: string } | null)?.type === '询问闪'
-  );
+  return viewAskedDodge(ctx);
 }
 
 /** rescue 激活:桃/求桃 pending 命中自己 + 本回合未用过 + 有手牌。 */
