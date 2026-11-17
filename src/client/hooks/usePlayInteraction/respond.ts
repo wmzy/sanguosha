@@ -6,6 +6,8 @@
 //   - pending 切换时的重置 effect;respond 模式派生(目标过滤/是否需目标/就绪判定)
 //   - handleRespond / handlePlayRespond / clearRespondSelection
 //   - 回应窗口的点牌、双击、点目标分支(外壳 dispatcher 委托)
+//   - 回应候选数单一口径派生 respondCandidateCountOf(GameView memo 后供
+//     CenterActionBar/AwaitingPrompt 共用,本文件外的纯函数)
 // 与出牌阶段 selectedTarget/selectedUseAction 是两套独立交互,互不复用。
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -15,6 +17,27 @@ import { rescueSkillFor, respondCandidates } from '../../utils/pendingRespond';
 import { toggleTargetSelection, validateTargetSelection } from '../../../engine/rules/target-selection';
 import { SKIP_ACTION_TYPE, SKIP_SKILL_ID } from '../../utils/skipMessage';
 import type { PlaySend } from './common';
+
+/** 回应候选数(单一口径派生,供 GameView memo 后供 CenterActionBar 与 AwaitingPrompt
+ *  共用,替代两处各自计算):
+ *  - 阻塞型回应窗口(isMyAwaiting + useCard/useCardAndTarget 型 pending 且非弃牌窗口)
+ *    且 resolve 出 cardFilter 时,返回候选集张数(含装备区候选,界鬼才只持可换判定牌
+ *    的装备时不误报 0);
+ *  - 否则返回 null(非卡牌回应/未知)。null(未知)与 0(无牌可出)的语义由消费方区分。
+ *  注:不含 broadcastSkipped 门控——已跳过状态下消费方(isRespondPending 门控的按钮组
+ *  与「已跳过」提示分支)均不渲染该值,无需该条件。 */
+export function respondCandidateCountOf(
+  isMyAwaiting: boolean,
+  isDiscardPhase: boolean,
+  pending: PendingView | null,
+  pendingRespondInfo: PendingRespondInfo | null,
+  candidateCount: number,
+): number | null {
+  if (!isMyAwaiting || isDiscardPhase || !pendingRespondInfo?.cardFilter) return null;
+  const promptType = pending?.prompt?.type;
+  if (promptType !== 'useCard' && promptType !== 'useCardAndTarget') return null;
+  return candidateCount;
+}
 
 export interface RespondInteractionParams {
   view: GameView;

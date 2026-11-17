@@ -8,6 +8,7 @@ import type {
   GameView,
   Json,
   Card,
+  PendingSlot,
 } from '../types';
 import { createGameState } from '../types';
 import { buildView as buildViewImpl } from '../view/buildView';
@@ -245,6 +246,33 @@ function normalizeMessageTargetShape(message: ClientMessage): ClientMessage {
   return { ...message, params, ...(preceding ? { preceding } : {}) };
 }
 
+/** skip action 的槽位解析结果(dispatch 的 skip 分支专用;kind 为实现层判别器)。
+ *  - broadcast:广播型 slot(target<0,如无懈可击)→ 累积 skippedPlayers,全员 skip 触发超时
+ *  - blocking:非广播型阻塞 pending(如弃牌)→ 直接触发超时
+ *  - unsupported:槽缺失/超时/暂停/被认领,或非阻塞型 pending(出牌窗口不支持 skip)→ 拒绝 */
+type SkipSlotResolution =
+  | { kind: 'broadcast'; slot: PendingSlot }
+  | { kind: 'blocking'; slot: PendingSlot }
+  | { kind: 'unsupported' };
+
+/** 解析 skip action 应作用的 pending slot。**纯同步只读、无副作用**——skip 块首个
+ *  真实 await 之前的段不得引入任何微任务让出(零挂起契约,见 dispatch 内注释),
+ *  故抽为同步 helper 由调用方直接调用,而非 async helper + await。
+ *  优先查找广播型 slot(target<0,如无懈可击):出牌阶段 findPendingSlot 可能返回
+ *  当前玩家的出牌窗口 slot(target=0),导致 skip 误匹配非广播型 pending。
+ *  (extractPendingTarget:内置等待型 atom 必有 target 或 player 字段,player≥0。) */
+function resolveSkipSlot(state: GameState, ownerId: number): SkipSlotResolution {
+  const broadcastSlot = [...state.pendingSlots.values()].find(
+    (s) => extractPendingTarget(s.atom) < 0,
+  );
+  const slot = broadcastSlot ?? findPendingSlot(state, ownerId);
+  if (!slot || slot.isTimeout || slot.isPaused || slot.isClaimed) {
+    return { kind: 'unsupported' };
+  }
+  if (extractPendingTarget(slot.atom) < 0) return { kind: 'broadcast', slot };
+  return slot.isBlocking ? { kind: 'blocking', slot } : { kind: 'unsupported' };
+}
+
 const preparingStates = new WeakSet<GameState>();
 
 export async function dispatch(
@@ -362,43 +390,38 @@ export async function dispatch(
     if (hasPreceding) {
       return rejectRolledBack();
     }
-    // 优先查找广播型 slot(target<0,如无懈可击):出牌阶段 findPendingSlot 可能返回
-    // 当前玩家的出牌窗口 slot(target=0),导致 skip 误匹配非广播型 pending。
-    // (extractPendingTarget:内置等待型 atom 必有 target 或 player 字段,player≥0。)
-    const broadcastSlot = [...state.pendingSlots.values()].find(
-      (s) => extractPendingTarget(s.atom) < 0,
-    );
-    const slot = broadcastSlot ?? findPendingSlot(state, message.ownerId);
-    if (!slot || slot.isTimeout || slot.isPaused || slot.isClaimed) return reject();
-    const isBroadcast = extractPendingTarget(slot.atom) < 0;
-    if (isBroadcast) {
+    const resolution = resolveSkipSlot(state, message.ownerId);
+    // 槽缺失/已超时/暂停/被认领,或非阻塞型 pending(出牌窗口不支持 skip)→ 拒绝
+    if (resolution.kind === 'unsupported') return reject();
+    // ── skip 语义(零挂起约束)─────────────────────────────────────────────
+    // 首个真实 await(_fireTimeoutNow)之前的段——resolveSkipSlot(纯同步)+
+    // logAction + skippedPlayers 累积/全员判定——必须留在 dispatch 原位同步执行:
+    // 抽成 async helper 再 await 会无条件引入一个微任务让出(即使 helper 内无
+    // 真实 await),破坏「dispatch() 调用的同一同步段内副作用可见」的契约。
+    // 广播/阻塞两分支的结算尾段(whenIdle → signalSettle → accept)原本各写一遍,
+    // 现由下方汇合点共用,不再重复。
+    logAction(state, message);
+    if (resolution.kind === 'broadcast') {
       // 广播型:记录该玩家已 skip,全员 skip 时提前触发超时。
       // skip 是真实玩家决策,记入 actionLog(缺陷①:此前不记录,服务端重启重放时
       // 「全员快速放弃无懈」的事实丢失,只能靠虚拟时钟超时兜底,resolve 时序与原局
       // 错位 → RNG 链发散)。重放时照常 dispatch 这些 skip 条目即可在广播槽上
       // 忠实累积 skippedPlayers 并在全员 skip 时触发超时;旧日志无 skip 条目则由
       // restore 的兜底逻辑补发(向后兼容)。
-      logAction(state, message);
-      slot.skippedPlayers ??= new Set();
-      slot.skippedPlayers.add(message.ownerId);
+      resolution.slot.skippedPlayers ??= new Set();
+      resolution.slot.skippedPlayers.add(message.ownerId);
       const alivePlayers = state.players.filter((p) => p.alive).map((p) => p.index);
-      if (alivePlayers.every((idx) => slot.skippedPlayers!.has(idx))) {
-        await slot._fireTimeoutNow?.();
+      if (alivePlayers.every((idx) => resolution.slot.skippedPlayers!.has(idx))) {
+        await resolution.slot._fireTimeoutNow?.();
       }
-      await whenIdle(state);
-      signalSettle();
-      return accept();
+    } else {
+      // 非广播型阻塞 pending:触发超时(onTimeout 处理,如弃牌自动弃牌)
+      await resolution.slot._fireTimeoutNow?.();
     }
-    // 非广播型阻塞 pending:触发超时(onTimeout 处理,如弃牌自动弃牌)
-    if (slot.isBlocking) {
-      logAction(state, message);
-      await slot._fireTimeoutNow?.();
-      await whenIdle(state);
-      signalSettle();
-      return accept();
-    }
-    // 非阻塞型 pending(出牌窗口):不支持 skip,返回 false
-    return reject();
+    // 广播/阻塞共用结算尾段:等引擎回稳 → 放行 settle → 接受
+    await whenIdle(state);
+    signalSettle();
+    return accept();
   }
   const entry = findActionEntry(state, message.skillId, message.ownerId, message.actionType);
   // 回应路径:定位该玩家对应的 slot。
@@ -459,7 +482,13 @@ export async function dispatch(
     oldSlot.releaseClaim?.();
   };
   // fire-and-forget 启动 execute,完成后 resolve 该玩家的 slot.
-  // then/finally 都走 cleanupSlot。safeResolve 防重入 + 删除幂等 → 无副作用重复执行。
+  // cleanupSlot 只挂 .finally,不与 .then 双挂:链首 .catch 已把 execute 抛错
+  // 转为 fulfilled,而 .finally 对 fulfilled/rejected 都触发、首跳时序与 .then
+  // 完全一致(同一微任务拍),且额外覆盖 .catch 内 onError 自身抛错导致 .then
+  // 回调被跳过的路径——单挂 .finally 的覆盖面是 .then 的超集。清理幂等由
+  // safeResolve(resolveCalled 防重入)+ removePendingSlot(key+引用匹配)保证。
+  // (历史:双挂源自 .catch 加入之前的写法——.then 管成功路径清理、.finally 管
+  //  抛错路径兜底;链首 .catch 落地后 .then 一档已无独有语义。)
   // 注意:不 return execute 的 promise——execute 内 await pending slot 可能阻塞到玩家回应,
   // 如果 dispatch 返回该 promise,session/harness 的 await 会死锁。
   // dispatch 返回 { accepted, settle }。execute 抛错由链首 .catch 捕获:同步 onError 上报,
@@ -479,7 +508,6 @@ export async function dispatch(
       state.onError?.(e);
       executeError = e;
     })
-    .then(cleanupSlot)
     .finally(cleanupSlot)
     .then(endRun);
   // settle = 本 execute 的稳定点(core/run-tracker.ts):它已完成或已挂到 PendingSlot 上,

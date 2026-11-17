@@ -105,21 +105,28 @@ export function EquipColumnImpl({
     // 回应选牌窗口(界天香/界鬼才)同理抑制,装备技能按钮让位给候选点选。
     const rawSkill = activeSkillByEquipName.get(name);
     const activeSkill = (isDistributeActive || inRespondPick) ? undefined : rawSkill;
-    const isDistCandidate = !!isDistributeActive && !!distCandidateEquipIds?.has(id);
-    const isDistSelected = !!distSelectedEquipIds?.has(id);
-    const isRespondCandidate = inRespondPick && !!respondCandidateEquipIds?.has(id);
-    const isRespondSelected = selectedRespondEquipId === id;
-    const clickable = !!activeSkill || isDistCandidate || isRespondCandidate;
+    // distribute 与回应选牌共用「候选点选」语义,合并为单一 {dist, candidate, selected}
+    // 派生:两窗口互斥(GameView 在 distribute 激活时不下发 respondCandidateEquipIds,
+    // 回应选牌激活时不产生 distSelected),clickable/handleClick/stateHint 只看 candidate;
+    // 样式类仍按 dist 分派(equipDistCandidate/equipSelected vs equipRespond*),DOM 不变。
+    const pick: EquipPickState = isDistributeActive
+      ? {
+          dist: true,
+          candidate: !!distCandidateEquipIds?.has(id),
+          selected: !!distSelectedEquipIds?.has(id),
+        }
+      : {
+          dist: false,
+          candidate: !!respondCandidateEquipIds?.has(id),
+          selected: selectedRespondEquipId === id,
+        };
+    const clickable = !!activeSkill || pick.candidate;
     const handleClick = activeSkill
       ? () => onSkillAction(activeSkill)
-      : isDistCandidate || isRespondCandidate
+      : pick.candidate
         ? () => onEquipCardClick?.(id)
         : undefined;
-    const stateHint = activeSkill
-      ? ' · 可发动'
-      : isDistCandidate || isRespondCandidate
-        ? ' · 可选中'
-        : '';
+    const stateHint = activeSkill ? ' · 可发动' : pick.candidate ? ' · 可选中' : '';
     const equipDesc = EQUIPMENT_SKILL_NAMES.has(name) ? getSkillDescription(name) : undefined;
     const head = `${name}(${slot})${stateHint}`;
     const tooltipText = equipDesc ? `${head}\n${equipDesc}` : head;
@@ -130,10 +137,7 @@ export function EquipColumnImpl({
         name={name}
         tooltipText={card ? tooltipText : id}
         activeSkill={activeSkill}
-        isDistCandidate={isDistCandidate}
-        isDistSelected={isDistSelected}
-        isRespondCandidate={isRespondCandidate}
-        isRespondSelected={isRespondSelected}
+        pick={pick}
         clickable={clickable}
         handleClick={handleClick}
       />
@@ -156,16 +160,24 @@ export function EquipColumnImpl({
   );
 }
 
+/** 装备卡「候选点选」状态:distribute(制衡/仁德)与回应选牌(界天香/界鬼才)两窗口
+ *  合并后的单一派生(原先 isDist 系列与 isRespond 系列两套平行状态位)。 */
+interface EquipPickState {
+  /** true=distribute 窗口;false=回应选牌窗口(决定候选/选中样式类取哪一套) */
+  dist: boolean;
+  /** 该装备是选牌候选(可点击选中) */
+  candidate: boolean;
+  /** 该装备已被选中 */
+  selected: boolean;
+}
+
 /** 单个装备卡片(含 hover tooltip)。提取为子组件以遵守 hooks 规则。 */
 function EquipItem({
   icon,
   name,
   tooltipText,
   activeSkill,
-  isDistCandidate,
-  isDistSelected,
-  isRespondCandidate,
-  isRespondSelected,
+  pick,
   clickable,
   handleClick,
 }: {
@@ -173,12 +185,9 @@ function EquipItem({
   name: string;
   tooltipText: string;
   activeSkill: SkillActionDef | undefined;
-  isDistCandidate: boolean;
-  isDistSelected: boolean;
-  /** 回应窗口:该装备是回应候选(界天香弃红桃装备/界鬼才换判定牌),可点击选中 */
-  isRespondCandidate: boolean;
-  /** 回应窗口:该装备已被选为回应牌(与手牌回应选中同源) */
-  isRespondSelected: boolean;
+  /** 候选点选状态(两窗口合并派生);dist 决定 equipDistCandidate/equipSelected 与
+   *  equipRespondCandidate/equipRespondSelected 哪一套样式类生效 */
+  pick: EquipPickState;
   clickable: boolean;
   handleClick: (() => void) | undefined;
 }) {
@@ -191,10 +200,10 @@ function EquipItem({
         className={cx(
           styles.equipColumnItem,
           activeSkill && styles.equipSkillActive,
-          isDistCandidate && styles.equipDistCandidate,
-          isDistSelected && styles.equipSelected,
-          isRespondCandidate && styles.equipRespondCandidate,
-          isRespondSelected && styles.equipRespondSelected,
+          pick.dist && pick.candidate && styles.equipDistCandidate,
+          pick.dist && pick.selected && styles.equipSelected,
+          !pick.dist && pick.candidate && styles.equipRespondCandidate,
+          !pick.dist && pick.selected && styles.equipRespondSelected,
         )}
         role={clickable ? 'button' : undefined}
         onClick={handleClick}

@@ -11,10 +11,14 @@
 //   - pushToDiscardPile:牌入弃牌堆的 apply 单点(裁决 + push 的两行组合)。
 //   - removeFromEquipment:装备区按谓词重建(apply/applyView 的「剔除被移走的装备槽」样板)。
 //   - clearEquipVars:装备离身时清除武器距离 vars(卸下/移出至暂存区 共用)。
+//   - clearEquipViewVars:clearEquipVars 的 view 侧配对(武器离身清 distanceVars.attackRange)。
+//   - decrementHandCount:others 视角的手牌计数扣减(仅减计数不动 hand 数组)。
 //   - makeCardAskAtom:卡牌询问型等待 atom 工厂(询问杀/询问闪 逐行同构)。
+//   - makeHealthDeltaAtom:体力增减 atom 工厂(回复体力/失去体力 同构,差异仅方向/钳制/文案)。
 import type {
   ActionPrompt,
   AtomDefinition,
+  AtomEffect,
   Card,
   EquipSlot,
   GameState,
@@ -100,6 +104,13 @@ export function removeCardsFromHand(p: PlayerViewEntry, cardIds: string[]): void
     const removeSet = new Set(cardIds);
     p.hand = p.hand.filter((c: Card) => !removeSet.has(c.id));
   }
+}
+
+/** others 视角的手牌计数扣减:仅减 handCount(下限 0),不动 hand 数组。
+ *  用于「owner 视图按 handIds 精确移除、others 视图只见计数」的分叉 else 支
+ *  (移出至暂存区 等):不可见视角无 hand 数组,可见视角的数组同步走 removeCardsFromHand。 */
+export function decrementHandCount(p: PlayerViewEntry, n: number): void {
+  if (n > 0) p.handCount = Math.max(0, p.handCount - n);
 }
 
 /** 一张牌进手牌:handCount+1;可见视角(p.hand 存在)且 view.cardMap 有该卡时追加进数组。
@@ -211,6 +222,19 @@ export function clearEquipVars(state: GameState, playerIdx: number, slot: EquipS
   }
 }
 
+/** clearEquipVars 的 view 侧配对:武器槽离身时把玩家视图条目的
+ *  distanceVars.attackRange 置 undefined(马匹由 移除技能 atom 的视图处理)。
+ *  卸下 与 移出至暂存区 的 applyView 共用——与 state 侧 clearEquipVars 一一对应,
+ *  否则徒手玩家视图仍带旧武器射程。 */
+export function clearEquipViewVars(p: PlayerViewEntry, slot: EquipSlot): void {
+  if (slot === '武器' && p.distanceVars) {
+    p.distanceVars = {
+      ...p.distanceVars,
+      attackRange: undefined,
+    };
+  }
+}
+
 // ── 卡牌询问型等待 atom 工厂 ──
 
 /** 询问超时秒数:超时 = 不出牌,父流程检查处理区无响应牌继续结算。 */
@@ -252,6 +276,61 @@ export function makeCardAskAtom(
     // Interactive state is published from the actual slot, never reconstructed by the client clock.
     toViewEvents(_state, atom): ViewEventSplit {
       return broadcast({ type, target: atom.target, source: atom.source });
+    },
+  };
+}
+
+// ── 体力增减 atom 工厂 ──
+
+/** 体力增减 atom 的工厂(回复体力/失去体力 逐行同构,差异仅四点):
+ *  - sign:+1 回复(向 maxHealth 钳制)/ -1 失去(可扣至负值,濒死由 after-hook 流程处理);
+ *  - clamp:是否以 maxHealth 封顶;
+ *  - effect:atom 的 fallback 展示(音效/动画各自不同);
+ *  - logVerb:toViewLog 文案动词(「回复」/「失去」)。
+ *  validate/toViewEvents/applyView 的行为对两者逐字一致:
+ *  校验 amount>0 + target 存在 + 存活;广播 {type,target,amount};
+ *  视图侧按 sign 增减 health(clamp 时封顶)。
+ *  扣减体力(life-timing)不并入本工厂——其 validate 文案与 toViewEvents payload
+ *  均有独立差异(错误信息带座次、事件携带按伤害点数计算的 injure_N 音效)。 */
+export function makeHealthDeltaAtom<T extends { target: number; amount: number }>(
+  type: string,
+  opts: {
+    /** 体力增减方向:+1=回复,-1=失去。 */
+    sign: 1 | -1;
+    /** 是否以 maxHealth 封顶(回复体力);失去体力不封顶。 */
+    clamp: boolean;
+    /** atom 的 fallback 展示效果。 */
+    effect: AtomEffect;
+    /** toViewLog 的动词(「回复」/「失去」)。 */
+    logVerb: string;
+  },
+): AtomDefinition<T> {
+  return {
+    type,
+    validate(state, atom) {
+      if (atom.amount <= 0) return 'amount must be > 0';
+      const err = requirePlayer(state, atom.target, 'target');
+      if (err) return err;
+      if (!state.players[atom.target].alive) return 'target is dead';
+      return null;
+    },
+    apply(state, atom) {
+      const target = state.players[atom.target];
+      const next = target.health + opts.sign * atom.amount;
+      target.health = opts.clamp ? Math.min(target.maxHealth, next) : next;
+    },
+    effect: opts.effect,
+    toViewEvents(_state, atom): ViewEventSplit {
+      return broadcast({ type, target: atom.target, amount: atom.amount });
+    },
+    applyView(view: GameView, event: ViewEvent) {
+      const p = viewPlayer(view, event.target as number);
+      if (!p) return;
+      const delta = opts.sign * (event.amount as number);
+      p.health = opts.clamp ? Math.min(p.maxHealth, p.health + delta) : p.health + delta;
+    },
+    toViewLog(event) {
+      return { player: event.target as number, text: `${opts.logVerb} ${event.amount ?? 0} 点体力` };
     },
   };
 }

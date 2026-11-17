@@ -85,9 +85,11 @@ export type ResolvedPlayer =
   | { playerId: string; response?: undefined }
   | { playerId?: undefined; response: Response };
 
-/** 房间操作者身份(start/action/reorder/chat/leave/kick/password 族)。
- *  非调试房取会话 userId;调试房回退 bodyPlayerId(可为空串,调用方 400 兜底)。
- *  未登录回 401(带 AUTH_REQUIRED code)。 */
+/** 底层身份适配:requireAuth=true 时取会话 userId(未登录回 401,带
+ *  AUTH_REQUIRED code),否则回退 bodyPlayerId(可为空串,调用方 400 兜底)。
+ *  requireAuth 的推导已单点化到 resolveRoomRequestActor,本适配器仅由
+ *  resolveSessionActor 内部复用(action/reorder,requireAuth 来自会话房的
+ *  session-first 语义,见其注释)。 */
 export async function resolveActorOr401(
   c: Context,
   requireAuth: boolean,
@@ -95,6 +97,45 @@ export async function resolveActorOr401(
 ): Promise<ResolvedPlayer> {
   const actor = await resolveRoomActor(c, { requireAuth }, bodyPlayerId);
   return actor.error ? { response: authRequired(c) } : { playerId: actor.playerId };
+}
+
+/** 「非调试房间需鉴权」操作者解析单点(leave/kick/start/chat/password 族):
+ *  内部 getRoom(roomId) 推导 requireAuth——非调试房与房间不存在(fail-closed,
+ *  防凭空 roomId 绕过会话校验)一律取会话 userId,未登录回 401(AUTH_REQUIRED);
+ *  调试房回退 bodyPlayerId(可为空串,调用方 400 兜底)。
+ *  opts.requireRoom=true 时房间不存在先回 404「房间不存在」(校验顺序与原
+ *  requireRoom → 身份解析一致),成功分支附带非空 room;缺省不校验存在性也
+ *  不返回 room(缺失房由调用方处理:leave 幂等离开 / kick 交给 kickPlayer
+ *  的 roomNotFound 分支)。response 非空时调用方直接 `return xxx.response`。 */
+export async function resolveRoomRequestActor(
+  c: Context,
+  roomId: string,
+  bodyPlayerId: string,
+  opts: { requireRoom: true },
+): Promise<
+  | { room: Room; playerId: string; response?: undefined }
+  | { room?: undefined; playerId?: undefined; response: Response }
+>;
+export async function resolveRoomRequestActor(
+  c: Context,
+  roomId: string,
+  bodyPlayerId: string,
+  opts?: { requireRoom?: boolean },
+): Promise<ResolvedPlayer>;
+export async function resolveRoomRequestActor(
+  c: Context,
+  roomId: string,
+  bodyPlayerId: string,
+  opts: { requireRoom?: boolean } = {},
+): Promise<
+  | { room: Room | null; playerId: string; response?: undefined }
+  | { room?: undefined; playerId?: undefined; response: Response }
+> {
+  const room = getRoom(roomId);
+  if (!room && opts.requireRoom) return { response: c.json({ error: '房间不存在' }, 404) };
+  const requireAuth = !room || !room.isDebug;
+  const actor = await resolveRoomActor(c, { requireAuth }, bodyPlayerId);
+  return actor.error ? { response: authRequired(c) } : { room, playerId: actor.playerId };
 }
 
 /** 对局会话操作者的共用前奏(action/reorder):会话不存在回 404「游戏会话不存在」;

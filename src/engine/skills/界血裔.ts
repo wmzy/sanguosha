@@ -30,11 +30,11 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import type { SkillModule } from '../types';
 import { getHandLimitBonus } from '../rules/vars-keys';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 const SKILL_ID = '界血裔';
 const DISPLAY_NAME = '血裔';
@@ -168,23 +168,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── respond action:处理 confirm 询问(是否发动血裔) ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>): string | null => {
-      return requireRequestType(st, ownerId, [USE_RT], {
-        wrongTypeError: '当前不是血裔询问',
-        mismatchError: '当前不是血裔询问',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      // 前端 confirm prompt 提交 { choice: true/false }(见 AwaitingPrompt.tsx)。
-      // 兼容 confirmed 别名(与八卦阵/奸雄/再起等同构)。
-      st.localVars[USE_CHOICE_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, USE_RT, USE_CHOICE_KEY, {
+    mismatchError: '当前不是血裔询问',
+    wrongTypeError: '当前不是血裔询问',
+  });
 
   return () => {
     unloadProvider();

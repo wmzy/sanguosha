@@ -2,7 +2,8 @@
 // 伤害编排时机 atom 定义(对齐 出牌流程重设计.md 模块 A / damage.md 8 时机):
 //   - 伤害结算开始时 / 造成伤害时 / 受到伤害时 / 造成伤害后 / 受到伤害后 /
 //     伤害结算结束时 / 伤害结算结束后
-//   全部为事件标记型:validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
+//   全部为事件标记型:validate 恒通过、apply 无副作用,只提供 before/after hook 注册点,
+//   四件套样板由 _timing.makeTimingAtom 统一产出。
 //   由 src/engine/damage-flow.ts 的编排函数 runDamageFlow 在扣减体力前后依次发出。
 //
 // before-hook modify amount 的回传通道:
@@ -15,8 +16,9 @@
 // 与 life-timing / 生效前 / 使用结算结束时 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { DamageType } from '../../engine/types';
-import type { AtomDefinition, GameState, ViewEventSplit } from '../types';
-import { hookSilentView, requirePlayer } from './_helpers';
+import type { AtomDefinition, GameState, ViewEvent } from '../types';
+import { makeTimingAtom } from './_timing';
+import { requirePlayer } from './_helpers';
 
 // ── before-hook modify amount 的回传通道 ────────────────────
 // 伤害结算开始时/造成伤害时/受到伤害时 的 before-hook 可 modify amount;afterApply 把最终
@@ -40,114 +42,86 @@ function validateDamageTiming(state: GameState, atom: DamageTimingAtom): string 
   return requirePlayer(state, atom.target, 'target');
 }
 
-/** 无 before-hook 时静默(no-op 视图),有 before-hook 时发通知事件。 */
-function damageTimingView(state: GameState, type: string, atom: DamageTimingAtom): ViewEventSplit {
-  return hookSilentView(state, type, () => ({
+/** 通知事件 payload(source/target/amount/damageType;有 before-hook 时广播)。 */
+function damageTimingView(type: string, atom: DamageTimingAtom): ViewEvent {
+  return {
     type,
     source: atom.source,
     target: atom.target,
     amount: atom.amount,
     damageType: atom.damageType,
-  }));
+  };
 }
 
 // ── 时机1:伤害结算开始时(绝情 cancel / 狂风大雾修正) ─────────
 // before-hook 可 cancel(绝情→跳过整个结算)或 modify amount/source(狂风大雾修正/祸首改来源)。
-export const 伤害结算开始时: AtomDefinition<DamageTimingAtom> = {
-  type: '伤害结算开始时',
-  validate: validateDamageTiming,
-  apply() {},
-  async afterApply(state, atom) {
+export const 伤害结算开始时: AtomDefinition<DamageTimingAtom> = makeTimingAtom(
+  '伤害结算开始时',
+  validateDamageTiming,
+  damageTimingView,
+  // before-hook modify 折叠后的 amount/source 回写,供 runDamageFlow 读取。
+  async (state, atom) => {
     state.localVars[DAMAGE_AMOUNT_KEY] = atom.amount;
     state.localVars[DAMAGE_SOURCE_KEY] = atom.source;
   },
-  toViewEvents(state, atom) {
-    return damageTimingView(state, '伤害结算开始时', atom);
-  },
-  applyView() {},
-};
+);
 
 
 // ── 时机2:造成伤害时(来源方加伤:裸衣/古锭刀/暗箭/酒) ────────
 // before-hook modify amount 链式叠加(裸衣+1 后续减伤看到加过的值)。
-export const 造成伤害时: AtomDefinition<DamageTimingAtom> = {
-  type: '造成伤害时',
-  validate: validateDamageTiming,
-  apply() {},
-  async afterApply(state, atom) {
+export const 造成伤害时: AtomDefinition<DamageTimingAtom> = makeTimingAtom(
+  '造成伤害时',
+  validateDamageTiming,
+  damageTimingView,
+  async (state, atom) => {
     state.localVars[DAMAGE_AMOUNT_KEY] = atom.amount;
   },
-  toViewEvents(state, atom) {
-    return damageTimingView(state, '造成伤害时', atom);
-  },
-  applyView() {},
-};
+);
 
 
 // ── 时机3:受到伤害时(目标方减伤/防止:藤甲/白银狮子/天香/名士) ─
 // before-hook 可 modify amount(减伤)或 cancel(完全防止→编排函数跳到伤害结算结束时)。
-export const 受到伤害时: AtomDefinition<DamageTimingAtom> = {
-  type: '受到伤害时',
-  validate: validateDamageTiming,
-  apply() {},
-  async afterApply(state, atom) {
+export const 受到伤害时: AtomDefinition<DamageTimingAtom> = makeTimingAtom(
+  '受到伤害时',
+  validateDamageTiming,
+  damageTimingView,
+  async (state, atom) => {
     state.localVars[DAMAGE_AMOUNT_KEY] = atom.amount;
   },
-  toViewEvents(state, atom) {
-    return damageTimingView(state, '受到伤害时', atom);
-  },
-  applyView() {},
-};
+);
 
 
 // ── 时机4:造成伤害后(来源方:狂骨/破军) ─────────────────────
 // 纯标记,after-hook 触发来源方结算。无 afterApply(不修正 amount)。
-export const 造成伤害后: AtomDefinition<DamageTimingAtom> = {
-  type: '造成伤害后',
-  validate: validateDamageTiming,
-  apply() {},
-  toViewEvents(state, atom) {
-    return damageTimingView(state, '造成伤害后', atom);
-  },
-  applyView() {},
-};
+export const 造成伤害后: AtomDefinition<DamageTimingAtom> = makeTimingAtom(
+  '造成伤害后',
+  validateDamageTiming,
+  damageTimingView,
+);
 
 
 // ── 时机5:受到伤害后(目标方:奸雄/反馈/遗计/刚烈) ────────────
 // 纯标记,after-hook 触发目标方结算(扣血前)。
-export const 受到伤害后: AtomDefinition<DamageTimingAtom> = {
-  type: '受到伤害后',
-  validate: validateDamageTiming,
-  apply() {},
-  toViewEvents(state, atom) {
-    return damageTimingView(state, '受到伤害后', atom);
-  },
-  applyView() {},
-};
+export const 受到伤害后: AtomDefinition<DamageTimingAtom> = makeTimingAtom(
+  '受到伤害后',
+  validateDamageTiming,
+  damageTimingView,
+);
 
 
 // ── 时机7:伤害结算结束时(天香摸牌/连环重置) ─────────────────
 // 纯标记,扣减体力之后发出。
-export const 伤害结算结束时: AtomDefinition<DamageTimingAtom> = {
-  type: '伤害结算结束时',
-  validate: validateDamageTiming,
-  apply() {},
-  toViewEvents(state, atom) {
-    return damageTimingView(state, '伤害结算结束时', atom);
-  },
-  applyView() {},
-};
+export const 伤害结算结束时: AtomDefinition<DamageTimingAtom> = makeTimingAtom(
+  '伤害结算结束时',
+  validateDamageTiming,
+  damageTimingView,
+);
 
 
 // ── 时机8:伤害结算结束后(酒诗②/连环传导——可能触发新伤害) ────
 // 纯标记,整个结算的最末时机。连环传导在此 after-hook 内发起一次新的 runDamageFlow。
-export const 伤害结算结束后: AtomDefinition<DamageTimingAtom> = {
-  type: '伤害结算结束后',
-  validate: validateDamageTiming,
-  apply() {},
-  toViewEvents(state, atom) {
-    return damageTimingView(state, '伤害结算结束后', atom);
-  },
-  applyView() {},
-};
-
+export const 伤害结算结束后: AtomDefinition<DamageTimingAtom> = makeTimingAtom(
+  '伤害结算结束后',
+  validateDamageTiming,
+  damageTimingView,
+);

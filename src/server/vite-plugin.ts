@@ -22,6 +22,19 @@ interface ServerModule {
   startServerLifecycle(): Promise<void>;
 }
 
+/** 从 SSR 世界取到的 shutdown 模块形状(优雅关闭单一实现,见 shutdown.ts)。 */
+interface ShutdownModule {
+  runGracefulShutdown: (
+    loaders: {
+      flushPendingWrites: () => Promise<void>;
+      shutdownAll: () => Promise<void>;
+      closeRoomStore: () => Promise<void>;
+    },
+    timeoutMs?: number,
+    preClose?: () => Promise<void>,
+  ) => Promise<void>;
+}
+
 export function honoApiPlugin(): Plugin {
   let serverModule: ServerModule | null = null;
   let serverReady: Promise<ServerModule> | null = null;
@@ -45,26 +58,54 @@ export function honoApiPlugin(): Plugin {
       // 留下 postmaster.pid + 未刷 WAL,下次启动 crash recovery 时 WASM abort。
       const originalClose = server.close.bind(server);
       server.close = async () => {
+        // 优雅关闭走 shutdown.ts 的单一实现(runGracefulShutdown:HTTP 关闭 +
+        // 刷盘 + 关资源 + 关 DB,含超时强退),经 ssrLoadModule 反射加载——本文件
+        // 禁止静态 import server 模块(见文件头注释)。清理失败/加载失败不阻塞关闭。
         try {
-          // SSR 世界里的清理函数
           const mods = await Promise.all([
+            server.ssrLoadModule('/src/server/shutdown.ts').catch(() => null),
             server.ssrLoadModule('/src/server/persistence.ts').catch(() => null),
             server.ssrLoadModule('/src/server/resourceRegistry.ts').catch(() => null),
             server.ssrLoadModule('/src/server/roomStore.ts').catch(() => null),
           ]);
-          const [persistence, resourceRegistry, roomStore] = mods as Array<Record<string, (() => unknown) | null> | null>;
-          await persistence?.flushPendingWrites?.();
-          await resourceRegistry?.shutdownAll?.();
-          await roomStore?.closeRoomStore?.();
+          const [shutdownMod, persistence, resourceRegistry, roomStore] = mods as [
+            ShutdownModule | null,
+            Record<string, (() => Promise<void>) | undefined> | null,
+            Record<string, (() => Promise<void>) | undefined> | null,
+            Record<string, (() => Promise<void>) | undefined> | null,
+          ];
+          const step =
+            (mod: Record<string, (() => Promise<void>) | undefined> | null, name: string) =>
+            async () => {
+              await mod?.[name]?.();
+            };
+          if (shutdownMod) {
+            // 超时缺省即 shutdown.ts 的 SHUTDOWN_TIMEOUT_MS(10s,与生产统一)。
+            // originalClose 作为 preClose:先关 HTTP 再清理,整段都在超时强退保护内,
+            // 与生产入口(index.ts)的步骤顺序一致。
+            await shutdownMod.runGracefulShutdown(
+              {
+                flushPendingWrites: step(persistence, 'flushPendingWrites'),
+                shutdownAll: step(resourceRegistry, 'shutdownAll'),
+                closeRoomStore: step(roomStore, 'closeRoomStore'),
+              },
+              undefined,
+              async () => {
+                await originalClose();
+              },
+            );
+            return;
+          }
         } catch {
           // 清理失败不阻塞关闭
         }
         return originalClose();
       };
       // Ctrl+C(SIGINT)vite 不处理:接管它,走完整关闭(含上面的清理)再退出。
-      // 分级响应:第一次优雅关闭,第二次 SIGINT 立即强制退出;优雅关闭设 6s 超时
-      // 兜底,防止清理卡住导致进程挂起(挂起后只能 kill -9 → PGlite 脏关闭 →
-      // postmaster.pid 残留 → 恶性循环)。
+      // 分级响应:第一次优雅关闭,第二次 SIGINT 立即强制退出;优雅关闭的超时强退
+      // (10s,与生产统一;原为 6s)由 runGracefulShutdown 内部兜底,防止清理卡住
+      // 导致进程挂起(挂起后只能 kill -9 → PGlite 脏关闭 → postmaster.pid 残留 →
+      // 恶性循环)。
       // 注意:主线程被同步死循环阻塞(如依赖优化卡死)时信号 callback 无法执行。
       let sigintCount = 0;
       process.on('SIGINT', () => {
@@ -72,17 +113,10 @@ export function honoApiPlugin(): Plugin {
         if (sigintCount >= 2) {
           process.exit(130);
         }
-        const forceExit = setTimeout(() => {
-          process.exit(1);
-        }, 6000);
-        forceExit.unref();
         server
           .close()
           .catch(() => {})
-          .finally(() => {
-            clearTimeout(forceExit);
-            process.exit(0);
-          });
+          .finally(() => process.exit(0));
       });
 
       // 挂载 Hono REST API 到 /api(经 ssrLoadModule 与引擎同一模块世界)

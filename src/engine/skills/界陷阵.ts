@@ -36,38 +36,34 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界陷阵'(避开标版潜在冲突);
 //   内部 Skill.name = '陷阵'(OL 官方技能名,玩家可见)。
+// use action 骨架(七连检 validate + 拼点仪式 + 输赢分支)由 flows/rank 的
+// registerRankUseAction/defineRankUseAction 提供,本文件只注入赢/没赢的 turn.vars 结算差异。
 import type {
   FrontendAPI,
   GameState,
   HookResult,
-  Json,
   Skill,
 } from '../types';
 import { getHealthValue } from '../types';
-import { popFrame, pushFrame } from '../core/frame';
 import { setTurnVarUsage, projectTurnUsage } from '../rules/turn-usage';
-import { askRankCardAndCompare, registerRankCardRespond } from '../flows/rank';
+import { registerRankUseAction, defineRankUseAction } from '../flows/rank';
 import {
-  registerAction,
   registerAfterHook,
   registerBeforeHook,
 } from '../core/skill';
 import { unloadSkillInstance, instantiateSkill } from './lifecycle';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
+import { activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
 import { slashUnlimitedKey } from '../rules/vars-keys';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import { registerDistanceExemptor } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
-import { engineCanPlayNowReason } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 import { getHandLimitBonus, XIANZHEN_WIN_TARGET_VIEW_KEY } from '../rules/vars-keys';
 
 const SKILL_ID = '界陷阵';
 const DISPLAY_NAME = '陷阵';
 
-const TARGET_CARD_KEY = `${SKILL_ID}/targetCard`;
-const PD_RT = `${SKILL_ID}/拼点`;
 /** 赢效果标记:owner 本回合对 target 使用牌无距离/次数限制且无视防具。值=目标座次。 */
 const WIN_VAR = XIANZHEN_WIN_TARGET_VIEW_KEY;
 /** 没赢效果标记:owner 本回合不能对 target 使用杀。值=目标座次。 */
@@ -141,68 +137,25 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     return health + bonus + slashCount;
   });
 
-  // ─── use action:owner 主动发动界陷阵拼点 ────────────────────────
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'use',
-    (st: GameState, params: Record<string, Json>): string | null => {
-      const playError = engineCanPlayNowReason(st, ownerId);
-      if (playError) return playError;
-      if (usedThisTurn(st, ownerId, SKILL_ID)) return '本回合已使用过陷阵';
-      const self = st.players[ownerId];
-      const cardId = params.cardId as string;
-      if (typeof cardId !== 'string') return '需要选择一张拼点牌';
-      if (!self.hand.includes(cardId)) return '拼点牌不在手牌中';
-      const target = params.target as number;
-      if (typeof target !== 'number') return '需要选择拼点目标';
-      if (target === ownerId) return '不能与自己拼点';
-      const targetPlayer = st.players[target];
-      if (!targetPlayer?.alive) return '目标不存在或已死亡';
-      if (targetPlayer.hand.length === 0) return '目标没有手牌,无法拼点';
-      return null;
+  // ─── use action:owner 主动发动界陷阵拼点(拼点 use-action 骨架工厂) ──
+  registerRankUseAction(state, skill.id, ownerId, {
+    displayName: DISPLAY_NAME,
+    // 赢:turn.vars['陷阵/winTarget']=target,驱动 无距离/无视防具/多指定(各 provider/hook)
+    onWin: async (st, from, target) => {
+      await setTurnVarUsage(st, from, WIN_VAR, target);
+      // 「对其使用牌无次数限制」须投影到 view:前端 viewCanSlash/无头枚举读
+      // view.turnUsage['杀/unlimited/*'],缺失则拼点赢后第 2 张杀在客户端不可用。
+      await projectTurnUsage(st, from, slashUnlimitedKey('界陷阵'), true);
     },
-    async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const from = ownerId;
-      const initiatorCardId = params.cardId as string;
-      const target = params.target as number;
-
-      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
-      await markOncePerTurn(st, from, SKILL_ID);
-
-      await pushFrame(st, SKILL_ID, from, { ...params });
-
-      // 1)+2) 询问 target 出拼点牌并比点(扣置→亮出→后→弃牌堆;target 未出牌走弃权兜底),
-      //    封装于 flows/rank.ts。
-      const win = await askRankCardAndCompare(st, from, target, initiatorCardId, {
-        requestType: PD_RT,
-        answerKey: TARGET_CARD_KEY,
-        title: `陷阵:与 ${st.players[from].name} 拼点,请出一张手牌`,
-        timeout: 30,
-      });
-
-      // 3) 结算输赢:发起方点数严格大于目标 = 赢;否则(输或平)没赢
-      if (win) {
-        await setTurnVarUsage(st, from, WIN_VAR, target);
-        // 「对其使用牌无次数限制」须投影到 view:前端 viewCanSlash/无头枚举读
-        // view.turnUsage['杀/unlimited/*'],缺失则拼点赢后第 2 张杀在客户端不可用。
-        await projectTurnUsage(st, from, slashUnlimitedKey('界陷阵'), true);
-      } else {
-        await setTurnVarUsage(st, from, LOST_VAR, target);
-      }
-
-      await popFrame(st);
+    // 没赢:本回合不能对 target 使用杀(turn.vars['陷阵/lostTarget']=target)
+    onLose: async (st, from, target) => {
+      await setTurnVarUsage(st, from, LOST_VAR, target);
     },
-  );
+    respondMismatchError: '当前不是陷阵回应',
+  });
 
   // ─── respond action:为所有玩家注册(目标需 respond 选拼点牌) ────────
-  // 封装于 flows/rank.registerRankCardRespond(validate 严格校验 pending requestType)。
-  registerRankCardRespond(state, skill.id, {
-    requestType: PD_RT,
-    answerKey: TARGET_CARD_KEY,
-    mismatchError: '当前不是陷阵回应',
-  });
+  // 封装于工厂内 registerRankCardRespond(validate 严格校验 pending requestType)。
 
   // ─── 指定目标 after hook:win 效果——临时卸载 winTarget 的防具技能实例 ──
   //   仅当 source=owner 且 target=winTarget 时触发(其他 source/target 不影响)。
@@ -293,25 +246,19 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineRankUseAction(api, {
     label: DISPLAY_NAME,
     style: 'danger',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '选择一张手牌与一名其他角色拼点(陷阵)',
-      // filter:()=>true(拼点牌=任意手牌):缺失则 extractCardFilter 返回 null →
-      // findUseActionForCard 恒不匹配,AI/无头客户端枚举不出陷阵动作
-      cardFilter: { filter: () => true, min: 1, max: 1 },
-      targetFilter: {
-        min: 1,
-        max: 1,
-        filter: (view, t) => {
-          const target = view.players[t];
-          if (!target?.alive) return false;
-          if (target.index === view.currentPlayerIndex) return false;
-          // 目标需有手牌(拼点要求)
-          return (target.handCount ?? 0) > 0;
-        },
+    title: '选择一张手牌与一名其他角色拼点(陷阵)',
+    targetFilter: {
+      min: 1,
+      max: 1,
+      filter: (view, t) => {
+        const target = view.players[t];
+        if (!target?.alive) return false;
+        if (target.index === view.currentPlayerIndex) return false;
+        // 目标需有手牌(拼点要求)
+        return (target.handCount ?? 0) > 0;
       },
     },
     activeWhen: (ctx) => {

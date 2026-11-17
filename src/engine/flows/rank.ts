@@ -19,9 +19,19 @@
 // 死亡中拼点:
 //   扣置与亮出之间不插入任何询问,无死亡窗口。若一方在选牌阶段死亡,调用方应自行检查存活
 //   (编排函数前置保证双方手牌中持有拼点牌)。
-import type { Card, GameState, Json } from '../types';
+import type {
+  ActionActiveWhen,
+  Card,
+  FrontendAPI,
+  GameState,
+  Json,
+  TargetFilter,
+} from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction } from '../core/skill';
+import { popFrame, pushFrame } from '../core/frame';
+import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
+import { engineCanPlayNowReason } from '../util/skillRuntime';
 
 /** 拼点/点数牌通用点数:A=1, 2-10=面值, J=11, Q=12, K=13。
  *  各拼点技(天义/驱虎/烈刃/制霸 等)与点数技(界烈弓/界称象/酣战)共用。
@@ -246,5 +256,162 @@ export function registerRankCardRespond(
         st.localVars[opts.answerKey] = params.cardId;
       },
     );
+  }
+}
+
+// ─── 拼点 use-action 骨架工厂(驱虎/天义/界巧说/界陷阵 共用) ───
+//
+// 四技能原先在 use action 里逐字复制同一套骨架:
+//   validate 七连检(出牌时机 → 限一次 → cardId 是字符串 → 在手牌 → target 是数值 →
+//   非自己 → 目标存活且有手牌)+ execute 仪式(markOncePerTurn → pushFrame →
+//   askRankCardAndCompare → 赢/没赢结算 → popFrame),差异只在输赢结算与文案。
+// onMount 侧的 defineAction('use'/'respond') 声明同为逐字复制,收敛于 defineRankUseAction。
+//
+// 关键契约:requestType/answerKey 由 skillId 派生(`${skillId}/拼点`、`${skillId}/targetCard`)。
+// requestType 前缀必须等于技能 id——前端 resolvePendingRespond 按前缀解析 skillId,
+// 写错 = 按钮不可点;派生而非注入从根上杜绝四技能各自手写时的漂移。
+
+/** registerRankUseAction 可选项。 */
+export interface RankUseActionOptions {
+  /** 玩家可见技能名(限一次错误文案与拼点询问 title 前缀;界版与注册 id 不同:'巧说'/'陷阵')。 */
+  displayName: string;
+  /** 本回合已用过时的 validate 错误文案(默认 `本回合已使用过${displayName}`)。 */
+  usedError?: string;
+  /** cardId 缺失时的 validate 错误文案(默认 '需要选择一张拼点牌';驱虎现状无"一张",逐字注入)。 */
+  needCardError?: string;
+  /** 拼点询问超时秒数(默认 30;四技能现状一致)。 */
+  timeout?: number;
+  /** 拼点赢的结算(拼点仪式完成后、popFrame 前执行;可提前 return 跳过结算)。 */
+  onWin: (state: GameState, from: number, target: number) => Promise<void>;
+  /** 拼点没赢(输或平)的结算(拼点仪式完成后、popFrame 前执行)。 */
+  onLose: (state: GameState, from: number, target: number) => Promise<void>;
+  /** 提供时一并注册「出拼点牌」respond(registerRankCardRespond,requestType/answerKey 由
+   *  skillId 派生)。同一 respond 内分流多种 requestType 的技能(驱虎:拼点+选目标)
+   *  不传,自管 respond。 */
+  respondMismatchError?: string;
+}
+
+/** 注册拼点技 use action 骨架:七连检 validate + 限一次标记 + 帧 + 完整拼点仪式
+ *  (询问→比点/弃权兜底)+ 赢/没赢结算 + popFrame;可选同时注册「出拼点牌」respond。
+ *  actions/responds 随 state-bound 注册表自动清理,无需返回 unloader。 */
+export function registerRankUseAction(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  opts: RankUseActionOptions,
+): void {
+  const SKILL_ID = skillId; // 键模板大写别名约定(turnUsage-projection-meta 静态契约)
+  registerAction(
+    state,
+    skillId,
+    ownerId,
+    'use',
+    (st: GameState, params: Record<string, Json>): string | null => {
+      const playError = engineCanPlayNowReason(st, ownerId);
+      if (playError) return playError;
+      if (usedThisTurn(st, ownerId, SKILL_ID)) {
+        return opts.usedError ?? `本回合已使用过${opts.displayName}`;
+      }
+      const self = st.players[ownerId];
+      const cardId = params.cardId as string;
+      if (typeof cardId !== 'string') return opts.needCardError ?? '需要选择一张拼点牌';
+      if (!self.hand.includes(cardId)) return '拼点牌不在手牌中';
+      const target = params.target as number;
+      if (typeof target !== 'number') return '需要选择拼点目标';
+      if (target === ownerId) return '不能与自己拼点';
+      const targetPlayer = st.players[target];
+      if (!targetPlayer?.alive) return '目标不存在或已死亡';
+      if (targetPlayer.hand.length === 0) return '目标没有手牌,无法拼点';
+      return null;
+    },
+    async (st: GameState, params: Record<string, Json>): Promise<void> => {
+      const from = ownerId;
+      const initiatorCardId = params.cardId as string;
+      const target = params.target as number;
+
+      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
+      await markOncePerTurn(st, from, SKILL_ID);
+
+      await pushFrame(st, SKILL_ID, from, { ...params });
+
+      // 1)+2) 询问目标出拼点牌并比点(扣置→亮出→后→弃牌堆;目标未出牌走弃权兜底),
+      //    封装于本文件 askRankCardAndCompare。
+      const win = await askRankCardAndCompare(st, from, target, initiatorCardId, {
+        requestType: `${SKILL_ID}/拼点`,
+        answerKey: `${SKILL_ID}/targetCard`,
+        title: `${opts.displayName}:与 ${st.players[from].name} 拼点,请出一张手牌`,
+        timeout: opts.timeout ?? 30,
+      });
+
+      // 3) 结算输赢:发起方点数严格大于目标 = 赢;否则(输或平)没赢
+      if (win) await opts.onWin(st, from, target);
+      else await opts.onLose(st, from, target);
+
+      await popFrame(st);
+    },
+  );
+  if (opts.respondMismatchError !== undefined) {
+    registerRankCardRespond(state, skillId, {
+      requestType: `${SKILL_ID}/拼点`,
+      answerKey: `${SKILL_ID}/targetCard`,
+      mismatchError: opts.respondMismatchError,
+    });
+  }
+}
+
+/** defineRankUseAction 可选项。 */
+export interface DefineRankUseActionOptions {
+  /** 玩家可见技能名(label)。 */
+  label: string;
+  /** use 动作样式(驱虎/界陷阵 'danger',天义/界巧说 'primary')。 */
+  style: 'danger' | 'primary';
+  /** use prompt 标题(逐字注入;界陷阵文案格式不同)。 */
+  title: string;
+  /** use 动作激活谓词(各技能判定不同,逐字注入)。 */
+  activeWhen: ActionActiveWhen;
+  /** respond 声明的 prompt 标题(逐字注入);缺省不声明 respond(界陷阵现状无)。 */
+  respondTitle?: string;
+  /** 目标过滤(默认:非自己 + 存活 + 有手牌;界陷阵原实现写法不同,逐字注入覆盖)。 */
+  targetFilter?: TargetFilter;
+}
+
+/** 拼点技 onMount 侧声明骨架:defineAction('use')(选一张拼点牌 + 一名目标的
+ *  useCardAndTarget prompt)+ 可选 defineAction('respond')(出拼点牌 useCard prompt,
+ *  style 固定 'primary'——三处现状一致)。前端通过 pending prompt 渲染 respond,
+ *  声明让前端识别为对应技能的回应。 */
+export function defineRankUseAction(api: FrontendAPI, opts: DefineRankUseActionOptions): void {
+  api.defineAction('use', {
+    label: opts.label,
+    style: opts.style,
+    prompt: {
+      type: 'useCardAndTarget',
+      title: opts.title,
+      // filter:()=>true(拼点牌=任意手牌):缺失则 AI/无头客户端枚举不出该动作
+      cardFilter: { filter: () => true, min: 1, max: 1 },
+      targetFilter:
+        opts.targetFilter ?? {
+          min: 1,
+          max: 1,
+          filter: (view, t) => {
+            const me = view.currentPlayerIndex;
+            if (t === me) return false;
+            const tp = view.players[t];
+            if (!tp) return false;
+            return tp.alive !== false && (tp.handCount ?? 0) > 0;
+          },
+        },
+    },
+    activeWhen: opts.activeWhen,
+  });
+  if (opts.respondTitle !== undefined) {
+    api.defineAction('respond', {
+      label: opts.label,
+      style: 'primary',
+      prompt: {
+        type: 'useCard',
+        title: opts.respondTitle,
+        cardFilter: { filter: () => true, min: 1, max: 1 },
+      },
+    });
   }
 }

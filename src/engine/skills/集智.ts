@@ -15,8 +15,8 @@
 // (标准版 10 + 军争篇 火攻/铁索连环)
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { registerAfterHook } from '../core/skill';
+import { registerConfirmRespond, askConfirm } from '../util/skillRuntime';
 import { NON_DELAY_TRICK_NAMES } from '../util/non-delay-tricks';
 
 const CONFIRM_REQUEST = '集智/confirm';
@@ -34,21 +34,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── confirm respond:黄月英本人回应是否摸牌 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState) => {
-      return requireRequestType(st, ownerId, [CONFIRM_REQUEST], {
-        wrongTypeError: '当前不是集智确认窗口',
-        mismatchError: '当前不是集智确认窗口',
-      }).error;
-    },
-    async (st: GameState, params) => {
-      st.localVars['集智/confirmed'] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_REQUEST, '集智/confirmed', {
+    mismatchError: '当前不是集智确认窗口',
+    wrongTypeError: '当前不是集智确认窗口',
+  });
 
   // ── 移动牌 after hook:打出非延时锦囊时询问摸牌 ──
   registerAfterHook(state, skill.id, ownerId, '移动牌', async (ctx) => {

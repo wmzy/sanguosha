@@ -10,15 +10,16 @@
 //     目标(其他玩家)无法 dispatch。因此本技能在 onInit 时为所有玩家注册 respond action,
 //     validate 严格检查 pending requestType,非驱虎 pending 时拒绝(无副作用)。
 //   - 每回合限一次:用 player.vars['驱虎/usedThisTurn'] + 回合用量 atom 同步 view。
+//   - use action 骨架(七连检 validate + 拼点仪式 + 输赢分支)由 flows/rank 的
+//     registerRankUseAction/defineRankUseAction 提供,本文件只注入赢/没赢的伤害结算差异。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
-import { popFrame, pushFrame } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
-import { askRankCardAndCompare } from '../flows/rank';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
+import { registerRankUseAction, defineRankUseAction } from '../flows/rank';
+import { activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
-import { requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
+import { requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -32,94 +33,52 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // ─── use action:荀彧主动发动驱虎 ──────────────────────────
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'use',
-    (state: GameState, params: Record<string, Json>) => {
-      const playError = engineCanPlayNowReason(state, ownerId);
-      if (playError) return playError;
-      if (usedThisTurn(state, ownerId, '驱虎')) return '本回合已使用过驱虎';
-      const self = state.players[ownerId];
-      const cardId = params.cardId as string;
-      if (typeof cardId !== 'string') return '需要选择拼点牌';
-      if (!self.hand.includes(cardId)) return '拼点牌不在手牌中';
-      const target = params.target as number;
-      if (typeof target !== 'number') return '需要选择拼点目标';
-      if (target === ownerId) return '不能与自己拼点';
-      const targetPlayer = state.players[target];
-      if (!targetPlayer?.alive) return '目标不存在或已死亡';
-      if (targetPlayer.hand.length === 0) return '目标没有手牌,无法拼点';
-      return null;
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
-      const initiatorCardId = params.cardId as string;
-      const target = params.target as number;
+  // ─── use action:荀彧主动发动驱虎(拼点 use-action 骨架工厂) ──
+  registerRankUseAction(state, skill.id, ownerId, {
+    displayName: '驱虎',
+    needCardError: '需要选择拼点牌',
+    // 赢:目标对其攻击范围内另一名角色造成 1 点伤害(荀彧选目标)
+    onWin: async (st, from, target) => {
+      // 检查目标的攻击范围内是否有可选角色
+      const candidates = st.players
+        .filter(
+          (p) => p.alive && p.index !== target && inAttackRange(st, target, p.index),
+        )
+        .map((p) => p.index);
 
-      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
-      await markOncePerTurn(state, from, '驱虎');
+      if (candidates.length === 0) {
+        // 目标攻击范围内无其他角色,无法造成伤害,驱虎结算结束
+        return;
+      }
 
-      await pushFrame(state, '驱虎', from, { ...params });
-
-      // 1)+2) 询问目标出拼点牌并比点(扣置→亮出→后→弃牌堆;目标未出牌走弃权兜底
-      //    ——清理发起方拼点牌、按发起方默认胜出,与正常拼点赢的结算一致),
-      //    封装于 flows/rank.ts。
-      const win = await askRankCardAndCompare(state, from, target, initiatorCardId, {
-        requestType: '驱虎/拼点',
-        answerKey: '驱虎/targetCard',
-        title: `驱虎:与 ${state.players[from].name} 拼点,请出一张手牌`,
+      delete st.localVars['驱虎/victim'];
+      await applyAtom(st, {
+        type: '请求回应',
+        requestType: '驱虎/选目标',
+        target: from,
+        prompt: {
+          type: 'choosePlayer',
+          title: `驱虎:选择 ${st.players[target].name} 攻击范围内的一名角色,其将受到1点伤害`,
+          min: 1,
+          max: 1,
+          filter: (view, t) => t !== from && view.players[t]?.alive === true, // 后端 validate 已校验攻击范围;前端排除自己与死亡角色
+        },
         timeout: 30,
       });
 
-      // 3) 结算输赢
-      if (win) {
-        // 荀彧赢:目标对其攻击范围内另一名角色造成 1 点伤害(荀彧选目标)
-        // 检查目标的攻击范围内是否有可选角色
-        const candidates = state.players
-          .filter(
-            (p) => p.alive && p.index !== target && inAttackRange(state, target, p.index),
-          )
-          .map((p) => p.index);
-
-        if (candidates.length === 0) {
-          // 目标攻击范围内无其他角色,无法造成伤害,驱虎结算结束
-          await popFrame(state);
-          return;
+      const victim = st.localVars['驱虎/victim'] as number | undefined;
+      delete st.localVars['驱虎/victim'];
+      if (typeof victim === 'number' && st.players[victim]?.alive && victim !== target) {
+        if (inAttackRange(st, target, victim)) {
+          await runDamageFlow(st, target, victim, 1);
         }
-
-        delete state.localVars['驱虎/victim'];
-        await applyAtom(state, {
-          type: '请求回应',
-          requestType: '驱虎/选目标',
-          target: from,
-          prompt: {
-            type: 'choosePlayer',
-            title: `驱虎:选择 ${state.players[target].name} 攻击范围内的一名角色,其将受到1点伤害`,
-            min: 1,
-            max: 1,
-            filter: (view, t) => t !== from && view.players[t]?.alive === true, // 后端 validate 已校验攻击范围;前端排除自己与死亡角色
-          },
-          timeout: 30,
-        });
-
-        const victim = state.localVars['驱虎/victim'] as number | undefined;
-        delete state.localVars['驱虎/victim'];
-        if (typeof victim === 'number' && state.players[victim]?.alive && victim !== target) {
-          if (inAttackRange(state, target, victim)) {
-            await runDamageFlow(state, target, victim, 1);
-          }
-        }
-      } else {
-        // 荀彧没赢(输或平):目标对荀彧造成 1 点伤害
-        await runDamageFlow(state, target, from, 1);
       }
-
-      await popFrame(state);
     },
-  );
+    // 没赢(输或平):目标对荀彧造成 1 点伤害
+    onLose: async (st, from, target) => {
+      await runDamageFlow(st, target, from, 1);
+    },
+  });
 
   // ─── respond action:为所有玩家注册 ────────────────────────
   // 目标(其他玩家)需要 respond 选拼点牌;荀彧赢后荀彧自己也要 respond 选伤害目标。
@@ -172,39 +131,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineRankUseAction(api, {
     label: '驱虎',
     style: 'danger',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '驱虎:选择一张拼点牌和一名目标',
-      cardFilter: { filter: () => true, min: 1, max: 1 },
-      targetFilter: {
-        min: 1,
-        max: 1,
-        filter: (view, t) => {
-          const me = view.currentPlayerIndex;
-          if (t === me) return false;
-          const tp = view.players[t];
-          if (!tp) return false;
-          return tp.alive !== false && (tp.handCount ?? 0) > 0;
-        },
-      },
-    },
+    title: '驱虎:选择一张拼点牌和一名目标',
     activeWhen: (ctx) =>
       activeUnlessUsedThisTurn('驱虎')(ctx) &&
       (ctx.view.players[ctx.perspectiveIdx]?.hand?.length ?? 0) > 0,
-  });
-
-  // respond(拼点牌选择 / 伤害目标选择):前端通过 pending prompt 渲染,
-  // 此处声明让前端识别为驱虎回应。
-  api.defineAction('respond', {
-    label: '驱虎',
-    style: 'primary',
-    prompt: {
-      type: 'useCard',
-      title: '驱虎:请出一张拼点牌',
-      cardFilter: { filter: () => true, min: 1, max: 1 },
-    },
+    // respond(拼点牌选择 / 伤害目标选择):前端通过 pending prompt 渲染,
+    // 声明让前端识别为驱虎回应。
+    respondTitle: '驱虎:请出一张拼点牌',
   });
 }

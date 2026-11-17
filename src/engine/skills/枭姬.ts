@@ -17,9 +17,9 @@
 //      同理用 before hook 快照(after 时已无法判断来自手牌还是装备)。
 import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerBeforeHook, registerAfterHook } from '../core/skill';
+import { registerBeforeHook, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -60,21 +60,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // respond:玩家回应"是否发动枭姬"询问,设 localVars 标记结果
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (state, _params) => {
-      return requireRequestType(state, ownerId, ['枭姬/confirm'], {
-        wrongTypeError: '当前不是枭姬窗口',
-        mismatchError: '当前不是枭姬窗口',
-      }).error;
-    },
-    async (state, params) => {
-      state.localVars['枭姬/confirmed'] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, '枭姬/confirm', '枭姬/confirmed', {
+    mismatchError: '当前不是枭姬窗口',
+    wrongTypeError: '当前不是枭姬窗口',
+  });
 
   // ── 路径 1:卸下(替换装备) ──
   registerAfterHook(state, skill.id, ownerId, '卸下', async (ctx) => {

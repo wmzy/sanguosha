@@ -14,11 +14,11 @@
 // 本文件同时导出 createBenghuaiSkill 工厂(崩坏族共享实现),界崩坏 复用之,
 // 仅注入 描述/询问 requestType/禁用检查 差异参数(选择键共享 '崩坏/choice'——
 // 标/界董卓只会拥有一版崩坏)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { registerAfterHook } from '../core/skill';
+import { defineConfirmAction, registerChoiceRespond } from '../util/skillRuntime';
 
 const CHOICE_KEY = '崩坏/choice'; // 'maxHealth' | 'health'
 
@@ -49,18 +49,17 @@ export function createBenghuaiSkill(opts: BenghuaiOptions) {
       const ownerId = skill.ownerId;
 
       // ── respond:董卓回应崩坏选择(确认=减体力上限,取消=减体力) ──
-      registerAction(
+      // choice=true → 减体力上限;choice=false(或超时)→ 减体力
+      registerChoiceRespond(
         state,
         skill.id,
         ownerId,
-        'respond',
-        (s: GameState, _params: Record<string, Json>): string | null =>
-          requireRequestType(s, ownerId, [opts.chooseRt], {
-            mismatchError: '当前不是崩坏选择',
-          }).error,
-        async (s: GameState, params: Record<string, Json>) => {
-          // choice=true → 减体力上限;choice=false(或超时)→ 减体力
-          s.localVars[CHOICE_KEY] = params.choice === true ? 'maxHealth' : 'health';
+        opts.chooseRt,
+        CHOICE_KEY,
+        'maxHealth',
+        'health',
+        {
+          mismatchError: '当前不是崩坏选择',
         },
       );
 

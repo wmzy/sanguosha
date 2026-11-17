@@ -16,6 +16,7 @@ import {
   upsertGithubUser,
   updateDisplayName,
   changePassword,
+  type PublicUser,
 } from './store';
 import { getGithubConfig, generateState, exchangeCodeForProfile, isGithubEnabled } from './github';
 import { extractSessionToken, SESSION_COOKIE } from './guard';
@@ -51,6 +52,20 @@ export function applyAuthRoutes(app: Hono): void {
     });
   };
 
+  /** 注册/登录共用尾奏:为已通过校验的 user 签发会话——createSession 失败回
+   *  503「服务暂不可用」;成功则写 HttpOnly Cookie 并返回同一响应形状
+   *  { user, token, expiresAt }(token 同时放响应体:程序化客户端 HGC/MCP
+   *  无 Cookie 存储,走 Bearer;泄露面与 Cookie 等价,不下发哈希等敏感字段)。 */
+  const issueSessionResponse = async (
+    c: Parameters<typeof setCookie>[0],
+    user: PublicUser,
+  ): Promise<Response> => {
+    const session = await createSession(user.id);
+    if (!session) return c.json({ error: '服务暂不可用' }, 503);
+    setSessionCookie(c, session.token, session.expiresAt);
+    return c.json({ user, token: session.token, expiresAt: session.expiresAt });
+  };
+
   // ── 注册 ──
   auth.post('/register', async (c) => {
     const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -58,12 +73,7 @@ export function applyAuthRoutes(app: Hono): void {
     const password = typeof raw.password === 'string' ? raw.password : '';
     const result = await createUser(username, password);
     if (!result.ok) return c.json({ error: result.error }, 400);
-    const session = await createSession(result.user.id);
-    if (!session) return c.json({ error: '服务暂不可用' }, 503);
-    setSessionCookie(c, session.token, session.expiresAt);
-    // token 同时放响应体:程序化客户端(HGC/MCP)无 Cookie 存储,走 Bearer。
-    // token 泄露面与 Cookie 等价,不下发哈希等敏感字段。
-    return c.json({ user: result.user, token: session.token, expiresAt: session.expiresAt });
+    return issueSessionResponse(c, result.user);
   });
 
   // ── 登录(用户名/密码) ──
@@ -73,10 +83,7 @@ export function applyAuthRoutes(app: Hono): void {
     const password = typeof raw.password === 'string' ? raw.password : '';
     const result = await verifyLogin(username, password);
     if (!result.ok) return c.json({ error: result.error }, 401);
-    const session = await createSession(result.user.id);
-    if (!session) return c.json({ error: '服务暂不可用' }, 503);
-    setSessionCookie(c, session.token, session.expiresAt);
-    return c.json({ user: result.user, token: session.token, expiresAt: session.expiresAt });
+    return issueSessionResponse(c, result.user);
   });
 
   // ── 当前用户 ──

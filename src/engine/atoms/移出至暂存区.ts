@@ -29,7 +29,7 @@
 //     谦逊 source===target(自己选自己的牌);破军 source≠target(徐盛选目标牌)。
 //   - varsKey: 暂存键名,由调用方技能自行定义(如 '界破军/移出'),归还方须用同一键。
 import type { AtomDefinition, Card, EquipSlot, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { clearEquipVars, removeCardsFromHand, removeFromEquipment, requirePlayer, viewPlayer } from './_helpers';
+import { clearEquipVars, clearEquipViewVars, decrementHandCount, removeCardsFromHand, removeFromEquipment, requirePlayer, viewPlayer } from './_helpers';
 
 export const 移出至暂存区: AtomDefinition<{
   source: number;
@@ -129,8 +129,7 @@ export const 移出至暂存区: AtomDefinition<{
     if (handIds && handIds.length > 0) {
       removeCardsFromHand(p, handIds);
     } else {
-      const n = (event.handCount as number) ?? 0;
-      if (n > 0) p.handCount = Math.max(0, p.handCount - n);
+      decrementHandCount(p, (event.handCount as number) ?? 0);
     }
     // 装备槽:清除
     const equipEntries = event.equipEntries as
@@ -140,12 +139,7 @@ export const 移出至暂存区: AtomDefinition<{
       for (const e of equipEntries) {
         delete p.equipment[e.slot];
         // 武器:同步清 distanceVars.attackRange(与 卸下 atom applyView 一致)
-        if (e.slot === '武器' && p.distanceVars) {
-          p.distanceVars = {
-            ...p.distanceVars,
-            attackRange: undefined,
-          };
-        }
+        clearEquipViewVars(p, e.slot);
       }
     }
   },

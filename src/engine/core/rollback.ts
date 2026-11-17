@@ -8,6 +8,7 @@
 // 不是同一张。故 dispatch 在跑 preceding 之前对全部可变字段做快照,任一 reject 路径
 // 按快照整体还原(内容 + 顺序)。
 import type { Card, GameState, PendingSlot, PlayerState } from '../types';
+import { DISTANCE_ATTACK_RANGE_KEY } from '../rules/vars-keys';
 
 /** 单字段的拷贝语义。快照与还原两个方向共用同一语义(快照拷一次、还原再拷一次,
  *  快照对象本体永不落入活状态,重复还原也安全)。 */
@@ -194,7 +195,7 @@ export function restoreState(state: GameState, snap: DispatchSnapshot): void {
       const weaponId = p.equipment['武器'];
       if (weaponId) {
         const weapon = state.cardMap[weaponId];
-        if (weapon?.range !== undefined) p.vars['距离/出杀范围'] = weapon.range;
+        if (weapon?.range !== undefined) p.vars[DISTANCE_ATTACK_RANGE_KEY] = weapon.range;
       }
     }
   }

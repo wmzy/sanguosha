@@ -17,20 +17,17 @@
 //
 // 限一次:player.vars['天义/usedThisTurn'](后缀约定,回合结束 atom 自动清空)。
 // 目标需 respond 选拼点牌——respond action 为所有玩家注册(validate 严格校验 pending requestType)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { popFrame, pushFrame } from '../core/frame';
-import { askRankCardAndCompare, registerRankCardRespond } from '../flows/rank';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction } from '../core/skill';
+// use action 骨架(七连检 validate + 拼点仪式 + 输赢分支)由 flows/rank 的
+// registerRankUseAction/defineRankUseAction 提供,本文件只注入赢/没赢的 turn.vars 结算差异。
+import type { FrontendAPI, GameState, Skill } from '../types';
+import { registerRankUseAction, defineRankUseAction } from '../flows/rank';
+import { activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerSlashExtraProvider, registerSlashBlocker } from '../rules/slash-quota';
 import { registerSlashTargetProvider } from '../rules/slash-target';
 import { registerAttackRangeExemptor } from '../rules/distance';
 import { slashExtraKey, slashTargetKey, slashBlockedKey, TIANYI_WIN_VIEW_KEY } from '../rules/vars-keys';
 import { setTurnVarUsage, projectTurnUsage } from '../rules/turn-usage';
-import { engineCanPlayNowReason } from '../util/skillRuntime';
 
-const TARGET_CARD_KEY = '天义/targetCard';
-const PD_RT = '天义/拼点';
 const WIN_VAR = TIANYI_WIN_VIEW_KEY;
 const LOST_VAR = '天义/lost';
 
@@ -76,75 +73,30 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     (st, player) => (st.turn.vars[WIN_VAR] === player ? 2 : 0),
   );
 
-  // ─── use action:太史慈主动发动天义 ────────────────────────
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'use',
-    (st: GameState, params: Record<string, Json>): string | null => {
-      const playError = engineCanPlayNowReason(st, ownerId);
-      if (playError) return playError;
-      if (usedThisTurn(st, ownerId, '天义')) return '本回合已使用过天义';
-      const self = st.players[ownerId];
-      const cardId = params.cardId as string;
-      if (typeof cardId !== 'string') return '需要选择一张拼点牌';
-      if (!self.hand.includes(cardId)) return '拼点牌不在手牌中';
-      const target = params.target as number;
-      if (typeof target !== 'number') return '需要选择拼点目标';
-      if (target === ownerId) return '不能与自己拼点';
-      const targetPlayer = st.players[target];
-      if (!targetPlayer?.alive) return '目标不存在或已死亡';
-      if (targetPlayer.hand.length === 0) return '目标没有手牌,无法拼点';
-      return null;
+  // ─── use action:太史慈主动发动天义(拼点 use-action 骨架工厂) ──
+  registerRankUseAction(state, skill.id, ownerId, {
+    displayName: '天义',
+    // 赢:三项效果(攻击范围无限 / +1 杀 / 额外目标)统一由 turn.vars['天义/win'] 驱动
+    // (state 真相 + view 投影同 key 同值一步提交;「攻击范围无限」投影到 view 后,
+    //  前端 viewCanAttack/无头枚举据此放开距离,否则超出徒手范围的目标选不中)
+    onWin: async (st, from) => {
+      await setTurnVarUsage(st, from, WIN_VAR, from);
+      // 投影到 view.turnUsage,供前端 viewSlashMax/viewSlashTargetMax 推断(通用前缀 key)
+      await projectTurnUsage(st, from, slashExtraKey('天义'), 1);
+      await projectTurnUsage(st, from, slashTargetKey('天义'), 1);
     },
-    async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const from = ownerId;
-      const initiatorCardId = params.cardId as string;
-      const target = params.target as number;
-
-      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
-      await markOncePerTurn(st, from, '天义');
-
-      await pushFrame(st, '天义', from, { ...params });
-
-      // 1)+2) 询问目标出拼点牌并比点(扣置→亮出→后→弃牌堆;目标未出牌走弃权兜底),
-      //    封装于 flows/rank.ts。
-      const win = await askRankCardAndCompare(st, from, target, initiatorCardId, {
-        requestType: PD_RT,
-        answerKey: TARGET_CARD_KEY,
-        title: `天义:与 ${st.players[from].name} 拼点,请出一张手牌`,
-        timeout: 30,
-      });
-
-      // 3) 结算输赢:发起方点数严格大于目标 = 赢;否则(输或平)没赢
-      if (win) {
-        // 赢:三项效果(攻击范围无限 / +1 杀 / 额外目标)统一由 turn.vars['天义/win'] 驱动
-        // (state 真相 + view 投影同 key 同值一步提交;「攻击范围无限」投影到 view 后,
-        //  前端 viewCanAttack/无头枚举据此放开距离,否则超出徒手范围的目标选不中)
-        await setTurnVarUsage(st, from, WIN_VAR, from);
-        // 投影到 view.turnUsage,供前端 viewSlashMax/viewSlashTargetMax 推断(通用前缀 key)
-        await projectTurnUsage(st, from, slashExtraKey('天义'), 1);
-        await projectTurnUsage(st, from, slashTargetKey('天义'), 1);
-      } else {
-        // 没赢:本回合不能使用杀(由 slashBlocker 落实;state 存座次、view 投影 true,不同值须分开写)
-        st.turn.vars[LOST_VAR] = from;
-        await projectTurnUsage(st, from, slashBlockedKey('天义'), true);
-      }
-
-      await popFrame(st);
+    // 没赢:本回合不能使用杀(由 slashBlocker 落实;state 存座次、view 投影 true,不同值须分开写)
+    onLose: async (st, from) => {
+      st.turn.vars[LOST_VAR] = from;
+      await projectTurnUsage(st, from, slashBlockedKey('天义'), true);
     },
-  );
+    respondMismatchError: '当前不是天义回应',
+  });
 
   // ─── respond action:为所有玩家注册 ────────────────────────
   // 目标(其他玩家)需要 respond 选拼点牌。默认 respond 只注册在 owner(太史慈)上,
-  // 目标无法 dispatch,故为每个玩家注册(封装于 flows/rank.registerRankCardRespond,
+  // 目标无法 dispatch,故为每个玩家注册(封装于工厂内 registerRankCardRespond,
   // validate 严格检查 pending requestType,非天义 pending 一律拒绝)。
-  registerRankCardRespond(state, skill.id, {
-    requestType: PD_RT,
-    answerKey: TARGET_CARD_KEY,
-    mismatchError: '当前不是天义回应',
-  });
 
   // actions/hooks 随 state-bound 注册表自动清理;provider/blocker 是模块级集合,需显式卸载。
   return () => {
@@ -156,39 +108,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineRankUseAction(api, {
     label: '天义',
     style: 'primary',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '天义:选择一张拼点牌和一名目标',
-      cardFilter: { filter: () => true, min: 1, max: 1 },
-      targetFilter: {
-        min: 1,
-        max: 1,
-        filter: (view, t) => {
-          const me = view.currentPlayerIndex;
-          if (t === me) return false;
-          const tp = view.players[t];
-          if (!tp) return false;
-          return tp.alive !== false && (tp.handCount ?? 0) > 0;
-        },
-      },
-    },
+    title: '天义:选择一张拼点牌和一名目标',
     activeWhen: (ctx) =>
       activeUnlessUsedThisTurn('天义')(ctx) &&
       (ctx.view.players[ctx.perspectiveIdx]?.hand?.length ?? 0) > 0,
-  });
-
-  // respond(拼点牌选择):前端通过 pending prompt 渲染,此处声明让前端识别为天义回应。
-  api.defineAction('respond', {
-    label: '天义',
-    style: 'primary',
-    prompt: {
-      type: 'useCard',
-      title: '天义:请出一张拼点牌',
-      cardFilter: { filter: () => true, min: 1, max: 1 },
-    },
+    // respond(拼点牌选择):前端通过 pending prompt 渲染,声明让前端识别为天义回应。
+    respondTitle: '天义:请出一张拼点牌',
   });
 }
 

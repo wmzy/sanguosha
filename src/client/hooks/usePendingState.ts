@@ -43,6 +43,10 @@ export interface PendingState {
   pendingRespondInfo: PendingRespondInfo | null;
   /** 广播去重 key(memo 化);pending 为 null 时为空串。 */
   broadcastKey: string;
+  /** 广播型 pending(target<0)且本视角已本地跳过(无懈可击等点「不回应」后避免
+   *  重复弹窗):GameView(倒计时/按钮门控)与 AwaitingPrompt(已跳过提示)共用
+   *  同一派生,不再各自判 pendingTargetIdx<0 && skippedBroadcast.has(key)。 */
+  broadcastSkipped: boolean;
 }
 
 interface AtomLike {
@@ -115,6 +119,8 @@ export function usePendingState(
     [pending, skillActions],
   );
   const broadcastKey = useMemo(() => (pending ? getBroadcastKey(pending) : ''), [pending]);
+  // 广播型 pending 已本地跳过(原 GameView/AwaitingPrompt 两处同判据各算一份,收敛至此)
+  const broadcastSkipped = pendingTargetIdx < 0 && skippedBroadcast.has(broadcastKey);
 
   return {
     pending,
@@ -129,5 +135,6 @@ export function usePendingState(
     deadlineTotalMs,
     pendingRespondInfo,
     broadcastKey,
+    broadcastSkipped,
   };
 }

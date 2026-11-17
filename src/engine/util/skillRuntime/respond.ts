@@ -3,6 +3,7 @@
 // 收敛 skills/ 下逐字复制的样板:
 //   requireRequestType:respond validate 的「读 pending slot → 断言 请求回应 → 比对 requestType」三连;
 //   registerConfirmRespond:confirm 型 respond 三件套;
+//   registerChoiceRespond:confirm 二选一 → 枚举值 respond 三件套(勤学/志继/崩坏 模式);
 //   askConfirm / askResponse:询问三段(delete 键残值 → applyAtom(请求回应) → 读键);
 //   currentRequestType:读座次当前 pending 的 requestType;
 //   hasNullifyWindow:无懈可击广播窗口扫描(看破/界看破/解围 转化 validate 共用);
@@ -64,6 +65,10 @@ export function requireRequestType(
 export interface ConfirmRespondOptions {
   /** requestType 不匹配时的错误文案(默认 `当前不是${skillId}确认`) */
   mismatchError?: string;
+  /** pending slot 缺失时的错误文案(默认 '当前不需要回应') */
+  noSlotError?: string;
+  /** slot 的 atom 类型不是 请求回应 时的错误文案(默认同 noSlotError) */
+  wrongTypeError?: string;
 }
 
 /**
@@ -91,9 +96,56 @@ export function registerConfirmRespond(
     (st, _params) =>
       requireRequestType(st, ownerId, [requestType], {
         mismatchError: opts.mismatchError ?? `当前不是${skillId}确认`,
+        ...(opts.noSlotError !== undefined ? { noSlotError: opts.noSlotError } : {}),
+        ...(opts.wrongTypeError !== undefined ? { wrongTypeError: opts.wrongTypeError } : {}),
       }).error,
     async (st, params) => {
       st.localVars[confirmedKey] = params.choice === true || params.confirmed === true;
+    },
+  );
+}
+
+/** registerChoiceRespond 可选项。 */
+export interface ChoiceRespondOptions {
+  /** requestType 不匹配时的错误文案(默认 `当前不是${skillId}选择`) */
+  mismatchError?: string;
+}
+
+/**
+ * 注册「confirm 二选一 → 枚举值」respond action(与 registerConfirmRespond 同构,
+ * 差异仅 execute 写入的不是 boolean,而是 confirmed ? trueValue : falseValue):
+ *   validate = requireRequestType(单 requestType);
+ *   execute  = localVars[choiceKey] = (choice===true||confirmed===true) ? trueValue : falseValue
+ * (choice/confirmed 是客户端两种键名形态,一并接受,同 registerConfirmRespond)。
+ * 收敛 confirm 询问的「确认/取消映射到两个枚举值」样板:
+ *   勤学/志继 `choice===true ? 'draw' : 'heal'`、崩坏 `? 'maxHealth' : 'health'`、
+ *   刚烈 `? 'discard' : 'damage'`。
+ * 仅适用于「该 respond 只处理一个 confirm 二选一」的形态;confirm 之外还分支
+ * 选牌/选人的 respond(刚烈 双 requestType 分流)不适用,仍由技能手写。
+ * 返回 unloader(registerAction 原样透传)。
+ */
+export function registerChoiceRespond(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  requestType: string,
+  choiceKey: string,
+  trueValue: Json,
+  falseValue: Json,
+  opts: ChoiceRespondOptions = {},
+): () => void {
+  return registerAction(
+    state,
+    skillId,
+    ownerId,
+    'respond',
+    (st, _params) =>
+      requireRequestType(st, ownerId, [requestType], {
+        mismatchError: opts.mismatchError ?? `当前不是${skillId}选择`,
+      }).error,
+    async (st, params) => {
+      st.localVars[choiceKey] =
+        params.choice === true || params.confirmed === true ? trueValue : falseValue;
     },
   );
 }

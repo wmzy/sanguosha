@@ -25,6 +25,8 @@ import {
   identityStampClass,
 } from '../utils/characterVisuals';
 import { HpFloatNumber } from '../utils/HpFloatNumber';
+import { isPlayerChained, isPlayerDead } from '../utils/characterDerived';
+import { BadgeGroup, HandCountChip, JudgeTagRow } from './characterAnatomy';
 
 export interface PlayerSeatProps {
   player: GameView['players'][number];
@@ -109,20 +111,19 @@ function SeatNamePlate({
       )}
       <span className={styles.seatIndexBadge}>#{index + 1}</span>
       <span className={styles.seatName}>{player.name.slice(0, 6)}</span>
-      <div className={styles.seatBadgeGroup}>
-        {isPerspective && <span className={styles.youBadge}>我</span>}
-        {isCurrentPlayer && <span className={styles.turnBadge}>回合</span>}
-        {isChained && (
-          <span className={styles.chainBadge} title="横置·铁索连环">
-            ⛓
-          </span>
-        )}
-        {isDisconnected && (
-          <span className={styles.offlineBadge} title="该玩家已断线,等待重连">
-            离线
-          </span>
-        )}
-      </div>
+      <BadgeGroup
+        classes={{
+          group: styles.seatBadgeGroup,
+          you: styles.youBadge,
+          turn: styles.turnBadge,
+          chain: styles.chainBadge,
+          offline: styles.offlineBadge,
+        }}
+        isYou={isPerspective}
+        isTurn={isCurrentPlayer}
+        isChained={isChained}
+        isOffline={isDisconnected}
+      />
     </div>
   );
 }
@@ -215,10 +216,8 @@ function SeatCardBody({
             {player.health}
           </span>
         </div>
-        {/* 手牌数角标:卡内右下角小暗章(title 保留完整手牌信息) */}
-        <span className={styles.seatHandBadge} title={`手牌: ${player.handCount}`}>
-          🂠 {player.handCount}
-        </span>
+        {/* 手牌数角标:卡内右下角小暗章(title 保留完整手牌信息;共享实现见 characterAnatomy) */}
+        <HandCountChip className={styles.seatHandBadge} count={player.handCount} />
         {/* 选目标阶段距离角标:卡内左下角「距N」(仅 needsTarget 时上层传入) */}
         {needsTarget && seatDistance != null && (
           <span
@@ -288,32 +287,12 @@ function SeatLabelRows({ player, view }: { player: PlayerSeatProps['player']; vi
           })}
         </div>
       )}
-      {/* 判定区(延时锦囊):紫边 chip */}
-      {(() => {
-        const ids = player.pendingTricks ?? [];
-        if (ids.length === 0) return null;
-        return (
-          <div className={styles.judgeRow}>
-            <span className={styles.judgeRowLabel}>判定:</span>
-            {ids.map((cardId: string) => {
-              const card = view.cardMap[cardId];
-              const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
-              const desc = card?.description ?? '';
-              return (
-                <span
-                  key={cardId}
-                  className={styles.judgeTag}
-                  style={{ '--suit-color': suitColor } as React.CSSProperties}
-                  title={desc || card?.name || cardId}
-                >
-                  {card?.name ?? cardId}
-                  {card ? ` ${card.suit}${card.rank}` : ''}
-                </span>
-              );
-            })}
-          </div>
-        );
-      })()}
+      {/* 判定区(延时锦囊):紫边 chip(共享实现见 characterAnatomy.JudgeTagRow) */}
+      <JudgeTagRow
+        cardIds={player.pendingTricks ?? []}
+        cardMap={view.cardMap}
+        classes={{ row: styles.judgeRow, label: styles.judgeRowLabel, tag: styles.judgeTag }}
+      />
       {/* 技能 chips:暗底金字小圆角 */}
       {(() => {
         // 过滤默认/装备技能;非主公隐藏主公技(共享逻辑见 utils/skillDisplay)
@@ -372,9 +351,9 @@ function PlayerSeatViewImpl({
 }: PlayerSeatProps) {
   useSkillDescReady(); // 技能模块加载后重渲染,确保 title 中 getSkillDescription 命中
   void turnGlowVersion; // 预留:未来用于触发不同强度的回合光环动画
-  const isDead = !player.alive;
+  const isDead = isPlayerDead(player);
   // 横置(铁索连环):marks 含 'chained' —— 卡边框铁链光泽 + 立绘冷色调 + 连环徽章
-  const isChained = player.marks.some((m) => m.id === 'chained');
+  const isChained = isPlayerChained(player);
   const isClickable = needsTarget && !isDead && isTargetable;
   // 选目标阶段:不可选的活座位置灰(距离外/不满足槽位条件),与可选座位形成对比
   const isUntargetable = needsTarget && !isDead && !isTargetable;

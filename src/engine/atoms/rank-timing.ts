@@ -13,7 +13,8 @@
 //   拼点后(纯标记 atom):validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
 //     无 before hook 时 toViewEvents 返回 null(与 damage-timing / move-timing 一致)。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent, Card } from '../types';
-import { broadcast, hookSilentView, removeCardFromHand, requirePlayer, viewPlayer } from './_helpers';
+import { broadcast, removeCardFromHand, requirePlayer, viewPlayer } from './_helpers';
+import { makeTimingAtom } from './_timing';
 
 /** 拼点时机 atom 的公共形状(扣置/亮出)。 */
 type RankCompareAtom = {
@@ -165,26 +166,24 @@ export const 拼点亮出: AtomDefinition<RankCompareAtom> = {
 // result 由编排函数确定后透传('赢'/'没赢'),供 拼点后 hook 读取。
 // 携带 initiatorCard/targetCard:钩子(酣战获杀/纵适获牌)据此定位拼点牌(在弃牌堆中)。
 // 无 before hook 时静默(no-op 视图),与 damage-timing / move-timing 一致。
-export const 拼点后: AtomDefinition<{
-  initiator: number;
-  target: number;
-  initiatorCard: string;
-  targetCard: string;
-  result: '赢' | '没赢';
-}> = {
-  type: '拼点后',
-  validate: validateRankCompare,
-  apply() {},
-  toViewEvents(state, atom): ViewEventSplit {
-    return hookSilentView(state, '拼点后', () => ({
-      type: '拼点后',
-      initiator: atom.initiator,
-      target: atom.target,
-      initiatorCard: atom.initiatorCard,
-      targetCard: atom.targetCard,
-      result: atom.result,
-    }));
-  },
-  applyView() {},
-};
+/** 拼点后 的公共形状(两张拼点牌 + 胜负结果)。 */
+type RankAfterAtom = RankCompareAtom & { result: '赢' | '没赢' };
+
+/** 通知事件 payload:initiator/target/两张拼点牌 + result(hook 据此分支)。 */
+function rankAfterView(type: string, atom: RankAfterAtom): ViewEvent {
+  return {
+    type,
+    initiator: atom.initiator,
+    target: atom.target,
+    initiatorCard: atom.initiatorCard,
+    targetCard: atom.targetCard,
+    result: atom.result,
+  };
+}
+
+export const 拼点后: AtomDefinition<RankAfterAtom> = makeTimingAtom<RankAfterAtom>(
+  '拼点后',
+  validateRankCompare,
+  rankAfterView,
+);
 

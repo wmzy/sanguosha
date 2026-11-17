@@ -22,9 +22,9 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
 import { getDistanceAttackRange } from '../rules/vars-keys';
-import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 const TAG = '烈弓/禁闪';
 const CONFIRM = '烈弓/confirmed';
@@ -43,21 +43,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // respond:被询问"是否发动烈弓"时回应,设 localVars 标记结果
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (state, _params) => {
-      return requireRequestType(state, ownerId, ['烈弓/confirm'], {
-        wrongTypeError: '当前不是请求回应',
-        mismatchError: '当前不是烈弓确认',
-      }).error;
-    },
-    async (state, params) => {
-      state.localVars[CONFIRM] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, '烈弓/confirm', CONFIRM, {
+    mismatchError: '当前不是烈弓确认',
+    wrongTypeError: '当前不是请求回应',
+  });
 
   // ── 指定目标 after:条件满足 → 询问 → 加禁闪标签 ──
   registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx) => {

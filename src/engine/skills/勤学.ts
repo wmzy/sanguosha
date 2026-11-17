@@ -10,12 +10,12 @@
 //
 // 模式参考:志继/若愚(觉醒技 after-hook + 二选一 + 设上限 + 添加技能)。
 //   志继挂在「回合开始」,本技挂在「阶段开始」(因触发点是"阶段"而非"回合开始")。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import { isAwakened, markAwakened } from '../rules/vars-keys';
-import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { defineConfirmAction, registerChoiceRespond } from '../util/skillRuntime';
 
 const CHOOSE_RT = '勤学/choose';
 const CHOICE_KEY = '勤学/choice';
@@ -35,21 +35,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
   // ── respond:吕蒙二选一(摸两张牌 / 回复1点体力)──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      return requireRequestType(st, ownerId, [CHOOSE_RT], {
-        mismatchError: '当前不是勤学选择',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      // choice=true → 摸两张牌;choice=false → 回复1点体力
-      st.localVars[CHOICE_KEY] = params.choice === true ? 'draw' : 'heal';
-    },
-  );
+  // choice=true → 摸两张牌;choice=false → 回复1点体力
+  registerChoiceRespond(state, skill.id, ownerId, CHOOSE_RT, CHOICE_KEY, 'draw', 'heal', {
+    mismatchError: '当前不是勤学选择',
+  });
 
   // ── 阶段开始 after-hook:勤学主逻辑(准备 或 回合结束)──
   registerAfterHook(state, skill.id, ownerId, '阶段开始', async (ctx) => {

@@ -27,8 +27,8 @@ import {
   requireRoom,
   requireRoomMember,
   requireSessionHost,
-  resolveActorOr401,
   resolvePlayerOrRespond,
+  resolveRoomRequestActor,
   resolveSessionActor,
 } from './helpers';
 
@@ -131,13 +131,12 @@ export function applyGameRoutes(app: Hono): void {
     const roomId = c.req.param('id');
     const raw = await readJsonBody(c);
 
-    const room = requireRoom(c, roomId);
-    if (room instanceof Response) return room;
-
     // 非 debug 房间:身份取会话 userId(body.playerId 可伪造 hostId 绕过下方校验,
     // 强行在未全员准备时开局);调试房间任意座次可触发。
-    const actor = await resolveActorOr401(c, !room.isDebug, optString(raw.playerId));
+    // 房间不存在先回 404,校验顺序见 resolveRoomRequestActor。
+    const actor = await resolveRoomRequestActor(c, roomId, optString(raw.playerId), { requireRoom: true });
     if (actor.response) return actor.response;
+    const room = actor.room;
     const playerId = actor.playerId;
 
     // debug 房间任意座次可触发;普通房间仅房主
@@ -227,13 +226,11 @@ export function applyGameRoutes(app: Hono): void {
     const raw = await readJsonBody(c);
     const text = typeof raw.text === 'string' ? raw.text : '';
 
-    const room = requireRoom(c, roomId);
-    if (room instanceof Response) return room;
-
     // 身份解析:非调试房间一律取会话 userId(body.playerId 忽略,防冒充他人发言);
-    // 调试房保持游客模型(query/body.playerId)。
-    const actor = await resolveActorOr401(c, !room.isDebug, optString(raw.playerId));
+    // 调试房保持游客模型(query/body.playerId)。房间不存在先回 404。
+    const actor = await resolveRoomRequestActor(c, roomId, optString(raw.playerId), { requireRoom: true });
     if (actor.response) return actor.response;
+    const room = actor.room;
     const playerId = actor.playerId;
     if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
     if (!room.players.has(playerId)) return c.json({ error: '不在房间中' }, 403);

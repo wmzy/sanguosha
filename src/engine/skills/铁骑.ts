@@ -26,8 +26,8 @@ import type {
 import { applyAtom } from '../core/apply';
 import { frameCards } from '../core/frame';
 import { runJudgeFlow } from '../flows/judge';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM = '铁骑/confirmed';
 const TARGET_VAR = '铁骑/target';
@@ -175,23 +175,10 @@ const OPTIONS: TieqiOptions = {
   confirmTitle: '是否发动铁骑判定?',
   // respond:被询问"是否发动铁骑"时回应,设 localVars 标记结果
   registerRespond: (state, skillId, ownerId) => {
-    const u = registerAction(
-      state,
-      skillId,
-      ownerId,
-      'respond',
-      (state, _params) => {
-        const slot = state.pendingSlots.get(ownerId);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as { type?: string; requestType?: string };
-        if (atom.type !== '请求回应') return '当前不是请求回应';
-        if (atom.requestType !== '铁骑/confirm') return '当前不是铁骑确认';
-        return null;
-      },
-      async (state, params) => {
-        state.localVars[CONFIRM] = params.choice === true || params.confirmed === true;
-      },
-    );
+    const u = registerConfirmRespond(state, skillId, ownerId, '铁骑/confirm', CONFIRM, {
+      mismatchError: '当前不是铁骑确认',
+      wrongTypeError: '当前不是请求回应',
+    });
     return [u];
   },
   // 判定牌生效后:红色 → 给目标加禁闪标签(询问闪 before hook 消费)

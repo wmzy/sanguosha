@@ -9,8 +9,8 @@
 //   transform.ts — 转化技五件套工厂(registerTransformAction/mountTransformAction)+
 //                  影子卡 id 构造/还原(shadowCardId/effectiveCardId);
 //   respond.ts   — pending 询问与 respond 样板(requireRequestType/registerConfirmRespond/
-//                  askConfirm/askResponse/currentRequestType/hasNullifyWindow/
-//                  registerRespondForAllSeats);
+//                  registerChoiceRespond/askConfirm/askResponse/currentRequestType/
+//                  hasNullifyWindow/registerRespondForAllSeats);
 //   hooks.ts     — hook 守卫工厂(registerOnOwnSlashDodged/registerOnDamagedAsTarget/
 //                  registerPhaseStartHook);
 //   misc.ts      — 出牌时机判定(engineCanPlayNow/engineCanPlayNowReason)、被询问杀/闪窗口

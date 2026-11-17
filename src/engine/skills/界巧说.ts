@@ -27,28 +27,25 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界巧说'(避开标版潜在冲突);
 //   内部 Skill.name = '巧说'(OL 官方技能名,玩家可见)。
+// use action 骨架(七连检 validate + 拼点仪式 + 输赢分支)由 flows/rank 的
+// registerRankUseAction/defineRankUseAction 提供,本文件只注入赢/没赢的 turn.vars 结算差异。
 import type {
   FrontendAPI,
   GameState,
-  Json,
   Skill,
 } from '../types';
 import { projectTurnUsage } from '../rules/turn-usage';
-import { popFrame, pushFrame } from '../core/frame';
-import { askRankCardAndCompare, registerRankCardRespond } from '../flows/rank';
-import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerRankUseAction, defineRankUseAction } from '../flows/rank';
+import { activeUnlessUsedThisTurn } from '../rules/once-per-turn';
+import { registerAfterHook } from '../core/skill';
 import { registerTrickBlocker } from '../rules/trick-quota';
 import { registerSlashTargetProvider } from '../rules/slash-target';
-import { engineCanPlayNowReason } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 import { slashTargetKey } from '../rules/vars-keys';
 
 const SKILL_ID = '界巧说';
 const DISPLAY_NAME = '巧说';
 
-const TARGET_CARD_KEY = `${SKILL_ID}/targetCard`;
-const PD_RT = `${SKILL_ID}/拼点`;
 /** 赢效果标记:owner 本回合下一张牌可 +/-1 目标。 */
 const WIN_NEXT_VAR = '巧说/winNext';
 /** 没赢效果标记:owner 本回合不能使用普通锦囊牌。 */
@@ -86,75 +83,30 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     (st: GameState, player: number) => (st.turn.vars[WIN_NEXT_VAR] === player ? 2 : 0),
   );
 
-  // ─── use action:owner 主动发动巧说拼点 ────────────────────────
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'use',
-    (st: GameState, params: Record<string, Json>): string | null => {
-      const playError = engineCanPlayNowReason(st, ownerId);
-      if (playError) return playError;
-      if (usedThisTurn(st, ownerId, SKILL_ID)) return '本回合已使用过巧说';
-      const self = st.players[ownerId];
-      const cardId = params.cardId as string;
-      if (typeof cardId !== 'string') return '需要选择一张拼点牌';
-      if (!self.hand.includes(cardId)) return '拼点牌不在手牌中';
-      const target = params.target as number;
-      if (typeof target !== 'number') return '需要选择拼点目标';
-      if (target === ownerId) return '不能与自己拼点';
-      const targetPlayer = st.players[target];
-      if (!targetPlayer?.alive) return '目标不存在或已死亡';
-      if (targetPlayer.hand.length === 0) return '目标没有手牌,无法拼点';
-      return null;
+  // ─── use action:owner 主动发动巧说拼点(拼点 use-action 骨架工厂) ──
+  registerRankUseAction(state, skill.id, ownerId, {
+    displayName: DISPLAY_NAME,
+    // 赢:下一张牌可 +/-1 目标。turn.vars['巧说/winNext'] 驱动 slashTargetProvider(+1 杀目标);
+    // 投影 turnUsage['杀/target/界巧说']=1 供前端 viewSlashTargetMax 放宽多选。
+    // 移动牌 after-hook 在 owner 下张牌打出时清除 winNext + 投影(消费"下一张")。
+    // state 存座次(from)、view 投影常量 1,key/值不同 → 走 projectTurnUsage。
+    onWin: async (st, from) => {
+      st.turn.vars[WIN_NEXT_VAR] = from;
+      await projectTurnUsage(st, from, SLASH_TARGET_TU, 1);
     },
-    async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const from = ownerId;
-      const initiatorCardId = params.cardId as string;
-      const target = params.target as number;
-
-      // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
-      await markOncePerTurn(st, from, SKILL_ID);
-
-      await pushFrame(st, SKILL_ID, from, { ...params });
-
-      // 1)+2) 询问 target 出拼点牌并比点(扣置→亮出→后→弃牌堆;target 未出牌走弃权兜底),
-      //    封装于 flows/rank.ts。
-      const win = await askRankCardAndCompare(st, from, target, initiatorCardId, {
-        requestType: PD_RT,
-        answerKey: TARGET_CARD_KEY,
-        title: `巧说:与 ${st.players[from].name} 拼点,请出一张手牌`,
-        timeout: 30,
-      });
-
-      // 3) 结算输赢:发起方点数严格大于目标 = 赢;否则(输或平)没赢
-      if (win) {
-        // 赢:下一张牌可 +/-1 目标。turn.vars['巧说/winNext'] 驱动 slashTargetProvider(+1 杀目标);
-        // 投影 turnUsage['杀/target/界巧说']=1 供前端 viewSlashTargetMax 放宽多选。
-        // 移动牌 after-hook 在 owner 下张牌打出时清除 winNext + 投影(消费"下一张")。
-        // state 存座次(from)、view 投影常量 1,key/值不同 → 走 projectTurnUsage。
-        st.turn.vars[WIN_NEXT_VAR] = from;
-        await projectTurnUsage(st, from, SLASH_TARGET_TU, 1);
-      } else {
-        // 没赢:本回合不能使用锦囊牌(由 trickBlocker + validateUseCard 落实)
-        // state 存座次、view 投影 true → 同上走 projectTurnUsage。
-        st.turn.vars[LOST_VAR] = from;
-        await projectTurnUsage(st, from, LOST_VAR, true);
-      }
-
-      await popFrame(st);
+    // 没赢:本回合不能使用锦囊牌(由 trickBlocker + validateUseCard 落实)
+    // state 存座次、view 投影 true → 同上走 projectTurnUsage。
+    onLose: async (st, from) => {
+      st.turn.vars[LOST_VAR] = from;
+      await projectTurnUsage(st, from, LOST_VAR, true);
     },
-  );
+    respondMismatchError: '当前不是巧说回应',
+  });
 
   // ─── respond action:为所有玩家注册 ────────────────────────
   // target(其他玩家)需要 respond 选拼点牌。默认 respond 只注册在 owner 上,
-  // 目标无法 dispatch,故为每个玩家注册(封装于 flows/rank.registerRankCardRespond,
+  // 目标无法 dispatch,故为每个玩家注册(封装于工厂内 registerRankCardRespond,
   // validate 严格检查 pending requestType)。
-  registerRankCardRespond(state, skill.id, {
-    requestType: PD_RT,
-    answerKey: TARGET_CARD_KEY,
-    mismatchError: '当前不是巧说回应',
-  });
 
   // ─── 清理 winNext:owner 下一张牌打出时消费 ───────────────────
   // 监听 移动牌 from 手牌(owner)→ 处理区:即 owner 出牌/打牌的时机。
@@ -180,40 +132,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineRankUseAction(api, {
     label: DISPLAY_NAME,
     style: 'primary',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '巧说:选择一张拼点牌和一名目标',
-      // filter:()=>true(拼点牌=任意手牌):缺失则 AI/无头客户端枚举不出该动作
-      cardFilter: { filter: () => true, min: 1, max: 1 },
-      targetFilter: {
-        min: 1,
-        max: 1,
-        filter: (view, t) => {
-          const me = view.currentPlayerIndex;
-          if (t === me) return false;
-          const tp = view.players[t];
-          if (!tp) return false;
-          return tp.alive !== false && (tp.handCount ?? 0) > 0;
-        },
-      },
-    },
+    title: '巧说:选择一张拼点牌和一名目标',
     activeWhen: (ctx) =>
       activeUnlessUsedThisTurn(SKILL_ID)(ctx) &&
       (ctx.view.players[ctx.perspectiveIdx]?.hand?.length ?? 0) > 0,
-  });
-
-  // respond(拼点牌选择):前端通过 pending prompt 渲染
-  api.defineAction('respond', {
-    label: DISPLAY_NAME,
-    style: 'primary',
-    prompt: {
-      type: 'useCard',
-      title: '巧说:请出一张拼点牌',
-      cardFilter: { filter: () => true, min: 1, max: 1 },
-    },
+    // respond(拼点牌选择):前端通过 pending prompt 渲染
+    respondTitle: '巧说:请出一张拼点牌',
   });
 }
 

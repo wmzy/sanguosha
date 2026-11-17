@@ -1,9 +1,9 @@
 // 卸下:玩家卸下指定槽位的装备,返回手牌
 // 副作用:清除武器攻击范围 vars(距离/出杀范围,由 _helpers.clearEquipVars 统一实现,
-// 与 移出至暂存区 的武器移出共用)。
+// 与 移出至暂存区 的武器移出共用;view 侧配对 clearEquipViewVars 清 distanceVars.attackRange)。
 // 进攻马/防御马的 vars 由马匹技能的 移除技能 hook 清理,不在此硬编码。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { addCardToHand, broadcast, clearEquipVars, requirePlayer, viewPlayer } from './_helpers';
+import { addCardToHand, broadcast, clearEquipVars, clearEquipViewVars, requirePlayer, viewPlayer } from './_helpers';
 
 export const 卸下: AtomDefinition<{
   player: number;
@@ -50,11 +50,8 @@ export const 卸下: AtomDefinition<{
       addCardToHand(view, event.player as number, cardId);
     }
     // 武器卸下:清除 distanceVars.attackRange(马匹由 移除技能 atom 处理)
-    if (slot === '武器' && p.distanceVars) {
-      p.distanceVars = {
-        ...p.distanceVars,
-        attackRange: undefined,
-      };
+    if (slot) {
+      clearEquipViewVars(p, slot);
     }
   },
 };

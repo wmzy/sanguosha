@@ -26,7 +26,9 @@ function hasAliveConnection(room: Room): boolean {
   return false;
 }
 
-/** 闲置房间存活时间:无玩家连接且超过此时长未活动的会话将被回收。 */
+/** 孤儿 session 兜底 TTL:room 对象已被删除、仅剩 session 残留(无可观测的连接
+ *  状态)时,按 session 最后活动时间回收。快速房的常规「无连接」回收统一走
+ *  cleanupDisconnectedRooms 的 disconnectedSince 单点时钟(DISCONNECTED_ROOM_TTL_MS)。 */
 export const IDLE_ROOM_TTL_MS = 60 * 60 * 1000;
 
 /** 快速/debug 房间在「无任何 SSE 连接」状态下的存活时间。
@@ -62,18 +64,25 @@ function classifyRoom(roomId: string, session: GameSession, now: number): Cleanu
   // ── 快速房间 ──
   // 1. zombie session(全员断线 grace 超时后遗留):立即回收
   if (session.isDestroyed()) return { action: 'destroy' };
-  // 2. 有玩家连接:保留(游戏结束后玩家留在房间等「再来一局」)。
+  // 2. 孤儿 session:room 对象已被删除但 session 残留(正常路径 destroyRoomCompletely
+  //    会同时移除两者,此为防御性兜底)。无 room 即无连接状态可观测,只能退回
+  //    session 级闲置时钟(lastActivityAt + IDLE_ROOM_TTL_MS)。
+  if (!room) {
+    return now - session.getLastActivityAt() > IDLE_ROOM_TTL_MS
+      ? { action: 'destroy' }
+      : { action: 'keep' };
+  }
+  // 3. 有玩家连接:保留(游戏结束后玩家留在房间等「再来一局」)。
   //    按 isAlive 判定:nullSink 占位(join 未开流/单活流非视角座次)不算连接,
   //    否则此类房间既不满足本条、又因 players 非空躲过无连接回收,成为僵尸。
-  if (room && hasAliveConnection(room)) return { action: 'keep' };
-  // 3. 僵尸房间:进行中/已结束但座次全空(重启后 seats 丢失),无人可重连
-  if (room && room.status !== '等待中' && room.seats.every((s) => s === null)) {
+  if (hasAliveConnection(room)) return { action: 'keep' };
+  // 4. 僵尸房间:进行中/已结束但座次全空(重启后 seats 丢失),无人可重连
+  if (room.status !== '等待中' && room.seats.every((s) => s === null)) {
     return { action: 'destroy' };
   }
-  // 4. 无玩家 + 超过 TTL:闲置回收
-  if (now - session.getLastActivityAt() > IDLE_ROOM_TTL_MS) {
-    return { action: 'destroy' };
-  }
+  // 5. 其余「无连接快速房」不在此处计时:统一交由 cleanupDisconnectedRooms 的
+  //    disconnectedSince 单点时钟(60s)回收。app.ts 同时调度两个入口(30s 扫描
+  //    恒先于 1h TTL 触发),回收时机不会早于原「lastActivityAt + 1h」并行路径。
   return { action: 'keep' };
 }
 
@@ -133,6 +142,10 @@ export function cleanupIdleRooms(now: number = Date.now()): string[] {
 // /api/rooms?type=debug 积累 44+ 死房间(玩家数 0)即由此而来。
 // 本扫描直接遍历 roomList,以「players + spectators 全空」(SSE onAbort 均已
 // 从 Map 删除条目)作为无连接信号,补齐这一盲区。
+//
+// 时钟收敛:disconnectedSince 是快速房「无连接时长」的唯一时钟,classifyRoom
+// 不再维护并行的「lastActivityAt + 1h」无连接判定(仅保留 room 已删除的孤儿
+// session 兜底);两处入口由 app.ts 同时调度,调用频率不变。
 
 /** 每房间首次观察到「无任何 SSE 连接」的时间戳(roomId → 观察时刻)。
  *  有连接时清除;房间销毁/从列表消失时由扫描顺带修剪。 */

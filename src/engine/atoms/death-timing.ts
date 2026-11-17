@@ -15,7 +15,8 @@
 // 与 damage-timing / life-timing 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameState, ViewEventSplit, ViewEvent } from '../types';
-import { broadcast, hookSilentView, pushToDiscardPile, requirePlayer, viewPlayer } from './_helpers';
+import { broadcast, pushToDiscardPile, requirePlayer, viewPlayer } from './_helpers';
+import { makeTimingAtom } from './_timing';
 import { locateCard } from '../core/judge-zone';
 
 /** 死亡时机 atom 的公共形状(含可选 killer)。 */
@@ -26,22 +27,19 @@ function validateDeathTiming(state: GameState, atom: { player: number }): string
   return requirePlayer(state, atom.player, 'player');
 }
 
-/** 无 before hook 时静默(no-op 视图),有 before-hook 时发通知事件(携带 killer)。 */
-function deathTimingView(state: GameState, type: string, atom: DeathTimingAtom): ViewEventSplit {
-  return hookSilentView(state, type, () => ({ type, player: atom.player, killer: atom.killer }));
+/** 通知事件 payload:player + killer(致死来源;有 before-hook 时广播)。 */
+function deathTimingView(type: string, atom: DeathTimingAtom): ViewEvent {
+  return { type, player: atom.player, killer: atom.killer };
 }
 
 // ── 时机1:亮身份牌前(焚心·转移身份) ─────────────────────────
 // 纯标记,before-hook 可改写身份(焚心)。无 after-hook 技能。
-export const 亮身份牌前: AtomDefinition<{ player: number }> = {
-  type: '亮身份牌前',
-  validate: validateDeathTiming,
-  apply() {},
-  toViewEvents(state, atom): ViewEventSplit {
-    return hookSilentView(state, '亮身份牌前', () => ({ type: '亮身份牌前', player: atom.player }));
-  },
-  applyView() {},
-};
+// 与 死亡时/死亡后 不同:此时机不携带 killer(纯身份揭示前置点)。
+export const 亮身份牌前: AtomDefinition<{ player: number }> = makeTimingAtom(
+  '亮身份牌前',
+  validateDeathTiming,
+  (type, atom) => ({ type, player: atom.player }),
+);
 
 
 // ── 时机2:亮身份牌(揭示阵亡者身份) ──────────────────────────
@@ -77,15 +75,11 @@ export const 亮身份牌: AtomDefinition<{ player: number }> = {
 // ── 时机3:死亡时(行殇/断肠/界节命——在系统处理牌之前) ────────
 // 纯标记,after-hook 触发死亡时技能。断肠在此移除凶手技能(系统处理牌弃牌之前)。
 // killer 供技能读取(断肠移除凶手技能;行殇/界节命不依赖 killer)。
-export const 死亡时: AtomDefinition<DeathTimingAtom> = {
-  type: '死亡时',
-  validate: validateDeathTiming,
-  apply() {},
-  toViewEvents(state, atom): ViewEventSplit {
-    return deathTimingView(state, '死亡时', atom);
-  },
-  applyView() {},
-};
+export const 死亡时: AtomDefinition<DeathTimingAtom> = makeTimingAtom(
+  '死亡时',
+  validateDeathTiming,
+  deathTimingView,
+);
 
 
 // ── 时机4:系统处理牌(弃手牌+装备入弃牌堆 + alive=false) ──────
@@ -175,15 +169,11 @@ export const 系统处理牌: AtomDefinition<{ player: number }> = {
 
 // ── 时机5:死亡后(功獒/界完杀 cleanup) ───────────────────────
 // 纯标记,after-hook 触发死亡后技能(在系统处理牌与奖惩之后)。
-export const 死亡后: AtomDefinition<DeathTimingAtom> = {
-  type: '死亡后',
-  validate: validateDeathTiming,
-  apply() {},
-  toViewEvents(state, atom): ViewEventSplit {
-    return deathTimingView(state, '死亡后', atom);
-  },
-  applyView() {},
-};
+export const 死亡后: AtomDefinition<DeathTimingAtom> = makeTimingAtom(
+  '死亡后',
+  validateDeathTiming,
+  deathTimingView,
+);
 
 
 // ── 濒死编排时机(对齐 出牌流程重设计.md 模块 C / neardeath.md) ────
@@ -205,31 +195,17 @@ function validateDyingTiming(state: GameState, atom: { target: number }): string
 }
 
 // ── 进入濒死状态时(补益/随势①)─────────────────────────────
-export const 进入濒死状态时: AtomDefinition<{ target: number }> = {
-  type: '进入濒死状态时',
-  validate: validateDyingTiming,
-  apply() {},
-  toViewEvents(state, atom): ViewEventSplit {
-    return hookSilentView(state, '进入濒死状态时', () => ({
-      type: '进入濒死状态时',
-      target: atom.target,
-    }));
-  },
-  applyView() {},
-};
+export const 进入濒死状态时: AtomDefinition<{ target: number }> = makeTimingAtom(
+  '进入濒死状态时',
+  validateDyingTiming,
+  (type, atom) => ({ type, target: atom.target }),
+);
 
 
 // ── 新的濒死状态时(被救仍濒死,重置响应起点)──────────────
-export const 新的濒死状态时: AtomDefinition<{ target: number }> = {
-  type: '新的濒死状态时',
-  validate: validateDyingTiming,
-  apply() {},
-  toViewEvents(state, atom): ViewEventSplit {
-    return hookSilentView(state, '新的濒死状态时', () => ({
-      type: '新的濒死状态时',
-      target: atom.target,
-    }));
-  },
-  applyView() {},
-};
+export const 新的濒死状态时: AtomDefinition<{ target: number }> = makeTimingAtom(
+  '新的濒死状态时',
+  validateDyingTiming,
+  (type, atom) => ({ type, target: atom.target }),
+);
 

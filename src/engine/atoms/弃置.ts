@@ -57,6 +57,9 @@ export const 弃置: AtomDefinition<{ player: number; cardIds: string[]; volunta
     for (const cardId of atom.cardIds) {
       if (player.hand.includes(cardId)) zones[cardId] = 'hand';
       else if (equipSet.has(cardId)) zones[cardId] = 'equipment';
+      // 防御性兜底:既不在手牌也不在装备的牌标 'judge'。实际是 no-op——判定区弃置
+      // 走 移除延时锦囊,不经本 atom;applyView 只按 'hand'/'equipment' 分支动作,
+      // 'judge' 标签不触发任何视图变更。标签字面量保持不变(客户端可能按它分发)。
       else zones[cardId] = 'judge';
     }
     const view: ViewEvent = {

@@ -111,6 +111,65 @@ export function registerShensuTagSkipHook(
   );
 }
 
+/** 神速族发动确认询问(标/界共用):confirmedKey 固定 '神速/confirmed',
+ *  发动/不发动 二选,默认不发动(超时=不发动),10s 超时。 */
+export async function askShensuConfirm(
+  state: GameState,
+  ownerId: number,
+  requestType: string,
+  title: string,
+): Promise<boolean> {
+  return askConfirm(state, requestType, ownerId, {
+    confirmedKey: '神速/confirmed',
+    title,
+    confirmLabel: '发动',
+    cancelLabel: '不发动',
+    defaultChoice: false,
+    timeout: 10,
+  });
+}
+
+/** 神速族询问虚拟杀目标:choosePlayer 选一名其他存活角色,读回 '神速/target' 后清理。
+ *  requestType 由调用方传入(标版 OPT1/2/3_TARGET_RT / 界版 '界神速/target');
+ *  存在其他存活角色的前置守卫由 shensuPhaseEntry 保证(无目标则整个 hook 不触发)。 */
+export async function askShensuKillTarget(
+  state: GameState,
+  ownerId: number,
+  requestType: string,
+  label: string,
+): Promise<number | undefined> {
+  delete state.localVars['神速/target'];
+  await applyAtom(state, {
+    type: '请求回应',
+    requestType,
+    target: ownerId,
+    prompt: {
+      type: 'choosePlayer',
+      title: `${label}:选择一名其他角色(视为出杀,无距离限制)`,
+      min: 1,
+      max: 1,
+      filter: (_view: GameView, t: number) => t !== ownerId && state.players[t]?.alive === true,
+    },
+    timeout: 15,
+  });
+  const t = state.localVars['神速/target'] as number | undefined;
+  delete state.localVars['神速/target'];
+  return t;
+}
+
+/** 神速族虚拟杀:target 为数字且仍存活才执行,统一 charge:true(视为使用杀,计入出杀次数)。
+ *  prefix=虚拟卡 id 前缀(技能名:标 '神速' / 界 '界神速')。 */
+export async function runShensuVirtualSlash(
+  state: GameState,
+  ownerId: number,
+  target: number | undefined,
+  prefix: string,
+): Promise<void> {
+  if (typeof target === 'number' && state.players[target]?.alive) {
+    await runVirtualSlash(state, ownerId, target, { prefix, charge: true });
+  }
+}
+
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
@@ -165,45 +224,20 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 询问是否发动选项1
       if (
-        !(await askConfirm(ctx.state, OPT1_TRIGGER_RT, ownerId, {
-          confirmedKey: '神速/confirmed',
-          title: '是否发动神速①?(跳过判定+摸牌,视为出杀)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-          defaultChoice: false,
-          timeout: 10,
-        }))
+        !(await askShensuConfirm(ctx.state, ownerId, OPT1_TRIGGER_RT, '是否发动神速①?(跳过判定+摸牌,视为出杀)'))
       ) {
         return; // 不发动 → 判定阶段正常进行
       }
 
       // 选目标
-      delete ctx.state.localVars['神速/target'];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: OPT1_TARGET_RT,
-        target: ownerId,
-        prompt: {
-          type: 'choosePlayer',
-          title: '神速①:选择一名其他角色(视为出杀,无距离限制)',
-          min: 1,
-          max: 1,
-          filter: (_view: GameView, t: number) =>
-            t !== ownerId && ctx.state.players[t]?.alive === true,
-        },
-        timeout: 15,
-      });
-      const target = ctx.state.localVars['神速/target'] as number | undefined;
-      delete ctx.state.localVars['神速/target'];
+      const target = await askShensuKillTarget(ctx.state, ownerId, OPT1_TARGET_RT, '神速①');
 
       // 标记选项1已使用 + 加跳过摸牌标签
       self.vars[OPT1_USED_KEY] = true;
       await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_MO_TAG });
 
       // 虚拟杀
-      if (typeof target === 'number' && ctx.state.players[target]?.alive) {
-        await runVirtualSlash(ctx.state, ownerId, target, { prefix: '神速', charge: true });
-      }
+      await runShensuVirtualSlash(ctx.state, ownerId, target, '神速');
 
       // 跳过判定阶段(直接型):阶段结束(判定)+ cancel
       return skipPhase(ctx.state, atom);
@@ -228,14 +262,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 询问是否发动选项2
       if (
-        !(await askConfirm(ctx.state, OPT2_TRIGGER_RT, ownerId, {
-          confirmedKey: '神速/confirmed',
-          title: '是否发动神速②?(弃置一张装备牌,跳过出牌,视为出杀)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-          defaultChoice: false,
-          timeout: 10,
-        }))
+        !(await askShensuConfirm(ctx.state, ownerId, OPT2_TRIGGER_RT, '是否发动神速②?(弃置一张装备牌,跳过出牌,视为出杀)'))
       ) {
         return; // 不发动 → 出牌阶段正常进行
       }
@@ -263,23 +290,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
 
       // 选目标
-      delete ctx.state.localVars['神速/target'];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: OPT2_TARGET_RT,
-        target: ownerId,
-        prompt: {
-          type: 'choosePlayer',
-          title: '神速②:选择一名其他角色(视为出杀,无距离限制)',
-          min: 1,
-          max: 1,
-          filter: (_view: GameView, t: number) =>
-            t !== ownerId && ctx.state.players[t]?.alive === true,
-        },
-        timeout: 15,
-      });
-      const target = ctx.state.localVars['神速/target'] as number | undefined;
-      delete ctx.state.localVars['神速/target'];
+      const target = await askShensuKillTarget(ctx.state, ownerId, OPT2_TARGET_RT, '神速②');
 
       // 标记选项2已使用(出牌阶段由下方 skipPhase 直接跳过,无需再加标签;
       // 否则标签残留到下回合会被「跳过出牌」hook 误消费,导致下回合出牌阶段被错误跳过)
@@ -289,9 +300,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [equipCardId], voluntary: true });
 
       // 虚拟杀
-      if (typeof target === 'number' && ctx.state.players[target]?.alive) {
-        await runVirtualSlash(ctx.state, ownerId, target, { prefix: '神速', charge: true });
-      }
+      await runShensuVirtualSlash(ctx.state, ownerId, target, '神速');
 
       // 跳过出牌阶段(直接型):阶段结束(出牌)+ cancel
       return skipPhase(ctx.state, atom);
@@ -318,45 +327,20 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 询问是否发动选项3
       if (
-        !(await askConfirm(ctx.state, OPT3_TRIGGER_RT, ownerId, {
-          confirmedKey: '神速/confirmed',
-          title: '是否发动神速③?(翻面,跳过弃牌,视为出杀)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-          defaultChoice: false,
-          timeout: 10,
-        }))
+        !(await askShensuConfirm(ctx.state, ownerId, OPT3_TRIGGER_RT, '是否发动神速③?(翻面,跳过弃牌,视为出杀)'))
       ) {
         return; // 不发动 → 弃牌阶段正常进行
       }
 
       // 选目标
-      delete ctx.state.localVars['神速/target'];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: OPT3_TARGET_RT,
-        target: ownerId,
-        prompt: {
-          type: 'choosePlayer',
-          title: '神速③:选择一名其他角色(视为出杀,无距离限制)',
-          min: 1,
-          max: 1,
-          filter: (_view: GameView, t: number) =>
-            t !== ownerId && ctx.state.players[t]?.alive === true,
-        },
-        timeout: 15,
-      });
-      const target = ctx.state.localVars['神速/target'] as number | undefined;
-      delete ctx.state.localVars['神速/target'];
+      const target = await askShensuKillTarget(ctx.state, ownerId, OPT3_TARGET_RT, '神速③');
 
       // 标记选项3已使用 + 加翻面标签(下一回合被消费)
       self.vars[OPT3_USED_KEY] = true;
       await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: FLIP_TAG });
 
       // 虚拟杀
-      if (typeof target === 'number' && ctx.state.players[target]?.alive) {
-        await runVirtualSlash(ctx.state, ownerId, target, { prefix: '神速', charge: true });
-      }
+      await runShensuVirtualSlash(ctx.state, ownerId, target, '神速');
 
       // 跳过弃牌阶段(直接型):阶段结束(弃牌)+ cancel
       return skipPhase(ctx.state, atom);

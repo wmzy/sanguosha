@@ -75,8 +75,22 @@ function generateRoomId(): string {
   return result;
 }
 
+/** 房间人数合法区间(创建房间 maxPlayers / 调试房 playerCount / updateConfig
+ *  收缩共用;clampPlayers 与路由侧 400 校验的同源上下限)。 */
+export const PLAYER_RANGE = { min: 2, max: 8 } as const;
+
+/** 人数越界时的统一 400 文案(路由侧校验共用,数值随 PLAYER_RANGE 派生)。 */
+export const PLAYER_COUNT_ERROR = `玩家人数须在${PLAYER_RANGE.min}-${PLAYER_RANGE.max}之间`;
+
+/** 人数是否在合法区间内(与路由侧原 `n < 2 || n > 8` 判据逐字等价:NaN 两侧
+ *  比较均为 false → 判合法,与原行为一致;非整数/NaN 的最终兜底在 clampPlayers)。 */
+export function isValidPlayerCount(count: number): boolean {
+  return !(count < PLAYER_RANGE.min || count > PLAYER_RANGE.max);
+}
+
+/** 人数 clamp 单点(创建路径与 updateConfig 收缩共用)。 */
 function clampPlayers(n: number): number {
-  return Math.min(Math.max(n, 2), 8);
+  return Math.min(Math.max(n, PLAYER_RANGE.min), PLAYER_RANGE.max);
 }
 
 /** 座位交换请求超时(ms) */

@@ -1,7 +1,8 @@
 // src/engine/atoms/move-timing.ts
 // 移动牌编排时机 atom 定义(对齐 出牌流程重设计.md 模块 F / move.md):
 //   - 移动到目标区域前 / 移动到目标区域后
-//   全部为事件标记型:validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
+//   全部为事件标记型:validate 恒通过、apply 无副作用,只提供 before/after hook 注册点,
+//   四件套样板由 _timing.makeTimingAtom 统一产出。
 //   由 src/engine/move-flow.ts 的编排函数 runMoveCardFlow 在实质移动牌(移动牌 atom)前后依次发出。
 //
 // before-hook modify to 的回传通道:
@@ -17,8 +18,8 @@
 // 噪声抑制:无 before hook 时标记型 atom 的 toViewEvents 返回 null(整个 atom 视图上 no-op),
 // 与 damage-timing / life-timing / statechange-timing 一致。atom 本身仍走完整 pipeline
 // (apply + after hooks),编排函数/测试可从 state.atomHistory 观察时序。
-import type { AtomDefinition, GameState, MoveReason, ViewEventSplit, ZoneLoc } from '../types';
-import { hookSilentView } from './_helpers';
+import type { AtomDefinition, GameState, MoveReason, ViewEvent, ZoneLoc } from '../types';
+import { makeTimingAtom } from './_timing';
 
 // ── before-hook modify to 的回传通道 ─────────────────────────
 // 移动到目标区域前 的 before-hook 可 modify to(纵玄/章武②);afterApply 把折叠后的
@@ -39,42 +40,33 @@ function validateMoveTiming(state: GameState, atom: MoveTimingAtom): string | nu
   return null;
 }
 
-/** 无 before-hook 时静默(no-op 视图),有 before-hook 时发通知事件。 */
-function moveTimingView(state: GameState, type: string, atom: MoveTimingAtom): ViewEventSplit {
-  return hookSilentView(state, type, () => ({
+/** 通知事件 payload:cardId/from/to/reason(有 before-hook 时广播)。 */
+function moveTimingView(type: string, atom: MoveTimingAtom): ViewEvent {
+  return {
     type,
     cardId: atom.cardId,
     from: atom.from,
     to: atom.to,
     reason: atom.reason,
-  }));
+  };
 }
 
 // ── 时机1:移动到目标区域前(纵玄/章武② 可改变目标区域) ───────
 // before-hook 可 modify to(改变实质移动的目标区域)。afterApply 回写最终 to 供编排函数读取。
-export const 移动到目标区域前: AtomDefinition<MoveTimingAtom> = {
-  type: '移动到目标区域前',
-  validate: validateMoveTiming,
-  apply() {},
-  async afterApply(state, atom) {
+export const 移动到目标区域前: AtomDefinition<MoveTimingAtom> = makeTimingAtom(
+  '移动到目标区域前',
+  validateMoveTiming,
+  moveTimingView,
+  async (state, atom) => {
     state.localVars[MOVE_TO_KEY] = atom.to;
   },
-  toViewEvents(state, atom) {
-    return moveTimingView(state, '移动到目标区域前', atom);
-  },
-  applyView() {},
-};
+);
 
 
 // ── 时机2:移动到目标区域后(连营/伤逝/落英/屯田 等「失去牌」技能) ─
 // 纯标记,after-hook 触发失去牌类技能(按 reason 区分触发场景)。无 afterApply。
-export const 移动到目标区域后: AtomDefinition<MoveTimingAtom> = {
-  type: '移动到目标区域后',
-  validate: validateMoveTiming,
-  apply() {},
-  toViewEvents(state, atom) {
-    return moveTimingView(state, '移动到目标区域后', atom);
-  },
-  applyView() {},
-};
-
+export const 移动到目标区域后: AtomDefinition<MoveTimingAtom> = makeTimingAtom(
+  '移动到目标区域后',
+  validateMoveTiming,
+  moveTimingView,
+);

@@ -7,18 +7,9 @@
 // 注册表为 state-bound(WeakMap 外挂),随 state 自动隔离/GC,与 slash-quota/hand-limit 同构。
 
 import type { GameState } from '../types';
+import { aliveSeatOrdinal, applyDistanceMods, ringSeatDistance, withinAttackRange } from './distance-core';
 import { createProviderRegistry } from './provider-registry';
 import { getDistanceAttackMod, getDistanceDefenseMod, getDistanceAttackRange } from './vars-keys';
-
-/**
- * 环形座位距离(只算存活玩家)。
- * 两人之间最短的顺时针/逆时针步数,跳过死亡玩家。
- */
-function seatDistance(aliveCount: number, fromIdx: number, toIdx: number): number {
-  if (aliveCount <= 1) return 0;
-  const d = Math.abs(fromIdx - toIdx);
-  return Math.min(d, aliveCount - d);
-}
 
 /**
  * 两人之间的实际距离(from 看 to)。
@@ -35,17 +26,16 @@ export function effectiveDistance(state: GameState, from: number, to: number, ca
   // 豁免器命中视为距离 1(可被所有距离检查放行)。
   if (isDistanceExempted(state, from, to, cardId)) return 1;
   const alive = state.players.filter((p) => p.alive);
-  const aliveFrom = alive.findIndex((p) => p.index === from);
-  const aliveTo = alive.findIndex((p) => p.index === to);
+  const aliveFrom = aliveSeatOrdinal(alive, from);
+  const aliveTo = aliveSeatOrdinal(alive, to);
+  // 守卫顺序与 view 侧(viewDistance.ts)不同:先判未命中存活序列(→ 无限远),
+  // 再进环形公式(存活 ≤ 1 → 0)。公式/定位器共享 rules/distance-core.ts。
   if (aliveFrom < 0 || aliveTo < 0) return Infinity;
-  let dist = seatDistance(alive.length, aliveFrom, aliveTo);
-  // 进攻修正:缩短距离(进攻马/马术)
+  const seatDist = ringSeatDistance(alive.length, aliveFrom, aliveTo);
+  // 进攻修正:缩短距离(进攻马/马术);防御修正:增加距离(防御马)——公式见 distance-core。
   const attackMod = getDistanceAttackMod(state.players[from].vars) ?? 0;
-  dist -= attackMod;
-  // 防御修正:增加距离(防御马)
   const defenseMod = getDistanceDefenseMod(state.players[to].vars) ?? 0;
-  dist += defenseMod;
-  return Math.max(1, dist);
+  return applyDistanceMods(seatDist, attackMod, defenseMod);
 }
 
 /**
@@ -67,7 +57,7 @@ export function inAttackRange(
   if (from === to) return false;
   if (isAttackRangeExempted(state, from, to, cardId)) return true;
   const range = getDistanceAttackRange(state.players[from].vars) ?? 1;
-  return effectiveDistance(state, from, to) <= range;
+  return withinAttackRange(effectiveDistance(state, from, to), range);
 }
 
 // ─── 攻击范围豁免器(state-bound 注册表,镜像 slash-quota 的 provider 模式) ───

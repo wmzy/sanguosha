@@ -65,6 +65,7 @@ import { useAnimationState } from '../hooks/useAnimationState';
 import { useCardMoveAnimation } from '../hooks/useCardMoveAnimation';
 import { useSkillActions } from '../hooks/useSkillActions';
 import { usePendingState } from '../hooks/usePendingState';
+import { respondCandidateCountOf } from '../hooks/usePlayInteraction/respond';
 import { useCharSelect } from '../hooks/useCharSelect';
 import { useSeatOrder } from '../hooks/useSeatOrder';
 import { useHandReorder } from '../hooks/useHandReorder';
@@ -172,7 +173,7 @@ export function GameViewComponentImpl({
     isDiscardPhase,
     discardMin,
     discardMax,
-    skippedBroadcast,
+    broadcastSkipped,
     markBroadcastSkipped,
     deadline,
     deadlineTotalMs,
@@ -331,9 +332,9 @@ export function GameViewComponentImpl({
   } = play;
 
   const isMyAwaiting = isPerspectiveAwaiting && canOperate;
-  // 广播型 pending(无懈可击等)当前视角已点「不回应」:本地标记跳过,
-  // 隐藏自己的倒计时和「不回应」按钮(广播型 pending 仍在,其他座次照常显示)。
-  const broadcastSkipped = pendingTargetIdx < 0 && skippedBroadcast.has(broadcastKey);
+  // 广播型 pending(无懈可击等)当前视角已点「不回应」的本地跳过标记:
+  // broadcastSkipped 由 usePendingState 统一派生(隐藏自己的倒计时和「不回应」
+  // 按钮;广播型 pending 仍在,其他座次照常显示)。
 
   // ─── 手牌可选性判定(渲染循环与数字键快捷键共用)───
   // 与点击置灰严格同源:自由出牌 canPlay(无 use 入口/未激活的牌置灰)、respond 回应
@@ -537,14 +538,21 @@ export function GameViewComponentImpl({
     (pending?.prompt?.type === 'useCard' || pending?.prompt?.type === 'useCardAndTarget');
 
   // ─── 回应窗口候选数(0 时动作条显示「一键不回应」,替代置灰的「打出」)───
-  // 注意必须在 isRespondPending 定义之后(同源计算条件)。计数用共享候选集
-  // respondCandidates(含装备区候选,界鬼才只持可换判定牌的装备时不误报 0),
-  // 与 AwaitingPrompt 的 respondableCount 同判据;无 filter(非卡牌回应)时
-  // 保持 null(未知),与 AwaitingPrompt 的 0(无)语义由调用方区分。
-  const respondCandidateCount = useMemo(() => {
-    if (!isRespondPending || !pendingRespondInfo?.cardFilter) return null;
-    return respondCandidates.length;
-  }, [isRespondPending, pendingRespondInfo, respondCandidates]);
+  // 判据单一口径在 usePlayInteraction/respond.ts 的 respondCandidateCountOf(与
+  // AwaitingPrompt 的可选数文案同源,含装备区候选,界鬼才只持可换判定牌的装备时
+  // 不误报 0);无 filter(非卡牌回应)时为 null(未知),与 0(无)语义由消费方
+  // 区分。此处 memo 一次,CenterActionBar 与 AwaitingPrompt 取同一值。
+  const respondCandidateCount = useMemo(
+    () =>
+      respondCandidateCountOf(
+        isMyAwaiting,
+        isDiscardPhase,
+        pending,
+        pendingRespondInfo,
+        respondCandidates.length,
+      ),
+    [isMyAwaiting, isDiscardPhase, pending, pendingRespondInfo, respondCandidates],
+  );
   const showCenterActionBar =
     isRespondPending ||
     (canOperate && !!selectedActive && !!transformMode) ||
@@ -646,8 +654,9 @@ export function GameViewComponentImpl({
         },
   );
 
-  // 底栏自己的大卡是否可作为目标（铁索连环含自己）。与 SeatArcLayout 的
-  // selectedNeedsTarget 同源：选目标阶段 + 自己可被选（allowSelf/selfTarget）。
+  // 底栏自己的大卡是否可作为目标（铁索连环含自己）：选目标模式四来源
+  // (出牌 needsTarget / distribute 外部目标 / 回应窗口需目标 / 主动技选目标)。
+  // SeatArcLayout 的 selectedNeedsTarget 直接复用本值(原两处各写一遍同一 OR)。
   const selfInTargetMode =
     (!!playRules && playRules.needsTarget) ||
     (isDistributeActive && !!activeDistribute?.externalTargetSelection) ||
@@ -739,12 +748,7 @@ export function GameViewComponentImpl({
                   <SeatArcLayout
                     orderedPlayers={orderedPlayers}
                     currentPlayerName={currentPlayerName}
-                    selectedNeedsTarget={
-                      (!!playRules && playRules.needsTarget) ||
-                      (isDistributeActive && !!activeDistribute?.externalTargetSelection) ||
-                      respondNeedsTarget ||
-                      skillTargetMode
-                    }
+                    selectedNeedsTarget={selfInTargetMode}
                     selectedTargetNames={
                       // 独立选中态(distribute 外部目标/回应窗口目标)经 overrideNames
                       // 优先提供,其余走出牌选中态统一口径 selectedTargetNamesOf
@@ -791,11 +795,9 @@ export function GameViewComponentImpl({
                           pending.prompt.type !== 'distribute' && (
                             <AwaitingPrompt
                               pending={pending}
-                              pendingTargetIdx={pendingTargetIdx}
-                              respondCandidates={respondCandidates}
+                              broadcastSkipped={broadcastSkipped}
+                              respondCandidateCount={respondCandidateCount}
                               pendingRespondInfo={pendingRespondInfo}
-                              broadcastKey={broadcastKey}
-                              skippedBroadcast={skippedBroadcast}
                               processingPicks={processingPicks}
                               autoSkipPrefs={autoSkipPrefs}
                               onToggleAutoSkip={toggleAutoSkip}

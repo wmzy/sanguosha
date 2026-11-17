@@ -18,7 +18,6 @@
 import type {
   FrontendAPI,
   GameState,
-  GameView,
   HookResult,
   Skill,
 } from '../types';
@@ -27,14 +26,16 @@ import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { registerFlipSkipTurnHooks } from '../flows/face-down';
 import { skipPhase } from '../rules/skip-phase';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
-import { runVirtualSlash } from './cards/_virtualSlash';
+import { defineConfirmAction } from '../util/skillRuntime';
 import {
   FLIP_TAG,
   SKIP_MO_TAG,
   SKIP_PLAY_TAG,
   registerShensuTagSkipHook,
   shensuPhaseEntry,
+  askShensuConfirm,
+  askShensuKillTarget,
+  runShensuVirtualSlash,
 } from './神速';
 
 // 请求类型(requestType)——保持 神速/ 前缀(界版键名约定)
@@ -72,36 +73,6 @@ function equipCardIds(state: GameState, player: number): string[] {
   const p = state.players[player];
   if (!p) return [];
   return Object.values(p.equipment).filter((id): id is string => !!id);
-}
-
-/** 询问选择一个虚拟杀目标(其他存活角色)。
- *  无其他存活角色时直接返回 undefined,避免创建 0 候选的 choosePlayer 询问
- *  (preResolve 不处理 choosePlayer filter,会导致玩家卡等超时)。 */
-async function askKillTarget(
-  state: GameState,
-  ownerId: number,
-  label: string,
-): Promise<number | undefined> {
-  const hasTarget = state.players.some((p, i) => i !== ownerId && p.alive);
-  if (!hasTarget) return undefined;
-  delete state.localVars[TARGET_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: TARGET_RT,
-    target: ownerId,
-    prompt: {
-      type: 'choosePlayer',
-      title: `${label}:选择一名其他角色(视为出杀,无距离限制)`,
-      min: 1,
-      max: 1,
-      filter: (_view: GameView, t: number) =>
-        t !== ownerId && state.players[t]?.alive === true,
-    },
-    timeout: 15,
-  });
-  const t = state.localVars[TARGET_KEY] as number | undefined;
-  delete state.localVars[TARGET_KEY];
-  return t;
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {
@@ -155,38 +126,17 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // ── 逐项询问 ──────────────────────────────────
       // 选项1:跳过判定+摸牌
-      const opt1 = await askConfirm(ctx.state, OPT1_RT, ownerId, {
-        confirmedKey: CONFIRMED_KEY,
-        title: '是否发动界神速①?(跳过判定+摸牌,视为出杀)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-        defaultChoice: false,
-        timeout: 10,
-      });
+      const opt1 = await askShensuConfirm(ctx.state, ownerId, OPT1_RT, '是否发动界神速①?(跳过判定+摸牌,视为出杀)');
 
       // 选项2:弃装备+跳过出牌(仅有装备时询问)
       let opt2 = false;
       const equipCount = equipCardIds(ctx.state, ownerId).length;
       if (equipCount > 0) {
-        opt2 = await askConfirm(ctx.state, OPT2_RT, ownerId, {
-          confirmedKey: CONFIRMED_KEY,
-          title: '是否发动界神速②?(弃置一张装备牌,跳过出牌,视为出杀)',
-          confirmLabel: '发动',
-          cancelLabel: '不发动',
-          defaultChoice: false,
-          timeout: 10,
-        });
+        opt2 = await askShensuConfirm(ctx.state, ownerId, OPT2_RT, '是否发动界神速②?(弃置一张装备牌,跳过出牌,视为出杀)');
       }
 
       // 选项3:翻面+跳过弃牌
-      const opt3 = await askConfirm(ctx.state, OPT3_RT, ownerId, {
-        confirmedKey: CONFIRMED_KEY,
-        title: '是否发动界神速③?(翻面,跳过弃牌,视为出杀)',
-        confirmLabel: '发动',
-        cancelLabel: '不发动',
-        defaultChoice: false,
-        timeout: 10,
-      });
+      const opt3 = await askShensuConfirm(ctx.state, ownerId, OPT3_RT, '是否发动界神速③?(翻面,跳过弃牌,视为出杀)');
 
       // 三项全否 → 未发动神速
       if (!opt1 && !opt2 && !opt3) {
@@ -204,10 +154,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
         // 选项1:选目标 → 加跳过摸牌标签 → 虚拟杀
         // (先确认目标再付代价,避免超时/无目标白付跳过代价;同标版先选目标后结算)
         if (opt1 && self.alive) {
-          const target = await askKillTarget(ctx.state, ownerId, '界神速①');
+          const target = await askShensuKillTarget(ctx.state, ownerId, TARGET_RT, '界神速①');
           if (typeof target === 'number' && ctx.state.players[target]?.alive) {
             await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_MO_TAG });
-            await runVirtualSlash(ctx.state, ownerId, target, { prefix: '界神速', charge: true });
+            await runShensuVirtualSlash(ctx.state, ownerId, target, '界神速');
             opt1Settled = true;
           }
         }
@@ -233,11 +183,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
           const equipCardIdRaw = ctx.state.localVars[EQUIP_KEY] as string | undefined;
           delete ctx.state.localVars[EQUIP_KEY];
           if (equipCardIdRaw && equipCardIds(ctx.state, ownerId).includes(equipCardIdRaw)) {
-            const target = await askKillTarget(ctx.state, ownerId, '界神速②');
+            const target = await askShensuKillTarget(ctx.state, ownerId, TARGET_RT, '界神速②');
             if (typeof target === 'number' && ctx.state.players[target]?.alive) {
               await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_PLAY_TAG });
               await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds: [equipCardIdRaw], voluntary: true });
-              await runVirtualSlash(ctx.state, ownerId, target, { prefix: '界神速', charge: true });
+              await runShensuVirtualSlash(ctx.state, ownerId, target, '界神速');
             }
           }
           // 无效选择/无目标 → 选项2未生效(不弃牌、不跳过出牌、不虚拟杀)
@@ -246,11 +196,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
         // 选项3:选目标 → 加跳过弃牌标签 + 翻面(加翻面标签) → 虚拟杀
         // (先确认目标再付翻面代价,避免超时/无目标白付翻面代价)
         if (opt3 && self.alive) {
-          const target = await askKillTarget(ctx.state, ownerId, '界神速③');
+          const target = await askShensuKillTarget(ctx.state, ownerId, TARGET_RT, '界神速③');
           if (typeof target === 'number' && ctx.state.players[target]?.alive) {
             await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_DISCARD_TAG });
             await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: FLIP_TAG });
-            await runVirtualSlash(ctx.state, ownerId, target, { prefix: '界神速', charge: true });
+            await runShensuVirtualSlash(ctx.state, ownerId, target, '界神速');
           }
         }
       } finally {

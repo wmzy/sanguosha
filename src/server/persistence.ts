@@ -1,6 +1,7 @@
 // src/server/persistence.ts
 import { writeFile, readFile, unlink, rename, mkdir, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { ROOMS_DATA_DIR } from './paths';
 import type { ActionLogEntry, GameState } from '../engine/types';
 import { RealClock } from '../engine/core/clock';
 import { register as registerLifecycle } from './resourceRegistry';
@@ -10,8 +11,6 @@ import { createLogger, normalizeError } from './logger';
 // 函数级循环依赖(persistence→eventJournal→snapshot→persistence):所有交叉引用均在
 // 函数体内调用,模块求值期无访问,ESM 下安全。详见 eventJournal.ts 头部注释。
 import { removeEventJournal } from './eventJournal';
-
-const DATA_DIR = join(process.cwd(), 'data', 'rooms');
 
 const log = createLogger('persistence');
 
@@ -59,7 +58,7 @@ interface PersistedWrapper {
 }
 
 async function ensureDir(): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true });
+  await mkdir(ROOMS_DATA_DIR, { recursive: true });
 }
 
 function filePath(roomId: string): string {
@@ -68,7 +67,7 @@ function filePath(roomId: string): string {
   if (!isSafeRoomId(roomId)) {
     throw new Error(`拒绝为非法 roomId 生成持久化路径: ${roomId}`);
   }
-  return join(DATA_DIR, `${roomId}.json`);
+  return join(ROOMS_DATA_DIR, `${roomId}.json`);
 }
 
 async function writeNow(roomId: string, wrapper: PersistedWrapper): Promise<void> {
@@ -86,6 +85,24 @@ async function writeNow(roomId: string, wrapper: PersistedWrapper): Promise<void
     log.err(`save failed for room ${roomId}`, err);
     throw normalizeError(err);
   }
+}
+
+/** 「墓碑复查(可选) + 建目录 + 写盘」的单点封装(排入房间串行链执行)。
+ *  debounce 回调与 flushPendingWrites 开启链内墓碑复查:墓碑命中(删除进行中/
+ *  已删除)时静默跳过,不得复活持久化文件。
+ *  immediate 路径不复查:其墓碑检查在 saveRoom 入口已完成,且同房间串行链保证
+ *  删除任务必排在本次写入之后(写入不越删除);复查反而会把「写入先入队、删除
+ *  后发起」的合法竞态误判为已删除而丢写(门控竞态用例依赖写入必达 fs.writeFile)。 */
+function writeWrapperGuarded(
+  roomId: string,
+  wrapper: PersistedWrapper,
+  recheckTombstone = true,
+): Promise<void> {
+  return enqueueRoom(roomId, async () => {
+    if (recheckTombstone && deletedRoomIds.has(roomId)) return;
+    await ensureDir();
+    await writeNow(roomId, wrapper);
+  });
 }
 
 async function readWrapperFromDisk(roomId: string): Promise<PersistedWrapper | null> {
@@ -210,10 +227,7 @@ export async function saveRoom(
       pendingTimers.delete(roomId);
     }
     pendingWrappers.delete(roomId);
-    return enqueueRoom(roomId, async () => {
-      await ensureDir();
-      await writeNow(roomId, wrapper);
-    });
+    return writeWrapperGuarded(roomId, wrapper, false);
   }
 
   // 只保留最新 debounce 快照。timer 身份检查可防止已清除的旧回调回写。
@@ -227,11 +241,7 @@ export async function saveRoom(
     if (!current || current !== wrapper) return;
     pendingWrappers.delete(roomId);
     if (deletedRoomIds.has(roomId)) return;
-    void enqueueRoom(roomId, async () => {
-      if (deletedRoomIds.has(roomId)) return;
-      await ensureDir();
-      await writeNow(roomId, wrapper);
-    }).catch(() => {
+    void writeWrapperGuarded(roomId, wrapper).catch(() => {
       // writeNow 已记录错误;定时写失败不得产生未处理 rejection,也不得毒化后续队列。
     });
   }, DEBOUNCE_MS);
@@ -292,7 +302,7 @@ export async function deletePersistedRoom(roomId: string): Promise<void> {
 
 export async function listPersistedRooms(): Promise<string[]> {
   await ensureDir();
-  const entries = await readdir(DATA_DIR);
+  const entries = await readdir(ROOMS_DATA_DIR);
   return entries.filter((f) => f.endsWith('.json')).map((f) => f.replace(/\.json$/, ''));
 }
 
@@ -304,13 +314,7 @@ export async function flushPendingWrites(): Promise<void> {
     pendingTimers.delete(roomId);
     pendingWrappers.delete(roomId);
     if (deletedRoomIds.has(roomId)) continue;
-    pending.push(
-      enqueueRoom(roomId, async () => {
-        if (deletedRoomIds.has(roomId)) return;
-        await ensureDir();
-        await writeNow(roomId, wrapper);
-      }),
-    );
+    pending.push(writeWrapperGuarded(roomId, wrapper));
   }
   // 快照本身可能在 flush 扫描后才进入房间链;等待当前链尾即可确保本次 flush 的所有排队 IO 完成。
   for (const chain of roomChains.values()) pending.push(chain);

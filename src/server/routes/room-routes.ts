@@ -17,6 +17,8 @@ import {
   isRoomFull,
   bindPlayerRoom,
   setRoomPassword,
+  isValidPlayerCount,
+  PLAYER_COUNT_ERROR,
   type KickFailureReason,
 } from '../room';
 import { destroyRoomCompletely } from '../teardown';
@@ -40,8 +42,8 @@ import {
   requireRoom,
   requireRoomPassword,
   requireSessionHost,
-  resolveActorOr401,
   resolvePlayerOrRespond,
+  resolveRoomRequestActor,
 } from './helpers';
 
 const log = createLogger('rest');
@@ -91,8 +93,8 @@ export function applyRoomRoutes(app: Hono): void {
     const name =
       (typeof raw.name === 'string' ? raw.name.trim() : '') || `房间${Date.now().toString(36)}`;
     const maxPlayers = typeof raw.maxPlayers === 'number' ? raw.maxPlayers : 2;
-    if (maxPlayers < 2 || maxPlayers > 8) {
-      return c.json({ error: '最大玩家数须在2-8之间' }, 400);
+    if (!isValidPlayerCount(maxPlayers)) {
+      return c.json({ error: PLAYER_COUNT_ERROR }, 400);
     }
     const config = raw.config ? normalizeRoomConfig(raw.config) : undefined;
     const roomType: 'normal' | 'quick' =
@@ -179,8 +181,8 @@ export function applyRoomRoutes(app: Hono): void {
   app.post('/api/debug-room', async (c) => {
     const raw = await readJsonBody(c);
     const playerCount = typeof raw.playerCount === 'number' ? raw.playerCount : 5;
-    if (playerCount < 2 || playerCount > 8) {
-      return c.json({ error: '玩家人数须在2-8之间' }, 400);
+    if (!isValidPlayerCount(playerCount)) {
+      return c.json({ error: PLAYER_COUNT_ERROR }, 400);
     }
 
     try {
@@ -255,12 +257,14 @@ export function applyRoomRoutes(app: Hono): void {
     const roomId = c.req.param('id');
     const raw = await readJsonBody(c);
     // 非调试房间:登录用户只能离开自己的座位(忽略伪造的 playerId)。
-    // 房间不存在时同样要求登录(getRoom()?.isDebug 对 null 房为 undefined → 鉴权)。
-    const actor = await resolveActorOr401(c, getRoom(roomId)?.isDebug !== true, optString(raw.playerId));
+    // 房间不存在时同样要求登录(fail-closed,见 resolveRoomRequestActor)。
+    const actor = await resolveRoomRequestActor(c, roomId, optString(raw.playerId));
     if (actor.response) return actor.response;
     const playerId = actor.playerId;
     if (!playerId) return c.json({ error: '缺少 playerId' }, 400);
 
+    // roomBefore 在身份解析之后读取(与原实现同时序):auth await 期间房间可能
+    // 被并发删除,这里要的是 leaveRoom 前的最新快照,不用 actor.room。
     const roomBefore = getRoom(roomId);
     const isNormal = roomBefore?.roomType === 'normal';
 
@@ -286,9 +290,10 @@ export function applyRoomRoutes(app: Hono): void {
     const targetPlayerId = typeof raw.targetPlayerId === 'string' ? raw.targetPlayerId : '';
     if (!targetPlayerId) return c.json({ error: '缺少参数' }, 400);
 
-    // 非调试房间:房主身份由会话决定(登录用户 id 必须 === room.hostId)
-    const room0 = getRoom(roomId);
-    const actor = await resolveActorOr401(c, !!room0 && !room0.isDebug, optString(raw.playerId));
+    // 非调试房间:房主身份由会话决定(登录用户 id 必须 === room.hostId)。
+    // 房间不存在时同样要求登录(fail-closed;原实现不鉴权直接落到 kickPlayer
+    // 的 roomNotFound 400,属有意收紧)。
+    const actor = await resolveRoomRequestActor(c, roomId, optString(raw.playerId));
     if (actor.response) return actor.response;
     const playerId = actor.playerId;
     if (!playerId || !targetPlayerId) return c.json({ error: '缺少参数' }, 400);
@@ -350,13 +355,11 @@ export function applyRoomRoutes(app: Hono): void {
   // 修改后已入房成员不受影响,仅约束后续加入者。
   app.put('/api/rooms/:id/password', async (c) => {
     const roomId = c.req.param('id');
-    const room = requireRoom(c, roomId);
-    if (room instanceof Response) return room;
-
     const raw = await readJsonBody(c);
-    // 非调试房间:房主身份由会话决定
-    const actor = await resolveActorOr401(c, !room.isDebug, optString(raw.playerId));
+    // 房间不存在回 404;非调试房间房主身份由会话决定(见 resolveRoomRequestActor)
+    const actor = await resolveRoomRequestActor(c, roomId, optString(raw.playerId), { requireRoom: true });
     if (actor.response) return actor.response;
+    const room = actor.room;
     const forbidden = requireHost(c, room, actor.playerId, '只有房主可以修改密码');
     if (forbidden) return forbidden;
     if (room.status !== '等待中') {

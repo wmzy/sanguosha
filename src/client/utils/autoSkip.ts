@@ -168,3 +168,75 @@ export function decideAutoSkipForView(input: {
   const handCount = view.players[viewer]?.handCount ?? 0;
   return decideAutoSkip({ pending, canRespond, handCount, prefs, delayRange: input.delayRange, rng: input.rng });
 }
+
+// ─── 自动跳过调度器(框架无关) ────────────────────────────────
+
+/** 自动跳过调度器:封装「清上一定时器 → deadline 去重 → 决策 → act-now 立即 /
+ *  act-delayed setTimeout → 触发时校验 deadline 未变(防串扰)」的编排,
+ *  供 React hook(useAutoSkip)与 HeadlessGameClient(maybeAutoSkipBroadcast)
+ *  共享,两端时序语义一致。 */
+export interface AutoSkipScheduler {
+  /** 通知 pending 窗口(重新)评估:先清上一个未触发的定时器,再按 deadline 去重
+   *  (同一窗口只决策一次);decide 仅在通过去重后调用。act-now 立即触发 fire,
+   *  act-delayed 延迟 ms 触发(触发前校验窗口未变)。 */
+  schedule(pending: PendingView, decide: () => AutoSkipDecision): void;
+  /** 清理未触发的延迟定时器(保留 deadline 去重状态;pending 消失/卸载/断开时调)。 */
+  cancel(): void;
+  /** 清定时器并重置 deadline 去重状态(对局重置回大厅时调)。 */
+  reset(): void;
+}
+
+/**
+ * 创建自动跳过调度器。
+ * @param getLatestPending 读取当前最新 pending:延迟触发时校验窗口未变(防串扰
+ *   双保险——延迟期间 view 可能推进到新 pending 如杀问询,旧 skip 不得误作用于
+ *   新窗口;主防御是 schedule/cancel 的清理,此处比对决策时 deadline 拦截漏网)。
+ * @param fire 触发 skip(立即或延迟到点;deadline 已校验未变)。参数为决策时的
+ *   pending(广播型标记等需要决策时上下文时使用)。 */
+export function createAutoSkipScheduler(
+  getLatestPending: () => PendingView | null,
+  fire: (pending: PendingView) => void,
+): AutoSkipScheduler {
+  /** 未触发的延迟 skip 定时器 */
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  /** 已自动跳过的 pending deadline 去重键(deadline ?? 0;同一窗口只跳一次) */
+  let skippedDeadline: number | null = null;
+
+  const cancel = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+
+  return {
+    schedule(pending, decide) {
+      // 清理上一个未触发的延迟 skip(防串扰:view 已推进到新 pending,旧 skip 不应再发)
+      cancel();
+      // 去重:同一窗口(deadline)只决策一次
+      const deadline = pending.deadline ?? 0;
+      if (deadline === skippedDeadline) return;
+      const decision = decide();
+      if (decision.kind === 'wait') return;
+      skippedDeadline = deadline;
+      const fireGuarded = () => {
+        const cur = getLatestPending();
+        if (!cur || (cur.deadline ?? 0) !== deadline) return;
+        fire(pending);
+      };
+      if (decision.kind === 'act-now') {
+        fireGuarded();
+      } else {
+        timer = setTimeout(() => {
+          timer = null;
+          fireGuarded();
+        }, decision.ms);
+      }
+    },
+    cancel,
+    reset() {
+      cancel();
+      skippedDeadline = null;
+    },
+  };
+}

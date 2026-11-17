@@ -38,39 +38,11 @@ export const promptBox = css`
     pointer-events: none;
   }
 `;
-// 等待回应面板:与 promptBox 同一横幅形态(金铜描边,靠标题/按钮语义区分紧迫感)
-export const promptBoxAwaiting = css`
-  position: relative;
-  border: 1px solid #8a7448;
-  border-radius: 8px;
-  padding: 10px 14px 12px;
-  background: linear-gradient(#241d14f2, #171209f2);
-  box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
-    0 4px 16px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(6px);
-  width: min(720px, 92%);
-  margin: 0 auto;
-  box-sizing: border-box;
-  &::after {
-    content: '';
-    position: absolute;
-    left: 10px;
-    right: 10px;
-    bottom: 3px;
-    height: 2px;
-    border-radius: 1px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(232, 196, 122, 0.55) 18%,
-      rgba(240, 215, 138, 0.85) 50%,
-      rgba(232, 196, 122, 0.55) 82%,
-      transparent
-    );
-    pointer-events: none;
-  }
-`;
+// 等待回应面板:与 promptBox 同一横幅形态(金铜描边,靠标题/按钮语义区分紧迫感),
+// 无额外独有属性——直接复用 promptBox 基座类(原先逐字重复两份)。
+// 注:不能用 css`${promptBox}` 类插值——本仓库 wyw-in-js 构建下不内联类规则(非法
+// 声明,见 AuthPanel/InfoDock 的同类教训),类组合一律走 class 字符串拼接/别名。
+export const promptBoxAwaiting = promptBox;
 // 标题:金色粗体,前置「◆」小菱形装饰,字间距 2px
 export const promptTitle = css`
   color: #f0d78a;

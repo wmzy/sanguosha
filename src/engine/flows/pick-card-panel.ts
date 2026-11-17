@@ -128,13 +128,20 @@ export async function askPickTargetCard(
     spliceHandOrderEntry(state, target);
   }
 
-  // 超时默认选择:明牌优先(装备第一张→判定第一张),否则手牌[0]
-  const defaultZone =
-    equipment.length > 0
-      ? { zone: 'equipment', cardId: equipment[0].cardId }
+  // 超时默认选择:明牌优先(装备第一张→判定第一张),否则手牌[0]。
+  // 界奇才 before-hook 可能就地过滤装备——重算兜底时以过滤后列表再走同一优先级链,
+  // 故抽局部函数供「初始默认」与「过滤后重算」两处共用。
+  const chooseDefaultZone = (equipList: Array<{ cardId: string }>): {
+    zone: 'equipment' | 'judge' | 'hand';
+    cardId?: string;
+    handIndex?: number;
+  } =>
+    equipList.length > 0
+      ? { zone: 'equipment', cardId: equipList[0].cardId }
       : judge.length > 0
         ? { zone: 'judge', cardId: judge[0].cardId }
         : { zone: 'hand', handIndex: 0 };
+  const defaultZone = chooseDefaultZone(equipment);
   const hasTimeoutFallback = opts.timeoutFallback !== false;
 
   // 保留 atom 引用:before-hook(界奇才)会就地过滤 prompt.equipment,applyAtom 后回读
@@ -175,12 +182,7 @@ export async function askPickTargetCard(
   if (fallback.zone === 'equipment') {
     const stillThere = filteredEquip.some((e) => e.cardId === fallback.cardId);
     if (!stillThere) {
-      fallback =
-        filteredEquip.length > 0
-          ? { zone: 'equipment', cardId: filteredEquip[0].cardId }
-          : judge.length > 0
-            ? { zone: 'judge', cardId: judge[0].cardId }
-            : { zone: 'hand', handIndex: 0 };
+      fallback = chooseDefaultZone(filteredEquip);
     }
   }
   const zone = result?.zone ?? fallback.zone;
@@ -226,18 +228,7 @@ export async function runPickTargetCardPanel(
   });
   if (!selection) return;
 
-  if (selection.zone === 'equipment') {
-    if (obtain) {
-      await applyAtom(state, {
-        type: '获得',
-        player: from,
-        cardId: selection.cardId,
-        from: target,
-      });
-    } else {
-      await applyAtom(state, { type: '弃置', player: target, cardIds: [selection.cardId] });
-    }
-  } else if (selection.zone === 'judge') {
+  if (selection.zone === 'judge') {
     const trick = targetPlayer.pendingTricks.find((t) => t.card.id === selection.cardId);
     if (trick) {
       await applyAtom(state, { type: '移除延时锦囊', player: target, trickName: trick.name });
@@ -249,17 +240,18 @@ export async function runPickTargetCardPanel(
         await discardJudgeZoneCard(state, target, selection.cardId);
       }
     }
+    return;
+  }
+  // equipment 与 hand 的转移同构(两分支四行逐字相同,合并):
+  //   obtain=获得(给 from);discard=弃置(由牌主 target 弃)。
+  if (obtain) {
+    await applyAtom(state, {
+      type: '获得',
+      player: from,
+      cardId: selection.cardId,
+      from: target,
+    });
   } else {
-    // hand:盲选
-    if (obtain) {
-      await applyAtom(state, {
-        type: '获得',
-        player: from,
-        cardId: selection.cardId,
-        from: target,
-      });
-    } else {
-      await applyAtom(state, { type: '弃置', player: target, cardIds: [selection.cardId] });
-    }
+    await applyAtom(state, { type: '弃置', player: target, cardIds: [selection.cardId] });
   }
 }

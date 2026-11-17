@@ -25,10 +25,9 @@ import { createLogger } from './logger';
 import { register as registerLifecycle } from './resourceRegistry';
 import { createRoomSerialChain } from './serialChain';
 import { isSafeRoomId } from './safeId';
+import { ROOMS_DATA_DIR } from './paths';
 
 const log = createLogger('eventJournal');
-
-const DATA_DIR = join(process.cwd(), 'data', 'rooms');
 
 /** 已确认存在的 journal 目录(避免每次 append 都 mkdir)。 */
 const ensuredDirs = new Set<string>();
@@ -47,7 +46,7 @@ function journalPath(roomId: string): string | null {
     log.warn(`拒绝为非法 roomId 生成 journal 路径: ${roomId}`);
     return null;
   }
-  return join(DATA_DIR, `${roomId}.events.jsonl`);
+  return join(ROOMS_DATA_DIR, `${roomId}.events.jsonl`);
 }
 
 /** 追加被裁剪的 atomHistory 条目到 journal,每行 JSON:{ epoch, ...entry }。

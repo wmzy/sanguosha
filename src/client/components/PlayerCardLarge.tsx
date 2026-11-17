@@ -18,7 +18,6 @@ import {
   skillActionVariants,
   hasBlockingPending,
 } from '../utils/gameViewHelpers';
-import { SUIT_COLOR } from './gameViewConstants';
 import { getSkillDescription } from '../../engine/skills/lifecycle';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import type { HpChangeNumber } from '../hooks/useAnimationState';
@@ -31,6 +30,8 @@ import {
   identityStampClass,
 } from '../utils/characterVisuals';
 import { HpFloatNumber } from '../utils/HpFloatNumber';
+import { isPlayerChained, isPlayerDead } from '../utils/characterDerived';
+import { BadgeGroup, HandCountChip, JudgeTagRow } from './characterAnatomy';
 import { useGameView } from './GameViewCtx';
 
 export interface PlayerCardLargeProps {
@@ -85,9 +86,9 @@ export function PlayerCardLargeImpl({
   const p = view.players[perspectiveIdx];
   if (!p) return null;
 
-  const isDead = !p.alive;
+  const isDead = isPlayerDead(p);
   // 横置(铁索连环):marks 含 'chained' —— 大卡给出铁链光泽 + 连环徽章
-  const isChained = p.marks.some((m) => m.id === 'chained');
+  const isChained = isPlayerChained(p);
   // 势力信息(与座位卡/选将遮罩共享派生,见 utils/characterVisuals)
   const { factionColor, charImg } = getCharacterCardVisuals(p.character);
   const identity = p.identity;
@@ -165,15 +166,18 @@ export function PlayerCardLargeImpl({
       >
         <div className={styles.playerCardHeaderTop}>
           <span className={styles.playerCardName}>{p.name}</span>
-          <div className={styles.playerCardBadges}>
-            {perspectiveIdx === viewer && <span className={styles.playerCardBadgeYou}>我</span>}
-            {isPerspectiveTurn && <span className={styles.playerCardBadgeTurn}>回合</span>}
-            {isChained && (
-              <span className={styles.playerCardBadgeChain} title="横置·铁索连环">
-                ⛓
-              </span>
-            )}
-          </div>
+          <BadgeGroup
+            classes={{
+              group: styles.playerCardBadges,
+              you: styles.playerCardBadgeYou,
+              turn: styles.playerCardBadgeTurn,
+              chain: styles.playerCardBadgeChain,
+              offline: '',
+            }}
+            isYou={perspectiveIdx === viewer}
+            isTurn={isPerspectiveTurn}
+            isChained={isChained}
+          />
         </div>
       </div>
       {/* 卡内左缘竖带:身份章 + 竖排武将名 + 体力数字 */}
@@ -270,31 +274,18 @@ export function PlayerCardLargeImpl({
           })}
         </div>
       )}
-      {/* 判定区 */}
-      {(p.pendingTricks?.length ?? 0) > 0 && (
-        <div className={styles.playerCardJudgeRow}>
-          <span className={styles.playerCardJudgeLabel}>判定:</span>
-          {(p.pendingTricks ?? []).map((cardId: string) => {
-            const card = view.cardMap[cardId];
-            const suitColor = SUIT_COLOR[card?.suit ?? '♠'] ?? '#ccc';
-            return (
-              <span
-                key={cardId}
-                className={styles.playerCardJudgeTag}
-                style={{ '--suit-color': suitColor } as React.CSSProperties}
-                title={card?.description ?? card?.name ?? cardId}
-              >
-                {card?.name ?? cardId}
-                {card ? ` ${card.suit}${card.rank}` : ''}
-              </span>
-            );
-          })}
-        </div>
-      )}
-      {/* 手牌数角标 */}
-      <span className={styles.playerCardHandChip} title={`手牌: ${p.handCount}`}>
-        🂠 {p.handCount}
-      </span>
+      {/* 判定区(延时锦囊):共享实现见 characterAnatomy.JudgeTagRow */}
+      <JudgeTagRow
+        cardIds={p.pendingTricks ?? []}
+        cardMap={view.cardMap}
+        classes={{
+          row: styles.playerCardJudgeRow,
+          label: styles.playerCardJudgeLabel,
+          tag: styles.playerCardJudgeTag,
+        }}
+      />
+      {/* 手牌数角标(共享实现见 characterAnatomy) */}
+      <HandCountChip className={styles.playerCardHandChip} count={p.handCount} />
       </div>
       </div>
     </>

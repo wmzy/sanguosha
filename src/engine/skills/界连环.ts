@@ -24,27 +24,18 @@
 //
 // 模式参考:标连环.ts(转化/重铸)、界火计.ts(覆盖 DEFAULT_SKILLS 中 card skill 的 use)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply';
-import { popFrame, pushFrame, frameCards } from '../core/frame';
-import { setChain } from '../flows/face-down';
-import { registerAction, validateUseCard } from '../core/skill';
+import { registerAction } from '../core/skill';
 import {
   mountTransformAction,
   registerTransformAction,
   type TransformActionOptions,
 } from '../util/skillRuntime';
 import { registerRecycleAction } from './连环';
-import { promptCancel } from '../flows/cancel';
+import { makeChainUseHandlers } from './cards/铁索连环';
 import { defaultPlayActive } from '../rules/action-active';
-
-const CHAIN_MARK = 'chained';
 
 /** 界庞统使用铁索连环的目标上限(标版 2,界版 +1 = 3) */
 const MAX_TARGETS = 3;
-
-function isChained(state: GameState, idx: number): boolean {
-  return state.players[idx]?.marks.some((m) => m.id === CHAIN_MARK) ?? false;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -111,61 +102,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ─── use action:覆盖标版铁索连环.use,本座次走界版结算(目标上限 3) ───
   // 铁索连环在 DEFAULT_SKILLS 中先实例化标版铁索连环.use;此处 registerAction 覆盖之(同 key 覆盖)。
   // 仅影响本座次(界庞统),其他座次的铁索连环仍走标版。
-  // 与标版唯一差异:targets.length 上限由 2 提升至 3(官方"多指定一个目标")。
-  registerAction(
-    state,
-    '铁索连环',
-    ownerId,
-    'use',
-    (state: GameState, params: Record<string, Json>) => {
-      const base = validateUseCard(state, ownerId, params, { cardName: '铁索连环' });
-      if (base) return base;
-      const targets = params.targets as number[] | undefined;
-      if (!Array.isArray(targets) || targets.length < 1 || targets.length > MAX_TARGETS)
-        return `需选择一至${MAX_TARGETS}名角色`;
-      for (const t of targets) {
-        if (!state.players[t]?.alive) return '目标不合法';
-      }
-      return null;
-    },
-    async (state: GameState, params: Record<string, Json>) => {
-      const from = ownerId;
-      const cardId = params.cardId as string;
-      const targets = params.targets as number[];
-      await pushFrame(state, '铁索连环', from, { ...params });
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-      try {
-        const cancelled = await promptCancel(state, { cardName: '无懈可击', broadcast: true }, from, from);
-        if (!cancelled) {
-          for (const t of targets) {
-            const chained = isChained(state, t);
-            await setChain(state, t, !chained);
-          }
-        }
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
-      } finally {
-        if (frameCards(state).includes(cardId)) {
-          await applyAtom(state, {
-            type: '移动牌',
-            cardId,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
-          });
-        }
-        await popFrame(state);
-      }
-    },
-  );
+  // 结算(帧/无懈询问参数/横置切换/异常清理)与标版逐字相同,由 cards/铁索连环.ts 的
+  // makeChainUseHandlers 共享;与标版唯一差异:targets.length 上限由 2 提升至 3
+  // (官方"多指定一个目标")。
+  const chainUse = makeChainUseHandlers(ownerId, MAX_TARGETS);
+  registerAction(state, '铁索连环', ownerId, 'use', chainUse.validate, chainUse.execute);
 
   return () => {};
 }

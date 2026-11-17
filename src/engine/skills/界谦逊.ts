@@ -29,8 +29,8 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { registerAfterHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond, defineConfirmAction } from '../util/skillRuntime';
 
 const CONFIRM_RT = '界谦逊/trigger';
 const CONFIRMED_KEY = '界谦逊/confirmed';
@@ -112,21 +112,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
   }
 
   // respond:回答谦逊确认
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      return requireRequestType(st, ownerId, [CONFIRM_RT], {
-        wrongTypeError: '当前不是请求回应',
-        mismatchError: '当前不是谦逊确认',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, CONFIRM_RT, CONFIRMED_KEY, {
+    mismatchError: '当前不是谦逊确认',
+    wrongTypeError: '当前不是请求回应',
+  });
 
   // ── 延时锦囊:放置到陆逊判定区 → 触发(天然唯一目标) ──
   registerAfterHook(state, skill.id, ownerId, '添加延时锦囊', async (ctx) => {

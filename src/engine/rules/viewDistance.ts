@@ -11,6 +11,7 @@
 // 注:本模块是前端 UI 判断距离/攻击范围的唯一实现(高亮/禁用)。
 
 import type { GameView } from '../types';
+import { aliveSeatOrdinal, applyDistanceMods, ringSeatDistance, withinAttackRange } from './distance-core';
 import {
   XIANZHEN_WIN_TARGET_VIEW_KEY,
   CHENGLUE_SUITS_VIEW_KEY,
@@ -37,7 +38,9 @@ function playerBySeat(
   return players.find((p) => p.index === idx);
 }
 
-/** GameView 上 from 到 to 的环形座位距离(只算存活玩家;仅本文件消费) */
+/** GameView 上 from 到 to 的环形座位距离(只算存活玩家;仅本文件消费)。
+ *  守卫顺序与引擎侧(distance.ts)不同:存活 ≤ 1 先返回 0,再按座次定位(未命中 → 无限远);
+ *  环形公式与座次定位器共享 rules/distance-core.ts。 */
 function viewSeatDistance(
   players: GameView['players'],
   fromIdx: number,
@@ -46,14 +49,13 @@ function viewSeatDistance(
   const alive = players.filter((p) => p.alive);
   const n = alive.length;
   if (n <= 1) return 0;
-  // 座位定位按 p.index(座次),与引擎侧 rules/distance.ts 的 `p.index === from` 同构。
-  // 不能按 name 匹配:昵称可重名 → findIndex 撞到第一个同名者,距离算错
+  // 座位定位按 p.index(座次),定位器与引擎侧共享(aliveSeatOrdinal)。
+  // 不能按 name 匹配:昵称可重名 → 撞到第一个同名者,距离算错
   // (view 玩家条目由 projectPlayer 投影,恒携带 index)。
-  const aliveFrom = alive.findIndex((p) => p.index === fromIdx);
-  const aliveTo = alive.findIndex((p) => p.index === toIdx);
+  const aliveFrom = aliveSeatOrdinal(alive, fromIdx);
+  const aliveTo = aliveSeatOrdinal(alive, toIdx);
   if (aliveFrom < 0 || aliveTo < 0) return Infinity;
-  const d = Math.abs(aliveFrom - aliveTo);
-  return Math.min(d, n - d);
+  return ringSeatDistance(n, aliveFrom, aliveTo);
 }
 
 // ─── 距离/攻击范围豁免登记表 ─────────────────────────────────
@@ -209,14 +211,15 @@ export function viewEffectiveDistance(
 ): number {
   // 豁免器命中视为距离 1(可被所有距离检查放行)。
   if (viewDistanceExempted(players, fromIdx, toIdx)) return 1;
-  let dist = viewSeatDistance(players, fromIdx, toIdx);
+  const dist = viewSeatDistance(players, fromIdx, toIdx);
   const fromP = playerBySeat(players, fromIdx);
   const toP = playerBySeat(players, toIdx);
-  // 进攻修正:缩短距离(进攻马/马术等)
-  dist -= fromP?.distanceVars?.attackMod ?? 0;
-  // 防御修正:增加距离(防御马等)
-  dist += toP?.distanceVars?.defenseMod ?? 0;
-  return Math.max(1, dist);
+  // 进攻修正:缩短距离(进攻马/马术等);防御修正:增加距离(防御马等)——公式见 distance-core。
+  return applyDistanceMods(
+    dist,
+    fromP?.distanceVars?.attackMod ?? 0,
+    toP?.distanceVars?.defenseMod ?? 0,
+  );
 }
 
 /** GameView 上 from 是否能对 to 出杀(基于 from 的攻击范围,徒手默认 1) */
@@ -227,8 +230,8 @@ export function viewCanAttack(
 ): boolean {
   if (fromIdx === toIdx) return false;
   // 与引擎 inAttackRange 同构:攻击范围豁免直接放行;
-  // 否则 effectiveDistance(含通用距离豁免)≤ 攻击范围。
+  // 否则 effectiveDistance(含通用距离豁免)≤ 攻击范围(比较共享 distance-core)。
   if (viewAttackRangeExempted(players, fromIdx, toIdx)) return true;
   const range = playerBySeat(players, fromIdx)?.distanceVars?.attackRange ?? 1;
-  return viewEffectiveDistance(players, fromIdx, toIdx) <= range;
+  return withinAttackRange(viewEffectiveDistance(players, fromIdx, toIdx), range);
 }

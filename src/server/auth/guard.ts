@@ -59,8 +59,9 @@ export type RoomActorResolution =
   | { playerId?: undefined; error: 'unauthenticated' | 'missing_player_id' };
 
 /** REST 操作者身份解析(原 resolveRoomActorId/resolveRestPlayerId 合并)。
- *  requireAuth: 非调试房语义(通常 `!!room && !room.isDebug`;leave 路由对不存在
- *  的房间也要求登录,传 `getRoom(id)?.isDebug !== true`)——强制取会话 userId,
+ *  requireAuth: 非调试房语义(requireRoom 族路由经 routes/helpers 的
+ *  resolveRoomRequestActor 统一推导 `!room || !room.isDebug`,房间不存在时
+ *  fail-closed 要求登录)——强制取会话 userId,
  *  未登录返回 unauthenticated;否则回退 bodyPlayerId(调试房游客模型)。
  *  rejectMissingBodyId: 回退身份为空串时立即返回 missing_player_id
  *  (ready/config/换座族——否则任何人可伪造他人准备,或塞入垃圾 id 使 allReady

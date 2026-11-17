@@ -8,8 +8,12 @@
 // 连环传导(属性伤害联动)在 face-down.ts 的 registerChainConductionHook，
 //   由 index 作为伤害结算基础设施注册。
 
-import type { Card } from '../../types';
+import type { Card, GameState, Json } from '../../types';
+import { applyAtom } from '../../core/apply';
+import { frameCards, popFrame, pushFrame } from '../../core/frame';
 import { setChain, isChained } from '../../flows/face-down';
+import { promptCancel } from '../../flows/cancel';
+import { validateUseCard } from '../../core/skill';
 import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 铁索连环的逐目标结算：按当前状态切换（未横置→横置，已横置→重置）。
@@ -33,6 +37,63 @@ function canUseChain(
     if (!state.players[t]?.alive) return '目标不合法';
   }
   return null;
+}
+
+/** 铁索连环手动结算 use 的 validate+execute 工厂（整卡一次无懈的手动结算路径）。
+ *  标版 use 走 use-card.ts 通用注册（runUseFlow + 逐目标 resolveChain）；
+ *  界庞统「界连环」覆盖标版 use 时保持本手动序列（帧/无懈询问参数/横置切换/异常清理
+ *  逐字保留），与标版的唯一实质差异 targets 上限由 maxTargets 注入（界版 3）。 */
+export function makeChainUseHandlers(ownerId: number, maxTargets: number) {
+  return {
+    validate: (state: GameState, params: Record<string, Json>): string | null => {
+      const base = validateUseCard(state, ownerId, params, { cardName: '铁索连环' });
+      if (base) return base;
+      const targets = params.targets as number[] | undefined;
+      if (!Array.isArray(targets) || targets.length < 1 || targets.length > maxTargets)
+        return `需选择一至${maxTargets}名角色`;
+      for (const t of targets) {
+        if (!state.players[t]?.alive) return '目标不合法';
+      }
+      return null;
+    },
+    execute: async (state: GameState, params: Record<string, Json>): Promise<void> => {
+      const from = ownerId;
+      const cardId = params.cardId as string;
+      const targets = params.targets as number[];
+      await pushFrame(state, '铁索连环', from, { ...params });
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '手牌', player: from },
+        to: { zone: '处理区' },
+      });
+      try {
+        const cancelled = await promptCancel(state, { cardName: '无懈可击', broadcast: true }, from, from);
+        if (!cancelled) {
+          for (const t of targets) {
+            const chained = isChained(state, t);
+            await setChain(state, t, !chained);
+          }
+        }
+        await applyAtom(state, {
+          type: '移动牌',
+          cardId,
+          from: { zone: '处理区' },
+          to: { zone: '弃牌堆' },
+        });
+      } finally {
+        if (frameCards(state).includes(cardId)) {
+          await applyAtom(state, {
+            type: '移动牌',
+            cardId,
+            from: { zone: '处理区' },
+            to: { zone: '弃牌堆' },
+          });
+        }
+        await popFrame(state);
+      }
+    },
+  };
 }
 
 export const chainEffect: CardEffect = {

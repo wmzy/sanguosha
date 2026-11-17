@@ -35,10 +35,10 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerAttackRangeExemptor, effectiveDistance } from '../rules/distance';
 import { getCardValue } from '../flows/rank';
-import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 const TAG_BLOCK = '界烈弓/禁闪';
 const TAG_BONUS = '界烈弓/加伤';
@@ -75,21 +75,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // respond:界黄忠本人回应「是否发动烈弓」的 confirm 询问,结果写入 localVars。
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (st: GameState, _params: Record<string, Json>): string | null => {
-      return requireRequestType(st, ownerId, ['界烈弓/confirm'], {
-        wrongTypeError: '当前不是请求回应',
-        mismatchError: '当前不是界烈弓确认',
-      }).error;
-    },
-    async (st: GameState, params: Record<string, Json>) => {
-      st.localVars[CONFIRM] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, '界烈弓/confirm', CONFIRM, {
+    mismatchError: '当前不是界烈弓确认',
+    wrongTypeError: '当前不是请求回应',
+  });
 
   // ── 指定目标 after:条件满足 → 询问 → 按条件加标签 ──
   registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx) => {

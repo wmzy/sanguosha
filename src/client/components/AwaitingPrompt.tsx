@@ -20,15 +20,14 @@ import { useGameView } from './GameViewCtx';
 
 export interface AwaitingPromptProps {
   pending: PendingView;
-  pendingTargetIdx: number;
-  /** 回应窗口可选牌(与无头枚举共用 respondCandidates 单一口径,可能含装备区牌,
-   *  如界天香弃红桃装备/界鬼才换判定牌;由 GameView 经 usePlayInteraction 派生传入) */
-  respondCandidates: Card[];
+  /** 广播型 pending 已本地跳过(无懈可击等点「不回应」后避免重复弹窗):
+   *  usePendingState 统一派生,经 GameView 传入,显示「已跳过」提示 */
+  broadcastSkipped: boolean;
+  /** 回应候选数(respondCandidateCountOf 单一口径,含装备区候选;null=未知/非卡牌
+   *  回应,文案按 0 处理):GameView memo 后传入,与 CenterActionBar 同值 */
+  respondCandidateCount: number | null;
   /** 已 resolve 的 respond 信息(由 usePendingState memo 后传入) */
   pendingRespondInfo: PendingRespondInfo | null;
-  /** 广播去重 key(由 usePendingState memo 后传入) */
-  broadcastKey: string;
-  skippedBroadcast: Set<string>;
   /** 五谷丰登选牌展示增强:被选走的牌标注选牌者并禁用 */
   processingPicks?: ProcessingPickState | null;
   /** 自动跳过用户偏好(策略跳过开关状态) */
@@ -76,19 +75,13 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
   const { view, canOperate, perspectiveName, send } = useGameView();
   const {
     pending,
-    pendingTargetIdx,
-    respondCandidates,
+    broadcastSkipped,
+    respondCandidateCount,
     pendingRespondInfo,
-    broadcastKey,
-    skippedBroadcast,
     processingPicks,
     autoSkipPrefs,
     onToggleAutoSkip,
   } = props;
-
-  // 广播型 pending 且已本地跳过:显示已跳过提示
-  const isBroadcast = pendingTargetIdx < 0;
-  const isSkipped = isBroadcast && skippedBroadcast.has(broadcastKey);
 
   // choosePlayer 多选累积状态(pending 变化时重置)
   const [multiSelect, setMultiSelect] = useState<number[]>([]);
@@ -143,13 +136,12 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
           </label>
         );
       })()}
-      {isSkipped ? (
+      {broadcastSkipped ? (
         <div className={styles.waitingHint}>已跳过，等待其他玩家回应...</div>
       ) : canOperate ? (
         (() => {
           // respond 信息由 usePendingState memo 后传入,不再在此重复 resolve(原先每个分支调一次)。
           const skillId = pendingRespondInfo?.skillId ?? '系统规则';
-          const filterFn = pendingRespondInfo?.cardFilter;
           // pickHandIndex 类 pending(过河拆桥/顺手牵羊盲选手牌位置):
           // 渲染目标手牌的牌背序列,使用者点击位置选择
           if (pending.prompt.type === 'pickTargetCard') {
@@ -364,8 +356,9 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
           // useCard / useCardAndTarget 类 pending:手牌/装备区对可回应的牌高亮。改为「先选牌再点打出」两步式
           // (避免误触直接出牌),出牌/不回应按钮在下方统一操作区(actionBar),此处仅显示文案提示。
           // useCardAndTarget(借刀杀人/出杀)还需选目标座次,提示文案区分。
-          // 计数用共享候选集 respondCandidates(含装备区候选,界鬼才只持装备候选时不误报 0)。
-          const respondableCount = filterFn ? respondCandidates.length : 0;
+          // 计数走 respondCandidateCountOf 单一口径(含装备区候选,界鬼才只持装备候选时
+          // 不误报 0);null(无 filter 的非卡牌回应)按 0 处理,与 CenterActionBar 同值。
+          const respondableCount = respondCandidateCount ?? 0;
           const needsTarget = pending.prompt.type === 'useCardAndTarget';
           return (
             <div className={styles.promptActions}>

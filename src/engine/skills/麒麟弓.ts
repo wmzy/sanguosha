@@ -6,8 +6,8 @@
 //   不防止伤害——只是额外弃马(与寒冰剑的关键区别)。
 import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerBeforeHook } from '../core/skill';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { registerBeforeHook } from '../core/skill';
+import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '麒麟弓', description: '武器:杀造成伤害时可弃目标1匹马', isLocked: true };
@@ -16,22 +16,10 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
   // ── respond:玩家确认是否发动 ──
-  registerAction(
-    state,
-    skill.id,
-    ownerId,
-    'respond',
-    (state, params) => {
-      return requireRequestType(state, ownerId, ['麒麟弓/confirm'], {
-        wrongTypeError: '当前不是麒麟弓窗口',
-        mismatchError: '当前不是麒麟弓窗口',
-      }).error;
-      void params;
-    },
-    async (state, params) => {
-      state.localVars['麒麟弓/confirmed'] = params.choice === true || params.confirmed === true;
-    },
-  );
+  registerConfirmRespond(state, skill.id, ownerId, '麒麟弓/confirm', '麒麟弓/confirmed', {
+    mismatchError: '当前不是麒麟弓窗口',
+    wrongTypeError: '当前不是麒麟弓窗口',
+  });
 
   // ── 造成伤害 before hook:杀命中后额外弃马 ──
   registerBeforeHook(

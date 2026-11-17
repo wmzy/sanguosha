@@ -6,12 +6,15 @@
 //     validate 恒通过、apply 无副作用,只提供 before/after hook 注册点。
 //     由 src/engine/life-flow.ts 的编排函数(runDecreaseLifeFlow/runRecoverLifeFlow/
 //     runLoseLifeFlow/runSetMaxHealthFlow)在实质操作前后依次发出。
+//     标记型四件套样板由 _timing.makeTimingAtom 统一产出(确定回复数值时 除外——
+//     其 apply 有副作用,回写 localVars 回传通道)。
 //
 // 噪声抑制:无 before hook 时标记型 atom 的 toViewEvents 返回 null(整个 atom 视图上 no-op),
 // 与 生效前/使用结算结束时 一致。atom 本身仍走完整 pipeline(apply + after hooks),
 // 编排函数/测试可从 state.atomHistory 观察时序。
 import type { AtomDefinition, GameView, GameState, ViewEventSplit, ViewEvent } from '../types';
 import { broadcast, hookSilentView, requirePlayer, viewPlayer } from './_helpers';
+import { makeTimingAtom } from './_timing';
 
 // ── 扣减体力:底层实质 atom ──────────────────────────────────
 // 扣减体力(可负——濒死时 health ≤ 0),不在此处触发濒死/死亡——由编排函数或系统规则现有 after-hook 决定。
@@ -61,8 +64,8 @@ export const 扣减体力: AtomDefinition<{ target: number; amount: number }> = 
 export const MODIFY_AMOUNT_KEY = '__modifyAmount';
 
 // ── 时机标记型 atom 的共享工厂(对齐 damage-timing 的工厂模式)──
-// 9 个标记型时机 atom 的 validate/toViewEvents/applyView 逻辑相同,提取共享工厂消除样板。
-// 两种形状:{target, amount, source?} 型(回复/失去/扣减时机)与 {player} 型(体力上限时机)。
+// 8 个标记型时机 atom 的 validate/toViewEvents/applyView 逻辑相同,统一走 makeTimingAtom
+// 消除样板。两种形状:{target, amount, source?} 型(回复/失去/扣减时机)与 {player} 型(体力上限时机)。
 /** 体力时机标记 atom 的公共形状。 */
 type LifeTimingAtom =
   | { target: number; amount: number; source?: number }
@@ -75,18 +78,13 @@ function validateLifeTiming(state: GameState, atom: LifeTimingAtom): string | nu
     : requirePlayer(state, atom.player, 'player');
 }
 
-/** 无 before-hook 时静默(no-op 视图),有 before-hook 时发通知事件(携带 target/player/amount/source)。 */
-function lifeTimingView(state: GameState, type: string, atom: LifeTimingAtom): ViewEventSplit {
-  return hookSilentView(state, type, () => {
-    // source 仅在 atom 携带该字段时下发(回复时机 source 型;失去/扣减时机 {target,amount} 型无 source)。
-    return 'target' in atom
-      ? { type, target: atom.target, amount: atom.amount, ...('source' in atom ? { source: atom.source } : {}) }
-      : { type, player: atom.player };
-  });
+/** 通知事件 payload(携带 target/player/amount/source;有 before-hook 时广播)。 */
+function lifeTimingView(type: string, atom: LifeTimingAtom): ViewEvent {
+  // source 仅在 atom 携带该字段时下发(回复时机 source 型;失去/扣减时机 {target,amount} 型无 source)。
+  return 'target' in atom
+    ? { type, target: atom.target, amount: atom.amount, ...('source' in atom ? { source: atom.source } : {}) }
+    : { type, player: atom.player };
 }
-
-/** 标记型 atom 视图应用 no-op(实质变更由编排函数/扣减体力等实质 atom 负责)。 */
-function lifeTimingApplyView() {}
 
 // ── 回复体力时机 ────────────────────────────────────────────
 // 确定回复数值时:回复前确定数值(救援可修正)。apply 回写最终 amount 到 localVars(不可工厂化)。
@@ -102,106 +100,71 @@ export const 确定回复数值时: AtomDefinition<{
     state.localVars[MODIFY_AMOUNT_KEY] = atom.amount;
   },
   toViewEvents(state, atom) {
-    return lifeTimingView(state, '确定回复数值时', atom);
+    return hookSilentView(state, '确定回复数值时', () => lifeTimingView('确定回复数值时', atom));
   },
-  applyView: lifeTimingApplyView,
+  applyView() {},
 };
 
 
 // 回复体力后:回复完成后的时机(伤逝/淑慎/恩怨①)。纯标记。
-export const 回复体力后: AtomDefinition<{ target: number; amount: number; source?: number }> = {
-  type: '回复体力后',
-  validate: validateLifeTiming,
-  apply() {},
-  toViewEvents(state, atom) {
-    return lifeTimingView(state, '回复体力后', atom);
-  },
-  applyView: lifeTimingApplyView,
-};
+export const 回复体力后: AtomDefinition<{ target: number; amount: number; source?: number }> =
+  makeTimingAtom('回复体力后', validateLifeTiming, lifeTimingView);
 
 
 // ── 失去体力时机 ────────────────────────────────────────────
 // 失去体力时:失去体力前(黄巾天兵符②)。纯标记。
-export const 失去体力时: AtomDefinition<{ target: number; amount: number }> = {
-  type: '失去体力时',
-  validate: validateLifeTiming,
-  apply() {},
-  toViewEvents(state, atom) {
-    return lifeTimingView(state, '失去体力时', atom);
-  },
-  applyView: lifeTimingApplyView,
-};
+export const 失去体力时: AtomDefinition<{ target: number; amount: number }> = makeTimingAtom(
+  '失去体力时',
+  validateLifeTiming,
+  lifeTimingView,
+);
 
 
 // 失去体力后:失去体力完成后(诈降)。纯标记。
-export const 失去体力后: AtomDefinition<{ target: number; amount: number }> = {
-  type: '失去体力后',
-  validate: validateLifeTiming,
-  apply() {},
-  toViewEvents(state, atom) {
-    return lifeTimingView(state, '失去体力后', atom);
-  },
-  applyView: lifeTimingApplyView,
-};
+export const 失去体力后: AtomDefinition<{ target: number; amount: number }> = makeTimingAtom(
+  '失去体力后',
+  validateLifeTiming,
+  lifeTimingView,
+);
 
 
 // ── 扣减体力时机(decreaselife.md,被 runDamageFlow 和 runLoseLifeFlow 共用)──
 // 扣减体力前:酒诗②/连环条件检测/重置。纯标记。
-export const 扣减体力前: AtomDefinition<{ target: number; amount: number }> = {
-  type: '扣减体力前',
-  validate: validateLifeTiming,
-  apply() {},
-  toViewEvents(state, atom) {
-    return lifeTimingView(state, '扣减体力前', atom);
-  },
-  applyView: lifeTimingApplyView,
-};
+export const 扣减体力前: AtomDefinition<{ target: number; amount: number }> = makeTimingAtom(
+  '扣减体力前',
+  validateLifeTiming,
+  lifeTimingView,
+);
 
 
 // 扣减体力时:不屈。纯标记。
-export const 扣减体力时: AtomDefinition<{ target: number; amount: number }> = {
-  type: '扣减体力时',
-  validate: validateLifeTiming,
-  apply() {},
-  toViewEvents(state, atom) {
-    return lifeTimingView(state, '扣减体力时', atom);
-  },
-  applyView: lifeTimingApplyView,
-};
+export const 扣减体力时: AtomDefinition<{ target: number; amount: number }> = makeTimingAtom(
+  '扣减体力时',
+  validateLifeTiming,
+  lifeTimingView,
+);
 
 
 // 扣减体力后:伤逝。纯标记。
-export const 扣减体力后: AtomDefinition<{ target: number; amount: number }> = {
-  type: '扣减体力后',
-  validate: validateLifeTiming,
-  apply() {},
-  toViewEvents(state, atom) {
-    return lifeTimingView(state, '扣减体力后', atom);
-  },
-  applyView: lifeTimingApplyView,
-};
+export const 扣减体力后: AtomDefinition<{ target: number; amount: number }> = makeTimingAtom(
+  '扣减体力后',
+  validateLifeTiming,
+  lifeTimingView,
+);
 
 
 // ── 体力上限时机 ────────────────────────────────────────────
 // 减上限后:runSetMaxHealthFlow 减上限(含同步降体力)后发出。纯标记。
-export const 减上限后: AtomDefinition<{ player: number }> = {
-  type: '减上限后',
-  validate: validateLifeTiming,
-  apply() {},
-  toViewEvents(state, atom) {
-    return lifeTimingView(state, '减上限后', atom);
-  },
-  applyView: lifeTimingApplyView,
-};
+export const 减上限后: AtomDefinition<{ player: number }> = makeTimingAtom(
+  '减上限后',
+  validateLifeTiming,
+  lifeTimingView,
+);
 
 
 // 加上限后:runSetMaxHealthFlow 加上限后发出。纯标记。
-export const 加上限后: AtomDefinition<{ player: number }> = {
-  type: '加上限后',
-  validate: validateLifeTiming,
-  apply() {},
-  toViewEvents(state, atom) {
-    return lifeTimingView(state, '加上限后', atom);
-  },
-  applyView: lifeTimingApplyView,
-};
+export const 加上限后: AtomDefinition<{ player: number }> = makeTimingAtom(
+  '加上限后',
+  validateLifeTiming,
+  lifeTimingView,
+);
