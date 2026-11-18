@@ -27,6 +27,7 @@ import {
   copyBtnRow,
   readyInfo,
   buttonRow,
+  btnVars,
 } from './multiplayerStyles';
 import type { RoomConfig } from '../../../server/protocol';
 import type { RoomHistory } from '../../hooks/useRoomHistory';
@@ -103,12 +104,13 @@ export function WaitingStage({ history }: WaitingStageProps) {
 
   // 三枚复制按钮共用的内联变量(禁用态随 roomId 变化)
   const copyBtnStyle = {
-    '--btn-bg': colors.bg.input,
-    '--btn-padding': '4px 14px',
-    '--btn-font-size': '12px',
-    '--btn-cursor': mp.roomId ? 'pointer' : 'not-allowed',
+    ...btnVars(colors.bg.input, {
+      padding: '4px 14px',
+      fontSize: '12px',
+      cursor: mp.roomId ? 'pointer' : 'not-allowed',
+    }),
     opacity: mp.roomId ? 1 : 0.6,
-  } as React.CSSProperties;
+  };
 
   return (
     <>
@@ -189,9 +191,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
                       className={btnStyle}
                       title="踢出该旁观者"
                       style={{
-                        '--btn-bg': colors.accent.red,
-                        '--btn-padding': '0',
-                        '--btn-font-size': '11px',
+                        ...btnVars(colors.accent.red, { padding: '0', fontSize: '11px' }),
                         width: '16px',
                         height: '16px',
                         minWidth: 0,
@@ -200,9 +200,9 @@ export function WaitingStage({ history }: WaitingStageProps) {
                         border: 'none',
                         cursor: 'pointer',
                         padding: 0,
-                      } as React.CSSProperties}
+                      }}
                       onClick={() => {
-                        if (window.confirm(`确定将旁观者  踢出房间吗？`)) {
+                        if (window.confirm(`确定将旁观者 ${memberName(sid, mp.roomState?.playerNames)} 踢出房间吗？`)) {
                           mp.kickPlayer(sid);
                         }
                       }}
@@ -230,12 +230,12 @@ export function WaitingStage({ history }: WaitingStageProps) {
               <span>{memberName(sid, mp.roomState?.playerNames)} 申请查看 P{seat} 视角</span>
               <button
                 className={btnStyle}
-                style={{ '--btn-bg': colors.accent.green, '--btn-padding': '4px 12px', '--btn-font-size': '12px', marginLeft: '8px' } as React.CSSProperties}
+                style={{ ...btnVars(colors.accent.green, { padding: '4px 12px', fontSize: '12px' }), marginLeft: '8px' }}
                 onClick={() => mp.approveView(sid, seat)}
               >同意</button>
               <button
                 className={btnStyle}
-                style={{ '--btn-bg': colors.accent.red, '--btn-padding': '4px 12px', '--btn-font-size': '12px', marginLeft: '4px' } as React.CSSProperties}
+                style={{ ...btnVars(colors.accent.red, { padding: '4px 12px', fontSize: '12px' }), marginLeft: '4px' }}
                 onClick={() => mp.rejectView(sid)}
               >拒绝</button>
             </div>
@@ -246,7 +246,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
             {!mp.isSpectator && !mp.ready && (
               <button
                 className={btnStyle}
-                style={{ '--btn-bg': '#a03028' } as React.CSSProperties}
+                style={btnVars('#a03028')}
                 onClick={mp.toggleReady}
               >
                 准备
@@ -255,7 +255,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
             {!mp.isSpectator && mp.ready && (
               <button
                 className={btnStyle}
-                style={{ '--btn-bg': colors.disabled } as React.CSSProperties}
+                style={btnVars(colors.disabled)}
                 onClick={mp.toggleReady}
               >
                 取消准备
@@ -264,12 +264,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
             {mp.isHost && (
               <button
                 className={btnStyle}
-                style={
-                  {
-                    '--btn-bg': allReady ? '#b8912f' : colors.disabled,
-                    '--btn-cursor': allReady ? 'pointer' : 'not-allowed',
-                  } as React.CSSProperties
-                }
+                style={btnVars(allReady ? '#b8912f' : colors.disabled, { cursor: allReady ? 'pointer' : 'not-allowed' })}
                 disabled={!allReady}
                 onClick={mp.startGame}
               >
@@ -279,12 +274,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
             {mp.isSpectator ? (
               <button
                 className={btnStyle}
-                style={
-                  {
-                    '--btn-bg': playerCount < maxPlayers ? colors.accent.gold : colors.disabled,
-                    '--btn-cursor': playerCount < maxPlayers ? 'pointer' : 'not-allowed',
-                  } as React.CSSProperties
-                }
+                style={btnVars(playerCount < maxPlayers ? colors.accent.gold : colors.disabled, { cursor: playerCount < maxPlayers ? 'pointer' : 'not-allowed' })}
                 disabled={playerCount >= maxPlayers}
                 onClick={() => mp.switchRole('player')}
                 title={playerCount < maxPlayers ? '点击加入游戏' : '房间已满，无法加入'}
@@ -294,7 +284,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
             ) : (
               <button
                 className={btnStyle}
-                style={{ '--btn-bg': colors.bg.input } as React.CSSProperties}
+                style={btnVars(colors.bg.input)}
                 onClick={() => mp.switchRole('spectator')}
                 title="切换为旁观者，不参与本局游戏"
               >
@@ -303,7 +293,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
             )}
             <button
               className={btnStyle}
-              style={{ '--btn-bg': colors.bg.input } as React.CSSProperties}
+              style={btnVars(colors.bg.input)}
               onClick={() => {
                 mp.leaveRoom();
                 navigate('/');

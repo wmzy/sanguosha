@@ -23,9 +23,9 @@
 // 原牌归宿:原方块牌经 处理区→弃牌堆,进入弃牌堆(满足"使用后原牌进入弃牌堆")。
 //   乐不思蜀被无懈可击抵消或判定结束后,由 乐不思蜀.ts 的 移除延时锦囊 清 pendingTricks。
 //   无次数限制(描述明确)。
-import type { Card, EquipSlot, FrontendAPI, GameView, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply'
+import type { Card, FrontendAPI, GameView, GameState, Json, Skill } from '../types';
 import { popFrame, pushFrame } from '../core/frame';
+import { placeDelayedTrickTransform } from './_delayedTrickTransform';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction } from '../core/skill';
 import { engineCanPlayNow } from '../util/skillRuntime';
@@ -33,8 +33,8 @@ import { ownsCard } from '../util/player-query';
 
 const TRICK_NAME = '乐不思蜀';
 
-/** 国色可用牌:方块(♦)牌(手牌或装备区) */
-function isGuoseCard(card: Card | undefined): boolean {
+/** 国色可用牌:方块(♦)牌(手牌或装备区)——界国色 复用同一判据 */
+export function isGuoseCard(card: Card | undefined): boolean {
   return !!card && card.suit === '♦';
 }
 
@@ -90,48 +90,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         (params.targets as number[] | undefined)?.[0];
       await pushFrame(state, '国色', from, { ...params });
 
-      // 装备区的方块牌:先卸下到手牌(产生 ViewEvent,清除武器距离 vars),
-      // 再走标准打出流程(手牌→处理区)。描述明确允许装备区方块牌。
-      const equipSlotEntry = Object.entries(state.players[from].equipment).find(
-        ([, id]) => id === cardId,
-      );
-      if (equipSlotEntry) {
-        await applyAtom(state, {
-          type: '卸下',
-          player: from,
-          slot: equipSlotEntry[0] as EquipSlot,
-        });
-      }
-
-      // 卡牌进处理区(打出)
-      await applyAtom(state, {
-        type: '移动牌',
+      // 放置延时锦囊(装备区方块牌先卸下;判定/跳过出牌/无懈 hooks 见 乐不思蜀.ts)
+      await placeDelayedTrickTransform(state, {
+        from,
+        target: target as number,
         cardId,
-        from: { zone: '手牌', player: from },
-        to: { zone: '处理区' },
-      });
-
-      // 放置延时锦囊:复用现有 乐不思蜀 的判定/跳过出牌 hooks(只认 trick.name)
-      const trickCard: Card = state.cardMap[cardId] ?? {
-        id: cardId,
-        name: TRICK_NAME,
-        suit: '♦',
-        color: '红',
-        rank: 'A',
-        type: '锦囊牌',
-      };
-      await applyAtom(state, {
-        type: '添加延时锦囊',
-        player: target as number,
-        trick: { name: TRICK_NAME, source: from, card: trickCard },
-      });
-
-      // 使用卡进弃牌堆
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
+        trickName: TRICK_NAME,
+        fallback: { suit: '♦', color: '红', rank: 'A' },
+        allowEquipment: true,
       });
 
       await popFrame(state);

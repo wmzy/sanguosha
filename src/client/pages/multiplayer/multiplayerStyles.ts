@@ -5,6 +5,7 @@ import { css } from '@linaria/core';
 import { colors, pageStyle, pageBgStyle, glassPanelStyle, goldHeadingStyle, goldColors } from '../../theme';
 import type { GameMode } from '../../../engine/rules/types';
 import type { CharPoolPreset } from '../../../server/protocol';
+import type { CSSProperties } from 'react';
 
 // wyw-in-js 下 css`` 内插值其他 css 类(如 ${pageBgStyle})不会内联其属性,
 // 统一改为「自身属性类 + 基类字符串拼接」导出,使用处 className 零改动。
@@ -211,6 +212,21 @@ export const TIMEOUT_OPTIONS: Array<{ label: string; value: number }> = [
 export function timeoutLabel(v: number): string {
   if (v <= 0) return '无限';
   return `${v}s`;
+}
+
+/** btnStyle 按钮的内联 CSS 变量构造器:bg 必填,padding/fontSize/cursor 可选。
+ *  取代各 stage 按钮里散落的 `{ '--btn-bg': …, '--btn-padding': … } as React.CSSProperties`
+ *  对象字面量;需要附加普通样式时在调用处展开(`{ ...btnVars(...), marginLeft: 8 }`)。 */
+export function btnVars(
+  bg: string,
+  { padding, fontSize, cursor }: { padding?: string; fontSize?: string; cursor?: string } = {},
+): CSSProperties {
+  return {
+    '--btn-bg': bg,
+    ...(padding ? { '--btn-padding': padding } : {}),
+    ...(fontSize ? { '--btn-font-size': fontSize } : {}),
+    ...(cursor ? { '--btn-cursor': cursor } : {}),
+  } as CSSProperties;
 }
 
 export const buttonRow = css`

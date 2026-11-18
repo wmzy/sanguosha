@@ -5,10 +5,8 @@
 // respond/resolve 走 cards/_pickPanel 共享实现（过河拆桥同构，obtain/discard 差异注入）。
 
 import type { Card } from '../../types';
-import type { GameView } from '../../types';
-import { effectiveDistance } from '../../rules/distance';
-import { viewEffectiveDistance } from '../../rules/viewDistance';
 import { createPickPanelResolve, createPickPanelRespond } from './_pickPanel';
+import { distanceOneTargetFilter, distanceWithinOneOk } from './_distanceOne';
 import type { CardEffect } from '../../types';
 
 const PICK_REQUEST_TYPE = '顺手牵羊_选牌';
@@ -25,9 +23,8 @@ function canUseSnatch(
   if (target === ownerId) return '不能对自己使用';
   if (!state.players[target]?.alive) return '目标已死亡';
   // 距离检查:isLegalTarget 统一处理(含奇才豁免),canUse 也需检查具体目标
-  const ignoreDistance = !!state.players[ownerId]?.tags.includes('奇才/无距离限制');
-  const useCardId = params.cardId as string | undefined;
-  if (!ignoreDistance && effectiveDistance(state, ownerId, target, useCardId) > 1) return '距离太远';
+  if (!distanceWithinOneOk(state, ownerId, target, params.cardId as string | undefined))
+    return '距离太远';
   const p = state.players[target];
   if (!p) return '目标不合法';
   const hasCards =
@@ -54,17 +51,7 @@ export const snatchEffect: CardEffect = {
     type: 'useCardAndTarget',
     title: '顺手牵羊',
     cardFilter: { filter: (c: Card) => c.name === '顺手牵羊', min: 1, max: 1 },
-    targetFilter: {
-      min: 1,
-      max: 1,
-      filter: (view: GameView, t: number) => {
-        if (t === view.currentPlayerIndex) return false;
-        const tp = view.players[t];
-        if (!tp || tp.alive === false) return false;
-        if (view.players[view.currentPlayerIndex]?.tags?.includes('奇才/无距离限制')) return true;
-        return viewEffectiveDistance(view.players, view.currentPlayerIndex, t) <= 1;
-      },
-    },
+    targetFilter: { min: 1, max: 1, filter: distanceOneTargetFilter },
   },
   label: '顺手牵羊',
   style: 'primary',

@@ -8,6 +8,7 @@
 // 判定"杀/决斗":优先看 atom.cardId 对应卡牌名;无 cardId(虚拟杀等)时回退看栈顶帧 skillId。
 // 备注(规则):已被杀指定为目标后再失去手牌,不影响该杀的结算——本实现因挂在"成为目标"
 //   (结算阶段入口)天然满足:此时手牌状态即结算时状态。
+// 界空城共用此 guard(registerKongchengGuard),仅额外增加被抵消摸牌 after-hook。
 import type { HookResult, Skill, GameState } from '../types';
 import { topFrame } from '../core/frame';
 import { registerBeforeHook } from '../core/skill';
@@ -22,11 +23,11 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
-  registerBeforeHook(
+// 注册「无手牌时不是杀/决斗合法目标」before-hook,返回卸载函数。
+export function registerKongchengGuard(state: GameState, skillId: string, ownerId: number): () => void {
+  return registerBeforeHook(
     state,
-    skill.id,
+    skillId,
     ownerId,
     '成为目标',
     async (ctx): Promise<HookResult | void> => {
@@ -51,6 +52,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return { kind: 'cancel' };
     },
   );
+}
+
+export function onInit(skill: Skill, state: GameState): () => void {
+  registerKongchengGuard(state, skill.id, skill.ownerId);
   return () => {};
 }
 

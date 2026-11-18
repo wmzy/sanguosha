@@ -18,8 +18,6 @@
 // 判定/跳过出牌/无懈抵消由 乐不思蜀.ts 的 hooks 处理(只认 trick.name)。
 // 选项②:弃置方片(弃置 atom)+ 移除场上乐(移除延时锦囊 atom)。
 import type {
-  Card,
-  EquipSlot,
   FrontendAPI,
   GameState,
   Json,
@@ -31,7 +29,9 @@ import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rule
 import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
 import { currentRequestType, defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
-import { ownsCard } from '../util/player-query';
+import { ownsCard, ownedCardIds } from '../util/player-query';
+import { isGuoseCard } from './国色';
+import { placeDelayedTrickTransform } from './_delayedTrickTransform';
 
 const TRICK_NAME = '乐不思蜀';
 
@@ -44,11 +44,6 @@ const OPTION_KEY = '界国色/option'; // 'use' | 'remove'
 const CARD_KEY = '界国色/cardId';
 const TARGET_KEY = '界国色/target';
 const TRICK_TARGET_KEY = '界国色/trickTarget';
-
-/** 界国色可用牌:方块(♦)牌(手牌或装备区) */
-function isGuoseCard(card: Card | undefined): boolean {
-  return !!card && card.suit === '♦';
-}
 
 /** 场上是否存在乐不思蜀 */
 function _anyLeOnField(state: GameState): boolean {
@@ -80,11 +75,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (usedThisTurn(st, ownerId, '界国色')) return '本回合已使用过界国色';
       const self = st.players[ownerId];
       // 至少一张方片牌(手牌或装备区)
-      const ownedIds = [
-        ...self.hand,
-        ...Object.values(self.equipment).filter((id): id is string => typeof id === 'string'),
-      ];
-      const hasDiamond = ownedIds.some((id) => isGuoseCard(st.cardMap[id]));
+      const hasDiamond = ownedCardIds(self).some((id) => isGuoseCard(st.cardMap[id]));
       if (!hasDiamond) return '需要一张方片牌';
       return null;
     },
@@ -240,47 +231,14 @@ async function executeOptionUse(st: GameState, ownerId: number): Promise<void> {
   if (typeof cardId !== 'string' || typeof target !== 'number') return;
   if (!st.players[target]?.alive) return;
 
-  // 装备区的方片牌:先卸下到手牌(产生 ViewEvent,清除武器距离 vars),再走标准打出流程
-  const equipSlotEntry = Object.entries(st.players[ownerId].equipment).find(
-    ([, id]) => id === cardId,
-  );
-  if (equipSlotEntry) {
-    await applyAtom(st, {
-      type: '卸下',
-      player: ownerId,
-      slot: equipSlotEntry[0] as EquipSlot,
-    });
-  }
-
-  // 卡牌进处理区(打出)
-  await applyAtom(st, {
-    type: '移动牌',
+  // 放置延时锦囊(装备区方片牌先卸下;判定/跳过出牌/无懈 hooks 见 乐不思蜀.ts)
+  await placeDelayedTrickTransform(st, {
+    from: ownerId,
+    target,
     cardId,
-    from: { zone: '手牌', player: ownerId },
-    to: { zone: '处理区' },
-  });
-
-  // 放置延时锦囊(复用 乐不思蜀 hooks:判定/跳过出牌/无懈)
-  const trickCard: Card = st.cardMap[cardId] ?? {
-    id: cardId,
-    name: TRICK_NAME,
-    suit: '♦',
-    color: '红',
-    rank: 'A',
-    type: '锦囊牌',
-  };
-  await applyAtom(st, {
-    type: '添加延时锦囊',
-    player: target,
-    trick: { name: TRICK_NAME, source: ownerId, card: trickCard },
-  });
-
-  // 使用卡进弃牌堆
-  await applyAtom(st, {
-    type: '移动牌',
-    cardId,
-    from: { zone: '处理区' },
-    to: { zone: '弃牌堆' },
+    trickName: TRICK_NAME,
+    fallback: { suit: '♦', color: '红', rank: 'A' },
+    allowEquipment: true,
   });
 }
 

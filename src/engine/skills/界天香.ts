@@ -12,17 +12,9 @@
 //   3. respond 校验含 owner 存活检查('玩家不可用')。
 // 其余(respond validate/execute 骨架、before-hook 六步流程、红桃判定认 红颜|界红颜)
 // 与标版共用 天香.ts 的参数化实现。
-import type { FrontendAPI, GameState, PlayerState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { registerTianxiangWiring, mountTianxiangRespondAction, type TianxiangVariant } from './天香';
-import { ownsCard } from '../util/player-query';
-
-/** 界版:红桃牌可在手牌或装备区。返回玩家拥有的所有 cardId(手牌 + 装备区)。 */
-function getOwnedCardIds(self: PlayerState): string[] {
-  const equipIds = Object.values(self.equipment).filter(
-    (id): id is string => typeof id === 'string',
-  );
-  return [...self.hand, ...equipIds];
-}
+import { ownsCard, ownedCardIds } from '../util/player-query';
 
 /** 界天香差异配置(共享实现见 天香.ts)。 */
 const JIE_VARIANT: TianxiangVariant = {
@@ -36,7 +28,8 @@ const JIE_VARIANT: TianxiangVariant = {
   selfTargetError: '不能选择自己',
   confirmTitle: '是否发动界天香(弃红桃牌防止伤害)?',
   chooseTitle: '界天香:弃一张红桃牌(手牌或装备区),选择一名其他角色',
-  candidateCardIds: (self) => getOwnedCardIds(self),
+  // 界版:红桃牌可在手牌或装备区(候选=手牌+装备区全部牌)
+  candidateCardIds: ownedCardIds,
   ownsCard,
   explicitCandidates: true,
   optionDamageAmount: () => 1,

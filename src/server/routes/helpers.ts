@@ -21,15 +21,10 @@ import type { ConnectionSink } from '../connection';
 import { gameSessions } from '../registry';
 import type { GameSession } from '../session';
 
-/** 读取 JSON body;缺失/解析失败回退空对象(与原 rest.ts 各路由内联写法一致)。 */
-export async function readJsonBody(c: Context): Promise<Record<string, unknown>> {
-  return (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-}
-
-/** 提取可选字符串字段(缺失/类型不符回退空串)。 */
-export function optString(value: unknown): string {
-  return typeof value === 'string' ? value : '';
-}
+// 请求体读取/字段提取已下沉到零依赖叶子 server/http.ts(auth 路由与
+// routes/helpers 共用,避免 auth→routes 依赖);此处 re-export 保持既有
+// 路由文件的导入路径不变。
+export { readJsonBody, optString } from '../http';
 
 /** 统一 401 未登录响应(文案与既有路由一致,带 AUTH_REQUIRED code)。 */
 export function authRequired(c: Context): Response {

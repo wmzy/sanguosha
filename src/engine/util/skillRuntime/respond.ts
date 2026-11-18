@@ -7,6 +7,7 @@
 //   askConfirm / askResponse:询问三段(delete 键残值 → applyAtom(请求回应) → 读键);
 //   currentRequestType:读座次当前 pending 的 requestType;
 //   hasNullifyWindow:无懈可击广播窗口扫描(看破/界看破/解围 转化 validate 共用);
+//   blockedByOtherPending:其他阻塞型 pending 扫描(与 hasNullifyWindow 并列,同三技能共用);
 //   registerRespondForAllSeats:respond 注册到全部座次的 for 循环样板(鞬出 骨架)。
 // 命名:函数/类型英文;业务字面量(atom 类型 '请求回应'/错误文案)保持中文。
 import type { ActionPrompt, GameState, Json } from '../../types';
@@ -262,6 +263,20 @@ export function hasNullifyWindow(state: GameState, playerId: number): boolean {
     // 广播型(target<0)或精确指向本玩家
     if (typeof atom.target === 'number' && (atom.target < 0 || atom.target === playerId))
       return true;
+  }
+  return false;
+}
+
+/** 是否存在无懈可击窗口之外的阻塞型 pending:扫描 pendingSlots,跳过非阻塞 slot 与
+ *  无懈窗口本身(请求回应 + requestType='无懈可击'),其余任一存在即视为阻塞。
+ *  与 hasNullifyWindow 并列,同为看破/界看破/解围 转化 validate 的共用判据
+ *  (转化不应打断正在进行的结算;无懈窗口是当前响应目标,允许)。 */
+export function blockedByOtherPending(state: GameState): boolean {
+  for (const slot of state.pendingSlots.values()) {
+    const atom = slot.atom as { type?: string; requestType?: string };
+    if (!slot.isBlocking) continue;
+    if (atom.type === '请求回应' && atom.requestType === '无懈可击') continue;
+    return true;
   }
   return false;
 }

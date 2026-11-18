@@ -13,6 +13,8 @@
 //     (state, idx) 语义相同(手牌或装备有牌),调用方自行取 player 后复用;
 //   - ownsCard:制衡/界苦肉/界明策/国色/界国色/界天香/界看破 的
 //     「牌在手牌或装备区」内联表达式(includes/some 写法差异,语义一致);
+//   - ownedCardIds:界国色/界破军/界镇军/界天香 的
+//     「手牌 + 装备区全部 cardId」手写拼接(手牌在前,装备槽位值序);
 //   - isSlashCard/isSlashCardById:同一谓词(含转化/影子杀——name 即 '杀')的两种
 //     入参形状——card 对象(界明策)与 cardId(拒战/界破军),不做合并以免调用方反复解包。
 // 依赖仅限 types + data/character-meta(getGender)。
@@ -86,6 +88,17 @@ export function ownsCard(
   if (!player) return false;
   if (player.hand.includes(cardId)) return true;
   return Object.values(player.equipment).some((id) => id === cardId);
+}
+
+/** 玩家拥有的所有 cardId(手牌在前 + 装备区各槽位);玩家不存在返回空数组。 */
+export function ownedCardIds(
+  player: Pick<PlayerState, 'hand' | 'equipment'> | undefined | null,
+): string[] {
+  if (!player) return [];
+  return [
+    ...player.hand,
+    ...Object.values(player.equipment).filter((id): id is string => typeof id === 'string'),
+  ];
 }
 
 /** 卡牌是否为【杀】(含转化/影子杀——name 即 '杀');入参为 card 对象。 */

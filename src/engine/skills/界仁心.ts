@@ -34,6 +34,7 @@ import { applyAtom } from '../core/apply';
 import { flipFaceDown, registerFlipSkipTurnHooks } from '../flows/face-down';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { EQUIP_SLOTS } from '../util/equip-slot';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界仁心';
@@ -56,7 +57,7 @@ function listEquipmentChoices(state: GameState, ownerId: number): string[] {
   for (const cid of player.hand) {
     if (isEquipmentCard(state.cardMap[cid])) result.push(cid);
   }
-  for (const slot of ['武器', '防具', '进攻马', '防御马', '宝物'] as const) {
+  for (const slot of EQUIP_SLOTS) {
     const cid = player.equipment[slot];
     if (cid && isEquipmentCard(state.cardMap[cid])) result.push(cid);
   }

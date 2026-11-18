@@ -15,8 +15,8 @@
 // 本文件同时导出 createDuanliangSkill 工厂(断粮族共享实现),界断粮 复用之,
 // 仅注入 距离放松判据(引擎侧 + view 侧同源)与本回合伤害追踪 hook 差异。
 import type { Card, GameView, FrontendAPI, GameState, Json, Skill } from '../types';
-import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
+import { placeDelayedTrickTransform } from './_delayedTrickTransform';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction } from '../core/skill';
 import { engineCanPlayNow } from '../util/skillRuntime';
@@ -97,35 +97,13 @@ export function createDuanliangSkill(opts: DuanliangOptions) {
         const target = params.target as number;
         await pushFrame(state, opts.skillId, from, { ...params });
 
-        // 卡牌进处理区(打出)
-        await applyAtom(state, {
-          type: '移动牌',
+        // 放置延时锦囊(打出进处理区 → 添加 → 弃牌堆;判定/跳过摸牌 hooks 见 兵粮寸断.ts)
+        await placeDelayedTrickTransform(state, {
+          from,
+          target,
           cardId,
-          from: { zone: '手牌', player: from },
-          to: { zone: '处理区' },
-        });
-
-        // 放置延时锦囊:复用现有 兵粮寸断 的判定/跳过摸牌 hooks
-        const trickCard: Card = state.cardMap[cardId] ?? {
-          id: cardId,
-          name: TRICK_NAME,
-          suit: '♣',
-          color: '黑',
-          rank: 'A',
-          type: '锦囊牌',
-        };
-        await applyAtom(state, {
-          type: '添加延时锦囊',
-          player: target,
-          trick: { name: TRICK_NAME, source: from, card: trickCard },
-        });
-
-        // 使用卡进弃牌堆
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
+          trickName: TRICK_NAME,
+          fallback: { suit: '♣', color: '黑', rank: 'A' },
         });
 
         await popFrame(state);

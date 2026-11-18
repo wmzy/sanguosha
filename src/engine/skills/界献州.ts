@@ -34,6 +34,7 @@ import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive } from '../rules/action-active';
 import type { SkillModule } from '../types';
 import { askConfirm, requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
+import { EQUIP_SLOTS } from '../util/equip-slot';
 
 const SKILL_ID = '界献州';
 const DISPLAY_NAME = '献州';
@@ -52,8 +53,6 @@ const TARGETS_KEY = `${SKILL_ID}/damageTargets`;
 const TARGET_KEY = `${SKILL_ID}/target`;
 /** localVars:X(交出牌数) */
 const COUNT_KEY = `${SKILL_ID}/X`;
-
-const EQUIP_SLOTS = ['武器', '防具', '进攻马', '防御马', '宝物'] as const;
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

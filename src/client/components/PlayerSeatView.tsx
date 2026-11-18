@@ -10,7 +10,6 @@ import { memo } from 'react';
 import { cx } from '@linaria/core';
 import type { EquipSlot, GameView } from '../../engine/types';
 import { shallowArrayEqual, playerVisibleEqual } from '../utils/memo';
-import type { SkillActionDef } from '../skillActionRegistry';
 import { getSkillDescription } from '../../engine/skills/lifecycle';
 import { useSkillDescReady } from '../hooks/useSkillDescReady';
 import type { HpChangeNumber } from '../hooks/useAnimationState';
@@ -53,11 +52,8 @@ export interface PlayerSeatProps {
   hpChange?: HpChangeNumber;
   /** 是否触发新回合光环 */
   isTurnGlow?: boolean;
-  turnGlowVersion?: number;
   /** debug 模式:是否在前端隐藏身份(非视角/非主公/非死亡) */
   hideIdentity?: boolean;
-  /** 视角玩家可主动发动的技能动作列表(预留,目前仅接受不渲染) */
-  skillActions?: SkillActionDef[];
   /** 该座次对应玩家已断线(重连宽限期内),座位卡显示离线角标并置灰 */
   isDisconnected?: boolean;
   /** 选目标阶段:到我的实际距离(含马修正),非 null 时在座位卡上显示「距N」角标 */
@@ -342,15 +338,12 @@ function PlayerSeatViewImpl({
   healVersion = 0,
   hpChange,
   isTurnGlow = false,
-  turnGlowVersion = 0,
   hideIdentity = true,
-  skillActions: _skillActions, // 预留:未来用于在座位卡上显示可点使用的技能按钮
   isDisconnected = false,
   seatDistance = null,
   untargetableReason = null,
 }: PlayerSeatProps) {
   useSkillDescReady(); // 技能模块加载后重渲染,确保 title 中 getSkillDescription 命中
-  void turnGlowVersion; // 预留:未来用于触发不同强度的回合光环动画
   const isDead = isPlayerDead(player);
   // 横置(铁索连环):marks 含 'chained' —— 卡边框铁链光泽 + 立绘冷色调 + 连环徽章
   const isChained = isPlayerChained(player);
@@ -442,7 +435,6 @@ function playerSeatPropsEqual(prev: PlayerSeatProps, next: PlayerSeatProps): boo
     prev.hpChange?.amount === next.hpChange?.amount &&
     prev.hpChange?.version === next.hpChange?.version &&
     prev.isTurnGlow === next.isTurnGlow &&
-    prev.turnGlowVersion === next.turnGlowVersion &&
     prev.hideIdentity === next.hideIdentity &&
     prev.isDisconnected === next.isDisconnected &&
     prev.seatDistance === next.seatDistance &&

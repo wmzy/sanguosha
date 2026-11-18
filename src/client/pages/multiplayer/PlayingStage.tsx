@@ -8,7 +8,7 @@ import { btnStyle, colors } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
 import { ErrorToast } from './ErrorToast';
 import { ReconnectBanner } from './ReconnectBanner';
-import { gameWrap } from './multiplayerStyles';
+import { btnVars, gameWrap } from './multiplayerStyles';
 import type { ActionMsg } from '../../types';
 
 export function PlayingStage() {
@@ -65,12 +65,12 @@ export function PlayingStage() {
                   👁 {memberName(sid, mp.roomState?.playerNames)} 申请查看你的视角
                   <button
                     className={btnStyle}
-                    style={{ '--btn-bg': colors.accent.green, '--btn-padding': '2px 8px', '--btn-font-size': '11px' } as React.CSSProperties}
+                    style={btnVars(colors.accent.green, { padding: '2px 8px', fontSize: '11px' })}
                     onClick={() => mp.approveView(sid, mySeat)}
                   >同意</button>
                   <button
                     className={btnStyle}
-                    style={{ '--btn-bg': colors.accent.red, '--btn-padding': '2px 8px', '--btn-font-size': '11px' } as React.CSSProperties}
+                    style={btnVars(colors.accent.red, { padding: '2px 8px', fontSize: '11px' })}
                     onClick={() => mp.rejectView(sid)}
                   >拒绝</button>
                 </span>

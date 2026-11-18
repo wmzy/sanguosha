@@ -44,14 +44,12 @@ import { registerAction } from '../core/skill';
 import { getGender } from '../data/character-meta';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
-import { slotOf } from '../util/equip-slot';
+import { EQUIP_SLOTS, slotOf } from '../util/equip-slot';
 import { engineCanPlayNowReason } from '../util/skillRuntime';
 import { isMaleAlive } from '../util/player-query';
 
 const SKILL_NAME = '界结姻';
 const USED_KEY = `${SKILL_NAME}/usedThisTurn`;
-
-const EQUIP_SLOTS: EquipSlot[] = ['武器', '防具', '进攻马', '防御马', '宝物'];
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {

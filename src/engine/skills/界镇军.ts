@@ -42,7 +42,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
-import { totalCardCount } from '../util/player-query';
+import { totalCardCount, ownedCardIds } from '../util/player-query';
 
 const SKILL_ID = '界镇军';
 const DISPLAY_NAME = '镇军';
@@ -308,12 +308,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           mode: 'select',
           title: `镇军:选择 ${targetPlayer.name} 的 ${X} 张牌弃置(可从手牌或装备区)`,
           // 静态列出目标当前所有牌(供前端展示;真实面杀手牌为暗牌,前端可渲染牌背)
-          cardIds: [
-            ...targetPlayer.hand,
-            ...Object.values(targetPlayer.equipment).filter(
-              (id): id is string => !!id,
-            ),
-          ],
+          cardIds: ownedCardIds(targetPlayer),
           minTotal: X,
           maxTotal: X,
         },

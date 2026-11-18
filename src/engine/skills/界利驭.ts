@@ -41,15 +41,15 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界利驭'(避开标版未实现的"利驭");
 //   内部 Skill.name = '利驭'(OL 官方技能名,玩家可见)。
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, requireRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
 
 const SKILL_ID = '界利驭';
 const DISPLAY_NAME = '利驭';
@@ -79,61 +79,49 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // pendingSlots.get(pid) 自然区分:
   //   - CONFIRM_RT / PICK_RT:仅吕布(pid===ownerId)有该 pending
   //   - CHOOSE_DUEL_RT      :仅受伤目标(pid===pending.target)有该 pending
-  for (const player of state.players) {
-    const pid = player.index;
-
-    offs.push(
-      registerAction(
-        state,
-        skill.id,
-        pid,
-        'respond',
-        (s, params) => {
-          const slot = s.pendingSlots.get(pid);
-          if (!slot) return '当前不需要回应';
-          if (slot.atom.type !== '请求回应') return '当前不需要回应';
-          const requestType = (slot.atom as { requestType?: string }).requestType;
-          if (requestType === CONFIRM_RT) {
-            // confirm:接受 choice/confirmed 布尔
-            return null;
+  offs.push(
+    ...registerRespondForAllSeats(
+      state,
+      skill.id,
+      (s, pid: number, params: Record<string, Json>): string | null => {
+        const check = requireRequestType(s, pid, [CONFIRM_RT, PICK_RT, CHOOSE_DUEL_RT], {
+          mismatchError: '当前不是利驭回应',
+        });
+        if (check.error) return check.error;
+        const requestType = check.requestType;
+        if (requestType === PICK_RT) {
+          // 选牌面板:校验 zone + cardId/handIndex(同反馈/过河拆桥)
+          const zone = params.zone;
+          if (zone === 'equipment' || zone === 'judge') {
+            if (typeof params.cardId !== 'string') return 'cardId required';
+          } else if (zone === 'hand') {
+            if (typeof params.handIndex !== 'number') return 'handIndex required';
+          } else {
+            return 'zone required (equipment|hand|judge)';
           }
-          if (requestType === PICK_RT) {
-            // 选牌面板:校验 zone + cardId/handIndex(同反馈/过河拆桥)
-            const zone = params.zone;
-            if (zone === 'equipment' || zone === 'judge') {
-              if (typeof params.cardId !== 'string') return 'cardId required';
-            } else if (zone === 'hand') {
-              if (typeof params.handIndex !== 'number') return 'handIndex required';
-            } else {
-              return 'zone required (equipment|hand|judge)';
-            }
-            return null;
-          }
-          if (requestType === CHOOSE_DUEL_RT) {
-            // 受伤目标选择决斗对象
-            if (typeof params.target !== 'number') return 'target required';
-            return null;
-          }
-          return '当前不是利驭回应';
-        },
-        async (s, params) => {
-          const slot = s.pendingSlots.get(pid);
-          const requestType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
-          if (requestType === CONFIRM_RT) {
-            s.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
-          } else if (requestType === PICK_RT) {
-            s.localVars[PICK_RESULT_KEY] = {
-              zone: params.zone,
-              cardId: params.cardId ?? null,
-              handIndex: params.handIndex ?? null,
-            };
-          } else if (requestType === CHOOSE_DUEL_RT) {
-            s.localVars[DUEL_TARGET_KEY] = params.target;
-          }
-        },
-      ),
-    );
-  }
+        } else if (requestType === CHOOSE_DUEL_RT) {
+          // 受伤目标选择决斗对象
+          if (typeof params.target !== 'number') return 'target required';
+        }
+        return null; // CONFIRM_RT:接受 choice/confirmed 布尔
+      },
+      async (s, pid: number, params: Record<string, Json>): Promise<void> => {
+        const slot = s.pendingSlots.get(pid);
+        const requestType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+        if (requestType === CONFIRM_RT) {
+          s.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
+        } else if (requestType === PICK_RT) {
+          s.localVars[PICK_RESULT_KEY] = {
+            zone: params.zone,
+            cardId: params.cardId ?? null,
+            handIndex: params.handIndex ?? null,
+          };
+        } else if (requestType === CHOOSE_DUEL_RT) {
+          s.localVars[DUEL_TARGET_KEY] = params.target;
+        }
+      },
+    ),
+  );
 
   offs.push(
     registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {

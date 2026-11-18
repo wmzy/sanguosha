@@ -118,6 +118,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── respond:目标拼点牌。为所有非 owner 座次注册(validate 严格校验 requestType) ──
+  // registerRespondForAllSeats 无法表达跳过 owner 座次,故保留手写循环。
   for (const p of state.players) {
     if (p.index === ownerId) continue;
     const pid = p.index;

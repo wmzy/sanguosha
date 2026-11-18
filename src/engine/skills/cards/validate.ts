@@ -4,6 +4,7 @@ import type { GameState, Json, CardTargetSpec } from '../../types';
 import { effectiveDistance, inAttackRange } from '../../rules/distance';
 import { canSlash } from '../../rules/slash-quota';
 import { validateUseCard } from '../../core/skill';
+import { hasNoDistanceLimit } from './_distanceOne';
 import { getCardEffect } from '.';
 
 export function isCardBanned(state: GameState, ownerId: number, _cardName: string): boolean {
@@ -58,7 +59,8 @@ export function isLegalTarget(
     case 'inAttackRange':
       return inAttackRange(state, ownerId, target);
     case 'distance': {
-      if (state.players[ownerId]?.tags.includes('奇才/无距离限制')) return true;
+      // 奇才(无距离限制)豁免判据与 cards/_distanceOne 同源
+      if (hasNoDistanceLimit(state, ownerId)) return true;
       return effectiveDistance(state, ownerId, target, cardId) <= spec.dist;
     }
     case 'allOthers':

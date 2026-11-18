@@ -39,8 +39,8 @@ import type {
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm } from '../util/skillRuntime';
+import { registerAfterHook } from '../core/skill';
+import { askConfirm, registerRespondForAllSeats } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const BASE_VAR = '界再起/base'; // turn.vars:本回合弃牌堆基线长度
@@ -82,69 +82,62 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // ── respond:注册到每个座次(以 skillId='界再起' 隔离)──
   //   ownerId 座次额外处理 trigger/chooseTargets;所有座次都处理 option。
   //   (dispatch 按 (skillId, seatId, 'respond') 查 action,故每座次独立闭包绑定 seatId。)
-  const unloaders: Array<() => void> = [];
-  for (const p of state.players) {
-    const seatId = p.index;
-    const u = registerAction(
-      state,
-      skill.id,
-      seatId,
-      'respond',
-      (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as Record<string, unknown>;
-        if (atom['type'] !== '请求回应') return '当前不需要回应';
-        const rt = atom['requestType'] as string;
+  const unloaders = registerRespondForAllSeats(
+    state,
+    skill.id,
+    (st: GameState, seatId: number, params: Record<string, Json>): string | null => {
+      const slot = st.pendingSlots.get(seatId);
+      if (!slot) return '当前不需要回应';
+      const atom = slot.atom as Record<string, unknown>;
+      if (atom['type'] !== '请求回应') return '当前不需要回应';
+      const rt = atom['requestType'] as string;
 
-        // 孟获本人询问:仅 ownerId 座次回应
-        if (rt === TRIGGER_RT || rt === CHOOSE_TARGETS_RT) {
-          if (seatId !== ownerId) return '当前不是你的询问';
-          if (rt === CHOOSE_TARGETS_RT) {
-            const x = st.localVars[X_VAR] as number | undefined;
-            const targets = params.targets as Json[] | undefined;
-            if (!Array.isArray(targets)) return '需选择目标(可为空)';
-            const maxN = typeof x === 'number' ? x : 0;
-            if (targets.length > maxN) return `至多选择 ${maxN} 名角色`;
-            for (const t of targets) {
-              if (typeof t !== 'number') return '目标不合法';
-              if (!st.players[t]?.alive) return '目标不合法';
-            }
-          }
-          return null;
-        }
-
-        // 选项询问:任何座次(以 OPTION_RT_PREFIX+seatId 命名,确保是问自己的)
-        if (typeof rt === 'string' && rt === OPTION_RT_PREFIX + seatId) {
-          return null; // confirm 二选一,choice/confirmed 即答案
-        }
-
-        return '当前不是界再起询问';
-      },
-      async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        const slot = st.pendingSlots.get(seatId);
-        const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
-        if (rt === TRIGGER_RT) {
-          st.localVars[TRIGGER_CONFIRMED_KEY] =
-            params.choice === true || params.confirmed === true;
-        } else if (rt === CHOOSE_TARGETS_RT) {
+      // 孟获本人询问:仅 ownerId 座次回应
+      if (rt === TRIGGER_RT || rt === CHOOSE_TARGETS_RT) {
+        if (seatId !== ownerId) return '当前不是你的询问';
+        if (rt === CHOOSE_TARGETS_RT) {
+          const x = st.localVars[X_VAR] as number | undefined;
           const targets = params.targets as Json[] | undefined;
-          st.localVars[TARGETS_KEY] = Array.isArray(targets)
-            ? (targets.filter((t): t is number => typeof t === 'number'))
-            : [];
-        } else if (rt === OPTION_RT_PREFIX + seatId) {
-          // choice=true / confirmed=true → 选项 1(摸一张牌);否则 → 选项 2(孟获回 1 血)
-          const choice = params.choice === true || params.confirmed === true;
-          const option: 1 | 2 = choice ? 1 : 2;
-          const results =
-            (st.localVars[OPTION_RESULTS_KEY] as Record<string, Json> | undefined) ?? {};
-          results[String(seatId)] = option;
-          st.localVars[OPTION_RESULTS_KEY] = results;
+          if (!Array.isArray(targets)) return '需选择目标(可为空)';
+          const maxN = typeof x === 'number' ? x : 0;
+          if (targets.length > maxN) return `至多选择 ${maxN} 名角色`;
+          for (const t of targets) {
+            if (typeof t !== 'number') return '目标不合法';
+            if (!st.players[t]?.alive) return '目标不合法';
+          }
         }
-      },
-    );
-    unloaders.push(u);
-  }
+        return null;
+      }
+
+      // 选项询问:任何座次(以 OPTION_RT_PREFIX+seatId 命名,确保是问自己的)
+      if (typeof rt === 'string' && rt === OPTION_RT_PREFIX + seatId) {
+        return null; // confirm 二选一,choice/confirmed 即答案
+      }
+
+      return '当前不是界再起询问';
+    },
+    async (st: GameState, seatId: number, params: Record<string, Json>): Promise<void> => {
+      const slot = st.pendingSlots.get(seatId);
+      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      if (rt === TRIGGER_RT) {
+        st.localVars[TRIGGER_CONFIRMED_KEY] =
+          params.choice === true || params.confirmed === true;
+      } else if (rt === CHOOSE_TARGETS_RT) {
+        const targets = params.targets as Json[] | undefined;
+        st.localVars[TARGETS_KEY] = Array.isArray(targets)
+          ? (targets.filter((t): t is number => typeof t === 'number'))
+          : [];
+      } else if (rt === OPTION_RT_PREFIX + seatId) {
+        // choice=true / confirmed=true → 选项 1(摸一张牌);否则 → 选项 2(孟获回 1 血)
+        const choice = params.choice === true || params.confirmed === true;
+        const option: 1 | 2 = choice ? 1 : 2;
+        const results =
+          (st.localVars[OPTION_RESULTS_KEY] as Record<string, Json> | undefined) ?? {};
+        results[String(seatId)] = option;
+        st.localVars[OPTION_RESULTS_KEY] = results;
+      }
+    },
+  );
 
   // ── 阶段开始(回合结束) after-hook:界再起主逻辑 ──
   const unloadEndHook = registerAfterHook(

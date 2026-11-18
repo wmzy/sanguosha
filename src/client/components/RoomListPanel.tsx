@@ -1,7 +1,7 @@
 import { memo, useState } from 'react';
 import { css, cx } from '@linaria/core';
 import type { RoomInfo } from '../../server/protocol';
-import { colors } from '../theme';
+import { colors, panelCard } from '../theme';
 
 /* ── 房间操作按钮:幽灵药丸体系(与游戏内顶栏同语言)──
    形状/字号一致,以色相区分语义:中性(刷新)/金(加入=主操作)/蓝(旁观)/红(删除)。 */
@@ -73,16 +73,9 @@ interface RoomListPanelProps {
   allowJoinAlways?: boolean;
 }
 
+/* 暗色面板视觉主体在 theme.panelCard,此处只叠加本卡片的最小宽度 */
 const panelRoot = css`
-  background: linear-gradient(rgba(22, 20, 30, 0.85), rgba(14, 13, 20, 0.88));
-  border: 1px solid rgba(196, 162, 84, 0.28);
-  border-radius: 12px;
-  padding: 30px;
   min-width: 300px;
-  max-width: 400px;
-  box-shadow:
-    0 6px 20px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 232, 170, 0.05);
 `;
 
 const panelTitle = css`
@@ -239,7 +232,7 @@ export const RoomListPanel = memo(
         : rooms;
 
     return (
-      <div className={panelRoot}>
+      <div className={cx(panelCard, panelRoot)}>
         <h2 className={panelTitle}>房间列表</h2>
 
         {currentPlayerId && (

@@ -5,7 +5,7 @@
 
 import { css, cx } from '@linaria/core';
 import type { RoomInfo } from '../../../server/protocol';
-import { colors, inputStyle } from '../../theme';
+import { colors, inputStyle, panelCard } from '../../theme';
 import { RoomListPanel } from '../RoomListPanel';
 
 interface DebugRoomListProps {
@@ -35,16 +35,9 @@ const rootRow = css`
   flex-wrap: wrap;
 `;
 
+/* 暗色面板视觉主体在 theme.panelCard,此处只叠加本卡片的最小宽度 */
 const createCard = css`
-  background: linear-gradient(rgba(22, 20, 30, 0.85), rgba(14, 13, 20, 0.88));
-  border: 1px solid rgba(196, 162, 84, 0.28);
-  border-radius: 12px;
-  padding: 30px;
   min-width: 320px;
-  max-width: 400px;
-  box-shadow:
-    0 6px 20px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 232, 170, 0.05);
 `;
 
 const createTitle = css`
@@ -107,7 +100,7 @@ export function DebugRoomList({
 }: DebugRoomListProps) {
   return (
     <div className={rootRow}>
-      <div className={createCard}>
+      <div className={cx(panelCard, createCard)}>
         <h2 className={createTitle}>创建调试房间</h2>
         <div className={formGroup}>
           <label className={formLabel}>玩家人数</label>

@@ -1,64 +1,17 @@
 // 乐不思蜀 CardEffect — 延时锦囊·乐不思蜀的使用结算。
 //
-// 延迟类锦囊：runUseFlow 置入判定区后暂停（delayed=true），
-// 判定阶段由 resumeDelayedSettlement 恢复使用结算中，resolve 执行判定+效果。
+// 延迟类锦囊:runUseFlow 置入判定区后暂停(delayed=true),
+// 判定阶段由 resumeDelayedSettlement 恢复使用结算中,resolve 执行判定+效果。
 //
-// 生效后效果（use.md）：先进行判定结算 → 读判定牌花色 → 执行效果 → 移除延时锦囊。
-//   判定非♥ → 跳过出牌阶段（加标签，出牌阶段 before-hook 消费）
-//   判定♥   → 无效，弃置
+// 生效后效果(use.md):判定 ♥ → 无效,弃置;判定非 ♥ → 跳过出牌阶段
+// (加标签,出牌阶段 before-hook 消费)。使用无距离限制。
+// canUse/resolve/放置与校验的单源实现见 cards/_delayedSkipEffect。
+import { createDelayedSkipEffect } from './_delayedSkipEffect';
 
-import type { Card } from '../../types';
-import { applyAtom } from '../../core/apply';
-import { runJudgeFlow } from '../../flows/judge';
-import type { CardEffect, ResolveCtx } from '../../types';
-
-/** 跳过出牌阶段的 tag 名 */
-const SKIP_TAG = '乐不思蜀/跳过出牌';
-
-/** 乐不思蜀牌特有校验：任意其他角色、判定区无同名（无距离限制） */
-function canUseIndulgence(
-  state: import('../../types').GameState,
-  ownerId: number,
-  params: Record<string, import('../../types').Json>,
-): string | null {
-  const target =
-    (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0];
-  if (target === undefined) return '目标不合法';
-  if (target === ownerId) return '不能对自己使用';
-  if (!state.players[target]?.alive) return '目标已死亡';
-  if (state.players[target].pendingTricks.some((t) => t.name === '乐不思蜀'))
-    return '目标判定区已有乐不思蜀';
-  return null;
-}
-
-/** 乐不思蜀的生效后效果：判定 → 非♥加跳过标签 → 移除延时锦囊 */
-async function resolveIndulgence(ctx: ResolveCtx): Promise<void> {
-  const { state, target } = ctx;
-  // 判定结果属于本次调用,不受嵌套判定或天妒收牌影响。
-  const judgeCardId = await runJudgeFlow(state, target, '乐不思蜀');
-  const judgeCard = judgeCardId ? state.cardMap[judgeCardId] : undefined;
-  if (judgeCard && judgeCard.suit !== '♥') {
-    // 非♥：加跳过出牌阶段标签
-    await applyAtom(state, { type: '加标签', player: target, tag: SKIP_TAG });
-  }
-  // 移除延时锦囊（♥时无效弃置，非♥时生效后弃置）
-  await applyAtom(state, { type: '移除延时锦囊', player: target, trickName: '乐不思蜀' });
-}
-
-export const indulgenceEffect: CardEffect = {
-  timing: '出牌阶段',
-  target: { kind: 'other', min: 1, max: 1 },
-  delayed: true,
-  skipPhase: { tag: SKIP_TAG, phase: '出牌' },
-  cancelledBy: { cardName: '无懈可击', broadcast: true },
-  canUse: canUseIndulgence,
-  resolve: resolveIndulgence,
-  prompt: {
-    type: 'useCardAndTarget',
-    title: '乐不思蜀',
-    cardFilter: { filter: (c: Card) => c.name === '乐不思蜀', min: 1, max: 1 },
-    targetFilter: { min: 1, max: 1 },
-  },
-  label: '乐不思蜀',
-  style: 'danger',
-};
+export const indulgenceEffect = createDelayedSkipEffect({
+  trickName: '乐不思蜀',
+  failSuit: '♥',
+  skipTag: '乐不思蜀/跳过出牌',
+  phase: '出牌',
+  withDistance: false,
+});

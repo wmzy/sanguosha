@@ -12,6 +12,7 @@
 //   6. 负面:黑牌 transform 被拒(不是红色)
 //   7. 负面:非自己回合 transform 被拒
 //   8. availableActions:界火计 transform 声明,prompt 卡过滤是红牌(手牌+装备)
+//   9. 展示结束:随机展示结算后广播收尾信号(带 player+cardId,晚于展示)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness } from '../engine-harness';
 import '../../src/engine/atoms';
@@ -330,5 +331,45 @@ describe('界火计', () => {
     expect(cardFilter!(blackSpade)).toBe(false);
     // 装备区红牌也通过(界版:含装备区)
     expect(cardFilter!(redEquip)).toBe(true);
+  });
+
+  // ─── 9. 展示结束广播:粘性展示卡的收尾信号 ──────────────────────
+  // 与标版火攻(火攻.test.ts 用例 11)同契约:界版随机展示后的所有出口都要广播
+  // 展示结束——否则旁观/回放/其他座次的粘性展示卡永不收起(此前界版只发 展示 不发结束)。
+  it('结算后广播展示结束(带 player+cardId,且晚于展示)', async () => {
+    const red = makeCard('c1', '桃', '♥', 'A');
+    const diamond = makeCard('m1', '杀', '♦', '5'); // P1 弃的♦(同颜色不同花色)
+    const reveal = makeCard('r1', '闪', '♥', '3'); // P2 唯一手牌(随机即此牌)
+    const state = buildState({
+      p1Hand: ['c1', 'm1'],
+      p2Hand: ['r1'],
+      extraCards: { c1: red, m1: diamond, r1: reveal },
+    });
+    await harness.setup(state);
+    const P1 = harness.player('P1');
+
+    await P1.transformThenUse('界火计', { cardId: 'c1' }, '火攻', {
+      cardId: 'c1#界火计',
+      targets: [1],
+    });
+    await P1.pass(); // 无懈
+    P1.expectPending('请求回应');
+    await P1.respond('界火计', { cardId: 'm1' }); // P1 弃♦(同颜色)
+
+    const findAtoms = (type: string) =>
+      harness.state.atomHistory.filter(
+        (e): e is typeof e & { atom: Record<string, unknown> } =>
+          e.kind === 'atom' && (e.atom as Record<string, unknown>).type === type,
+      );
+    const reveals = findAtoms('展示');
+    expect(reveals).toHaveLength(1);
+    const ends = findAtoms('展示结束');
+    expect(ends).toHaveLength(1);
+    // 收尾广播带展示者与展示牌
+    expect(ends[0].atom).toMatchObject({ player: 1, cardId: 'r1' });
+    // 顺序:展示 → (弃牌/伤害等) → 展示结束
+    expect(harness.state.atomHistory.indexOf(reveals[0])).toBeLessThan(
+      harness.state.atomHistory.indexOf(ends[0]),
+    );
   });
 });

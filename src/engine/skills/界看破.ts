@@ -27,14 +27,16 @@
 //   询问抵消 close-reopen 循环:respond 设 已回应=true,无懈 resolve 设下层帧 cancelled=true →
 //   循环检测到已抵消即退出(无新窗口)。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
-import { registerAction, findPendingSlot } from '../core/skill';
+import { registerAction } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import {
+  blockedByOtherPending,
   hasNullifyWindow,
   mountTransformAction,
   registerTransformAction,
   type TransformActionOptions,
 } from '../util/skillRuntime';
+import { nullifyRespondValidate } from './cards/无懈可击';
 import { ownsCard } from '../util/player-query';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -63,15 +65,7 @@ const OPTIONS: TransformActionOptions = {
     // 必须存在无懈可击窗口(否则转化出的无懈无处使用)
     const hasWindow = hasNullifyWindow(state, ownerId);
     // 无其他阻塞型 pending(转化不应打断正在进行的结算);无懈窗口本身是当前响应目标,允许
-    const blockedByOther = (() => {
-      for (const slot of state.pendingSlots.values()) {
-        const atom = slot.atom as { type?: string; requestType?: string };
-        if (!slot.isBlocking) continue;
-        if (atom.type === '请求回应' && atom.requestType === '无懈可击') continue;
-        return true;
-      }
-      return false;
-    })();
+    const blockedByOther = blockedByOtherPending(state);
     const ok = owned && isBlack && hasWindow && !blockedByOther;
     return ok ? null : '现在不能使用界看破';
   },
@@ -118,22 +112,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     '无懈可击',
     ownerId,
     'respond',
-    (state: GameState, params: Record<string, Json>) => {
-      // 校验同标版:无懈窗口 + 无懈牌
-      const slot = findPendingSlot(state, ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是无懈可击窗口';
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType !== '无懈可击') return '当前不是无懈可击窗口';
-      const cardId = params.cardId as string | undefined;
-      if (!cardId) return 'cardId required';
-      const self = state.players[ownerId];
-      if (!self.alive) return '你已死亡';
-      if (!self.hand.includes(cardId)) return '牌不在手牌中';
-      const card = state.cardMap[cardId];
-      if (card.name !== '无懈可击') return '只能打出无懈可击';
-      return null;
-    },
+    // 校验同标版(单源:cards/无懈可击.ts 的 nullifyRespondValidate)
+    (state: GameState, params: Record<string, Json>) =>
+      nullifyRespondValidate(state, ownerId, params),
     async (state: GameState, params: Record<string, Json>) => {
       const cardId = params.cardId as string;
       // 标记本次询问已 respond（询问抵消 循环据此决定是否退出）

@@ -5,10 +5,9 @@
 // 跨玩家 respond（展示/弃牌）仍保留在 skill 中（按 requestType 分流）。
 // resolve 内部通过 localVars 与 respond action 通信。
 
-import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { runDamageFlow } from '../../flows/damage';
-import type { CardEffect, ResolveCtx } from '../../types';
+import type { CardEffect, Card, GameState, ResolveCtx } from '../../types';
 import { requireRequestType } from '../../util/skillRuntime';
 
 /** 火攻的结算：展示手牌 → 弃同花色 → 火焰伤害 */
@@ -63,16 +62,53 @@ async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
     return;
   }
 
-  delete state.localVars['火攻/弃牌'];
+  await askFireDiscardAndDamage(state, source, target, cardId, {
+    requestType: '火攻/弃牌',
+    discardKey: '火攻/弃牌',
+    titlePrefix: '火攻',
+    matchValue: revealedSuit,
+    matchKey: 'suit',
+  });
+  // ── 收尾:广播展示结束,收起前端粘性展示卡 ──
+  // 覆盖剩余出口:已弃牌(伤害结算完)、不弃(无 discardId)、弃牌超时(discardId 空)。
+  // 旁观/回放/其他座次没有本地动作,粘性卡只能靠此事件收起——见 atoms/展示结束.ts。
+  await applyAtom(state, { type: '展示结束', player: target, cardId: revealed.cardId });
+}
+
+/** 火攻族结算尾段参数(标版火攻与界火计共用,差异全部参数化)。 */
+export interface FireDiscardAskOptions {
+  /** 询问 requestType,同时决定 respond 路由(标版→火攻卡效果,界版→界火计技能)。 */
+  requestType: string;
+  /** localVars 弃牌结果键(即 requestType 同名键)。 */
+  discardKey: string;
+  /** 询问标题前缀。 */
+  titlePrefix: string;
+  /** 展示牌匹配值(标版=花色,界版=颜色)。 */
+  matchValue: string;
+  /** 匹配维度:'suit'=同花色(标版)|'color'=同颜色(界版)。 */
+  matchKey: 'suit' | 'color';
+}
+
+/** 火攻族结算尾段:询问使用者弃一张与展示牌同 suit/color 的手牌 → 弃置(voluntary)
+ *  → 1 点火焰伤害;未弃/超时/目标已死则无事发生。展示结束 由调用方收尾。
+ *  标版火攻(resolve)与界火计(use 覆盖)共用,脚手架差异(无懈时机/展示方式)留在各自调用方。 */
+export async function askFireDiscardAndDamage(
+  state: GameState,
+  source: number,
+  target: number,
+  cardId: string,
+  opts: FireDiscardAskOptions,
+): Promise<void> {
+  delete state.localVars[opts.discardKey];
   await applyAtom(state, {
     type: '请求回应',
-    requestType: '火攻/弃牌',
+    requestType: opts.requestType,
     target: source,
     prompt: {
       type: 'useCard',
-      title: `火攻:弃置一张 ${revealedSuit} 手牌对其造成1点火焰伤害(不弃则无效)`,
+      title: `${opts.titlePrefix}:弃置一张 ${opts.matchValue} 手牌对其造成1点火焰伤害(不弃则无效)`,
       cardFilter: {
-        filter: (c) => c.suit === revealedSuit,
+        filter: (c: Card) => c[opts.matchKey] === opts.matchValue,
         min: 1,
         max: 1,
       },
@@ -80,15 +116,12 @@ async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
     timeout: 15,
   });
 
-  const discardId = state.localVars['火攻/弃牌'] as string | undefined;
+  const discardId = state.localVars[opts.discardKey] as string | undefined;
+  // 使用者弃了 → 造成 1 点火焰伤害;没弃(超时)→ 无事发生
   if (discardId && state.players[target]?.alive) {
     await applyAtom(state, { type: '弃置', player: source, cardIds: [discardId], voluntary: true });
     await runDamageFlow(state, source, target, 1, cardId, '火焰');
   }
-  // ── 收尾:广播展示结束,收起前端粘性展示卡 ──
-  // 覆盖剩余出口:已弃牌(伤害结算完)、不弃(无 discardId)、弃牌超时(discardId 空)。
-  // 旁观/回放/其他座次没有本地动作,粘性卡只能靠此事件收起——见 atoms/展示结束.ts。
-  await applyAtom(state, { type: '展示结束', player: target, cardId: revealed.cardId });
 }
 
 /** 火攻牌特有校验：目标有手牌（可对自己使用火攻） */

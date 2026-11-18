@@ -5,9 +5,11 @@
 //   2. 贾诩本人可在自己回合内对濒死者使用桃(完杀允许"你")
 //   3. 濒死者本人可对自己使用桃(完杀允许濒死角色)
 //   4. 负面对照:非贾诩回合,完杀不生效,第三方可正常救援
+//   5. 嵌套濒死回归:两名濒死者并存时,问询第二个濒死者不被误 cancel
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
 import '../../src/engine/atoms';
+import { applyAtom } from '../../src/engine/core/apply';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, PlayerState } from '../../src/engine/types';
@@ -264,5 +266,66 @@ describe('完杀', () => {
 
     expect(harness.state.players[1].alive).toBe(true);
     expect(harness.state.players[1].health).toBe(1);
+  });
+
+  // ─── 5. 嵌套濒死回归:第二名濒死者的求桃问询不被误 cancel ─────────────
+  // 修复前:濒死者定位用 findIndex(首个 alive && health<=0),嵌套濒死
+  // (濒死结算中死亡触发型技能又致他人濒死)时同时存在两名濒死者,
+  // 问询第二个会被误 cancel。修复后:直接检查被问询者自身是否濒死(同界完杀)。
+  it('嵌套濒死:两名濒死者并存时,问询第二个濒死者不被 cancel', async () => {
+    await harness.setup(
+      createGameState({
+        players: [
+          mkPlayer({ index: 0, name: '贾诩', skills: ['完杀'], health: 3, maxHealth: 3 }),
+          // 两名濒死者并存(嵌套濒死中间态:alive 且 health<=0)
+          mkPlayer({ index: 1, name: 'P2', hand: ['p5'], skills: ['桃'], health: 0, maxHealth: 4 }),
+          mkPlayer({ index: 2, name: 'P3', hand: ['p6'], skills: ['桃'], health: 0, maxHealth: 4 }),
+          // 健康第三方:仍应被完杀 cancel(负面对照)
+          mkPlayer({ index: 3, name: 'P4', hand: ['p7'], skills: ['桃'], health: 4 }),
+        ],
+        cardMap: {
+          p5: mkCard('p5', '桃', '♥', '3'),
+          p6: mkCard('p6', '桃', '♥', '4'),
+          p7: mkCard('p7', '桃', '♥', '5'),
+        },
+        currentPlayerIndex: 0,
+        phase: '出牌',
+        turn: { round: 1, phase: '出牌', vars: {} },
+      }),
+    );
+
+    // 直接 applyAtom 求桃问询(同 runDyingFlow 构造,濒死者=P2)。不经父流程
+    // 会触发视图自动对比的 transient 差异,临时关闭(与丈八蛇矛同款处理)。
+    const restoreAutoCompare = disableAutoCompare();
+    try {
+      const askPeach = (target: number) => {
+        void applyAtom(harness.state, {
+          type: '请求回应',
+          requestType: '桃/求桃',
+          target,
+          prompt: {
+            type: 'useCard',
+            title: 'P2 濒死,使用桃/酒救援',
+            cardFilter: { filter: () => true, min: 1, max: 1 },
+          },
+          timeout: 15,
+        });
+      };
+
+      // 健康第三方 P4:完杀 cancel,不创建 pending
+      askPeach(3);
+      await harness.waitForStable();
+      expect(harness.state.pendingSlots.size).toBe(0);
+
+      // 第二名濒死者 P3(旧实现 findIndex 只找到 P2 → P3 被误 cancel):
+      // 修复后问询保留,pending 落在 P3(idx 2)
+      askPeach(2);
+      await harness.waitForStable();
+      const pendingSlot = [...harness.state.pendingSlots.values()][0];
+      expect(pendingSlot).toBeTruthy();
+      expect((pendingSlot.atom as { target: number }).target).toBe(2);
+    } finally {
+      restoreAutoCompare();
+    }
   });
 });

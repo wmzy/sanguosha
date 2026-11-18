@@ -808,7 +808,6 @@ export function GameViewComponentImpl({
                           isPerspectiveTurn={isPerspectiveTurn}
                           isPerspectiveAwaiting={isPerspectiveAwaiting}
                           isDiscardPhase={isDiscardPhase}
-                          isMyTurn={isMyTurn}
                           selectedCardId={selectedCardId}
                           selectedTarget={selectedTarget}
                           discardMin={discardMin}

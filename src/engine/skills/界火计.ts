@@ -40,15 +40,16 @@ import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, validateUseCard } from '../core/skill';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame, frameCards } from '../core/frame';
-import { runDamageFlow } from '../flows/damage';
 import { promptCancel } from '../flows/cancel';
 import { defaultPlayActive } from '../rules/action-active';
 import { pickRandom } from '../util/rng';
 import {
   registerTransformAction,
   mountTransformAction,
+  requireRequestType,
   type TransformActionOptions,
 } from '../util/skillRuntime';
+import { askFireDiscardAndDamage } from './cards/火攻';
 
 const TRANSFORM_OPTIONS: TransformActionOptions = {
   outputName: '火攻',
@@ -167,37 +168,27 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             });
 
             // ── 2) 请求使用者弃一张同颜色手牌(界版:同颜色,非同花色) ──
+            // 尾段与标版火攻共用(cards/火攻.ts askFireDiscardAndDamage),此处按颜色匹配;
+            // respond 路由仍走 '界火计/弃牌' → 本技能 respond(校验同颜色)。
             const fromPlayer = state.players[from];
             if (fromPlayer?.alive) {
               const hasMatch = fromPlayer.hand.some(
                 (id) => state.cardMap[id]?.color === revealedColor,
               );
               if (hasMatch) {
-                delete state.localVars['界火计/弃牌'];
-                await applyAtom(state, {
-                  type: '请求回应',
+                await askFireDiscardAndDamage(state, from, target, cardId, {
                   requestType: '界火计/弃牌',
-                  target: from,
-                  prompt: {
-                    type: 'useCard',
-                    title: `界火计:弃置一张 ${revealedColor} 手牌对其造成1点火焰伤害(不弃则无效)`,
-                    cardFilter: {
-                      filter: (c) => c.color === revealedColor,
-                      min: 1,
-                      max: 1,
-                    },
-                  },
-                  timeout: 15,
+                  discardKey: '界火计/弃牌',
+                  titlePrefix: '界火计',
+                  matchValue: revealedColor,
+                  matchKey: 'color',
                 });
-
-                const discardId = state.localVars['界火计/弃牌'] as string | undefined;
-                // 使用者弃了 → 造成 1 点火焰伤害;没弃(超时)→ 无事发生
-                if (discardId && state.players[target]?.alive) {
-                  await applyAtom(state, { type: '弃置', player: from, cardIds: [discardId], voluntary: true });
-                  await runDamageFlow(state, from, target, 1, cardId, '火焰');
-                }
               }
             }
+            // ── 收尾:广播展示结束,收起前端粘性展示卡 ──
+            // 覆盖展示后的所有出口:已弃牌(伤害结算完)、不弃/超时、使用者死亡、无同颜色可弃。
+            // 旁观/回放/其他座次没有本地动作,粘性卡只能靠此事件收起(同标版火攻,见 atoms/展示结束.ts)。
+            await applyAtom(state, { type: '展示结束', player: target, cardId: revealedCardId });
           }
         }
         // 火攻锦囊移出处理区 → 弃牌堆
@@ -229,11 +220,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (state: GameState, params: Record<string, Json>) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是界火计窗口';
-      const reqType = (slot.atom as { requestType?: string }).requestType;
-      if (reqType !== '界火计/弃牌') return '当前不是界火计窗口';
+      const check = requireRequestType(state, ownerId, ['界火计/弃牌'], {
+        mismatchError: '当前不是界火计窗口',
+        wrongTypeError: '当前不是界火计窗口',
+      });
+      if (check.error) return check.error;
       const cardId = params.cardId as string;
       if (typeof cardId !== 'string') return 'cardId required';
       const self = state.players[ownerId];

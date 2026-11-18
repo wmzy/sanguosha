@@ -32,14 +32,13 @@ import { spliceHandOrderEntry } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY as PICK_KEY } from '../rules/vars-keys';
 import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { EQUIP_SLOTS } from '../util/equip-slot';
 
 const _SKILL_NAME = '界补益';
 const DISPLAY_NAME = '补益';
 const CONFIRM_RT = '界补益/confirm'; // 是否发动
 const PICK_RT = '界补益/pick'; // 选目标一张牌
 const CONFIRM_KEY = '界补益/confirmed';
-
-const EQUIP_SLOTS = ['武器', '防具', '进攻马', '防御马', '宝物'] as const;
 
 /** 列出濒死目标可选的牌(装备区明牌 + 手牌张数)。 */
 function listTargetCards(

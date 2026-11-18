@@ -31,7 +31,7 @@ import { hasSkillModule } from './registry';
 import { DISTANCE_ATTACK_RANGE_KEY, PICK_RESULT_KEY } from '../rules/vars-keys';
 import { fieldCardIds, moveFieldCard } from '../flows/field-card';
 import { askPickTargetCard } from '../flows/pick-card-panel';
-import { askConfirm, firstCardId, defineConfirmAction, shadowCardId, hasNullifyWindow } from '../util/skillRuntime';
+import { askConfirm, blockedByOtherPending, firstCardId, defineConfirmAction, shadowCardId, hasNullifyWindow } from '../util/skillRuntime';
 
 // ── 效果①:装备→无懈可击 转化(影子 id/广播窗口判据走 skillRuntime 共享 helper) ──
 const SHADOW_SUFFIX = '解围';
@@ -82,15 +82,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 必须存在无懈可击窗口
     const hasWindow = hasNullifyWindow(state, ownerId);
     // 无其他阻塞型 pending(无懈窗口本身允许)
-    const blockedByOther = (() => {
-      for (const slot of state.pendingSlots.values()) {
-        const atom = slot.atom as { type?: string; requestType?: string };
-        if (!slot.isBlocking) continue;
-        if (atom.type === '请求回应' && atom.requestType === '无懈可击') continue;
-        return true;
-      }
-      return false;
-    })();
+    const blockedByOther = blockedByOtherPending(state);
     const ok = isEquip && cardInEquip && hasWindow && !blockedByOther;
     return ok ? null : '现在不能使用解围';
   },

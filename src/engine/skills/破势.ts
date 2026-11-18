@@ -22,7 +22,7 @@
 //     instantiateSkill 检测未注册则跳过实例化(不影响觉醒其余效果)
 import type { AtomAfterContext, FrontendAPI, GameState, Skill } from '../types';
 import { getHealthValue } from '../types';
-import type { EquipSlot } from '../types';
+import { EQUIP_SLOTS } from '../util/equip-slot';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { isAwakened, markAwakened } from '../rules/vars-keys';
@@ -30,9 +30,6 @@ import { ABOLISH_PREFIX } from './决堰';
 import type { SkillModule } from '../types';
 
 const AWAKENED_KEY = '破势/awakened';
-
-/** 全部装备槽(5 个) */
-const ALL_SLOTS: EquipSlot[] = ['武器', '防具', '进攻马', '防御马', '宝物'];
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -48,7 +45,7 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function allSlotsAbolished(state: GameState, player: number): boolean {
   const vars = state.players[player]?.vars;
   if (!vars) return false;
-  return ALL_SLOTS.every((s) => vars[ABOLISH_PREFIX + s]);
+  return EQUIP_SLOTS.every((s) => vars[ABOLISH_PREFIX + s]);
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {

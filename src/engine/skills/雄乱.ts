@@ -19,7 +19,6 @@
 // 限定技整局一次:player.vars['雄乱/used'](永久 vars,不被 回合结束 清理)。
 //   use action validate 校验;activeWhen 用默认出牌条件(validate 兜底已用状态)。
 import type {
-  EquipSlot,
   FrontendAPI,
   GameState,
   HookResult,
@@ -39,7 +38,7 @@ import { registerDistanceExemptor } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
 import { engineCanPlayNowReason } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
-import { slotOf } from '../util/equip-slot';
+import { EQUIP_SLOTS, slotOf } from '../util/equip-slot';
 
 const SKILL_NAME = '雄乱';
 
@@ -51,9 +50,6 @@ const TARGET_VAR = XIONGLUAN_TARGET_VIEW_KEY;
 const ABOLISH_PREFIX = '雄乱/废除:';
 /** 判定区废除标记 */
 const JUDGE_ABOLISHED = `${ABOLISH_PREFIX}判定`;
-
-/** 全部装备槽(废除装备区时逐槽处理) */
-const ALL_EQUIP_SLOTS: EquipSlot[] = ['武器', '防具', '进攻马', '防御马', '宝物'];
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -123,7 +119,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         st.players[ownerId].vars[JUDGE_ABOLISHED] = true;
 
         // 3) 废除装备区:逐槽卸下已装备的牌并弃置,写废除标记
-        for (const slot of ALL_EQUIP_SLOTS) {
+        for (const slot of EQUIP_SLOTS) {
           const equipId = self.equipment[slot];
           if (equipId) {
             await applyAtom(st, { type: '卸下', player: ownerId, slot });

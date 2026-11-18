@@ -139,6 +139,19 @@ export const glassPanelStyle = css`
   box-shadow: ${shadows.panel};
 `;
 
+/** 暗色卡片面板:大厅/调试大厅列表卡片共用(渐变底 + 金边 + 双层阴影)。
+ *  宽度差异(最小宽度)由使用方自己的类叠加。 */
+export const panelCard = css`
+  background: linear-gradient(rgba(22, 20, 30, 0.85), rgba(14, 13, 20, 0.88));
+  border: 1px solid rgba(196, 162, 84, 0.28);
+  border-radius: 12px;
+  padding: 30px;
+  max-width: 400px;
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 232, 170, 0.05);
+`;
+
 /** 页面主标题装饰:底部金色渐隐下边线(宽度固定 140px,不随标题拉伸) */
 export const goldHeadingStyle = css`
   padding-bottom: 10px;

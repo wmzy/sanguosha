@@ -226,6 +226,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── respond:helper 座次处理 option + giveCard ──
   // 为所有非 owner 座次注册(helper 可能是任意玩家)。
+  // registerRespondForAllSeats 无法表达跳过 owner 座次,故保留手写循环。
   for (const p of state.players) {
     if (p.index === ownerId) continue;
     const pid = p.index;

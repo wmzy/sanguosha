@@ -43,6 +43,7 @@ import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
 import { requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
 import { lostHealth } from '../util/player-query';
+import { EQUIP_SLOTS } from '../util/equip-slot';
 
 const SKILL_NAME = '界甘露';
 const DISPLAY_NAME = '甘露';
@@ -50,8 +51,6 @@ const TARGET_RT = '界甘露/target'; // 选两名目标
 const DISCARD_RT = '界甘露/discard'; // 弃 X 张手牌
 const TARGET_KEY = '界甘露/targets';
 const DISCARD_KEY = '界甘露/discardCards';
-
-const EQUIP_SLOTS: EquipSlot[] = ['武器', '防具', '进攻马', '防御马', '宝物'];
 
 /** 玩家装备区牌数(所有 slot 之和)。 */
 function equipmentCount(state: GameState, idx: number): number {

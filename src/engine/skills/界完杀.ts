@@ -34,6 +34,7 @@ import type { HookResult, Skill, GameState } from '../types';
 import { registerBeforeHook, registerAfterHook } from '../core/skill';
 import { applyAtom } from '../core/apply';
 import { registerSuppressionProvider } from '../core/skill-suppression';
+import { peachAskShouldCancel } from './完杀';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界完杀';
@@ -94,20 +95,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       ownerId,
       '请求回应',
       async (ctx): Promise<HookResult | void> => {
-        const atom = ctx.atom;
-        if (atom.requestType !== '桃/求桃') return; // 仅干预濒死求桃
-        // 仅在贾诩回合内生效
-        if (ctx.state.currentPlayerIndex !== ownerId) return;
-        const asked = atom.target;
-        if (typeof asked !== 'number') return;
-        if (asked === ownerId) return; // 贾诩本人可使用桃
-        // 濒死者本人可使用桃:直接检查被问询者是否处于濒死(health<=0)。
-        // 不用 findIndex——嵌套濒死(濒死结算中死亡触发型技能又致他人濒死)时,
-        // findIndex 只返回第一个濒死者,其余濒死者会被误 cancel。
-        const askedPlayer = ctx.state.players[asked];
-        if (askedPlayer?.alive && askedPlayer.health <= 0) return;
         // 其余角色:不能使用桃 → 跳过对该角色的问询
-        return { kind: 'cancel' };
+        if (peachAskShouldCancel(ctx.state, ownerId, ctx.atom)) return { kind: 'cancel' };
       },
     ),
   );

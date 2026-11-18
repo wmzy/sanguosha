@@ -5,7 +5,7 @@ import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm } from '../util/skillRuntime';
+import { askConfirm, requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '寒冰剑', description: '武器:杀造成伤害时可改为依次弃目标2张牌', isLocked: true };
@@ -22,14 +22,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (state, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (slot.atom as { requestType?: string }).requestType;
-      if (requestType === '寒冰剑/confirm') {
-        return null;
-      }
-      if (requestType === '寒冰剑/选牌') {
+      const check = requireRequestType(state, ownerId, ['寒冰剑/confirm', '寒冰剑/选牌'], {
+        mismatchError: '当前不是寒冰剑回应',
+      });
+      if (check.error) return check.error;
+      if (check.requestType === '寒冰剑/选牌') {
         const zone = params.zone;
         if (zone === 'equipment') {
           if (typeof params.cardId !== 'string') return 'cardId required';
@@ -38,9 +35,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
         } else {
           return 'zone required (equipment|hand)';
         }
-        return null;
       }
-      return '当前不是寒冰剑回应';
+      return null;
     },
     async (state, params) => {
       const slot = state.pendingSlots.get(ownerId);

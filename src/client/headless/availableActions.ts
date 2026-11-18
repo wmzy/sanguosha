@@ -1054,7 +1054,7 @@ export function appendRespondActions(
         const me = view.players[ownerId];
         const equip = (me?.equipment ?? {}) as Partial<Record<string, string>>;
         if (mode === 'select') {
-          const requestType = (pending.atom as { requestType?: string }).requestType;
+          const requestType = getPendingRequestType(pending);
           if (requestType === '观星/arrange') {
             // 观星的 distribute 契约不是 cardIds，而是 { top, bottom }。默认「全留顶、
             // 保持原顺序」：top[0]=最先摸到=牌堆顶，因此 top 是 observed 的逆序；

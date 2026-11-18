@@ -3,19 +3,14 @@
 //
 // 实现:
 //   1. before-hook 挂「成为目标」(结算阶段第一个 atom):
-//      当 target===owner 且 owner 无手牌,且当前结算的牌是 杀 或 决斗 时,cancel 该目标。
-//      杀.use / 决斗.use 检测 成为目标 返回 false(cancel)后跳过该目标的结算。
-//      判定"杀/决斗":优先看 atom.cardId 对应卡牌名;无 cardId(虚拟杀等)时回退看栈顶帧 skillId。
-//      备注(规则):已被杀指定为目标后再失去手牌,不影响该杀的结算——本实现因挂在"成为目标"
-//      (结算阶段入口)天然满足:此时手牌状态即结算时状态。
+//      无手牌时不是 杀/决斗 合法目标——与标版空城共用 registerKongchengGuard(见 空城.ts)。
 //
 //   2. after-hook 挂「被抵消」:检测自己使用的杀被闪抵消 → 摸一张牌。
 //      实现模式与界张飞咆哮(界咆哮.ts)完全一致。
-import type { HookResult, Skill, GameState } from '../types';
+import type { Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply'
-import { topFrame } from '../core/frame';
-import { registerBeforeHook } from '../core/skill';
 import { registerOnOwnSlashDodged } from '../util/skillRuntime';
+import { registerKongchengGuard } from './空城';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -30,34 +25,8 @@ export function createSkill(id: string, ownerId: number): Skill {
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
 
-  // before-hook:无手牌时不能成为 杀/决斗 的目标
-  const unregBefore = registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '成为目标',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.target !== ownerId) return;
-      // 只有无手牌时生效
-      if (ctx.state.players[ownerId]?.hand.length !== 0) return;
-
-      // 判定当前结算的牌是否为 杀 或 决斗
-      let cardName: string | undefined;
-      if (atom.cardId) {
-        cardName = ctx.state.cardMap[atom.cardId]?.name;
-      }
-      if (!cardName) {
-        // 无 cardId(虚拟杀等):看栈顶结算帧的技能名
-        const frame = topFrame(ctx.state);
-        cardName = frame?.skillId;
-      }
-      if (cardName !== '杀' && cardName !== '决斗') return;
-
-      // 无手牌 → 不是合法目标 → cancel(杀/决斗跳过此目标结算)
-      return { kind: 'cancel' };
-    },
-  );
+  // before-hook:无手牌时不能成为 杀/决斗 的目标(与标版空城共用)
+  const unregBefore = registerKongchengGuard(state, skill.id, ownerId);
 
   // 杀被闪抵消后摸一张牌(与界张飞咆哮同款:武将技形态,不传 weaponName)
   const unregAfter = registerOnOwnSlashDodged(state, skill.id, ownerId, async (ctx) => {

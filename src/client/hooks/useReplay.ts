@@ -10,10 +10,10 @@
 // 这与 useEventPlayback 的语义一致:回放每一步 = 实时收到一个 ViewEvent。
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import type { GameView, ViewEvent } from '../../engine/types';
+import type { GameView } from '../../engine/types';
 import type { ReplayFile } from '../replay/types';
 import { getViewAt, totalSteps, availableSeats } from '../replay/replayEngine';
-import { getAtomDef } from '../../engine/core/atom';
+import { computeEventDuration, MIN_VISIBLE_MS, FALLBACK_DURATION_MS } from '../utils/eventDuration';
 import type { QueuedEvent } from './useEventPlayback';
 
 export type ReplaySpeed = 0.5 | 1 | 2 | 4;
@@ -49,28 +49,6 @@ export interface UseReplayResult {
   togglePlay: () => void;
   /** 设置速度 */
   setSpeed: (speed: ReplaySpeed) => void;
-}
-
-/** 事件最小可见时长(ms),与 useEventPlayback 的 MIN_VISIBLE_MS 对齐 */
-const MIN_VISIBLE_MS = 400;
-/** duration 缺失时的回退间隔(ms) */
-const FALLBACK_DURATION_MS = 400;
-
-/** 取某 ViewEvent 的播放时长:
- *  1. ViewEvent 自带 effect.duration(派生事件如「打出」)
- *  2. atom 静态 effect.duration(查 atomType 优先)
- *  3. 兜底 FALLBACK_DURATION_MS
- *  与 useEventPlayback.playNext 的取值逻辑保持一致。 */
-function computeEventDuration(event: ViewEvent): number {
-  const type = (event as { atomType?: string; type?: string }).atomType ?? event.type;
-  let staticDuration: number | undefined;
-  try {
-    staticDuration = getAtomDef(type).effect?.duration;
-  } catch {
-    staticDuration = undefined;
-  }
-  const eventEffect = event.effect as { duration?: number } | undefined;
-  return eventEffect?.duration ?? staticDuration ?? FALLBACK_DURATION_MS;
 }
 
 export function useReplay(file: ReplayFile): UseReplayResult {
@@ -133,6 +111,7 @@ export function useReplay(file: ReplayFile): UseReplayResult {
     // 即将播放 events[effectiveStep],等待其 duration / speed
     const nextEvent = file.seats[seat].events[effectiveStep];
     const duration = nextEvent ? computeEventDuration(nextEvent.event) : FALLBACK_DURATION_MS;
+    // 刻意不加 useEventPlayback 的 ARROW_MIN_MS 箭头加成:回放与直播的节奏差异是既有行为。
     const wait = Math.max(duration, MIN_VISIBLE_MS) / speed;
     timerRef.current = setTimeout(() => {
       advance();

@@ -37,7 +37,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
-import { askConfirm, engineCanPlayNowReason } from '../util/skillRuntime';
+import { askConfirm, engineCanPlayNowReason, registerConfirmRespond } from '../util/skillRuntime';
 import { runVirtualSlash } from './cards/_virtualSlash';
 import { registerAction } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
@@ -185,29 +185,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── respond:target 响应选项询问(CHOICE_RT)──
   //   为每个座次注册(因为 target 可能是任意玩家),与界乱武/界激将 跨座次 respond 模式一致
+  //   (界救援 模式:registerConfirmRespond 三件套统一 validate+写键,
+  //    confirm → choice=true(选项①);cancel/超时 → choice=false(选项②))
   for (const pl of state.players) {
     const seat = pl.index;
     unloaders.push(
-      registerAction(
-        state,
-        skill.id,
-        seat,
-        'respond',
-        (st: GameState, _params: Record<string, Json>): string | null => {
-          const slot = st.pendingSlots.get(seat);
-          if (!slot) return '当前不需要回应';
-          const rt = (slot.atom as { requestType?: string }).requestType;
-          if (rt !== CHOICE_RT) return '当前不是明策询问';
-          return null;
-        },
-        async (st: GameState, params: Record<string, Json>): Promise<void> => {
-          const slot = st.pendingSlots.get(seat);
-          const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
-          if (rt !== CHOICE_RT) return;
-          // confirm → choice=true(选项①);cancel/其他 → choice=false(选项②)
-          st.localVars[CHOICE_KEY] = params.choice === true || params.confirmed === true;
-        },
-      ),
+      registerConfirmRespond(state, skill.id, seat, CHOICE_RT, CHOICE_KEY, {
+        mismatchError: '当前不是明策询问',
+      }),
     );
   }
 

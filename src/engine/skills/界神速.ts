@@ -26,7 +26,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { registerFlipSkipTurnHooks } from '../flows/face-down';
 import { skipPhase } from '../rules/skip-phase';
-import { defineConfirmAction } from '../util/skillRuntime';
+import { defineConfirmAction, firstCardId, requireRequestType } from '../util/skillRuntime';
 import {
   FLIP_TAG,
   SKIP_MO_TAG,
@@ -84,13 +84,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     ownerId,
     'respond',
-    (s) => {
-      const slot = s.pendingSlots.get(ownerId);
-      if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as unknown as { requestType?: string }).requestType ?? '';
-      if (!ALL_RTS.includes(rt)) return '当前不是界神速询问';
-      return null;
-    },
+    (s) =>
+      requireRequestType(s, ownerId, ALL_RTS, {
+        mismatchError: '当前不是界神速询问',
+      }).error,
     async (s, params) => {
       const slot = s.pendingSlots.get(ownerId);
       const rt =
@@ -103,11 +100,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           (typeof params.target === 'number' ? params.target : undefined);
         if (typeof t === 'number') s.localVars[TARGET_KEY] = t;
       } else if (rt === EQUIP_RT) {
-        const cardIds = params.cardIds as string[] | undefined;
-        const single = params.cardId as string | undefined;
-        const id =
-          (Array.isArray(cardIds) && cardIds.length > 0 ? cardIds[0] : undefined) ??
-          (typeof single === 'string' ? single : undefined);
+        // 兼容 distribute/select 的 cardIds 数组与单 cardId
+        const id = firstCardId(params);
         if (id) s.localVars[EQUIP_KEY] = id;
       }
     },

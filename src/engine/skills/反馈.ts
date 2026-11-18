@@ -17,7 +17,12 @@ import type { FrontendAPI, Skill } from '../types';
 import { registerAction } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm, defineConfirmAction, registerOnDamagedAsTarget } from '../util/skillRuntime';
+import {
+  askConfirm,
+  defineConfirmAction,
+  registerOnDamagedAsTarget,
+  requireRequestType,
+} from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -39,15 +44,11 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
     ownerId,
     'respond',
     (state, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不需要回应';
-      const requestType = (slot.atom as { requestType?: string }).requestType;
-      if (requestType === '反馈/confirm') {
-        // confirm:接受 choice/confirmed 布尔
-        return null;
-      }
-      if (requestType === '反馈/选牌') {
+      const check = requireRequestType(state, ownerId, ['反馈/confirm', '反馈/选牌'], {
+        mismatchError: '当前不是反馈回应',
+      });
+      if (check.error) return check.error;
+      if (check.requestType === '反馈/选牌') {
         // 选牌面板:校验 zone + cardId/handIndex(同过河拆桥/顺手牵羊)
         const zone = params.zone;
         if (zone === 'equipment') {
@@ -57,9 +58,9 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
         } else {
           return 'zone required (equipment|hand)';
         }
-        return null;
       }
-      return '当前不是反馈回应';
+      // confirm:接受 choice/confirmed 布尔
+      return null;
     },
     async (state, params) => {
       const slot = state.pendingSlots.get(ownerId);

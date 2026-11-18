@@ -9,10 +9,11 @@
 //
 // 五件套(影子 id 后缀=技能 id '看破'、当作、rollback、defineAction)由
 // skillRuntime 工厂统一实现。看破不受自己回合限制(无懈可击任意时机可打),
-// 故不走工厂默认时机维度——自定义 validate 逐字保留无懈窗口(共享 hasNullifyWindow)
-// 与阻塞检查;activeWhen 检测无懈可击广播窗口且有黑牌。
+// 故不走工厂默认时机维度——自定义 validate 逐字保留无懈窗口(共享
+// hasNullifyWindow/blockedByOtherPending)与阻塞检查;activeWhen 检测无懈可击广播窗口且有黑牌。
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
 import {
+  blockedByOtherPending,
   hasNullifyWindow,
   mountTransformAction,
   registerTransformAction,
@@ -42,15 +43,7 @@ const OPTIONS: TransformActionOptions = {
     // 必须存在无懈可击窗口(否则转化出的无懈无处使用)
     const hasWindow = hasNullifyWindow(state, ownerId);
     // 无其他阻塞型 pending(转化不应打断正在进行的结算);无懈窗口本身是当前响应目标,允许
-    const blockedByOther = (() => {
-      for (const slot of state.pendingSlots.values()) {
-        const atom = slot.atom as { type?: string; requestType?: string };
-        if (!slot.isBlocking) continue;
-        if (atom.type === '请求回应' && atom.requestType === '无懈可击') continue;
-        return true;
-      }
-      return false;
-    })();
+    const blockedByOther = blockedByOtherPending(state);
     const ok = cardInHand && isBlack && hasWindow && !blockedByOther;
     return ok ? null : '现在不能使用看破';
   },

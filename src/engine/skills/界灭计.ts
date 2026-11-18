@@ -37,7 +37,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { defineConfirmAction, requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
+import { defineConfirmAction, requireRequestType, engineCanPlayNowReason, registerRespondForAllSeats } from '../util/skillRuntime';
 
 const SKILL_ID = '界灭计';
 const DISPLAY_NAME = '灭计';
@@ -227,54 +227,49 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── respond(注册到每个座次:被灭计问询的目标回应)──
-  for (const pl of state.players) {
-    const seat = pl.index;
-    unloaders.push(
-      registerAction(
-        state,
-        skill.id,
-        seat,
-        'respond',
-        (st: GameState, params: Record<string, Json>): string | null => {
-          const check = requireRequestType(st, seat, [CHOOSE_RT, PICK_TRICK_RT, PICK_ONE_RT], {
-            mismatchError: '当前不是灭计询问',
-          });
-          if (check.error) return check.error;
-          const rt = check.requestType;
-          if (rt === CHOOSE_RT) return null; // confirm:任意 params 均接受
-          if (rt === PICK_TRICK_RT || rt === PICK_ONE_RT) {
-            // 强制型弃牌走多牌选择 UI,提交 cardIds(数组);兼容单 cardId
-            const ids = params.cardIds as string[] | undefined;
-            const cardId = (Array.isArray(ids) ? ids[0] : params.cardId) as
-              | string
-              | undefined;
-            if (typeof cardId !== 'string') return '请选择一张牌';
-            if (!st.players[seat]?.hand.includes(cardId)) return '牌不在手牌中';
-            if (rt === PICK_TRICK_RT && !isTrickCard(st.cardMap[cardId])) {
-              return '只能选择锦囊牌';
-            }
-            return null;
+  unloaders.push(
+    ...registerRespondForAllSeats(
+      state,
+      skill.id,
+      (st: GameState, seat: number, params: Record<string, Json>): string | null => {
+        const check = requireRequestType(st, seat, [CHOOSE_RT, PICK_TRICK_RT, PICK_ONE_RT], {
+          mismatchError: '当前不是灭计询问',
+        });
+        if (check.error) return check.error;
+        const rt = check.requestType;
+        if (rt === CHOOSE_RT) return null; // confirm:任意 params 均接受
+        if (rt === PICK_TRICK_RT || rt === PICK_ONE_RT) {
+          // 强制型弃牌走多牌选择 UI,提交 cardIds(数组);兼容单 cardId
+          const ids = params.cardIds as string[] | undefined;
+          const cardId = (Array.isArray(ids) ? ids[0] : params.cardId) as
+            | string
+            | undefined;
+          if (typeof cardId !== 'string') return '请选择一张牌';
+          if (!st.players[seat]?.hand.includes(cardId)) return '牌不在手牌中';
+          if (rt === PICK_TRICK_RT && !isTrickCard(st.cardMap[cardId])) {
+            return '只能选择锦囊牌';
           }
           return null;
-        },
-        async (st: GameState, params: Record<string, Json>): Promise<void> => {
-          const slot = st.pendingSlots.get(seat);
-          const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
-          if (rt === CHOOSE_RT) {
-            // confirm=true → 弃锦囊(choice='trick');confirm=false → 弃两张(choice='twoCards')
-            st.localVars[CHOICE_KEY] =
-              params.choice === true || params.confirmed === true ? 'trick' : 'twoCards';
-          } else if (rt === PICK_TRICK_RT || rt === PICK_ONE_RT) {
-            const ids = params.cardIds as string[] | undefined;
-            const cardId = (Array.isArray(ids) ? ids[0] : params.cardId) as
-              | string
-              | undefined;
-            if (typeof cardId === 'string') st.localVars[CARD_KEY] = cardId;
-          }
-        },
-      ),
-    );
-  }
+        }
+        return null;
+      },
+      async (st: GameState, seat: number, params: Record<string, Json>): Promise<void> => {
+        const slot = st.pendingSlots.get(seat);
+        const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+        if (rt === CHOOSE_RT) {
+          // confirm=true → 弃锦囊(choice='trick');confirm=false → 弃两张(choice='twoCards')
+          st.localVars[CHOICE_KEY] =
+            params.choice === true || params.confirmed === true ? 'trick' : 'twoCards';
+        } else if (rt === PICK_TRICK_RT || rt === PICK_ONE_RT) {
+          const ids = params.cardIds as string[] | undefined;
+          const cardId = (Array.isArray(ids) ? ids[0] : params.cardId) as
+            | string
+            | undefined;
+          if (typeof cardId === 'string') st.localVars[CARD_KEY] = cardId;
+        }
+      },
+    ),
+  );
 
   return () => {
     for (const u of unloaders) u();

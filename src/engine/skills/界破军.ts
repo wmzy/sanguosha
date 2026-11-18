@@ -50,7 +50,7 @@ import { pushFrame, popFrame } from '../core/frame';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
-import { totalCardCount, isSlashCardById } from '../util/player-query';
+import { totalCardCount, isSlashCardById, ownedCardIds } from '../util/player-query';
 
 const SKILL_ID = '界破军';
 const DISPLAY_NAME = '破军';
@@ -87,14 +87,6 @@ export function createSkill(id: string, ownerId: number): Skill {
 /** 玩家装备区内的牌数 */
 function equipCount(p: { equipment: Partial<Record<EquipSlot, string>> }): number {
   return Object.values(p.equipment).filter((id): id is string => !!id).length;
-}
-
-/** 玩家所有可被破军的牌(手牌+装备),用于选牌面板展示 */
-function targetCardIds(p: { hand: string[]; equipment: Partial<Record<EquipSlot, string>> }): string[] {
-  return [
-    ...p.hand,
-    ...Object.values(p.equipment).filter((id): id is string => !!id),
-  ];
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
@@ -192,7 +184,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!targetNow?.alive) return;
       const Xnow = Math.min(X, getHealthValue(targetNow));
       if (Xnow <= 0) return;
-      const available = targetCardIds(targetNow);
+      const available = ownedCardIds(targetNow);
       if (available.length === 0) return;
 
       delete ctx.state.localVars[LV_CARDS];

@@ -8,7 +8,7 @@ import { btnStyle, inputStyle, colors } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
 import { ErrorToast } from './ErrorToast';
 import { ReconnectBanner } from './ReconnectBanner';
-import { gameWrap } from './multiplayerStyles';
+import { btnVars, gameWrap } from './multiplayerStyles';
 
 export function SpectatingStage() {
   const mp = useMultiplayerRoomCtx();
@@ -84,7 +84,7 @@ export function SpectatingStage() {
           )}
           <button
             className={btnStyle}
-            style={{ '--btn-bg': colors.disabled, '--btn-padding': '4px 12px', '--btn-font-size': '12px' } as React.CSSProperties}
+            style={btnVars(colors.disabled, { padding: '4px 12px', fontSize: '12px' })}
             onClick={() => {
               mp.leaveRoom();
               navigate('/');

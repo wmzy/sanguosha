@@ -36,7 +36,7 @@ import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rule
 import { registerAction } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
-import { requireRequestType, askConfirm, engineCanPlayNowReason } from '../util/skillRuntime';
+import { requireRequestType, askConfirm, engineCanPlayNowReason, registerRespondForAllSeats } from '../util/skillRuntime';
 
 const SKILL_ID = '界翦灭';
 const DISPLAY_NAME = '翦灭';
@@ -159,35 +159,27 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // ─── respond action:为所有玩家注册 ────────────────────────
   // 春华与目标均需 respond 选色;validate 严格检查 pending requestType,
   // 非翦灭 pending 一律拒绝(无副作用)。
-  const unloaders: Array<() => void> = [];
-  for (const p of state.players) {
-    const pid = p.index;
-    const u = registerAction(
-      state,
-      skill.id,
-      pid,
-      'respond',
-      (st: GameState, _params: Record<string, Json>) => {
-        return requireRequestType(st, pid, [OWNER_COLOR_RT, TARGET_COLOR_RT], {
-          mismatchError: '当前不是翦灭选色',
-        }).error;
-      },
-      async (st: GameState, params: Record<string, Json>) => {
-        const slot = st.pendingSlots.get(pid);
-        if (!slot) return;
-        const atom = slot.atom as { requestType?: string };
-        const choice = params.choice === true || params.confirmed === true;
-        if (atom.requestType === OWNER_COLOR_RT) {
-          // 仅春华(ownerId)可回应此 RT
-          if (pid !== ownerId) return;
-          st.localVars[OWNER_COLOR_KEY] = choice;
-        } else if (atom.requestType === TARGET_COLOR_RT) {
-          st.localVars[TARGET_COLOR_KEY] = choice;
-        }
-      },
-    );
-    unloaders.push(u);
-  }
+  const unloaders = registerRespondForAllSeats(
+    state,
+    skill.id,
+    (st: GameState, seat: number, _params: Record<string, Json>) =>
+      requireRequestType(st, seat, [OWNER_COLOR_RT, TARGET_COLOR_RT], {
+        mismatchError: '当前不是翦灭选色',
+      }).error,
+    async (st: GameState, seat: number, params: Record<string, Json>) => {
+      const slot = st.pendingSlots.get(seat);
+      if (!slot) return;
+      const atom = slot.atom as { requestType?: string };
+      const choice = params.choice === true || params.confirmed === true;
+      if (atom.requestType === OWNER_COLOR_RT) {
+        // 仅春华(ownerId)可回应此 RT
+        if (seat !== ownerId) return;
+        st.localVars[OWNER_COLOR_KEY] = choice;
+      } else if (atom.requestType === TARGET_COLOR_RT) {
+        st.localVars[TARGET_COLOR_KEY] = choice;
+      }
+    },
+  );
 
   return () => {
     unloaders.forEach((u) => u());

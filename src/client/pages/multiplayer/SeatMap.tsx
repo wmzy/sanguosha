@@ -6,7 +6,7 @@ import { css, cx } from '@linaria/core';
 import { btnStyle, colors } from '../../theme';
 import { memberName } from '../../utils/memberNames';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
-import { sectionTitle } from './multiplayerStyles';
+import { btnVars, sectionTitle } from './multiplayerStyles';
 
 export function SeatMap() {
   const mp = useMultiplayerRoomCtx();
@@ -68,7 +68,7 @@ export function SeatMap() {
                       mp.moveSeat(i);
                     } else if (!isMe) {
                       // 请求交换座位
-                      if (window.confirm(`要与  交换座位吗？`)) {
+                      if (window.confirm(`要与 ${memberName(seatPlayerId, mp.roomState?.playerNames)} 交换座位吗？`)) {
                         mp.requestSeatSwap(i);
                       }
                     }
@@ -94,7 +94,7 @@ export function SeatMap() {
                     title="踢出该玩家"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (window.confirm(`确定将  踢出房间吗？`)) {
+                      if (window.confirm(`确定将 ${memberName(seatPlayerId, mp.roomState?.playerNames)} 踢出房间吗？`)) {
                         mp.kickPlayer(seatPlayerId);
                       }
                     }}
@@ -128,12 +128,12 @@ export function SeatMap() {
           <div className={seatSwapCardBtns}>
             <button
               className={btnStyle}
-              style={{ '--btn-bg': colors.accent.green, '--btn-padding': '4px 14px', '--btn-font-size': '12px' } as React.CSSProperties}
+              style={btnVars(colors.accent.green, { padding: '4px 14px', fontSize: '12px' })}
               onClick={() => mp.respondSeatSwap(swapRequestForMe.requesterId, true)}
             >同意</button>
             <button
               className={btnStyle}
-              style={{ '--btn-bg': colors.accent.red, '--btn-padding': '4px 14px', '--btn-font-size': '12px' } as React.CSSProperties}
+              style={btnVars(colors.accent.red, { padding: '4px 14px', fontSize: '12px' })}
               onClick={() => mp.respondSeatSwap(swapRequestForMe.requesterId, false)}
             >拒绝</button>
           </div>

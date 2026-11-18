@@ -32,7 +32,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界强识';
 const DISPLAY_NAME = '强识';
@@ -92,21 +92,21 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不需要回应';
-      const rt = (slot.atom as { requestType?: string }).requestType;
+      const check = requireRequestType(
+        st,
+        ownerId,
+        [CONFIRM_RT, TARGET_RT, PICK_RT, DRAW_RT],
+        { mismatchError: '当前不是强识询问' },
+      );
+      if (check.error) return check.error;
+      const rt = check.requestType;
 
-      if (rt === CONFIRM_RT || rt === DRAW_RT) {
-        return null; // confirm:接受任意 choice
-      }
       if (rt === TARGET_RT) {
         const t = params.target as number | undefined;
         if (typeof t !== 'number') return '需要指定一名目标';
         if (t === ownerId) return '不能观看自己的手牌';
         if (!st.players[t]?.alive) return '目标不合法';
         if (st.players[t].hand.length === 0) return '目标无手牌';
-        return null;
       }
       if (rt === PICK_RT) {
         const cardId = params.cardId as string | undefined;
@@ -114,9 +114,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const target = st.localVars[TARGET_KEY] as number | undefined;
         if (typeof target !== 'number') return '目标未确定';
         if (!st.players[target]?.hand.includes(cardId)) return '该牌不在目标手牌中';
-        return null;
       }
-      return '当前不是强识询问';
+      // confirm(CONFIRM_RT/DRAW_RT):接受任意 choice
+      return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
       const slot = st.pendingSlots.get(ownerId);

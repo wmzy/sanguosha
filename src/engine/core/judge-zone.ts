@@ -14,6 +14,7 @@
 // skills/涅槃|界涅槃|行殇 共用,避免各调用点各自猜测牌的位置。
 import type { GameState } from '../types';
 import { applyAtom } from './apply';
+import { EQUIP_SLOTS } from '../util/equip-slot';
 
 /** 实体牌可能所在的区(不含判定区——判定区只持快照)。 */
 export type CardZoneKind = '牌堆' | '弃牌堆' | '处理区' | '手牌' | '装备';
@@ -34,7 +35,7 @@ export function locateCard(state: GameState, cardId: string): CardLocation | nul
   }
   for (const p of state.players) {
     if (p.hand.includes(cardId)) return { zone: '手牌', player: p.index };
-    for (const slot of ['武器', '防具', '进攻马', '防御马', '宝物'] as const) {
+    for (const slot of EQUIP_SLOTS) {
       if (p.equipment[slot] === cardId) return { zone: '装备', player: p.index };
     }
   }

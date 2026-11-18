@@ -5,6 +5,9 @@
 // 依赖仅限 types。
 import type { EquipSlot } from '../types';
 
+/** 全部装备栏位(按 武器→宝物 顺序)。judge-zone 与装备区遍历类技能共用,勿再内联字面量。 */
+export const EQUIP_SLOTS: readonly EquipSlot[] = ['武器', '防具', '进攻马', '防御马', '宝物'];
+
 /** 装备牌 subtype → 装备栏位;非装备牌(或未知 subtype)返回 null。 */
 export function slotOf(card: { subtype?: string } | undefined): EquipSlot | null {
   switch (card?.subtype) {

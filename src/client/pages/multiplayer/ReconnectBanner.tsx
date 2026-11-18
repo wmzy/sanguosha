@@ -3,7 +3,7 @@
 // reconnecting 分支显示进度 + 取消按钮;failed 分支提示检查网络 + 返回大厅。
 import { btnStyle, colors } from '../../theme';
 import type { ConnectionState } from '../../hooks/useMultiplayerRoom';
-import { reconnectOverlay, reconnectFailedOverlay, reconnectSpinner } from './multiplayerStyles';
+import { btnVars, reconnectOverlay, reconnectFailedOverlay, reconnectSpinner } from './multiplayerStyles';
 
 interface ReconnectBannerProps {
   connectionState: ConnectionState;
@@ -25,11 +25,7 @@ export function ReconnectBanner({ connectionState, reconnectAttempt, onCancel, o
         </span>
         <button
           className={btnStyle}
-          style={{
-            '--btn-bg': colors.accent.darkRed,
-            '--btn-padding': '4px 12px',
-            '--btn-font-size': '12px',
-          } as React.CSSProperties}
+          style={btnVars(colors.accent.darkRed, { padding: '4px 12px', fontSize: '12px' })}
           onClick={onCancel}
         >
           取消
@@ -43,11 +39,7 @@ export function ReconnectBanner({ connectionState, reconnectAttempt, onCancel, o
         <span>重连失败,请检查网络</span>
         <button
           className={btnStyle}
-          style={{
-            '--btn-bg': colors.accent.darkRed,
-            '--btn-padding': '4px 12px',
-            '--btn-font-size': '12px',
-          } as React.CSSProperties}
+          style={btnVars(colors.accent.darkRed, { padding: '4px 12px', fontSize: '12px' })}
           onClick={onLeave}
         >
           返回大厅

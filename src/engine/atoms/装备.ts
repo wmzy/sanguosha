@@ -63,7 +63,7 @@ export const 装备: AtomDefinition<{ player: number; cardId: string }> = {
   applyView(view, event) {
     const p = viewPlayer(view, event.player as number);
     if (!p) return;
-    const slot = event.slot as '武器' | '防具' | '进攻马' | '防御马' | '宝物' | undefined;
+    const slot = event.slot as EquipSlot | undefined;
     if (slot) {
       p.equipment[slot] = event.cardId as string;
     }

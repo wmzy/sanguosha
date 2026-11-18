@@ -128,7 +128,6 @@ export function SeatArcLayout(props: SeatArcLayoutProps) {
                 healVersion={healFlashIndices.get(realIdx) ?? 0}
                 hpChange={hpChangeNumbers.get(realIdx)}
                 isTurnGlow={player.name === currentPlayerName && turnVersion > 0}
-                turnGlowVersion={turnVersion}
                 isDisconnected={disconnectedSeats?.has(realIdx) ?? false}
                 seatDistance={targetInfo.distance}
                 untargetableReason={targetInfo.reason}

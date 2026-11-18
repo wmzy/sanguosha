@@ -16,6 +16,30 @@ import type { CardEffect } from '../../types';
 
 const CARD_NAME = '无懈可击';
 
+/** 无懈可击 respond validate(标版规则):无懈窗口 + 手牌中的无懈牌。
+ *  具名导出供 界看破 的 respond override 复用(其校验同标版,单源维护)。 */
+export function nullifyRespondValidate(
+  state: GameState,
+  ownerId: number,
+  params: Record<string, Json>,
+): string | null {
+  // 无懈可击是广播型(target=TARGET_BROADCAST):先按 ownerId 查(并行询问场景下 ownerId 也可能命中),
+  // 未命中时查找广播型 slot(findPendingSlot 统一 fallback)。
+  const slot = findPendingSlot(state, ownerId);
+  if (!slot) return '当前不需要回应';
+  if (slot.atom.type !== '请求回应') return '当前不是无懈可击窗口';
+  const atom = slot.atom as { requestType?: string };
+  if (atom.requestType !== CARD_NAME) return '当前不是无懈可击窗口';
+  const cardId = params.cardId as string | undefined;
+  if (!cardId) return 'cardId required';
+  const self = state.players[ownerId];
+  if (!self.alive) return '你已死亡';
+  if (!self.hand.includes(cardId)) return '牌不在手牌中';
+  const card = state.cardMap[cardId];
+  if (card.name !== CARD_NAME) return '只能打出无懈可击';
+  return null;
+}
+
 export const nullificationEffect: CardEffect = {
   timing: '生效前',
   target: { kind: 'effect' },
@@ -26,23 +50,7 @@ export const nullificationEffect: CardEffect = {
     await setFrameCancelled(state, targetFrame, true);
   },
   respond: {
-    validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
-      // 无懈可击是广播型(target=TARGET_BROADCAST):先按 ownerId 查(并行询问场景下 ownerId 也可能命中),
-      // 未命中时查找广播型 slot(findPendingSlot 统一 fallback)。
-      const slot = findPendingSlot(state, ownerId);
-      if (!slot) return '当前不需要回应';
-      if (slot.atom.type !== '请求回应') return '当前不是无懈可击窗口';
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType !== CARD_NAME) return '当前不是无懈可击窗口';
-      const cardId = params.cardId as string | undefined;
-      if (!cardId) return 'cardId required';
-      const self = state.players[ownerId];
-      if (!self.alive) return '你已死亡';
-      if (!self.hand.includes(cardId)) return '牌不在手牌中';
-      const card = state.cardMap[cardId];
-      if (card.name !== CARD_NAME) return '只能打出无懈可击';
-      return null;
-    },
+    validate: nullifyRespondValidate,
     // execute 已由 play-card.ts 的 effect kind 包装统一接管：runUseFlow(无懈可击)。
     execute: async () => {},
   },

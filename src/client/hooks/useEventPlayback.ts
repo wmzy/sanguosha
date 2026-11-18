@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { ViewEvent } from '../../engine/types';
-import { getAtomDef } from '../../engine/core/atom';
+import { computeEventDuration, MIN_VISIBLE_MS } from '../utils/eventDuration';
 
 /** 事件动效播放速度档位(localStorage 持久化) */
 export type AnimSpeed = 'normal' | 'fast';
@@ -34,9 +34,6 @@ export function setAnimSpeed(s: AnimSpeed): void {
     // 写入失败(隐私模式/存储满)静默忽略:本次会话内仍可经 state 生效
   }
 }
-
-/** 最小可见时长(ms),保证事件能被看清,即便 effect.duration 偏短 */
-const MIN_VISIBLE_MS = 400;
 
 /** 箭头类事件最小播放时长(ms),保证 ActionOverlay 有足够时间渲染箭头。
  *  指定目标/成为目标 atom 的 effect.duration 仅 400ms,与 MIN_VISIBLE_MS 相同;
@@ -126,17 +123,8 @@ export function useEventPlayback(options: EventPlaybackOptions = {}) {
     isPlayingRef.current = true;
     setCurrent(next);
     setPendingCount(queueRef.current.length);
-    // duration:ViewEvent 自带 effect → atom 静态 effect(atomType 优先)→ 下限
-    // 注意:打出/弃牌 等 ViewEvent.type 不是 atom 名,必须用 atomType,且查表失败时不能抛。
-    const type = next.event.atomType ?? next.event.type;
-    let staticDuration: number | undefined;
-    try {
-      staticDuration = getAtomDef(type).effect?.duration;
-    } catch {
-      staticDuration = undefined;
-    }
-    const eventEffect = next.event.effect as { duration?: number } | undefined;
-    const duration = eventEffect?.duration ?? staticDuration ?? MIN_VISIBLE_MS;
+    // duration 单源取自 utils/eventDuration(ViewEvent 自带 effect → atom 静态 → 兜底)
+    const duration = computeEventDuration(next.event);
     // 箭头类事件(指定目标/成为目标)强制更长最小播放时长,避免后续事件过快覆盖、
     // 箭头来不及渲染。其他事件仍走 MIN_VISIBLE_MS 下限。
     const isArrowEvent = ARROW_EVENT_TYPES.has(next.event.type);

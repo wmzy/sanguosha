@@ -70,7 +70,6 @@ export interface PlayPhasePromptProps {
   isPerspectiveTurn: boolean;
   isPerspectiveAwaiting: boolean;
   isDiscardPhase: boolean;
-  isMyTurn: boolean;
   selectedCardId: string | null;
   selectedTarget: string | null;
   discardMin: number;
@@ -93,7 +92,6 @@ export function PlayPhasePromptImpl(props: PlayPhasePromptImplProps) {
     isPerspectiveTurn,
     isPerspectiveAwaiting,
     isDiscardPhase,
-    isMyTurn: _isMyTurn,
     canOperate,
     selectedCardId,
     selectedTarget,

@@ -42,7 +42,7 @@ import { runDamageFlow } from '../flows/damage';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
+import { requireRequestType, engineCanPlayNowReason, registerRespondForAllSeats } from '../util/skillRuntime';
 
 const SKILL_ID = '界焚城';
 const DISPLAY_NAME = '焚城';
@@ -210,62 +210,57 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
   // ── respond(注册到每个座次)──
   // ownerId 座次:起点选择;其他座次:confirm + 弃牌
-  for (const pl of state.players) {
-    const seat = pl.index;
-    unloaders.push(
-      registerAction(
-        state,
-        skill.id,
-        seat,
-        'respond',
-        (st: GameState, params: Record<string, Json>): string | null => {
-          const check = requireRequestType(st, seat, [START_RT, CONFIRM_RT, DISCARD_RT], {
-            mismatchError: '当前不是焚城询问',
-          });
-          if (check.error) return check.error;
-          const rt = check.requestType;
-          if (rt === START_RT) {
-            const targets = params.targets as number[] | undefined;
-            if (!Array.isArray(targets) || targets.length !== 1) return '请选择一名起点';
-            const t = targets[0];
-            if (t === seat) return '不能选自己为起点';
-            if (!st.players[t]?.alive) return '起点不合法';
-            return null;
-          }
-          if (rt === CONFIRM_RT) return null; // confirm:任意 params 均接受
-          if (rt === DISCARD_RT) {
-            const cardIds = params.cardIds as string[] | undefined;
-            if (!Array.isArray(cardIds) || cardIds.length === 0) return '请选择要弃置的牌';
-            const self = st.players[seat];
-            if (!self) return '玩家不存在';
-            const prev = lastCount(st);
-            if (cardIds.length <= prev) return `须弃置至少 ${prev + 1} 张`;
-            // 不能重复选牌(否则弃置 atom 会向弃牌堆压入幻影副本且 lastCount 虚高)
-            if (new Set(cardIds).size !== cardIds.length) return '不能重复选牌';
-            for (const id of cardIds) {
-              if (!self.hand.includes(id)) return '牌不在手牌中';
-            }
-            return null;
+  unloaders.push(
+    ...registerRespondForAllSeats(
+      state,
+      skill.id,
+      (st: GameState, seat: number, params: Record<string, Json>): string | null => {
+        const check = requireRequestType(st, seat, [START_RT, CONFIRM_RT, DISCARD_RT], {
+          mismatchError: '当前不是焚城询问',
+        });
+        if (check.error) return check.error;
+        const rt = check.requestType;
+        if (rt === START_RT) {
+          const targets = params.targets as number[] | undefined;
+          if (!Array.isArray(targets) || targets.length !== 1) return '请选择一名起点';
+          const t = targets[0];
+          if (t === seat) return '不能选自己为起点';
+          if (!st.players[t]?.alive) return '起点不合法';
+          return null;
+        }
+        if (rt === CONFIRM_RT) return null; // confirm:任意 params 均接受
+        if (rt === DISCARD_RT) {
+          const cardIds = params.cardIds as string[] | undefined;
+          if (!Array.isArray(cardIds) || cardIds.length === 0) return '请选择要弃置的牌';
+          const self = st.players[seat];
+          if (!self) return '玩家不存在';
+          const prev = lastCount(st);
+          if (cardIds.length <= prev) return `须弃置至少 ${prev + 1} 张`;
+          // 不能重复选牌(否则弃置 atom 会向弃牌堆压入幻影副本且 lastCount 虚高)
+          if (new Set(cardIds).size !== cardIds.length) return '不能重复选牌';
+          for (const id of cardIds) {
+            if (!self.hand.includes(id)) return '牌不在手牌中';
           }
           return null;
-        },
-        async (st: GameState, params: Record<string, Json>): Promise<void> => {
-          const slot = st.pendingSlots.get(seat);
-          const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
-          if (rt === START_RT) {
-            const targets = params.targets as number[] | undefined;
-            if (Array.isArray(targets)) st.localVars[START_KEY] = targets;
-          } else if (rt === CONFIRM_RT) {
-            st.localVars[CHOICE_KEY] =
-              params.choice === true || params.confirmed === true ? 'discard' : 'damage';
-          } else if (rt === DISCARD_RT) {
-            const cardIds = params.cardIds as string[] | undefined;
-            if (Array.isArray(cardIds)) st.localVars[DISCARD_KEY] = cardIds;
-          }
-        },
-      ),
-    );
-  }
+        }
+        return null;
+      },
+      async (st: GameState, seat: number, params: Record<string, Json>): Promise<void> => {
+        const slot = st.pendingSlots.get(seat);
+        const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+        if (rt === START_RT) {
+          const targets = params.targets as number[] | undefined;
+          if (Array.isArray(targets)) st.localVars[START_KEY] = targets;
+        } else if (rt === CONFIRM_RT) {
+          st.localVars[CHOICE_KEY] =
+            params.choice === true || params.confirmed === true ? 'discard' : 'damage';
+        } else if (rt === DISCARD_RT) {
+          const cardIds = params.cardIds as string[] | undefined;
+          if (Array.isArray(cardIds)) st.localVars[DISCARD_KEY] = cardIds;
+        }
+      },
+    ),
+  );
 
   return () => {
     for (const u of unloaders) u();

@@ -20,6 +20,7 @@ import {
 } from './store';
 import { getGithubConfig, generateState, exchangeCodeForProfile, isGithubEnabled } from './github';
 import { extractSessionToken, SESSION_COOKIE } from './guard';
+import { readJsonBody, optString } from '../http';
 import { applyDisplayName } from '../room';
 
 const log = createLogger('auth-routes');
@@ -68,9 +69,9 @@ export function applyAuthRoutes(app: Hono): void {
 
   // ── 注册 ──
   auth.post('/register', async (c) => {
-    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const username = typeof raw.username === 'string' ? raw.username : '';
-    const password = typeof raw.password === 'string' ? raw.password : '';
+    const raw = await readJsonBody(c);
+    const username = optString(raw.username);
+    const password = optString(raw.password);
     const result = await createUser(username, password);
     if (!result.ok) return c.json({ error: result.error }, 400);
     return issueSessionResponse(c, result.user);
@@ -78,9 +79,9 @@ export function applyAuthRoutes(app: Hono): void {
 
   // ── 登录(用户名/密码) ──
   auth.post('/login', async (c) => {
-    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const username = typeof raw.username === 'string' ? raw.username : '';
-    const password = typeof raw.password === 'string' ? raw.password : '';
+    const raw = await readJsonBody(c);
+    const username = optString(raw.username);
+    const password = optString(raw.password);
     const result = await verifyLogin(username, password);
     if (!result.ok) return c.json({ error: result.error }, 401);
     return issueSessionResponse(c, result.user);
@@ -109,8 +110,8 @@ export function applyAuthRoutes(app: Hono): void {
   auth.patch('/profile', async (c) => {
     const me = await getUserByToken(extractSessionToken(c));
     if (!me) return c.json({ error: '请先登录' }, 401);
-    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const displayName = typeof raw.displayName === 'string' ? raw.displayName : '';
+    const raw = await readJsonBody(c);
+    const displayName = optString(raw.displayName);
     const updated = await updateDisplayName(me.id, displayName);
     if (!updated) return c.json({ error: '昵称不合法(1-24位,不含空格)' }, 400);
     applyDisplayName(me.id, updated.displayName);
@@ -121,9 +122,9 @@ export function applyAuthRoutes(app: Hono): void {
   auth.put('/password', async (c) => {
     const me = await getUserByToken(extractSessionToken(c));
     if (!me) return c.json({ error: '请先登录' }, 401);
-    const raw = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const oldPassword = typeof raw.oldPassword === 'string' ? raw.oldPassword : '';
-    const newPassword = typeof raw.newPassword === 'string' ? raw.newPassword : '';
+    const raw = await readJsonBody(c);
+    const oldPassword = optString(raw.oldPassword);
+    const newPassword = optString(raw.newPassword);
     const result = await changePassword(me.id, oldPassword, newPassword);
     if (!result.ok) return c.json({ error: result.error }, 400);
     return c.json({ user: result.user });
