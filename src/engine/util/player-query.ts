@@ -17,11 +17,21 @@
 //     「手牌 + 装备区全部 cardId」手写拼接(手牌在前,装备槽位值序);
 //   - isSlashCard/isSlashCardById:同一谓词(含转化/影子杀——name 即 '杀')的两种
 //     入参形状——card 对象(界明策)与 cardId(拒战/界破军),不做合并以免调用方反复解包。
-// 依赖仅限 types + data/character-meta(getGender)。
+//   - equipmentCardIds/equipSlotOf:恃才/界结姻 的 findEquipSlot 两处逐字同构
+//     (鬼才 findCardLocation 多一个手牌分支,不纳入);
+//   - hasObtainableCards:顺手牵羊/过河拆桥 的
+//     「手牌/装备区/判定区任一有牌」canUse 校验两处逐字相同;
+//   - alivePlayersClockwiseFrom:cards/validate.computeAutoTargets / 五谷丰登.alivePlayersFrom /
+//     界乱击.defaultTargets 三处「存活角色按座位递减自 from 起的有序列表」
+//     (三者仅起点含不含自己不同,用 opts 表达);
+//   - findNextAlive 的可选谓词:闪电.findNextRecipient 的判定区过滤
+//     (全亡/无匹配时返回 fromIndex 的既有语义不变)。
+// 依赖仅限 types + data/character-meta(getGender) + util/equip-slot(EQUIP_SLOTS)。
 // 命名:函数名英文;业务字面量('男'/'杀')保持中文。
-import type { Card, GameState, PlayerState } from '../types';
+import type { Card, EquipSlot, GameState, PlayerState } from '../types';
 import { getHealthValue } from '../types';
 import { getGender } from '../data/character-meta';
+import { EQUIP_SLOTS } from './equip-slot';
 
 /** 座次是否为存活男性角色(离间/界结姻/界荐言/界燕语 的目标校验共用)。 */
 export function isMaleAlive(state: GameState, idx: number): boolean {
@@ -47,17 +57,46 @@ export function countFactions(state: GameState): number {
   return factions.size;
 }
 
-/** 逆时针(座次递减)从 fromIndex 的下一位找第一个存活玩家;全死亡时返回 fromIndex。 */
-export function findNextAlive(
-  state: { players: { alive: boolean }[] },
+/** 逆时针(座次递减)从 fromIndex 的下一位找第一个存活玩家;全死亡时返回 fromIndex。
+ *  predicate:候选玩家的附加过滤(如 闪电 传 (p) => 判定区无同名延时锦囊);
+ *  无 predicate 时与原三处逐字实现完全等价(向后兼容)。 */
+export function findNextAlive<P extends { alive: boolean }>(
+  state: { players: P[] },
   fromIndex: number,
+  predicate?: (player: P, idx: number) => boolean,
 ): number {
   const n = state.players.length;
   for (let i = 1; i <= n; i++) {
     const idx = (fromIndex - i + n) % n;
-    if (state.players[idx]?.alive) return idx;
+    const p = state.players[idx];
+    if (p?.alive && (!predicate || predicate(p, idx))) return idx;
   }
   return fromIndex;
+}
+
+/** 存活角色按座位递减方向(引擎「逆时针」,与 下一玩家 atom / findNextAlive 一致)
+ *  自 fromIndex 起的有序座次列表。收敛三处调用点,起点差异用 opts 表达:
+ *    - includeSelf(默认 true):fromIndex 自身存活时是否列于首位
+ *      (false = computeAutoTargets 的 allOthers / 五谷丰登含自己 / 界乱击不含自己);
+ *    - startOffset(默认 0):起点再沿逆时针跳过若干名存活角色。
+ *  fromIndex 不在存活列表(已死/不存在)时按座位升序返回全部存活角色
+ *  (computeAutoTargets/五谷丰登 的既有兜底;界乱击 原为空数组,其 from 为使用者,实际不可达)。 */
+export function alivePlayersClockwiseFrom(
+  state: { players: { alive: boolean; index: number }[] },
+  fromIndex: number,
+  opts?: { includeSelf?: boolean; startOffset?: number },
+): number[] {
+  const alive = state.players.filter((p) => p.alive);
+  const n = alive.length;
+  if (n === 0) return [];
+  const fromPos = alive.findIndex((p) => p.index === fromIndex);
+  if (fromPos < 0) return alive.map((p) => p.index);
+  const skip = (opts?.includeSelf === false ? 1 : 0) + (opts?.startOffset ?? 0);
+  const result: number[] = [];
+  for (let i = skip; i < n; i++) {
+    result.push(alive[(fromPos - i + n) % n].index);
+  }
+  return result;
 }
 
 /** 玩家「场上」总牌数(手牌 + 装备区);玩家不存在返回 0。 */
@@ -99,6 +138,40 @@ export function ownedCardIds(
     ...player.hand,
     ...Object.values(player.equipment).filter((id): id is string => typeof id === 'string'),
   ];
+}
+
+/** 玩家装备区全部 cardId(按 EQUIP_SLOTS 槽位序);玩家不存在返回空数组。 */
+export function equipmentCardIds(
+  player: Pick<PlayerState, 'equipment'> | undefined | null,
+): string[] {
+  if (!player) return [];
+  return Object.values(player.equipment).filter((id): id is string => !!id);
+}
+
+/** cardId 所在的装备槽;不在该玩家装备区(或玩家不存在)返回 null。
+ *  恃才/界结姻 的 findEquipSlot 共用;鬼才 的 findCardLocation 多手牌分支,不纳入。 */
+export function equipSlotOf(
+  player: Pick<PlayerState, 'equipment'> | undefined | null,
+  cardId: string,
+): EquipSlot | null {
+  if (!player) return null;
+  for (const slot of EQUIP_SLOTS) {
+    if (player.equipment[slot] === cardId) return slot;
+  }
+  return null;
+}
+
+/** 玩家是否有可被获取/弃置的牌(手牌、装备区或判定区任一有牌);
+ *  顺手牵羊/过河拆桥 的「目标无可获取/弃置的牌」canUse 校验共用。 */
+export function hasObtainableCards(
+  player: Pick<PlayerState, 'hand' | 'equipment' | 'pendingTricks'> | undefined | null,
+): boolean {
+  if (!player) return false;
+  return (
+    player.hand.length > 0 ||
+    equipmentCardIds(player).length > 0 ||
+    player.pendingTricks.length > 0
+  );
 }
 
 /** 卡牌是否为【杀】(含转化/影子杀——name 即 '杀');入参为 card 对象。 */

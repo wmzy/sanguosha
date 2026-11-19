@@ -8,7 +8,7 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { currentJudgeCardId } from '../flows/judge';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 const CHOOSE_RT = '天妒/choose';
 const CHOICE_KEY = '天妒/choice';
@@ -67,14 +67,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '天妒',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动天妒?',
-      confirmLabel: '获得判定牌',
-      cancelLabel: '不获得',
-    },
+    title: '是否发动天妒?',
+    confirmLabel: '获得判定牌',
+    cancelLabel: '不获得',
   });
 }

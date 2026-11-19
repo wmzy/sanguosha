@@ -14,7 +14,8 @@ import { registerBeforeHook } from '../../core/skill';
 import { defaultPlayActive } from '../../rules/action-active';
 import type { CardEffect, ResolveCtx } from '../../types';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../../rules/once-per-turn';
-import { requireRequestType } from '../../util/skillRuntime';
+import { firstTarget, requireRequestType } from '../../util/skillRuntime';
+import { playRescueCard } from './桃';
 import type { HookResult } from '../../types';
 
 /** 注册酒的全局「造成伤害」before-hook（消费增伤标记）。
@@ -71,8 +72,7 @@ function canUseWine(
   ) {
     return '本回合已使用过酒';
   }
-  const target =
-    (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0];
+  const target = firstTarget(params);
   if (target !== undefined && target !== ownerId) return '只能对自己使用酒';
   return null;
 }
@@ -98,14 +98,7 @@ export const wineEffect: CardEffect = {
       return null;
     },
     execute: async (state, ownerId, params) => {
-      const cardId = params.cardId as string;
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: ownerId },
-        to: { zone: '弃牌堆' },
-      });
-      state.localVars['求桃/已救'] = true;
+      await playRescueCard(state, ownerId, params.cardId as string);
     },
   },
   prompt: {

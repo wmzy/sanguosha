@@ -17,6 +17,7 @@
 
 import { css } from '@linaria/core';
 import { colors } from '../../theme';
+import { ghostPill } from '../pillStyles';
 
 // ─── 页面骨架 ───
 export const pageRoot = css`
@@ -45,24 +46,13 @@ export const headerBar = css`
   border-bottom: 1px solid rgba(196, 162, 84, 0.3);
   box-shadow: 0 1px 0 rgba(255, 232, 170, 0.04);
 `;
-/* ── 顶栏按钮体系:统一幽灵药丸(ghost pill) ──
+/* ── 顶栏按钮体系:统一幽灵药丸(ghost pill,基类与色相变体见 components/pillStyles) ──
    形状/字号/高度一致,仅以色相区分语义:中性(退出/查看)/蓝(视角)/绿(自动切换/快照)。 */
-export const backBtn = css`
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
+const headerPillSize = css`
   padding: 3px 12px;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.03);
-  color: #cfcabb;
   font-size: 12px;
-  line-height: 1.5;
-  transition: all 0.15s;
-  &:hover {
-    border-color: rgba(217, 180, 92, 0.65);
-    color: #ecd9a8;
-    background: rgba(217, 180, 92, 0.08);
-  }
 `;
+export const backBtn = `${ghostPill} ${headerPillSize}`;
 export const headerCenter = css`
   display: flex;
   align-items: center;
@@ -111,22 +101,12 @@ export const perspectiveBtn = css`
     background: rgba(52, 120, 200, 0.22);
   }
 `;
-export const goToBtn = css`
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  padding: 3px 12px;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.03);
+/** 「查看/跳转」类按钮:同 backBtn 尺寸,文字更暗(次要操作)。
+ *  本地类声明在 pillStyles 之后,按样式表顺序覆盖基类的 #cfcabb。 */
+const goToBtnDim = css`
   color: #b7b2a4;
-  font-size: 12px;
-  line-height: 1.5;
-  transition: all 0.15s;
-  &:hover {
-    border-color: rgba(217, 180, 92, 0.65);
-    color: #ecd9a8;
-    background: rgba(217, 180, 92, 0.08);
-  }
 `;
+export const goToBtn = `${ghostPill} ${headerPillSize} ${goToBtnDim}`;
 
 /** 顶部栏右侧工具组:资源包/音效等常驻游戏工具按钮(内嵌 headerBar 右上角) */
 export const toolbarGroup = css`
@@ -137,22 +117,12 @@ export const toolbarGroup = css`
 `;
 
 /** 工具组内的图标按钮(📦 等),风格与 headerBar 其他按钮一致 */
-export const toolbarBtn = css`
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
+const toolbarPillSize = css`
   padding: 3px 9px;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.03);
-  color: #cfcabb;
   font-size: 14px;
   line-height: 1;
-  transition: all 0.15s;
-  &:hover {
-    border-color: rgba(217, 180, 92, 0.65);
-    color: #ecd9a8;
-    background: rgba(217, 180, 92, 0.08);
-  }
 `;
+export const toolbarBtn = `${ghostPill} ${toolbarPillSize}`;
 
 /** 资源包管理下拉浮层(相对 toolbarGroup,从按钮下方弹出) */
 export const packDropdown = css`

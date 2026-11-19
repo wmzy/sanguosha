@@ -7,7 +7,7 @@
 import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerBeforeHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '麒麟弓', description: '武器:杀造成伤害时可弃目标1匹马', isLocked: true };
@@ -79,14 +79,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '麒麟弓',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '麒麟弓:是否弃目标1匹马?',
-      confirmLabel: '弃马',
-      cancelLabel: '不发动',
-    },
+    title: '麒麟弓:是否弃目标1匹马?',
+    confirmLabel: '弃马',
   });
 }

@@ -28,7 +28,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, firstTarget, requireRequestType } from '../util/skillRuntime';
 
 /** owner.vars key:箜声牌 cardId 列表(由 箜声.ts 维护,良姻只读) */
 const KONGSHENG_KEY = '箜声/牌';
@@ -56,14 +56,6 @@ function kongshengCount(state: GameState, player: number): number {
     (state.players[player].vars[KONGSHENG_KEY] as string[] | undefined)
       ?.length ?? 0
   );
-}
-
-/** 从 respond params 提取选中的目标座次(targets 数组优先,兼容 target 单值) */
-function extractTarget(params: Record<string, Json>): number | undefined {
-  const arr = params.targets as number[] | undefined;
-  if (Array.isArray(arr) && arr.length > 0) return arr[0];
-  const t = params.target;
-  return typeof t === 'number' ? t : undefined;
 }
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -298,14 +290,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           st.localVars[CONFIRMED_KEY] =
             params.choice === true || params.confirmed === true;
         } else if (rt === TARGET_RT) {
-          const t = extractTarget(params);
+          const t = firstTarget(params);
           if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
         } else if (rt === MODE_RT) {
           st.localVars[MODE_KEY] = params.choice === true ? '摸' : '弃';
         } else if (rt === DISCARD_RT) {
           st.localVars[DISCARD_KEY] = params.cardIds;
         } else if (rt === HEAL_RT) {
-          const t = extractTarget(params);
+          const t = firstTarget(params);
           if (typeof t === 'number') st.localVars[HEAL_KEY] = t;
         }
       },

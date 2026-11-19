@@ -58,7 +58,7 @@ import { usedThisTurnKey } from '../rules/vars-keys';
 import { viewCanAttack } from '../rules/viewDistance';
 import { viewCanSlash } from '../rules/action-active';
 import { USE_ACTION_PREFIX } from '../util/declaredActionType';
-import { registerRespondForAllSeats, engineCanPlayNowReason, viewAskedDodge } from '../util/skillRuntime';
+import { registerRespondForAllSeats, engineCanPlayNowReason, viewAskedDodge, defineConfirmAction } from '../util/skillRuntime';
 import { runVirtualSlash } from './cards/_virtualSlash';
 import { canUseSlash } from './cards/杀';
 
@@ -511,10 +511,10 @@ export function mountGuActions(api: FrontendAPI, skillKey: string): (() => void)
     activeWhen: (ctx: ActionContext) => rescueActive(ctx, skillKey),
   });
   // respond:被蛊惑问询的角色选择是否质疑。前端按 pending prompt 渲染。
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '质疑',
     style: 'danger',
-    prompt: { type: 'confirm', title: '是否质疑于吉的蛊惑?' },
+    title: '是否质疑于吉的蛊惑?',
   });
   return () => {};
 }

@@ -2,10 +2,10 @@
 // debug 模式视角控制栏:视角切换 / 跳转当前玩家 / 自动跟随开关 / 退出房间 / 保存快照。
 // 由上层(DebugLobby)渲染到 GameViewComponent 的 headerSlot / overlaySlot,
 // GameViewComponent 本身不感知视角切换。
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { cx } from '@linaria/core';
 import * as styles from './gameViewStyles';
-import { copyToClipboard } from '../utils/clipboard';
+import { useCopyFeedback } from '../hooks/useCopyFeedback';
 
 export interface DebugPerspectiveBarProps {
   perspectiveName: string;
@@ -39,17 +39,14 @@ export function DebugPerspectiveBar({
   snapshotPath,
   snapshotError,
 }: DebugPerspectiveBarProps) {
-  // 复制反馈:点击后短暂显示「已复制」,2 秒后恢复
-  const [copied, setCopied] = useState(false);
+  // 复制反馈:点击后短暂显示「已复制」,2 秒后恢复(共享 hook,见 useCopyFeedback)
+  const { copiedKey, copy } = useCopyFeedback();
+  const copied = copiedKey !== null;
   const handleCopy = useCallback(async () => {
     if (!snapshotPath) return;
-    const ok = await copyToClipboard(snapshotPath);
-    if (ok) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-    // fallback 也失败时静默:此时无可靠手段,不弹错打扰用户
-  }, [snapshotPath]);
+    await copy(snapshotPath);
+    // 复制失败静默(hook 内处理):两条复制路径都失败时无可靠手段,不弹错打扰用户
+  }, [snapshotPath, copy]);
   if (!onSwitchPerspective && !onDeleteRoom && !onSwitchToNextUnselected && !onSaveSnapshot)
     return null;
   return (

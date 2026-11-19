@@ -38,7 +38,7 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { handLimitBonusKey, getHandLimitBonus } from '../rules/vars-keys';
-import { askConfirm, currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
 import { NON_DELAY_TRICK_NAMES } from '../util/non-delay-tricks';
 
 const CONFIRM_REQUEST = '界集智/confirm'; // 是否摸一张牌
@@ -160,15 +160,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '集智',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动集智?',
-      confirmLabel: '摸牌',
-      cancelLabel: '不摸',
-    },
+    title: '是否发动集智?',
+    confirmLabel: '摸牌',
+    cancelLabel: '不摸',
   });
 }
 

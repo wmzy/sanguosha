@@ -14,6 +14,7 @@
 import type { Card, CardEffect } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { runJudgeFlow } from '../../flows/judge';
+import { firstTarget } from '../../util/skillRuntime';
 import { distanceOneTargetFilter, distanceWithinOneOk } from './_distanceOne';
 
 /** createDelayedSkipEffect 可选项。 */
@@ -43,8 +44,7 @@ export function createDelayedSkipEffect(opts: DelayedSkipOptions): CardEffect {
     skipPhase: { tag: skipTag, phase },
     cancelledBy: { cardName: '无懈可击', broadcast: true },
     canUse(state, ownerId, params) {
-      const target =
-        (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0];
+      const target = firstTarget(params);
       if (target === undefined) return '目标不合法';
       if (target === ownerId) return '不能对自己使用';
       if (!state.players[target]?.alive) return '目标已死亡';

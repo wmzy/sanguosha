@@ -31,6 +31,7 @@ import {
   requireRequestType,
   registerPhaseStartHook,
   defineConfirmAction,
+  firstTarget,
 } from '../util/skillRuntime';
 
 const CONFIRM_RT = '英魂/confirm'; // 孙坚:是否发动
@@ -202,11 +203,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (rt === CONFIRM_RT) {
           st.localVars[CONFIRMED_KEY] = params.choice === true;
         } else if (rt === TARGET_RT) {
-          const t =
-            (params.targets as number[] | undefined)?.[0] ??
-            (typeof params.target === 'number'
-              ? (params.target)
-              : undefined);
+          const t = firstTarget(params);
           if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
         } else if (rt === OPTION_RT) {
           // choice===true → 选项1(摸X弃1);否则 → 选项2(摸1弃X)

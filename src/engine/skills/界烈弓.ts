@@ -10,7 +10,8 @@
 //     → 不能抵消(禁闪)。
 //   - 加伤:界版新增效果2「体力值不小于你」→ 此杀伤害 +1(原版无加伤)。
 //
-// 实现:
+// 实现(骨架由 铁骑.ts 的 createLiegongSkill 共享工厂实现;守卫链/发动询问/respond/
+// 禁闪拦截与标版烈弓逐字共享,本文件注入界版条件与附加初始化):
 //   1. 攻击范围:杀.ts use.validate 检测 skills.includes('界烈弓') 后,用 max(武器范围, 杀点数)
 //      作为有效范围。本技能文件不重复实现距离逻辑(权威在 distance.ts + 杀.ts)。
 //   2. 指定目标 after hook(source===ownerId, card 是杀):
@@ -26,168 +27,102 @@
 //
 // 标签生命周期:由 指定目标 after 产出,由对应 before hook 消费清除——天然按单次杀结算,
 // 多目标杀时各目标的标签互不干扰(标签挂在目标身上)。
-import type {
-  FrontendAPI,
-  GameState,
-  HookResult,
-  Json,
-  Skill,
-} from '../types';
+import type { HookResult } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAfterHook, registerBeforeHook } from '../core/skill';
+import { registerBeforeHook } from '../core/skill';
 import { registerAttackRangeExemptor, effectiveDistance } from '../rules/distance';
 import { getCardValue } from '../flows/rank';
-import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
+import { createLiegongSkill, type LiegongOptions } from './铁骑';
 
 const TAG_BLOCK = '界烈弓/禁闪';
 const TAG_BONUS = '界烈弓/加伤';
 const CONFIRM = '界烈弓/confirmed';
 
-export function createSkill(id: string, ownerId: number): Skill {
-  return {
-    id,
-    ownerId,
-    name: '界烈弓',
-    description:
-      '你的杀攻击范围为此杀点数;指定目标后,若其手牌数不大于你,其不能抵消;若其体力值不小于你,伤害+1',
-  };
-}
-
-export function onInit(skill: Skill, state: GameState): (() => void) | void {
-  const ownerId = skill.ownerId;
-
-  // ── 距离豁免器:你【杀】的攻击范围为此【杀】点数 ──────────────────
-  //   官方语义:effectiveRange = max(武器范围, 杀点数)。
-  //   predicate 自行计算 effectiveDistance 与 点数比较,命中则放行(返回 true)。
-  //   通过 distance provider 实现,避免污染 杀.ts/distance.ts。
-  const unloadRangeExemptor = registerAttackRangeExemptor(
-    state,
-    ownerId,
-    (st, from, to, cardId) => {
-      if (!cardId) return false;
-      const card = st.cardMap[cardId];
-      if (!card) return false;
-      const rank = getCardValue(card);
-      if (rank <= 0) return false;
-      return effectiveDistance(st, from, to) <= rank;
-    },
-  );
-
-  // respond:界黄忠本人回应「是否发动烈弓」的 confirm 询问,结果写入 localVars。
-  registerConfirmRespond(state, skill.id, ownerId, '界烈弓/confirm', CONFIRM, {
-    mismatchError: '当前不是界烈弓确认',
-    wrongTypeError: '当前不是请求回应',
-  });
-
-  // ── 指定目标 after:条件满足 → 询问 → 按条件加标签 ──
-  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.source !== ownerId) return;
-    if (atom.target === undefined) return;
-    const target = atom.target;
-    if (atom.cardId !== undefined) {
-      const card = ctx.state.cardMap[atom.cardId];
-      if (card?.name !== '杀') return;
-    }
-    const self = ctx.state.players[ownerId];
-    const targetPlayer = ctx.state.players[target];
-    if (!self?.alive || !targetPlayer?.alive) return;
-
-    // 清除本目标上残留的界烈弓标签:标签本应"单次杀结算",由对应 before-hook 消费,
-    // 但 TAG_BONUS 仅在 造成伤害时 消费——若本杀被闪抵消则 造成伤害不触发,标签会残留;
-    // TAG_BLOCK 也可能在 成为目标 被取消(空城/帷幕)导致 询问闪 未触发时残留。残留标签会
-    // 串扰下一次对该目标的杀(误禁闪/误加伤,即使本次未发动烈弓)。每次指定目标先清空残留。
+const OPTIONS: LiegongOptions = {
+  name: '界烈弓',
+  description:
+    '你的杀攻击范围为此杀点数;指定目标后,若其手牌数不大于你,其不能抵消;若其体力值不小于你,伤害+1',
+  confirmRt: '界烈弓/confirm',
+  confirmKey: CONFIRM,
+  confirmTitle: '是否发动烈弓?',
+  mismatchError: '当前不是界烈弓确认',
+  dodgeBlockTag: TAG_BLOCK,
+  // 条件判定前的先行副作用 + 两条件独立判定:
+  // 清除本目标上残留的界烈弓标签:标签本应"单次杀结算",由对应 before-hook 消费,
+  // 但 TAG_BONUS 仅在 造成伤害时 消费——若本杀被闪抵消则 造成伤害不触发,标签会残留;
+  // TAG_BLOCK 也可能在 成为目标 被取消(空城/帷幕)导致 询问闪 未触发时残留。残留标签会
+  // 串扰下一次对该目标的杀(误禁闪/误加伤,即使本次未发动烈弓)。每次指定目标先清空残留。
+  decide: async (state, self, targetPlayer, target) => {
     if (targetPlayer.tags.includes(TAG_BLOCK)) {
-      await applyAtom(ctx.state, { type: '去标签', player: target, tag: TAG_BLOCK });
+      await applyAtom(state, { type: '去标签', player: target, tag: TAG_BLOCK });
     }
     if (targetPlayer.tags.includes(TAG_BONUS)) {
-      await applyAtom(ctx.state, { type: '去标签', player: target, tag: TAG_BONUS });
+      await applyAtom(state, { type: '去标签', player: target, tag: TAG_BONUS });
     }
-
-    // 两条件独立判定
     const condBlock = targetPlayer.hand.length <= self.hand.length; // 效果1:手牌不大于自己
     const condBonus = getHealthValue(targetPlayer) >= getHealthValue(self); // 效果2:体力值不小于自己
-    if (!condBlock && !condBonus) return;
-
-    // 询问是否发动(单次发动,统一管理两效果)
-    const confirmed = await askConfirm(ctx.state, '界烈弓/confirm', ownerId, {
-      confirmedKey: CONFIRM,
-      title: '是否发动烈弓?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-      defaultChoice: false,
-      timeout: 10,
-    });
-    if (!confirmed) return;
-
-    // 按成立条件加标签(同一杀对同一目标可同时叠加禁闪+加伤)
-    if (condBlock) {
-      await applyAtom(ctx.state, { type: '加标签', player: target, tag: TAG_BLOCK });
+    return condBlock || condBonus;
+  },
+  // 按成立条件加标签(同一杀对同一目标可同时叠加禁闪+加伤)。
+  // 询问窗口期间状态不变(询问只等本座次 confirm 回应),此处重算条件与发动前判定等价。
+  onConfirmed: async (state, self, targetPlayer, target) => {
+    if (targetPlayer.hand.length <= self.hand.length) {
+      await applyAtom(state, { type: '加标签', player: target, tag: TAG_BLOCK });
     }
-    if (condBonus) {
-      await applyAtom(ctx.state, { type: '加标签', player: target, tag: TAG_BONUS });
+    if (getHealthValue(targetPlayer) >= getHealthValue(self)) {
+      await applyAtom(state, { type: '加标签', player: target, tag: TAG_BONUS });
     }
-  });
+  },
+  extraInit: (state, skillId, ownerId) => {
+    // ── 距离豁免器:你【杀】的攻击范围为此【杀】点数 ──────────────────
+    //   官方语义:effectiveRange = max(武器范围, 杀点数)。
+    //   predicate 自行计算 effectiveDistance 与 点数比较,命中则放行(返回 true)。
+    //   通过 distance provider 实现,避免污染 杀.ts/distance.ts。
+    const unloadRangeExemptor = registerAttackRangeExemptor(
+      state,
+      ownerId,
+      (st, from, to, cardId) => {
+        if (!cardId) return false;
+        const card = st.cardMap[cardId];
+        if (!card) return false;
+        const rank = getCardValue(card);
+        if (rank <= 0) return false;
+        return effectiveDistance(st, from, to) <= rank;
+      },
+    );
 
-  // ── 询问闪 before:目标有禁闪标签 → 去标签 + cancel(强制命中) ──
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '询问闪',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.source !== ownerId) return;
-      const target = atom.target;
-      if (target === undefined) return;
-      const player = ctx.state.players[target];
-      if (!player?.tags.includes(TAG_BLOCK)) return;
-      await applyAtom(ctx.state, { type: '去标签', player: target, tag: TAG_BLOCK });
-      return { kind: 'cancel' };
-    },
-  );
+    // ── 造成伤害 before:目标有加伤标签 → 去标签 + modify(amount+1) ──
+    registerBeforeHook(
+      state,
+      skillId,
+      ownerId,
+      '造成伤害时',
+      async (ctx): Promise<HookResult | void> => {
+        const atom = ctx.atom;
+        if (atom.source !== ownerId) return;
+        if ((atom.amount ?? 0) <= 0) return;
+        const targetIdx = atom.target;
+        if (targetIdx === undefined) return;
+        const cardId = atom.cardId;
+        // cardId 非 string(虚拟伤害等)不触发;仅实体杀的伤害才加伤
+        if (typeof cardId !== 'string') return;
+        const card = ctx.state.cardMap[cardId];
+        if (card?.name !== '杀') return;
+        const player = ctx.state.players[targetIdx];
+        if (!player?.tags.includes(TAG_BONUS)) return;
+        await applyAtom(ctx.state, { type: '去标签', player: targetIdx, tag: TAG_BONUS });
+        return {
+          kind: 'modify',
+          atom: { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as typeof ctx.atom,
+        };
+      },
+    );
 
-  // ── 造成伤害 before:目标有加伤标签 → 去标签 + modify(amount+1) ──
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '造成伤害时',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.source !== ownerId) return;
-      if ((atom.amount ?? 0) <= 0) return;
-      const targetIdx = atom.target;
-      if (targetIdx === undefined) return;
-      const cardId = atom.cardId;
-      // cardId 非 string(虚拟伤害等)不触发;仅实体杀的伤害才加伤
-      if (typeof cardId !== 'string') return;
-      const card = ctx.state.cardMap[cardId];
-      if (card?.name !== '杀') return;
-      const player = ctx.state.players[targetIdx];
-      if (!player?.tags.includes(TAG_BONUS)) return;
-      await applyAtom(ctx.state, { type: '去标签', player: targetIdx, tag: TAG_BONUS });
-      return {
-        kind: 'modify',
-        atom: { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as typeof ctx.atom,
-      };
-    },
-  );
+    return [unloadRangeExemptor];
+  },
+};
 
-  return () => {
-    unloadRangeExemptor();
-  };
-}
-
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '界烈弓',
-    style: 'default',
-    title: '是否发动烈弓?',
-    confirmLabel: '发动',
-    cancelLabel: '不发动',
-  });
-}
+export const { createSkill, onInit, onMount } = createLiegongSkill(OPTIONS);
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

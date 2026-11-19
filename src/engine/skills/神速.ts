@@ -31,9 +31,11 @@ import {
   requireRequestType,
   askConfirm,
   firstCardId,
+  firstTarget,
   registerPhaseStartHook,
   defineConfirmAction,
 } from '../util/skillRuntime';
+import { equipmentCardIds } from '../util/player-query';
 import { runVirtualSlash } from './cards/_virtualSlash';
 import { skipPhase } from '../rules/skip-phase';
 
@@ -200,9 +202,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt === OPT1_TRIGGER_RT || rt === OPT2_TRIGGER_RT || rt === OPT3_TRIGGER_RT) {
         s.localVars['神速/confirmed'] = params.choice === true;
       } else if (rt === OPT1_TARGET_RT || rt === OPT2_TARGET_RT || rt === OPT3_TARGET_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? (params.target) : undefined);
+        const t = firstTarget(params);
         if (typeof t === 'number') s.localVars['神速/target'] = t;
       } else if (rt === OPT2_EQUIP_RT) {
         // 兼容 distribute/select 的 cardIds 数组与单 cardId
@@ -257,7 +257,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const { atom, self } = entry;
 
       // 发动条件:有装备牌(其他存活角色守卫在 shensuPhaseEntry 内)
-      const equipCount = Object.values(self.equipment).filter(Boolean).length;
+      const equipCount = equipmentCardIds(self).length;
       if (equipCount === 0) return;
 
       // 询问是否发动选项2

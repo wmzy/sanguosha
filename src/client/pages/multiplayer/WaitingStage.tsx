@@ -2,13 +2,13 @@
 // 等待大厅(玩家 waiting 与旁观者 spectating 无 view 时共用):
 // 房间码+复制、房主配置编辑(委托 RoomConfigSection)、新手教程、对局历史、已就绪/旁观者列表、
 // 聊天配置、待处理视角申请、座位图(SeatMap)、底部准备/开始/旁观/退出按钮。
-// 持有 editConfig 与复制反馈 state;对局历史 history 由页面 useRoomHistory 传入(刷新语义不变)。
+// 持有 editConfig;复制反馈走 useCopyFeedback;对局历史 history 由页面 useRoomHistory 传入(刷新语义不变)。
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { OnboardingGuide } from '../../components/OnboardingGuide';
 import { RoomHistoryPanel } from '../../components/RoomHistoryPanel';
 import { ChatConfigSection } from '../../components/ChatConfigSection';
-import { copyToClipboard } from '../../utils/clipboard';
+import { useCopyFeedback } from '../../hooks/useCopyFeedback';
 import { memberName } from '../../utils/memberNames';
 import { btnStyle, colors } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
@@ -48,14 +48,9 @@ export function WaitingStage({ history }: WaitingStageProps) {
   const mp = useMultiplayerRoomCtx();
   const navigate = useNavigate();
 
-  // 房间码/邀请链接复制反馈:成功后按钮短暂显示 ✓,2 秒后恢复(范式同 DebugPerspectiveBar)。
-  // 用单一状态 + 可清除计时器:连续点两个按钮时,后点的反馈覆盖先点的,旧计时器不残留。
-  const [copiedKind, setCopiedKind] = useState<'code' | 'link' | 'spectate' | null>(null);
-  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    // 卸载清理计时器,避免对已卸载组件 setState
-    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
-  }, []);
+  // 房间码/邀请链接复制反馈:成功后按钮短暂显示 ✓,2 秒后恢复(共享 hook,见 useCopyFeedback;
+  // 单一 copiedKey 状态:连续点两个按钮时,后点的反馈覆盖先点的,旧计时器不残留)。
+  const { copiedKey, copy } = useCopyFeedback();
   const handleCopyRoomInfo = useCallback(
     async (kind: 'code' | 'link' | 'spectate') => {
       if (!mp.roomId) return;
@@ -67,15 +62,9 @@ export function WaitingStage({ history }: WaitingStageProps) {
           : kind === 'spectate'
             ? `${window.location.origin}/play/${mp.roomId}?spectate=1`
             : `${window.location.origin}/play/${mp.roomId}`;
-      const ok = await copyToClipboard(text);
-      if (ok) {
-        setCopiedKind(kind);
-        if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
-        copiedTimerRef.current = setTimeout(() => setCopiedKind(null), 2000);
-      }
-      // 复制失败静默:两条复制路径都失败时无可靠反馈手段,不弹错打扰用户
+      await copy(text, kind);
     },
-    [mp.roomId],
+    [copy, mp.roomId],
   );
 
   // waiting 阶段房主配置编辑状态（首次从服务端同步后由用户控制）
@@ -139,7 +128,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
                   onClick={() => void handleCopyRoomInfo(kind)}
                   style={copyBtnStyle}
                 >
-                  {copiedKind === kind ? '✓ 已复制' : label}
+                  {copiedKey === kind ? '✓ 已复制' : label}
                 </button>
               ))}
             </div>

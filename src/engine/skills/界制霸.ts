@@ -38,7 +38,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
-import { engineCanPlayNow } from '../util/skillRuntime';
+import { defineConfirmAction, engineCanPlayNow } from '../util/skillRuntime';
 import { askRankCard, getCardValue } from '../flows/rank';
 import { isLordOwner } from '../rules/action-active';
 import {
@@ -238,15 +238,11 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     },
   });
 
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '制霸',
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
+    title: '制霸',
+    confirmLabel: '确认',
+    cancelLabel: '取消',
   });
   return undefined;
 }

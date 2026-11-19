@@ -7,11 +7,18 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { css, cx } from '@linaria/core';
-import type { RoomConfig, CharPoolPreset } from '../../../server/protocol';
+import type { RoomConfig } from '../../../server/protocol';
 import { colors } from '../../theme';
 import { ChatConfigSection } from '../ChatConfigSection';
-// 将池/倒计时选项与等待大厅(RoomConfigSection)共用同一出处,见 multiplayerStyles
-import { POOL_OPTIONS, TIMEOUT_OPTIONS, timeoutLabel } from '../../pages/multiplayer/multiplayerStyles';
+import { ErrorToast } from '../../pages/multiplayer/ErrorToast';
+// 公共配置字段(房间名/将池/倒计时/手牌数)与等待大厅(RoomConfigSection)共用同一出处
+import {
+  RoomNameField,
+  RoomCharPoolField,
+  RoomTimeoutField,
+  RoomHandSizeField,
+  type RoomConfigField,
+} from '../../pages/multiplayer/RoomConfigFields';
 
 interface RoomConfigPanelProps {
   /** 当前房间配置 */
@@ -99,8 +106,6 @@ const input = css`
     border-color: ${colors.accent.blue};
   }
 `;
-
-const select = input;
 
 const row = css`
   display: flex;
@@ -228,17 +233,6 @@ const waitHint = css`
   color: ${colors.text.dim};
 `;
 
-const errorBox = css`
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  background-color: ${colors.accent.red};
-  color: white;
-  padding: 12px 20px;
-  border-radius: 8px;
-  z-index: 1000;
-`;
-
 export function RoomConfigPanel({
   config,
   readyPlayers,
@@ -261,9 +255,19 @@ export function RoomConfigPanel({
     setEditConfig((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const handleApply = useCallback(() => {
-    onUpdateConfig(editConfig);
-  }, [editConfig, onUpdateConfig]);
+  // 公共字段提交层:输入框字段(房间名/手牌数)失焦即同步提交;
+  // 下拉字段(将池/倒计时)选中即提交,但延后到当前事件之后(setTimeout 0,
+  // 保留原有「select 立即提交」语义,不进共享字段组件)。
+  const handleFieldCommit = useCallback(
+    (field: RoomConfigField, next: RoomConfig) => {
+      if (field === 'charPool' || field === 'timeoutSec') {
+        setTimeout(() => onUpdateConfig(next), 0);
+      } else {
+        onUpdateConfig(next);
+      }
+    },
+    [onUpdateConfig],
+  );
 
   // 全部座次已连接 + 全部准备
   const allSeatsReady = useMemo(() => {
@@ -295,80 +299,43 @@ export function RoomConfigPanel({
         <h2 className={title}>房间配置</h2>
         <p className={subtitle}>配置完成后,切换到每个座次视角点「准备」。全部准备后可开始。</p>
 
-        {/* 房间名 */}
+        {/* 房间名/将池/倒计时/手牌数:公共字段组件,与等待大厅(RoomConfigSection)共用 */}
         <div className={formGroup}>
-          <label className={label}>房间名称</label>
-          <input
-            className={input}
-            type="text"
-            value={editConfig.name}
-            maxLength={40}
-            onChange={(e) => handleField('name', e.target.value)}
-            onBlur={handleApply}
+          <RoomNameField
+            config={editConfig}
+            onFieldChange={handleField}
+            onCommit={handleFieldCommit}
+            labelCls={label}
+            inputCls={input}
           />
         </div>
 
         <div className={row}>
-          {/* 将池 */}
           <div className={formGroup}>
-            <label className={label}>将池</label>
-            <select
-              className={select}
-              value={editConfig.charPool}
-              onChange={(e) => {
-                handleField('charPool', e.target.value as CharPoolPreset);
-                // select 立即提交
-                setTimeout(
-                  () =>
-                    onUpdateConfig({ ...editConfig, charPool: e.target.value as CharPoolPreset }),
-                  0,
-                );
-              }}
-            >
-              {POOL_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            <RoomCharPoolField
+              config={editConfig}
+              onFieldChange={handleField}
+              onCommit={handleFieldCommit}
+              labelCls={label}
+              inputCls={input}
+            />
           </div>
-
-          {/* 倒计时 */}
           <div className={formGroup}>
-            <label className={label}>操作倒计时</label>
-            <select
-              className={select}
-              value={editConfig.timeoutSec}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                handleField('timeoutSec', v);
-                setTimeout(() => onUpdateConfig({ ...editConfig, timeoutSec: v }), 0);
-              }}
-            >
-              {TIMEOUT_OPTIONS.map((o) => (
-                <option key={o.label} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-              {!TIMEOUT_OPTIONS.some((o) => o.value === editConfig.timeoutSec) && (
-                <option value={editConfig.timeoutSec}>
-                  {timeoutLabel(editConfig.timeoutSec)}
-                </option>
-              )}
-            </select>
+            <RoomTimeoutField
+              config={editConfig}
+              onFieldChange={handleField}
+              onCommit={handleFieldCommit}
+              labelCls={label}
+              inputCls={input}
+            />
           </div>
-
-          {/* 手牌数 */}
           <div className={formGroup}>
-            <label className={label}>初始手牌</label>
-            <input
-              className={input}
-              type="number"
-              min={0}
-              max={10}
-              value={editConfig.handSize}
-              onChange={(e) => handleField('handSize', Number(e.target.value))}
-              onBlur={handleApply}
+            <RoomHandSizeField
+              config={editConfig}
+              onFieldChange={handleField}
+              onCommit={handleFieldCommit}
+              labelCls={label}
+              inputCls={input}
             />
           </div>
         </div>
@@ -426,7 +393,6 @@ export function RoomConfigPanel({
                       e.stopPropagation();
                       onReady(i);
                     }}
-                    disabled={isReady}
                   >
                     准备
                   </button>
@@ -454,7 +420,7 @@ export function RoomConfigPanel({
         </div>
         {!allSeatsReady && <div className={waitHint}>{waitingReason}</div>}
       </div>
-      {error && <div className={errorBox}>{error}</div>}
+      {error && <ErrorToast message={error} />}
     </div>
   );
 }

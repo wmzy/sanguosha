@@ -41,7 +41,7 @@ import {
 } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
-import { engineCanPlayNowReason } from '../util/skillRuntime';
+import { defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界解烦';
@@ -278,10 +278,10 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     // view.turnUsage 每回合被「回合结束」atom 整体清空,无法承载整局一次的持久标记,
     // 故不在此读取(与 乱武/界乱武/界焚城/界献州 等限定技一致)。
   });
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'default',
-    prompt: { type: 'confirm', title: '解烦' },
+    title: '解烦',
   });
   return undefined;
 }

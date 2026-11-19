@@ -1,32 +1,16 @@
 // 打出牌时:牌被打出(生效)时触发(play.md 时机2)。
 // after hook 触发"打出牌时"时机技能(雷击/涯角等):打出特定牌后触发判定/摸牌。
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
-import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { broadcast, requirePlayer } from './_helpers';
+import type { AtomDefinition } from '../types';
+import { requirePlayer } from './_helpers';
+import { HIGHLIGHT_EFFECT, makeEventMarkerAtom, playEventView } from './_eventMarker';
 
-export const 打出牌时: AtomDefinition<{ player: number; cardId: string }> = {
-  type: '打出牌时',
-  validate(state, atom) {
-    return requirePlayer(state, atom.player, 'player');
-  },
-  apply() {
-    // 事件标记——after hook 触发雷击/涯角等"打出牌时"时机技能
-  },
-  effect: { animation: 'highlight', duration: 400 },
-  toViewEvents(state, atom): ViewEventSplit {
-    const cardName = state.cardMap[atom.cardId]?.name ?? atom.cardId;
+export const 打出牌时: AtomDefinition<{ player: number; cardId: string }> = makeEventMarkerAtom(
+  '打出牌时',
+  {
+    validate: (state, atom) => requirePlayer(state, atom.player, 'player'),
     // 打出按牌名播报语音(sound/card/{牌名}),与「使用时」对齐;无语音文件的牌静默跳过
-    const view: ViewEvent = {
-      type: '打出牌时',
-      player: atom.player,
-      cardId: atom.cardId,
-      cardName,
-      effect: { sound: `card/${cardName}`, animation: 'highlight', duration: 400 },
-    };
-    return broadcast(view);
+    buildView: (type, state, atom) => playEventView(type, state, atom, true),
+    effect: HIGHLIGHT_EFFECT,
   },
-  applyView() {
-    // 事件标记——无 GameView 字段需要直接更新(判定/摸牌由后续 atom 的 applyView 体现)。
-  },
-};
-
+);

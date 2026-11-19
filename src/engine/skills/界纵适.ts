@@ -29,7 +29,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { getCardValue } from '../flows/rank';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界纵适';
@@ -118,13 +118,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '纵适:是否获得拼点牌?',
-    },
+    title: '纵适:是否获得拼点牌?',
   });
 }
 

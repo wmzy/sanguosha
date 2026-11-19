@@ -5,35 +5,31 @@
 //   其他结果 → 闪电传递给下家（下家的判定区）
 // 无来源伤害用 source: TARGET_SYSTEM（系统惯例，见 扣减体力 atom）。
 
-import type { Card, GameState } from '../../types';
+import type { Card, GameState, PlayerState } from '../../types';
 import { TARGET_SYSTEM } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { runJudgeFlow } from '../../flows/judge';
 import { runDamageFlow } from '../../flows/damage';
 import { isSpade2to9 } from '../../flows/rank';
+import { findNextAlive } from '../../util/player-query';
 import type { CardEffect, ResolveCtx } from '../../types';
 
 const TRICK_NAME = '闪电';
 
-/** 找逆时针下一位判定区没有闪电的存活玩家（从 current 起环形搜索） */
-function findNextRecipient(state: GameState, current: number): number | null {
-  const n = state.players.length;
-  for (let i = 1; i <= n; i++) {
-    const idx = (current - i + n) % n;
-    const p = state.players[idx];
-    if (!p.alive) continue;
-    if (p.pendingTricks.some((t) => t.name === TRICK_NAME)) continue;
-    return idx;
-  }
-  return null;
-}
+/** 判定区是否无闪电（findNextAlive 的候选谓词）。 */
+const noLightning = (p: PlayerState): boolean =>
+  !p.pendingTricks.some((t) => t.name === TRICK_NAME);
 
 /** 闪电传递给下家：移除当前玩家的闪电，添加到下一个判定区无闪电的存活玩家。
- *  用于：判定非命中（resolveLightning）+ 被无懈可击抵消（onCancelled）。 */
+ *  用于：判定非命中（resolveLightning）+ 被无懈可击抵消（onCancelled）。
+ *  候选环形搜索含 from 自身兜底（全场他人均不可传时回到自己，原 findNextRecipient 同此）；
+ *  findNextAlive 无匹配时同样返回 from（原版此时返回 null=闪电离场，不再回置）——
+ *  两种「返回 from」按 from 自身是否仍可持有（存活且判定区无闪电）区分。 */
 async function passLightningToNext(state: GameState, from: number, card: Card): Promise<void> {
   await applyAtom(state, { type: '移除延时锦囊', player: from, trickName: TRICK_NAME });
-  const next = findNextRecipient(state, from);
-  if (next !== null) {
+  const next = findNextAlive(state, from, noLightning);
+  const self = state.players[from];
+  if (next !== from || (self?.alive === true && noLightning(self))) {
     await applyAtom(state, {
       type: '添加延时锦囊',
       player: next,

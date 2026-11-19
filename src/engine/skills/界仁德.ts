@@ -28,7 +28,7 @@ import { inAttackRange } from '../rules/distance';
 import { canSlash } from '../rules/slash-quota';
 import { usedThisTurn } from '../rules/once-per-turn';
 import { runUseFlow } from './cards/use-card';
-import { requireRequestType } from '../util/skillRuntime';
+import { requireRequestType, firstTarget, defineConfirmAction } from '../util/skillRuntime';
 import { runVirtualSlash } from './cards/_virtualSlash';
 import { createRendeSkill, type RendeOptions } from './仁德';
 import type { SkillModule } from '../types';
@@ -205,22 +205,17 @@ const OPTIONS: RendeOptions = {
             s.localVars[BASIC_CHOICE_VAR] = '不使用';
           }
         } else if (rt === TARGET_RT) {
-          const t =
-            (params.targets as number[] | undefined)?.[0] ??
-            (typeof params.target === 'number' ? params.target : undefined);
+          const t = firstTarget(params);
           if (typeof t === 'number') s.localVars[BASIC_TARGET_VAR] = t;
         }
       },
     );
   },
   extraMount: (api) => {
-    api.defineAction('respond', {
+    defineConfirmAction(api, 'respond', {
       label: '界仁德',
+      title: '界仁德',
       style: 'default',
-      prompt: {
-        type: 'confirm',
-        title: '界仁德',
-      },
     });
   },
 };

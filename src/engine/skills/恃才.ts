@@ -26,11 +26,12 @@
 //
 // 范围:owner 使用的所有牌(主动使用 + 被迫使用如逼杀;respond 出闪亦走 runUseFlow
 //   → 使用时,故防守出闪也可触发)。source===ownerId 判定。
-import type { EquipSlot, FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { askConfirm, defineConfirmAction, effectiveCardId, registerConfirmRespond } from '../util/skillRuntime';
+import { equipSlotOf } from '../util/player-query';
 
 const SKILL_ID = '恃才';
 /** turn.vars:本回合已占用的牌类型(string[])。 */
@@ -43,16 +44,6 @@ const CONFIRM_KEY = '恃才/confirmed';
 const EFFECTIVE_ID_KEY = '恃才/effectiveCardId';
 /** 询问 requestType(T1:前缀 = skillId)。 */
 const CONFIRM_RT = '恃才/confirm';
-
-/** 在 owner 装备区查找 cardId 所在槽位。 */
-function findEquipSlot(state: GameState, ownerId: number, cardId: string): EquipSlot | null {
-  const equip = state.players[ownerId]?.equipment;
-  if (!equip) return null;
-  for (const [slot, id] of Object.entries(equip)) {
-    if (id === cardId) return slot as EquipSlot;
-  }
-  return null;
-}
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -139,7 +130,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         to: { zone: '牌堆' },
       });
     } else {
-      const slot = findEquipSlot(st, ownerId, effectiveId);
+      const slot = equipSlotOf(st.players[ownerId], effectiveId);
       if (slot) {
         // 装备牌:卸下(装备区→手牌)→ 手牌→牌堆顶
         await applyAtom(st, { type: '卸下', player: ownerId, slot });

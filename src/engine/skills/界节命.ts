@@ -39,7 +39,14 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, normalizeCardIds, defineConfirmAction, registerRespondForAllSeats } from '../util/skillRuntime';
+import {
+  askConfirm,
+  normalizeCardIds,
+  defineConfirmAction,
+  firstTarget,
+  registerRespondForAllSeats,
+  requireRequestType,
+} from '../util/skillRuntime';
 
 // 内部 requestType/localVars 键名保持原前缀「节命/」,不改为「界节命/」
 const CONFIRM_RT = '界节命/confirm';
@@ -147,15 +154,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       state,
       skill.id,
       (st: GameState, seatId: number, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as Record<string, unknown>;
-        if (atom['type'] !== '请求回应') return '当前不需要回应';
-        const rt = atom['requestType'] as string;
-        if (rt !== CONFIRM_RT && rt !== TARGET_RT && rt !== DISCARD_RT) {
-          return '当前不是节命询问';
-        }
-        if (rt === DISCARD_RT) {
+        const check = requireRequestType(st, seatId, [CONFIRM_RT, TARGET_RT, DISCARD_RT], {
+          mismatchError: '当前不是节命询问',
+        });
+        if (check.error) return check.error;
+        if (check.requestType === DISCARD_RT) {
           // 目标座次选弃牌:校验 cardIds 在手牌中,数量 == excess
           const cardIds = normalizeCardIds(params);
           if (cardIds.length === 0) return '请选择要弃置的牌';
@@ -177,9 +180,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (rt === CONFIRM_RT) {
           st.localVars[CONFIRMED_KEY] = params.choice === true;
         } else if (rt === TARGET_RT) {
-          const t =
-            (params.targets as number[] | undefined)?.[0] ??
-            (typeof params.target === 'number' ? params.target : undefined);
+          const t = firstTarget(params);
           if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
         } else if (rt === DISCARD_RT) {
           const cardIds = normalizeCardIds(params);

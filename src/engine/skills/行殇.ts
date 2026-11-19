@@ -19,6 +19,7 @@ import { applyAtom } from '../core/apply';
 import { obtainJudgeZoneCard } from '../core/judge-zone';
 import { registerAfterHook } from '../core/skill';
 import { askConfirm, registerConfirmRespond, defineConfirmAction } from '../util/skillRuntime';
+import { equipmentCardIds } from '../util/player-query';
 
 const CONFIRM_RT = '行殇/confirm';
 const CONFIRMED_KEY = '行殇/confirmed';
@@ -54,9 +55,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 收集死亡角色的所有牌(快照,避免转移过程中数组变动)
       const handCards = [...dead.hand];
-      const equipCards = Object.values(dead.equipment).filter(
-        (id): id is string => typeof id === 'string',
-      );
+      const equipCards = equipmentCardIds(dead);
       const judgeCards = dead.pendingTricks.map((t) => ({
         trickName: t.name,
         cardId: t.card.id,

@@ -17,6 +17,7 @@ import { isCardBanned } from '../../skills/cards/validate';
 import type { CardEffect, ResolveCtx } from '../../types';
 import { inAttackRange } from '../../rules/distance';
 import { slashTargetMax } from '../../rules/slash-target';
+import { requireRequestType } from '../../util/skillRuntime';
 
 /** 请求 A 出杀问询的 requestType */
 const REQUEST_TYPE = '借刀杀人/出杀';
@@ -157,8 +158,11 @@ export const borrowedSwordEffect: CardEffect = {
       const slot = state.pendingSlots.get(ownerId);
       if (!slot) return '当前不需要回应';
       if ((slot.atom as { target?: number }).target !== ownerId) return '不是问你的';
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType !== REQUEST_TYPE) return '当前不是借刀杀人询问';
+      const check = requireRequestType(state, ownerId, [REQUEST_TYPE], {
+        mismatchError: '当前不是借刀杀人询问',
+        wrongTypeError: '当前不是借刀杀人询问',
+      });
+      if (check.error) return check.error;
       // 不传 cardId = 选择交出武器(pass),由 resolve 兑底走交武器分支
       const cardId = params.cardId as string | undefined;
       if (cardId === undefined) return null;

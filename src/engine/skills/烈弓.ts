@@ -7,106 +7,47 @@
 //   分支2: target.hand.length <= owner.attackRange (目标手牌数 ≤ 自己攻击范围)
 //   攻击范围取 owner.vars[DISTANCE_ATTACK_RANGE_KEY],默认 1(徒手)。
 //
-// 实现(与铁骑同构的禁闪横切机制):
+// 实现(与铁骑同构的禁闪横切机制;骨架由 铁骑.ts 的 createLiegongSkill 共享工厂实现):
 //   1. 指定目标 after hook(source===ownerId, card 是杀):
 //        若上述条件满足 → 询问"是否发动烈弓" → 若发动 → 给目标加标签 '烈弓/禁闪'。
 //   2. 询问闪 before hook(source===ownerId 且 target 有 '烈弓/禁闪' 标签):
 //        去标签 + cancel(跳过询问闪 → 处理区无闪 → 杀.execute 造成伤害,强制命中)。
+//   守卫链/发动询问/respond/禁闪拦截由工厂逐字共享;本文件仅注入条件判定与加标签。
 //
 // 标签生命周期:阶段1(指定目标)产出,阶段2(询问闪)消费并清除——天然按单次杀结算。
-import type {
-  FrontendAPI,
-  GameState,
-  HookResult,
-  Skill,
-} from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAfterHook, registerBeforeHook } from '../core/skill';
 import { getDistanceAttackRange } from '../rules/vars-keys';
-import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
+import { createLiegongSkill, type LiegongOptions } from './铁骑';
 
 const TAG = '烈弓/禁闪';
 const CONFIRM = '烈弓/confirmed';
 
-export function createSkill(id: string, ownerId: number): Skill {
-  return {
-    id,
-    ownerId,
-    name: '烈弓',
-    description:
-      '使用杀指定目标后,若其手牌数不小于你的体力值或不大于你的攻击范围,可令其不能抵消此杀',
-  };
-}
-
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
-
-  // respond:被询问"是否发动烈弓"时回应,设 localVars 标记结果
-  registerConfirmRespond(state, skill.id, ownerId, '烈弓/confirm', CONFIRM, {
-    mismatchError: '当前不是烈弓确认',
-    wrongTypeError: '当前不是请求回应',
-  });
-
-  // ── 指定目标 after:条件满足 → 询问 → 加禁闪标签 ──
-  registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.source !== ownerId) return;
-    if (atom.target === undefined) return;
-    const target = atom.target;
-    if (atom.cardId !== undefined) {
-      const card = ctx.state.cardMap[atom.cardId];
-      if (card?.name !== '杀') return;
-    }
-    const self = ctx.state.players[ownerId];
-    const targetPlayer = ctx.state.players[target];
-    if (!self?.alive || !targetPlayer?.alive) return;
-
-    // 发动条件(官方):目标手牌数 ≥ 自己体力值,或 目标手牌数 ≤ 自己攻击范围
+const OPTIONS: LiegongOptions = {
+  name: '烈弓',
+  description:
+    '使用杀指定目标后,若其手牌数不小于你的体力值或不大于你的攻击范围,可令其不能抵消此杀',
+  confirmRt: '烈弓/confirm',
+  confirmKey: CONFIRM,
+  confirmTitle: '是否发动烈弓(令目标不能出闪)?',
+  // 弹窗标题与询问文案不同(全角问号,保留原字面量)
+  mountTitle: '是否发动烈弓？',
+  mismatchError: '当前不是烈弓确认',
+  dodgeBlockTag: TAG,
+  // 发动条件(官方):目标手牌数 ≥ 自己体力值,或 目标手牌数 ≤ 自己攻击范围;
+  // 攻击范围取 owner.vars[DISTANCE_ATTACK_RANGE_KEY],默认 1(徒手)。
+  decide: async (_state, self, targetPlayer) => {
     const attackRange = getDistanceAttackRange(self.vars) ?? 1;
-    const condMet =
-      targetPlayer.hand.length >= getHealthValue(self) || targetPlayer.hand.length <= attackRange;
-    if (!condMet) return;
+    return (
+      targetPlayer.hand.length >= getHealthValue(self) || targetPlayer.hand.length <= attackRange
+    );
+  },
+  // 询问发动("你可以令其不能出闪"——可选)确认后加禁闪标签
+  onConfirmed: async (state, _self, _targetPlayer, target) => {
+    await applyAtom(state, { type: '加标签', player: target, tag: TAG });
+  },
+};
 
-    // 询问是否发动烈弓("你可以令其不能出闪"——可选)
-    const confirmed = await askConfirm(ctx.state, '烈弓/confirm', ownerId, {
-      confirmedKey: CONFIRM,
-      title: '是否发动烈弓(令目标不能出闪)?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-      defaultChoice: false,
-      timeout: 10,
-    });
-    if (!confirmed) return;
+export const { createSkill, onInit, onMount } = createLiegongSkill(OPTIONS);
 
-    await applyAtom(ctx.state, { type: '加标签', player: target, tag: TAG });
-  });
-
-  // ── 询问闪 before:目标有禁闪标签 → 去标签 + cancel(强制命中) ──
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '询问闪',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.source !== ownerId) return;
-      const target = atom.target;
-      if (target === undefined) return;
-      const player = ctx.state.players[target];
-      if (!player?.tags.includes(TAG)) return;
-      await applyAtom(ctx.state, { type: '去标签', player: target, tag: TAG });
-      return { kind: 'cancel' };
-    },
-  );
-
-  return () => {};
-}
-
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '烈弓',
-    title: '是否发动烈弓？',
-    style: 'default',
-  });
-}
+export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;

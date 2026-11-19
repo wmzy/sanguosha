@@ -26,7 +26,7 @@ import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
 import { registerAction, declareAlternativeResponse } from '../core/skill';
-import { engineCanPlayNow } from '../util/skillRuntime';
+import { engineCanPlayNow, defineConfirmAction } from '../util/skillRuntime';
 import { inAttackRange } from '../rules/distance';
 import { defaultPlayActive, isLordOwner } from '../rules/action-active';
 
@@ -348,15 +348,11 @@ export function mountJijiangActions(
     activeWhen: (ctx) => defaultPlayActive(ctx) && isLordOwner(skill.ownerId),
   });
   // respond:响应型激将(被询问杀时激活)
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: opts.label,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: opts.respondTitle,
-      confirmLabel: '激将',
-      cancelLabel: '不发动',
-    },
+    title: opts.respondTitle,
+    confirmLabel: '激将',
+    cancelLabel: '不发动',
     activeWhen: (ctx) => {
       const slot = ctx.view.pending;
       if (!slot) return false;

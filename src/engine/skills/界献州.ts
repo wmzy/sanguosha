@@ -33,7 +33,12 @@ import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive } from '../rules/action-active';
 import type { SkillModule } from '../types';
-import { askConfirm, requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
+import {
+  askConfirm,
+  defineConfirmAction,
+  engineCanPlayNowReason,
+  requireRequestType,
+} from '../util/skillRuntime';
 import { EQUIP_SLOTS } from '../util/equip-slot';
 
 const SKILL_ID = '界献州';
@@ -267,15 +272,12 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
     },
   });
 
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'danger',
-    prompt: {
-      type: 'confirm',
-      title: '献州',
-      confirmLabel: '令其回血',
-      cancelLabel: '造伤',
-    },
+    title: '献州',
+    confirmLabel: '令其回血',
+    cancelLabel: '造伤',
   });
 
   return () => {};

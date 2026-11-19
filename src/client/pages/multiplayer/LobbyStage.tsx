@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { css, cx } from '@linaria/core';
 import { RoomListPanel } from '../../components/RoomListPanel';
+import { pillShape } from '../../components/pillStyles';
 import { useRoomList } from '../../hooks/useRoomList';
 import { inputStyle } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
@@ -30,12 +31,11 @@ import {
 import type { RoomConfig } from '../../../server/protocol';
 import type { GameMode } from '../../../engine/rules/types';
 
-/* ── 表单主按钮:与全站幽灵药丸体系同语言 ── */
-const formBtn = css`
-  border: 1px solid rgba(217, 180, 92, 0.55);
-  border-radius: 999px;
+/* ── 表单主按钮:与全站幽灵药丸体系同语言(形状基类见 components/pillStyles)──
+   实心金渐变主操作面;formBtnGhost 为其蓝系幽灵变体。 */
+const formBtnLook = css`
+  border-color: rgba(217, 180, 92, 0.55);
   padding: 10px 18px;
-  cursor: pointer;
   background: linear-gradient(rgba(240, 178, 60, 0.94), rgba(206, 138, 30, 0.94));
   color: #2b1c05;
   font-size: 14px;
@@ -45,7 +45,6 @@ const formBtn = css`
   box-shadow:
     inset 0 1px 0 rgba(255, 240, 200, 0.3),
     0 4px 14px rgba(206, 138, 30, 0.32);
-  transition: all 0.15s;
   &:hover {
     filter: brightness(1.07);
     transform: translateY(-1px);
@@ -56,6 +55,7 @@ const formBtn = css`
     transform: none;
   }
 `;
+const formBtn = `${pillShape} ${formBtnLook}`;
 const formBtnGhost = css`
   border-color: rgba(82, 150, 220, 0.55);
   background: rgba(52, 120, 200, 0.12);

@@ -25,7 +25,8 @@ import { GameViewComponent } from './GameView';
 import { GameResultOverlay } from './GameResultOverlay';
 import { DebugPerspectiveBar } from './DebugPerspectiveBar';
 import { DebugInfo } from './DebugInfo';
-import { pageStyle, errorToastStyle } from '../theme';
+import { pageStyle } from '../theme';
+import { ErrorToast } from '../pages/multiplayer/ErrorToast';
 import { css } from '@linaria/core';
 
 const connectingHint = css`
@@ -73,7 +74,7 @@ export function DebugLobby({ onExit: _onExit, initialRoomId }: DebugLobbyProps) 
         onJoin={c.handleJoinDebugRoom}
         onDelete={c.handleDeleteDebugRoom}
       />
-      {c.error && <div className={errorToastStyle}>{c.error}</div>}
+      {c.error && <ErrorToast message={c.error} />}
     </div>
   );
 }
@@ -290,9 +291,7 @@ function DebugGameViewInner({
           onDownloadReplay={handleDownloadReplay}
         />
       )}
-      {replayPending && (
-        <div className={errorToastStyle}>录像生成中，请稍后再试</div>
-      )}
+      {replayPending && <ErrorToast message="录像生成中，请稍后再试" />}
     </>
   );
 }

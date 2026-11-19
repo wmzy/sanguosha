@@ -28,7 +28,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { currentRequestType, defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
+import { currentRequestType, defineConfirmAction, engineCanPlayNowReason, firstTarget, requireRequestType } from '../util/skillRuntime';
 import { ownsCard, ownedCardIds } from '../util/player-query';
 import { isGuoseCard } from './国色';
 import { placeDelayedTrickTransform } from './_delayedTrickTransform';
@@ -124,10 +124,18 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const rt = currentRequestType(st, ownerId);
-      if (rt !== OPTION_RT && rt !== USE_RT && rt !== REMOVE_CARD_RT && rt !== REMOVE_TARGET_RT) {
-        return '当前不是界国色询问';
-      }
+      const check = requireRequestType(
+        st,
+        ownerId,
+        [OPTION_RT, USE_RT, REMOVE_CARD_RT, REMOVE_TARGET_RT],
+        {
+          mismatchError: '当前不是界国色询问',
+          noSlotError: '当前不是界国色询问',
+          wrongTypeError: '当前不是界国色询问',
+        },
+      );
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === OPTION_RT) return null; // confirm:任意 choice
 
       const self = st.players[ownerId];
@@ -139,9 +147,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (typeof cardId !== 'string') return '请选择一张方片牌';
         if (!ownsCard(self, cardId)) return '牌不在手牌或装备区';
         if (!isGuoseCard(st.cardMap[cardId])) return '需要一张方片牌';
-        const target =
-          (params.target as number | undefined) ??
-          (params.targets as number[] | undefined)?.[0];
+        const target = firstTarget(params);
         if (typeof target !== 'number') return '请选择目标';
         if (target === ownerId) return '不能对自己使用';
         if (!st.players[target]?.alive) return '目标不存在或已死亡';
@@ -177,12 +183,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         st.localVars[OPTION_KEY] = confirmed ? 'use' : 'remove';
       } else if (rt === USE_RT) {
         st.localVars[CARD_KEY] = params.cardId ?? null;
-        // 用 ?? (nullish) 而非 truthy 判断:target===0 是合法座次,
-        // truthy 写法会错误地 fall-through 到 targets[0](与上方 validate 不一致)
-        st.localVars[TARGET_KEY] =
-          (params.target) ??
-          (params.targets as number[] | undefined)?.[0] ??
-          null;
+        // 用 ?? (nullish) 判断:target===0 是合法座次,truthy 写法会错误地丢失座次 0
+        st.localVars[TARGET_KEY] = firstTarget(params) ?? null;
       } else if (rt === REMOVE_CARD_RT) {
         st.localVars[CARD_KEY] = params.cardId ?? null;
       } else if (rt === REMOVE_TARGET_RT) {
@@ -301,15 +303,9 @@ async function executeOptionRemove(st: GameState, ownerId: number): Promise<void
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineConfirmAction(api, 'use', {
     label: '界国色',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '界国色:选一项后摸一张牌',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '界国色:选一项后摸一张牌',
     activeWhen: (ctx) => {
       if (!activeUnlessUsedThisTurn('界国色')(ctx)) return false;
       // 至少有一张方片牌

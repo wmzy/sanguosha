@@ -26,7 +26,13 @@ import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { registerFlipSkipTurnHooks } from '../flows/face-down';
 import { skipPhase } from '../rules/skip-phase';
-import { defineConfirmAction, firstCardId, requireRequestType } from '../util/skillRuntime';
+import {
+  defineConfirmAction,
+  firstCardId,
+  firstTarget,
+  requireRequestType,
+} from '../util/skillRuntime';
+import { equipmentCardIds } from '../util/player-query';
 import {
   FLIP_TAG,
   SKIP_MO_TAG,
@@ -68,14 +74,7 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 取玩家装备区的所有 cardId */
-function equipCardIds(state: GameState, player: number): string[] {
-  const p = state.players[player];
-  if (!p) return [];
-  return Object.values(p.equipment).filter((id): id is string => !!id);
-}
-
-export function onInit(skill: Skill, state: GameState): () => void {
+export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // respond:处理所有 神速 相关的 confirm/target/equip 询问
@@ -95,9 +94,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt === OPT1_RT || rt === OPT2_RT || rt === OPT3_RT) {
         s.localVars[CONFIRMED_KEY] = params.choice === true;
       } else if (rt === TARGET_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? params.target : undefined);
+        const t = firstTarget(params);
         if (typeof t === 'number') s.localVars[TARGET_KEY] = t;
       } else if (rt === EQUIP_RT) {
         // 兼容 distribute/select 的 cardIds 数组与单 cardId
@@ -124,7 +121,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
       // 选项2:弃装备+跳过出牌(仅有装备时询问)
       let opt2 = false;
-      const equipCount = equipCardIds(ctx.state, ownerId).length;
+      const equipCount = equipmentCardIds(ctx.state.players[ownerId]).length;
       if (equipCount > 0) {
         opt2 = await askShensuConfirm(ctx.state, ownerId, OPT2_RT, '是否发动界神速②?(弃置一张装备牌,跳过出牌,视为出杀)');
       }
@@ -176,7 +173,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
           });
           const equipCardIdRaw = ctx.state.localVars[EQUIP_KEY] as string | undefined;
           delete ctx.state.localVars[EQUIP_KEY];
-          if (equipCardIdRaw && equipCardIds(ctx.state, ownerId).includes(equipCardIdRaw)) {
+          if (equipCardIdRaw && equipmentCardIds(ctx.state.players[ownerId]).includes(equipCardIdRaw)) {
             const target = await askShensuKillTarget(ctx.state, ownerId, TARGET_RT, '界神速②');
             if (typeof target === 'number' && ctx.state.players[target]?.alive) {
               await applyAtom(ctx.state, { type: '加标签', player: ownerId, tag: SKIP_PLAY_TAG });

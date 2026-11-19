@@ -240,15 +240,11 @@ export function createDimengSkill(opts: DimengOptions) {
   }
 
   function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-    api.defineAction('use', {
+    defineConfirmAction(api, 'use', {
       label: opts.displayName,
-      style: 'primary',
-      prompt: {
-        type: 'confirm',
-        title: '缔盟:选择两名其他角色交换手牌',
-        confirmLabel: '发动',
-        cancelLabel: '取消',
-      },
+      title: '缔盟:选择两名其他角色交换手牌',
+      confirmLabel: '发动',
+      cancelLabel: '取消',
       activeWhen: (ctx) => activeUnlessUsedThisTurn(opts.skillKey)(ctx),
     });
 

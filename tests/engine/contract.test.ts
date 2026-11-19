@@ -133,6 +133,7 @@ describe('技能声明注册表 meta', () => {
       '系统规则',
       '_guanxing',
       '_delayedTrickTransform',
+      '_equipReplace',
     ]);
     const loaderOwnedCards = new Set(['use-card', 'play-card']);
     const skillsDir = resolve(engineRoot, 'skills');

@@ -37,7 +37,6 @@
 // 命名:文件名/loader key/character skill name 均为 '界破军'(避开标破军冲突,标破军尚未实现);
 //   内部 Skill.name = '破军'(OL 官方技能名,玩家可见)。
 import type {
-  EquipSlot,
   FrontendAPI,
   GameState,
   HookResult,
@@ -50,7 +49,7 @@ import { pushFrame, popFrame } from '../core/frame';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
-import { totalCardCount, isSlashCardById, ownedCardIds } from '../util/player-query';
+import { totalCardCount, isSlashCardById, ownedCardIds, equipmentCardIds } from '../util/player-query';
 
 const SKILL_ID = '界破军';
 const DISPLAY_NAME = '破军';
@@ -84,11 +83,6 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 玩家装备区内的牌数 */
-function equipCount(p: { equipment: Partial<Record<EquipSlot, string>> }): number {
-  return Object.values(p.equipment).filter((id): id is string => !!id).length;
-}
-
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
@@ -117,9 +111,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (typeof promptTarget !== 'number') return '询问上下文异常';
       const targetPlayer = st.players[promptTarget];
       if (!targetPlayer) return '目标不存在';
-      const equipSet = new Set(
-        Object.values(targetPlayer.equipment).filter((id): id is string => !!id),
-      );
+      const equipSet = new Set(equipmentCardIds(targetPlayer));
       for (const id of cardIds) {
         if (typeof id !== 'string') return 'cardIds 必须为字符串数组';
         if (!targetPlayer.hand.includes(id) && !equipSet.has(id)) return '牌不在目标区域';
@@ -243,7 +235,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!targetPlayer || !selfPlayer) return;
       // 条件:target 手牌数 ≤ self 手牌数 且 target 装备数 ≤ self 装备数
       if (targetPlayer.hand.length > selfPlayer.hand.length) return;
-      if (equipCount(targetPlayer) > equipCount(selfPlayer)) return;
+      if (equipmentCardIds(targetPlayer).length > equipmentCardIds(selfPlayer).length) return;
       // 命中:伤害 +1
       const amount = typeof atom.amount === 'number' ? atom.amount : 0;
       return {

@@ -26,18 +26,15 @@
 //   对无懈自身跳过 cancel(反无懈)询问 → 无懈必然生效(不被反无懈)。
 //   询问抵消 close-reopen 循环:respond 设 已回应=true,无懈 resolve 设下层帧 cancelled=true →
 //   循环检测到已抵消即退出(无新窗口)。
-import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import {
-  blockedByOtherPending,
-  hasNullifyWindow,
   mountTransformAction,
   registerTransformAction,
-  type TransformActionOptions,
 } from '../util/skillRuntime';
 import { nullifyRespondValidate } from './cards/无懈可击';
-import { ownsCard } from '../util/player-query';
+import { createKanpoOptions } from './看破';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -48,54 +45,14 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-const OPTIONS: TransformActionOptions = {
-  outputName: '无懈可击',
-  // 界版"黑色牌"包括装备区:转化时先卸下到手牌再「当作」(工厂 includeEquipment 维度;
-  // rollback 还原槽位与武器距离 vars)
+// OPTIONS 由 看破.ts 的 createKanpoOptions 共享工厂生成(无懈窗口守卫/黑牌
+// cardFilter/activeWhen 前导与标版逐字共享);界版差异:黑色牌含装备区
+// (includeEquipment=true:ownsCard 持有判定 + 卸下维度 + activeWhen 装备黑牌检测)。
+const OPTIONS = createKanpoOptions({
+  name: '界看破',
+  selectTitle: '选择一张黑色牌(手牌或装备)当无懈可击使用',
   includeEquipment: true,
-  // 界看破不受自己回合限制(无懈可击任意时机可打),但需有无懈窗口且无其他阻塞
-  validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
-    const self = state.players[ownerId];
-    if (!self?.alive) return '玩家不存在或已死亡';
-    const cardId = params.cardId as string;
-    const cardIdOk = typeof cardId === 'string';
-    const card = cardIdOk ? state.cardMap[cardId] : undefined;
-    const owned = cardIdOk && ownsCard(self, cardId);
-    const isBlack = !!card && card.color === '黑';
-    // 必须存在无懈可击窗口(否则转化出的无懈无处使用)
-    const hasWindow = hasNullifyWindow(state, ownerId);
-    // 无其他阻塞型 pending(转化不应打断正在进行的结算);无懈窗口本身是当前响应目标,允许
-    const blockedByOther = blockedByOtherPending(state);
-    const ok = owned && isBlack && hasWindow && !blockedByOther;
-    return ok ? null : '现在不能使用界看破';
-  },
-  mount: {
-    label: '界看破',
-    style: 'passive',
-    prompt: {
-      type: 'useCard',
-      title: '选择一张黑色牌(手牌或装备)当无懈可击使用',
-      cardFilter: { filter: (c: Card) => c.color === '黑', min: 1, max: 1 },
-    },
-    activeWhen: (ctx) => {
-      const view = ctx.view;
-      const pending = view.pending;
-      if (!pending) return false;
-      // 无懈可击广播窗口:requestType='无懈可击'
-      const atom = pending.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应' || atom.requestType !== '无懈可击') return false;
-      const p = view.players[ctx.perspectiveIdx];
-      if (!p) return false;
-      // 界版:黑色牌包括手牌和装备区
-      const hasBlackInHand = p.hand?.some((c) => c.color === '黑') ?? false;
-      const hasBlackEquip = Object.values(p.equipment ?? {}).some((id) => {
-        const card = id ? ctx.view.cardMap[id] : undefined;
-        return card?.color === '黑';
-      });
-      return hasBlackInHand || hasBlackEquip;
-    },
-  },
-};
+});
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;

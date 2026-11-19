@@ -8,8 +8,8 @@
 //
 // 关键点:
 //   - 装备 atom 的 validate 要求 cardId 在目标手牌中,故先把装备牌移动牌到目标手牌再装备。
-//   - 装备到"他人"而非自己:不能复用 装备通用.use(它绑定 ownerId),这里手动复刻
-//     装备通用的 装备+添加技能 序列(目标=target)。
+//   - 装备到"他人"而非自己:不能复用 装备通用.use(它绑定 ownerId),这里经共享
+//     _equipReplace.equipReplacingOld 复刻 装备通用 的 替换/装备+添加技能 序列(目标=target)。
 //   - 无次数限制。
 //
 // 本文件同时导出 createZhijianSkill 工厂(直谏族共享实现),界直谏 复用之,
@@ -18,7 +18,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction } from '../core/skill';
-import { hasSkillModule } from './registry';
+import { equipReplacingOld } from './_equipReplace';
 import { slotOf } from '../util/equip-slot';
 import { engineCanPlayNowReason } from '../util/skillRuntime';
 
@@ -107,31 +107,11 @@ export function createZhijianSkill(opts: ZhijianOptions) {
             from: { zone: '手牌', player: ownerId },
             to: { zone: '手牌', player: target },
           });
-          // 2. 界版:若目标对应栏位已有装备 → 替换:移除旧装备技能 → 卸下 → 旧装备入弃牌堆
-          //    (与 装备通用 替换语义一致;会触发目标"失去装备"类技能如枭姬,属预期)
-          if (opts.allowReplace) {
-            const slot = slotOf(card)!;
-            const currentEquip = st.players[target].equipment[slot];
-            if (currentEquip) {
-              const oldCard = st.cardMap[currentEquip];
-              if (oldCard?.name && hasSkillModule(oldCard.name)) {
-                await applyAtom(st, { type: '移除技能', player: target, skillId: oldCard.name });
-              }
-              await applyAtom(st, { type: '卸下', player: target, slot });
-              await applyAtom(st, {
-                type: '移动牌',
-                cardId: currentEquip,
-                from: { zone: '手牌', player: target },
-                to: { zone: '弃牌堆' },
-              });
-            }
-          }
-          // 3. 装备到目标(从目标手牌移入目标装备区)
-          await applyAtom(st, { type: '装备', player: target, cardId });
-          // 4. 若装备自带技能(以 card.name 作 skillId),动态挂载(与 装备通用 一致)
-          if (card?.name && hasSkillModule(card.name)) {
-            await applyAtom(st, { type: '添加技能', player: target, skillId: card.name });
-          }
+          // 2. 界版:目标对应栏位已有装备则替换(与 装备通用 替换语义一致;会触发目标
+          //    "失去装备"类技能如枭姬,属预期)。标版 validate 已保证栏位为空,替换分支不触发。
+          // 3. 装备到目标(从目标手牌移入目标装备区)。
+          // 4. 若装备自带技能(以 card.name 作 skillId),动态挂载(与 装备通用 一致)。
+          await equipReplacingOld(st, target, slotOf(card)!, cardId);
           // 5. 摸一张牌
           await applyAtom(st, { type: '摸牌', player: ownerId, count: 1 });
           await popFrame(st);

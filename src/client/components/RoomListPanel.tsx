@@ -2,59 +2,16 @@ import { memo, useState } from 'react';
 import { css, cx } from '@linaria/core';
 import type { RoomInfo } from '../../server/protocol';
 import { colors, panelCard } from '../theme';
+import { ghostPill, ghostPillGold, ghostPillBlue, ghostPillRed } from './pillStyles';
 
-/* ── 房间操作按钮:幽灵药丸体系(与游戏内顶栏同语言)──
+/* ── 房间操作按钮:幽灵药丸体系(基类与金/蓝/红变体见 pillStyles,与游戏内顶栏同语言)──
    形状/字号一致,以色相区分语义:中性(刷新)/金(加入=主操作)/蓝(旁观)/红(删除)。 */
-const btnGhost = css`
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
+const btnGhostSize = css`
   padding: 7px 16px;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.03);
-  color: #cfcabb;
   font-size: 13px;
-  line-height: 1.5;
   white-space: nowrap;
-  transition: all 0.15s;
-  &:hover {
-    border-color: rgba(217, 180, 92, 0.65);
-    color: #ecd9a8;
-    background: rgba(217, 180, 92, 0.08);
-  }
-  &:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
 `;
-const btnGhostGold = css`
-  border-color: rgba(217, 180, 92, 0.55);
-  color: #ecd9a8;
-  background: rgba(217, 180, 92, 0.1);
-  &:hover {
-    border-color: rgba(240, 205, 120, 0.85);
-    background: rgba(217, 180, 92, 0.18);
-  }
-`;
-const btnGhostBlue = css`
-  border-color: rgba(82, 150, 220, 0.55);
-  color: #7db8e8;
-  background: rgba(52, 120, 200, 0.12);
-  &:hover {
-    border-color: rgba(120, 180, 240, 0.8);
-    color: #a5ccf0;
-    background: rgba(52, 120, 200, 0.22);
-  }
-`;
-const btnGhostRed = css`
-  border-color: rgba(231, 76, 60, 0.5);
-  color: #e89a8d;
-  background: rgba(231, 76, 60, 0.1);
-  &:hover {
-    border-color: rgba(240, 120, 100, 0.75);
-    color: #f4b8ad;
-    background: rgba(231, 76, 60, 0.2);
-  }
-`;
+const btnGhost = `${ghostPill} ${btnGhostSize}`;
 
 interface RoomListPanelProps {
   rooms: RoomInfo[];
@@ -297,7 +254,7 @@ export const RoomListPanel = memo(
                       <button
                         onClick={() => handleJoinClick(room.id)}
                         disabled={joiningId === room.id}
-                        className={cx(btnGhost, btnGhostGold)}
+                        className={cx(btnGhost, ghostPillGold)}
                       >
                         进入
                       </button>
@@ -306,12 +263,12 @@ export const RoomListPanel = memo(
                         <button
                           onClick={() => handleJoinClick(room.id)}
                           disabled={!isJoinable(room) || joiningId === room.id}
-                          className={cx(btnGhost, btnGhostGold)}
+                          className={cx(btnGhost, ghostPillGold)}
                         >
                           {joiningId === room.id ? '加入中…' : '加入'}
                         </button>
                         {onSpectate && (
-                          <button onClick={() => onSpectate(room.id)} className={cx(btnGhost, btnGhostBlue)}>
+                          <button onClick={() => onSpectate(room.id)} className={cx(btnGhost, ghostPillBlue)}>
                             旁观
                           </button>
                         )}
@@ -320,7 +277,7 @@ export const RoomListPanel = memo(
                     {/* 普通房间只有房主能删（服务端同样校验）；非房主点删除只会收到
                         「只有房主可以删除房间」的静默失败，徒增困惑。debug 房间保留全员删除。 */}
                     {onDelete && (isMyRoom === true || allowJoinAlways) && (
-                      <button onClick={() => onDelete(room.id)} className={cx(btnGhost, btnGhostRed)}>
+                      <button onClick={() => onDelete(room.id)} className={cx(btnGhost, ghostPillRed)}>
                         删除
                       </button>
                     )}

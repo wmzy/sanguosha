@@ -6,6 +6,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction } from '../core/skill';
+import { defineConfirmAction } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -48,13 +49,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): () => void {
-  api.defineAction('use', {
+  defineConfirmAction(api, 'use', {
     label: '苦肉',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '苦肉：失去1点体力，然后摸两张牌',
-    },
+    title: '苦肉：失去1点体力，然后摸两张牌',
     activeWhen: (ctx) =>
       defaultPlayActive(ctx) &&
       (ctx.view.players[ctx.perspectiveIdx]?.health ?? 0) > 0,

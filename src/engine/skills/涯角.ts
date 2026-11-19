@@ -24,7 +24,7 @@ import { peekTop } from '../core/deck';
 import { inAttackRange } from '../rules/distance';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 /** localVars keys */
 const CONFIRMED_KEY = '涯角/confirmed';
@@ -55,9 +55,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>) => {
-      const rt = currentRequestType(st, ownerId);
-      if (rt !== CONFIRM_RT && rt !== TARGET_RT && rt !== DISCARD_RT)
-        return '当前不是涯角询问';
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, TARGET_RT, DISCARD_RT], {
+        noSlotError: '当前不是涯角询问',
+        wrongTypeError: '当前不是涯角询问',
+        mismatchError: '当前不是涯角询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       // DISCARD_RT = pickTargetCard 选牌面板(由 runPickTargetCardPanel 发起):
       //   需 zone + 对应 cardId/handIndex(与界刚烈/过河拆桥选牌一致)
       if (rt === DISCARD_RT) {

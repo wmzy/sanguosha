@@ -6,6 +6,7 @@
 
 import type { Card } from '../../types';
 import { createPickPanelResolve, createPickPanelRespond } from './_pickPanel';
+import { hasObtainableCards } from '../../util/player-query';
 import type { CardEffect } from '../../types';
 
 const PICK_REQUEST_TYPE = '过河拆桥_选牌';
@@ -24,9 +25,7 @@ function canUseDismantle(
     const p = state.players[t];
     if (!p) return '目标不合法';
     // 仅检查目标是否有牌(手牌/装备/判定区);装备保护由界奇才 before-hook 在选牌面板拦截
-    const hasCards =
-      p.hand.length > 0 || Object.keys(p.equipment).length > 0 || p.pendingTricks.length > 0;
-    if (!hasCards) return '目标无可弃置的牌';
+    if (!hasObtainableCards(p)) return '目标无可弃置的牌';
   }
   return null;
 }

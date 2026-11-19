@@ -1,5 +1,7 @@
 // src/client/pages/multiplayer/RoomConfigSection.tsx
 // 等待大厅「房间配置」区块:房主可编辑表单(逐字段 onBlur/onChange 提交)与非房主只读 configGrid 两分支。
+// 房间名/将池/倒计时/手牌数走公共字段组件(RoomConfigFields,与调试面板共用);
+// 游戏模式/玩家数量为本页专有,留在本地。
 // editConfig 由 WaitingStage 持有传入;字段修改走 onFieldChange,提交服务端走 onCommit(= mp.updateConfig)。
 import { inputStyle } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
@@ -12,12 +14,16 @@ import {
   configVal,
   GAME_MODE_OPTIONS,
   GAME_MODE_LABELS,
-  POOL_OPTIONS,
   POOL_LABELS,
-  TIMEOUT_OPTIONS,
   timeoutLabel,
 } from './multiplayerStyles';
-import type { RoomConfig, CharPoolPreset } from '../../../server/protocol';
+import {
+  RoomNameField,
+  RoomCharPoolField,
+  RoomTimeoutField,
+  RoomHandSizeField,
+} from './RoomConfigFields';
+import type { RoomConfig } from '../../../server/protocol';
 import type { GameMode } from '../../../engine/rules/types';
 
 interface RoomConfigSectionProps {
@@ -38,14 +44,12 @@ export function RoomConfigSection({ editConfig, onFieldChange, onCommit }: RoomC
       {mp.isHost && editConfig ? (
         <>
           <div className={formRow} style={{ marginBottom: '14px' }}>
-            <label className={label}>房间名称</label>
-            <input
-              className={inputStyle}
-              type="text"
-              value={editConfig.name}
-              maxLength={40}
-              onChange={(e) => onFieldChange('name', e.target.value)}
-              onBlur={() => onCommit(editConfig)}
+            <RoomNameField
+              config={editConfig}
+              onFieldChange={onFieldChange}
+              onCommit={(_field, next) => onCommit(next)}
+              labelCls={label}
+              inputCls={inputStyle}
             />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
@@ -70,57 +74,31 @@ export function RoomConfigSection({ editConfig, onFieldChange, onCommit }: RoomC
               </select>
             </div>
             <div>
-              <label className={label}>将池</label>
-              <select
-                className={inputStyle}
-                value={editConfig.charPool}
-                onChange={(e) => {
-                  const v = e.target.value as CharPoolPreset;
-                  onFieldChange('charPool', v);
-                  onCommit({ ...editConfig, charPool: v });
-                }}
-              >
-                {POOL_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+              <RoomCharPoolField
+                config={editConfig}
+                onFieldChange={onFieldChange}
+                onCommit={(_field, next) => onCommit(next)}
+                labelCls={label}
+                inputCls={inputStyle}
+              />
             </div>
             <div>
-              <label className={label}>操作倒计时</label>
-              <select
-                className={inputStyle}
-                value={editConfig.timeoutSec}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  onFieldChange('timeoutSec', v);
-                  onCommit({ ...editConfig, timeoutSec: v });
-                }}
-              >
-                {TIMEOUT_OPTIONS.map((o) => (
-                  <option key={o.label} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-                {!TIMEOUT_OPTIONS.some((o) => o.value === editConfig.timeoutSec) && (
-                  <option value={editConfig.timeoutSec}>
-                    {timeoutLabel(editConfig.timeoutSec)}
-                  </option>
-                )}
-              </select>
+              <RoomTimeoutField
+                config={editConfig}
+                onFieldChange={onFieldChange}
+                onCommit={(_field, next) => onCommit(next)}
+                labelCls={label}
+                inputCls={inputStyle}
+              />
             </div>
           </div>
           <div className={formRow} style={{ marginBottom: '14px' }}>
-            <label className={label}>初始手牌</label>
-            <input
-              className={inputStyle}
-              type="number"
-              min={0}
-              max={10}
-              value={editConfig.handSize}
-              onChange={(e) => onFieldChange('handSize', Number(e.target.value))}
-              onBlur={() => onCommit(editConfig)}
+            <RoomHandSizeField
+              config={editConfig}
+              onFieldChange={onFieldChange}
+              onCommit={(_field, next) => onCommit(next)}
+              labelCls={label}
+              inputCls={inputStyle}
             />
           </div>
           <div className={formRow} style={{ marginBottom: '14px' }}>

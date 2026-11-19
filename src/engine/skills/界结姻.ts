@@ -34,7 +34,7 @@
 //   - distribute prompt 的 source='handAndEquip' 让前端把手牌+装备区都纳入候选;
 //     filter/targetFilter 是函数不可跨进程序列化,但主动技 distribute 的候选由前端
 //     resolveDistributeCardIds 就地计算,无需投影层注入。
-import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { getHealthValue } from '../types';
 import type { GameView } from '../types';
 import { applyAtom } from '../core/apply'
@@ -42,11 +42,12 @@ import { popFrame, pushFrame } from '../core/frame';
 import { markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import { getGender } from '../data/character-meta';
+import { equipReplacingOld } from './_equipReplace';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
-import { EQUIP_SLOTS, slotOf } from '../util/equip-slot';
+import { slotOf } from '../util/equip-slot';
 import { engineCanPlayNowReason } from '../util/skillRuntime';
-import { isMaleAlive } from '../util/player-query';
+import { isMaleAlive, equipSlotOf } from '../util/player-query';
 
 const SKILL_NAME = '界结姻';
 const USED_KEY = `${SKILL_NAME}/usedThisTurn`;
@@ -59,15 +60,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '出牌阶段限一次:选一名男性角色,弃一张手牌或置一张装备牌入其装备区,体力大者摸1张,小者回1点',
   };
-}
-
-/** cardId 是否在 owner 装备区,返回所在栏位;不在返回 null。 */
-function findEquipSlot(state: GameState, player: number, cardId: string): EquipSlot | null {
-  const eq = state.players[player]?.equipment ?? {};
-  for (const slot of EQUIP_SLOTS) {
-    if (eq[slot] === cardId) return slot;
-  }
-  return null;
 }
 
 /** 从 params 规范化出 { cardId, target }。
@@ -122,7 +114,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
       // 牌必须在 owner 手牌或装备区
       const inHand = self.hand.includes(cardId);
-      const ownerSlot = findEquipSlot(st, ownerId, cardId);
+      const ownerSlot = equipSlotOf(st.players[ownerId], cardId);
       if (!inHand && ownerSlot === null) return '牌不在手牌或装备区';
 
       // 装备区来的牌必为装备牌(装备区只放装备),代价 B 必有合法栏位
@@ -149,7 +141,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           const slot = slotOf(card)!;
 
           // 若装备来自 owner 装备区:先卸下(牌回 owner 手牌)+ 移除其技能
-          const ownerSlot = findEquipSlot(st, from, cardId);
+          const ownerSlot = equipSlotOf(st.players[from], cardId);
           if (ownerSlot !== null) {
             if (card?.name && hasSkillModule(card.name)) {
               await applyAtom(st, { type: '移除技能', player: from, skillId: card.name });
@@ -164,26 +156,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
             to: { zone: '手牌', player: target },
           });
 
-          // 替换目标同栏位旧装备
-          const currentEquip = st.players[target].equipment[slot];
-          if (currentEquip) {
-            const oldCard = st.cardMap[currentEquip];
-            if (oldCard?.name && hasSkillModule(oldCard.name)) {
-              await applyAtom(st, { type: '移除技能', player: target, skillId: oldCard.name });
-            }
-            await applyAtom(st, { type: '卸下', player: target, slot });
-            await applyAtom(st, {
-              type: '移动牌',
-              cardId: currentEquip,
-              from: { zone: '手牌', player: target },
-              to: { zone: '弃牌堆' },
-            });
-          }
-
-          await applyAtom(st, { type: '装备', player: target, cardId });
-          if (card?.name && hasSkillModule(card.name)) {
-            await applyAtom(st, { type: '添加技能', player: target, skillId: card.name });
-          }
+          // 替换目标同栏位旧装备 + 装备 + 挂载自带技能(与 装备通用 对齐)
+          await equipReplacingOld(st, target, slot, cardId);
         } else {
           // ── 代价 A:弃置一张手牌 ──
           await applyAtom(st, { type: '弃置', player: from, cardIds: [cardId], voluntary: true });

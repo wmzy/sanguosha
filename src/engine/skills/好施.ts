@@ -34,6 +34,7 @@ import type { SkillModule } from '../types';
 import {
   askConfirm,
   defineConfirmAction,
+  firstTarget,
   requireRequestType,
   currentRequestType,
 } from '../util/skillRuntime';
@@ -239,9 +240,7 @@ export function applyHaoshiDrawRespond(
     return true;
   }
   if (rt === CHOOSE_TARGET_RT) {
-    const t =
-      (params.targets as number[] | undefined)?.[0] ??
-      (typeof params.target === 'number' ? params.target : undefined);
+    const t = firstTarget(params);
     if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
     return true;
   }

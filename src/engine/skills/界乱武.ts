@@ -24,7 +24,7 @@ import type { FrontendAPI, GameState, GameView, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { defaultPlayActive } from '../rules/action-active';
-import { registerRespondForAllSeats, currentRequestType } from '../util/skillRuntime';
+import { registerRespondForAllSeats, currentRequestType, firstTarget, defineConfirmAction } from '../util/skillRuntime';
 import { runVirtualSlash } from './cards/_virtualSlash';
 import { registerAction } from '../core/skill';
 import { canSlash } from '../rules/slash-quota';
@@ -121,9 +121,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       (st, seat, params) => {
         if (currentRequestType(st, seat) === FINAL_TARGET_RT) {
           // 最终杀目标:仅需 target(任意存活其他角色,无距离限制)
-          const t =
-            (params.targets as number[] | undefined)?.[0] ??
-            (typeof params.target === 'number' ? params.target : undefined);
+          const t = firstTarget(params);
           if (typeof t !== 'number') return '请选择目标';
           if (t === seat) return '不能以自己为目标';
           if (!st.players[t]?.alive) return '目标不存在或已死亡';
@@ -133,9 +131,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       },
       async (st, seat, params) => {
         if (currentRequestType(st, seat) === FINAL_TARGET_RT) {
-          const t =
-            (params.targets as number[] | undefined)?.[0] ??
-            (typeof params.target === 'number' ? params.target : undefined);
+          const t = firstTarget(params);
           if (typeof t === 'number') st.localVars[FINAL_TARGET_VAR] = t;
           return;
         }
@@ -150,13 +146,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineConfirmAction(api, 'use', {
     label: '乱武',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '乱武(限定技):令所有其他角色依次对距离最近者出杀,无法如此做者失去1点体力;结算后可视为使用一张无距离限制的【杀】',
-    },
+    title: '乱武(限定技):令所有其他角色依次对距离最近者出杀,无法如此做者失去1点体力;结算后可视为使用一张无距离限制的【杀】',
     activeWhen: (ctx) => defaultPlayActive(ctx),
   });
   // respond:被乱武问询的角色选杀+最近目标 / 贾诩选最终杀目标。前端按 pending prompt 渲染。

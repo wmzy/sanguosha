@@ -23,7 +23,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, firstTarget, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '罪论';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -75,15 +75,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const rt = currentRequestType(st, ownerId);
-      if (rt !== CONFIRM_RT && rt !== PICK_RT && rt !== CHOOSE_TARGET_RT) {
-        return '当前不是罪论询问';
-      }
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, PICK_RT, CHOOSE_TARGET_RT], {
+        mismatchError: '当前不是罪论询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === CONFIRM_RT) return null; // confirm:任意 choice 均可
 
       if (rt === CHOOSE_TARGET_RT) {
         // chooseTarget:需提供一名其他存活角色
-        const tgt = (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0];
+        const tgt = firstTarget(params);
         if (typeof tgt !== 'number') return '请选择一名其他角色';
         if (tgt === ownerId) return '不能选择自己';
         if (!st.players[tgt]?.alive) return '目标已死亡';
@@ -116,7 +117,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           topOrder: params.topOrder ?? [],
         };
       } else if (rt === CHOOSE_TARGET_RT) {
-        const tgt = (params.target as number | undefined) ?? (params.targets as number[] | undefined)?.[0];
+        const tgt = firstTarget(params);
         if (typeof tgt === 'number') st.localVars[TARGET_KEY] = tgt;
       }
     },

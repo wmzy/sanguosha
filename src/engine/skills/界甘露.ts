@@ -40,8 +40,9 @@ import {
 } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import { hasSkillModule } from './registry';
+import { equipReplacingOld } from './_equipReplace';
 import type { SkillModule } from '../types';
-import { requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
+import { requireRequestType, engineCanPlayNowReason, defineConfirmAction } from '../util/skillRuntime';
 import { lostHealth } from '../util/player-query';
 import { EQUIP_SLOTS } from '../util/equip-slot';
 
@@ -74,16 +75,6 @@ async function unloadSkillAt(state: GameState, idx: number, slot: EquipSlot): Pr
   }
 }
 
-/** 把指定 cardId 装备到 idx 的对应 slot,并挂载自带技能(若有)。
- *  cardId 必须已在 idx 的手牌中(由先前 卸下 + 移动牌 完成)。 */
-async function equipWithSkill(state: GameState, idx: number, cardId: string): Promise<void> {
-  await applyAtom(state, { type: '装备', player: idx, cardId });
-  const card = state.cardMap[cardId];
-  if (card?.name && hasSkillModule(card.name)) {
-    await applyAtom(state, { type: '添加技能', player: idx, skillId: card.name });
-  }
-}
-
 /** 交换 A、B 的装备区:对每个 slot,先卸下双方该 slot,再把对方的装到自己。
  *  对每个 slot 独立处理(无跨 slot 依赖)。 */
 async function swapEquipment(state: GameState, A: number, B: number): Promise<void> {
@@ -103,6 +94,7 @@ async function swapEquipment(state: GameState, A: number, B: number): Promise<vo
 
     // 阶段 3:把对方原装备移到自己手牌 → 装备 → 挂载技能。
     //   aCard 现在在 A 手牌中,要装到 B;bCard 现在在 B 手牌中,要装到 A。
+    //   双方该 slot 已在阶段 2 卸下,equipReplacingOld 的替换分支天然不触发。
     if (aCard) {
       await applyAtom(state, {
         type: '移动牌',
@@ -110,7 +102,7 @@ async function swapEquipment(state: GameState, A: number, B: number): Promise<vo
         from: { zone: '手牌', player: A },
         to: { zone: '手牌', player: B },
       });
-      await equipWithSkill(state, B, aCard);
+      await equipReplacingOld(state, B, slot, aCard);
     }
     if (bCard) {
       await applyAtom(state, {
@@ -119,7 +111,7 @@ async function swapEquipment(state: GameState, A: number, B: number): Promise<vo
         from: { zone: '手牌', player: B },
         to: { zone: '手牌', player: A },
       });
-      await equipWithSkill(state, A, bCard);
+      await equipReplacingOld(state, A, slot, bCard);
     }
   }
 }
@@ -299,15 +291,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineConfirmAction(api, 'use', {
     label: DISPLAY_NAME,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '甘露',
-      description: '令两名角色交换装备区里的牌(若装备数差>已损失体力值,须弃等量牌)',
-      confirmLabel: '发动',
-    },
+    title: '甘露',
+    description: '令两名角色交换装备区里的牌(若装备数差>已损失体力值,须弃等量牌)',
     activeWhen: (ctx) => activeUnlessUsedThisTurn(SKILL_NAME)(ctx),
   });
   return () => {};

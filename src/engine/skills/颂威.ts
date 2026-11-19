@@ -12,7 +12,7 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '颂威/confirm';
 const CONFIRMED_KEY = '颂威/confirmed';
@@ -74,15 +74,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '颂威',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '颂威:是否摸一张牌?',
-      confirmLabel: '摸牌',
-      cancelLabel: '不摸',
-    },
+    title: '颂威:是否摸一张牌?',
+    confirmLabel: '摸牌',
+    cancelLabel: '不摸',
   });
 }
 

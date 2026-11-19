@@ -31,7 +31,7 @@ import { runDamageFlow } from '../flows/damage';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, defineConfirmAction, normalizeCardIds, registerOnDamagedAsTarget, engineCanPlayNowReason } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, firstTarget, normalizeCardIds, registerOnDamagedAsTarget, engineCanPlayNowReason } from '../util/skillRuntime';
 import { SHENSHI_STATE_VIEW_KEY } from '../rules/vars-keys';
 import { createYinYangState } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
@@ -121,9 +121,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return null;
       }
       if (rt === YANG_DEATH_TARGET_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? params.target : undefined);
+        const t = firstTarget(params);
         if (typeof t !== 'number') return '需要指定一名角色';
         if (!st.players[t]?.alive) return '目标不合法';
         return null;
@@ -142,9 +140,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         st.localVars[YANG_DEATH_CONFIRMED_KEY] =
           params.choice === true || params.confirmed === true;
       } else if (rt === YANG_DEATH_TARGET_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? params.target : undefined);
+        const t = firstTarget(params);
         if (typeof t === 'number') st.localVars[YANG_DEATH_TARGET_KEY] = t;
       }
     },

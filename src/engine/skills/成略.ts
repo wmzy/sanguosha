@@ -41,7 +41,7 @@ import {
 } from '../core/skill';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
-import { engineCanPlayNowReason } from '../util/skillRuntime';
+import { defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
 import {
   registerSlashExemptor,
 } from '../rules/slash-quota';
@@ -260,15 +260,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineConfirmAction(api, 'use', {
     label: SKILL_ID,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '发动成略(摸牌并弃置手牌,本阶段同花色牌无距离和次数限制)',
-      confirmLabel: '发动',
-      cancelLabel: '取消',
-    },
+    title: '发动成略(摸牌并弃置手牌,本阶段同花色牌无距离和次数限制)',
+    confirmLabel: '发动',
+    cancelLabel: '取消',
     activeWhen: (ctx) => {
       if (!activeUnlessUsedThisTurn(SKILL_ID)(ctx)) return false;
       // 阳 需至少 1 张手牌(摸1弃2)

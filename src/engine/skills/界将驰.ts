@@ -50,7 +50,7 @@ import type { SkillModule } from '../types';
 import { getHandLimitBonus, JIANGCHI_CHOICE2_VIEW_KEY } from '../rules/vars-keys';
 import { projectSlashExtra, projectSlashBlocked } from '../rules/slash-quota';
 import { projectTurnUsage } from '../rules/turn-usage';
-import { askConfirm, currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界将驰';
 const DISPLAY_NAME = '将驰';
@@ -130,13 +130,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     'respond',
-    (s) => {
-      const rt = currentRequestType(s, ownerId);
-      if (rt !== ACTIVATE_RT && rt !== CHOOSE_RT && rt !== PICK_RT) {
-        return '当前不是将驰询问';
-      }
-      return null;
-    },
+    (s) =>
+      requireRequestType(s, ownerId, [ACTIVATE_RT, CHOOSE_RT, PICK_RT], {
+        mismatchError: '当前不是将驰询问',
+      }).error,
     async (s, params) => {
       const rt = currentRequestType(s, ownerId);
       if (rt === ACTIVATE_RT) {

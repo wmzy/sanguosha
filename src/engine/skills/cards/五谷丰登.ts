@@ -13,20 +13,7 @@ import { frameCards } from '../../core/frame';
 import { peekTop } from '../../core/deck';
 import type { CardEffect, ResolveCtx } from '../../types';
 import { requireRequestType } from '../../util/skillRuntime';
-
-/** 从使用者开始,按逆时针旋转的所有存活玩家 */
-function alivePlayersFrom(state: import('../../types').GameState, from: number): number[] {
-  const alive = state.players.filter((p) => p.alive);
-  const n = alive.length;
-  if (n === 0) return [];
-  const fromPos = alive.findIndex((p) => p.index === from);
-  if (fromPos < 0) return alive.map((p) => p.index);
-  const result: number[] = [];
-  for (let i = 0; i < n; i++) {
-    result.push(alive[(fromPos - i + n) % n].index);
-  }
-  return result;
-}
+import { alivePlayersClockwiseFrom } from '../../util/player-query';
 
 /** 选牌面板：弹 pickProcessingCard pending，超时兜底选候选列表第一张 */
 async function runPickProcessingCard(
@@ -89,7 +76,7 @@ async function resolveBountifulHarvest(ctx: ResolveCtx): Promise<void> {
   // 仅首次调用时翻牌：将 X 张牌从牌堆移到处理区
   if (!state.localVars['五谷丰登/已翻牌']) {
     state.localVars['五谷丰登/已翻牌'] = true;
-    const allTargets = alivePlayersFrom(state, source);
+    const allTargets = alivePlayersClockwiseFrom(state, source);
     const cardCount = allTargets.length;
     const revealedIds: string[] = [];
     for (let i = 0; i < cardCount; i++) {

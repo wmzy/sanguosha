@@ -41,7 +41,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
-import { askConfirm, engineCanPlayNow } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, engineCanPlayNow } from '../util/skillRuntime';
 import { getHunziAwakened } from '../rules/vars-keys';
 import { askRankCard, getCardValue } from '../flows/rank';
 
@@ -343,15 +343,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   // 孙策的回应 action(拒绝/选拼点牌/获得确认)。盟友的主动拼点 action 由后端
   // validate 处理(GameView 不暴露 faction,activeWhen 仅做能力范围内的 UI 过滤)。
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '制霸',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '制霸',
-      confirmLabel: '确认',
-      cancelLabel: '取消',
-    },
+    title: '制霸',
+    confirmLabel: '确认',
+    cancelLabel: '取消',
   });
   return undefined;
 }

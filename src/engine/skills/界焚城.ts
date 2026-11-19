@@ -42,7 +42,7 @@ import { runDamageFlow } from '../flows/damage';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, engineCanPlayNowReason, registerRespondForAllSeats } from '../util/skillRuntime';
+import { requireRequestType, engineCanPlayNowReason, registerRespondForAllSeats, defineConfirmAction } from '../util/skillRuntime';
 
 const SKILL_ID = '界焚城';
 const DISPLAY_NAME = '焚城';
@@ -268,23 +268,17 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineConfirmAction(api, 'use', {
     label: DISPLAY_NAME,
     style: 'danger',
-    prompt: {
-      type: 'confirm',
-      title: '焚城(限定技):选一名其他角色开始,所有其他角色依次弃比上家多的牌或受2点火焰伤害',
-    },
+    title: '焚城(限定技):选一名其他角色开始,所有其他角色依次弃比上家多的牌或受2点火焰伤害',
     activeWhen: (ctx) => defaultPlayActive(ctx),
   });
   // respond:目标按 pending prompt 渲染(choosePlayer/confirm/distribute 三种轮转)
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'danger',
-    prompt: {
-      type: 'confirm',
-      title: '焚城:选择一项',
-    },
+    title: '焚城:选择一项',
   });
   return undefined;
 }

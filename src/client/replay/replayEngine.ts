@@ -4,6 +4,7 @@
 // 回放也用 applyView 逐条重放。
 
 import { viewReducer } from '../view/reducer';
+import { shouldClearPending, syncDeadline, cloneViewForMutation } from '../utils/viewMaintenance';
 import type { Card, GameView } from '../../engine/types';
 import type { ReplayBaseline, ReplayFile, SeatDelta } from './types';
 
@@ -13,9 +14,10 @@ export function totalSteps(delta: SeatDelta | undefined): number {
 }
 
 /** 合并 baseline + seatDelta,重建该座次的完整 initialView。
- *  深拷贝 baseline,回填 viewer/手牌/身份,返回独立副本(避免污染录像原始数据)。 */
+ *  防御性拷贝 baseline(手写嵌套拷贝,覆盖 viewReducer 的全部原地突变点,见
+ *  cloneViewForMutation),回填 viewer/手牌/身份,返回独立副本(避免污染录像原始数据)。 */
 function reconstructInitialView(baseline: ReplayBaseline, delta: SeatDelta): GameView {
-  const view: GameView = JSON.parse(JSON.stringify(baseline)) as GameView;
+  const view: GameView = cloneViewForMutation(baseline as GameView);
   view.viewer = delta.viewer;
   // 回填私有手牌 + 身份可见性。
   // 手牌必须复制数组本体:viewReducer 会原地 push/splice view.players 的 hand,
@@ -38,8 +40,7 @@ function reconstructInitialView(baseline: ReplayBaseline, delta: SeatDelta): Gam
   });
   view.pending = delta.pending === undefined ? view.pending : delta.pending;
   if (view.pending) {
-    view.deadline = view.pending.deadline ?? null;
-    view.deadlineTotalMs = view.pending.totalMs ?? 0;
+    syncDeadline(view, view.pending);
   }
   return view;
 }
@@ -62,19 +63,14 @@ export function getViewAt(file: ReplayFile, seat: number, step: number): GameVie
     if (type === 'pendingChanged') {
       const pending = (event as unknown as { pending: GameView['pending'] }).pending ?? null;
       view.pending = pending;
-      view.deadline = pending?.deadline ?? null;
-      view.deadlineTotalMs = pending?.totalMs ?? 0;
+      syncDeadline(view, pending);
       continue;
     }
     if (type === 'notify') {
       if ((event.eventType as string) === 'pendingResolved') {
         const target = (event.data as { target?: number } | undefined)?.target;
-        if (target !== undefined) {
-          // 宽松清除:target<0(系统)、target===viewer(前端逻辑)、
-          // 或 pending.target===target(harness 逻辑)任一满足即清
-          if (target < 0 || target === view.viewer || view.pending?.target === target) {
-            view.pending = null;
-          }
+        if (target !== undefined && shouldClearPending(view.pending, target, view.viewer)) {
+          view.pending = null;
         }
       }
       continue;

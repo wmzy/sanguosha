@@ -27,12 +27,13 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
-import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
+import { registerAction, registerAfterHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 import {
   askConfirm,
   requireRequestType,
   registerPhaseStartHook,
+  registerDamageBonusHook,
   defineConfirmAction,
 } from '../util/skillRuntime';
 
@@ -201,29 +202,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     { requireCurrentPlayer: true },
   );
 
-  // ── 造成伤害 before hook:杀/决斗伤害 +1 ──
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '造成伤害时',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.source !== ownerId) return;
-      if ((atom.amount ?? 0) <= 0) return;
-      const self = ctx.state.players[ownerId];
-      if (!self?.tags.includes(BONUS_TAG)) return;
-      const cardId = atom.cardId;
-      if (typeof cardId !== 'string') return;
-      const card = ctx.state.cardMap[cardId];
-      if (!card) return;
-      if (card.name !== '杀' && card.name !== '决斗') return;
-      return {
-        kind: 'modify',
-        atom: { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as typeof ctx.atom,
-      };
-    },
-  );
+  // ── 造成伤害 before hook:杀/决斗伤害 +1(共享增伤工厂,裸衣/界裸衣 同款守卫链) ──
+  registerDamageBonusHook(state, skill.id, ownerId, { tag: BONUS_TAG, cardNames: ['杀', '决斗'] });
 
   // ── 回合开始 after hook:owner 自己的下回合开始时清增伤标签 ──
   // 严格匹配官方"直到你的下回合开始":仅 owner 自己的回合开始时清,

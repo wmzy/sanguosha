@@ -8,28 +8,14 @@
 // 调用方(runUseFlow)据此跳过 生效时/生效后,直接进入下一个目标。
 //
 // 事件标记型——apply 无副作用,只提供 hook 注册点。
-// 噪声抑制:无 before hook 时整个 atom 是 no-op,不发 ViewEvent。
-import type { AtomDefinition, ViewEventSplit } from '../types';
-import { hookSilentView, requirePlayer } from './_helpers';
+// 噪声抑制(viewMode 'silentWithoutHook'):无 before hook 时整个 atom 是 no-op,不发 ViewEvent。
+import type { AtomDefinition } from '../types';
+import { requirePlayer } from './_helpers';
+import { makeEventMarkerAtom, resolveTimingView } from './_eventMarker';
 
-export const 生效前: AtomDefinition<{ source: number; target: number; cardId: string }> = {
-  type: '生效前',
-  validate(state, atom) {
-    return requirePlayer(state, atom.target, 'target');
-  },
-  apply() {
-    // 纯时机型 atom:响应交互(询问闪/被抵消)由 before hook 驱动,apply 无副作用。
-  },
-  toViewEvents(state, atom): ViewEventSplit {
-    return hookSilentView(state, '生效前', () => ({
-      type: '生效前',
-      source: atom.source,
-      target: atom.target,
-      cardId: atom.cardId,
-    }));
-  },
-  applyView() {
-    // 无视图状态变更:响应结果由后续 atom(被抵消/造成伤害)的 applyView 体现。
-  },
-};
-
+export const 生效前: AtomDefinition<{ source: number; target: number; cardId: string }> =
+  makeEventMarkerAtom('生效前', {
+    validate: (state, atom) => requirePlayer(state, atom.target, 'target'),
+    buildView: resolveTimingView,
+    viewMode: 'silentWithoutHook',
+  });

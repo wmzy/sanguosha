@@ -39,7 +39,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerBeforeHook } from '../core/skill';
-import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 /** 玩家是否拥有红颜系锁定技(红颜/界红颜):黑桃视为红桃。 */
 function hasHongyanVariant(state: GameState, ownerId: number): boolean {
@@ -129,10 +129,13 @@ export function registerTianxiangWiring(skill: Skill, state: GameState, variant:
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const rt = currentRequestType(st, ownerId);
-      if (rt !== CONFIRM_RT && rt !== CHOOSE_RT && rt !== OPTION_RT) {
-        return variant.notAskError;
-      }
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, CHOOSE_RT, OPTION_RT], {
+        noSlotError: variant.notAskError,
+        wrongTypeError: variant.notAskError,
+        mismatchError: variant.notAskError,
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === CONFIRM_RT || rt === OPTION_RT) return null; // confirm 类:任意 choice 均可
 
       // choose:校验 cardId + target

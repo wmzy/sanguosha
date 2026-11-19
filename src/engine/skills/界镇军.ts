@@ -42,7 +42,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
-import { totalCardCount, ownedCardIds } from '../util/player-query';
+import { totalCardCount, ownedCardIds, equipmentCardIds } from '../util/player-query';
 
 const SKILL_ID = '界镇军';
 const DISPLAY_NAME = '镇军';
@@ -91,9 +91,7 @@ function computeX(target: { hand: string[]; health: number }): number {
 
 /** 目标牌中非装备牌数(即手牌数,因为目标牌来源只能是手牌或装备区) */
 function countNonEquipment(state: GameState, target: number, cardIds: string[]): number {
-  const equipSet = new Set(
-    Object.values(state.players[target]?.equipment ?? {}).filter((id): id is string => !!id),
-  );
+  const equipSet = new Set(equipmentCardIds(state.players[target]));
   return cardIds.filter((id) => !equipSet.has(id)).length;
 }
 
@@ -140,9 +138,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (typeof promptTarget !== 'number') return '询问上下文异常';
         const targetPlayer = st.players[promptTarget];
         if (!targetPlayer) return '目标不存在';
-        const equipSet = new Set(
-          Object.values(targetPlayer.equipment).filter((id): id is string => !!id),
-        );
+        const equipSet = new Set(equipmentCardIds(targetPlayer));
         for (const id of cardIds) {
           if (typeof id !== 'string') return 'cardIds 必须为字符串数组';
           if (!targetPlayer.hand.includes(id) && !equipSet.has(id)) return '牌不在目标区域';

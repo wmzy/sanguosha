@@ -98,8 +98,9 @@ export function isLord(name: string): boolean {
 /** 主公技技能 id(player.skills 中的 loader key)集合。
  *  用于前端在非主公座次隐藏主公技展示(主公技仅主公生效,非主公展示无意义)。
  *  来源:各主公技技能文件 createSkill 声明 description 含「主公技」。
- *  标版:护驾/激将/救援/制霸/暴虐/黄天/若愚;界版:界护驾/界激将/界救援/界制霸/界暴虐/界黄天/界若愚/界血裔。
- *  新增主公技时需同步更新此名单(与 LORD_CANDIDATES 维护方式一致)。 */
+ *  标版:护驾/激将/救援/制霸/暴虐/黄天/若愚/颂威/立军;界版:界护驾/界激将/界救援/界制霸/界暴虐/界黄天/界若愚/界血裔。
+ *  新增主公技时需同步更新此名单(与 LORD_CANDIDATES 维护方式一致;
+ *  由 tests/engine/lord-data-contract.test.ts 契约测试兜底防漂移)。 */
 export const LORD_SKILLS: ReadonlySet<string> = new Set([
   '护驾', '界护驾',
   '激将', '界激将',
@@ -108,5 +109,7 @@ export const LORD_SKILLS: ReadonlySet<string> = new Set([
   '暴虐', '界暴虐',
   '黄天', '界黄天',
   '若愚', '界若愚',
+  '颂威',
+  '立军',
   '界血裔',
 ]);

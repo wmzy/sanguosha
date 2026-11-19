@@ -34,7 +34,8 @@ import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rule
 import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
 import { BINGLUE_TARGETS_KEY, getBinglueTargets } from '../rules/vars-keys';
-import { requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
+import { requireRequestType, engineCanPlayNowReason, firstTarget } from '../util/skillRuntime';
+import { equipmentCardIds } from '../util/player-query';
 
 // 请求类型(requestType 前缀 = skillId,见 T1)
 const OPTION_RT = '飞军/option'; // owner:选择效果
@@ -254,7 +255,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
       } else {
         // 选项2:目标从装备区选一张弃置
-        const equipIds = Object.values(targetPlayer.equipment).filter((id) => !!id);
+        const equipIds = equipmentCardIds(targetPlayer);
         if (equipIds.length === 0) {
           await popFrame(st);
           return;
@@ -274,9 +275,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         });
 
         let discardCardId = st.localVars[DISCARD_EQUIP_KEY] as string | undefined;
-        const currentEquips = Object.values(st.players[target]?.equipment ?? {}).filter(
-          (id) => !!id,
-        );
+        const currentEquips = equipmentCardIds(st.players[target]);
         if (!discardCardId || !currentEquips.includes(discardCardId)) {
           discardCardId = currentEquips[0]; // 超时兜底:弃第一张装备
         }
@@ -319,9 +318,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           return null;
         }
         if (rt === TARGET_RT) {
-          const t =
-            (params.targets as number[] | undefined)?.[0] ??
-            (typeof params.target === 'number' ? params.target : undefined);
+          const t = firstTarget(params);
           if (typeof t !== 'number') return '请选择目标';
           return null;
         }
@@ -346,9 +343,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (rt === OPTION_RT) {
           st.localVars[OPTION_KEY] = params.option;
         } else if (rt === TARGET_RT) {
-          const t =
-            (params.targets as number[] | undefined)?.[0] ??
-            (typeof params.target === 'number' ? params.target : undefined);
+          const t = firstTarget(params);
           if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
         } else if (rt === GIVE_RT) {
           st.localVars[GIVE_KEY] = params.cardId;
@@ -380,14 +375,14 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       if (!p) return false;
       if ((p.hand?.length ?? 0) === 0) return false; // 需要代价牌
       const ownerHand = p.handCount;
-      const ownerEquip = Object.values(p.equipment ?? {}).filter((id) => !!id).length;
+      const ownerEquip = equipmentCardIds(p).length;
       const hasOption1 = ctx.view.players.some(
         (other) =>
           other.index !== skill.ownerId && other.alive && (other.handCount ?? 0) > ownerHand,
       );
       const hasOption2 = ctx.view.players.some((other) => {
         if (other.index === skill.ownerId || !other.alive) return false;
-        return Object.values(other.equipment ?? {}).filter((id) => !!id).length > ownerEquip;
+        return equipmentCardIds(other).length > ownerEquip;
       });
       return hasOption1 || hasOption2;
     },

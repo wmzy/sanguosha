@@ -20,6 +20,7 @@ import { applyAtom } from '../core/apply';
 import { registerBeforeHook, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
+import { equipmentCardIds } from '../util/player-query';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -77,9 +78,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   registerBeforeHook(state, skill.id, ownerId, '弃置', async (ctx) => {
     const atom = ctx.atom;
     if (atom.player !== ownerId) return;
-    const myEquip = new Set(
-      Object.values(ctx.state.players[ownerId].equipment).filter((id): id is string => typeof id === 'string'),
-    );
+    const myEquip = new Set(equipmentCardIds(ctx.state.players[ownerId]));
     const lost = (atom.cardIds ?? []).filter((id) => myEquip.has(id)).length;
     if (lost > 0) {
       ctx.state.localVars['枭姬/弃置loss'] = lost;
@@ -99,9 +98,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   registerBeforeHook(state, skill.id, ownerId, '获得', async (ctx) => {
     const atom = ctx.atom;
     if (atom.from !== ownerId) return;
-    const myEquip = new Set(
-      Object.values(ctx.state.players[ownerId].equipment).filter((id): id is string => typeof id === 'string'),
-    );
+    const myEquip = new Set(equipmentCardIds(ctx.state.players[ownerId]));
     if (atom.cardId && myEquip.has(atom.cardId)) {
       ctx.state.localVars['枭姬/获得loss'] = 1;
     }

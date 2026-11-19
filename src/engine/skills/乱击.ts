@@ -27,9 +27,13 @@ import {
   registerTransformAction,
   mountTransformAction,
   type TransformActionOptions,
+  type TransformMountOptions,
 } from '../util/skillRuntime';
 
-const OPTIONS: TransformActionOptions = {
+// 本文件同时导出 OPTIONS(乱击族共享转化配置),界乱击 spread 覆盖文案差异
+// (invalidError/prompt.title),comboFilter/activeWhen 同花色扫描逐字共用。
+// mount 交叉标注为必填:界乱击 spread 时直接读 OPTIONS.mount.prompt 覆盖 title。
+export const OPTIONS: TransformActionOptions & { mount: TransformMountOptions } = {
   outputName: '万箭齐发',
   // 两张手牌 → 影子 id = `${id1}#${id2}#乱击`(后缀 = 技能 id,工厂统一构造)
   cardCount: 2,

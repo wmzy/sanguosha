@@ -27,7 +27,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { hasSkillModule } from './registry';
+import { equipReplacingOld } from './_equipReplace';
 import type { SkillModule } from '../types';
 import { requireRequestType, askConfirm, normalizeCardIds } from '../util/skillRuntime';
 import { slotOf } from '../util/equip-slot';
@@ -176,33 +176,8 @@ async function performKongshengEnd(
     const card = state.cardMap[cardId];
     const slot = slotOf(card);
     if (!slot) continue;
-    // 替换同槽旧装备(逻辑同 界直言/装备通用)
-    const current = state.players[target].equipment[slot];
-    if (current) {
-      const oldCard = state.cardMap[current];
-      if (oldCard?.name && hasSkillModule(oldCard.name)) {
-        await applyAtom(state, {
-          type: '移除技能',
-          player: target,
-          skillId: oldCard.name,
-        });
-      }
-      await applyAtom(state, { type: '卸下', player: target, slot });
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId: current,
-        from: { zone: '手牌', player: target },
-        to: { zone: '弃牌堆' },
-      });
-    }
-    await applyAtom(state, { type: '装备', player: target, cardId });
-    if (card?.name && hasSkillModule(card.name)) {
-      await applyAtom(state, {
-        type: '添加技能',
-        player: target,
-        skillId: card.name,
-      });
-    }
+    // 替换同槽旧装备 + 装备 + 挂载技能(逻辑同 界直言/装备通用)
+    await equipReplacingOld(state, target, slot, cardId);
   }
 
   // 该角色失去1点体力

@@ -4,6 +4,7 @@ import type { GameState, Json, CardTargetSpec } from '../../types';
 import { effectiveDistance, inAttackRange } from '../../rules/distance';
 import { canSlash } from '../../rules/slash-quota';
 import { validateUseCard } from '../../core/skill';
+import { alivePlayersClockwiseFrom } from '../../util/player-query';
 import { hasNoDistanceLimit } from './_distanceOne';
 import { getCardEffect } from '.';
 
@@ -84,18 +85,8 @@ export function computeAutoTargets(
   if (!effect) return [];
   const spec = effect.target;
   if (spec.kind !== 'allOthers' && spec.kind !== 'allPlayers') return [];
-  const alive = state.players.filter((p) => p.alive);
-  const n = alive.length;
-  if (n === 0) return [];
-  const fromPos = alive.findIndex((p) => p.index === ownerId);
-  if (fromPos < 0) return alive.map((p) => p.index);
-  const result: number[] = [];
-  const start = spec.kind === 'allOthers' ? 1 : 0;
-  // 多目标结算顺序:从使用者起逆时针(含使用者时 i=0 先自己)。
-  for (let i = start; i < n; i++) {
-    result.push(alive[(fromPos - i + n) % n].index);
-  }
-  return result;
+  // 多目标结算顺序:从使用者起逆时针(allOthers 不含使用者,allPlayers 含使用者时自己居首)。
+  return alivePlayersClockwiseFrom(state, ownerId, { includeSelf: spec.kind === 'allPlayers' });
 }
 
 export function findLegalTargets(

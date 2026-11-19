@@ -50,7 +50,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, firstTarget, requireRequestType } from '../util/skillRuntime';
 
 /** localVars key:最近一个正常开始的摸牌阶段所属玩家 */
 const NORMAL_KEY = '截辎/normalDrawPhase';
@@ -110,9 +110,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === CHOOSE_TARGET_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? params.target : undefined);
+        const t = firstTarget(params);
         if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
       }
     },

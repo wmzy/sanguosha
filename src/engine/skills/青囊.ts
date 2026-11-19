@@ -13,7 +13,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
-import { engineCanPlayNowReason } from '../util/skillRuntime';
+import { engineCanPlayNowReason, firstTarget } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -43,9 +43,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!cardId) return 'cardId required';
       if (!self.hand.includes(cardId)) return '牌不在手牌中';
       // 目标:任意存活且体力未满的角色(含自己)
-      const target =
-        ((params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined) ??
-        ownerId;
+      const target = firstTarget(params) ?? ownerId;
       const tp = state.players[target];
       if (!tp) return '目标不存在';
       if (!tp.alive) return '目标已死亡';
@@ -55,9 +53,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (state: GameState, params: Record<string, Json>) => {
       const from = ownerId;
       const cardId = params.cardId as string;
-      const target = (
-        (params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined
-      ) ?? ownerId;
+      const target = firstTarget(params) ?? ownerId;
       // 限一次标记:同步设 vars + 回合用量 atom 投影 view(防 dispatch 重入)
       await markOncePerTurn(state, from, '青囊');
       await pushFrame(state, '青囊', from, { ...params });

@@ -28,6 +28,7 @@ import type { FrontendAPI, GameState, HookResult, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { hasSkillModule } from './registry';
+import { equipReplacingOld } from './_equipReplace';
 import type { SkillModule } from '../types';
 import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
@@ -137,28 +138,9 @@ async function executeStealEquip(
   // 2. 从 target 装备区取到 owner 手牌(获得 atom 同时清理 target.equipment[slot])
   await applyAtom(state, { type: '获得', player: ownerId, cardId, from: turnPlayer });
 
-  // 3. 若 owner 同槽位已有装备:替换(移除技能 + 卸下 + 移动牌 to 弃牌堆,与 装备通用 对齐)
-  const myOld = state.players[ownerId].equipment[slot];
-  if (myOld) {
-    const oldCard = state.cardMap[myOld];
-    if (oldCard?.name && hasSkillModule(oldCard.name)) {
-      await applyAtom(state, { type: '移除技能', player: ownerId, skillId: oldCard.name });
-    }
-    await applyAtom(state, { type: '卸下', player: ownerId, slot });
-    await applyAtom(state, {
-      type: '移动牌',
-      cardId: myOld,
-      from: { zone: '手牌', player: ownerId },
-      to: { zone: '弃牌堆' },
-    });
-  }
-
-  // 4. 装备 stolen card(此时牌已在 owner 手牌)
-  await applyAtom(state, { type: '装备', player: ownerId, cardId });
-  // 5. 添加 stolen card 的自带技能(若有)
-  if (card.name && hasSkillModule(card.name)) {
-    await applyAtom(state, { type: '添加技能', player: ownerId, skillId: card.name });
-  }
+  // 3. 若 owner 同槽位已有装备:替换(移除技能 + 卸下 + 移动牌 to 弃牌堆,与 装备通用 对齐);
+  //    4. 装备 stolen card(此时牌已在 owner 手牌);5. 添加 stolen card 的自带技能(若有)
+  await equipReplacingOld(state, ownerId, slot, cardId);
 }
 
 export function onInit(skill: Skill, state: GameState): () => void {

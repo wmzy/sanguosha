@@ -31,8 +31,8 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, hasBlockingPending } from '../core/skill';
-import { hasSkillModule } from './registry';
-import { firstCardId, requireRequestType } from '../util/skillRuntime';
+import { equipReplacingOld } from './_equipReplace';
+import { firstCardId, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
 import { slotOf } from '../util/equip-slot';
 
 const USED_KEY = '据守/usedThisTurn';
@@ -111,32 +111,7 @@ export async function jushouDiscardOrEquip(
       const slot = slotOf(card);
       if (card?.type === '装备牌' && slot) {
         // 装备牌:使用之(替换旧装备,逻辑同 装备通用)
-        const currentEquip = state.players[ownerId].equipment[slot];
-        if (currentEquip) {
-          const oldCard = state.cardMap[currentEquip];
-          if (oldCard?.name && hasSkillModule(oldCard.name)) {
-            await applyAtom(state, {
-              type: '移除技能',
-              player: ownerId,
-              skillId: oldCard.name,
-            });
-          }
-          await applyAtom(state, { type: '卸下', player: ownerId, slot });
-          await applyAtom(state, {
-            type: '移动牌',
-            cardId: currentEquip,
-            from: { zone: '手牌', player: ownerId },
-            to: { zone: '弃牌堆' },
-          });
-        }
-        await applyAtom(state, { type: '装备', player: ownerId, cardId: chosenId });
-        if (card?.name && hasSkillModule(card.name)) {
-          await applyAtom(state, {
-            type: '添加技能',
-            player: ownerId,
-            skillId: card.name,
-          });
-        }
+        await equipReplacingOld(state, ownerId, slot, chosenId);
       } else {
         // 非装备牌:弃置
         await applyAtom(state, { type: '弃置', player: ownerId, cardIds: [chosenId], voluntary: true });
@@ -210,15 +185,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineConfirmAction(api, 'use', {
     label: '据守',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动据守?(翻面摸四张,然后弃置一张手牌)',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动据守?(翻面摸四张,然后弃置一张手牌)',
     activeWhen: (ctx) => {
       if (ctx.view.currentPlayerIndex !== ctx.perspectiveIdx) return false;
       const phase = ctx.view.phase;

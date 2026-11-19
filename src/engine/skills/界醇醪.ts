@@ -28,7 +28,7 @@
 //   内部 Skill.name = '醇醪'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Skill } from '../types';
 import { registerAction, registerAfterHook, declareAlternativeResponse } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界醇醪';
 const DISPLAY_NAME = '醇醪';
@@ -154,16 +154,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '醇醪',
-    style: 'primary',
+    title: '醇醪:移去 X 张"醇"视为一张【酒】救援?',
+    confirmLabel: '移醇当酒',
     respondFor: '桃/求桃',
-    prompt: {
-      type: 'confirm',
-      title: '醇醪:移去 X 张"醇"视为一张【酒】救援?',
-      confirmLabel: '移醇当酒',
-      cancelLabel: '不发动',
-    },
   });
 }
 

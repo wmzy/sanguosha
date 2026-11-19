@@ -18,7 +18,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { requireRequestType, askConfirm, defineConfirmAction, firstTarget } from '../util/skillRuntime';
 
 const CONFIRM_RT = '节命/confirm';
 const TARGET_RT = '节命/target';
@@ -54,9 +54,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true;
       } else if (rt === TARGET_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? (params.target) : undefined);
+        const t = firstTarget(params);
         if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
       }
     },

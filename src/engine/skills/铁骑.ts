@@ -21,6 +21,7 @@ import type {
   FrontendAPI,
   GameState,
   HookResult,
+  PlayerState,
   Skill,
 } from '../types';
 import { applyAtom } from '../core/apply';
@@ -162,6 +163,141 @@ export function createTieqiSkill(opts: TieqiOptions) {
       defineConfirmAction(api, 'respond', {
         label: '铁骑',
         title: '是否发动铁骑判定？',
+        style: 'default',
+      });
+    },
+  };
+}
+
+// ────────────────────────── 烈弓族(被动禁闪)共享工厂 ──────────────────────────
+// 烈弓/界烈弓 与铁骑同构的部分:「杀指定目标」after-hook 前导守卫 + 发动询问 +
+// 「询问闪」before-hook 去标签+cancel(即上方 dodgeBlockTag 块的参数化)。
+// 与铁骑族的差异:无判定环节——条件判定与标签应用由 opts 注入。
+
+/** 烈弓族(被动禁闪)差异参数 */
+export interface LiegongOptions {
+  /** Skill.name(标 '烈弓' / 界 '界烈弓') */
+  name: string;
+  description: string;
+  /** 发动询问 requestType(标 '烈弓/confirm' / 界 '界烈弓/confirm',键空间隔离) */
+  confirmRt: string;
+  /** 发动询问结果 localVars key(标 '烈弓/confirmed' / 界 '界烈弓/confirmed') */
+  confirmKey: string;
+  /** 发动询问文案(askConfirm title) */
+  confirmTitle: string;
+  /** onMount 确认按钮弹窗标题(标烈弓与询问文案不同;缺省同 confirmTitle) */
+  mountTitle?: string;
+  /** respond 注册不匹配文案(标 '当前不是烈弓确认' / 界 '当前不是界烈弓确认') */
+  mismatchError: string;
+  /** 禁闪标签(询问闪 before hook 消费:去标签 + cancel 强制命中) */
+  dodgeBlockTag: string;
+  /** 指定目标守卫通过后的技能条件判定(标:手牌/体力/攻击范围;界:清残留标签+两条件),
+   *  可含先行副作用(界版清残留标签);返回 false = 不询问。
+   *  self/targetPlayer 为守卫链已判定存活的玩家对象,target 为目标座次。 */
+  decide: (
+    state: GameState,
+    self: PlayerState,
+    targetPlayer: PlayerState,
+    target: number,
+  ) => Promise<boolean>;
+  /** 发动确认后的标签应用(标:加禁闪;界:按条件加禁闪/加伤两标签——询问窗口期间
+   *  状态不变,此处重算条件与发动前判定等价)。 */
+  onConfirmed: (
+    state: GameState,
+    self: PlayerState,
+    targetPlayer: PlayerState,
+    target: number,
+  ) => Promise<void>;
+  /** 界版附加初始化(攻击范围豁免器 + 造成伤害加伤 hook)。返回 unloaders。 */
+  extraInit?: (state: GameState, skillId: string, ownerId: number) => Array<() => void>;
+}
+
+/** 烈弓族共享实现:标版烈弓与界烈弓的「指定目标守卫 → 询问发动 → 标签应用」骨架
+ *  逐字一致,禁闪拦截(询问闪 去标签+cancel)共享;条件与标签差异由 opts 注入。 */
+export function createLiegongSkill(opts: LiegongOptions) {
+  return {
+    createSkill(id: string, ownerId: number): Skill {
+      return {
+        id,
+        ownerId,
+        name: opts.name,
+        description: opts.description,
+      };
+    },
+
+    onInit(skill: Skill, state: GameState): (() => void) | undefined {
+      const ownerId = skill.ownerId;
+
+      const unloaders: Array<() => void> = [];
+
+      // respond:被询问"是否发动"时回应,设 localVars 标记结果
+      registerConfirmRespond(state, skill.id, ownerId, opts.confirmRt, opts.confirmKey, {
+        mismatchError: opts.mismatchError,
+        wrongTypeError: '当前不是请求回应',
+      });
+
+      // ── 指定目标 after:自己出杀指定目标 → 条件判定 → 询问是否发动 ──
+      registerAfterHook(state, skill.id, ownerId, '指定目标', async (ctx) => {
+        const atom = ctx.atom;
+        if (atom.source !== ownerId) return;
+        if (atom.target === undefined) return;
+        const target = atom.target;
+        // 仅对杀触发(cardId 缺省时容错放过——避免误拦无牌事件)
+        if (atom.cardId !== undefined) {
+          const card = ctx.state.cardMap[atom.cardId];
+          if (card?.name !== '杀') return;
+        }
+        const self = ctx.state.players[ownerId];
+        const targetPlayer = ctx.state.players[target];
+        if (!self?.alive || !targetPlayer?.alive) return;
+
+        if (!(await opts.decide(ctx.state, self, targetPlayer, target))) return;
+
+        const confirmed = await askConfirm(ctx.state, opts.confirmRt, ownerId, {
+          confirmedKey: opts.confirmKey,
+          title: opts.confirmTitle,
+          confirmLabel: '发动',
+          cancelLabel: '不发动',
+          defaultChoice: false,
+          timeout: 10,
+        });
+        if (!confirmed) return;
+
+        await opts.onConfirmed(ctx.state, self, targetPlayer, target);
+      });
+
+      // ── 询问闪 before:目标有禁闪标签 → 去标签 + cancel(强制命中)──
+      registerBeforeHook(
+        state,
+        skill.id,
+        ownerId,
+        '询问闪',
+        async (ctx): Promise<HookResult | void> => {
+          const atom = ctx.atom;
+          if (atom.source !== ownerId) return;
+          const target = atom.target;
+          if (target === undefined) return;
+          const player = ctx.state.players[target];
+          if (!player?.tags.includes(opts.dodgeBlockTag)) return;
+          // 清标签(仅本次杀有效)+ cancel 询问闪 → 处理区无闪 → 造成伤害
+          await applyAtom(ctx.state, { type: '去标签', player: target, tag: opts.dodgeBlockTag });
+          return { kind: 'cancel' };
+        },
+      );
+
+      if (opts.extraInit) {
+        unloaders.push(...opts.extraInit(state, skill.id, ownerId));
+      }
+
+      return () => {
+        for (const u of unloaders) u();
+      };
+    },
+
+    onMount(_skill: Skill, api: FrontendAPI): void {
+      defineConfirmAction(api, 'respond', {
+        label: opts.name,
+        title: opts.mountTitle ?? opts.confirmTitle,
         style: 'default',
       });
     },

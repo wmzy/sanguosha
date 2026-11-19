@@ -41,7 +41,7 @@ import { applyAtom } from '../core/apply';
 import { getCardEffect } from '../skills/cards';
 import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 import { lostHealth } from '../util/player-query';
 
 const CONFIRM_RT = '界伤逝/confirm';
@@ -195,15 +195,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '伤逝',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动伤逝?',
-      confirmLabel: '摸牌',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动伤逝?',
+    confirmLabel: '摸牌',
   });
   return undefined;
 }

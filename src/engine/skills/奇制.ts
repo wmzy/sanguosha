@@ -29,7 +29,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { QIZHI_COUNT_KEY as COUNT_VAR, PICK_RESULT_KEY, getQizhiCount } from '../rules/vars-keys';
-import { currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, defineConfirmAction, firstTarget, requireRequestType } from '../util/skillRuntime';
 import { hasDiscardableCards } from '../util/player-query';
 
 const SKILL_ID = '奇制';
@@ -66,17 +66,18 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const rt = currentRequestType(st, ownerId);
-      if (rt !== CONFIRM_RT && rt !== TARGET_RT && rt !== PICK_CARD_RT) {
-        return '当前不是奇制询问';
-      }
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, TARGET_RT, PICK_CARD_RT], {
+        noSlotError: '当前不是奇制询问',
+        wrongTypeError: '当前不是奇制询问',
+        mismatchError: '当前不是奇制询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === CONFIRM_RT) return null; // confirm:任意 choice 均可
 
       if (rt === TARGET_RT) {
         // choosePlayer:校验目标是其他存活且有牌的角色
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? params.target : undefined);
+        const t = firstTarget(params);
         if (typeof t !== 'number') return '请选择一名角色';
         if (t === ownerId) return '不能选择自己';
         const tp = st.players[t];
@@ -103,9 +104,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return;
       }
       if (rt === TARGET_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? params.target : undefined);
+        const t = firstTarget(params);
         if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
         return;
       }

@@ -23,8 +23,8 @@ import { popFrame, pushFrame } from '../core/frame';
 import { inAttackRange } from '../rules/distance';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { pickRandom } from '../util/rng';
-import { requireRequestType } from '../util/skillRuntime';
-import { hasDiscardableCards } from '../util/player-query';
+import { firstTarget, requireRequestType } from '../util/skillRuntime';
+import { equipmentCardIds, hasDiscardableCards } from '../util/player-query';
 
 const CHOOSE_RT = '掣政/选目标';
 const CHOOSE_KEY = '掣政/所选目标';
@@ -134,9 +134,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (tp.hand.length > 0) {
         discardId = pickRandom(st, tp.hand)!;
       } else {
-        const equipIds = Object.values(tp.equipment).filter(
-          (id): id is string => !!id,
-        );
+        const equipIds = equipmentCardIds(tp);
         if (equipIds.length > 0) discardId = equipIds[0];
       }
       if (discardId) {
@@ -159,9 +157,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         mismatchError: '当前不是掣政窗口',
       });
       if (check.error) return check.error;
-      const t =
-        (params.targets as number[] | undefined)?.[0] ??
-        (typeof params.target === 'number' ? params.target : undefined);
+      const t = firstTarget(params);
       if (typeof t !== 'number') return '请选择一名角色';
       if (t === ownerId) return '不能选择自己';
       if (!st.players[t]?.alive) return '目标不合法';
@@ -170,9 +166,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const t =
-        (params.targets as number[] | undefined)?.[0] ??
-        (typeof params.target === 'number' ? params.target : undefined);
+      const t = firstTarget(params);
       if (typeof t === 'number') st.localVars[CHOOSE_KEY] = t;
     },
   );

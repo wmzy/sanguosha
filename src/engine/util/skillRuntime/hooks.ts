@@ -4,7 +4,8 @@
 //   registerOnOwnSlashDodged:「自己使用的杀被闪抵消」前导守卫 after-hook
 //     (贯石斧/青龙偃月刀/界咆哮/界空城 四处时机一致,均为 '被抵消' after);
 //   registerOnDamagedAsTarget:「受到伤害后」四行前导守卫 after-hook(刚烈 骨架);
-//   registerPhaseStartHook:「阶段开始」before-hook 前导三查(type/player/phase 归属)。
+//   registerPhaseStartHook:「阶段开始」before-hook 前导三查(type/player/phase 归属);
+//   registerDamageBonusHook:「造成伤害时」增伤 before-hook(裸衣/界裸衣 同款守卫链)。
 // 命名:函数/类型英文;业务字面量(atom 类型/牌名)保持中文。
 import type {
   AtomAfterContext,
@@ -150,5 +151,61 @@ export function registerPhaseStartHook(
     if (atom.phase !== phase) return;
     if (opts.requireCurrentPlayer === true && ctx.state.currentPlayerIndex !== ownerId) return;
     return await handler(ctx);
+  });
+}
+
+// ────────────────────────── 「造成伤害」增伤 before-hook ──────────────────────────
+
+/** registerDamageBonusHook 必填项。 */
+export interface DamageBonusHookOptions {
+  /** 增伤标签 key(`技能名/属性` 命名空间,如 '裸衣/bonus' / '界裸衣/bonus')——
+   *  owner 的 tags 含此标签时本 hook 才生效。标签的挂/清时机由技能自身的其他
+   *  hook 负责,本工厂只管读。 */
+  tag: string;
+  /** 享受增伤的伤害来源牌名(如 ['杀', '决斗'])——atom.cardId 对应卡牌的 name
+   *  不在列表内则放行。 */
+  cardNames: string[];
+}
+
+/**
+ * 注册「造成伤害时」增伤 before-hook(裸衣/界裸衣 两处逐字重复的实现收敛):
+ * 前导守卫全过 → `{ kind: 'modify', atom: {...atom, amount: (amount ?? 0) + 1} }`。
+ * 守卫链(与参考实现逐字一致):
+ *   ① atom.source === ownerId——只增伤自己为来源的伤害;
+ *   ② (atom.amount ?? 0) > 0——零/负伤害不触发;
+ *   ③ owner 存在于 players 且 tags 含 opts.tag;
+ *   ④ atom.cardId 为 string 且 cardMap 中卡牌 name ∈ opts.cardNames。
+ *
+ * 用法(裸衣式):
+ * ```ts
+ * const unreg = registerDamageBonusHook(state, skill.id, ownerId, {
+ *   tag: '裸衣/bonus',
+ *   cardNames: ['杀', '决斗'],
+ * });
+ * ```
+ *
+ * @returns unloader(registerBeforeHook 原样透传)。
+ */
+export function registerDamageBonusHook(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  opts: DamageBonusHookOptions,
+): () => void {
+  return registerBeforeHook(state, skillId, ownerId, '造成伤害时', async (ctx) => {
+    const atom = ctx.atom;
+    if (atom.source !== ownerId) return;
+    if ((atom.amount ?? 0) <= 0) return;
+    const self = ctx.state.players[ownerId];
+    if (!self?.tags.includes(opts.tag)) return;
+    const cardId = atom.cardId;
+    if (typeof cardId !== 'string') return;
+    const card = ctx.state.cardMap[cardId];
+    if (!card) return;
+    if (!opts.cardNames.includes(card.name)) return;
+    return {
+      kind: 'modify',
+      atom: { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as typeof ctx.atom,
+    };
   });
 }

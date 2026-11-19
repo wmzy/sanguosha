@@ -29,7 +29,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { currentRequestType } from '../util/skillRuntime';
+import { currentRequestType, firstTarget } from '../util/skillRuntime';
 
 const SKILL_NAME = '镇骨';
 
@@ -163,9 +163,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       async (st: GameState, params: Record<string, Json>): Promise<void> => {
         const rt = currentRequestType(st, seatId);
         if (rt === CHOOSE_RT) {
-          const t =
-            (params.targets as number[] | undefined)?.[0] ??
-            (typeof params.target === 'number' ? params.target : undefined);
+          const t = firstTarget(params);
           if (typeof t === 'number') st.localVars[CHOOSE_LV] = t;
         } else if (rt === DISCARD_RT) {
           const ids = params.cardIds as string[] | undefined;

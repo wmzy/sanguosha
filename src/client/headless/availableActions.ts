@@ -865,339 +865,338 @@ export function appendRespondActions(
       category: 'discard',
     });
   };
-    const pending = view.pending!;
-    // 卡牌回应 silent 模式(target 有手牌但无匹配牌):target 不被询问。
-    // 不为该 pending 生成任何 skip/respond action,让短延时 slot 自然超时
-    // (否则 AI 会提前 skip 绕过延时,暴露"无匹配牌"信息)。广播型(target<0)永不为 silent。
-    if (pending.responseMode === 'silent' && pending.target === ownerId) return;
-    const atom = pending.atom as {
-      type: string;
-      candidates?: Array<{ name: string; skills: string[]; baseId?: string }>;
-      requestType?: string;
-    };
-    // 选将询问：每个候选武将一个 selectChar action（引擎注册 系统规则:选将）
-    if (atom.type === '选将询问' && Array.isArray(atom.candidates)) {
-      for (const c of atom.candidates) {
-        out.push({
-          description: `选择武将【${c.name}】`,
-          message: {
-            skillId: '系统规则',
-            actionType: '选将',
-            ownerId,
-            params: { character: c.name },
-            baseSeq: 0,
-          },
-          validTargets: [],
-          category: 'selectChar',
-        });
-      }
-      return;
-    }
-    // 广播型 pending（无懈可击等）：添加跳过 action
-    if (pending.target < 0) {
+  if (!view.pending) return;
+  const pending = view.pending;
+  // 卡牌回应 silent 模式(target 有手牌但无匹配牌):target 不被询问。
+  // 不为该 pending 生成任何 skip/respond action,让短延时 slot 自然超时
+  // (否则 AI 会提前 skip 绕过延时,暴露"无匹配牌"信息)。广播型(target<0)永不为 silent。
+  if (pending.responseMode === 'silent' && pending.target === ownerId) return;
+  /** skip 兜底(useCardAndTarget 与 cardFilter 两分支逐字同构):单播型
+   *  (target>=0)才补 skip——广播型(target<0)已在上方统一补过,不重复;
+   *  无可出牌时文案切「无牌可出,跳过」,策略性不出为「不出【技能】」。 */
+  const pushOptionalSkip = (skillId: string, hasCandidates: boolean): void => {
+    if (pending.target >= 0) {
       out.push({
-        description: '跳过（不打出无懈可击）',
+        description: hasCandidates ? `不出【${skillId}】` : `无牌可出，跳过`,
         message: buildSkipMessage(ownerId),
         validTargets: [],
         category: 'skip',
       });
     }
-    const reqType = getPendingRequestType(pending);
-    // pickTargetCard 类型 prompt（过河拆桥/顺手牵羊/反馈 选牌）：生成可选牌动作。
-    // skillId 按 requestType 的首段（'过河拆桥_选牌'→'过河拆桥'、'反馈/选牌'→'反馈'）
-    // 与前端 resolvePendingRespond 一致；动作文案按 obtain/discard 区分。
-    if (pending.prompt?.type === 'pickTargetCard') {
-      const pickPrompt = pending.prompt;
-      const targetIdx = pickPrompt.target;
-      const targetPlayer = view.players[targetIdx];
-      // requestType 形如 '过河拆桥_选牌' / '顺手牵羊_选牌' / '反馈/选牌'
-      const pickSkillId = requestTypeFirstSegment(reqType);
-      // obtain=获得（顺手牵羊/反馈）；discard=弃置（过河拆桥）
-      const obtain = reqType.startsWith('顺手牵羊') || reqType.startsWith('反馈');
-      const verb = obtain ? '获得' : '弃置';
-      // 装备牌（明牌）：每张一个 action
-      for (const eq of (pickPrompt.equipment ?? [])) {
-        out.push({
-          description: `${verb}【${eq.cardName}】(装备)`,
-          message: respondMsg(pickSkillId, { zone: 'equipment', cardId: eq.cardId }),
-          validTargets: [],
-          category: 'respond',
-        });
-      }
-      // 判定区牌（明牌）
-      for (const j of (pickPrompt.judge ?? [])) {
-        out.push({
-          description: `${verb}【${j.cardName}】(判定区)`,
-          message: respondMsg(pickSkillId, { zone: 'judge', cardId: j.cardId }),
-          validTargets: [],
-          category: 'respond',
-        });
-      }
-      // 手牌（盲选：目标手牌对 responder 不可见,但按位置选取是合法动作——
-      // 此前只枚举 handIndex 0,AI 第 2+ 张永远选不到。逐位置枚举 0..handCount-1,
-      // 与浏览器/引擎接受任意 handIndex 的盲选契约一致)
-      const handCount = pickPrompt.handCount ?? targetPlayer?.handCount ?? 0;
-      for (let i = 0; i < handCount; i++) {
-        out.push({
-          description: `${verb}手牌（第${i + 1}张）`,
-          message: respondMsg(pickSkillId, { zone: 'hand', handIndex: i }),
-          validTargets: [],
-          category: 'respond',
-        });
-      }
-      return;
+  };
+  const atom = pending.atom as {
+    type: string;
+    candidates?: Array<{ name: string; skills: string[]; baseId?: string }>;
+    requestType?: string;
+  };
+  // 选将询问：每个候选武将一个 selectChar action（引擎注册 系统规则:选将）
+  if (atom.type === '选将询问' && Array.isArray(atom.candidates)) {
+    for (const c of atom.candidates) {
+      out.push({
+        description: `选择武将【${c.name}】`,
+        message: {
+          skillId: '系统规则',
+          actionType: '选将',
+          ownerId,
+          params: { character: c.name },
+          baseSeq: 0,
+        },
+        validTargets: [],
+        category: 'selectChar',
+      });
     }
-    // pickProcessingCard 类型 prompt（五谷丰登：从处理区亮的明牌选一张）：
-    // 为每张可选牌生成独立 respond action，与前端 AwaitingPrompt 一致。
-    if (pending.prompt?.type === 'pickProcessingCard') {
-      const pickPrompt = pending.prompt;
-      const pickSkillId = requestTypeFirstSegment(reqType);
-      for (const c of (pickPrompt.cards ?? [])) {
-        out.push({
-          description: `选【${c.cardName} ${c.suit}${c.rank}】`,
-          message: respondMsg(pickSkillId, { cardId: c.cardId }),
-          validTargets: [],
-          category: 'respond',
-        });
-      }
-      return;
+    return;
+  }
+  // 广播型 pending（无懈可击等）：添加跳过 action
+  if (pending.target < 0) {
+    out.push({
+      description: '跳过（不打出无懈可击）',
+      message: buildSkipMessage(ownerId),
+      validTargets: [],
+      category: 'skip',
+    });
+  }
+  const reqType = getPendingRequestType(pending);
+  // pickTargetCard 类型 prompt（过河拆桥/顺手牵羊/反馈 选牌）：生成可选牌动作。
+  // skillId 按 requestType 的首段（'过河拆桥_选牌'→'过河拆桥'、'反馈/选牌'→'反馈'）
+  // 与前端 resolvePendingRespond 一致；动作文案按 obtain/discard 区分。
+  if (pending.prompt?.type === 'pickTargetCard') {
+    const pickPrompt = pending.prompt;
+    const targetIdx = pickPrompt.target;
+    const targetPlayer = view.players[targetIdx];
+    // requestType 形如 '过河拆桥_选牌' / '顺手牵羊_选牌' / '反馈/选牌'
+    const pickSkillId = requestTypeFirstSegment(reqType);
+    // obtain=获得（顺手牵羊/反馈）；discard=弃置（过河拆桥）
+    const obtain = reqType.startsWith('顺手牵羊') || reqType.startsWith('反馈');
+    const verb = obtain ? '获得' : '弃置';
+    // 装备牌（明牌）：每张一个 action
+    for (const eq of (pickPrompt.equipment ?? [])) {
+      out.push({
+        description: `${verb}【${eq.cardName}】(装备)`,
+        message: respondMsg(pickSkillId, { zone: 'equipment', cardId: eq.cardId }),
+        validTargets: [],
+        category: 'respond',
+      });
     }
-    // 弃牌阶段：引擎注册 系统规则:respond，validate 要求 params.cardIds。
-    if (reqType === '__弃牌') {
-      const minCount = pending.prompt?.type === 'useCard' ? pending.prompt.cardFilter.min : 1;
-      const me = view.players[ownerId];
-      pushDiscardAction('系统规则', (me?.hand ?? []).map((c) => c.id), minCount, '弃牌');
-      return;
+    // 判定区牌（明牌）
+    for (const j of (pickPrompt.judge ?? [])) {
+      out.push({
+        description: `${verb}【${j.cardName}】(判定区)`,
+        message: respondMsg(pickSkillId, { zone: 'judge', cardId: j.cardId }),
+        validTargets: [],
+        category: 'respond',
+      });
     }
-    // 强制型弃牌(英魂等):mandatory=true + useCard prompt。与 __弃牌 同构,
-    // 但 skillId 由 resolvePendingRespond 推导(英魂/discard → '英魂'),不硬编码 系统规则。
-    // 不生成 skip(弃牌是义务)。agent 须从手牌选足 min 张填入 cardIds。
-    if (pending.mandatory === true && pending.prompt?.type === 'useCard') {
-      const minfo = resolvePendingRespond(pending, skillActions);
-      const minCount = pending.prompt.cardFilter.min;
-      const me = view.players[ownerId];
-      const candidates = pending.prompt.cardFilter.candidates;
-      const baseIds = candidates ? [...candidates] : (me?.hand ?? []).map((c) => c.id);
-      pushDiscardAction(minfo?.skillId ?? '系统规则', baseIds, minCount, '强制弃牌');
-      return;
+    // 手牌（盲选：目标手牌对 responder 不可见,但按位置选取是合法动作——
+    // 此前只枚举 handIndex 0,AI 第 2+ 张永远选不到。逐位置枚举 0..handCount-1,
+    // 与浏览器/引擎接受任意 handIndex 的盲选契约一致)
+    const handCount = pickPrompt.handCount ?? targetPlayer?.handCount ?? 0;
+    for (let i = 0; i < handCount; i++) {
+      out.push({
+        description: `${verb}手牌（第${i + 1}张）`,
+        message: respondMsg(pickSkillId, { zone: 'hand', handIndex: i }),
+        validTargets: [],
+        category: 'respond',
+      });
     }
-    // 通用回应（出闪/出杀/确认发动等）
-    const info = resolvePendingRespond(pending, skillActions);
-    if (info?.skillId) {
-      // choosePlayer 类（突袭/激将/奋威 等）：用引擎注入的可序列化 candidates
-      // （filter 跨进程序列化丢失，不能依赖）。单选逐候选生成独立 action；
-      // 多选生成一个描述性 action，agent 需填 targets。
-      if (pending.prompt?.type === 'choosePlayer') {
-        const choosePrompt = pending.prompt;
-        const validTargets: number[] = choosePlayerCandidates(view, choosePrompt);
-        const max = choosePrompt.max ?? 1;
-        const min = choosePrompt.min ?? 1;
-        if (max <= 1) {
-          // 单选：每个候选一个独立 action（与其他 respond 一致，agent 直接选）
-          for (const t of validTargets) {
-            out.push({
-              description: `${choosePrompt.title ?? info.skillId} → ${view.players[t]?.name ?? `P${t}`}`,
-              message: respondMsg(info.skillId, { target: t, targets: [t] }),
-              validTargets: [t],
-              category: 'respond',
-            });
-          }
-          if (min === 0) {
-            out.push({
-              description: `${choosePrompt.title ?? info.skillId} → 不选择`,
-              message: respondMsg(info.skillId, { targets: [] }),
-              validTargets: [],
-              category: 'skip',
-            });
-          }
-        } else {
-          // 多选：描述性 action，agent 需从 validTargets 填 targets。
-          // minTarget/maxTarget 与描述文本同源(prompt.min/max):结构化字段让
-          // agent 不必解析描述文本即可知道要选几个。
-          out.push(describeMultiSelectAction(
-            {
-              description: `${choosePrompt.title ?? info.skillId}（选 ${min}-${max} 个目标）`,
-              skillId: info.skillId,
-              actionType: 'respond',
-              ownerId,
-              category: 'respond',
-            },
-            validTargets,
-            min,
-            max,
-          ));
-        }
-        return;
-      }
-      // chooseOption 类（化身:选技能/选化身牌/选行动等）：每个选项一个 action。
-      if (pending.prompt?.type === 'chooseOption') {
-        const p = pending.prompt;
-        for (const opt of p.options) {
+    return;
+  }
+  // pickProcessingCard 类型 prompt（五谷丰登：从处理区亮的明牌选一张）：
+  // 为每张可选牌生成独立 respond action，与前端 AwaitingPrompt 一致。
+  if (pending.prompt?.type === 'pickProcessingCard') {
+    const pickPrompt = pending.prompt;
+    const pickSkillId = requestTypeFirstSegment(reqType);
+    for (const c of (pickPrompt.cards ?? [])) {
+      out.push({
+        description: `选【${c.cardName} ${c.suit}${c.rank}】`,
+        message: respondMsg(pickSkillId, { cardId: c.cardId }),
+        validTargets: [],
+        category: 'respond',
+      });
+    }
+    return;
+  }
+  // 弃牌阶段：引擎注册 系统规则:respond，validate 要求 params.cardIds。
+  if (reqType === '__弃牌') {
+    const minCount = pending.prompt?.type === 'useCard' ? pending.prompt.cardFilter.min : 1;
+    const me = view.players[ownerId];
+    pushDiscardAction('系统规则', (me?.hand ?? []).map((c) => c.id), minCount, '弃牌');
+    return;
+  }
+  // 强制型弃牌(英魂等):mandatory=true + useCard prompt。与 __弃牌 同构,
+  // 但 skillId 由 resolvePendingRespond 推导(英魂/discard → '英魂'),不硬编码 系统规则。
+  // 不生成 skip(弃牌是义务)。agent 须从手牌选足 min 张填入 cardIds。
+  if (pending.mandatory === true && pending.prompt?.type === 'useCard') {
+    const minfo = resolvePendingRespond(pending, skillActions);
+    const minCount = pending.prompt.cardFilter.min;
+    const me = view.players[ownerId];
+    const candidates = pending.prompt.cardFilter.candidates;
+    const baseIds = candidates ? [...candidates] : (me?.hand ?? []).map((c) => c.id);
+    pushDiscardAction(minfo?.skillId ?? '系统规则', baseIds, minCount, '强制弃牌');
+    return;
+  }
+  // 通用回应（出闪/出杀/确认发动等）
+  const info = resolvePendingRespond(pending, skillActions);
+  if (info?.skillId) {
+    // choosePlayer 类（突袭/激将/奋威 等）：用引擎注入的可序列化 candidates
+    // （filter 跨进程序列化丢失，不能依赖）。单选逐候选生成独立 action；
+    // 多选生成一个描述性 action，agent 需填 targets。
+    if (pending.prompt?.type === 'choosePlayer') {
+      const choosePrompt = pending.prompt;
+      const validTargets: number[] = choosePlayerCandidates(view, choosePrompt);
+      const max = choosePrompt.max ?? 1;
+      const min = choosePrompt.min ?? 1;
+      if (max <= 1) {
+        // 单选：每个候选一个独立 action（与其他 respond 一致，agent 直接选）
+        for (const t of validTargets) {
           out.push({
-            description: opt.label,
-            message: respondMsg(info.skillId, { option: opt.value }),
-            validTargets: [],
+            description: `${choosePrompt.title ?? info.skillId} → ${view.players[t]?.name ?? `P${t}`}`,
+            message: respondMsg(info.skillId, { target: t, targets: [t] }),
+            validTargets: [t],
             category: 'respond',
           });
         }
-        return;
-      }
-      // 被动 distribute prompt（贯石斧杀被闪抵消后选 2 张弃置强命 / 遗计分配 等
-      // 请求回应型 distribute）。与主动 distribute（制衡/仁德 use，由 enumerateDistributeActions
-      // 处理）不同：这里 actionType='respond'，skillId 由 resolvePendingRespond 推导
-      // （贯石斧/select → '贯石斧'）。
-      // Bug4:此前无此分支，落入下方 info.cardFilter 兜底——deriveCardFilterFromAtom 对
-      // distribute 误推 c.name===skillId 匹配 0 张手牌 → 只生成 skip → AI 永远不发动贯石斧。
-      if (pending.prompt?.type === 'distribute') {
-        const distPrompt = pending.prompt;
-        const mode = distPrompt.mode ?? 'allocate';
-        const me = view.players[ownerId];
-        const equip = (me?.equipment ?? {}) as Partial<Record<string, string>>;
-        if (mode === 'select') {
-          const requestType = getPendingRequestType(pending);
-          if (requestType === '观星/arrange') {
-            // 观星的 distribute 契约不是 cardIds，而是 { top, bottom }。默认「全留顶、
-            // 保持原顺序」：top[0]=最先摸到=牌堆顶，因此 top 是 observed 的逆序；
-            // 这样整理牌堆后顺序不变，是无需 LLM 补参的可执行动作。
-            const observed = distPrompt.cardIds ?? [];
-            out.push({
-              description: `发动【${info.skillId}】（观星：全部留在牌堆顶，保持原顺序）`,
-              message: respondMsg(info.skillId, { top: [...observed].reverse(), bottom: [] }),
-              validTargets: [],
-              category: 'distribute',
-            });
-          } else {
-          // select 模式（贯石斧/神速②/制衡式弃牌 等）：选 minTotal..maxTotal 张。
-          // 候选可凑足下限时才生成 distribute（否则只 skip）；params.cardIds 留空由
-          // agent/LLM 补全——与主动 distribute（enumerateDistributeActions 制衡）一致，
-          // 避免对不同技能（神速②需装备、观星需排列）预填出非法 cardIds。
-          const candidateIds = resolveDistributeCardIds(distPrompt, me?.hand ?? [], equip);
-          const minTotal = distPrompt.minTotal ?? 1;
-          if (candidateIds.length >= minTotal) {
-            out.push({
-              description: `发动【${info.skillId}】（选 ${minTotal} 张${
-                distPrompt.source === 'handAndEquip' ? '手牌或装备' : '手牌'
-              }弃置）`,
-              // 预填可执行的下限选择，避免 agent 原样提交空 cardIds 被拒。
-              message: respondMsg(info.skillId, { cardIds: candidateIds.slice(0, Math.max(minTotal, 1)) }),
-              validTargets: [],
-              category: 'distribute',
-            });
-          }
-          }
-        } else {
-          // allocate 模式（遗计/界遗计 分配 等）：params.allocation 由 agent 补全。
+        if (min === 0) {
           out.push({
-            description: `发动【${info.skillId}】（分配牌给目标，需填 allocation）`,
-            message: respondMsg(info.skillId, { allocation: [] }),
-            validTargets: [],
-            category: 'distribute',
-          });
-        }
-        // 可选询问（非 mandatory）：提供 skip（贯石斧 defaultChoice=false → 不发动）
-        if (pending.target >= 0 && pending.mandatory !== true) {
-          out.push({
-            description: `不发动【${info.skillId}】`,
-            message: buildSkipMessage(ownerId),
-            validTargets: [],
-            category: 'skip',
-          });
-        }
-        return;
-      }
-      // confirm 类（突袭/trigger 等）优先于 cardFilter：
-      //   询问杀/闪 的 prompt 也是 confirm，但它们需要 cardId（atom.type 以「询问」开头）。
-      //   只有 请求回应 + confirm 才是纯确认操作（choice: true/false）。
-      const atomType = atom.type ?? '';
-      const isAskType = atomType.startsWith('询问');
-      // useCardAndTarget 类回应（界天香选牌+选目标 / 乱武·挑衅·借刀杀人 逼杀）：
-      // 既有 cardFilter 又有 targetFilter，agent 须同时提交 cardId + target。
-      // 此前落入下方通用 cardFilter 分支只带 cardId、无目标信息 → 永远被拒（界天香卡死）。
-      if (!isAskType && pending.prompt?.type === 'useCardAndTarget') {
-        const prompt = pending.prompt;
-        const me = view.players[ownerId];
-        // 候选口径与浏览器共用 respondCandidates:投影层 candidates(权威,可能含
-        // 装备区牌,如界天香弃红桃装备)优先;否则 info.cardFilter 过滤手牌。
-        const candidates = respondCandidates(info, me?.hand ?? [], view.cardMap);
-        for (const card of candidates) {
-          const resolved = resolveTargetSelection(view, ownerId, prompt.targetFilter, card);
-          const targetParams: Record<string, Json> = resolved.targets
-            ? { targets: resolved.targets }
-            : {};
-          if (prompt.targetFilter.min > 0 && !resolved.targets) continue;
-          out.push({
-            description: `回应【${info.skillId}】(${card.suit}${card.rank})`,
-            message: respondMsg(info.skillId, { cardId: card.id, ...targetParams }),
-            validTargets: resolved.contract.candidates,
-            targetSelection: resolved.contract,
-            category: 'respond',
-            ...(resolved.contract.min > 1 ? { minTarget: resolved.contract.min } : {}),
-            maxTarget: resolved.contract.max,
-          });
-        }
-        if (pending.target >= 0) {
-          out.push({
-            description: candidates.length === 0 ? `无牌可出，跳过` : `不出【${info.skillId}】`,
-            message: buildSkipMessage(ownerId),
-            validTargets: [],
-            category: 'skip',
-          });
-        }
-        return;
-      }
-      if (!isAskType && pending.prompt?.type === 'confirm') {
-        const confirmLabel = pending.prompt.confirmLabel ?? '确认';
-        const cancelLabel = pending.prompt.cancelLabel ?? '取消';
-        // confirmDisabled(如界狂骨满血):不生成 confirm(choice=true) action,AI 只能选 cancel
-        if (pending.prompt.confirmDisabled !== true) {
-          out.push({
-            description: `${confirmLabel}【${info.skillId}】`,
-            message: respondMsg(info.skillId, { choice: true }),
-            validTargets: [],
-            category: 'respond',
-          });
-        }
-        out.push({
-          description: `${cancelLabel}`,
-          message: respondMsg(info.skillId, { choice: false }),
-          validTargets: [],
-          category: 'skip',
-        });
-      } else if (info.cardFilter) {
-        // 需要选牌（杀/闪等）：为每张可出的牌生成独立 respond action（带 cardId）
-        // 求桃救援（rescueSkillFor）：桃/酒/急救红牌各自走对应技能 respond
-        const me = view.players[ownerId];
-        // 候选口径与浏览器/useCardAndTarget 分支共用 respondCandidates:
-        // candidates(权威)存在时含装备区牌(界鬼才换判定牌的手牌+装备候选),
-        // 否则 info.cardFilter 过滤手牌(求桃:字面桃/酒 ∪ 急救等转化救援并集)。
-        const candidates = respondCandidates(info, me?.hand ?? [], view.cardMap);
-        for (const card of candidates) {
-          const rescueSkill = rescueSkillFor(info, card);
-          out.push({
-            description: `回应【${rescueSkill}】(${card.suit}${card.rank})`,
-            message: respondMsg(rescueSkill, { cardId: card.id }),
-            validTargets: [],
-            category: 'respond',
-          });
-        }
-        // 没有可出的牌或策略性不出：提供 skip
-        // 广播型 pending（target<0）已在上面添加过 skip，不重复
-        if (pending.target >= 0) {
-          out.push({
-            description: candidates.length === 0 ? `无牌可出，跳过` : `不出【${info.skillId}】`,
-            message: buildSkipMessage(ownerId),
+            description: `${choosePrompt.title ?? info.skillId} → 不选择`,
+            message: respondMsg(info.skillId, { targets: [] }),
             validTargets: [],
             category: 'skip',
           });
         }
       } else {
-        // 兜底（choosePlayer 等）：空 params，agent 需自行补全 targets
+        // 多选：描述性 action，agent 需从 validTargets 填 targets。
+        // minTarget/maxTarget 与描述文本同源(prompt.min/max):结构化字段让
+        // agent 不必解析描述文本即可知道要选几个。
+        out.push(describeMultiSelectAction(
+          {
+            description: `${choosePrompt.title ?? info.skillId}（选 ${min}-${max} 个目标）`,
+            skillId: info.skillId,
+            actionType: 'respond',
+            ownerId,
+            category: 'respond',
+          },
+          validTargets,
+          min,
+          max,
+        ));
+      }
+      return;
+    }
+    // chooseOption 类（化身:选技能/选化身牌/选行动等）：每个选项一个 action。
+    if (pending.prompt?.type === 'chooseOption') {
+      const p = pending.prompt;
+      for (const opt of p.options) {
         out.push({
-          description: `回应【${info.skillId}】`,
-          message: respondMsg(info.skillId, {}),
+          description: opt.label,
+          message: respondMsg(info.skillId, { option: opt.value }),
           validTargets: [],
           category: 'respond',
         });
       }
-}
+      return;
+    }
+    // 被动 distribute prompt（贯石斧杀被闪抵消后选 2 张弃置强命 / 遗计分配 等
+    // 请求回应型 distribute）。与主动 distribute（制衡/仁德 use，由 enumerateDistributeActions
+    // 处理）不同：这里 actionType='respond'，skillId 由 resolvePendingRespond 推导
+    // （贯石斧/select → '贯石斧'）。
+    // Bug4:此前无此分支，落入下方 info.cardFilter 兜底——deriveCardFilterFromAtom 对
+    // distribute 误推 c.name===skillId 匹配 0 张手牌 → 只生成 skip → AI 永远不发动贯石斧。
+    if (pending.prompt?.type === 'distribute') {
+      const distPrompt = pending.prompt;
+      const mode = distPrompt.mode ?? 'allocate';
+      const me = view.players[ownerId];
+      const equip = (me?.equipment ?? {}) as Partial<Record<string, string>>;
+      if (mode === 'select') {
+        const requestType = getPendingRequestType(pending);
+        if (requestType === '观星/arrange') {
+          // 观星的 distribute 契约不是 cardIds，而是 { top, bottom }。默认「全留顶、
+          // 保持原顺序」：top[0]=最先摸到=牌堆顶，因此 top 是 observed 的逆序；
+          // 这样整理牌堆后顺序不变，是无需 LLM 补参的可执行动作。
+          const observed = distPrompt.cardIds ?? [];
+          out.push({
+            description: `发动【${info.skillId}】（观星：全部留在牌堆顶，保持原顺序）`,
+            message: respondMsg(info.skillId, { top: [...observed].reverse(), bottom: [] }),
+            validTargets: [],
+            category: 'distribute',
+          });
+        } else {
+        // select 模式（贯石斧/神速②/制衡式弃牌 等）：选 minTotal..maxTotal 张。
+        // 候选可凑足下限时才生成 distribute（否则只 skip）；params.cardIds 留空由
+        // agent/LLM 补全——与主动 distribute（enumerateDistributeActions 制衡）一致，
+        // 避免对不同技能（神速②需装备、观星需排列）预填出非法 cardIds。
+        const candidateIds = resolveDistributeCardIds(distPrompt, me?.hand ?? [], equip);
+        const minTotal = distPrompt.minTotal ?? 1;
+        if (candidateIds.length >= minTotal) {
+          out.push({
+            description: `发动【${info.skillId}】（选 ${minTotal} 张${
+              distPrompt.source === 'handAndEquip' ? '手牌或装备' : '手牌'
+            }弃置）`,
+            // 预填可执行的下限选择，避免 agent 原样提交空 cardIds 被拒。
+            message: respondMsg(info.skillId, { cardIds: candidateIds.slice(0, Math.max(minTotal, 1)) }),
+            validTargets: [],
+            category: 'distribute',
+          });
+        }
+        }
+      } else {
+        // allocate 模式（遗计/界遗计 分配 等）：params.allocation 由 agent 补全。
+        out.push({
+          description: `发动【${info.skillId}】（分配牌给目标，需填 allocation）`,
+          message: respondMsg(info.skillId, { allocation: [] }),
+          validTargets: [],
+          category: 'distribute',
+        });
+      }
+      // 可选询问（非 mandatory）：提供 skip（贯石斧 defaultChoice=false → 不发动）
+      if (pending.target >= 0 && pending.mandatory !== true) {
+        out.push({
+          description: `不发动【${info.skillId}】`,
+          message: buildSkipMessage(ownerId),
+          validTargets: [],
+          category: 'skip',
+        });
+      }
+      return;
+    }
+    // confirm 类（突袭/trigger 等）优先于 cardFilter：
+    //   询问杀/闪 的 prompt 也是 confirm，但它们需要 cardId（atom.type 以「询问」开头）。
+    //   只有 请求回应 + confirm 才是纯确认操作（choice: true/false）。
+    const atomType = atom.type ?? '';
+    const isAskType = atomType.startsWith('询问');
+    // useCardAndTarget 类回应（界天香选牌+选目标 / 乱武·挑衅·借刀杀人 逼杀）：
+    // 既有 cardFilter 又有 targetFilter，agent 须同时提交 cardId + target。
+    // 此前落入下方通用 cardFilter 分支只带 cardId、无目标信息 → 永远被拒（界天香卡死）。
+    if (!isAskType && pending.prompt?.type === 'useCardAndTarget') {
+      const prompt = pending.prompt;
+      const me = view.players[ownerId];
+      // 候选口径与浏览器共用 respondCandidates:投影层 candidates(权威,可能含
+      // 装备区牌,如界天香弃红桃装备)优先;否则 info.cardFilter 过滤手牌。
+      const candidates = respondCandidates(info, me?.hand ?? [], view.cardMap);
+      for (const card of candidates) {
+        const resolved = resolveTargetSelection(view, ownerId, prompt.targetFilter, card);
+        const targetParams: Record<string, Json> = resolved.targets
+          ? { targets: resolved.targets }
+          : {};
+        if (prompt.targetFilter.min > 0 && !resolved.targets) continue;
+        out.push({
+          description: `回应【${info.skillId}】(${card.suit}${card.rank})`,
+          message: respondMsg(info.skillId, { cardId: card.id, ...targetParams }),
+          validTargets: resolved.contract.candidates,
+          targetSelection: resolved.contract,
+          category: 'respond',
+          ...(resolved.contract.min > 1 ? { minTarget: resolved.contract.min } : {}),
+          maxTarget: resolved.contract.max,
+        });
+      }
+      pushOptionalSkip(info.skillId, candidates.length > 0);
+      return;
+    }
+    if (!isAskType && pending.prompt?.type === 'confirm') {
+      const confirmLabel = pending.prompt.confirmLabel ?? '确认';
+      const cancelLabel = pending.prompt.cancelLabel ?? '取消';
+      // confirmDisabled(如界狂骨满血):不生成 confirm(choice=true) action,AI 只能选 cancel
+      if (pending.prompt.confirmDisabled !== true) {
+        out.push({
+          description: `${confirmLabel}【${info.skillId}】`,
+          message: respondMsg(info.skillId, { choice: true }),
+          validTargets: [],
+          category: 'respond',
+        });
+      }
+      out.push({
+        description: `${cancelLabel}`,
+        message: respondMsg(info.skillId, { choice: false }),
+        validTargets: [],
+        category: 'skip',
+      });
+    } else if (info.cardFilter) {
+      // 需要选牌（杀/闪等）：为每张可出的牌生成独立 respond action（带 cardId）
+      // 求桃救援（rescueSkillFor）：桃/酒/急救红牌各自走对应技能 respond
+      const me = view.players[ownerId];
+      // 候选口径与浏览器/useCardAndTarget 分支共用 respondCandidates:
+      // candidates(权威)存在时含装备区牌(界鬼才换判定牌的手牌+装备候选),
+      // 否则 info.cardFilter 过滤手牌(求桃:字面桃/酒 ∪ 急救等转化救援并集)。
+      const candidates = respondCandidates(info, me?.hand ?? [], view.cardMap);
+      for (const card of candidates) {
+        const rescueSkill = rescueSkillFor(info, card);
+        out.push({
+          description: `回应【${rescueSkill}】(${card.suit}${card.rank})`,
+          message: respondMsg(rescueSkill, { cardId: card.id }),
+          validTargets: [],
+          category: 'respond',
+        });
+      }
+      // 没有可出的牌或策略性不出：提供 skip
+      pushOptionalSkip(info.skillId, candidates.length > 0);
+    } else {
+      // 兜底（choosePlayer 等）：空 params，agent 需自行补全 targets
+      out.push({
+        description: `回应【${info.skillId}】`,
+        message: respondMsg(info.skillId, {}),
+        validTargets: [],
+        category: 'respond',
+      });
+    }
+  }
 }

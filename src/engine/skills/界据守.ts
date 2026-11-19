@@ -18,6 +18,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { flipFaceDown, registerFlipSkipTurnHooks } from '../flows/face-down';
 import { markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
+import { defineConfirmAction } from '../util/skillRuntime';
 import {
   validateJushouUse,
   jushouDiscardOrEquip,
@@ -76,15 +77,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineConfirmAction(api, 'use', {
     label: '界据守',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动据守?(翻面摸四张,然后弃置一张手牌)',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动据守?(翻面摸四张,然后弃置一张手牌)',
     activeWhen: (ctx) => {
       if (ctx.view.currentPlayerIndex !== ctx.perspectiveIdx) return false;
       const phase = ctx.view.phase;

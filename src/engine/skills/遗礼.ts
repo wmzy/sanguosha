@@ -19,7 +19,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { addJu, juCount, removeJu } from './怀橘';
 import type { SkillModule } from '../types';
-import { askConfirm, currentRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '遗礼';
 
@@ -52,10 +52,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const rt = currentRequestType(st, ownerId);
-      if (rt !== CONFIRM_RT && rt !== COST_RT && rt !== TARGET_RT) {
-        return '当前不是遗礼询问';
-      }
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, COST_RT, TARGET_RT], {
+        mismatchError: '当前不是遗礼询问',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === CONFIRM_RT) return null; // confirm:任意 choice 均可
 
       if (rt === COST_RT) {

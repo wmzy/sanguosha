@@ -16,7 +16,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond, defineConfirmAction, registerDamageBonusHook } from '../util/skillRuntime';
 
 const BONUS_TAG = '裸衣/bonus';
 const CONFIRM_REQUEST = '裸衣/confirm';
@@ -73,26 +73,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     },
   );
 
-  // ── 造成伤害 before hook:杀/决斗伤害 +1 ──
-  registerBeforeHook(
-    state,
-    skill.id,
-    ownerId,
-    '造成伤害时',
-    async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.source !== ownerId) return;
-      if ((atom.amount ?? 0) <= 0) return;
-      const self = ctx.state.players[ownerId];
-      if (!self?.tags.includes(BONUS_TAG)) return;
-      const cardId = atom.cardId;
-      if (typeof cardId !== 'string') return;
-      const card = ctx.state.cardMap[cardId];
-      if (!card) return;
-      if (card.name !== '杀' && card.name !== '决斗') return;
-      return { kind: 'modify', atom: { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as typeof ctx.atom };
-    },
-  );
+  // ── 造成伤害 before hook:杀/决斗伤害 +1(共享增伤工厂,裸衣/界裸衣 同款守卫链) ──
+  registerDamageBonusHook(state, skill.id, ownerId, { tag: BONUS_TAG, cardNames: ['杀', '决斗'] });
 
   // ── 回合结束 after hook:许褚自己回合结束时清除增伤标签(官方"本回合"语义)──
   // 许褚摸牌阶段设标签 → 持续到许褚自己回合结束清除(本回合内生效)。

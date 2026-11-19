@@ -36,12 +36,13 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界乱击'(避开标乱击冲突);
 //   内部 Skill.name = '乱击'(OL 官方技能名,玩家可见)。
-import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction } from '../core/skill';
 import { applyAtom } from '../core/apply';
 import { runUseFlow, chargeOnSettle } from './cards/use-card';
-import { defaultPlayActive } from '../rules/action-active';
-import { requireRequestType, registerTransformAction, mountTransformAction, engineCanPlayNowReason, type TransformActionOptions } from '../util/skillRuntime';
+import { requireRequestType, registerTransformAction, mountTransformAction, engineCanPlayNowReason, firstTarget, type TransformActionOptions } from '../util/skillRuntime';
+import { alivePlayersClockwiseFrom } from '../util/player-query';
+import { OPTIONS } from './乱击';
 
 const SKILL_ID = '界乱击';
 const DISPLAY_NAME = '乱击';
@@ -50,46 +51,17 @@ const SKIP_TARGET_RT = `${SKILL_ID}/skipTarget`;
 /** localVars key:玩家选择的排除目标座次(number | undefined | null) */
 const SKIP_TARGET_KEY = `${SKILL_ID}/skipTargetChoice`;
 
+// 转化部分与标版完全一致:spread 乱击.ts 的共享 OPTIONS(cardPredicate/comboFilter/
+// activeWhen 同花色扫描/targetFilter 逐字共用),仅覆盖界版文案差异(invalidError/
+// prompt.title)。影子后缀 `${id1}#${id2}#界乱击` 由注册时的 skill.id 决定,与标版天然隔离。
 const TRANSFORM_OPTIONS: TransformActionOptions = {
-  outputName: '万箭齐发',
-  // 两张手牌 → 影子 id = `${id1}#${id2}#界乱击`(后缀 = 技能 id,避免与标版冲突)
-  cardCount: 2,
-  needCardsError: '需要选择 2 张手牌',
-  // 乱击核心条件:两张牌花色相同(同花色,suit 严格相等)
-  cardPredicate: (state, _ownerId, cardIds) => {
-    const [c1, c2] = cardIds.map((id) => state.cardMap[id]);
-    return !!c1 && !!c2 && c1.suit !== '' && c1.suit === c2.suit;
-  },
+  ...OPTIONS,
   invalidError: '界乱击需要两张同花色的手牌',
   mount: {
-    label: DISPLAY_NAME,
-    style: 'danger',
+    ...OPTIONS.mount,
     prompt: {
-      // useCardAndTarget 才会进入前端 transformMode(多卡转化);万箭齐发是 AOE
-      // 无需选目标,targetFilter max=0 表示不强制选目标(直接提交)。
-      type: 'useCardAndTarget',
+      ...OPTIONS.mount.prompt,
       title: '选择 2 张同花色的手牌当万箭齐发使用(界版:可少选一个目标)',
-      cardFilter: {
-        filter: () => true,
-        min: 2,
-        max: 2,
-        // 同花色配对约束(与后端 validate 同源):无头枚举/浏览器据此过滤组合
-        comboFilter: (cards: Card[]) => cards[0]?.suit === cards[1]?.suit,
-      },
-      targetFilter: { min: 0, max: 0 },
-    },
-    activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
-      const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p?.hand) return false;
-      // 至少存在两张同花色手牌才可发动
-      const suitCount: Record<string, number> = {};
-      for (const c of p.hand) {
-        if (!c.suit) continue;
-        suitCount[c.suit] = (suitCount[c.suit] ?? 0) + 1;
-        if (suitCount[c.suit] >= 2) return true;
-      }
-      return false;
     },
   },
 };
@@ -134,17 +106,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const cardId = params.cardId as string;
 
       // 计算默认目标:除使用者外所有存活角色,从下家起逆时针
-      const alivePlayers = state.players.filter((p) => p.alive);
-      const n = alivePlayers.length;
-      const defaultTargets: number[] = [];
-      if (n > 1) {
-        const fromPos = alivePlayers.findIndex((p) => p.index === from);
-        if (fromPos >= 0) {
-          for (let i = 1; i < n; i++) {
-            defaultTargets.push(alivePlayers[(fromPos - i + n) % n].index);
-          }
-        }
-      }
+      // (from 为使用者必存活;fromPos<0 的升序兜底分支实际不可达)
+      const defaultTargets = alivePlayersClockwiseFrom(state, from, { includeSelf: false });
 
       // ── "少选一个目标"询问(界版核心):从默认目标中可选排除至多 1 名 ──
       // 仅当默认目标 ≥ 1 时才有意义询问(0 个目标时万箭齐发无效果,但仍走流程)
@@ -202,21 +165,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
       });
       if (check.error) return check.error;
       // choosePlayer 契约:单选发 {target,targets:[t]};「不选择」发 {targets:[]}。
-      // params.target:未选(undefined/null)=不排除;选了 = 座次号
-      const target =
-        (params.target as number | undefined) ??
-        (Array.isArray(params.targets) ? (params.targets as number[])[0] : undefined);
-      if (target === undefined || target === null) return null;
-      if (typeof target !== 'number') return 'target 必须为数字';
+      // 未选(undefined/null)=不排除;选了 = 座次号(firstTarget 两形状归一读取)
+      const target = firstTarget(params);
+      if (target === undefined) return null;
       if (!state.players[target]?.alive) return '目标不存在或已死亡';
       // target 必须在候选目标中(由 prompt.filter 限制,后端兜底)
       return null;
     },
     async (state: GameState, params: Record<string, Json>) => {
-      const target =
-        (params.target as number | undefined) ??
-        (Array.isArray(params.targets) ? (params.targets as number[])[0] : undefined);
-      state.localVars[SKIP_TARGET_KEY] = typeof target === 'number' ? target : null;
+      const target = firstTarget(params);
+      state.localVars[SKIP_TARGET_KEY] = target ?? null;
     },
   );
 

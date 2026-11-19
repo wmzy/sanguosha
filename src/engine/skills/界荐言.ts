@@ -31,7 +31,7 @@ import { registerAction } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import type { GameView } from '../types';
 import type { SkillModule } from '../types';
-import { requireRequestType, askResponse, engineCanPlayNowReason } from '../util/skillRuntime';
+import { requireRequestType, askResponse, engineCanPlayNowReason, firstTarget, defineConfirmAction } from '../util/skillRuntime';
 import { setPlayerVarUsage } from '../rules/turn-usage';
 import { usedThisTurn as usedOncePerTurn } from '../rules/once-per-turn';
 import { isMaleAlive } from '../util/player-query';
@@ -101,7 +101,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           return '声明不合法(基本牌/锦囊牌/装备牌/红/黑)';
         }
       } else if (rt === TARGET_RT) {
-        const t = params.target ?? (Array.isArray(params.targets) ? params.targets[0] : undefined);
+        const t = firstTarget(params);
         if (typeof t !== 'number') return '需要选择目标';
         if (!isMaleAlive(st, t)) return '目标必须是男性角色';
       }
@@ -116,7 +116,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           st.localVars[DECLARATION_KEY] = decl;
         }
       } else if (rt === TARGET_RT) {
-        const t = params.target ?? (Array.isArray(params.targets) ? params.targets[0] : undefined);
+        const t = firstTarget(params);
         if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
       }
     },
@@ -235,19 +235,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineConfirmAction(api, 'use', {
     label: DISPLAY_NAME,
-    style: 'primary',
+    title: '是否发动荐言?',
     activeWhen: (ctx) => {
       // 出牌阶段 + 自己回合 + 无阻塞 pending + 本回合未用过荐言
       if (!defaultPlayActive(ctx)) return false;
       return !ctx.view.players[ctx.perspectiveIdx]?.turnUsage?.[USED_KEY];
-    },
-    prompt: {
-      type: 'confirm',
-      title: '是否发动荐言?',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
     },
   });
 }

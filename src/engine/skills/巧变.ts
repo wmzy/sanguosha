@@ -38,7 +38,7 @@ import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/
 import { skipPhase } from '../rules/skip-phase';
 import { fieldCardIds, moveFieldCard } from '../flows/field-card';
 import { tuxiStealCards } from './突袭';
-import { defineConfirmAction, firstCardId } from '../util/skillRuntime';
+import { defineConfirmAction, firstCardId, firstTarget } from '../util/skillRuntime';
 
 const SKILL_NAME = '巧变';
 
@@ -321,9 +321,7 @@ export function handleQiaobianRespond(
     return;
   }
   if (rt === `${skillName}/move-source-player`) {
-    const t =
-      (params.targets as number[] | undefined)?.[0] ??
-      (typeof params.target === 'number' ? params.target : undefined);
+    const t = firstTarget(params);
     if (typeof t === 'number') st.localVars[`${skillName}/moveSourcePlayer`] = t;
     return;
   }
@@ -333,9 +331,7 @@ export function handleQiaobianRespond(
     return;
   }
   if (rt === `${skillName}/move-dest-player`) {
-    const t =
-      (params.targets as number[] | undefined)?.[0] ??
-      (typeof params.target === 'number' ? params.target : undefined);
+    const t = firstTarget(params);
     if (typeof t === 'number') st.localVars[`${skillName}/moveDestPlayer`] = t;
     return;
   }

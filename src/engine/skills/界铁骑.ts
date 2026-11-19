@@ -22,6 +22,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerSuppressionProvider } from '../core/skill-suppression';
 import { createTieqiSkill, type TieqiOptions } from './铁骑';
+import { currentRequestType, requireRequestType } from '../util/skillRuntime';
 
 /** 标签:目标本回合非锁定技失效(index.runBeforeHooks/runAfterHooks 读取) */
 export const SUPPRESSION_TAG = '界铁骑/非锁定技失效';
@@ -53,14 +54,15 @@ const OPTIONS: TieqiOptions = {
           pid,
           'respond',
           (st: GameState, params: Record<string, unknown>): string | null => {
-            const slot = st.pendingSlots.get(pid);
-            if (!slot) return '当前不需要回应';
-            const atom = slot.atom as { type?: string; requestType?: string };
-            if (atom.type !== '请求回应') return '当前不是请求回应';
-            if (atom.requestType === '界铁骑/confirm') {
+            const check = requireRequestType(st, pid, ['界铁骑/confirm', DISCARD_REQUEST], {
+              mismatchError: '当前不是铁骑回应',
+              wrongTypeError: '当前不是请求回应',
+            });
+            if (check.error) return check.error;
+            if (check.requestType === '界铁骑/confirm') {
               return null; // 确认型:无需额外校验
             }
-            if (atom.requestType === DISCARD_REQUEST) {
+            if (check.requestType === DISCARD_REQUEST) {
               const cardId = params.cardId as string | undefined;
               if (typeof cardId !== 'string') return '请选择一张手牌弃置';
               if (!st.players[pid].hand.includes(cardId)) return '牌不在手牌中';
@@ -74,8 +76,7 @@ const OPTIONS: TieqiOptions = {
             return '当前不是铁骑回应';
           },
           async (st: GameState, params: Record<string, unknown>) => {
-            const slot = st.pendingSlots.get(pid);
-            const reqType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+            const reqType = currentRequestType(st, pid);
             if (reqType === '界铁骑/confirm') {
               st.localVars[CONFIRM] = params.choice === true || params.confirmed === true;
             } else if (reqType === DISCARD_REQUEST) {

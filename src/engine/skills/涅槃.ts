@@ -25,6 +25,7 @@ import { setChain } from '../flows/face-down';
 import { locateCard } from '../core/judge-zone';
 import { registerAfterHook } from '../core/skill';
 import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
+import { equipmentCardIds } from '../util/player-query';
 import type { SkillModule } from '../types';
 
 /** 涅槃族差异参数(标/界共享实现,差异全部显式注入)。 */
@@ -102,9 +103,7 @@ export function createNiepanSkill(opts: NiepanOptions) {
       const player = ctx.state.players[ownerId];
       // 先快照(转移过程中数组会变)
       const handCards = [...player.hand];
-      const equipCards = Object.values(player.equipment).filter(
-        (id): id is string => typeof id === 'string',
-      );
+      const equipCards = equipmentCardIds(player);
       const judgeTricks = player.pendingTricks.map((t) => ({
         trickName: t.name,
         cardId: t.card.id,

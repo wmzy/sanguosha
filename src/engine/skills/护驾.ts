@@ -33,7 +33,7 @@ import { applyAtom } from '../core/apply';
 import { setTurnVarUsage } from '../rules/turn-usage';
 import { registerAction, registerAfterHook, declareAlternativeResponse } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 /** 护驾族差异参数(标/界共享实现,差异全部显式注入)。 */
 export interface HujiaOptions {
@@ -297,15 +297,10 @@ export function createHujiaSkill(opts: HujiaOptions) {
     //   用 Map.set 覆盖;同 key 的第二次 defineAction 会覆盖第一次。故多条 respond
     //   必须合并为一条,否则曹操的护驾按钮会被魏角色定义覆盖而无法发动护驾。
     //   魏角色的出闪卡牌筛选由 pending 的 candidates(投影层注入)驱动,不依赖本 action。
-    api.defineAction('respond', {
+    defineConfirmAction(api, 'respond', {
       label: opts.displayName,
-      style: 'primary',
-      prompt: {
-        type: 'confirm',
-        title: '护驾:令魏势力角色替你出闪?',
-        confirmLabel: '护驾',
-        cancelLabel: '不发动',
-      },
+      title: '护驾:令魏势力角色替你出闪?',
+      confirmLabel: '护驾',
       activeWhen: (ctx) => {
         const slot = ctx.view.pending;
         if (!slot) return false;

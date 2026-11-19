@@ -19,7 +19,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, askConfirm, registerRespondForAllSeats, engineCanPlayNowReason } from '../util/skillRuntime';
+import { requireRequestType, askConfirm, registerRespondForAllSeats, engineCanPlayNowReason, defineConfirmAction } from '../util/skillRuntime';
 
 /** 目标二选一请求类型。 */
 const CHOICE_REQUEST = '界反间/choice';
@@ -153,15 +153,12 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       (ctx.view.players[ctx.perspectiveIdx]?.hand?.length ?? 0) > 0,
   });
 
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '界反间',
     style: 'danger',
-    prompt: {
-      type: 'confirm',
-      title: '反间:展示所有手牌弃置同色牌，或失去1点体力',
-      confirmLabel: '展示并弃置同色牌',
-      cancelLabel: '失去1点体力',
-    },
+    title: '反间:展示所有手牌弃置同色牌，或失去1点体力',
+    confirmLabel: '展示并弃置同色牌',
+    cancelLabel: '失去1点体力',
   });
 
   return () => {};

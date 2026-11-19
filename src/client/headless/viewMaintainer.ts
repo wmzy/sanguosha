@@ -5,6 +5,7 @@ import { viewReducer } from '../view/reducer';
 import type { GameView, ViewEvent } from '../../engine/types';
 import type { ServerMessage, RoomConfig } from '../../server/protocol';
 import type { ClientPhase, RoomState } from './types';
+import { shouldClearPending, syncDeadline, cloneViewForMutation } from '../utils/viewMaintenance';
 
 export interface ViewSnapshot {
   view: GameView | null;
@@ -63,42 +64,16 @@ export function applyServerMessage(
       if (msg.notify) {
         if (msg.notify.eventType === 'pendingResolved') {
           const target = (msg.notify.data as { target?: number }).target;
-          if (target !== undefined && (target < 0 || view.pending?.target === target)) {
-            view = { ...view, pending: null, deadline: null, deadlineTotalMs: 0 };
+          if (target !== undefined && shouldClearPending(view.pending, target, view.viewer)) {
+            view = { ...view, pending: null };
+            syncDeadline(view, null);
           }
         }
       }
       if (msg.view) {
-        // viewReducer 原地突变；复制一份避免污染外部引用。
-        // zones 需单独浅拷贝（processing 数组亦需复制，因 applyView 会 push/filter 它），
-        // 否则 prev/next 的 zones 同引用，ZoneInfoBar 的 memo 比较器会读到已被原地
-        // 突变的同一值而永远判等，导致弃牌堆/处理区显示冻结（Bug 1 & Bug 2）。
-        // log 同理需拷贝：viewReducer 会 push 新条目，若不拷贝则 GameLog 的 memo
-        // 比较器看到同一引用 → length/末尾条目永远相等 → 日志面板冻结。
-        view = {
-          ...view,
-          // players 需深拷贝:viewReducer 原地突变 player 字段(health/hand/equipment/
-          // marks/skills…),若不拷贝则 prev/next 的 player 同引用,playerVisibleEqual
-          // 比较同一对象永远判等 → 座位卡 HP/装备/标记显示冻结;且 useAnimationState 的
-          // [view.players] 依赖不变 → 伤害闪烁动画失效。深拷贝每个 player 的数组/对象字段,
-          // 让 memo 比较器读到独立副本,正确触发 re-render(与 zones/log 同理)。
-          players: view.players.map((p) => ({
-            ...p,
-            hand: p.hand ? [...p.hand] : p.hand,
-            skills: [...(p.skills ?? [])],
-            marks: [...(p.marks ?? [])],
-            // tags/judgeZone/vars 不进 GameView（ViewPlayer 无此字段，见 view.ts）——
-            // 它们是 state player 的内部状态，不投影到前端。原深拷贝是旧残留，类型报 TS2339。
-            equipment: { ...(p.equipment ?? {}) },
-            pendingTricks: [...(p.pendingTricks ?? [])],
-            distanceVars: p.distanceVars ? { ...p.distanceVars } : p.distanceVars,
-            turnUsage: p.turnUsage ? { ...p.turnUsage } : p.turnUsage,
-          })),
-          zones: view.zones
-            ? { ...view.zones, processing: [...(view.zones.processing ?? [])] }
-            : view.zones,
-          log: [...view.log],
-        };
+        // viewReducer 原地突变；复制一份避免污染外部引用(含 memo 冻结规避,
+        // 覆盖字段与理由见 cloneViewForMutation 的 doc comment)。
+        view = cloneViewForMutation(view);
         viewReducer(view, msg.view, msg.timestamp);
         newEvents.push(msg.view);
       }
@@ -113,19 +88,12 @@ export function applyServerMessage(
             },
           };
         }
-        view = {
-          ...view,
-          deadline: msg.deadline !== null ? msg.deadline.deadline : null,
-          deadlineTotalMs: msg.deadline !== null ? msg.deadline.totalMs : 0,
-        };
+        view = { ...view };
+        syncDeadline(view, msg.deadline);
       }
       if (msg.pending !== undefined) {
-        view = {
-          ...view,
-          pending: msg.pending,
-          deadline: msg.pending?.deadline ?? null,
-          deadlineTotalMs: msg.pending?.totalMs ?? 0,
-        };
+        view = { ...view, pending: msg.pending };
+        syncDeadline(view, msg.pending);
       }
       return { ...base, view, lastSeq: msg.seq, newEvents };
     }

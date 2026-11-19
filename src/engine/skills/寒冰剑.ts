@@ -5,7 +5,7 @@ import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '寒冰剑', description: '武器:杀造成伤害时可改为依次弃目标2张牌', isLocked: true };
@@ -111,14 +111,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '寒冰剑',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '寒冰剑：是否改为弃目标2张？',
-      confirmLabel: '弃牌',
-      cancelLabel: '正常伤害',
-    },
+    title: '寒冰剑：是否改为弃目标2张？',
+    confirmLabel: '弃牌',
+    cancelLabel: '正常伤害',
   });
 }

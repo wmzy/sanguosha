@@ -37,6 +37,7 @@ import type { FrontendAPI, GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAfterHook } from '../core/skill';
+import { defineConfirmAction } from '../util/skillRuntime';
 import { askTyrannyJudgeAfterDamage, registerTyrannyConfirmRespond } from './暴虐';
 
 const CONFIRM_RT = '界暴虐/confirm';
@@ -97,15 +98,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '暴虐',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动暴虐?(判定,黑桃回复1点体力并获得判定牌)',
-      confirmLabel: '判定',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动暴虐?(判定,黑桃回复1点体力并获得判定牌)',
+    confirmLabel: '判定',
   });
 }
 

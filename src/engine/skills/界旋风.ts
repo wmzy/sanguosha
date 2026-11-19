@@ -47,8 +47,8 @@ import { registerAction, registerAfterHook, registerBeforeHook } from '../core/s
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
-import { hasDiscardableCards } from '../util/player-query';
+import { askConfirm, defineConfirmAction, firstTarget } from '../util/skillRuntime';
+import { equipmentCardIds, hasDiscardableCards } from '../util/player-query';
 
 const _SKILL_ID = '界旋风';
 const DISPLAY_NAME = '旋风';
@@ -191,9 +191,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return;
       }
       if (rt === PICK_TARGET_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? params.target : undefined);
+        const t = firstTarget(params);
         if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
         return;
       }
@@ -229,11 +227,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   registerBeforeHook(state, skill.id, ownerId, '弃置', async (ctx) => {
     const atom = ctx.atom;
     if (atom.player !== ownerId) return;
-    const myEquip = new Set(
-      Object.values(ctx.state.players[ownerId].equipment).filter(
-        (id): id is string => typeof id === 'string',
-      ),
-    );
+    const myEquip = new Set(equipmentCardIds(ctx.state.players[ownerId]));
     const cardIds = atom.cardIds ?? [];
     const equipLoss = cardIds.filter((id) => myEquip.has(id)).length;
     // 写入本次 atom 的快照(无论是否触发,after 都会清理)
@@ -258,11 +252,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   registerBeforeHook(state, skill.id, ownerId, '获得', async (ctx) => {
     const atom = ctx.atom;
     if (atom.from !== ownerId) return;
-    const myEquip = new Set(
-      Object.values(ctx.state.players[ownerId].equipment).filter(
-        (id): id is string => typeof id === 'string',
-      ),
-    );
+    const myEquip = new Set(equipmentCardIds(ctx.state.players[ownerId]));
     if (atom.cardId && myEquip.has(atom.cardId)) {
       ctx.state.localVars[OBTAIN_EQUIP_KEY] = 1;
     }

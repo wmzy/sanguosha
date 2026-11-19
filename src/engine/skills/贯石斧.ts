@@ -10,6 +10,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction } from '../core/skill';
 import { setFrameCancelled } from '../core/frame';
 import { requireRequestType, registerOnOwnSlashDodged } from '../util/skillRuntime';
+import { equipmentCardIds } from '../util/player-query';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -39,9 +40,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!self) return 'player not found';
       const [id1, id2] = cardIds as string[];
       if (id1 === id2) return '不能选择同一张牌';
-      const equipIds = Object.values(self.equipment).filter(
-        (id): id is string => typeof id === 'string',
-      );
+      const equipIds = equipmentCardIds(self);
       const allOwn = [id1, id2].every((id) => self.hand.includes(id) || equipIds.includes(id));
       if (!allOwn) return '所选牌不在你的手牌或装备区';
       return null;
@@ -60,9 +59,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!self) return;
 
       // 可弃牌数不足 2 张时无法强命(手牌 + 装备区)
-      const equipIds = Object.values(self.equipment).filter(
-        (id): id is string => typeof id === 'string',
-      );
+      const equipIds = equipmentCardIds(self);
       const availableCount = self.hand.length + equipIds.length;
       if (availableCount < 2) return;
 

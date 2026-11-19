@@ -31,7 +31,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { spliceHandOrderEntry } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY as PICK_KEY } from '../rules/vars-keys';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import { EQUIP_SLOTS } from '../util/equip-slot';
 
 const _SKILL_NAME = '界补益';
@@ -233,13 +233,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   // 补益是被动技,没有主动 use action;前端 UI 由 pending prompt 驱动
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '补益',
-    },
+    title: '补益',
   });
   return () => {};
 }

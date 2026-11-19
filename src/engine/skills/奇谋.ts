@@ -35,7 +35,7 @@ import {
   DISTANCE_ATTACK_MOD_KEY as ATTACK_KEY,
   getDistanceAttackMod,
 } from '../rules/vars-keys';
-import { requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
+import { requireRequestType, engineCanPlayNowReason, defineConfirmAction } from '../util/skillRuntime';
 
 /** 限定技已用标记(player.vars,整局一次,无自动清理后缀) */
 const USED_KEY = '奇谋/used';
@@ -215,24 +215,18 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineConfirmAction(api, 'use', {
     label: '奇谋',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动奇谋?(限定技)',
-      description:
-        '出牌阶段:失去任意点体力并摸等量的牌,本回合你计算与其他角色的距离-X且使用【杀】的限制次数+X',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动奇谋?(限定技)',
+    description:
+      '出牌阶段:失去任意点体力并摸等量的牌,本回合你计算与其他角色的距离-X且使用【杀】的限制次数+X',
     activeWhen: (ctx) => defaultPlayActive(ctx),
   });
   // respond:选 X。前端按 pending 自带的 chooseOption options 渲染按钮(同化身)。
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '选择体力值',
+    title: '奇谋:选择失去的体力值',
     style: 'default',
-    prompt: { type: 'confirm', title: '奇谋:选择失去的体力值' },
   });
   return () => {};
 }

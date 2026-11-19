@@ -18,7 +18,7 @@ import type { AtomAfterContext, AtomOfName, FrontendAPI, GameState, Skill } from
 import { applyAtom } from '../core/apply'
 import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '暴虐/confirm';
 const CONFIRMED_KEY = '暴虐/confirmed';
@@ -134,15 +134,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): void {
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: '暴虐',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动暴虐?(判定,黑桃回复1点体力)',
-      confirmLabel: '判定',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动暴虐?(判定,黑桃回复1点体力)',
+    confirmLabel: '判定',
   });
 }
 

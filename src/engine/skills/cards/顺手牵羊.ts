@@ -7,6 +7,7 @@
 import type { Card } from '../../types';
 import { createPickPanelResolve, createPickPanelRespond } from './_pickPanel';
 import { distanceOneTargetFilter, distanceWithinOneOk } from './_distanceOne';
+import { hasObtainableCards } from '../../util/player-query';
 import type { CardEffect } from '../../types';
 
 const PICK_REQUEST_TYPE = '顺手牵羊_选牌';
@@ -27,9 +28,7 @@ function canUseSnatch(
     return '距离太远';
   const p = state.players[target];
   if (!p) return '目标不合法';
-  const hasCards =
-    p.hand.length > 0 || Object.keys(p.equipment).length > 0 || p.pendingTricks.length > 0;
-  if (!hasCards) return '目标无可获取的牌';
+  if (!hasObtainableCards(p)) return '目标无可获取的牌';
   return null;
 }
 

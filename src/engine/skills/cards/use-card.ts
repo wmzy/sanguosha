@@ -4,7 +4,14 @@
 // CardEffect 定义在 types/card-effect.ts,数据聚合在 skills/cards/index.ts(cardEffectMap)。
 // validate 在 skills/cards/validate.ts,帧状态操作(isCancelled 等)在 core/frame.ts。
 
-import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../../types';
+import type {
+  FrontendAPI,
+  GameState,
+  Json,
+  SettlementFrame,
+  Skill,
+  SkillModule,
+} from '../../types';
 import { applyAtom } from '../../core/apply'
 import { frameCards, popFrame, pushFrame, setFrameCancelled, topFrame } from '../../core/frame';
 import { registerAction, registerBeforeHook, registerAfterHook } from '../../core/skill';
@@ -106,6 +113,27 @@ export interface RunUseFlowOpts {
   onSettle?: () => Promise<void>;
 }
 
+/** 声明/结算阶段逐目标循环的公共守卫迭代器：每轮迭代重读帧参数
+ *  （resolvedTargets/skippedTargets——「成为目标」before-hook 如流离可能经
+ *  帧参数赋值 中途改写，不能在循环外预展开），逐座次过 存活/skipped 过滤。
+ *  yield { index, target }：index 为 targets 数组原始序号（结算的 targetIndex 取它）。
+ *  skipSkipped=true 对应 指定目标后/成为目标后/结算 循环跳过被取消目标；
+ *  「成为目标」循环自身不做 skipped 过滤（它正是 skippedTargets 的生产者）。 */
+function* eachActiveTarget(
+  state: GameState,
+  frame: SettlementFrame,
+  targets: number[],
+  opts: { skipSkipped?: boolean } = {},
+): Generator<{ index: number; target: number }> {
+  for (let i = 0; i < targets.length; i++) {
+    const resolved = (frame.params.resolvedTargets as number[]) ?? targets;
+    const target = resolved[i];
+    if (!state.players[target]?.alive) continue;
+    if (opts.skipSkipped && (frame.params.skippedTargets as number[]).includes(target)) continue;
+    yield { index: i, target };
+  }
+}
+
 /**
  * runUseFlow：编排使用事件的完整结算流程（文档 use.md）。
  *
@@ -143,18 +171,22 @@ export async function runUseFlow(
     // 时机1：选择目标时（转化技 before-hook 可替换牌）
     await applyAtom(state, { type: '选择目标时', source, cardId, targets });
 
+    // 声明前置牌移动：手牌 → 处理区（effect/delayed/普通三分支同一移动，统一前置；
+    //   虚拟使用无实体牌，跳过。延迟类锦囊的「添加延时锦囊（置入判定区）」仍推迟到
+    //   「成为目标」之后，使帷幕/空城等 before-hook 有机会先取消非法目标）。
+    if (!opts?.virtual) {
+      await applyAtom(state, {
+        type: '移动牌',
+        cardId,
+        from: { zone: '手牌', player: source },
+        to: { zone: '处理区' },
+      });
+    }
+
     // effect kind（闪/无懈）：目标是当前生效中的效果，无玩家目标。
     // 跳过目标声明循环，但保留牌移动（手牌→处理区→弃牌堆）和完整 settlement phase。
     // resolve 中设下层帧 cancelled=true。skipWuxie=opts.virtual（虚拟使用不询问抵消）。
     if (effect.target.kind === 'effect') {
-      if (!opts?.virtual) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '手牌', player: source },
-          to: { zone: '处理区' },
-        });
-      }
       await applyAtom(state, { type: '使用时', source, cardId });
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- 布尔 OR 语义:false || true 必须为 true,?? 会误返回 false
       await runSettlementPhase(state, effect, source, source, cardId, 0, opts?.virtual || opts?.skipCancelQuery);
@@ -173,29 +205,6 @@ export async function runUseFlow(
       return;
     }
 
-    if (effect.delayed) {
-      // 延迟类锦囊：先展示置入处理区（手牌→处理区）。
-      //   添加延时锦囊（置入判定区）推迟到「成为目标」之后，使帷幕/空城等 before-hook
-      //   有机会先取消非法目标，再决定是否置入其判定区。虚拟使用无实体牌，跳过牌移动。
-      if (!opts?.virtual) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '手牌', player: source },
-          to: { zone: '处理区' },
-        });
-      }
-    } else if (!opts?.virtual) {
-      // 基本/普通锦囊/装备：置入处理区（手牌 → 处理区）
-      // 虚拟使用无实体牌，跳过
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: source },
-        to: { zone: '处理区' },
-      });
-    }
-
     // 时机2：使用时（集智/强识 after-hook 摸牌）
     await applyAtom(state, { type: '使用时', source, cardId });
 
@@ -207,10 +216,7 @@ export async function runUseFlow(
     // 声明阶段：逐目标 成为目标（空城/帷幕 before-hook 可 cancel → false = 标记跳过该目标）
     //   cancel 的目标记录到 frame.params.skippedTargets，后续 指定目标后/成为目标后/结算 循环统一跳过。
     //   逐时机跨所有目标：所有目标的「成为目标」先全部完成，再进入下一时机。
-    for (let i = 0; i < targets.length; i++) {
-      const resolved = (frame.params.resolvedTargets as number[]) ?? targets;
-      const target = resolved[i];
-      if (!state.players[target]?.alive) continue;
+    for (const { target } of eachActiveTarget(state, frame, targets)) {
       const becameTarget = await applyAtom(state, {
         type: '成为目标',
         source,
@@ -253,20 +259,12 @@ export async function runUseFlow(
     }
 
     // 声明阶段：逐目标 指定目标后（铁骑/烈弓/无双①/肉林① after-hook）
-    for (let i = 0; i < targets.length; i++) {
-      const resolved = (frame.params.resolvedTargets as number[]) ?? targets;
-      const target = resolved[i];
-      if (!state.players[target]?.alive) continue;
-      if ((frame.params.skippedTargets as number[]).includes(target)) continue;
+    for (const { target } of eachActiveTarget(state, frame, targets, { skipSkipped: true })) {
       await applyAtom(state, { type: '指定目标后', source, target, cardId });
     }
 
     // 声明阶段：逐目标 成为目标后（贞烈/啖酪/无双②/肉林② after-hook）
-    for (let i = 0; i < targets.length; i++) {
-      const resolved = (frame.params.resolvedTargets as number[]) ?? targets;
-      const target = resolved[i];
-      if (!state.players[target]?.alive) continue;
-      if ((frame.params.skippedTargets as number[]).includes(target)) continue;
+    for (const { target } of eachActiveTarget(state, frame, targets, { skipSkipped: true })) {
       await applyAtom(state, { type: '成为目标后', source, target, cardId });
     }
 
@@ -274,14 +272,13 @@ export async function runUseFlow(
     //   延迟类锦囊不走结算循环（延迟到判定阶段 resumeDelayedSettlement 恢复），
     //   但上方声明阶段的 4 个时机已对延时锦囊执行（对齐 use.md 声明阶段）。
     //   被取消的目标（skippedTargets）跳过结算。
-    for (let i = 0; i < targets.length; i++) {
-      const resolved = (frame.params.resolvedTargets as number[]) ?? targets;
-      const target = resolved[i];
-      if (!state.players[target]?.alive) continue;
-      if (effect.delayed) continue;
-      if ((frame.params.skippedTargets as number[]).includes(target)) continue;
-      // 使用结算中：检测有效性 → 生效前 → 生效时 → 生效后 → 使用结算结束时
-      await runSettlementPhase(state, effect, source, target, cardId, i, opts?.virtual);
+    if (!effect.delayed) {
+      for (const { index, target } of eachActiveTarget(state, frame, targets, {
+        skipSkipped: true,
+      })) {
+        // 使用结算中：检测有效性 → 生效前 → 生效时 → 生效后 → 使用结算结束时
+        await runSettlementPhase(state, effect, source, target, cardId, index, opts?.virtual);
+      }
     }
 
     // ── 使用结算后：使用结算结束后时机（use.md 使用结算后）──

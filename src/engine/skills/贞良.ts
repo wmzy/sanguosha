@@ -33,7 +33,7 @@ import { defaultPlayActive } from '../rules/action-active';
 import { viewCanAttack } from '../rules/viewDistance';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { REN_MARK_ID, getRenColor } from './明任';
-import { askConfirm, requireRequestType, defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
+import { askConfirm, requireRequestType, defineConfirmAction, firstTarget, engineCanPlayNowReason } from '../util/skillRuntime';
 import { createYinYangState } from '../rules/turn-usage';
 
 const SKILL_ID = '贞良';
@@ -93,9 +93,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return null; // confirm:接受 choice/confirmed
       }
       if (rt === YIN_TARGET_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? params.target : undefined);
+        const t = firstTarget(params);
         if (typeof t !== 'number') return '需要指定一名角色';
         if (!st.players[t]?.alive) return '目标不合法';
         return null;
@@ -108,9 +106,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (rt === YIN_CONFIRM_RT) {
         st.localVars[YIN_CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === YIN_TARGET_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? params.target : undefined);
+        const t = firstTarget(params);
         if (typeof t === 'number') st.localVars[YIN_TARGET_KEY] = t;
       }
     },

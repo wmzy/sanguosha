@@ -178,15 +178,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineConfirmAction(api, 'use', {
     label: DISPLAY_NAME,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '是否发动酒诗?(翻至背面,视为使用一张酒)',
-      confirmLabel: '发动',
-      cancelLabel: '不发动',
-    },
+    title: '是否发动酒诗?(翻至背面,视为使用一张酒)',
     activeWhen: (ctx) => {
       if (ctx.view.currentPlayerIndex !== ctx.perspectiveIdx) return false;
       if (ctx.view.phase !== '出牌') return false;

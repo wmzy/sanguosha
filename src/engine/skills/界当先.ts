@@ -347,15 +347,12 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     confirmLabel: '获得杀',
     cancelLabel: '不获得',
   });
-  api.defineAction('end', {
+  defineConfirmAction(api, 'end', {
     label: '当先·结束额外阶段',
     style: 'default',
-    prompt: {
-      type: 'confirm',
-      title: '结束当先额外出牌阶段?',
-      confirmLabel: '结束',
-      cancelLabel: '继续出牌',
-    },
+    title: '结束当先额外出牌阶段?',
+    confirmLabel: '结束',
+    cancelLabel: '继续出牌',
     // activeWhen 读 view.turnUsage 投影(经 回合用量 atom 同步),精确区分额外/正常出牌阶段;
     // 缺失投影时按钮会在所有出牌阶段误显示,后端 validate 兜底拒绝但 UX 混乱。
     activeWhen: (ctx) =>

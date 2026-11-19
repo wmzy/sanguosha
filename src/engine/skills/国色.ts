@@ -28,7 +28,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { placeDelayedTrickTransform } from './_delayedTrickTransform';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction } from '../core/skill';
-import { engineCanPlayNow } from '../util/skillRuntime';
+import { engineCanPlayNow, firstTarget } from '../util/skillRuntime';
 import { ownsCard } from '../util/player-query';
 
 const TRICK_NAME = '乐不思蜀';
@@ -66,9 +66,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!isGuoseCard(state.cardMap[cardId])) return '需要一张方块牌';
 
       // 目标:兼容 target(number) 与 targets(number[]) 两种提交形式(与乐不思蜀一致)
-      const target =
-        (params.target as number | undefined) ??
-        (params.targets as number[] | undefined)?.[0];
+      const target = firstTarget(params);
       if (typeof target !== 'number') return '需要选择目标';
       if (target === ownerId) return '不能对自己使用';
       const targetPlayer = state.players[target];
@@ -85,9 +83,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     async (state: GameState, params: Record<string, Json>): Promise<void> => {
       const from = ownerId;
       const cardId = params.cardId as string;
-      const target =
-        (params.target as number | undefined) ??
-        (params.targets as number[] | undefined)?.[0];
+      const target = firstTarget(params);
       await pushFrame(state, '国色', from, { ...params });
 
       // 放置延时锦囊(装备区方块牌先卸下;判定/跳过出牌/无懈 hooks 见 乐不思蜀.ts)

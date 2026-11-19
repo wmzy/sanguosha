@@ -31,7 +31,7 @@ import { hasSkillModule } from './registry';
 import { DISTANCE_ATTACK_RANGE_KEY, PICK_RESULT_KEY } from '../rules/vars-keys';
 import { fieldCardIds, moveFieldCard } from '../flows/field-card';
 import { askPickTargetCard } from '../flows/pick-card-panel';
-import { askConfirm, blockedByOtherPending, firstCardId, defineConfirmAction, shadowCardId, hasNullifyWindow } from '../util/skillRuntime';
+import { askConfirm, blockedByOtherPending, firstCardId, firstTarget, defineConfirmAction, shadowCardId, hasNullifyWindow } from '../util/skillRuntime';
 
 // ── 效果①:装备→无懈可击 转化(影子 id/广播窗口判据走 skillRuntime 共享 helper) ──
 const SHADOW_SUFFIX = '解围';
@@ -200,9 +200,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         return;
       }
       if (rt === SOURCE_PLAYER_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? params.target : undefined);
+        const t = firstTarget(params);
         if (typeof t === 'number') st.localVars[SOURCE_PLAYER_KEY] = t;
         return;
       }
@@ -216,9 +214,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         return;
       }
       if (rt === DEST_PLAYER_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? params.target : undefined);
+        const t = firstTarget(params);
         if (typeof t === 'number') st.localVars[DEST_PLAYER_KEY] = t;
         return;
       }

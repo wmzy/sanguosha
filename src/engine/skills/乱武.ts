@@ -35,7 +35,12 @@ import { runUseFlow } from './cards/use-card';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';
-import { askResponse, registerRespondForAllSeats, engineCanPlayNowReason } from '../util/skillRuntime';
+import {
+  askResponse,
+  defineConfirmAction,
+  engineCanPlayNowReason,
+  registerRespondForAllSeats,
+} from '../util/skillRuntime';
 
 const USED_KEY = '乱武/used';
 const CHOICE_VAR = '乱武/出杀';
@@ -222,13 +227,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('use', {
+  defineConfirmAction(api, 'use', {
     label: '乱武',
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '乱武(限定技):令所有其他角色依次对距离最近者出杀,无法如此做者失去1点体力',
-    },
+    title: '乱武(限定技):令所有其他角色依次对距离最近者出杀,无法如此做者失去1点体力',
     activeWhen: (ctx) => defaultPlayActive(ctx),
   });
   // respond:被乱武问询的角色选杀+最近目标。前端按 pending prompt 渲染。

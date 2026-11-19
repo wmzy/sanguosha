@@ -24,6 +24,7 @@ import { frameCards } from '../core/frame';
 import { registerAction, registerJudgeModifier } from '../core/skill';
 import { replaceJudgeCard } from '../flows/judge';
 import { requireRequestType } from '../util/skillRuntime';
+import { equipSlotOf } from '../util/player-query';
 
 /** 鬼才族(任意牌改判)差异参数 */
 export interface GuicaiOptions {
@@ -61,10 +62,7 @@ export function createGuicaiSkill(opts: GuicaiOptions) {
         const me = st.players[ownerId];
         if (!me) return null;
         if (me.hand.includes(cardId)) return 'hand';
-        for (const slot of Object.keys(me.equipment) as EquipSlot[]) {
-          if (me.equipment[slot] === cardId) return slot;
-        }
-        return null;
+        return equipSlotOf(me, cardId);
       }
 
       // owner 是否有可用作替换的牌(标版:手牌;界版:手牌或装备区)

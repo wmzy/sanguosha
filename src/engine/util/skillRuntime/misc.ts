@@ -1,10 +1,16 @@
-// src/engine/util/skillRuntime/misc.ts — 出牌时机判定、被询问杀窗口、params 选牌归一、
+// src/engine/util/skillRuntime/misc.ts — 出牌时机判定、被询问杀窗口、params 选牌/目标归一、
 // confirm 型 defineAction。
 // (自 util/skillRuntime.ts 按内聚拆出;导出经桶文件 skillRuntime.ts re-export,调用方零改动。)
 // 已迁出的同类样板:runVirtualSlash → skills/cards/_virtualSlash.ts(util 不得反向
 // 依赖 skills 层);slotOf → util/equip-slot.ts;玩家状态判定族 → util/player-query.ts。
 // 命名:函数/类型英文;业务字面量(错误文案/按钮文案)保持中文。
-import type { ActionContext, FrontendAPI, GameState, Json } from '../../types';
+import type {
+  ActionActiveWhen,
+  ActionContext,
+  FrontendAPI,
+  GameState,
+  Json,
+} from '../../types';
 import { hasBlockingPending } from '../../core/skill';
 
 // ────────────────────────── 出牌时机四合一 ──────────────────────────
@@ -105,6 +111,32 @@ export function firstCardId(params: Record<string, Json>): string | undefined {
   return typeof single === 'string' ? single : undefined;
 }
 
+/**
+ * params 单目标读取:normalizeCardIds/firstCardId 的 target 类比物——
+ * `targets[0]` 优先,回落单数 `target`;均无/非数字 → undefined。
+ * 与 CLAUDE.md「目标形状归一(dispatch 边界)」对齐:客户端两种 wire 形状
+ * (普通牌/技能代价牌发 `targets:[idx]`、延时锦囊发 `target:idx`),dispatch 入口
+ * 的 normalizeTargetShape(core/index.ts)按「已有值不互相覆盖、单数取 targets[0]」
+ * 补齐——本函数以同一优先级读取,故 dispatch 已归一后的 params 读到的就是权威值。
+ * 「distribute/select 面板发数组、延时锦囊单选路径发单数」的单目标技能读取样板收敛
+ * (桃/酒/_delayedSkipEffect 等的 `target ?? targets?.[0]` 变体)。
+ *
+ * 用法:
+ * ```ts
+ * const target = firstTarget(params);
+ * if (target === undefined) return '需要指定目标';
+ * ```
+ */
+export function firstTarget(params: {
+  target?: unknown;
+  targets?: unknown;
+}): number | undefined {
+  const t = params.targets;
+  const first = Array.isArray(t) ? t[0] : undefined;
+  const solo = typeof params.target === 'number' ? params.target : undefined;
+  return typeof first === 'number' ? first : solo;
+}
+
 // ────────────────────────── confirm 型 defineAction 样板 ──────────────────────────
 
 /** defineConfirmAction 可选项(label/title 必填,其余可选,缺省只兜底不覆盖显式传入)。 */
@@ -124,6 +156,12 @@ export interface ConfirmActionOptions {
   style?: 'primary' | 'danger' | 'default' | 'passive';
   /** 禁用确认按钮(prompt.confirmDisabled,如界狂骨满血时"回复体力"分支)。 */
   confirmDisabled?: boolean;
+  /** 激活谓词(defineAction.activeWhen,如乱武/据守/界甘露 的 defaultPlayActive /
+   *  activeUnlessUsedThisTurn)。缺省不传,沿用前端集中实现的缺省语义。 */
+  activeWhen?: ActionActiveWhen;
+  /** respond action 服务的 pending requestType(defineAction.respondFor,
+   *  如界醇醪 '桃/求桃')。缺省不传。 */
+  respondFor?: string;
 }
 
 /**
@@ -131,7 +169,8 @@ export interface ConfirmActionOptions {
  * `api.defineAction(actionName, {label, style:'primary', prompt:{type:'confirm',
  * title, confirmLabel:'发动', cancelLabel:'不发动'}})`。
  * 约 150 处 confirm 型 onMount 逐字复制收敛于此;label/title 必填,
- * confirmLabel/cancelLabel/style/description/confirmDisabled 可覆盖默认。
+ * confirmLabel/cancelLabel/style/description/confirmDisabled 可覆盖默认,
+ * activeWhen(激活谓词)/respondFor(respond 服务的 pending requestType)透传。
  *
  * 用法(标准 发动/不发动):
  * ```ts
@@ -160,6 +199,8 @@ export function defineConfirmAction(
   api.defineAction(actionName, {
     label: opts.label,
     style: opts.style ?? 'primary',
+    ...(opts.activeWhen !== undefined ? { activeWhen: opts.activeWhen } : {}),
+    ...(opts.respondFor !== undefined ? { respondFor: opts.respondFor } : {}),
     prompt: {
       type: 'confirm',
       title: opts.title,

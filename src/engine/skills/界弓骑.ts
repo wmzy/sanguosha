@@ -42,7 +42,7 @@ import { setPlayerVarUsage, projectTurnUsage } from '../rules/turn-usage';
 import { usedThisTurn as usedOncePerTurn } from '../rules/once-per-turn';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY, GONGQI_ACTIVE_VIEW_KEY, SLASH_EXEMPT_SUIT_KEY } from '../rules/vars-keys';
-import { askConfirm, askResponse, engineCanPlayNowReason } from '../util/skillRuntime';
+import { askConfirm, askResponse, engineCanPlayNowReason, firstTarget, defineConfirmAction } from '../util/skillRuntime';
 import { hasDiscardableCards } from '../util/player-query';
 
 const SKILL_ID = '界弓骑';
@@ -193,9 +193,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return;
       }
       if (rt === TARGET_RT) {
-        const t =
-          (params.targets as number[] | undefined)?.[0] ??
-          (typeof params.target === 'number' ? params.target : undefined);
+        const t = firstTarget(params);
         if (typeof t === 'number') st.localVars[TARGET_KEY] = t;
         return;
       }
@@ -294,10 +292,10 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
       return used !== true;
     },
   });
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
+    title: '弓骑',
     style: 'default',
-    prompt: { type: 'confirm', title: '弓骑' },
   });
   return undefined;
 }

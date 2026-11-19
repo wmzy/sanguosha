@@ -6,8 +6,8 @@
 import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { defaultPlayActive } from '../../rules/action-active';
-import { requireRequestType } from '../../util/skillRuntime';
-import type { CardEffect, ResolveCtx } from '../../types';
+import { firstTarget, requireRequestType } from '../../util/skillRuntime';
+import type { CardEffect, GameState, ResolveCtx } from '../../types';
 
 /** 桃的牌特有校验：目标必须已受伤 */
 function canUsePeach(
@@ -15,9 +15,7 @@ function canUsePeach(
   ownerId: number,
   params: Record<string, import('../../types').Json>,
 ): string | null {
-  const target =
-    ((params.target ?? (params.targets as number[] | undefined)?.[0]) as number | undefined) ??
-    ownerId;
+  const target = firstTarget(params) ?? ownerId;
   return state.players[target]?.alive === true &&
     state.players[target]?.health < state.players[target]?.maxHealth
     ? null
@@ -28,6 +26,22 @@ function canUsePeach(
 async function resolvePeach(ctx: ResolveCtx): Promise<void> {
   const { state, source, target } = ctx;
   await applyAtom(state, { type: '回复体力', target, amount: 1, source });
+}
+
+/** 濒死救援尾段：把救援牌（桃/酒）从手牌移入弃牌堆并置 localVars['求桃/已救']=true，
+ *  runDyingFlow 据此判断是否有人救援。桃/酒 的 respond.execute 共用。 */
+export async function playRescueCard(
+  state: GameState,
+  ownerId: number,
+  cardId: string,
+): Promise<void> {
+  await applyAtom(state, {
+    type: '移动牌',
+    cardId,
+    from: { zone: '手牌', player: ownerId },
+    to: { zone: '弃牌堆' },
+  });
+  state.localVars['求桃/已救'] = true;
 }
 
 /** 桃使用阶段激活条件：默认出牌条件 + 自己已受伤（满血不可出桃）。 */
@@ -67,13 +81,7 @@ export const peachEffect: CardEffect = {
     execute: async (state, ownerId, params) => {
       const cardId = params.cardId as string | undefined;
       if (!cardId) return;
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '手牌', player: ownerId },
-        to: { zone: '弃牌堆' },
-      });
-      state.localVars['求桃/已救'] = true;
+      await playRescueCard(state, ownerId, cardId);
     },
   },
   prompt: {

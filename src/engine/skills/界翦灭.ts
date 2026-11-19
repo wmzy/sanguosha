@@ -36,7 +36,13 @@ import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rule
 import { registerAction } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
-import { requireRequestType, askConfirm, engineCanPlayNowReason, registerRespondForAllSeats } from '../util/skillRuntime';
+import {
+  askConfirm,
+  defineConfirmAction,
+  engineCanPlayNowReason,
+  registerRespondForAllSeats,
+  requireRequestType,
+} from '../util/skillRuntime';
 
 const SKILL_ID = '界翦灭';
 const DISPLAY_NAME = '翦灭';
@@ -223,15 +229,11 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
       (ctx.view.players[ctx.perspectiveIdx]?.hand?.length ?? 0) > 0,
   });
 
-  api.defineAction('respond', {
+  defineConfirmAction(api, 'respond', {
     label: DISPLAY_NAME,
-    style: 'primary',
-    prompt: {
-      type: 'confirm',
-      title: '翦灭:选择你的颜色(确认=红色,取消=黑色)',
-      confirmLabel: '红色',
-      cancelLabel: '黑色',
-    },
+    title: '翦灭:选择你的颜色(确认=红色,取消=黑色)',
+    confirmLabel: '红色',
+    cancelLabel: '黑色',
   });
 
   return undefined;
