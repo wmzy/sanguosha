@@ -327,6 +327,25 @@ async function lightAndGainSkill(
   player.vars[CURRENT_KEY] = selected;
 }
 
+/** 卸载旧化身技能并重新亮牌获技(offerSwitch/doReplace 的共用尾巴)。
+ *  excludeIdx=当前展示牌索引:lightAndGainSkill 换牌时排除它(不重新亮回旧牌)。 */
+async function unloadCurrentAndRelight(
+  state: GameState,
+  ownerId: number,
+  excludeIdx: number,
+): Promise<void> {
+  const player = state.players[ownerId];
+  if (!player) return;
+  // 卸载旧化身技能
+  const oldSkill = player.vars[CURRENT_KEY] as string | undefined;
+  if (oldSkill) {
+    await applyAtom(state, { type: '移除技能', player: ownerId, skillId: oldSkill });
+    delete player.vars[CURRENT_KEY];
+  }
+
+  await lightAndGainSkill(state, ownerId, excludeIdx);
+}
+
 /**
  * 回合开始/结束行动分派:标版→offerSwitch(是否更换),界版→offerTurnAction(三选一)。
  */
@@ -364,14 +383,7 @@ async function offerSwitch(state: GameState, ownerId: number): Promise<void> {
   const newLit = curLit === 0 ? 1 : 0;
   if (getUsableSkills(pool[newLit]).length === 0) return;
 
-  // 卸载旧化身技能
-  const oldSkill = player.vars[CURRENT_KEY] as string | undefined;
-  if (oldSkill) {
-    await applyAtom(state, { type: '移除技能', player: ownerId, skillId: oldSkill });
-    delete player.vars[CURRENT_KEY];
-  }
-
-  await lightAndGainSkill(state, ownerId, curLit);
+  await unloadCurrentAndRelight(state, ownerId, curLit);
 }
 
 // ════════════════════ 界版:三选一行动 ════════════════════
@@ -424,14 +436,7 @@ async function doReplace(state: GameState, ownerId: number): Promise<void> {
   );
   if (!hasReplacement) return;
 
-  // 卸载旧化身技能
-  const oldSkill = player.vars[CURRENT_KEY] as string | undefined;
-  if (oldSkill) {
-    await applyAtom(state, { type: '移除技能', player: ownerId, skillId: oldSkill });
-    delete player.vars[CURRENT_KEY];
-  }
-
-  await lightAndGainSkill(state, ownerId, curLit);
+  await unloadCurrentAndRelight(state, ownerId, curLit);
 }
 
 /**

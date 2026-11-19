@@ -13,6 +13,7 @@
 //   - **可选**:玩家可 pass(空 allocation)放弃发动,牌留在牌堆顶。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
+import { peekTopN } from '../core/deck';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { requireRequestType } from '../util/skillRuntime';
@@ -48,8 +49,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (check.error) return check.error;
       const allocation = params.allocation as Allocation | undefined;
       if (Array.isArray(allocation) && allocation.length > 0) {
-        const deck = st.zones.deck;
-        const top2 = new Set([deck[deck.length - 1], deck[deck.length - 2]]);
+        const top2 = new Set(peekTopN(st, 2));
         const seen = new Set<string>();
         for (const entry of allocation) {
           if (!st.players[entry.target]?.alive) return '目标无效';
@@ -83,9 +83,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 官方规则:观看牌堆顶 2 张牌(牌不入手)。牌堆不足 2 张则跳过。
       if (ctx.state.zones.deck.length < 2) break;
 
-      // peek 牌堆顶 2 张(deck 末尾为顶,逆序成 [top, secondFromTop])
-      const deck = ctx.state.zones.deck;
-      const top2: string[] = [deck[deck.length - 1], deck[deck.length - 2]];
+      // peek 牌堆顶 2 张([顶, 次顶],与 摸牌 atom 同向)
+      const top2: string[] = peekTopN(ctx.state, 2);
 
       // 询问分配(cardIds 让郭嘉看见牌面,但牌不入郭嘉手牌)
       delete ctx.state.localVars[ALLOC_KEY];

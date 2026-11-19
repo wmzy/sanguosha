@@ -34,6 +34,7 @@ import {
   selectTargetCandidates,
   promptTargetBounds,
   choosePlayerAsTargetFilter,
+  singleTargetParams,
   isTriggerablePromptType,
   distributeAllocateCandidates,
   effectiveTargetCard,
@@ -72,8 +73,26 @@ function computeValidTargets(
   return selection.targets ? selection.contract.candidates : [];
 }
 
+/** minTarget/maxTarget 的 AvailableAction 投影(全文件单一口径;原 targetBoundsOf /
+ *  finalizeTargetContract / describeMultiSelectAction / respond 分支四处手写、
+ *  比较器漂移过:min>1 vs min!==1、max>1 抑制 vs 恒输出):
+ *  - min 用 `!== 1`:min=0 是「可选目标」语义(如 choosePlayer min=0 允许不选),
+ *    必须投影 minTarget:0,否则 AI/agent 不知道 0 个也合法;min=1 与缺省同义,不设字段;
+ *  - max 恒输出:消费方契约「未设时默认 1」(headless/types.ts 的 AvailableAction
+ *    文档),显式 maxTarget:1 与省略语义等价;且 finalize 路径此前恒输出并被测试
+ *    锁定(availableActions.test「默认杀 maxTarget=1」),改抑制口径反而破坏契约。
+ *    ai-mcp/heuristics 的 withDefaultTargets 只读 minTarget(min<1 短路),不受影响。 */
+type TargetProjection = { minTarget?: number; maxTarget: number };
+
+function targetProjectionOf({ min, max }: { min: number; max: number }): TargetProjection {
+  return {
+    ...(min !== 1 ? { minTarget: min } : {}),
+    maxTarget: max,
+  };
+}
+
 /** 目标数上下界(promptTargetBounds 的 AvailableAction 投影)。
- *  仅在「需要目标且非自动自身目标」时给值,且 >1 才输出字段(min/max 缺省 1 不设字段)。
+ *  仅在「需要目标且非自动自身目标」时给值;min/max 字段的取舍口径见 targetProjectionOf。
  *  引擎 validate 用同一份 targetFilter 判定,AI 少了这个下界就只会填 1 个目标 →
  *  离间(两名男性角色)一类多目标技能恒拒。 */
 function targetBoundsOf(
@@ -81,11 +100,7 @@ function targetBoundsOf(
   rules: PlayRules,
 ): { minTarget?: number; maxTarget?: number } {
   if (!rules.needsTarget || rules.selfTarget) return {};
-  const { min, max } = promptTargetBounds(prompt);
-  return {
-    ...(min > 1 ? { minTarget: min } : {}),
-    ...(max > 1 ? { maxTarget: max } : {}),
-  };
+  return targetProjectionOf(promptTargetBounds(prompt));
 }
 
 /** skip 兜底动作(广播无懈/不出/不发动等)的共享 message 构造在 utils/skipMessage.ts
@@ -137,20 +152,18 @@ function finalizeTargetContract(
 ): {
   targets: number[];
   targetSelection: TargetSelection;
-  minTarget?: number;
-  maxTarget: number;
+  /** minTarget/maxTarget 投影(口径唯一来源 targetProjectionOf,消费方直接展开) */
+  projection: TargetProjection;
 } | null {
   const resolved = resolveTargetSelection(view, seatIndex, filter, card);
   if (!resolved.targets) return null;
   const targets = validateTargetSelection(view, seatIndex, filter, current, card)
     ? current
     : resolved.targets;
-  const { min, max } = resolved.contract;
   return {
     targets,
     targetSelection: resolved.contract,
-    ...(min !== 1 ? { minTarget: min } : {}),
-    maxTarget: max,
+    projection: targetProjectionOf(resolved.contract),
   };
 }
 
@@ -200,8 +213,7 @@ function buildCardPlaySkeleton(
     if (!fin) return null;
     message.params = { ...message.params, targets: fin.targets };
     targetProjection.targetSelection = fin.targetSelection;
-    if (fin.minTarget !== undefined) targetProjection.minTarget = fin.minTarget;
-    targetProjection.maxTarget = fin.maxTarget;
+    Object.assign(targetProjection, fin.projection);
   }
   return {
     message,
@@ -345,7 +357,7 @@ function buildTransformUseAction(
     selfTarget: cardRules.selfTarget,
   });
   // 目标数边界与 promptTargetBounds 同源:产出牌 use action 的 prompt(无注册时
-  // 回退 transform 自身 prompt),>1 才输出的投影格式见 targetBoundsOf。
+  // 回退 transform 自身 prompt),字段取舍口径见 targetProjectionOf。
   const bounds = targetBoundsOf((gate.produced ?? action).prompt, cardRules);
   const slashMax = slashTargetMaxOf(view, seatIndex, { name: wrapperName }, cardRules);
   // 目标收尾(原尾部 flatMap 下沉,算一次):产出牌需目标时,use 牌约束 =
@@ -362,11 +374,7 @@ function buildTransformUseAction(
     );
     if (!fin) return null;
     message.params = { ...message.params, targets: fin.targets };
-    targetProjection = {
-      targetSelection: fin.targetSelection,
-      ...(fin.minTarget !== undefined ? { minTarget: fin.minTarget } : {}),
-      maxTarget: fin.maxTarget,
-    };
+    targetProjection = { targetSelection: fin.targetSelection, ...fin.projection };
   }
   return {
     description:
@@ -573,9 +581,10 @@ function enumerateAltActions(
 }
 
 /** 多选描述性 action(selectTarget/choosePlayer 目标数下界 >1 时):targets 留空
- *  由 agent 从 validTargets 中选 minTarget..maxTarget 个填入;minTarget 仅 min>1
- *  时给,maxTarget 恒给。enumeratePromptActions(主动技多目标变体展开)与
- *  appendRespondActions(choosePlayer 多选)两处镜像结构共用,字段形态不变。 */
+ *  由 agent 从 validTargets 中选 minTarget..maxTarget 个填入;min/max 字段取舍
+ *  口径统一走 targetProjectionOf(min=0 投影 0)。enumeratePromptActions(主动技
+ *  多目标变体展开)与 appendRespondActions(choosePlayer 多选)两处镜像结构共用,
+ *  字段形态不变。 */
 function describeMultiSelectAction(
   base: {
     description: string;
@@ -600,8 +609,7 @@ function describeMultiSelectAction(
     },
     validTargets,
     category: base.category,
-    ...(min > 1 ? { minTarget: min } : {}),
-    maxTarget: max,
+    ...targetProjectionOf({ min, max }),
   };
 }
 
@@ -741,11 +749,7 @@ function enumeratePromptActions(
             // targets 由收尾回填最小合法组合(可提交的默认值),agent 可改
             { ...variant.params, ...(costCard ? { cardId: costCard.id } : {}), ...(fin ? { targets: fin.targets } : {}) },
           ),
-          ...(fin ? {
-            targetSelection: fin.targetSelection,
-            ...(fin.minTarget !== undefined ? { minTarget: fin.minTarget } : {}),
-            maxTarget: fin.maxTarget,
-          } : {}),
+          ...(fin ? { targetSelection: fin.targetSelection, ...fin.projection } : {}),
         });
       });
       continue;
@@ -760,23 +764,17 @@ function enumeratePromptActions(
           description: `发动【${action.label}】${suffix}${cardSuffix} → ${targetName}`,
           message: {
             ...base,
-            // target 与 targets 同时携带:selectTarget 型技能两种读法都有
-            // (反间/雄乱 读 params.targets,挑衅/强袭/激将 读 params.target)。
-            params: {
-              target: t,
-              targets: [t],
+            // target/targets 双形状同时携带(反间/雄乱 读 targets,挑衅/强袭/激将 读
+            // target)——契约见 singleTargetParams。
+            params: singleTargetParams(t, {
               ...variant.params,
               ...(costCard ? { cardId: costCard.id } : {}),
-            },
+            }),
           },
           validTargets: [t],
           category: 'play',
           // 契约投影(收尾已算:[t] 经上游候选筛选恒合法,targets 无需逐目标重算)
-          ...(fin ? {
-            targetSelection: fin.targetSelection,
-            ...(fin.minTarget !== undefined ? { minTarget: fin.minTarget } : {}),
-            maxTarget: fin.maxTarget,
-          } : {}),
+          ...(fin ? { targetSelection: fin.targetSelection, ...fin.projection } : {}),
         });
       });
     }
@@ -1011,7 +1009,7 @@ export function appendRespondActions(
         for (const t of validTargets) {
           out.push({
             description: `${choosePrompt.title ?? info.skillId} → ${view.players[t]?.name ?? `P${t}`}`,
-            message: respondMsg(info.skillId, { target: t, targets: [t] }),
+            message: respondMsg(info.skillId, singleTargetParams(t)),
             validTargets: [t],
             category: 'respond',
           });
@@ -1145,8 +1143,7 @@ export function appendRespondActions(
           validTargets: resolved.contract.candidates,
           targetSelection: resolved.contract,
           category: 'respond',
-          ...(resolved.contract.min > 1 ? { minTarget: resolved.contract.min } : {}),
-          maxTarget: resolved.contract.max,
+          ...targetProjectionOf(resolved.contract),
         });
       }
       pushOptionalSkip(info.skillId, candidates.length > 0);

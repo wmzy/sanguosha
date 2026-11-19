@@ -9,16 +9,14 @@ import { register as registerLifecycle } from './resourceRegistry';
 // 游戏会话管理(进程级单例,按 roomId 索引)
 export const gameSessions = new Map<string, GameSession>();
 
-// 玩家到房间的映射(进程级单例):playerId → { roomId, role }。
-// 全部写入收敛到 room.ts 的 bindPlayerRoom/unbindPlayerRoom(成员函数自动维护),
-// 查询走 room.ts 的 findRoomByPlayerId(map 查询 + 成员身份校验)。
-export const playerRoomMap = new Map<string, { roomId: string; role: 'player' | 'spectator' }>();
+// playerRoomMap(玩家→房间映射)已下沉零依赖叶子模块 playerIndex.ts——此前映射
+// 本体在此,room.ts 为维护映射 import 本模块、本模块顶层又调用 room.ts 的
+// setSessionChecker,两模块成环(room.ts 只得用函数对象属性绕 TDZ)。下沉后环
+// 消除;此处 re-export 保持 teardown.ts/tests 的既有导入路径与公开面不变。
+export { playerRoomMap } from './playerIndex';
 
 registerLifecycle('gameSessions', gameSessions, () => {
   gameSessions.clear();
-});
-registerLifecycle('playerRoomMap', playerRoomMap, () => {
-  playerRoomMap.clear();
 });
 
 // 注册 session 检查器:getRoomList 用它过滤掉没有活跃 session 的房间。

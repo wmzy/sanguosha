@@ -14,6 +14,11 @@
 //   "其他角色":南蛮入侵结算帧 topFrame.from = 使用者;from≠owner 才触发获得。
 //   注:不用「获得」atom——它不清理弃牌堆(apply 仅过滤来源玩家手牌/装备)。
 //       改用「移动牌」(弃牌堆→手牌),其 default applyView 正确同步 discardPileCount-1 与 handCount+1。
+//
+// 免疫时机口径(与 祸首.ts 互指;新增同类「XX对你无效」免疫按此选择):
+//   纯免疫(不改写伤害来源)→ 挂「受到伤害时」cancel —— 本文件口径;
+//   需在同一 hook 兼改 source(伤害来源改写)→ 挂「伤害结算开始时」—— 祸首.ts 口径
+//   (其效果A 免疫与效果B 改 source=孟获 共用一个 before-hook,故整体挂该时机)。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';

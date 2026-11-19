@@ -3,7 +3,7 @@
 
 import type { Card, EquipSlot, Faction, Json, Mark, TurnPhase } from './state';
 import type { SettlementFrame } from './skill';
-import type { Atom } from './atom';
+import type { Atom, DistanceVarsDelta } from './atom';
 import type { ActionPrompt } from './prompt';
 
 export interface GameView {
@@ -34,11 +34,7 @@ export interface GameView {
     identityHidden?: boolean;
     /** 距离修正 vars(只投影距离相关的三个 key,不暴露身份等敏感 vars)。
      *  供前端 distance.ts 与引擎 distance.ts 用同一套数据计算距离。 */
-    distanceVars?: {
-      attackMod?: number;
-      defenseMod?: number;
-      attackRange?: number;
-    };
+    distanceVars?: DistanceVarsDelta;
     /** 判定区(延时锦囊)。元素为 cardId,通过 cardMap 查 Card */
     pendingTricks?: string[];
     /** 本回合用量(前端禁用超限/已用操作,与后端 validate 一致)。

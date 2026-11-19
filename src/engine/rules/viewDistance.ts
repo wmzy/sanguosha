@@ -82,13 +82,25 @@ function viewSeatDistance(
 
 type DistanceExemptKind = 'distance' | 'attackRange';
 
+/** 命中条件的通用形态(声明式;无法归一的特殊形态保留 matches lambda):
+ *  - turnUsageFlag:发起方(from 座次)的 turnUsage[key] 为真值 —— 激活类豁免
+ *  - turnUsageTarget:发起方的 turnUsage[key] === 目标座次 —— 指名目标豁免
+ *  - skillHeld:发起方 skills 含该技能 —— 持技即生效的被动豁免 */
+type ExemptionWhen =
+  | { basis: 'turnUsageFlag'; key: string }
+  | { basis: 'turnUsageTarget'; key: string }
+  | { basis: 'skillHeld'; skill: string };
+
 interface ViewDistanceExemption {
   /** 豁免来源技能名(排查/注释定位用) */
   source: string;
   /** 引擎侧注册的豁免器种类(与技能文件的 register* 调用一一对应) */
   kinds: readonly DistanceExemptKind[];
-  /** 基于投影(turnUsage / skills)判定该豁免当前是否命中 */
-  matches: (players: GameView['players'], fromIdx: number, toIdx: number) => boolean;
+  /** 通用命中形态(与 matches 二选一;可归一的条目优先用 when) */
+  when?: ExemptionWhen;
+  /** 特殊形态兜底(与 when 二选一)。现存两条:界陷阵(匹配主体是任意玩家——GameView
+   *  不携带发起方信息,只能宽松匹配)、天义(键值 === 发起方座次而非目标) */
+  matches?: (players: GameView['players'], fromIdx: number, toIdx: number) => boolean;
 }
 
 const VIEW_DISTANCE_EXEMPTIONS: readonly ViewDistanceExemption[] = [
@@ -97,6 +109,7 @@ const VIEW_DISTANCE_EXEMPTIONS: readonly ViewDistanceExemption[] = [
     // winTarget 存目标座次。注:GameView 不携带 currentPlayerIndex 区分发起方,
     // 这里宽松匹配(可被所有距离检查放行);后端 distance.ts effectiveDistance
     // 严格按 turn.vars 校验(仅对持有界陷阵技能的发起方生效)。
+    // 特殊形态(不可归一):匹配主体是"任意玩家"而非发起方 → 保留 matches lambda。
     source: '界陷阵',
     kinds: ['distance'],
     matches: (players, _fromIdx, toIdx) =>
@@ -107,29 +120,29 @@ const VIEW_DISTANCE_EXEMPTIONS: readonly ViewDistanceExemption[] = [
     // 引擎侧同时注册 AttackRangeExemptor(杀)与 DistanceExemptor(顺手牵羊/兵粮寸断)。
     source: '成略',
     kinds: ['distance', 'attackRange'],
-    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[CHENGLUE_SUITS_VIEW_KEY],
+    when: { basis: 'turnUsageFlag', key: CHENGLUE_SUITS_VIEW_KEY },
   },
   {
     // 决堰(界姜维):坐骑栏效果——本回合使用牌无距离限制 → 距离视为 1。
     source: '决堰',
     kinds: ['distance'],
-    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[JUEYAN_MOUNT_VIEW_KEY],
+    when: { basis: 'turnUsageFlag', key: JUEYAN_MOUNT_VIEW_KEY },
   },
   {
     // 往烈(界朱然):本回合使用的首张牌无距离限制 → 距离视为 1。
     source: '往烈',
     kinds: ['distance'],
-    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[WANGLIE_FIRST_VIEW_KEY],
+    when: { basis: 'turnUsageFlag', key: WANGLIE_FIRST_VIEW_KEY },
   },
   {
     // 雄乱(界吕布):本回合对其使用牌无距离限制(值=目标座次)。
     source: '雄乱',
     kinds: ['distance'],
-    matches: (players, fromIdx, toIdx) =>
-      playerBySeat(players, fromIdx)?.turnUsage?.[XIONGLUAN_TARGET_VIEW_KEY] === toIdx,
+    when: { basis: 'turnUsageTarget', key: XIONGLUAN_TARGET_VIEW_KEY },
   },
   {
     // 天义(太史慈):拼点赢后本回合攻击范围无限(值=发起者座次)。仅覆盖杀(攻击范围豁免)。
+    // 特殊形态(不可归一):键值 === 发起方座次而非目标 → 保留 matches lambda。
     source: '天义',
     kinds: ['attackRange'],
     matches: (players, fromIdx) =>
@@ -140,14 +153,14 @@ const VIEW_DISTANCE_EXEMPTIONS: readonly ViewDistanceExemption[] = [
     // 宽松放行(UI 提示);后端 杀.validate 按卡色严格校验(仅红杀放行)。
     source: '诈降',
     kinds: ['attackRange'],
-    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[slashExtraKey('诈降')],
+    when: { basis: 'turnUsageFlag', key: slashExtraKey('诈降') },
   },
   {
     // 界武圣(界关羽):你使用的方片【杀】无距离限制。
     // 宽松放行(所有目标可点);后端 杀.validate 按花色严格校验(仅方片杀放行)。
     source: '界武圣',
     kinds: ['attackRange'],
-    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.skills?.includes('界武圣'),
+    when: { basis: 'skillHeld', skill: '界武圣' },
   },
   {
     // 界烈弓(界黄忠):你【杀】的攻击范围为此杀点数(max(武器范围, 杀点数))。
@@ -155,21 +168,21 @@ const VIEW_DISTANCE_EXEMPTIONS: readonly ViewDistanceExemption[] = [
     // 严格校验(仅 effectiveDistance ≤ 杀点数 的目标放行)。
     source: '界烈弓',
     kinds: ['attackRange'],
-    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.skills?.includes('界烈弓'),
+    when: { basis: 'skillHeld', skill: '界烈弓' },
   },
   {
     // 界将驰(界曹彰)选项②:本回合使用【杀】无距离限制。turnUsage 由回合用量 atom 同步;
     // 激活时前端宽松放行(UI 提示),后端 杀.validate 严格校验。
     source: '界将驰',
     kinds: ['attackRange'],
-    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[JIANGCHI_CHOICE2_VIEW_KEY],
+    when: { basis: 'turnUsageFlag', key: JIANGCHI_CHOICE2_VIEW_KEY },
   },
   {
     // 界弓骑(界韩当):弃牌后本回合攻击范围无限。turnUsage 由 回合用量 atom 同步;
     // 激活时前端宽松放行(UI 提示),后端 distance.ts inAttackRange 严格校验。
     source: '界弓骑',
     kinds: ['attackRange'],
-    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[GONGQI_ACTIVE_VIEW_KEY],
+    when: { basis: 'turnUsageFlag', key: GONGQI_ACTIVE_VIEW_KEY },
   },
   {
     // 当先(界廖化):额外出牌阶段获得的该张杀无距离限制。turnUsage 由 回合用量 atom 同步;
@@ -177,9 +190,31 @@ const VIEW_DISTANCE_EXEMPTIONS: readonly ViewDistanceExemption[] = [
     // 严格校验(仅该张杀放行)。
     source: '界当先',
     kinds: ['attackRange'],
-    matches: (players, fromIdx) => !!playerBySeat(players, fromIdx)?.turnUsage?.[DANGXIAN_NO_RANGE_VIEW_KEY],
+    when: { basis: 'turnUsageFlag', key: DANGXIAN_NO_RANGE_VIEW_KEY },
   },
 ];
+
+/** 单条豁免的命中判定:when 三种通用形态与 matches 兜底的统一入口。
+ *  行为与原各条手写 lambda 逐字等价(由 view-distance-sync / distance-parity 契约测试锁定)。 */
+function exemptionHits(
+  e: ViewDistanceExemption,
+  players: GameView['players'],
+  fromIdx: number,
+  toIdx: number,
+): boolean {
+  if (e.matches) return e.matches(players, fromIdx, toIdx);
+  const from = playerBySeat(players, fromIdx);
+  const w = e.when;
+  if (!from || !w) return false;
+  switch (w.basis) {
+    case 'turnUsageFlag':
+      return !!from.turnUsage?.[w.key];
+    case 'turnUsageTarget':
+      return from.turnUsage?.[w.key] === toIdx;
+    case 'skillHeld':
+      return !!from.skills?.includes(w.skill);
+  }
+}
 
 /** 是否命中任一通用距离豁免(对应引擎 isDistanceExempted 的 view 投影)。 */
 function viewDistanceExempted(
@@ -188,7 +223,7 @@ function viewDistanceExempted(
   toIdx: number,
 ): boolean {
   return VIEW_DISTANCE_EXEMPTIONS.some(
-    (e) => e.kinds.includes('distance') && e.matches(players, fromIdx, toIdx),
+    (e) => e.kinds.includes('distance') && exemptionHits(e, players, fromIdx, toIdx),
   );
 }
 
@@ -199,7 +234,7 @@ function viewAttackRangeExempted(
   toIdx: number,
 ): boolean {
   return VIEW_DISTANCE_EXEMPTIONS.some(
-    (e) => e.kinds.includes('attackRange') && e.matches(players, fromIdx, toIdx),
+    (e) => e.kinds.includes('attackRange') && exemptionHits(e, players, fromIdx, toIdx),
   );
 }
 

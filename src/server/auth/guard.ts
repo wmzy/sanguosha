@@ -5,7 +5,7 @@
 import type { Context } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { getUserByToken, type PublicUser } from './store';
-import { getRoom } from '../room';
+import { getRoom, isRoomMember } from '../room';
 import type { Room } from '../room';
 
 /** 会话 Cookie 名(与 routes.ts 写入侧一致,收敛在此避免循环依赖)。 */
@@ -80,20 +80,49 @@ export async function resolveRoomActor(
   return { playerId: bodyPlayerId };
 }
 
+/** 非调试房间的会话身份+角色校验核心(requireRoomMember/requireSessionHost/
+ *  resolveApprover 三守卫共用):调试房间或房间不存在时放行('open',游客模型,
+ *  user 为 null),未登录 'unauthenticated',登录但角色不符 'forbidden',
+ *  通过 'ok' 并携带 user。check 口径:
+ *  - 'member': 本房成员(players ∪ spectators,log/chat/history 读取族)
+ *  - 'player': 本房玩家(players,旁观查看审批族)
+ *  - 'host':   房主(hostId 匹配;调试房无房主,由 'open' 分支先行放行)
+ *  失败响应形状(REST Response / SSE {error,status})由各调用方映射,
+ *  本函数不构造响应。 */
+export type RoomAccess =
+  | { kind: 'open'; user: null }
+  | { kind: 'unauthenticated'; user: null }
+  | { kind: 'forbidden'; user: PublicUser }
+  | { kind: 'ok'; user: PublicUser };
+
+export async function checkRoomAccess(
+  c: Context,
+  room: Room | null,
+  check: 'member' | 'player' | 'host',
+): Promise<RoomAccess> {
+  if (!room || room.isDebug) return { kind: 'open', user: null };
+  const user = await requireUser(c);
+  if (!user) return { kind: 'unauthenticated', user: null };
+  const allowed =
+    check === 'member'
+      ? isRoomMember(room, user.id)
+      : check === 'player'
+        ? room.players.has(user.id)
+        : room.hostId === user.id;
+  return allowed ? { kind: 'ok', user } : { kind: 'forbidden', user };
+}
+
 /** 审批者(批准/拒绝/撤销旁观者查看申请)必须是本房玩家。
  *  非调试房间按会话 userId 校验 players 成员资格;调试房保持游客模型。 */
 export async function resolveApprover(
   c: Context,
   roomId: string,
 ): Promise<{ playerId: string } | { error: string; status: 401 | 403 }> {
-  const room = getRoom(roomId);
-  if (room && !room.isDebug) {
-    const user = await requireUser(c);
-    if (!user) return { error: '请先登录', status: 401 };
-    if (!room.players.has(user.id)) return { error: '仅房间内玩家可操作', status: 403 };
-    return { playerId: user.id };
-  }
-  return { playerId: '' };
+  const access = await checkRoomAccess(c, getRoom(roomId), 'player');
+  if (access.kind === 'ok') return { playerId: access.user.id };
+  if (access.kind === 'open') return { playerId: '' };
+  if (access.kind === 'unauthenticated') return { error: '请先登录', status: 401 };
+  return { error: '仅房间内玩家可操作', status: 403 };
 }
 
 /** 解析房主身份(对局历史删除族路由共用):非调试房优先会话(登录用户 id),

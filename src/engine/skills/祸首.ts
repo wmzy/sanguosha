@@ -13,6 +13,11 @@
 //   契约:无 localVars/vars(纯锁定技)。造成伤害的 cardId 指向南蛮入侵牌(结算期间仍在处理区)。
 //   说明:不修改 南蛮入侵.ts——用 hook 解耦,且不破坏现有测试。A 与 B 在同一 造成伤害 hook 中
 //        分支处理(target=孟获→cancel;否则→modify source)。
+//
+// 免疫时机口径(与 巨象.ts 互指;新增同类「XX对你无效」免疫按此选择):
+//   纯免疫(不改写伤害来源)→ 挂「受到伤害时」cancel —— 巨象.ts 口径;
+//   需在同一 hook 兼改 source(伤害来源改写)→ 挂「伤害结算开始时」—— 本文件口径
+//   (效果A 免疫与效果B 改 source=孟获 共用一个 before-hook,故整体挂该时机)。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { topFrame } from '../core/frame';
 import { registerBeforeHook } from '../core/skill';

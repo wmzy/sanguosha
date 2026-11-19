@@ -13,6 +13,7 @@ import type {
   SkillModule,
 } from '../../types';
 import { applyAtom } from '../../core/apply'
+import { discardProcessingCard } from '../../core/processing-zone';
 import { frameCards, popFrame, pushFrame, setFrameCancelled, topFrame } from '../../core/frame';
 import { registerAction, registerBeforeHook, registerAfterHook } from '../../core/skill';
 import { promptCancel } from '../../flows/cancel';
@@ -193,12 +194,7 @@ export async function runUseFlow(
       // ── 使用结算后：使用结算结束后时机（use.md 使用结算后）──
       // Ⅰ. 若使用的不是装备牌，将处理区里此牌置入弃牌堆
       if (!opts?.virtual && frameCards(state).includes(cardId)) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
+        await discardProcessingCard(state, cardId);
       }
       // Ⅱ. 使用结算结束后时机（奔袭① after-hook）
       await applyAtom(state, { type: '使用结算结束后', source, cardId });
@@ -249,12 +245,7 @@ export async function runUseFlow(
       }
       // 虚拟使用无实体牌，跳过牌移动
       if (!opts?.virtual) {
-        await applyAtom(state, {
-          type: '移动牌',
-          cardId,
-          from: { zone: '处理区' },
-          to: { zone: '弃牌堆' },
-        });
+        await discardProcessingCard(state, cardId);
       }
     }
 
@@ -284,12 +275,7 @@ export async function runUseFlow(
     // ── 使用结算后：使用结算结束后时机（use.md 使用结算后）──
     // Ⅰ. 若使用的不是装备牌，将处理区里此牌置入弃牌堆（装备牌已装备不在处理区；虚拟使用无实体牌）
     if (!opts?.virtual && frameCards(state).includes(cardId)) {
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
+      await discardProcessingCard(state, cardId);
     }
     // Ⅱ. 使用结算结束后时机（奔袭① after-hook）
     //   延时锦囊的结算中延迟到判定阶段（resumeDelayedSettlement），其使用结算尚未结束，
@@ -306,12 +292,7 @@ export async function runUseFlow(
   } finally {
     // 异常安全：保证牌不滞留处理区 + 帧弹出（虚拟牌不在处理区，includes 为 false 自动跳过）
     if (frameCards(state).includes(cardId)) {
-      await applyAtom(state, {
-        type: '移动牌',
-        cardId,
-        from: { zone: '处理区' },
-        to: { zone: '弃牌堆' },
-      });
+      await discardProcessingCard(state, cardId);
     }
     await popFrame(state);
   }

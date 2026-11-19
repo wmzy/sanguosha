@@ -5,16 +5,15 @@
 import type { Context } from 'hono';
 import {
   broadcastMessage,
-  buildRoomState,
+  broadcastRoomState,
   checkRoomPassword,
   findRoomByPlayerId,
   getRoom,
-  isRoomMember,
   leaveRoom,
   removeSpectator,
   type Room,
 } from '../room';
-import { requireUser, resolveRoomActor } from '../auth/guard';
+import { checkRoomAccess, resolveRoomActor } from '../auth/guard';
 import type { PublicUser } from '../auth/store';
 import type { ServerMessage } from '../protocol';
 import type { ConnectionSink } from '../connection';
@@ -38,10 +37,9 @@ export function requireRoom(c: Context, roomId: string): Room | Response {
   return getRoom(roomId) ?? c.json({ error: '房间不存在' }, 404);
 }
 
-/** 广播 room_state 给房间内所有连接。 */
-export function broadcastRoomState(room: Room): void {
-  broadcastMessage(room, buildRoomState(room));
-}
+// broadcastRoomState 定义已下沉 room.ts(紧邻 buildRoomState,room.ts 内部广播与
+// 路由共用单点);此处 re-export 保持路由文件的既有导入路径不变。
+export { broadcastRoomState } from '../room';
 
 /** 路由成功路径的标准尾奏：先广播事件消息，再广播 room_state。
  *  excludeId 语义同 broadcastMessage（事件消息排除该成员，room_state 仍全员）。 */
@@ -177,32 +175,31 @@ export async function resolvePlayerOrRespond(
 
 /** 非调试房间的成员(玩家/旁观者)读取守卫(log/chat/history 族):
  *  未登录回 401(AUTH_REQUIRED);登录但非本房成员回 403(forbidden 文案)。
- *  调试房间/房间不存在直接放行(user 为 null,调用方保持游客模型)。 */
+ *  调试房间/房间不存在直接放行(user 为 null,调用方保持游客模型)。
+ *  身份+角色校验单点见 auth/guard 的 checkRoomAccess。 */
 export async function requireRoomMember(
   c: Context,
   room: Room | null,
   forbidden: string,
 ): Promise<{ user: PublicUser | null; error: Response | null }> {
-  if (!room || room.isDebug) return { user: null, error: null };
-  const user = await requireUser(c);
-  if (!user) return { user: null, error: authRequired(c) };
-  if (!isRoomMember(room, user.id)) {
-    return { user: null, error: c.json({ error: forbidden }, 403) };
-  }
-  return { user, error: null };
+  const access = await checkRoomAccess(c, room, 'member');
+  if (access.kind === 'open') return { user: null, error: null };
+  if (access.kind === 'unauthenticated') return { user: null, error: authRequired(c) };
+  if (access.kind === 'forbidden') return { user: null, error: c.json({ error: forbidden }, 403) };
+  return { user: access.user, error: null };
 }
 
 /** 非调试房间的房主守卫(会话身份;删除房间/再来一局):未登录回 401,非房主回 403。
- *  调试房间(debug 工作流无房主概念)与房间不存在(调用方幂等清理)直接放行。 */
+ *  调试房间(debug 工作流无房主概念)与房间不存在(调用方幂等清理)直接放行。
+ *  身份+角色校验单点见 auth/guard 的 checkRoomAccess。 */
 export async function requireSessionHost(
   c: Context,
   room: Room | null,
   forbidden: string,
 ): Promise<Response | null> {
-  if (!room || room.isDebug) return null;
-  const user = await requireUser(c);
-  if (!user) return authRequired(c);
-  if (room.hostId !== user.id) return c.json({ error: forbidden }, 403);
+  const access = await checkRoomAccess(c, room, 'host');
+  if (access.kind === 'unauthenticated') return authRequired(c);
+  if (access.kind === 'forbidden') return c.json({ error: forbidden }, 403);
   return null;
 }
 

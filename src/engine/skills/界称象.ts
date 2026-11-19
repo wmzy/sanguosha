@@ -26,6 +26,7 @@
 //   内部 Skill.name = '称象'(OL 官方技能名,玩家可见)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
+import { peekTopN } from '../core/deck';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { getCardValue } from '../flows/rank';
 import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
@@ -123,14 +124,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const bonus = currentBonus(ctx.state, ownerId);
       const revealCount = BASE_REVEAL + bonus;
 
-      // 牌堆不足 N 张:仅亮出可用张数;完全空则跳过本次
-      const deck = ctx.state.zones.deck;
-      if (deck.length === 0) break;
-      const n = Math.min(revealCount, deck.length);
-
-      // 亮出牌堆顶 n 张(deck 末尾为顶,与 摸牌 atom 一致)。顺序:top→bottom。
-      const revealed: string[] = [];
-      for (let k = 0; k < n; k++) revealed.push(deck[deck.length - 1 - k]);
+      // 亮出牌堆顶 revealCount 张([顶…往下],与 摸牌 atom 同向)。
+      // 牌堆不足时仅亮出可用张数;完全空则跳过本次(bonus 保留至下次发动)。
+      const revealed = peekTopN(ctx.state, revealCount);
+      if (revealed.length === 0) break;
+      const n = revealed.length;
 
       // 询问是否发动(可选)
       const confirmed = await askConfirm(ctx.state, '界称象/confirm', ownerId, {
@@ -190,11 +188,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const belowRevealed = deckArr.slice(0, deckArr.length - n);
       const revealedSet = new Set(revealed);
       const chosenSet = new Set(chosen);
-      const unpickedRevealedTopFirst: string[] = [];
-      for (let k = 0; k < n; k++) {
-        const cid = deckArr[deckArr.length - 1 - k]; // top→bottom
-        if (revealedSet.has(cid) && !chosenSet.has(cid)) unpickedRevealedTopFirst.push(cid);
-      }
+      // 亮出区(牌堆顶 n 张,[顶…往下])中未被选中的牌
+      const unpickedRevealedTopFirst = peekTopN(ctx.state, n).filter(
+        (cid) => revealedSet.has(cid) && !chosenSet.has(cid),
+      );
       // 反转:以底→顶顺序放置(保证原相对位置不变)
       const unpickedRevealedBottomFirst = [...unpickedRevealedTopFirst].reverse();
       const newDeck = [...belowRevealed, ...unpickedRevealedBottomFirst, ...[...chosen].reverse()];

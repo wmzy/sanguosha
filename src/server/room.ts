@@ -6,10 +6,12 @@ import { DEFAULT_ROOM_CONFIG, normalizeRoomConfig } from './protocol';
 import { createRng } from '../engine/util/rng';
 import { register } from './resourceRegistry';
 import { verifyPassword } from './auth/password';
-// 注意:本模块与 registry.ts 构成模块环(registry 顶层调用 setSessionChecker,
-// 本模块的成员函数维护 registry 导出的 playerRoomMap)。sessionChecker 因此
-// 改存函数对象属性(见下方),避免 room.ts 先被求值时的 TDZ 崩溃。
-import { playerRoomMap } from './registry';
+import { bindPlayerRoom, playerRoomMap, unbindPlayerRoom } from './playerIndex';
+
+// 玩家→房间映射写入口与聊天操作函数已分别下沉 playerIndex.ts / chat.ts;
+// 此处 re-export 保持既有导入路径(sse.ts/routes/tests 从 './room' 导入)不变。
+export { bindPlayerRoom, unbindPlayerRoom } from './playerIndex';
+export { addChatMessage, getChatHistory, resetChatUsage, type ChatValidation } from './chat';
 
 export interface Room {
   id: string;
@@ -31,9 +33,10 @@ export interface Room {
   viewGrants: Map<string, number>;
   /** 待处理申请：spectatorId → 申请查看的座次下标 */
   pendingViewRequests: Map<string, number>;
-  /** 聊天用量跟踪：playerId → { total: number; timestamps: number[] } */
+  /** 聊天用量跟踪：playerId → { total: number; timestamps: number[] }
+   *  (操作函数见 chat.ts) */
   chatUsage: Map<string, { total: number; timestamps: number[] }>;
-  /** 聊天历史（最近 50 条，供重连获取） */
+  /** 聊天历史（最近 50 条，供重连获取;操作函数见 chat.ts） */
   chatHistory: Array<{ playerId: string; seatIndex: number; text: string; timestamp: number }>;
   /** 进房密码哈希(scrypt `salt:hash`);null=无密码。永不存明文、永不下发客户端。 */
   passwordHash: string | null;
@@ -119,6 +122,12 @@ export function buildRoomState(room: Room): ServerMessage {
     ),
     hasPassword: room.passwordHash !== null,
   };
+}
+
+/** 广播 room_state 给房间内所有连接(单点:REST 路由经 routes/helpers re-export
+ *  共用,本模块内部广播(applyDisplayName/expireSeatSwap)也走此入口)。 */
+export function broadcastRoomState(room: Room): void {
+  broadcastMessage(room, buildRoomState(room));
 }
 
 /** 校验进房密码。无密码房间恒过;有密码房间需明文匹配(scrypt,timingSafeEqual)。 */
@@ -249,30 +258,7 @@ export function isRoomFull(room: Room): boolean {
   return occupiedSeatCount(room) >= room.maxPlayers;
 }
 
-// ── 玩家→房间映射（playerRoomMap 唯一写入口）──
-// 映射本体在 registry.ts(供测试与跨模块读取);全部写入收敛到这两个助手,
-// 并由成员变更函数(createRoom/joinRoom/joinDebugRoom/leaveRoom/
-// joinAsSpectator/removeSpectator/switchRole/kickPlayer)自动维护。
-// 路由/SSE 仅在绕过成员函数直改名单的场景(如 SSE registerSink 重挂连接)
-// 显式调用,禁止再手工 set/delete(不变量单点维护)。
-
-/** 记录玩家当前所在房间（加入/入座/转身份成功时由成员函数调用）。
- *  role 省略时(sse.ts 重挂连接不区分身份)沿用同房既有身份,
- *  避免旁观者的 SSE 重连把映射身份误记为玩家。 */
-export function bindPlayerRoom(
-  playerId: string,
-  roomId: string,
-  role?: 'player' | 'spectator',
-): void {
-  const previous = playerRoomMap.get(playerId);
-  const resolved = role ?? (previous?.roomId === roomId ? previous.role : 'player');
-  playerRoomMap.set(playerId, { roomId, role: resolved });
-}
-
-/** 清除玩家的房间映射（离开/被踢/断线清理时由成员函数调用）。 */
-export function unbindPlayerRoom(playerId: string): void {
-  playerRoomMap.delete(playerId);
-}
+// ── 玩家→房间映射（写入口在 playerIndex.ts,查询 findRoomByPlayerId 在下方）──
 
 /** 清理该 playerId 的旁观者身份（spectators/viewGrants/pendingViewRequests）。
  *  身份互斥保证：加入玩家前先清旁观，避免同一 playerId 同时存在于 players 和 spectators。 */
@@ -280,6 +266,30 @@ function clearSpectatorMembership(room: Room, playerId: string): void {
   room.spectators.delete(playerId);
   room.viewGrants.delete(playerId);
   room.pendingViewRequests.delete(playerId);
+}
+
+/** 成员登记四连(joinRoom/joinDebugRoom/joinAsSpectator/switchRole 共用):
+ *  名单写入 + 身份互斥清理 + recentlyLeft 撤销 + bindPlayerRoom。
+ *  「先写名单后清对方」与「先清对方后写名单」语义等价(两组操作触碰的集合
+ *  不相交,中间无异常/定时器路径),故按 role 归一为固定顺序:player 分支清
+ *  旁观残留(spectators/viewGrants/pendingViewRequests),spectator 分支清玩家
+ *  残留(players/seats/ready/交换请求——释放座位,调用方无需先手工移除)。 */
+function registerMembership(
+  room: Room,
+  playerId: string,
+  role: 'player' | 'spectator',
+  sink: ConnectionSink,
+): void {
+  if (role === 'player') {
+    room.players.set(playerId, sink);
+    clearSpectatorMembership(room, playerId);
+  } else {
+    removePlayerMembership(room, playerId);
+    room.spectators.set(playerId, sink);
+  }
+  // 重新入会成为正式成员，撤销可能残留的断线宽限条目
+  room.recentlyLeft.delete(playerId);
+  bindPlayerRoom(playerId, room.id, role);
 }
 
 /** 座位分配：优先占用 preferSeat（调用方已校验有效且为空），否则首个空座；
@@ -342,12 +352,7 @@ export function joinRoom(
   if (existingSeat < 0 && isRoomFull(room)) return null;
 
   // 复用座位与新入座共用的成员登记（两条路径仅座位来源不同）
-  room.players.set(playerId, sink);
-  // 身份互斥：清理可能残留的旁观者身份（如刷新前是旁观者/复用座位时的残留）
-  clearSpectatorMembership(room, playerId);
-  // 重新入会成为正式成员，撤销可能残留的断线宽限条目
-  room.recentlyLeft.delete(playerId);
-  bindPlayerRoom(playerId, room.id, 'player');
+  registerMembership(room, playerId, 'player', sink);
   // 新入座：分配首个空座位
   if (existingSeat < 0) assignSeat(room, playerId);
   return room;
@@ -411,8 +416,7 @@ export function joinDebugRoom(
     }
   }
 
-  room.players.set(playerId, sink);
-  bindPlayerRoom(playerId, room.id, 'player');
+  registerMembership(room, playerId, 'player', sink);
   // 复用已有座位或分配首个空座位（防止重复入座）
   const existingDebugSeat = room.seats.indexOf(playerId);
   if (existingDebugSeat >= 0) {
@@ -553,23 +557,51 @@ export function updateConfig(roomId: string, config: unknown, playerId: string, 
   return normalized;
 }
 
-export function setReady(roomId: string, playerId: string): boolean {
+/** 等待中房间守卫(ready/换座族共用):房间存在、状态「等待中」,且操作者持有
+ *  membership 口径的成员身份;任一不满足返回 null(调用方按各自失败形状映射
+ *  false/null)。两套判据是有意并存,不得互相「统一」:
+ *  - 'seat' 严判据(seats.includes,ready 族):准备状态直接决定 allReady 开局,
+ *    必须占座才可写 readyPlayers(见 setReady 注释);
+ *  - 'connection' 宽判据(players.has,moveSeat/requestSeatSwap 族):移座只搬
+ *    seats 不动 players,「有连接无座」的成员(重启恢复/SSE 先于 joinRoom 的
+ *    幽灵连接)也需能选空座归位,严判据会把他们锁死在无座状态。
+ *  membership 省略时仅校验房间与状态(respondSeatSwap:合法性由 pending 条目
+ *  与座位归属校验保证,无需成员预检)。 */
+function requireWaitingRoom(roomId: string): Room | null;
+function requireWaitingRoom(
+  roomId: string,
+  playerId: string,
+  membership: 'connection' | 'seat',
+): Room | null;
+function requireWaitingRoom(
+  roomId: string,
+  playerId?: string,
+  membership?: 'connection' | 'seat',
+): Room | null {
   const room = roomList.get(roomId);
-  if (room?.status !== '等待中') return false;
-  // 仅占座玩家可准备(seats 是权威座位表;players 是连接层,建房后 SSE 连接前为空)。
-  // 无此守卫时,任意字符串会被塞进 readyPlayers,
-  // 使 allReady 的 size 相等判断永假 → 房间永久无法开局。
-  if (!room.seats.includes(playerId)) return false;
+  if (!room) return null;
+  if (room.status !== '等待中') return null;
+  if (membership === 'connection' && !room.players.has(playerId!)) return null;
+  if (membership === 'seat' && !room.seats.includes(playerId!)) return null;
+  return room;
+}
+
+export function setReady(roomId: string, playerId: string): boolean {
+  // 'seat' 严判据(seats 是权威座位表;players 是连接层,建房后 SSE 连接前为空):
+  // 无此守卫时,任意字符串会被塞进 readyPlayers,使 allReady 的 size 相等判断
+  // 永假 → 房间永久无法开局。为何 ready 必须有座而 moveSeat 允许有连接无座,
+  // 见 requireWaitingRoom 的判据说明。
+  const room = requireWaitingRoom(roomId, playerId, 'seat');
+  if (!room) return false;
 
   room.readyPlayers.add(playerId);
   return true;
 }
 
 export function unsetReady(roomId: string, playerId: string): boolean {
-  const room = roomList.get(roomId);
-  if (room?.status !== '等待中') return false;
   // 同 setReady:非本房玩家的取消请求直接拒绝
-  if (!room.seats.includes(playerId)) return false;
+  const room = requireWaitingRoom(roomId, playerId, 'seat');
+  if (!room) return false;
 
   return room.readyPlayers.delete(playerId);
 }
@@ -722,25 +754,16 @@ export function broadcastMessage(room: Room, message: ServerMessage, excludeId?:
   );
 }
 
-// session 活跃检查器:由 app.ts 注册(避免 room.ts 直接依赖 app.ts 的 gameSessions)。
-// 检查器挂在 setSessionChecker 函数对象的属性上而非模块级 let:room.ts 为维护
-// playerRoomMap 引用了 registry.ts,而 registry.ts 顶层又调用 setSessionChecker,
-// 两模块构成环。当 room.ts 先进入求值(如测试直接 import room.ts)时,registry
-// 的顶层调用先于本模块函数体执行,模块级 let 届时处于暂时性死区,赋值会抛
-// ReferenceError;函数声明在模块实例化阶段即完整创建,其属性读写不受求值顺序
-// 影响,两个方向都安全。
+// session 活跃检查器:由 registry.ts 注册(避免 room.ts 直接依赖 app.ts 的
+// gameSessions)。playerRoomMap 下沉 playerIndex.ts 后 room↔registry 模块环
+// 已消除,普通模块级 let 即可,不再需要函数对象属性绕模块求值 TDZ。
 type SessionChecker = (roomId: string) => boolean;
-/** setSessionChecker 的函数对象形状（registered = 已注册检查器槽位）。 */
-interface SessionCheckerSlot {
-  (fn: SessionChecker | null): void;
-  registered?: SessionChecker | null;
-}
+let sessionChecker: SessionChecker | null = null;
 export function setSessionChecker(fn: SessionChecker | null): void {
-  (setSessionChecker as SessionCheckerSlot).registered = fn;
+  sessionChecker = fn;
 }
 function hasSession(roomId: string): boolean {
-  const checker = (setSessionChecker as SessionCheckerSlot).registered;
-  return checker ? checker(roomId) : true;
+  return sessionChecker ? sessionChecker(roomId) : true;
 }
 
 // 房间变更通知器:由 roomStore 注册,持久化普通房间元数据。
@@ -763,7 +786,7 @@ export function applyDisplayName(userId: string, displayName: string): void {
   for (const room of roomList.values()) {
     if (!room.playerNames.has(userId)) continue;
     room.playerNames.set(userId, displayName);
-    broadcastMessage(room, buildRoomState(room));
+    broadcastRoomState(room);
     if (room.roomType === 'normal') roomChangeHandler?.(room, 'update');
   }
 }
@@ -781,10 +804,9 @@ function cancelSeatSwapInternal(room: Room, requesterId: string): void {
 
 /** 移动到空座位。仅等待中允许。 */
 export function moveSeat(roomId: string, playerId: string, targetSeat: number): Room | null {
-  const room = roomList.get(roomId);
+  // 'connection' 宽判据(有连接无座的幽灵连接也可借此归位),见 requireWaitingRoom
+  const room = requireWaitingRoom(roomId, playerId, 'connection');
   if (!room) return null;
-  if (room.status !== '等待中') return null;
-  if (!room.players.has(playerId)) return null;
   if (targetSeat < 0 || targetSeat >= room.seats.length) return null;
   if (room.seats[targetSeat] !== null) return null; // 目标座位已有人
 
@@ -804,10 +826,9 @@ export function requestSeatSwap(
   requesterId: string,
   targetSeat: number,
 ): { room: Room; targetPlayerId: string; requesterSeat: number; expiresAt: number } | null {
-  const room = roomList.get(roomId);
+  // 'connection' 宽判据,同 moveSeat(见 requireWaitingRoom)
+  const room = requireWaitingRoom(roomId, requesterId, 'connection');
   if (!room) return null;
-  if (room.status !== '等待中') return null;
-  if (!room.players.has(requesterId)) return null;
   if (targetSeat < 0 || targetSeat >= room.seats.length) return null;
 
   const targetPlayerId = room.seats[targetSeat];
@@ -837,12 +858,11 @@ export function respondSeatSwap(
   requesterId: string,
   accept: boolean,
 ): { room: Room; swapped: boolean } | null {
-  const room = roomList.get(roomId);
-  if (!room) return null;
-  // 与 moveSeat/requestSeatSwap 同款守卫:仅等待中可换座。
+  // 仅等待中可换座(与 moveSeat/requestSeatSwap 同族守卫,见 requireWaitingRoom)。
   // 缺此检查时,开局瞬间点「接受」会在对局进行中改写 seats,
   // 破坏断线重连的 ensureSeatOnReconnect 归位与座次显示。
-  if (room.status !== '等待中') return null;
+  const room = requireWaitingRoom(roomId);
+  if (!room) return null;
 
   const pending = room.pendingSeatSwaps.get(requesterId);
   if (!pending) return null;
@@ -874,7 +894,7 @@ function expireSeatSwap(roomId: string, requesterId: string): void {
   room.pendingSeatSwaps.delete(requesterId);
   const responderId = room.seats[pending.targetSeat] ?? '';
   broadcastMessage(room, { type: 'seat_swap_result', success: false, requesterId, responderId });
-  broadcastMessage(room, buildRoomState(room));
+  broadcastRoomState(room);
 }
 
 // ── 旁观者管理 ──
@@ -890,15 +910,8 @@ export function joinAsSpectator(
 ): Room | null {
   const room = roomList.get(roomId);
   if (!room) return null;
-  // 清理残留的玩家身份：释放座位、移出 players/ready/交换请求
-  if (room.players.has(spectatorId) || room.seats.includes(spectatorId)) {
-    removePlayerMembership(room, spectatorId);
-  }
-  room.spectators.set(spectatorId, sink);
   if (displayName) room.playerNames.set(spectatorId, displayName);
-  // 重新入房成为正式旁观，撤销可能残留的断线宽限条目
-  room.recentlyLeft.delete(spectatorId);
-  bindPlayerRoom(spectatorId, room.id, 'spectator');
+  registerMembership(room, spectatorId, 'spectator', sink);
   return room;
 }
 
@@ -939,10 +952,7 @@ export function switchRole(
     // player → spectator
     const sink = room.players.get(playerId);
     if (!sink) return { room, success: false };
-    // 完整移除玩家身份（players/seats/ready/交换请求）
-    removePlayerMembership(room, playerId);
-    room.spectators.set(playerId, sink);
-    bindPlayerRoom(playerId, room.id, 'spectator');
+    registerMembership(room, playerId, 'spectator', sink);
     // 房主切旁观仍保留 hostId（管理权限不变）
     return { room, success: true };
   } else {
@@ -958,9 +968,7 @@ export function switchRole(
         return { room, success: false };
       }
     }
-    clearSpectatorMembership(room, playerId);
-    room.players.set(playerId, sink);
-    bindPlayerRoom(playerId, room.id, 'player');
+    registerMembership(room, playerId, 'player', sink);
     // 占据指定座位（或首个空座位）
     assignSeat(room, playerId, seat);
     return { room, success: true };
@@ -999,109 +1007,4 @@ export function revokeView(roomId: string, spectatorId: string): Room | null {
   if (!room) return null;
   room.viewGrants.delete(spectatorId);
   return room;
-}
-
-// ── 聊天管理 ──
-
-/** 聊天验证结果。 */
-export interface ChatValidation {
-  ok: boolean;
-  error?: string;
-  /** 发送后本局剩余次数（null=无限） */
-  remaining?: number | null;
-}
-
-const CHAT_HISTORY_LIMIT = 50;
-const MINUTE_MS = 60_000;
-
-/** 清理过期的每分钟时间戳（滑动窗口）。 */
-function pruneTimestamps(timestamps: number[], now: number): number[] {
-  const cutoff = now - MINUTE_MS;
-  return timestamps.filter((t) => t >= cutoff);
-}
-
-/** 验证并记录一条聊天消息。 */
-export function addChatMessage(
-  roomId: string,
-  playerId: string,
-  text: string,
-): ChatValidation {
-  const room = roomList.get(roomId);
-  if (!room) return { ok: false, error: '房间不存在' };
-
-  const chat = room.config.chat;
-  if (!chat.enabled) return { ok: false, error: '聊天已关闭' };
-  // 聊天仅在游戏中可用(非大厅/结算阶段)
-  if (room.status !== '进行中') return { ok: false, error: '聊天仅在游戏中可用' };
-
-  // 白名单校验
-  const trimmed = text.trim();
-  if (trimmed.length === 0) return { ok: false, error: '消息不能为空' };
-
-  if (chat.whitelistOnly && !chat.whitelist.includes(trimmed)) {
-    return { ok: false, error: '只能发送白名单内的消息' };
-  }
-
-  // 字数校验
-  if (chat.maxChars > 0 && trimmed.length > chat.maxChars) {
-    return { ok: false, error: `每条消息最多 ${chat.maxChars} 字` };
-  }
-
-  const now = Date.now();
-  let usage = room.chatUsage.get(playerId);
-  if (!usage) {
-    usage = { total: 0, timestamps: [] };
-    room.chatUsage.set(playerId, usage);
-  }
-
-  // 每局上限
-  if (chat.maxPerGame > 0 && usage.total >= chat.maxPerGame) {
-    return { ok: false, error: `本局消息上限 ${chat.maxPerGame} 条已用尽` };
-  }
-
-  // 每分钟上限（滑动窗口）
-  if (chat.maxPerMinute > 0) {
-    usage.timestamps = pruneTimestamps(usage.timestamps, now);
-    if (usage.timestamps.length >= chat.maxPerMinute) {
-      return { ok: false, error: `每分钟最多 ${chat.maxPerMinute} 条` };
-    }
-  }
-
-  // 记录用量
-  usage.total++;
-  usage.timestamps.push(now);
-
-  // 确定座次（从座位表派生，保证与座次顺序一致）
-  const seatIndex = room.seats.indexOf(playerId);
-  if (seatIndex < 0) return { ok: false, error: '不在房间中' };
-
-  // 存入历史
-  const entry = { playerId, seatIndex, text: trimmed, timestamp: now };
-  room.chatHistory.push(entry);
-  if (room.chatHistory.length > CHAT_HISTORY_LIMIT) {
-    room.chatHistory.shift();
-  }
-
-  const remaining = chat.maxPerGame > 0 ? chat.maxPerGame - usage.total : null;
-  return { ok: true, remaining };
-}
-
-/** 获取聊天历史（供重连）。 */
-export function getChatHistory(roomId: string): Array<{
-  playerId: string;
-  seatIndex: number;
-  text: string;
-  timestamp: number;
-}> {
-  const room = roomList.get(roomId);
-  return room ? [...room.chatHistory] : [];
-}
-
-/** 重置聊天用量（开局/重开时调用）。 */
-export function resetChatUsage(roomId: string): void {
-  const room = roomList.get(roomId);
-  if (room) {
-    room.chatUsage.clear();
-    room.chatHistory = [];
-  }
 }

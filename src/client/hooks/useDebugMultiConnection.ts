@@ -148,6 +148,31 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     return [...clientsRef.current.values()].find((c) => c.seatIndex === viewer);
   }, []);
 
+  /** 单活流对齐(单个座次):seat 是当前视角(activeSeat)则持流,否则挂起并废弃其
+   *  缓存视图(过时快照不能作渲染依据,也会误导 useDebugPerspective 的自动跟随)。
+   *  connect().then(开局瞬间在途 join 的当场对齐)与 [perspective, gameStarted]
+   *  effect(视角切换/开局翻转兜底)共用;activeSeat 由调用方传入(ref 实时值或
+   *  effect 闭包值),挂起分支要求 seat>=0(clientsByViewerRef 的键本就 >=0,
+   *  connect().then 侧真实座次可能未分配)。异常处理留给调用方:effect 侧
+   *  try/catch 忽略已 disconnect 实例,connect().then 侧沿用链式 catch 上报。 */
+  const alignSingleActiveStream = useCallback(
+    (seat: number, hgc: HeadlessGameClient, activeSeat: number): void => {
+      if (seat === activeSeat) {
+        hgc.resumeStream();
+      } else if (seat >= 0) {
+        hgc.suspendStream();
+        setViews((prev) => {
+          if (!prev.has(seat)) return prev;
+          const next = new Map(prev);
+          next.delete(seat);
+          return next;
+        });
+      }
+    },
+    // setViews 是 useState 稳定 setter,无需列入
+    [],
+  );
+
   // ── 建立连接：N 个 HGC 实例 ──
   useEffect(() => {
     if (!roomId || playerCount < 2) return;
@@ -258,17 +283,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
           // 的成员资格与 readyPlayers(表现:配置面板「已准备」静默弹回)。
           // 开局瞬间仍在途的 join 由 [perspective] effect 的 gameStarted 依赖兜底对齐。
           if (gameStartedRef.current) {
-            if (trueSeat === perspectiveRef.current) {
-              hgc.resumeStream();
-            } else if (trueSeat >= 0) {
-              hgc.suspendStream();
-              setViews((prev) => {
-                if (!prev.has(trueSeat)) return prev;
-                const next = new Map(prev);
-                next.delete(trueSeat);
-                return next;
-              });
-            }
+            alignSingleActiveStream(trueSeat, hgc, perspectiveRef.current);
           }
         })
         .catch((err: unknown) => {
@@ -319,22 +334,12 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     if (!gameStarted) return;
     for (const [seat, hgc] of clientsByViewerRef.current) {
       try {
-        if (seat === perspective) {
-          hgc.resumeStream();
-        } else {
-          hgc.suspendStream();
-          setViews((prev) => {
-            if (!prev.has(seat)) return prev;
-            const next = new Map(prev);
-            next.delete(seat);
-            return next;
-          });
-        }
+        alignSingleActiveStream(seat, hgc, perspective);
       } catch {
         /* 已 disconnect 的实例:忽略 */
       }
     }
-  }, [perspective, gameStarted]);
+  }, [perspective, gameStarted, alignSingleActiveStream]);
 
   // ── 自愈:当前视角缺视图超过阈值时全量重连 ──
   // 单活流下切视角依赖「挂起旧流→恢复新流→快照重建」。若快照丢失或重连后

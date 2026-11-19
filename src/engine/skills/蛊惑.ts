@@ -48,7 +48,7 @@
 //
 // respond(质疑)注册到每个座次(被问询者非于吉),onInit 返回合并卸载函数
 //   (unloadSkillInstance 仅按 (skillId,于吉座次) 清 action,清不到其他座次)。
-import type { ActionContext, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { ActionContext, FrontendAPI, GameState, Json, PendingSlot, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, declareAlternativeResponse } from '../core/skill';
@@ -311,17 +311,27 @@ export function registerGuEntries(
     );
   for (const declaredName of ACTIVE_DECLARATIONS) unloaders.push(registerDeclaredUse(declaredName));
 
-  // ── dodge(响应·闪):被杀指定(询问闪 pending)时,扣牌声明为闪打出 ──
-  unloaders.push(
+  // ── dodge/rescue(响应入口)共用工厂 ──
+  // 两入口仅三处不同:窗口判定(询问闪 vs 请求回应+桃/求桃)、声明牌名('闪'/'桃')、
+  // 质疑通过后的成功动作(向杀帧处理区提供闪 vs 置 RESCUED_VAR);validate 前奏与执行时序
+  // (markOncePerTurn → pushFrame → runQuestioning → finally{cleanupVars; popFrame} → 成功动作)
+  // 完全同构,由工厂统一承载——时序勿改(dispatch/测试依赖 finally 先清理后弹帧)。
+  const registerGuResponse = (
+    actionKind: string,
+    checkWindow: (slot: PendingSlot) => string | null,
+    declaredName: '闪' | '桃',
+    onSuccess: (st: GameState, from: number, downCard: string) => Promise<void> | void,
+  ): (() => void) =>
     registerAction(
       state,
       skill.id,
       ownerId,
-      'dodge',
+      actionKind,
       (st: GameState, params: Record<string, Json>): string | null => {
         const slot = st.pendingSlots.get(ownerId);
         if (!slot) return '当前不需要回应';
-        if ((slot.atom as { type: string }).type !== '询问闪') return '当前不是出闪的窗口';
+        const windowError = checkWindow(slot);
+        if (windowError) return windowError;
         if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
         if (!st.players[ownerId]?.alive) return '你已死亡';
         if (usedThisTurn(st, ownerId, deps.skillKey)) return '本回合已使用过蛊惑';
@@ -335,66 +345,52 @@ export function registerGuEntries(
         const from = ownerId;
         const cardId = params.cardId as string;
         await markOncePerTurn(st, from, deps.skillKey);
-        await pushFrame(st, '蛊惑', from, { cardId, declaredName: '闪' });
+        await pushFrame(st, '蛊惑', from, { cardId, declaredName });
         let notVoided: boolean;
         let downCard: string;
         try {
-          const result = await deps.runQuestioning(st, from, cardId, '闪');
+          const result = await deps.runQuestioning(st, from, cardId, declaredName);
           notVoided = !result.voided;
           downCard = result.downCard;
         } finally {
           deps.cleanupVars(st);
           await popFrame(st);
         }
-        // 质疑无人/真 → 向外层结算帧(杀帧)处理区提供一张"闪"(供抵消检测)
+        // 质疑无人/真 → onSuccess 按声明生效;作废(假牌被质疑)→ 不生效
         if (notVoided) {
-          await provideAsBasicToProcessing(st, from, downCard, '闪', deps.skillKey);
+          await onSuccess(st, from, downCard);
         }
-        // 作废(假牌被质疑)时不提供闪 → 杀结算检测处理区无闪 → 于吉受伤
       },
+    );
+
+  // ── dodge(响应·闪):被杀指定(询问闪 pending)时,扣牌声明为闪打出 ──
+  unloaders.push(
+    registerGuResponse(
+      'dodge',
+      (slot) =>
+        (slot.atom as { type: string }).type !== '询问闪' ? '当前不是出闪的窗口' : null,
+      '闪',
+      // 向外层结算帧(杀帧)处理区提供一张"闪"(供抵消检测);
+      // 作废(假牌被质疑)时不提供闪 → 杀结算检测处理区无闪 → 于吉受伤
+      (st, from, downCard) => provideAsBasicToProcessing(st, from, downCard, '闪', deps.skillKey),
     ),
   );
 
   // ── rescue(响应·桃濒死救援):求桃 pending 时,扣牌声明为桃打出 ──
   unloaders.push(
-    registerAction(
-      state,
-      skill.id,
-      ownerId,
+    registerGuResponse(
       'rescue',
-      (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(ownerId);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as { type: string; requestType?: string; target: number };
+      (slot) => {
+        const atom = slot.atom as { type: string; requestType?: string };
         if (atom.type !== '请求回应') return '当前不是求桃窗口';
         if (atom.requestType !== '桃/求桃') return '当前不是求桃窗口';
-        if (atom.target !== ownerId) return '不是问你的';
-        if (!st.players[ownerId]?.alive) return '你已死亡';
-        if (usedThisTurn(st, ownerId, deps.skillKey)) return '本回合已使用过蛊惑';
-        const cardId = params.cardId as string | undefined;
-        if (typeof cardId !== 'string' || !st.players[ownerId].hand.includes(cardId)) {
-          return '请选择一张手牌';
-        }
         return null;
       },
-      async (st: GameState, params: Record<string, Json>) => {
-        const from = ownerId;
-        const cardId = params.cardId as string;
-        await markOncePerTurn(st, from, deps.skillKey);
-        await pushFrame(st, '蛊惑', from, { cardId, declaredName: '桃' });
-        let notVoided: boolean;
-        try {
-          const result = await deps.runQuestioning(st, from, cardId, '桃');
-          notVoided = !result.voided;
-        } finally {
-          deps.cleanupVars(st);
-          await popFrame(st);
-        }
-        // 质疑无人/真 → 标记已救援(同 桃.respond/急救.respond,runDyingFlow 据此回复濒死者体力)
-        if (notVoided) {
-          st.localVars[RESCUED_VAR] = true;
-        }
-        // 作废(假牌被质疑)时不救援
+      '桃',
+      // 标记已救援(同 桃.respond/急救.respond,runDyingFlow 据此回复濒死者体力);
+      // 作废(假牌被质疑)时不救援
+      (st) => {
+        st.localVars[RESCUED_VAR] = true;
       },
     ),
   );

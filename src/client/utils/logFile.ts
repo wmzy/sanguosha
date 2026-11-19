@@ -1,31 +1,13 @@
 import type { GameState } from '../../engine/types';
 import type { GameLog } from '../../engine/util/log';
+import { downloadJson, readJsonFile, JsonValidationError } from './jsonFile';
 
 export function saveState(state: GameState): void {
-  const json = JSON.stringify(state);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `sanguosha_${state.meta.createdAt}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadJson(`sanguosha_${state.meta.createdAt}.json`, state);
 }
 
 export function loadState(file: File): Promise<GameState> {
-  const { promise, resolve, reject } = Promise.withResolvers<GameState>();
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const data = JSON.parse(reader.result as string) as GameState;
-      resolve(data);
-    } catch (e) {
-      reject(e);
-    }
-  };
-  reader.onerror = reject;
-  reader.readAsText(file);
-  return promise;
+  return readJsonFile<GameState>(file);
 }
 
 function validateGameLog(obj: unknown): obj is GameLog {
@@ -38,32 +20,15 @@ function validateGameLog(obj: unknown): obj is GameLog {
 }
 
 export function saveLog(log: GameLog): void {
-  const json = JSON.stringify(log, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `sanguosha-log-${Date.now()}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadJson(`sanguosha-log-${Date.now()}.json`, log, true);
 }
 
 export function loadLog(file: File): Promise<GameLog> {
-  const { promise, resolve, reject } = Promise.withResolvers<GameLog>();
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const data: unknown = JSON.parse(reader.result as string);
-      if (!validateGameLog(data)) {
-        reject(new Error('Invalid GameLog structure: missing meta, serverOps, or playerOps'));
-        return;
-      }
-      resolve(data);
-    } catch (e) {
-      reject(e);
+  // 校验失败时替换为 GameLog 专用文案(历史行为)
+  return readJsonFile(file, validateGameLog).catch((err) => {
+    if (err instanceof JsonValidationError) {
+      throw new Error('Invalid GameLog structure: missing meta, serverOps, or playerOps');
     }
-  };
-  reader.onerror = reject;
-  reader.readAsText(file);
-  return promise;
+    throw err;
+  });
 }

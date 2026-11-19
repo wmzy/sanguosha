@@ -1,6 +1,7 @@
 // 判定编排:结果绑定本次调用,不写公共 params/localVars。
 import type { Atom, GameState } from '../types';
 import { applyAtom } from '../core/apply';
+import { discardProcessingCard } from '../core/processing-zone';
 import { frameCards } from '../core/frame';
 
 interface JudgeResult {
@@ -74,12 +75,7 @@ export async function replaceJudgeCard(
   const cur = result?.cards ?? frameCards(state);
   const originalJudgeId = result ? result.cardId : cur[cur.length - 1];
   if (originalJudgeId === undefined || !cur.includes(originalJudgeId)) return;
-  await applyAtom(state, {
-    type: '移动牌',
-    cardId: originalJudgeId,
-    from: { zone: '处理区' },
-    to: { zone: '弃牌堆' },
-  });
+  await discardProcessingCard(state, originalJudgeId);
   await applyAtom(state, {
     type: '移动牌',
     cardId: replaceCardId,
@@ -92,10 +88,5 @@ export async function replaceJudgeCard(
 /** 按本次判定的稳定牌区引用和 cardId 清理,收走后为 no-op。 */
 async function cleanupJudgeCard(state: GameState, result: JudgeResult): Promise<void> {
   if (result.cardId === undefined || !result.cards?.includes(result.cardId)) return;
-  await applyAtom(state, {
-    type: '移动牌',
-    cardId: result.cardId,
-    from: { zone: '处理区' },
-    to: { zone: '弃牌堆' },
-  });
+  await discardProcessingCard(state, result.cardId);
 }

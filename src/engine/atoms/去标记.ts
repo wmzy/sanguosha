@@ -10,7 +10,7 @@ import { mergeDistanceVars, type DistanceVarsDelta } from './distance-vars';
 export const 去标记: AtomDefinition<{
   player: number;
   markId: string;
-  distanceVars?: { attackMod?: number; defenseMod?: number; attackRange?: number };
+  distanceVars?: DistanceVarsDelta;
 }> = {
   type: '去标记',
   validate(state, atom) {

@@ -15,6 +15,7 @@ import { getPendingRequestType } from '../utils/pendingRespond';
 import { DEFAULT_FACTION_COLOR, fallbackFaction } from '../utils/characterVisuals';
 import { FACTION_BG } from './gameViewConstants';
 import { displaySkillName } from '../utils/skillDisplay';
+import { singleTargetParams } from '../utils/gameViewHelpers';
 import { CardBack } from './CardBack';
 import { useGameView } from './GameViewCtx';
 
@@ -310,7 +311,7 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
                       key={t}
                       seatIdx={t}
                       playerName={names[t]?.name}
-                      onClick={() => send(skillId, 'respond', { target: t, targets: [t] })}
+                      onClick={() => send(skillId, 'respond', singleTargetParams(t))}
                     />
                   ))}
                   {min === 0 && (

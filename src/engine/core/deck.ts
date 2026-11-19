@@ -289,13 +289,24 @@ export function createStandardDeck(): Card[] {
 }
 
 // ─── zones.deck 顶牌访问(牌堆顶 = 末尾,见 引擎架构.md 方向约定) ────────
-// 与上方构造期 helper(操作 Card[])不同,这两个 helper 操作运行时牌堆 zones.deck
+// 与上方构造期 helper(操作 Card[])不同,这三个 helper 操作运行时牌堆 zones.deck
 // (string[] cardId)。所有「取/看牌堆顶」的调用点统一走此处,避免手写
 // `deck[deck.length - 1]` / `deck.pop()` 时方向写反(历史上判定/红颜 曾按 deck[0] 当顶出错)。
 
 /** 看牌堆顶(不移除)。空堆返回 undefined。 */
 export function peekTop(state: GameState): string | undefined {
   return state.zones.deck[state.zones.deck.length - 1];
+}
+
+/** 看牌堆顶 n 张(不移除)。返回 [顶…往下] 顺序(index 0 = 顶,与 peekTop 同向);
+ *  牌堆不足 n 张时返回全部可用张数,空堆返回 []。「看多张顶牌」的调用点统一走此处,
+ *  禁止手写 `deck[deck.length - 1 - k]` 下标算方向(牌堆方向唯一约定:末尾 = 顶)。 */
+export function peekTopN(state: GameState, n: number): string[] {
+  const deck = state.zones.deck;
+  const count = Math.max(0, Math.min(n, deck.length));
+  const top: string[] = new Array(count);
+  for (let k = 0; k < count; k++) top[k] = deck[deck.length - 1 - k];
+  return top;
 }
 
 /** 从牌堆顶取走一张(pop 末尾,与「摸牌」同向)。空堆返回 undefined。 */

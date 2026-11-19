@@ -98,6 +98,8 @@ export type MoveReason =
   | '判定'
   | '系统处理';
 
+export type DistanceVarsDelta = { attackMod?: number; defenseMod?: number; attackRange?: number };
+
 export type Atom =
   // 卡牌/资源
   | { type: '摸牌'; player: number; count: number; fromBottom?: boolean }
@@ -167,8 +169,8 @@ export type Atom =
   // 标记/状态
   // distanceVars: 可选的距离修正 view 同步通道(技能如屯田加田时携带,
   //   applyView 据此同步 view.distanceVars——后端 vars 由技能自行维护)。
-  | { type: '加标记'; player: number; mark: Mark; distanceVars?: { attackMod?: number; defenseMod?: number; attackRange?: number } }
-  | { type: '去标记'; player: number; markId: string; distanceVars?: { attackMod?: number; defenseMod?: number; attackRange?: number } }
+  | { type: '加标记'; player: number; mark: Mark; distanceVars?: DistanceVarsDelta }
+  | { type: '去标记'; player: number; markId: string; distanceVars?: DistanceVarsDelta }
   | { type: '清过期标记'; player: number }
   | { type: '设横置'; player: number; chained: boolean }
   | { type: '设上限'; player: number; amount: number }

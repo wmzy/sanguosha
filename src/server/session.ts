@@ -162,10 +162,8 @@ export class GameSession {
   /** 引擎座次 g 的玩家显示名。第 k 个非空座位的玩家映射到游戏座次 (k + offset) % n
    *  (与 playerId↔座次映射一致),故其昵称必须写在 out[(k + offset) % count]——
    *  直接按 seats 序填写会让 offset≠0 时每个玩家顶着别人的昵称/武将打完整局。
-   *  占位用占座序号 k 而非物理下标 i:座位表可能有空洞(等待中玩家离开只清空座位
-   *  不压缩 seats,room.ts removePlayerMembership),空洞后最高占座下标 ≥ count 时
-   *  (i+offset)%count 会与前面座位对 count 同余 → 两座位写同一 out 槽互相覆盖,
-   *  且 i<count 截断会漏掉空洞之后的所有玩家(引擎玩家名丢失,只剩 stub 兜底)。
+   *  遍历语义与不变量(遍历 seats 而非 players 连接序、占座序号而非物理下标)
+   *  见 room.ts occupiedSeatEntries。
    *  debug 房无 playerNames → 全 fallback。
    *  fallbackNames: 恢复路径传入旧 state 的玩家名(游戏座次序),按游戏座次 g 取值。 */
   private seatDisplayNames(count: number, offset: number, fallbackNames?: string[]): string[] {
@@ -260,12 +258,8 @@ export class GameSession {
    *  startGame 正常路径与 restoreState 恢复路径共用同一遍历。
    *  应用座次轮转偏移 offset:第 k 个非空座位 → 游戏座次 (k + offset) % n;
    *  主公恒在游戏座次 0(引擎不变量),经偏移后落到随机物理座位,房主不再恒为主公。
-   *  必须遍历 seats(权威座位表)而非 players.keys():换座(moveSeat/seat-swap)
-   *  只改 seats 不改 Map 插入序,按连接序映射会让玩家拿到他人座次的私有视图,
-   *  且 ownerId 校验随之错位。
-   *  用占座序号 k 而非物理下标 i:座位表可能有空洞(等待中玩家离开只清空座位
-   *  不压缩 seats),空洞后最高占座下标 ≥ n 时 i 与 i-n 对 n 同余 → 两玩家映射
-   *  到同一座次互相覆盖(handleAction 静默丢弃被顶者的操作),另一座次无人控制。 */
+   *  遍历语义与不变量(为何必须遍历 seats、为何用占座序号而非物理下标)
+   *  见 room.ts occupiedSeatEntries。 */
   private syncSeatMappings(n: number, offset: number): void {
     for (const { playerId, seat } of occupiedSeatEntries(this.room, n, offset)) {
       this.playerSeatIndex.set(playerId, seat);
@@ -723,11 +717,20 @@ export class GameSession {
     this.resumeConnection(spectatorId, viewer, lastSeq, /* strictSeat */ false);
   }
 
+  /** 连接簿记三元组(playerSeatIndex/baselineSent/lastSentDeadline)的 delete 组合
+   *  收口:clearDebugPlayer、reconnectPlayer 旧 playerId 迁移(全清)与
+   *  clearSpectatorBaseline(旁观者无座次映射,withSeat=false 只清后两项)三处共用。
+   *  单点维护,防止散落的 delete 各自漏一两个字段(此类 bug 极难肉眼发现)。 */
+  private clearConnBookkeeping(id: string, withSeat = true): void {
+    if (withSeat) this.playerSeatIndex.delete(id);
+    this.baselineSent.delete(id);
+    this.lastSentDeadline.delete(id);
+  }
+
   /** 清除旁观者 baseline，强制下次 broadcastNewState 重发 initialView。
    *  在授权变更（approve/revoke）时调用，确保旁观者获得新 viewer 的完整视图。 */
   clearSpectatorBaseline(spectatorId: string): void {
-    this.baselineSent.delete(spectatorId);
-    this.lastSentDeadline.delete(spectatorId);
+    this.clearConnBookkeeping(spectatorId, /* withSeat */ false);
   }
 
   handleDisconnect(playerId: string): void {
@@ -759,9 +762,7 @@ export class GameSession {
   /** debug 模式清理 playerId 的所有映射。deleteFromRoom=false 用于刷新重连
    *  (room.players 已由调用方处理)。 */
   private clearDebugPlayer(playerId: string, deleteFromRoom = true): void {
-    this.playerSeatIndex.delete(playerId);
-    this.baselineSent.delete(playerId);
-    this.lastSentDeadline.delete(playerId);
+    this.clearConnBookkeeping(playerId);
     if (deleteFromRoom) {
       this.room.players.delete(playerId);
     }
@@ -827,10 +828,9 @@ export class GameSession {
     if (previousPlayerId && previousPlayerId !== playerId) {
       const seatIndex = this.playerSeatIndex.get(previousPlayerId);
       if (seatIndex === undefined) return false; // 旧 playerId 已不存在(可能已超时清理)
-      this.playerSeatIndex.delete(previousPlayerId);
+      // 连接簿记三元组随旧 playerId 一并清理,座次随后迁给新 playerId
+      this.clearConnBookkeeping(previousPlayerId);
       this.playerSeatIndex.set(playerId, seatIndex);
-      this.baselineSent.delete(previousPlayerId);
-      this.lastSentDeadline.delete(previousPlayerId);
       this.disconnectedAt.delete(previousPlayerId);
       this.room.players.delete(previousPlayerId);
     }

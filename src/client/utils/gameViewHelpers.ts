@@ -196,7 +196,7 @@ const CARD_DEFS_BY_NAME = new Map(
 );
 
 /** 把原料牌包装成产出牌(名 + 真实 type/subtype),供 findUseActionForCard 匹配同源
- *  use action。仅 resolveProducedAction 内部消费,不导出。 */
+ *  use action。仅 resolveProducedAction / findUseActionByProducedName 内部消费,不导出。 */
 function asProducedCard(source: Card, outputName: string): Card {
   const def = CARD_DEFS_BY_NAME.get(outputName);
   return {
@@ -357,6 +357,23 @@ export function resolveProducedAction(
     ? derivePlayRules(targetFilter, getSelfTarget(produced.prompt))
     : derivePlayRules(fallbackFilter, getSelfTarget(action.prompt));
   return { wrapperName, produced, targetFilter, rules };
+}
+
+/** 按产出牌名查找其 use action——浏览器 usePlayInteraction 的 selectedUseAction
+ *  转化分支薄入口,与无头 resolveProducedAction 的 produced 查找同源:把原料牌
+ *  包装成产出牌(名 + 真实 type/subtype,asProducedCard)后走 findUseActionForCard
+ *  的 cardFilter 匹配。此前浏览器按 `actionType==='use' && skillId===产出牌名`
+ *  字符串匹配——skillId===牌名 只是注册惯例,cardFilter 才是「声明即真相」的
+ *  契约,两者等价靠巧合非契约。
+ *  原料牌由调用方给:单卡转化(武圣/龙胆)传当前选中牌;多卡转化(丈八蛇矛)传
+ *  首张已选原料,未选时传模式样本牌(与无头 buildTransformUseAction 取
+ *  materials[0] 同构)。 */
+export function findUseActionByProducedName(
+  skillActions: SkillActionDef[],
+  wrapperName: string,
+  sourceCard: Card,
+): SkillActionDef | undefined {
+  return findUseActionForCard(skillActions, asProducedCard(sourceCard, wrapperName));
 }
 
 // ─── params 构造 ───
@@ -521,6 +538,20 @@ export function targetShapeFor(
   } else {
     params.targets = [idx];
   }
+}
+
+/** 单目标提交的 target/targets 双形状(引擎对单目标技能两种读法并存:
+ *  反间/攻心/雄乱 读 params.targets(单选也必须为长度 1 的数组),
+ *  挑衅/强袭/激将 读 params.target——只发其一会让另一族 validate 恒拒)。
+ *  消费方:浏览器 submitSkillTarget / handleSkillAction 的 selectTarget·choosePlayer
+ *  分支、无头 enumeratePromptActions 逐目标展开与 respond 的 choosePlayer 单选——
+ *  此前五处各手写一份双形状,契约只在此写一份。
+ *  extra(变体参数/代价牌等)先展开,target/targets 恒为最终值。 */
+export function singleTargetParams(
+  idx: number,
+  extra?: Record<string, Json>,
+): Record<string, Json> {
+  return { ...(extra ?? {}), target: idx, targets: [idx] };
 }
 
 // ─── distribute cardIds 解析 ───

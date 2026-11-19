@@ -9,7 +9,7 @@ import { applyRestRoutes } from './rest';
 import { applyAuthRoutes } from './auth/routes';
 import { GameSession } from './session';
 import { createLogger } from './logger';
-import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog } from './persistence';
+import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog, type PersistedRoom } from './persistence';
 import { normalizeRoomConfig } from './protocol';
 import { getRoom, getAllRooms, createRoomShell, type Room } from './room';
 import { cleanupIdleRooms, cleanupDisconnectedRooms } from './cleanup';
@@ -116,7 +116,6 @@ async function restorePersistedRooms(): Promise<void> {
   // 无需启动时清理全局表。bootstrap 会为每个 state 注册各自的技能实例。
   // 清理超过 1 小时的游戏状态 .json(快速房间整体回收;普通房间仅删局内状态,
   // 房间元数据由 restoreNormalRoomsFromDb 从 DB 恢复,不受此影响)
-  const ONE_HOUR = 60 * 60 * 1000;
   const now = Date.now();
   for (const roomId of roomIds) {
     try {
@@ -127,78 +126,7 @@ async function restorePersistedRooms(): Promise<void> {
         await deletePersistedRoom(roomId);
         continue;
       }
-      // 用 startedAt(游戏开始时间)判定过期,不用文件 mtime:
-      // restoreState 后 pending slot 定时器会反复触发 saveRoom 刷新 mtime,
-      // 导致 mtime 永远是最近的,过期检查失效。
-      // 旧数据/未开局测试房间 startedAt 可能为 0(默认值),回退用 savedAt
-      // 判过期——否则这类房间永不过期,每次启动都被恢复成僵尸 session。
-      const startedAt = persisted.state?.startedAt ?? 0;
-      const refTime = startedAt || persisted.savedAt;
-      if (refTime && now - refTime > ONE_HOUR) {
-        const when = new Date(refTime).toISOString();
-        log.info(`跳过过期房间 ${roomId}（${startedAt ? '游戏开始' : '保存'}: ${when}）`);
-        await deletePersistedRoom(roomId);
-        continue;
-      }
-      const state = restoreFromLog(persisted);
-      // 兼容新旧 GameState 格式
-      if (!state.players || !Array.isArray(state.players)) {
-        log.info(`房间 ${roomId} 数据格式不兼容,跳过`);
-        await deletePersistedRoom(roomId);
-        continue;
-      }
-      // 从持久化 state.config 恢复房间配置;旧数据无 config 时用默认值
-      const restoredConfig =
-        state.config && typeof state.config.timeoutSec === 'number'
-          ? {
-              ...normalizeRoomConfig(undefined),
-              timeoutSec: state.config.timeoutSec,
-              name: persisted.roomName || `恢复-${roomId}`,
-            }
-          : { ...normalizeRoomConfig(undefined), name: persisted.roomName || `恢复-${roomId}` };
-      // 如果房间已从 DB 恢复(normal 房间), 复用已存在的 Room 对象;
-      // 否则新建 Room(quick 房间重启后丢失, 仅 JSON 游戏状态能恢复)
-      // 从持久化数据恢复座次映射(playerId → seat index)。
-      // 旧数据无 seats 字段时退回全 null(玩家无法重连,依赖安全网清理)。
-      const restoredSeats = persisted.seats ?? Array(persisted.maxPlayers || state.players.length).fill(null);
-      const existingRoom = getRoom(roomId);
-      // 恢复路径字段与持久化 wrapper 逐字段对应:name/config/seats/maxPlayers/
-      // hostId/isDebug 来自 .json;players/readyPlayers 等连接态重置为空;
-      // passwordHash/playerNames 不持久化在 wrapper(quick 房),恢复为空值。
-      // existingRoom(normal 房从 DB 恢复)时复用已存在的 Room 对象。
-      const room: Room =
-        existingRoom ??
-        createRoomShell(
-          {
-            name: persisted.roomName || `恢复-${roomId}`,
-            maxPlayers: persisted.maxPlayers || state.players.length,
-            hostId: persisted.hostId,
-            roomType: 'quick',
-            isDebug: persisted.debug,
-            config: restoredConfig,
-          },
-          {
-            id: roomId,
-            maxPlayers: persisted.maxPlayers || state.players.length,
-            seats: restoredSeats,
-            status: '进行中',
-          },
-        );
-      // 复用 existingRoom(normal 房间从 DB 恢复)时,DB schema 不存 seats,
-      // existingRoom.seats 是恢复时初始化的全 null 数组。必须用 .json 的 seats 覆盖,
-      // 否则 GameSession 构造时从 room.seats 填充 playerNames 会得到空映射,
-      // 玩家无法重连(session 存在但认不出任何 playerId)。
-      if (existingRoom) {
-        existingRoom.seats = restoredSeats;
-        if (persisted.hostId !== undefined) existingRoom.hostId = persisted.hostId;
-      }
-      // 新建分支已由 createRoomShell 注册进 roomList(等价于原 addRoom)。
-      const session = new GameSession(room, persisted.debug);
-      await session.restoreState(state, persisted.actionLog);
-      gameSessions.set(roomId, session);
-      log.info(
-        `恢复房间 ${roomId}（${state.players.length} 名玩家，${persisted.actionLog.length} 步操作）`,
-      );
+      await restoreOnePersistedRoom(roomId, persisted, now);
     } catch (err) {
       log.info(`房间 ${roomId} 恢复失败: ${err},删除`);
       // 非法 roomId(磁盘上手工放置的越界文件名)会让 deletePersistedRoom 直接
@@ -208,6 +136,90 @@ async function restorePersistedRooms(): Promise<void> {
       );
     }
   }
+}
+
+/** 恢复单个持久化房间:过期判定 → 格式兼容 → config 重构 → existingRoom 复用/
+ *  新建 Room → seats 覆盖 → GameSession 创建。各「跳过」分支删除持久化文件后
+ *  return;抛错由 restorePersistedRooms 主循环兜底删除。now 由主循环统一传入,
+ *  同批房间共用同一过期判定基准。 */
+async function restoreOnePersistedRoom(
+  roomId: string,
+  persisted: PersistedRoom,
+  now: number,
+): Promise<void> {
+  const ONE_HOUR = 60 * 60 * 1000;
+  // 用 startedAt(游戏开始时间)判定过期,不用文件 mtime:
+  // restoreState 后 pending slot 定时器会反复触发 saveRoom 刷新 mtime,
+  // 导致 mtime 永远是最近的,过期检查失效。
+  // 旧数据/未开局测试房间 startedAt 可能为 0(默认值),回退用 savedAt
+  // 判过期——否则这类房间永不过期,每次启动都被恢复成僵尸 session。
+  const startedAt = persisted.state?.startedAt ?? 0;
+  const refTime = startedAt || persisted.savedAt;
+  if (refTime && now - refTime > ONE_HOUR) {
+    const when = new Date(refTime).toISOString();
+    log.info(`跳过过期房间 ${roomId}（${startedAt ? '游戏开始' : '保存'}: ${when}）`);
+    await deletePersistedRoom(roomId);
+    return;
+  }
+  const state = restoreFromLog(persisted);
+  // 兼容新旧 GameState 格式
+  if (!state.players || !Array.isArray(state.players)) {
+    log.info(`房间 ${roomId} 数据格式不兼容,跳过`);
+    await deletePersistedRoom(roomId);
+    return;
+  }
+  // 从持久化 state.config 恢复房间配置;旧数据无 config 时用默认值
+  const restoredConfig =
+    state.config && typeof state.config.timeoutSec === 'number'
+      ? {
+          ...normalizeRoomConfig(undefined),
+          timeoutSec: state.config.timeoutSec,
+          name: persisted.roomName || `恢复-${roomId}`,
+        }
+      : { ...normalizeRoomConfig(undefined), name: persisted.roomName || `恢复-${roomId}` };
+  // 如果房间已从 DB 恢复(normal 房间), 复用已存在的 Room 对象;
+  // 否则新建 Room(quick 房间重启后丢失, 仅 JSON 游戏状态能恢复)
+  // 从持久化数据恢复座次映射(playerId → seat index)。
+  // 旧数据无 seats 字段时退回全 null(玩家无法重连,依赖安全网清理)。
+  const restoredSeats = persisted.seats ?? Array(persisted.maxPlayers || state.players.length).fill(null);
+  const existingRoom = getRoom(roomId);
+  // 恢复路径字段与持久化 wrapper 逐字段对应:name/config/seats/maxPlayers/
+  // hostId/isDebug 来自 .json;players/readyPlayers 等连接态重置为空;
+  // passwordHash/playerNames 不持久化在 wrapper(quick 房),恢复为空值。
+  // existingRoom(normal 房从 DB 恢复)时复用已存在的 Room 对象。
+  const room: Room =
+    existingRoom ??
+    createRoomShell(
+      {
+        name: persisted.roomName || `恢复-${roomId}`,
+        maxPlayers: persisted.maxPlayers || state.players.length,
+        hostId: persisted.hostId,
+        roomType: 'quick',
+        isDebug: persisted.debug,
+        config: restoredConfig,
+      },
+      {
+        id: roomId,
+        maxPlayers: persisted.maxPlayers || state.players.length,
+        seats: restoredSeats,
+        status: '进行中',
+      },
+    );
+  // 复用 existingRoom(normal 房间从 DB 恢复)时,DB schema 不存 seats,
+  // existingRoom.seats 是恢复时初始化的全 null 数组。必须用 .json 的 seats 覆盖,
+  // 否则 GameSession 构造时从 room.seats 填充 playerNames 会得到空映射,
+  // 玩家无法重连(session 存在但认不出任何 playerId)。
+  if (existingRoom) {
+    existingRoom.seats = restoredSeats;
+    if (persisted.hostId !== undefined) existingRoom.hostId = persisted.hostId;
+  }
+  // 新建分支已由 createRoomShell 注册进 roomList(等价于原 addRoom)。
+  const session = new GameSession(room, persisted.debug);
+  await session.restoreState(state, persisted.actionLog);
+  gameSessions.set(roomId, session);
+  log.info(
+    `恢复房间 ${roomId}（${state.players.length} 名玩家，${persisted.actionLog.length} 步操作）`,
+  );
 }
 
 export { app };

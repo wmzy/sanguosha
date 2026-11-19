@@ -1,20 +1,13 @@
 // src/client/replay/replayFile.ts
-// 录像文件 I/O:Blob 下载 + File 加载。
-// 复用 logFile.ts 的模式(saveLog/loadLog)。
+// 录像文件 I/O:委托 utils/jsonFile 完成下载/读取,校验逻辑留在本文件。
 
 import type { ReplayFile } from './types';
 import { REPLAY_FORMAT, REPLAY_VERSION } from './types';
+import { downloadJson, readJsonFile, JsonValidationError } from '../utils/jsonFile';
 
 /** 下载录像为 JSON 文件 */
 export function saveReplay(file: ReplayFile): void {
-  const json = JSON.stringify(file);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `sanguosha-replay-${file.meta.createdAt}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadJson(`sanguosha-replay-${file.meta.createdAt}.json`, file);
 }
 
 /** 校验对象是否符合 ReplayFile 结构(v2: baseline + delta) */
@@ -48,21 +41,11 @@ export function isReplayFile(value: unknown): value is ReplayFile {
 
 /** 从文件加载录像,校验格式 */
 export function loadReplay(file: File): Promise<ReplayFile> {
-  const { promise, resolve, reject } = Promise.withResolvers<ReplayFile>();
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const data: unknown = JSON.parse(reader.result as string);
-      if (!isReplayFile(data)) {
-        reject(new Error('无效的录像文件格式'));
-        return;
-      }
-      resolve(data);
-    } catch (e) {
-      reject(e);
+  // 校验失败时替换为录像专用文案(历史行为)
+  return readJsonFile(file, isReplayFile).catch((err) => {
+    if (err instanceof JsonValidationError) {
+      throw new Error('无效的录像文件格式');
     }
-  };
-  reader.onerror = reject;
-  reader.readAsText(file);
-  return promise;
+    throw err;
+  });
 }

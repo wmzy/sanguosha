@@ -43,6 +43,7 @@ import {
   buildPlayParams,
   derivePlayRules,
   findUseActionForCard,
+  findUseActionByProducedName,
   findAltActionsForCard,
   isActiveAction,
   isFreePlayWindow,
@@ -57,8 +58,10 @@ import {
   effectiveTargetCard,
   targetConstraintCard,
   targetShapeFor,
+  singleTargetParams,
   usedCardNameOf,
   promptTargetBounds,
+  resolveOwnCard,
 } from '../utils/gameViewHelpers';
 import { createCardFlyAnimation } from '../utils/cardFlyAnimation';
 import { targetCandidates, targetSelectionBounds, toggleTargetSelection } from '../../engine/rules/target-selection';
@@ -423,15 +426,21 @@ export function usePlayInteraction(
   const selectedUseAction = (() => {
     if (transformMode) {
       if (!transformWrapperName) return undefined;
-      // 多卡转化(丈八蛇矛):selectedCardId 为 null,直接用包装牌的 use action
-      if (transformMode.minCards > 1) {
-        return skillActions.find(
-          (a) => a.actionType === 'use' && a.skillId === transformWrapperName,
-        );
-      }
-      // 单卡转化(武圣/龙胆):需选中一张卡
-      if (!selectedCard) return undefined;
-      return skillActions.find((a) => a.actionType === 'use' && a.skillId === transformWrapperName);
+      // 产出牌 use action 查找与无头枚举(buildTransformUseAction → resolveProducedAction)
+      // 同源:按「产出牌名 + 真实 type」的 cardFilter 匹配(findUseActionByProducedName),
+      // 不再用 skillId===产出牌名 的字符串巧合等价。
+      // 原料牌:单卡转化(武圣/龙胆)=当前选中牌;多卡转化(丈八蛇矛)=首张已选原料,
+      // 未选时回退模式样本牌(transformWrapperName 未选牌时本就按该样本求名,同源)。
+      const firstSelectedMaterial =
+        transformMode.selectedCardIds.length > 0
+          ? resolveOwnCard(perspectiveHand, perspectiveEquipment, view.cardMap, transformMode.selectedCardIds[0])
+          : undefined;
+      const sourceCard: Card | undefined =
+        transformMode.minCards > 1
+          ? (firstSelectedMaterial ?? perspectiveHand.find((c) => transformMode.cardFilter(c)))
+          : (selectedCard ?? undefined);
+      if (!sourceCard) return undefined;
+      return findUseActionByProducedName(skillActions, transformWrapperName, sourceCard);
     }
     if (!selectedCard) return undefined;
     // altAction 覆盖:用户点了替代 use action(如断粮)后,用它而非默认匹配的主 use action。
@@ -552,15 +561,14 @@ export function usePlayInteraction(
 
   /** 提交 selectTarget/choosePlayer 型主动技(目标名 → 座次)。
    *  单选(max<=1)技能在点座位时即提交;当前全部 selectTarget/choosePlayer 均 max:1,单选提交。
-   *  target 与 targets 同时携带:反间/攻心/雄乱 读 targets(单选也须为长度 1 数组),
-   *  挑衅/强袭/激将 读 target。
+   *  target/targets 双形状由 singleTargetParams 单点装配(契约注释见其定义)。
    *  @param extra 变体 params 引用(paramVariants[i].params 本体,供 fillVariantCostCard
    *         按引用定位变体) */
   const submitSkillTarget = useCallback(
     (action: SkillActionDef, targetName: string, extra: Record<string, Json>, capturedCardId?: string) => {
       const idx = nameToIndex(targetName);
       if (idx < 0) return;
-      const params: Record<string, Json> = { ...extra, target: idx, targets: [idx] };
+      const params = singleTargetParams(idx, extra);
       // 变体声明的代价牌(强袭·弃武器):提交时兜底补 params.cardId ——
       // 覆盖「先点技能按钮、后选武器牌、再点目标」的顺序;
       // 「先选武器→点按钮」顺序下选中牌已被清空,用进入 pending 模式时的快照。
@@ -853,11 +861,12 @@ export function usePlayInteraction(
           params.cardIds = [selectedCardId];
           break;
         case 'selectTarget':
+        case 'choosePlayer':
           if (!selectedTarget) return;
-          params.target = nameToIndex(selectedTarget);
-          // targets 数组同时携带:反间/攻心/雄乱 读 params.targets(单选也必须为长度 1 的数组),
-          // 挑衅/强袭/激将 读 params.target。只发 target 会让反间族 validate 恒拒。
-          params.targets = [params.target];
+          // target/targets 双形状由 singleTargetParams 单点装配:读 targets 的
+          // 引擎路径(反间/攻心/雄乱)只发 target 会恒拒,读 target 的
+          // (挑衅/强袭/激将)反之。
+          Object.assign(params, singleTargetParams(nameToIndex(selectedTarget)));
           break;
         case 'useCardAndTarget':
           if (action.transform && prompt.cardFilter?.filter) {
@@ -886,13 +895,6 @@ export function usePlayInteraction(
             // buildPlayParams 单点同源)
             targetShapeFor(params, selectedCard ?? undefined, idx);
           }
-          break;
-        case 'choosePlayer':
-          if (!selectedTarget) return;
-          params.target = nameToIndex(selectedTarget);
-          // targets 数组同时携带(与 selectTarget 分支同构):读 targets 的
-          // choosePlayer 引擎路径只发 target 会恒拒。
-          params.targets = [params.target];
           break;
         case 'distribute':
           setDistributeMode({ skillId, actionType, prompt });

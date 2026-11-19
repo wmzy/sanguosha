@@ -1,0 +1,47 @@
+// src/shared/logger.ts — server/client 共用的轻量级结构化日志核心
+// string data 直传(字符串不再 JSON.stringify 包引号),两端口径一致;
+// level 经 process.env.LOG_LEVEL 读取,浏览器无 process 时退回 'info'。
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+const LEVEL_PRIORITY: Record<LogLevel, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+};
+
+const currentLevel: LogLevel =
+  (typeof process !== 'undefined' && (process.env?.LOG_LEVEL as LogLevel)) || 'info';
+
+function shouldLog(level: LogLevel): boolean {
+  return LEVEL_PRIORITY[level] >= LEVEL_PRIORITY[currentLevel];
+}
+
+function formatMessage(level: LogLevel, context: string, message: string, data?: unknown): string {
+  const timestamp = new Date().toISOString();
+  const base = `[${timestamp}] [${level.toUpperCase()}] [${context}] ${message}`;
+  if (data !== undefined) {
+    return `${base} ${typeof data === 'string' ? data : JSON.stringify(data)}`;
+  }
+  return base;
+}
+
+export function createLogger(context: string) {
+  return {
+    debug(message: string, data?: unknown) {
+      // eslint-disable-next-line no-console
+      if (shouldLog('debug')) console.log(formatMessage('debug', context, message, data));
+    },
+    info(message: string, data?: unknown) {
+      // eslint-disable-next-line no-console
+      if (shouldLog('info')) console.log(formatMessage('info', context, message, data));
+    },
+    warn(message: string, data?: unknown) {
+      if (shouldLog('warn')) console.warn(formatMessage('warn', context, message, data));
+    },
+    error(message: string, data?: unknown) {
+      if (shouldLog('error')) console.error(formatMessage('error', context, message, data));
+    },
+  };
+}
