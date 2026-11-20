@@ -18,6 +18,7 @@ import type {
 } from '../types';
 import { registerBeforeHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
+import { isOwnDrawPhaseDraw } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -33,7 +34,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   const ownerId = skill.ownerId;
 
   // ── 摸牌 before hook:锁定技,自己摸牌阶段强制多摸 1 张(不询问) ──
-  // 仅自己回合的摸牌阶段(排除无中生有/遗计/苦肉等其他摸牌场景)。
+  // 仅自己回合摸牌阶段(排除无中生有/遗计等,isOwnDrawPhaseDraw)。
   const unloadHook = registerBeforeHook(
     state,
     skill.id,
@@ -41,11 +42,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     '摸牌',
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
-      if (atom.player !== ownerId) return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
-      if (ctx.state.phase !== '摸牌') return;
-      const self = ctx.state.players[ownerId];
-      if (!self?.alive) return;
+      if (!isOwnDrawPhaseDraw(ctx, ownerId)) return;
       // 锁定技:无条件多摸一张
       const count = atom.count ?? 2;
       return { kind: 'modify', atom: { ...ctx.atom, count: count + 1 } as typeof ctx.atom };

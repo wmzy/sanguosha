@@ -33,8 +33,10 @@ import {
 import type { SkillModule } from '../types';
 import {
   askConfirm,
+  askMandatoryCardChoice,
   defineConfirmAction,
   firstTarget,
+  isOwnDrawPhaseDraw,
   requireRequestType,
   currentRequestType,
 } from '../util/skillRuntime';
@@ -88,11 +90,7 @@ export function registerHaoshiDrawHooks(
       async (ctx): Promise<HookResult | void> => {
         const atom = ctx.atom;
         // 仅自己回合的摸牌阶段(排除无中生有/遗计/苦肉等其他摸牌)
-        if (atom.player !== ownerId) return;
-        if (ctx.state.currentPlayerIndex !== ownerId) return;
-        if (ctx.state.phase !== '摸牌') return;
-        const self = ctx.state.players[ownerId];
-        if (!self?.alive) return;
+        if (!isOwnDrawPhaseDraw(ctx, ownerId)) return;
         if (usedThisTurn(ctx.state, ownerId, prefix)) return; // 本回合已发动
 
         // 询问是否发动
@@ -177,29 +175,16 @@ export function registerHaoshiDrawHooks(
           target = chosen;
         }
 
-        // 询问选择 giveCount 张牌给出
-        delete st.localVars[GIVE_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: GIVE_RT,
-          target: ownerId,
-          prompt: {
-            type: 'useCard',
-            title: `好施:选择 ${giveCount} 张牌交给 ${st.players[target].name}`,
-            cardFilter: { filter: () => true, min: giveCount, max: giveCount },
-          },
-          // 强制型给牌(「分半给最少者」是效果必要部分):前端走多选弃牌式 UI 提交 {cardIds}
-          mandatory: true,
+        // 询问选择 giveCount 张牌给出(强制型给牌:「分半给最少者」是效果必要部分,
+        // 前端走多选弃牌式 UI 提交 {cardIds};
+        // 超时/空回应由 askMandatoryCardChoice 兜底手牌前 N 张,不放弃给牌义务)
+        const giveCards = await askMandatoryCardChoice(st, GIVE_RT, ownerId, {
+          resultKey: GIVE_KEY,
+          count: giveCount,
+          title: `好施:选择 ${giveCount} 张牌交给 ${st.players[target].name}`,
           timeout: 30,
         });
-        let giveCards = st.localVars[GIVE_KEY] as string[] | undefined;
-        delete st.localVars[GIVE_KEY];
-        // 强制给牌兜底:超时未回应 → 自动从手牌首张起补足(不放弃给牌义务,
-        // 与庸肆/英魂/成略的 mandatory 兜底范式一致)
-        if (!giveCards || giveCards.length === 0) {
-          giveCards = st.players[ownerId]?.hand.slice(0, giveCount) ?? [];
-        }
-        if (giveCards && giveCards.length > 0) {
+        if (giveCards.length > 0) {
           for (const cardId of giveCards) {
             await applyAtom(st, { type: '给予', cardId, from: ownerId, to: target });
           }

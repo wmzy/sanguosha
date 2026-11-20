@@ -23,16 +23,15 @@
 //   符合官方语义。
 //
 // 模式参考:标连环.ts(转化/重铸)、界火计.ts(覆盖 DEFAULT_SKILLS 中 card skill 的 use)。
-import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill } from '../types';
 import { registerAction } from '../core/skill';
+import { mountTransformAction, registerTransformAction } from '../util/skillRuntime';
 import {
-  mountTransformAction,
-  registerTransformAction,
-  type TransformActionOptions,
-} from '../util/skillRuntime';
-import { registerRecycleAction } from './连环';
+  createChainTransformOptions,
+  mountChainRecycleAction,
+  registerRecycleAction,
+} from './连环';
 import { makeChainUseHandlers } from './cards/铁索连环';
-import { defaultPlayActive } from '../rules/action-active';
 
 /** 界庞统使用铁索连环的目标上限(标版 2,界版 +1 = 3) */
 const MAX_TARGETS = 3;
@@ -46,41 +45,6 @@ export function createSkill(id: string, ownerId: number): Skill {
       '你可以将一张梅花牌当【铁索连环】使用或重铸;你使用【铁索连环】可以多指定一个目标(至多3名)',
   };
 }
-
-/** transform 五件套工厂配置(梅花手牌 → 影子铁索连环;界版 targetFilter 上限 3)。 */
-const TRANSFORM_OPTIONS: TransformActionOptions = {
-  outputName: '铁索连环',
-  validate: (state: GameState, ownerId: number, params: Record<string, Json>) => {
-    const self = state.players[ownerId];
-    const selfAlive = self?.alive === true;
-    const cardId = params.cardId as string;
-    const cardIdOk = typeof cardId === 'string';
-    const card = cardIdOk ? state.cardMap[cardId] : undefined;
-    const cardInHand = cardIdOk && self.hand.includes(cardId);
-    const isClub = !!card && card.suit === '♣';
-    if (!selfAlive) return '你已死亡';
-    if (!cardIdOk || !cardInHand) return '牌不在手牌中';
-    if (!isClub) return '只能将梅花牌当铁索连环';
-    return null;
-  },
-  mount: {
-    label: '界连环',
-    style: 'primary',
-    prompt: {
-      type: 'useCardAndTarget',
-      title: '界连环:将一张梅花手牌当铁索连环使用(至多3名目标)',
-      cardFilter: { filter: (c: Card) => c.suit === '♣', min: 1, max: 1 },
-      // 界版目标上限 3(标版铁索连环 2)
-      targetFilter: { min: 1, max: MAX_TARGETS, allowSelf: true },
-    },
-    activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
-      const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p) return false;
-      return p.hand?.some((c) => c.suit === '♣') ?? false;
-    },
-  },
-};
 
 export function onInit(skill: Skill, state: GameState): () => void {
   const ownerId = skill.ownerId;
@@ -96,8 +60,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── transform:梅花手牌 → 影子"铁索连环"(作为 preceding,主 action=铁索连环.use) ──
   // 五件套由 skillRuntime 工厂统一实现;影子卡 id 后缀=技能 id '界连环'(与标连环
-  // `${原id}#连环` 隔离);validate 逐字保留原逐条件拒绝文案。
-  registerTransformAction(state, skill.id, ownerId, TRANSFORM_OPTIONS);
+  // `${原id}#连环` 隔离);配置由 连环.ts 的 createChainTransformOptions 构造
+  // (validate 拒绝文案逐字共享,仅目标上限/标题后缀不同)。
+  registerTransformAction(
+    state,
+    skill.id,
+    ownerId,
+    createChainTransformOptions('界连环', MAX_TARGETS, '(至多3名目标)'),
+  );
 
   // ─── use action:覆盖标版铁索连环.use,本座次走界版结算(目标上限 3) ───
   // 铁索连环在 DEFAULT_SKILLS 中先实例化标版铁索连环.use;此处 registerAction 覆盖之(同 key 覆盖)。
@@ -112,25 +82,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
 }
 
 export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
-  api.defineAction('recycle', {
-    label: '界连环·重铸',
-    style: 'primary',
-    prompt: {
-      type: 'useCard',
-      title: '界连环:弃一张梅花手牌,摸一张牌',
-      cardFilter: { filter: (c: Card) => c.suit === '♣', min: 1, max: 1 },
-    },
-    activeWhen: (ctx) => {
-      if (!defaultPlayActive(ctx)) return false;
-      const p = ctx.view.players[ctx.perspectiveIdx];
-      if (!p) return false;
-      const hasClub = p.hand?.some((c) => c.suit === '♣') ?? false;
-      return hasClub;
-    },
-  });
+  mountChainRecycleAction(api, '界连环');
   // transform 声明由工厂统一构造(前端据此进入转化模式,组合 preceding=[界连环.transform]
   // + 主 action=铁索连环.use(wrapperName='铁索连环'))。
-  mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
+  mountTransformAction(
+    api,
+    skill.id,
+    createChainTransformOptions('界连环', MAX_TARGETS, '(至多3名目标)'),
+  );
   return undefined;
 }
 

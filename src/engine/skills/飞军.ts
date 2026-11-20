@@ -21,7 +21,6 @@
 //   - 兵略协调:飞军 execute 内检查 owner.skills.includes('兵略'),首次对目标摸两张,
 //     目标记录在 owner.vars['兵略/已飞军目标'](整局,跨回合)。兵略.ts 仅提供元数据。
 import type {
-  Card,
   EquipSlot,
   FrontendAPI,
   GameState,
@@ -40,6 +39,7 @@ import {
   firstTarget,
   currentRequestType,
   registerRespondForAllSeats,
+  toPromptCards,
 } from '../util/skillRuntime';
 import { equipmentCardIds } from '../util/player-query';
 
@@ -60,23 +60,6 @@ const DISCARD_EQUIP_KEY = '飞军/discardEquipCardId';
 /** 计算玩家装备区牌数 */
 function equipCount(equipment: Partial<Record<EquipSlot, string>>): number {
   return Object.values(equipment).filter((id) => !!id).length;
-}
-
-/** 将手牌 cardId 列表转为 pickProcessingCard 的 cards 字段 */
-function handToCards(
-  state: GameState,
-  hand: string[],
-): Array<{ cardId: string; cardName: string; suit: Card['suit']; rank: string }> {
-  return hand
-    .map((id) => {
-      const c = state.cardMap[id];
-      if (!c) return null;
-      return { cardId: id, cardName: c.name, suit: c.suit, rank: c.rank };
-    })
-    .filter(
-      (c): c is { cardId: string; cardName: string; suit: Card['suit']; rank: string } =>
-        c !== null,
-    );
 }
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -244,7 +227,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           prompt: {
             type: 'pickProcessingCard',
             title: `飞军:选择一张手牌交给 ${st.players[ownerId]?.name ?? '对方'}`,
-            cards: handToCards(st, targetPlayer.hand),
+            cards: toPromptCards(st, targetPlayer.hand),
           },
           timeout: 30,
         });
@@ -275,7 +258,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           prompt: {
             type: 'pickProcessingCard',
             title: '飞军:选择一张装备牌弃置',
-            cards: handToCards(st, equipIds),
+            cards: toPromptCards(st, equipIds),
           },
           timeout: 30,
         });

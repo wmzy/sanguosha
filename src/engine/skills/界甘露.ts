@@ -42,7 +42,7 @@ import { registerAction } from '../core/skill';
 import { hasSkillModule } from './registry';
 import { equipReplacingOld } from './_equipReplace';
 import type { SkillModule } from '../types';
-import { currentRequestType, requireRequestType, engineCanPlayNowReason, defineConfirmAction } from '../util/skillRuntime';
+import { askMandatoryCardChoice, currentRequestType, requireRequestType, engineCanPlayNowReason, defineConfirmAction } from '../util/skillRuntime';
 import { lostHealth } from '../util/player-query';
 import { EQUIP_SLOTS } from '../util/equip-slot';
 
@@ -194,28 +194,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           await popFrame(st);
           return;
         }
-        delete st.localVars[DISCARD_KEY];
-        await applyAtom(st, {
-          type: '请求回应',
-          requestType: DISCARD_RT,
-          target: ownerId,
-          prompt: {
-            type: 'useCard',
-            title: `甘露:两人装备数差 ${X} 大于你已损失的体力值 ${lostHp},须弃 ${X} 张手牌`,
-            cardFilter: { filter: () => true, min: X, max: X },
-          },
-          // 强制型弃牌:前端隐藏"不回应"按钮 + 走多牌选择 UI(发 cardIds);headless 不生成 skip。
-          // 否则前端按普通 useCard 回应走单牌路径发 cardId,与本 respond 读取 cardIds 不匹配。
-          mandatory: true,
+        // 强制选牌询问四段(询问 + 超时兜底)收敛于 askMandatoryCardChoice
+        // (张数恰为 X 由 respond validate 保证,兜底交由 helper)
+        const toDiscard = await askMandatoryCardChoice(st, DISCARD_RT, ownerId, {
+          resultKey: DISCARD_KEY,
+          count: X,
+          title: `甘露:两人装备数差 ${X} 大于你已损失的体力值 ${lostHp},须弃 ${X} 张手牌`,
           timeout: 30,
         });
-        const discardCards = st.localVars[DISCARD_KEY] as string[] | undefined;
-        delete st.localVars[DISCARD_KEY];
-        // 强制弃牌:超时未回应 → 自动从手牌首张起补弃(不放弃弃牌义务,与英魂一致)
-        const toDiscard =
-          Array.isArray(discardCards) && discardCards.length === X
-            ? discardCards
-            : (st.players[ownerId]?.hand.slice(0, X) ?? []);
         await applyAtom(st, { type: '弃置', player: ownerId, cardIds: toDiscard });
       }
 

@@ -20,7 +20,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
-import { currentRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
+import { currentRequestType, engineCanPlayNowReason, toPromptCards } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const PICK_REQUEST = '攻心/选牌';
@@ -72,16 +72,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       await pushFrame(st, '攻心', from, { target });
 
       // ── 观看目标手牌中的♥牌(列给发起者)──
-      const hearts = st.players[target].hand
-        .map((id) => {
-          const c = st.cardMap[id];
-          if (c?.suit !== '♥') return null;
-          return { cardId: id, cardName: c.name, suit: c.suit, rank: c.rank };
-        })
-        .filter(
-          (c): c is { cardId: string; cardName: string; suit: '♥'; rank: string } =>
-            c !== null,
-        );
+      const hearts = toPromptCards(
+        st,
+        st.players[target].hand.filter((id) => st.cardMap[id]?.suit === '♥'),
+      );
 
       // 无♥牌:观看后无可展示牌,直接结束(已计一次)
       if (hearts.length === 0) {

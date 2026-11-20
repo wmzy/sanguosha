@@ -16,7 +16,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond, defineConfirmAction, registerDamageBonusHook } from '../util/skillRuntime';
+import { askConfirm, registerConfirmRespond, defineConfirmAction, registerDamageBonusHook, isOwnDrawPhaseDraw } from '../util/skillRuntime';
 
 const BONUS_TAG = '裸衣/bonus';
 const CONFIRM_REQUEST = '裸衣/confirm';
@@ -46,12 +46,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     '摸牌',
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
-      // 仅自己回合的摸牌阶段(排除无中生有/遗计/激将等其他摸牌)
-      if (atom.player !== ownerId) return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
-      if (ctx.state.phase !== '摸牌') return;
-      const self = ctx.state.players[ownerId];
-      if (!self?.alive) return;
+      // 仅自己回合摸牌阶段(排除无中生有/遗计等,isOwnDrawPhaseDraw)
+      if (!isOwnDrawPhaseDraw(ctx, ownerId)) return;
       if (usedThisTurn(ctx.state, ownerId, '裸衣')) return; // 本回合已发动
 
       // 询问是否发动

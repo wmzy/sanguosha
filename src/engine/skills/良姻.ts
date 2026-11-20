@@ -28,7 +28,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { currentRequestType, askConfirm, firstTarget, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, askMandatoryCardChoice, firstTarget, requireRequestType } from '../util/skillRuntime';
 
 /** owner.vars key:箜声牌 cardId 列表(由 箜声.ts 维护,良姻只读) */
 const KONGSHENG_KEY = '箜声/牌';
@@ -187,26 +187,14 @@ async function performLiangyin(
 async function discardOne(state: GameState, player: number): Promise<void> {
   const pl = state.players[player];
   if (!pl?.alive || pl.hand.length === 0) return;
-  delete state.localVars[DISCARD_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: DISCARD_RT,
-    target: player,
-    prompt: {
-      type: 'useCard',
-      title: '良姻:弃置一张牌',
-      cardFilter: { filter: () => true, min: 1, max: 1 },
-    },
-    mandatory: true,
+  // 强制选牌询问四段(询问 + 超时兜底)收敛于 askMandatoryCardChoice
+  const cards = await askMandatoryCardChoice(state, DISCARD_RT, player, {
+    resultKey: DISCARD_KEY,
+    count: 1,
+    title: '良姻:弃置一张牌',
     timeout: 20,
   });
-  let cards = state.localVars[DISCARD_KEY] as string[] | undefined;
-  delete state.localVars[DISCARD_KEY];
-  // 强制弃牌:超时未回应 → 自动弃首张(不放弃弃牌义务)
-  if ((!cards || cards.length === 0) && state.players[player]?.hand.length) {
-    cards = state.players[player].hand.slice(0, 1);
-  }
-  if (cards && cards.length > 0) {
+  if (cards.length > 0) {
     await applyAtom(state, { type: '弃置', player, cardIds: cards });
   }
 }

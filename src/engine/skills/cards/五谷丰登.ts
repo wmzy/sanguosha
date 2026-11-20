@@ -12,7 +12,7 @@ import { applyAtom } from '../../core/apply'
 import { frameCards } from '../../core/frame';
 import { peekTop } from '../../core/deck';
 import type { CardEffect, ResolveCtx } from '../../types';
-import { requireRequestType } from '../../util/skillRuntime';
+import { requireRequestType, toPromptCards } from '../../util/skillRuntime';
 import { alivePlayersClockwiseFrom } from '../../util/player-query';
 
 /** 选牌面板：弹 pickProcessingCard pending，超时兜底选候选列表第一张 */
@@ -25,16 +25,7 @@ async function runPickProcessingCard(
   const available = revealedIds.filter((id) => frameCards(state).includes(id));
   if (available.length === 0) return;
 
-  const cards = available
-    .map((id) => {
-      const c = state.cardMap[id];
-      if (!c) return null;
-      return { cardId: id, cardName: c.name, suit: c.suit, rank: c.rank };
-    })
-    .filter(
-      (c): c is { cardId: string; cardName: string; suit: Card['suit']; rank: string } =>
-        c !== null,
-    );
+  const cards = toPromptCards(state, available);
 
   await applyAtom(state, {
     type: '请求回应',

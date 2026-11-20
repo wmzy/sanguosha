@@ -27,7 +27,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
 import { getQizhiCount } from '../rules/vars-keys';
-import { currentRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, askMandatoryCardChoice, defineConfirmAction } from '../util/skillRuntime';
 
 const SKILL_ID = '进趋';
 const CONFIRM_RT = `${SKILL_ID}/confirm`;
@@ -130,28 +130,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const handNow = ctx.state.players[ownerId]?.hand.length ?? 0;
       if (handNow > x) {
         const excess = handNow - x;
-        delete ctx.state.localVars[DISCARD_KEY];
-        await applyAtom(ctx.state, {
-          type: '请求回应',
-          requestType: DISCARD_RT,
-          target: ownerId,
-          prompt: {
-            type: 'useCard',
-            title: `进趋:弃 ${excess} 张手牌(弃至 ${x} 张)`,
-            cardFilter: { filter: () => true, min: excess, max: excess },
-          },
-          // 强制型弃牌:前端隐藏"不回应"按钮;headless 不生成 skip
-          mandatory: true,
+        // 强制选牌询问四段(询问 + 超时兜底)收敛于 askMandatoryCardChoice
+        const cardIds = await askMandatoryCardChoice(ctx.state, DISCARD_RT, ownerId, {
+          resultKey: DISCARD_KEY,
+          count: excess,
+          title: `进趋:弃 ${excess} 张手牌(弃至 ${x} 张)`,
           timeout: 30,
         });
-
-        let cardIds = ctx.state.localVars[DISCARD_KEY] as string[] | undefined;
-        delete ctx.state.localVars[DISCARD_KEY];
-        // 强制弃牌:超时未回应 → 自动从手牌首张起补弃(不放弃弃牌义务)
-        if ((!cardIds || cardIds.length === 0) && excess > 0) {
-          cardIds = ctx.state.players[ownerId]?.hand.slice(0, excess) ?? [];
-        }
-        if (cardIds && cardIds.length > 0) {
+        if (cardIds.length > 0) {
           await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds });
         }
       }

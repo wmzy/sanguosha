@@ -27,6 +27,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import {
   askConfirm,
+  askMandatoryCardChoice,
   currentRequestType,
   registerPhaseStartHook,
   registerRespondForAllSeats,
@@ -149,27 +150,14 @@ export async function performYinghunPrepare(
   const hand = state.players[target].hand;
   const actual = Math.min(discardCount, hand.length);
   if (actual <= 0) return;
-  delete state.localVars[DISCARD_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: DISCARD_RT,
-    target,
-    prompt: {
-      type: 'useCard',
-      title: `英魂:弃 ${actual} 张牌`,
-      cardFilter: { filter: () => true, min: actual, max: actual },
-    },
-    // 强制型弃牌:前端隐藏"不回应"按钮 + 走多牌选择 UI;headless 不生成 skip
-    mandatory: true,
+  // 强制选牌询问四段(询问 + 超时兜底)收敛于 askMandatoryCardChoice
+  const discardCards = await askMandatoryCardChoice(state, DISCARD_RT, target, {
+    resultKey: DISCARD_KEY,
+    count: actual,
+    title: `英魂:弃 ${actual} 张牌`,
     timeout: 20,
   });
-  let discardCards = state.localVars[DISCARD_KEY] as string[] | undefined;
-  delete state.localVars[DISCARD_KEY];
-  // 强制弃牌:超时未回应 → 自动从手牌首张起补弃(不放弃弃牌义务)
-  if ((!discardCards || discardCards.length === 0) && actual > 0) {
-    discardCards = state.players[target]?.hand.slice(0, actual) ?? [];
-  }
-  if (discardCards && discardCards.length > 0) {
+  if (discardCards.length > 0) {
     await applyAtom(state, {
       type: '弃置',
       player: target,

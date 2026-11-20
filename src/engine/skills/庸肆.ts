@@ -24,7 +24,11 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import {
+  askMandatoryCardChoice,
+  isOwnDrawPhaseDraw,
+  requireRequestType,
+} from '../util/skillRuntime';
 
 /** 弃牌选择询问的 requestType(前缀=技能id,符合 T1)。 */
 const DISCARD_RT = '庸肆/弃牌';
@@ -64,11 +68,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
       // 仅自己摸牌阶段的摸牌(排除无中生有/遗计/苦肉等其他摸牌)
-      if (atom.player !== ownerId) return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
-      if (ctx.state.phase !== '摸牌') return;
-      const self = ctx.state.players[ownerId];
-      if (!self?.alive) return;
+      if (!isOwnDrawPhaseDraw(ctx, ownerId)) return;
 
       const X = aliveFactionCount(ctx.state);
       const count = atom.count ?? 2;
@@ -95,33 +95,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
       const toDiscard = Math.min(X, self.hand.length);
       if (toDiscard <= 0) return;
 
-      // 询问玩家选择弃置的 X 张牌(锁定技:超时自动弃)
-      delete st.localVars[DISCARD_CHOICE];
+      // 询问玩家选择弃置的 X 张牌(锁定技:超时/空回应由 askMandatoryCardChoice
+      // 兜底手牌前 N 张)。DISCARD_COUNT 供 respond validate 校验张数,询问后即清。
       st.localVars[DISCARD_COUNT] = toDiscard;
-      await applyAtom(st, {
-        type: '请求回应',
-        requestType: DISCARD_RT,
-        target: ownerId,
-        prompt: {
-          type: 'useCard',
-          title: `庸肆:弃置 ${toDiscard} 张牌`,
-          cardFilter: { filter: () => true, min: toDiscard, max: toDiscard },
-        },
-        // 锁定技:必须弃,前端隐藏"不回应"按钮;超时由下方兜底自动弃
-        mandatory: true,
+      const cardIds = await askMandatoryCardChoice(st, DISCARD_RT, ownerId, {
+        resultKey: DISCARD_CHOICE,
+        count: toDiscard,
+        title: `庸肆:弃置 ${toDiscard} 张牌`,
         timeout: 30,
       });
-
-      // 读取玩家选择;超时(未设)或不合法则自动弃手牌前 toDiscard 张
-      const me = st.players[ownerId];
-      const chosen = st.localVars[DISCARD_CHOICE] as string[] | undefined;
-      delete st.localVars[DISCARD_CHOICE];
       delete st.localVars[DISCARD_COUNT];
-      const chosenValid =
-        Array.isArray(chosen) &&
-        chosen.length === toDiscard &&
-        chosen.every((id) => me.hand.includes(id));
-      const cardIds = chosenValid ? chosen : me.hand.slice(0, toDiscard);
       await applyAtom(st, { type: '弃置', player: ownerId, cardIds });
     },
   );

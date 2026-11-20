@@ -17,16 +17,17 @@
 //        runDyingFlow(系统规则.ts)在 陷入濒死 atom 后检查 localVars['不屈/存活'],
 //        命中则清标记并 return,跳过求桃循环与击杀。
 //
-// 与界不屈的差异:界版额外有手牌上限规则(有创牌时手牌上限=创牌数量);标版无此规则。
+// 与界不屈的差异:濒死置创+回复至1体力两版逐字相同(界不屈.ts 复用本文件导出的
+//   registerBuquDyingHook);界版额外有手牌上限规则(有创牌时手牌上限=创牌数量),标版无此规则。
 //   二者共用 置创牌 atom(重复时移去此牌——对两版本语义一致)。
 import type { GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 
-const SURVIVE_KEY = '不屈/存活';
+export const SURVIVE_KEY = '不屈/存活';
 // 置创牌 atom 的 vars key(创牌列表存储键 + 重复判定结果键),与 atom 参数对齐
-const WOUND_KEY = '不屈/创牌';
-const DUPLICATE_KEY = '不屈/重复';
+export const WOUND_KEY = '不屈/创牌';
+export const DUPLICATE_KEY = '不屈/重复';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -38,11 +39,16 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-export function onInit(skill: Skill, state: GameState): () => void {
-  const ownerId = skill.ownerId;
-
-  // ── 陷入濒死 after-hook:不屈主逻辑(锁定技,每次濒死自动触发) ──
-  registerAfterHook(state, skill.id, ownerId, '陷入濒死', async (ctx) => {
+/**
+ * 注册不屈族「陷入濒死」after-hook:置创牌 → 点数不重复则回复至1体力并设存活标记
+ * (锁定技,每次濒死自动触发)。标版/界版逐字相同,界不屈.ts 消费本助手。
+ */
+export function registerBuquDyingHook(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+): () => void {
+  return registerAfterHook(state, skillId, ownerId, '陷入濒死', async (ctx) => {
     const atom = ctx.atom;
     if (atom.target !== ownerId) return;
     const self = ctx.state.players[ownerId];
@@ -78,8 +84,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
     // 设存活标记供 runDyingFlow 跳过求桃+击杀
     ctx.state.localVars[SURVIVE_KEY] = ownerId;
   });
+}
 
-  return () => {};
+export function onInit(skill: Skill, state: GameState): () => void {
+  return registerBuquDyingHook(state, skill.id, skill.ownerId);
 }
 
 export default { createSkill, onInit } satisfies import('../types').SkillModule;

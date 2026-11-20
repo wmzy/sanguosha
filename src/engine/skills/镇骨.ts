@@ -29,7 +29,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { currentRequestType, firstTarget } from '../util/skillRuntime';
+import { askMandatoryCardChoice, currentRequestType, firstTarget } from '../util/skillRuntime';
 
 const SKILL_NAME = '镇骨';
 
@@ -84,28 +84,14 @@ async function adjustHand(state: GameState, ownerId: number, target: number): Pr
 
   if (targetHand > ownerHand) {
     const excess = targetHand - ownerHand;
-    // 强制弃牌:询问 target 选 excess 张手牌弃置
-    delete state.localVars[DISCARD_LV];
-    await applyAtom(state, {
-      type: '请求回应',
-      requestType: DISCARD_RT,
-      target,
-      prompt: {
-        type: 'useCard',
-        title: `镇骨:手牌调整,弃 ${excess} 张牌`,
-        cardFilter: { filter: () => true, min: excess, max: excess },
-      },
-      mandatory: true,
+    // 强制选牌询问四段(询问 + 超时兜底)收敛于 askMandatoryCardChoice
+    const cardIds = await askMandatoryCardChoice(state, DISCARD_RT, target, {
+      resultKey: DISCARD_LV,
+      count: excess,
+      title: `镇骨:手牌调整,弃 ${excess} 张牌`,
       timeout: 30,
     });
-
-    let cardIds = state.localVars[DISCARD_LV] as string[] | undefined;
-    delete state.localVars[DISCARD_LV];
-    // 超时未回应 → 自动从手牌首张起补弃(不放弃弃牌义务)
-    if ((!cardIds || cardIds.length === 0) && excess > 0) {
-      cardIds = state.players[target]?.hand.slice(0, excess) ?? [];
-    }
-    if (cardIds && cardIds.length > 0) {
+    if (cardIds.length > 0) {
       await applyAtom(state, { type: '弃置', player: target, cardIds });
     }
   }

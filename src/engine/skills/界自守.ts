@@ -34,7 +34,13 @@ import {
   registerBeforeHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import {
+  askConfirm,
+  askMandatoryCardChoice,
+  currentRequestType,
+  defineConfirmAction,
+  isOwnDrawPhaseDraw,
+} from '../util/skillRuntime';
 import { countFactions } from '../util/player-query';
 
 const DISPLAY_NAME = '自守';
@@ -112,11 +118,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
       // 仅自己回合的摸牌阶段(排除无中生有/遗计/苦肉等其他摸牌)
-      if (atom.player !== ownerId) return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
-      if (ctx.state.phase !== '摸牌') return;
-      const self = ctx.state.players[ownerId];
-      if (!self?.alive) return;
+      if (!isOwnDrawPhaseDraw(ctx, ownerId)) return;
 
       const x = countFactions(ctx.state);
       if (x <= 0) return; // 无势力可计,不发动
@@ -176,29 +178,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (handCount === 0) return;
       const discardCount = Math.min(x, handCount);
 
-      // 询问玩家选 discardCount 张手牌弃置(强制:不可跳过)
-      delete ctx.state.localVars[DISCARD_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: DISCARD_RT,
-        target: ownerId,
-        prompt: {
-          type: 'useCard',
-          title: `自守:本回合对其他角色造成过伤害,弃 ${discardCount} 张牌`,
-          cardFilter: { filter: () => true, min: discardCount, max: discardCount },
-        },
-        // 强制型弃牌:前端隐藏"不回应"按钮;headless 不生成 skip
-        mandatory: true,
+      // 询问玩家选 discardCount 张手牌弃置(强制:不可跳过;
+      // 超时/空回应由 askMandatoryCardChoice 兜底手牌前 N 张,不放弃弃牌义务)
+      const cardIds = await askMandatoryCardChoice(ctx.state, DISCARD_RT, ownerId, {
+        resultKey: DISCARD_KEY,
+        count: discardCount,
+        title: `自守:本回合对其他角色造成过伤害,弃 ${discardCount} 张牌`,
         timeout: 30,
       });
-
-      let cardIds = ctx.state.localVars[DISCARD_KEY] as string[] | undefined;
-      delete ctx.state.localVars[DISCARD_KEY];
-      // 强制弃牌:超时未回应 → 自动从手牌首张起补弃(不放弃弃牌义务)
-      if ((!cardIds || cardIds.length === 0) && discardCount > 0) {
-        cardIds = ctx.state.players[ownerId]?.hand.slice(0, discardCount) ?? [];
-      }
-      if (cardIds && cardIds.length > 0) {
+      if (cardIds.length > 0) {
         await applyAtom(ctx.state, { type: '弃置', player: ownerId, cardIds });
       }
     },

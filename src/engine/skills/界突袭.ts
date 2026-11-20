@@ -23,7 +23,7 @@
 //   respond 注册/选目标询问/偷牌循环复用 突袭.ts 导出的共享助手(键前缀作参数)。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
 import { registerBeforeHook } from '../core/skill';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, isOwnDrawPhaseDraw } from '../util/skillRuntime';
 import { registerTuxiRespond, tuxiAskSelectTargets, tuxiStealCards } from './突袭';
 
 const PREFIX = '界突袭';
@@ -53,12 +53,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
     '摸牌',
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
-      // 仅自己回合的摸牌阶段(排除无中生有/遗计/苦肉/激将等其他摸牌)
-      if (atom.player !== ownerId) return;
-      if (ctx.state.currentPlayerIndex !== ownerId) return;
-      if (ctx.state.phase !== '摸牌') return;
-      const self = ctx.state.players[ownerId];
-      if (!self?.alive) return;
+      // 仅自己回合摸牌阶段(排除无中生有/遗计等,isOwnDrawPhaseDraw)
+      if (!isOwnDrawPhaseDraw(ctx, ownerId)) return;
 
       // 基础摸牌数(英姿/好施等可能已 modify 为 3+,界突袭在此基础上少摸)
       const baseCount = atom.count ?? 2;

@@ -48,7 +48,7 @@ import {
   registerBeforeHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, toPromptCards } from '../util/skillRuntime';
 
 const SKILL_ID = '界潜袭';
 const DISPLAY_NAME = '潜袭';
@@ -189,16 +189,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       await popFrame(ctx.state);
       return;
     }
-    const cards = self.hand
-      .map((id) => {
-        const c = ctx.state.cardMap[id];
-        if (!c) return null;
-        return { cardId: id, cardName: c.name, suit: c.suit, rank: c.rank };
-      })
-      .filter(
-        (c): c is { cardId: string; cardName: string; suit: Card['suit']; rank: string } =>
-          c !== null,
-      );
+    const cards = toPromptCards(ctx.state, self.hand);
 
     delete ctx.state.localVars[PICK_KEY];
     await applyAtom(ctx.state, {

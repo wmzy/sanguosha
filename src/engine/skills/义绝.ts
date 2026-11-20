@@ -25,7 +25,6 @@
 import type {
   AtomBeforeContext,
   AtomOfName,
-  Card,
   FrontendAPI,
   GameState,
   HookResult,
@@ -43,6 +42,7 @@ import {
   currentRequestType,
   engineCanPlayNowReason,
   registerRespondForAllSeats,
+  toPromptCards,
 } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
@@ -141,16 +141,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return;
       }
 
-      const cards = targetPlayer.hand
-        .map((id) => {
-          const c = st.cardMap[id];
-          if (!c) return null;
-          return { cardId: id, cardName: c.name, suit: c.suit, rank: c.rank };
-        })
-        .filter(
-          (c): c is { cardId: string; cardName: string; suit: Card['suit']; rank: string } =>
-            c !== null,
-        );
+      const cards = toPromptCards(st, targetPlayer.hand);
 
       // 读取目标的选择(超时兜底:选目标手牌第一张,不放弃展示机会)
       let revealedId = await askResponse<string | undefined>(st, REVEAL_REQUEST, target, {

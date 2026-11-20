@@ -42,6 +42,7 @@ import { registerAfterHook } from '../core/skill';
 import {
   currentRequestType,
   askConfirm,
+  askMandatoryCardChoice,
   normalizeCardIds,
   defineConfirmAction,
   firstTarget,
@@ -115,27 +116,14 @@ async function runJieMing(state: GameState, ownerId: number): Promise<void> {
   const handAfter = state.players[target]?.hand ?? [];
   const excess = handAfter.length - x;
   if (excess > 0) {
-    delete state.localVars[DISCARD_KEY];
-    await applyAtom(state, {
-      type: '请求回应',
-      requestType: DISCARD_RT,
-      target,
-      prompt: {
-        type: 'useCard',
-        title: `节命:需弃置 ${excess} 张手牌(将手牌弃至 ${x} 张)`,
-        cardFilter: { filter: () => true, min: excess, max: excess },
-      },
-      // 强制型弃牌:前端隐藏"不回应"按钮 + 走多牌选择 UI;headless 不生成 skip
-      mandatory: true,
+    // 强制选牌询问四段(询问 + 超时兜底)收敛于 askMandatoryCardChoice
+    const discardIds = await askMandatoryCardChoice(state, DISCARD_RT, target, {
+      resultKey: DISCARD_KEY,
+      count: excess,
+      title: `节命:需弃置 ${excess} 张手牌(将手牌弃至 ${x} 张)`,
       timeout: 15,
     });
-    let discardIds = state.localVars[DISCARD_KEY] as string[] | undefined;
-    delete state.localVars[DISCARD_KEY];
-    // 强制弃牌:超时未回应 → 自动从手牌首张起补弃(不放弃弃牌义务)
-    if ((!discardIds || discardIds.length === 0) && excess > 0) {
-      discardIds = state.players[target]?.hand.slice(0, excess) ?? [];
-    }
-    if (discardIds && discardIds.length > 0) {
+    if (discardIds.length > 0) {
       await applyAtom(state, { type: '弃置', player: target, cardIds: discardIds });
     }
   }

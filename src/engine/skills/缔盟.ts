@@ -22,7 +22,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { currentRequestType, requireRequestType, defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
+import { askMandatoryCardChoice, currentRequestType, requireRequestType, defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
 
 /** 缔盟族差异参数。 */
 export interface DimengOptions {
@@ -76,8 +76,7 @@ export async function swapHands(st: GameState, A: number, B: number): Promise<vo
 }
 
 /** 强制弃 N 张询问 + 兜底(标版交换前弃 / 界版出牌阶段结束时弃 共用,仅标题不同)。
- *  强制弃牌兜底:超时/未取得有效 cardIds → 自动从手牌首张起补足后继续
- *  (与 好施/庸肆/英魂 的 mandatory 兜底范式一致);防御性 min 由调用方先算好。 */
+ *  询问 + 超时兜底四段收敛于 askMandatoryCardChoice;防御性张数由调用方先算好。 */
 export async function askMandatoryDiscard(
   st: GameState,
   ownerId: number,
@@ -86,25 +85,12 @@ export async function askMandatoryDiscard(
   actualDiscard: number,
   title: string,
 ): Promise<void> {
-  delete st.localVars[discardKey];
-  await applyAtom(st, {
-    type: '请求回应',
-    requestType: discardRt,
-    target: ownerId,
-    prompt: {
-      type: 'useCard',
-      title,
-      cardFilter: { filter: () => true, min: actualDiscard, max: actualDiscard },
-    },
-    // 强制型弃牌(交换的代价):前端走多选弃牌 UI 提交 {cardIds};headless 不生成 skip
-    mandatory: true,
+  const discardCards = await askMandatoryCardChoice(st, discardRt, ownerId, {
+    resultKey: discardKey,
+    count: actualDiscard,
+    title,
     timeout: 30,
   });
-  let discardCards = st.localVars[discardKey] as string[] | undefined;
-  delete st.localVars[discardKey];
-  if (!discardCards || discardCards.length === 0) {
-    discardCards = st.players[ownerId]?.hand.slice(0, actualDiscard) ?? [];
-  }
   if (discardCards.length > 0) {
     await applyAtom(st, { type: '弃置', player: ownerId, cardIds: discardCards, voluntary: true });
   }

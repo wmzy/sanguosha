@@ -6,6 +6,7 @@
 //   registerConfirmRespond:confirm 型 respond 三件套;
 //   registerChoiceRespond:confirm 二选一 → 枚举值 respond 三件套(勤学/志继/崩坏 模式);
 //   askConfirm / askResponse:询问三段(delete 键残值 → applyAtom(请求回应) → 读键);
+//   askMandatoryCardChoice:强制选牌询问四段(询问 + 超时兜底 hand.slice);
 //   currentRequestType:读座次当前 pending 的 requestType;
 //   hasNullifyWindow:无懈可击广播窗口扫描(看破/界看破/解围 转化 validate 共用);
 //   blockedByOtherPending:其他阻塞型 pending 扫描(与 hasNullifyWindow 并列,同三技能共用);
@@ -253,6 +254,8 @@ export interface AskResponseOptions {
   /** localVars 结果键;缺省由 requestType 派生:`${requestType}/回应结果`。
    *  respond execute 写入的键必须与此一致才能读到。 */
   resultKey?: string;
+  /** 强制型询问(前端隐藏"不回应"按钮;headless 不生成 skip)。弃牌/给牌义务型选用。 */
+  mandatory?: boolean;
 }
 
 /** 请求回应三段式:delete 结果键残值 → applyAtom({type:'请求回应',…})
@@ -272,12 +275,54 @@ export async function askResponse<T = Json | undefined>(
     requestType,
     target,
     prompt: opts.prompt,
+    ...(opts.mandatory !== undefined ? { mandatory: opts.mandatory } : {}),
     ...(opts.defaultChoice !== undefined ? { defaultChoice: opts.defaultChoice } : {}),
     ...(opts.timeout !== undefined ? { timeout: opts.timeout } : {}),
   });
   const result = state.localVars[key] as T | undefined;
   delete state.localVars[key];
   return result;
+}
+
+// ────────────────────────── 强制选牌询问(弃牌/给牌义务) ──────────────────────────
+
+export interface MandatoryCardChoiceOptions {
+  /** localVars 结果键:询问前 delete 清残值;respond execute 写入选中的 cardIds。 */
+  resultKey: string;
+  /** 选牌数(prompt cardFilter min=max)与超时兜底张数。 */
+  count: number;
+  /** prompt.title */
+  title: string;
+  /** 超时秒数(各技能现状 15/20/30,逐字透传;缺省走 请求回应 atom 默认 30)。 */
+  timeout?: number;
+}
+
+/** 强制选牌询问四段样板:delete 结果键残值 → applyAtom(请求回应,useCard prompt,
+ *  mandatory=true,filter 恒真,min=max=count)→ 读键 → delete 键 → 超时/空回应
+ * 兜底 hand.slice(0, count)(不放弃选牌义务;请求回应.onTimeout 对 mandatory 不处理,
+ * 由本函数统一兜底)。
+ *  仅做「询问 + 兜底」,返回选中的 cardIds;后续 atom 由调用方执行——弃置(英魂/进趋/
+ * 界自守 等)、给予(好施)、voluntary 代价弃置(缔盟)语义各异,不收敛。
+ *  回应合法性(cardIds 均在手牌、张数恰为 count、无重复)由各技能自己的 respond
+ * validate 保证;兜底条件按「空/非数组」判定,与可达路径上的原逐站点行为等价。 */
+export async function askMandatoryCardChoice(
+  state: GameState,
+  requestType: string,
+  target: number,
+  opts: MandatoryCardChoiceOptions,
+): Promise<string[]> {
+  const ids = await askResponse<string[] | undefined>(state, requestType, target, {
+    prompt: {
+      type: 'useCard',
+      title: opts.title,
+      cardFilter: { filter: () => true, min: opts.count, max: opts.count },
+    },
+    resultKey: opts.resultKey,
+    mandatory: true,
+    ...(opts.timeout !== undefined ? { timeout: opts.timeout } : {}),
+  });
+  if (Array.isArray(ids) && ids.length > 0) return ids;
+  return state.players[target]?.hand.slice(0, opts.count) ?? [];
 }
 
 // ────────────────────────── pending requestType 读取 ──────────────────────────

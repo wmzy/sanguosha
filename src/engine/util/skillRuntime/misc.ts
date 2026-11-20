@@ -10,6 +10,7 @@ import type {
   FrontendAPI,
   GameState,
   Json,
+  PickProcessingCardPrompt,
 } from '../../types';
 import { hasBlockingPending } from '../../core/skill';
 
@@ -135,6 +136,40 @@ export function firstTarget(params: {
   const first = Array.isArray(t) ? t[0] : undefined;
   const solo = typeof params.target === 'number' ? params.target : undefined;
   return typeof first === 'number' ? first : solo;
+}
+
+// ────────────────────────── 摸牌阶段守卫 ──────────────────────────
+
+/** 摸牌 before-hook 的「自己回合摸牌阶段的常规摸牌」四连守卫:
+ *  atom.player=自己 + 当前玩家=自己 + phase='摸牌' + 自己存活。
+ *  英姿/裸衣/界英姿/界突袭/好施/庸肆/界自守 等摸牌阶段触发技的公共判定——
+ *  排除无中生有/遗计/苦肉等其他摸牌路径;漏任一条件会误触发(见各技能文件头注释)。 */
+export function isOwnDrawPhaseDraw(
+  ctx: { atom: { player?: number }; state: GameState },
+  ownerId: number,
+): boolean {
+  if (ctx.atom.player !== ownerId) return false;
+  if (ctx.state.currentPlayerIndex !== ownerId) return false;
+  if (ctx.state.phase !== '摸牌') return false;
+  return ctx.state.players[ownerId]?.alive === true;
+}
+
+// ────────────────────────── prompt 卡牌列表映射 ──────────────────────────
+
+/** cardIds → pickProcessingCard/useCard prompt 的 cards 列表映射
+ *  (cardMap 查面 + 未知 id 剔除)。义绝/界潜袭/攻心/飞军/五谷丰登 等
+ *  「列明候选牌给玩家点选」的公共样板;返回值直接作 prompt.cards。 */
+export function toPromptCards(
+  state: GameState,
+  cardIds: readonly string[],
+): PickProcessingCardPrompt['cards'] {
+  const cards: PickProcessingCardPrompt['cards'] = [];
+  for (const id of cardIds) {
+    const c = state.cardMap[id];
+    if (!c) continue;
+    cards.push({ cardId: id, cardName: c.name, suit: c.suit, rank: c.rank });
+  }
+  return cards;
 }
 
 // ────────────────────────── confirm 型 defineAction 样板 ──────────────────────────
