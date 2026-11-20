@@ -16,6 +16,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
+import { equippedWeaponIs } from '../util/player-query';
 import { currentRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
 import { getGender } from '../data/character-meta';
 
@@ -104,9 +105,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!self || !target) return;
 
       // 动态装备校核(陷阱#8):owner 武器槽仍是本技能
-      const weaponId = self.equipment['武器'];
-      if (!weaponId) return;
-      if (ctx.state.cardMap[weaponId]?.name !== '雌雄双股剑') return;
+      if (!equippedWeaponIs(ctx.state, ownerId, '雌雄双股剑')) return;
 
       // 性别校核:必须异性
       if (getGender(self.character) === getGender(target.character)) return;

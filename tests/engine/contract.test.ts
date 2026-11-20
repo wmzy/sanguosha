@@ -132,6 +132,7 @@ describe('技能声明注册表 meta', () => {
       'lifecycle',
       '系统规则',
       '_guanxing',
+      '_tempArmorStrip',
       '_delayedTrickTransform',
       '_equipReplace',
     ]);

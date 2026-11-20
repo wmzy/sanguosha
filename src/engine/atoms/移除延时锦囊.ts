@@ -31,20 +31,11 @@ export const 移除延时锦囊: AtomDefinition<{ player: number; trickName: str
     const list = p.pendingTricks;
     if (!list || list.length === 0) return;
     const targetId = event.cardId as string | undefined;
-    const targetName = event.trickName as string | undefined;
+    // PendingTrick.card 必有(types/state.ts),toViewEvents 恒打包匹配牌的 cardId,
+    // 直接按 id 精确移除即可;不设按 trickName 反查 cardMap 的兜底——同名异 id 的
+    // 牌会误删无关判定牌,事件缺 cardId(异常形状)时宁可不动作。
     if (targetId) {
-      // 直接按 cardId 移除
       p.pendingTricks = list.filter((id) => id !== targetId);
-      return;
-    }
-    if (!targetName) return;
-    // 兜底:按 trickName 反查 cardMap 找匹配的 cardId(此时 cardMap 中 Card.name === trickName)
-    const cardId = Object.keys(view.cardMap).find((id) => view.cardMap[id]?.name === targetName);
-    if (cardId) {
-      p.pendingTricks = list.filter((id) => id !== cardId);
-    } else {
-      // 无法定位:保留 list 不动(下一次 toViewEvents 重建会刷新)
-      p.pendingTricks = [...list];
     }
   },
 };

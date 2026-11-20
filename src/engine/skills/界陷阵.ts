@@ -51,7 +51,7 @@ import {
   registerAfterHook,
   registerBeforeHook,
 } from '../core/skill';
-import { unloadSkillInstance, instantiateSkill } from './lifecycle';
+import { stripTargetArmor, registerArmorRestoreHooks } from './_tempArmorStrip';
 import { activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerSlashUnlimitedProvider } from '../rules/slash-quota';
 import { slashUnlimitedKey } from '../rules/vars-keys';
@@ -77,24 +77,6 @@ export function createSkill(id: string, ownerId: number): Skill {
     description:
       '出牌阶段限一次,与一名角色拼点:赢则本回合对其使用牌无距离和次数限制且无视防具,可多指定其为目标;没赢则本回合不能对其使用杀,且你的杀不计入手牌上限',
   };
-}
-
-/** state-bound:记录当前被界陷阵临时卸载的 target 防具,供 造成伤害 after hook 恢复。
- *  key = target 座次(防具归属),value = { target, skillId }。 */
-const tempUnloadByState = new WeakMap<
-  GameState,
-  Map<number, { target: number; skillId: string }>
->();
-
-function getTempUnloadMap(
-  state: GameState,
-): Map<number, { target: number; skillId: string }> {
-  let m = tempUnloadByState.get(state);
-  if (!m) {
-    m = new Map();
-    tempUnloadByState.set(state, m);
-  }
-  return m;
 }
 
 export function onInit(skill: Skill, state: GameState): (() => void) | void {
@@ -177,43 +159,20 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (typeof cardId !== 'string') return;
       const card = ctx.state.cardMap[cardId];
       if (card?.name !== '杀') return;
-      const targetPlayer = ctx.state.players[winTarget];
-      if (!targetPlayer) return;
-      const armorId = targetPlayer.equipment?.['防具'];
-      if (!armorId) return;
-      const armorCard = ctx.state.cardMap[armorId];
-      if (!armorCard) return;
-      const armorSkillId = armorCard.name;
-      if (!armorSkillId || !targetPlayer.skills.includes(armorSkillId)) return;
-      // 已被本技能卸载 → 不重复
-      if (getTempUnloadMap(ctx.state).has(winTarget)) return;
-      unloadSkillInstance(ctx.state, armorSkillId, winTarget);
-      getTempUnloadMap(ctx.state).set(winTarget, { target: winTarget, skillId: armorSkillId });
+      // winTarget 的防具技能实例 → 临时卸载并记录(已记录则不重复)
+      stripTargetArmor(ctx.state, ownerId, winTarget);
     },
   );
 
   // ─── 恢复被临时卸载的 winTarget 防具(两个时机:造成伤害后 / 被抵消) ──
   //   杀命中 winTarget 造成伤害后恢复;杀被闪抵消时(不造成伤害)同样需恢复。
   //   原实现仅挂 造成伤害后 hook,被闪抵消时防具永久消失——现已补充 被抵消 hook。
-  for (const atomType of ['造成伤害后', '被抵消'] as const) {
-    registerAfterHook(
-      state,
-      skill.id,
-      ownerId,
-      atomType,
-      async (ctx) => {
-        const atom = ctx.atom;
-        if (atom.source !== ownerId) return;
-        const winTarget = ctx.state.turn.vars[WIN_VAR];
-        if (typeof winTarget !== 'number') return;
-        if (atom.target !== winTarget) return;
-        const unloaded = getTempUnloadMap(ctx.state).get(winTarget);
-        if (!unloaded) return;
-        await instantiateSkill(ctx.state, unloaded.skillId, winTarget);
-        getTempUnloadMap(ctx.state).delete(winTarget);
-      },
-    );
-  }
+  //   仅恢复 winTarget 的记录(其他目标 的伤害/抵消不消费记录)。
+  registerArmorRestoreHooks(state, ownerId, skill.id, (st, atom) => {
+    const winTarget = st.turn.vars[WIN_VAR];
+    if (typeof winTarget !== 'number') return undefined;
+    return atom.target === winTarget ? winTarget : undefined;
+  });
 
   // ─── 成为目标 before hook:lost 效果——owner 不能对 lostTarget 使用杀 ──
   //   杀.execute 检测 becameTarget=false → 跳过该目标结算(不询问闪、不伤害)。

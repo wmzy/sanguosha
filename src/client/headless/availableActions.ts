@@ -50,6 +50,7 @@ import {
   getPendingRequestedName,
   respondCandidates,
   rescueSkillFor,
+  pickTargetCardEntries,
 } from '../utils/pendingRespond';
 import { viewSlashTargetMax } from '../../engine/rules/action-active';
 import {
@@ -920,39 +921,32 @@ export function appendRespondActions(
   // 与前端 resolvePendingRespond 一致；动作文案按 obtain/discard 区分。
   if (pending.prompt?.type === 'pickTargetCard') {
     const pickPrompt = pending.prompt;
-    const targetIdx = pickPrompt.target;
-    const targetPlayer = view.players[targetIdx];
+    const targetPlayer = view.players[pickPrompt.target];
     // requestType 形如 '过河拆桥_选牌' / '顺手牵羊_选牌' / '反馈/选牌'
     const pickSkillId = requestTypeFirstSegment(reqType);
     // obtain=获得（顺手牵羊/反馈）；discard=弃置（过河拆桥）
     const obtain = reqType.startsWith('顺手牵羊') || reqType.startsWith('反馈');
     const verb = obtain ? '获得' : '弃置';
-    // 装备牌（明牌）：每张一个 action
-    for (const eq of (pickPrompt.equipment ?? [])) {
+    // 可选项与 respond params 由 pickTargetCardEntries 统一构造(与浏览器面板同源);
+    // prompt.handCount 缺失时以目标玩家手牌数兜底(盲选契约见该 helper 注释)。
+    const describeEntry = (entry: {
+      zone: 'equipment' | 'judge' | 'hand';
+      cardName?: string;
+      handIndex?: number;
+    }): string => {
+      switch (entry.zone) {
+        case 'equipment':
+          return `${verb}【${entry.cardName}】(装备)`;
+        case 'judge':
+          return `${verb}【${entry.cardName}】(判定区)`;
+        default:
+          return `${verb}手牌（第${(entry.handIndex ?? 0) + 1}张）`;
+      }
+    };
+    for (const entry of pickTargetCardEntries(pickPrompt, targetPlayer?.handCount ?? 0)) {
       out.push({
-        description: `${verb}【${eq.cardName}】(装备)`,
-        message: respondMsg(pickSkillId, { zone: 'equipment', cardId: eq.cardId }),
-        validTargets: [],
-        category: 'respond',
-      });
-    }
-    // 判定区牌（明牌）
-    for (const j of (pickPrompt.judge ?? [])) {
-      out.push({
-        description: `${verb}【${j.cardName}】(判定区)`,
-        message: respondMsg(pickSkillId, { zone: 'judge', cardId: j.cardId }),
-        validTargets: [],
-        category: 'respond',
-      });
-    }
-    // 手牌（盲选：目标手牌对 responder 不可见,但按位置选取是合法动作——
-    // 此前只枚举 handIndex 0,AI 第 2+ 张永远选不到。逐位置枚举 0..handCount-1,
-    // 与浏览器/引擎接受任意 handIndex 的盲选契约一致)
-    const handCount = pickPrompt.handCount ?? targetPlayer?.handCount ?? 0;
-    for (let i = 0; i < handCount; i++) {
-      out.push({
-        description: `${verb}手牌（第${i + 1}张）`,
-        message: respondMsg(pickSkillId, { zone: 'hand', handIndex: i }),
+        description: describeEntry(entry),
+        message: respondMsg(pickSkillId, entry.params),
         validTargets: [],
         category: 'respond',
       });

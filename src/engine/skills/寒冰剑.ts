@@ -4,7 +4,8 @@
 import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
-import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { equippedWeaponIs } from '../util/player-query';
+import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -27,14 +28,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       });
       if (check.error) return check.error;
       if (check.requestType === '寒冰剑/选牌') {
-        const zone = params.zone;
-        if (zone === 'equipment') {
-          if (typeof params.cardId !== 'string') return 'cardId required';
-        } else if (zone === 'hand') {
-          if (typeof params.handIndex !== 'number') return 'handIndex required';
-        } else {
-          return 'zone required (equipment|hand)';
-        }
+        const err = validatePickZoneParams(params, ['equipment', 'hand']);
+        if (err) return err;
       }
       return null;
     },
@@ -43,11 +38,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (requestType === '寒冰剑/confirm') {
         state.localVars['寒冰剑/confirmed'] = params.choice === true || params.confirmed === true;
       } else if (requestType === '寒冰剑/选牌') {
-        state.localVars[PICK_RESULT_KEY] = {
-          zone: params.zone,
-          cardId: params.cardId ?? null,
-          handIndex: params.handIndex ?? null,
-        };
+        writePickResult(state, params);
       }
     },
   );
@@ -60,12 +51,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
       if (atom.source !== ownerId) return;
-      const self = ctx.state.players[ownerId];
-      if (!self) return;
-      const weaponId = self.equipment['武器'];
-      if (!weaponId) return;
-      const weapon = ctx.state.cardMap[weaponId];
-      if (weapon?.name !== '寒冰剑') return;
+      if (!equippedWeaponIs(ctx.state, ownerId, '寒冰剑')) return;
       // 仅限【杀】造成的伤害才触发(普通/火/雷杀 name 均为 '杀')。
       // 决斗/南蛮入侵/万箭齐发/火攻 等其他来源的伤害不触发(规则:仅你使用【杀】造成伤害时)。
       const damageCardId = atom.cardId;

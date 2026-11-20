@@ -148,6 +148,16 @@ export function equipmentCardIds(
   return Object.values(player.equipment).filter((id): id is string => !!id);
 }
 
+/** 武器栏是否装备了指定卡名的武器(寒冰剑/古锭刀/麒麟弓/方天画戟/朱雀羽扇/
+ *  雌雄双股剑/青釭剑/丈八蛇矛/借刀杀人 的触发守卫共用:玩家存在 + 有武器 +
+ *  cardMap 中该武器卡名 === name)。技能实例随装备挂载/卸载,守卫仍需比对卡名
+ *  以排除同技能名的其他来源(如转化/影子卡)。 */
+export function equippedWeaponIs(state: GameState, ownerId: number, name: string): boolean {
+  const weaponId = state.players[ownerId]?.equipment['武器'];
+  if (!weaponId) return false;
+  return state.cardMap[weaponId]?.name === name;
+}
+
 /** cardId 所在的装备槽;不在该玩家装备区(或玩家不存在)返回 null。
  *  恃才/界结姻 的 findEquipSlot 共用;鬼才 的 findCardLocation 多手牌分支,不纳入。 */
 export function equipSlotOf(

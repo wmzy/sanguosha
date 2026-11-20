@@ -34,6 +34,35 @@ const CONFIRM = '铁骑/confirmed';
 const TARGET_VAR = '铁骑/target';
 const TAG = '铁骑/禁闪';
 
+/** 「询问闪」before-hook 的共享注册(去标签 + cancel 强制命中):目标带指定禁闪
+ *  标签时,清标签(仅本次杀有效)并 cancel 询问闪 → 处理区无闪 → 杀.execute 造成
+ *  伤害。铁骑族(dodgeBlockTag 可选)与 烈弓族(必注册)两处同构收敛;鞬出 的
+ *  禁闪分支(弃装备牌)亦复用。 */
+export function registerDodgeBlockHook(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  tag: string,
+): void {
+  registerBeforeHook(
+    state,
+    skillId,
+    ownerId,
+    '询问闪',
+    async (ctx): Promise<HookResult | void> => {
+      const atom = ctx.atom;
+      if (atom.source !== ownerId) return;
+      const target = atom.target;
+      if (target === undefined) return;
+      const player = ctx.state.players[target];
+      if (!player?.tags.includes(tag)) return;
+      // 清标签(仅本次杀有效)+ cancel 询问闪 → 处理区无闪 → 造成伤害
+      await applyAtom(ctx.state, { type: '去标签', player: target, tag });
+      return { kind: 'cancel' };
+    },
+  );
+}
+
 /** 铁骑族(被动技)差异参数 */
 export interface TieqiOptions {
   /** Skill.name(标 '铁骑' / 界 '界铁骑') */
@@ -129,25 +158,8 @@ export function createTieqiSkill(opts: TieqiOptions) {
       });
 
       // ── 询问闪 before(标版模式):目标有禁闪标签 → 去标签 + cancel(强制命中)──
-      const dodgeBlockTag = opts.dodgeBlockTag;
-      if (dodgeBlockTag) {
-        registerBeforeHook(
-          state,
-          skill.id,
-          ownerId,
-          '询问闪',
-          async (ctx): Promise<HookResult | void> => {
-            const atom = ctx.atom;
-            if (atom.source !== ownerId) return;
-            const target = atom.target;
-            if (target === undefined) return;
-            const player = ctx.state.players[target];
-            if (!player?.tags.includes(dodgeBlockTag)) return;
-            // 清标签(仅本次杀有效)+ cancel 询问闪 → 处理区无闪 → 造成伤害
-            await applyAtom(ctx.state, { type: '去标签', player: target, tag: dodgeBlockTag });
-            return { kind: 'cancel' };
-          },
-        );
+      if (opts.dodgeBlockTag) {
+        registerDodgeBlockHook(state, skill.id, ownerId, opts.dodgeBlockTag);
       }
 
       if (opts.extraInit) {
@@ -267,23 +279,7 @@ export function createLiegongSkill(opts: LiegongOptions) {
       });
 
       // ── 询问闪 before:目标有禁闪标签 → 去标签 + cancel(强制命中)──
-      registerBeforeHook(
-        state,
-        skill.id,
-        ownerId,
-        '询问闪',
-        async (ctx): Promise<HookResult | void> => {
-          const atom = ctx.atom;
-          if (atom.source !== ownerId) return;
-          const target = atom.target;
-          if (target === undefined) return;
-          const player = ctx.state.players[target];
-          if (!player?.tags.includes(opts.dodgeBlockTag)) return;
-          // 清标签(仅本次杀有效)+ cancel 询问闪 → 处理区无闪 → 造成伤害
-          await applyAtom(ctx.state, { type: '去标签', player: target, tag: opts.dodgeBlockTag });
-          return { kind: 'cancel' };
-        },
-      );
+      registerDodgeBlockHook(state, skill.id, ownerId, opts.dodgeBlockTag);
 
       if (opts.extraInit) {
         unloaders.push(...opts.extraInit(state, skill.id, ownerId));

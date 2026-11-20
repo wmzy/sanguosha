@@ -16,7 +16,7 @@
 import type { FrontendAPI, Skill } from '../types';
 import { registerAction } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
-import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import {
   askConfirm,
   currentRequestType,
@@ -51,14 +51,8 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
       if (check.error) return check.error;
       if (check.requestType === '反馈/选牌') {
         // 选牌面板:校验 zone + cardId/handIndex(同过河拆桥/顺手牵羊)
-        const zone = params.zone;
-        if (zone === 'equipment') {
-          if (typeof params.cardId !== 'string') return 'cardId required';
-        } else if (zone === 'hand') {
-          if (typeof params.handIndex !== 'number') return 'handIndex required';
-        } else {
-          return 'zone required (equipment|hand)';
-        }
+        const err = validatePickZoneParams(params, ['equipment', 'hand']);
+        if (err) return err;
       }
       // confirm:接受 choice/confirmed 布尔
       return null;
@@ -69,11 +63,7 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
         state.localVars['反馈/confirmed'] =
           params.choice === true || params.confirmed === true;
       } else if (requestType === '反馈/选牌') {
-        state.localVars[PICK_RESULT_KEY] = {
-          zone: params.zone,
-          cardId: params.cardId ?? null,
-          handIndex: params.handIndex ?? null,
-        };
+        writePickResult(state, params);
       }
     },
   );

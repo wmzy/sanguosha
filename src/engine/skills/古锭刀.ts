@@ -9,6 +9,7 @@
 // 锁定技,无需询问玩家,无需 onMount(无 respond 窗口)。
 import type { HookResult, Skill, GameState } from '../types';
 import { registerBeforeHook } from '../core/skill';
+import { equippedWeaponIs } from '../util/player-query';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -35,12 +36,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (baseAmount <= 0) return;
 
       // 防御性校验:装备了古锭刀(技能实例随装备挂载/卸载,此校验与麒麟弓一致)
-      const self = ctx.state.players[ownerId];
-      if (!self) return;
-      const weaponId = self.equipment['武器'];
-      if (!weaponId) return;
-      const weapon = ctx.state.cardMap[weaponId];
-      if (weapon?.name !== '古锭刀') return;
+      if (!equippedWeaponIs(ctx.state, ownerId, '古锭刀')) return;
 
       // 仅限【杀】造成的伤害才触发(普通/火/雷杀 name 均为 '杀')。
       const damageCardId = atom.cardId;

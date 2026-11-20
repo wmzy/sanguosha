@@ -24,7 +24,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
-import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 
 const CONFIRM_RT = '征荣/confirm';
 const PICK_TARGET_RT = '征荣/选目标';
@@ -82,15 +82,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
       if (rt === PICK_CARD_RT) {
         // 选牌面板:校验 zone + cardId/handIndex(同反馈/过河拆桥)
-        const zone = params.zone;
-        if (zone === 'equipment') {
-          if (typeof params.cardId !== 'string') return 'cardId required';
-        } else if (zone === 'hand') {
-          if (typeof params.handIndex !== 'number') return 'handIndex required';
-        } else {
-          return 'zone required (equipment|hand)';
-        }
-        return null;
+        return validatePickZoneParams(params, ['equipment', 'hand']);
       }
       return '当前不是征荣回应';
     },
@@ -102,11 +94,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const target = params.target ?? params.choice;
         if (typeof target === 'number') st.localVars[TARGET_KEY] = target;
       } else if (rt === PICK_CARD_RT) {
-        st.localVars[PICK_RESULT_KEY] = {
-          zone: params.zone,
-          cardId: params.cardId ?? null,
-          handIndex: params.handIndex ?? null,
-        };
+        writePickResult(st, params);
       }
     },
   );

@@ -10,6 +10,7 @@
 //   满足条件时同样允许多目标。
 import type { Skill, GameState } from '../types';
 import { registerSlashTargetProvider } from '../rules/slash-target';
+import { equippedWeaponIs } from '../util/player-query';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '方天画戟', description: '武器:最后一张手牌为杀时可指定最多3个目标', isLocked: true };
@@ -21,8 +22,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // 返回取消注册函数,由 setSkillInstanceUnload 在卸载技能实例(换装/弃装)时自动清理。
   return registerSlashTargetProvider(state, ownerId, (st, _p, _cardId) => {
     // 动态校核装备仍在(陷阱#8):装备可能同帧内被换下,按当前装备槽实时判定
-    const weaponId = st.players[ownerId]?.equipment['武器'];
-    if (!weaponId || st.cardMap[weaponId]?.name !== '方天画戟') return 0;
+    if (!equippedWeaponIs(st, ownerId, '方天画戟')) return 0;
     // 最后一张手牌:手牌仅此一张(这张杀即唯一手牌)。
     // 武圣转化杀同理——来源于最后一张手牌,亦满足「最后一张手牌出的杀」。
     // 丈八蛇矛转化用 2 张手牌(hand.length≥2),不满足,正确排除。

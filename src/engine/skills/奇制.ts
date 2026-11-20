@@ -28,7 +28,8 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
-import { QIZHI_COUNT_KEY as COUNT_VAR, PICK_RESULT_KEY, getQizhiCount } from '../rules/vars-keys';
+import { QIZHI_COUNT_KEY as COUNT_VAR, getQizhiCount } from '../rules/vars-keys';
+import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import { currentRequestType, defineConfirmAction, firstTarget, requireRequestType } from '../util/skillRuntime';
 import { hasDiscardableCards } from '../util/player-query';
 
@@ -87,15 +88,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
 
       // PICK_CARD_RT:选牌面板结果(与过河拆桥/反馈共用 '选牌/结果' 契约)
-      const zone = params.zone;
-      if (zone === 'equipment') {
-        if (typeof params.cardId !== 'string') return 'cardId required';
-      } else if (zone === 'hand') {
-        if (typeof params.handIndex !== 'number') return 'handIndex required';
-      } else {
-        return 'zone required (equipment|hand)';
-      }
-      return null;
+      return validatePickZoneParams(params, ['equipment', 'hand']);
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const rt = currentRequestType(st, ownerId);
@@ -110,11 +103,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
       if (rt === PICK_CARD_RT) {
         // 选牌面板结果(与过河拆桥/反馈共用 '选牌/结果' 契约)
-        st.localVars[PICK_RESULT_KEY] = {
-          zone: params.zone,
-          cardId: params.cardId ?? null,
-          handIndex: params.handIndex ?? null,
-        };
+        writePickResult(st, params);
         return;
       }
     },

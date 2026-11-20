@@ -7,6 +7,7 @@
 //   - removeCardFromHand/removeCardsFromHand/addCardToHand:applyView 的手牌样板
 //     (handCount 计数 + hand 数组按 cardId 精确同步)。
 //   - applyDrawEvent:摸牌 ViewEvent 的 applyView 单点(摸牌 atom 与 移动牌「牌堆→手牌」共用)。
+//   - takeFromDeck:牌堆计数递减单点(判定/移动牌/置创牌/发牌 的 applyView 共用)。
 //   - resolveDiscardEntry:牌入弃牌堆的单点裁决(临时牌销毁/影子卡还原/原样入堆)。
 //   - pushToDiscardPile:牌入弃牌堆的 apply 单点(裁决 + push 的两行组合)。
 //   - removeFromEquipment:装备区按谓词重建(apply/applyView 的「剔除被移走的装备槽」样板)。
@@ -126,6 +127,13 @@ export function addCardToHand(view: GameView, idx: number, cardId: string | unde
   }
 }
 
+/** 牌堆计数递减单点(判定/移动牌/置创牌/发牌 的 applyView 共用):
+ *  deckCount 按翻/摸走张数递减(下限 0)。zones 缺失时 no-op——GameView 契约中
+ *  zones 为可选项(types/view.ts),与各调用点原「if (view.zones)」守卫行为一致。 */
+export function takeFromDeck(view: GameView, n: number): void {
+  if (view.zones) view.zones.deckCount = Math.max(0, view.zones.deckCount - n);
+}
+
 /** 摸牌 ViewEvent 的 applyView 单点(摸牌 atom 与 移动牌「牌堆→手牌」路径共用):
  *  handCount += count;可见视角(p.hand 存在)且事件带 cards 时追加进手牌数组;
  *  deckCount 按摸入张数递减(下限 0)。reshuffled(摸牌 atom 牌堆不足重洗路径)时
@@ -149,7 +157,7 @@ export function applyDrawEvent(view: GameView, event: ViewEvent): void {
         (event.newDeckCount as number) ?? Math.max(0, view.zones.deckCount - count);
       view.zones.discardPileCount = (event.newDiscardPileCount as number) ?? 0;
     } else {
-      view.zones.deckCount = Math.max(0, view.zones.deckCount - count);
+      takeFromDeck(view, count);
     }
   }
 }

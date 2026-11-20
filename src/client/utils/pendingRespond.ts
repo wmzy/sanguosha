@@ -7,7 +7,7 @@
 //   cardFilter 优先取 skillActionRegistry 里保留的函数引用(不走 WS JSON 序列化);
 //   registry 异步加载窗口期取不到时,从 atom 类型本地重建兜底。
 
-import type { Card, GameView, PendingView } from '../../engine/types';
+import type { Card, GameView, Json, PendingView } from '../../engine/types';
 import type { SkillActionDef } from '../skillActionRegistry';
 import { findActionAcrossOwners } from '../skillActionRegistry';
 
@@ -265,4 +265,61 @@ export function respondCandidates(
  *  浏览器 handleRespond 与无头枚举共用(原先两处各自 `rescueSkill ?? info.skillId`)。 */
 export function rescueSkillFor(info: PendingRespondInfo, card: Card): string {
   return info.rescueSkillForCard?.(card) ?? info.skillId;
+}
+
+/** pickTargetCard 选牌面板的一条可选项(浏览器按钮与无头 respond 动作的统一载体):
+ *  params 即该选项的 respond 参数;zone 之外的元数据字段按区域可选携带
+ *  (equipment/judge 明牌带 cardId/cardName,equipment 另带 slot;hand 带 handIndex)。 */
+export interface PickTargetCardEntry {
+  zone: 'equipment' | 'judge' | 'hand';
+  params: Record<string, Json>;
+  cardId?: string;
+  cardName?: string;
+  slot?: string;
+  handIndex?: number;
+}
+
+/** pickTargetCard 选牌面板的可选项枚举(浏览器 AwaitingPrompt 与无头 availableActions
+ *  的单一口径,原先两处逐字重复 params 构造):
+ *  - 装备区/判定区明牌:每张一个 entry,params = { zone:'equipment'|'judge', cardId };
+ *  - 手牌暗牌(盲选:目标手牌对 responder 不可见,但按位置选取是合法动作——
+ *    无头侧须逐位置枚举 0..count-1,AI 才能选到第 2+ 张,与引擎接受任意 handIndex
+ *    的盲选契约一致):params = { zone:'hand', handIndex },count 取
+ *    prompt.handCount ?? fallbackHandCount(无头侧以目标玩家手牌数兜底)。
+ *  顺序:装备区 → 判定区 → 手牌(与原先两处渲染/枚举顺序一致)。 */
+export function pickTargetCardEntries(
+  prompt: {
+    equipment?: Array<{ slot: string; cardId: string; cardName: string }>;
+    judge?: Array<{ cardId: string; cardName: string }>;
+    handCount?: number;
+  },
+  fallbackHandCount = 0,
+): PickTargetCardEntry[] {
+  const entries: PickTargetCardEntry[] = [];
+  for (const eq of prompt.equipment ?? []) {
+    entries.push({
+      zone: 'equipment',
+      params: { zone: 'equipment', cardId: eq.cardId },
+      cardId: eq.cardId,
+      cardName: eq.cardName,
+      slot: eq.slot,
+    });
+  }
+  for (const j of prompt.judge ?? []) {
+    entries.push({
+      zone: 'judge',
+      params: { zone: 'judge', cardId: j.cardId },
+      cardId: j.cardId,
+      cardName: j.cardName,
+    });
+  }
+  const handCount = prompt.handCount ?? fallbackHandCount;
+  for (let i = 0; i < handCount; i++) {
+    entries.push({
+      zone: 'hand',
+      params: { zone: 'hand', handIndex: i },
+      handIndex: i,
+    });
+  }
+  return entries;
 }

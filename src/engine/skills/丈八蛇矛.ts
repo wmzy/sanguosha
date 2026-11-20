@@ -24,6 +24,7 @@ import type { GameView, GameState, Skill, FrontendAPI } from '../types';
 import { declareAlternativeResponse } from '../core/skill';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
+import { equippedWeaponIs } from '../util/player-query';
 import {
   registerTransformAction,
   mountTransformAction,
@@ -39,12 +40,7 @@ const OPTIONS: TransformActionOptions = {
   context: 'playOrRespondKill',
   needCardsError: '需要选择 2 张手牌',
   // 武器校核:必须装备丈八蛇矛(动态检查,允许同帧内换下后不再触发)
-  cardPredicate: (state, ownerId, _cardIds) => {
-    const self = state.players[ownerId];
-    const weaponId = self?.equipment['武器'];
-    const weaponCard = weaponId ? state.cardMap[weaponId] : undefined;
-    return weaponCard?.name === '丈八蛇矛';
-  },
+  cardPredicate: (state, ownerId, _cardIds) => equippedWeaponIs(state, ownerId, '丈八蛇矛'),
   invalidError: '丈八蛇矛转化条件不满足',
   mount: {
     label: '丈八蛇矛',

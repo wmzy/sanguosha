@@ -29,6 +29,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { spliceHandOrderEntry } from '../flows/pick-card-panel';
+import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY as PICK_KEY } from '../rules/vars-keys';
 import { currentRequestType, askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
@@ -97,18 +98,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (typeof target !== 'number') return '目标缺失';
         const tp = st.players[target];
         if (!tp) return '目标不存在';
-        const zone = params.zone;
-        if (zone === 'equipment') {
-          const cid = params.cardId as string | undefined;
-          if (typeof cid !== 'string') return 'cardId required';
+        const err = validatePickZoneParams(params, ['equipment', 'hand']);
+        if (err) return err;
+        if (params.zone === 'equipment') {
+          const cid = params.cardId as string;
           const inEquip = EQUIP_SLOTS.some((s) => tp.equipment[s] === cid);
           if (!inEquip) return '该牌不在目标装备区';
-        } else if (zone === 'hand') {
-          if (typeof params.handIndex !== 'number') return 'handIndex required';
-          if (params.handIndex < 0 || params.handIndex >= tp.hand.length)
-            return 'handIndex 越界';
         } else {
-          return 'zone required (equipment|hand)';
+          const handIndex = params.handIndex as number;
+          if (handIndex < 0 || handIndex >= tp.hand.length) return 'handIndex 越界';
         }
       }
       return null;
@@ -118,11 +116,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === PICK_RT) {
-        st.localVars[PICK_KEY] = {
-          zone: params.zone,
-          cardId: params.cardId ?? null,
-          handIndex: params.handIndex ?? null,
-        };
+        writePickResult(st, params);
       }
     },
   );

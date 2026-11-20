@@ -28,6 +28,7 @@ import type {
 } from '../types';
 import { registerAfterHook } from '../core/skill';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
+import { equippedWeaponIs } from '../util/player-query';
 import { askConfirm, defineConfirmAction, mountTransformAction, registerConfirmRespond, registerTransformAction, type TransformActionOptions } from '../util/skillRuntime';
 
 /** 是否为普通杀(damageType 为空或 '普通',即非火杀/雷杀) */
@@ -135,11 +136,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!cardId) return;
       const card = ctx.state.cardMap[cardId];
       if (!isNormalSlash(card)) return;
-      const self = ctx.state.players[ownerId];
-      if (!self) return;
       // 动态装备校核:owner 武器槽仍是朱雀羽扇(装备可能同帧被换下)
-      const weaponId = self.equipment['武器'];
-      if (!weaponId || ctx.state.cardMap[weaponId]?.name !== '朱雀羽扇') return;
+      if (!equippedWeaponIs(ctx.state, ownerId, '朱雀羽扇')) return;
 
       // 询问是否发动(默认不发动;超时不回应 → CONFIRMED_VAR 未设 → 不发动)
       const confirmed = await askConfirm(ctx.state, CONFIRM_REQUEST, ownerId, {

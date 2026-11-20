@@ -31,6 +31,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { spliceHandOrderEntry } from '../flows/pick-card-panel';
+import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import { currentRequestType, askConfirm, requireRequestType } from '../util/skillRuntime';
 
 /** 是否发动趫猛的 requestType */
@@ -123,14 +124,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       const rt = check.requestType;
       // 选牌阶段的参数校验
       if (rt === PICK_REQUEST) {
-        const zone = params.zone;
-        if (zone === 'equipment' || zone === 'judge') {
-          if (typeof params.cardId !== 'string') return 'cardId required';
-        } else if (zone === 'hand') {
-          if (typeof params.handIndex !== 'number') return 'handIndex required';
-        } else {
-          return 'zone required (equipment|judge|hand)';
-        }
+        const err = validatePickZoneParams(params, ['equipment', 'judge', 'hand']);
+        if (err) return err;
       }
       return null;
     },
@@ -139,11 +134,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (rt === CONFIRM_REQUEST) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === PICK_REQUEST) {
-        st.localVars[PICK_RESULT_KEY] = {
-          zone: params.zone,
-          cardId: params.cardId ?? null,
-          handIndex: params.handIndex ?? null,
-        };
+        writePickResult(st, params, PICK_RESULT_KEY);
       }
     },
   );

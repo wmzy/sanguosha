@@ -7,6 +7,7 @@
 import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerBeforeHook } from '../core/skill';
+import { equippedWeaponIs } from '../util/player-query';
 import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -30,12 +31,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
     async (ctx): Promise<HookResult | void> => {
       const atom = ctx.atom;
       if (atom.source !== ownerId) return;
-      const self = ctx.state.players[ownerId];
-      if (!self) return;
-      const weaponId = self.equipment['武器'];
-      if (!weaponId) return;
-      const weapon = ctx.state.cardMap[weaponId];
-      if (weapon?.name !== '麒麟弓') return;
+      if (!equippedWeaponIs(ctx.state, ownerId, '麒麟弓')) return;
       // 仅限【杀】造成的伤害才触发(普通/火/雷杀 name 均为 '杀')。
       // 决斗/南蛮入侵/万箭齐发/火攻 等其他来源的伤害不触发(规则:仅你使用【杀】造成伤害时)。
       const damageCardId = atom.cardId;

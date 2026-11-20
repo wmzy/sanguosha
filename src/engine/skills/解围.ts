@@ -29,6 +29,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { instantiateSkill } from './lifecycle';
 import { hasSkillModule } from './registry';
 import { DISTANCE_ATTACK_RANGE_KEY, PICK_RESULT_KEY } from '../rules/vars-keys';
+import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import { fieldCardIds, moveFieldCard } from '../flows/field-card';
 import { askPickTargetCard } from '../flows/pick-card-panel';
 import { currentRequestType, askConfirm, blockedByOtherPending, firstCardId, firstTarget, defineConfirmAction, shadowCardId, hasNullifyWindow } from '../util/skillRuntime';
@@ -176,14 +177,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 选源牌面板参数校验(同过河拆桥/顺手牵羊 respond;面板候选校验由
       // askPickTargetCard 的 equipment/judge/hand 解析兜底)
       if (rt === SOURCE_CARD_RT) {
-        const zone = params.zone;
-        if (zone === 'equipment' || zone === 'judge') {
-          if (typeof params.cardId !== 'string') return 'cardId required';
-        } else if (zone === 'hand') {
-          if (typeof params.handIndex !== 'number') return 'handIndex required';
-        } else {
-          return 'zone required (equipment|judge|hand)';
-        }
+        const err = validatePickZoneParams(params, ['equipment', 'judge', 'hand']);
+        if (err) return err;
       }
       return null;
     },
@@ -205,11 +200,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }
       if (rt === SOURCE_CARD_RT) {
         // pickTargetCard respond: { zone, cardId, handIndex } → 选牌/结果(由 askPickTargetCard 读取)
-        st.localVars[PICK_RESULT_KEY] = {
-          zone: params.zone,
-          cardId: params.cardId ?? null,
-          handIndex: params.handIndex ?? null,
-        };
+        writePickResult(st, params);
         return;
       }
       if (rt === DEST_PLAYER_RT) {

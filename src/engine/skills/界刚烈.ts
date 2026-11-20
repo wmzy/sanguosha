@@ -23,7 +23,7 @@ import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
-import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import { askConfirm, currentRequestType, registerOnDamagedAsTarget } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '界刚烈/confirm';
@@ -57,17 +57,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (requestType === CONFIRM_REQUEST) return null; // 是否发动
       if (requestType !== PICK_REQUEST) return '当前不是界刚烈回应';
       // 选牌:校验 zone + cardId/handIndex(同过河拆桥/反馈)
-      const zone = params.zone;
-      if (zone === 'equipment') {
-        if (typeof params.cardId !== 'string') return 'cardId required';
-      } else if (zone === 'hand') {
-        if (typeof params.handIndex !== 'number') return 'handIndex required';
-      } else if (zone === 'judge') {
-        if (typeof params.cardId !== 'string') return 'cardId required';
-      } else {
-        return 'zone required (equipment|hand|judge)';
-      }
-      return null;
+      return validatePickZoneParams(params, ['equipment', 'hand', 'judge']);
     },
     async (st: GameState, params: Record<string, Json>) => {
       const requestType = currentRequestType(st, ownerId);
@@ -76,11 +66,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         return;
       }
       // PICK_REQUEST: 由 选牌面板.ts 的 runPickTargetCardPanel 读取
-      st.localVars[PICK_RESULT_KEY] = {
-        zone: params.zone,
-        cardId: params.cardId ?? null,
-        handIndex: params.handIndex ?? null,
-      };
+      writePickResult(st, params);
     },
   );
 

@@ -3,8 +3,8 @@
 // 实现:临时卸载目标的防具技能实例(移除技能),杀结算后恢复(添加技能)。
 // 不用标签——更干净的抽象:装备不需要知道青釭剑的行为,防具技能也不需要检查标签。
 //
-// 防具技能 id 通过目标装备栏防具动态查找:目标 equipment['防具'] → cardMap → card.name 即防具技能 id,
-// 无需硬编码防具列表。
+// 卸载/记录/双时机恢复的通用机制在 _tempArmorStrip.ts(与 界陷阵 共享);
+// 防具技能 id 通过目标装备栏防具动态查找,无需硬编码防具列表。
 //
 // 时机:
 //   - 指定目标(杀 execute 内,造成伤害 之前):仅对【杀】检测目标防具,移除技能
@@ -16,23 +16,7 @@
 import type { Skill, GameState } from '../types';
 
 import { registerAfterHook } from '../core/skill';
-import { unloadSkillInstance, instantiateSkill } from './lifecycle';
-
-/**
- * state-bound:记录当前被青釭剑临时卸载的防具,供 造成伤害 after hook 恢复。
- * key = 来源玩家(青釭剑使用者)座次下标,确保多玩家同时装备青釭剑时互不干扰。
- * WeakMap 外挂在 GameState 上,随 state 自动隔离/GC,无模块级泄漏。
- */
-const tempUnloadByState = new WeakMap<GameState, Map<number, Array<{ target: number; skillId: string }>>>();
-
-function getTempUnloadMap(state: GameState): Map<number, Array<{ target: number; skillId: string }>> {
-  let m = tempUnloadByState.get(state);
-  if (!m) {
-    m = new Map();
-    tempUnloadByState.set(state, m);
-  }
-  return m;
-}
+import { stripTargetArmor, registerArmorRestoreHooks } from './_tempArmorStrip';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '青釭剑', description: '武器:杀无视目标防具', isLocked: true };
@@ -58,47 +42,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (weaponCard?.name !== '青釭剑') return;
 
     const target = (ctx.atom).target;
-    const targetPlayer = ctx.state.players[target];
-    if (!targetPlayer) return;
-
-    // 检查目标装备了什么防具,临时卸载对应技能
-    const armorId = targetPlayer.equipment?.['防具'];
-    if (!armorId) return;
-    const armorCard = ctx.state.cardMap[armorId];
-    if (!armorCard) return;
-
-    // 防具牌 card.name 即防具技能 id;检查目标已加载该技能,临时卸载
-    const unloaded: Array<{ target: number; skillId: string }> = [];
-    const armorSkillId = armorCard.name;
-    if (armorSkillId && targetPlayer.skills.includes(armorSkillId)) {
-      unloaded.push({ target, skillId: armorSkillId });
-      unloadSkillInstance(ctx.state, armorSkillId, target);
-    }
-    if (unloaded.length > 0) {
-      getTempUnloadMap(ctx.state).set(ownerId, unloaded);
-    }
+    // 目标的防具技能实例 → 临时卸载并记录(无防具/未加载则不动作)
+    stripTargetArmor(ctx.state, ownerId, target);
   });
 
   // 杀结算完毕后恢复被临时卸载的防具技能。
   // 杀命中 → 造成伤害后;杀被闪抵消 → 被抵消。两条路径互斥,合起来覆盖杀的全部退出路径:
   // 原实现只挂 造成伤害后,dodge 时该 atom 不触发,防具永久泄漏(后续对目标的杀失去防具保护)。
-  async function restoreArmor(curState: GameState, source: number): Promise<void> {
-    if (source !== ownerId) return;
-    const unloaded = getTempUnloadMap(curState).get(ownerId);
-    if (!unloaded || unloaded.length === 0) return;
-    for (const { target, skillId } of unloaded) {
-      await instantiateSkill(curState, skillId, target);
-    }
-    getTempUnloadMap(curState).delete(ownerId);
-  }
-
-  registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {
-    await restoreArmor(ctx.state, (ctx.atom).source);
-  });
-
-  registerAfterHook(state, skill.id, ownerId, '被抵消', async (ctx) => {
-    await restoreArmor(ctx.state, (ctx.atom).source);
-  });
+  registerArmorRestoreHooks(state, ownerId, skill.id);
 
   return () => {};
 }

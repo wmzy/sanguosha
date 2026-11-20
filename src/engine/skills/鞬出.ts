@@ -38,6 +38,8 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
+import { registerDodgeBlockHook } from './铁骑';
+import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import {
   currentRequestType,
   askConfirm,
@@ -120,20 +122,26 @@ export function createJianchuSkill(opts: JianchuOptions) {
               // 目标自选弃牌:校验所选牌在目标自己的区域内
               const me = st.players[seat];
               if (!me) return '玩家不存在';
-              const zone = params.zone;
-              if (zone === 'equipment') {
-                if (typeof params.cardId !== 'string') return 'cardId required';
-                if (!Object.values(me.equipment).includes(params.cardId))
+              const zoneError = validatePickZoneParams(params, ['equipment', 'hand']);
+              if (zoneError) return zoneError;
+              // 形状之外的归属/边界校验:牌必须真在目标自己的区域内
+              if (params.zone === 'equipment') {
+                const cardId = params.cardId;
+                if (typeof cardId !== 'string' || !Object.values(me.equipment).includes(cardId)) {
                   return '该牌不在你的装备区';
-                return null;
+                }
               }
-              if (zone === 'hand') {
-                if (typeof params.handIndex !== 'number') return 'handIndex required';
-                if (params.handIndex < 0 || params.handIndex >= me.hand.length)
+              if (params.zone === 'hand') {
+                const handIndex = params.handIndex;
+                if (
+                  typeof handIndex !== 'number' ||
+                  handIndex < 0 ||
+                  handIndex >= me.hand.length
+                ) {
                   return 'handIndex 越界';
-                return null;
+                }
               }
-              return 'zone required (equipment|hand)';
+              return null;
             }
             return opts.respondFallbackError;
           },
@@ -144,11 +152,7 @@ export function createJianchuSkill(opts: JianchuOptions) {
                 params.choice === true || params.confirmed === true;
             } else if (requestType === opts.pickRt) {
               // 目标自选弃牌结果(由 askTargetToDiscard 读取;键 = requestType 字面量)
-              st.localVars[opts.pickRt] = {
-                zone: params.zone,
-                cardId: params.cardId ?? null,
-                handIndex: params.handIndex ?? null,
-              };
+              writePickResult(st, params, opts.pickRt);
             }
           },
         ),
@@ -235,23 +239,7 @@ export function createJianchuSkill(opts: JianchuOptions) {
       });
 
       // ── 询问闪 before:目标有禁闪标签 → 去标签 + cancel(强制命中)──
-      registerBeforeHook(
-        state,
-        skill.id,
-        ownerId,
-        '询问闪',
-        async (ctx): Promise<HookResult | void> => {
-          const atom = ctx.atom;
-          if (atom.source !== ownerId) return;
-          const target = atom.target;
-          if (target === undefined) return;
-          const player = ctx.state.players[target];
-          if (!player?.tags.includes(opts.tag)) return;
-          // 清标签(仅本次杀有效)+ cancel 询问闪 → 处理区无闪 → 造成伤害
-          await applyAtom(ctx.state, { type: '去标签', player: target, tag: opts.tag });
-          return { kind: 'cancel' };
-        },
-      );
+      registerDodgeBlockHook(state, skill.id, ownerId, opts.tag);
 
       return () => {
         unloaders.forEach((u) => u());

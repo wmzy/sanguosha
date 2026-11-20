@@ -6,7 +6,7 @@ import type {
   ViewEvent,
   Card,
 } from '../types';
-import { addCardToHand, applyDrawEvent, broadcast, pushToDiscardPile, removeCardFromHand, viewPlayer } from './_helpers';
+import { addCardToHand, applyDrawEvent, broadcast, pushToDiscardPile, removeCardFromHand, takeFromDeck, viewPlayer } from './_helpers';
 
 export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: ZoneLoc }> = {
   type: '移动牌',
@@ -126,7 +126,7 @@ export const 移动牌: AtomDefinition<{ cardId: string; from: ZoneLoc; to: Zone
       const from = event.from as ZoneLoc;
       const to = event.to as ZoneLoc;
       const cardId = event.cardId as string;
-      if (from?.zone === '牌堆') view.zones.deckCount = Math.max(0, view.zones.deckCount - 1);
+      if (from?.zone === '牌堆') takeFromDeck(view, 1);
       else if (from?.zone === '弃牌堆')
         view.zones.discardPileCount = Math.max(0, view.zones.discardPileCount - 1);
       else if (from?.zone === '处理区') {

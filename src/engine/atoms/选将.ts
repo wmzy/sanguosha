@@ -13,7 +13,7 @@ import type {
   ViewEventSplit,
 } from '../types';
 import { TARGET_SYSTEM } from '../types';
-import { broadcast, requirePlayer, viewPlayer } from './_helpers';
+import { broadcast, requirePlayer, takeFromDeck, viewPlayer } from './_helpers';
 import { createRng } from '../util/rng';
 import { createStandardDeck } from '../core/deck';
 import { shuffle } from '../util/rng';
@@ -196,7 +196,7 @@ export const 发牌: AtomDefinition<{
     }
     // 牌堆减少(减去总发牌数)
     const total = view.players.length * handSize;
-    if (view.zones) view.zones.deckCount = Math.max(0, view.zones.deckCount - total);
+    takeFromDeck(view, total);
   },
 };
 

@@ -48,7 +48,7 @@ import { registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
-import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
 
 const SKILL_ID = '界利驭';
@@ -91,14 +91,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         const requestType = check.requestType;
         if (requestType === PICK_RT) {
           // 选牌面板:校验 zone + cardId/handIndex(同反馈/过河拆桥)
-          const zone = params.zone;
-          if (zone === 'equipment' || zone === 'judge') {
-            if (typeof params.cardId !== 'string') return 'cardId required';
-          } else if (zone === 'hand') {
-            if (typeof params.handIndex !== 'number') return 'handIndex required';
-          } else {
-            return 'zone required (equipment|hand|judge)';
-          }
+          const err = validatePickZoneParams(params, ['equipment', 'hand', 'judge']);
+          if (err) return err;
         } else if (requestType === CHOOSE_DUEL_RT) {
           // 受伤目标选择决斗对象
           if (typeof params.target !== 'number') return 'target required';
@@ -110,11 +104,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (requestType === CONFIRM_RT) {
           s.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
         } else if (requestType === PICK_RT) {
-          s.localVars[PICK_RESULT_KEY] = {
-            zone: params.zone,
-            cardId: params.cardId ?? null,
-            handIndex: params.handIndex ?? null,
-          };
+          writePickResult(s, params);
         } else if (requestType === CHOOSE_DUEL_RT) {
           s.localVars[DUEL_TARGET_KEY] = params.target;
         }

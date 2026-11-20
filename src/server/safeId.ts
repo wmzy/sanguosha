@@ -8,9 +8,6 @@
 /** 安全 id 白名单正则(字母数字/连字符/下划线)。 */
 export const SAFE_ID = /^[A-Za-z0-9_-]+$/;
 
-/** 兼容既有导入面:roomId 白名单 = SAFE_ID。 */
-export const SAFE_ROOM_ID = SAFE_ID;
-
 /** id 是否通过白名单(防路径穿越)。 */
 export function isSafeId(id: string): boolean {
   return SAFE_ID.test(id);

@@ -38,7 +38,8 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
-import { PICK_RESULT_KEY, JUZHAN_STATE_VIEW_KEY } from '../rules/vars-keys';
+import { JUZHAN_STATE_VIEW_KEY } from '../rules/vars-keys';
+import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import { createYinYangState } from '../rules/turn-usage';
 import { currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import { isSlashCardById } from '../util/player-query';
@@ -108,15 +109,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
       if (rt === YIN_PICK_RT) {
         // 选牌面板:校验 zone + cardId/handIndex(同反馈/过河拆桥)
-        const zone = params.zone;
-        if (zone === 'equipment') {
-          if (typeof params.cardId !== 'string') return 'cardId required';
-        } else if (zone === 'hand') {
-          if (typeof params.handIndex !== 'number') return 'handIndex required';
-        } else {
-          return 'zone required (equipment|hand)';
-        }
-        return null;
+        return validatePickZoneParams(params, ['equipment', 'hand']);
       }
       return null;
     },
@@ -128,11 +121,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         st.localVars[YIN_CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === YIN_PICK_RT) {
         // 选牌面板结果(与反馈/过河拆桥共用 '选牌/结果' 契约)
-        st.localVars[PICK_RESULT_KEY] = {
-          zone: params.zone,
-          cardId: params.cardId ?? null,
-          handIndex: params.handIndex ?? null,
-        };
+        writePickResult(st, params);
       }
     },
   );

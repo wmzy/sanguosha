@@ -11,7 +11,7 @@ import type { Card, PendingView } from '../../engine/types';
 import type { PendingRespondInfo } from '../utils/pendingRespond';
 import type { ProcessingPickState } from '../hooks/useProcessingPicks';
 import type { AutoSkipPrefs } from '../utils/autoSkip';
-import { getPendingRequestType } from '../utils/pendingRespond';
+import { getPendingRequestType, pickTargetCardEntries } from '../utils/pendingRespond';
 import { DEFAULT_FACTION_COLOR, fallbackFaction } from '../utils/characterVisuals';
 import { FACTION_BG } from './gameViewConstants';
 import { displaySkillName } from '../utils/skillDisplay';
@@ -143,50 +143,65 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
         (() => {
           // respond 信息由 usePendingState memo 后传入,不再在此重复 resolve(原先每个分支调一次)。
           const skillId = pendingRespondInfo?.skillId ?? '系统规则';
-          // pickHandIndex 类 pending(过河拆桥/顺手牵羊盲选手牌位置):
-          // 渲染目标手牌的牌背序列,使用者点击位置选择
+          // pickTargetCard 类 pending(过河拆桥/顺手牵羊盲选手牌位置):
+          // 渲染目标手牌的牌背序列,使用者点击位置选择。
+          // 可选项与 respond params 由 pickTargetCardEntries 统一构造(与无头枚举同源);
+          // 浏览器不传兜底(prompt.handCount 必有,为 0 时无手牌项)。
           if (pending.prompt.type === 'pickTargetCard') {
-            const p = pending.prompt;
+            const entries = pickTargetCardEntries(pending.prompt);
             return (
               <div className={styles.promptActionsWrap}>
                 {/* 装备区明牌 */}
-                {p.equipment.length > 0 && <span className={styles.promptDescFull}>装备区:</span>}
-                {p.equipment.map(({ slot, cardId, cardName }) => (
-                  <button
-                    key={cardId}
-                    className={styles.promptBtn}
-                    onClick={() => send(skillId, 'respond', { zone: 'equipment', cardId })}
-                  >
-                    {slot}:{cardName}
-                  </button>
-                ))}
+                {entries.some((e) => e.zone === 'equipment') && (
+                  <span className={styles.promptDescFull}>装备区:</span>
+                )}
+                {entries
+                  .filter((e) => e.zone === 'equipment')
+                  .map((e) => (
+                    <button
+                      key={e.cardId}
+                      className={styles.promptBtn}
+                      onClick={() => send(skillId, 'respond', e.params)}
+                    >
+                      {e.slot}:{e.cardName}
+                    </button>
+                  ))}
                 {/* 判定区明牌 */}
-                {p.judge.length > 0 && <span className={styles.promptDescFull}>判定区:</span>}
-                {p.judge.map(({ cardId, cardName }) => (
-                  <button
-                    key={cardId}
-                    className={styles.promptBtn}
-                    onClick={() => send(skillId, 'respond', { zone: 'judge', cardId })}
-                  >
-                    {cardName}
-                  </button>
-                ))}
+                {entries.some((e) => e.zone === 'judge') && (
+                  <span className={styles.promptDescFull}>判定区:</span>
+                )}
+                {entries
+                  .filter((e) => e.zone === 'judge')
+                  .map((e) => (
+                    <button
+                      key={e.cardId}
+                      className={styles.promptBtn}
+                      onClick={() => send(skillId, 'respond', e.params)}
+                    >
+                      {e.cardName}
+                    </button>
+                  ))}
                 {/* 手牌盲选:渲染目标手牌的牌背序列,使用者点击位置选择(序号作角标) */}
-                {p.handCount > 0 && (
+                {entries.some((e) => e.zone === 'hand') && (
                   <>
                     <span className={styles.promptDescFull}>手牌（凭位置盲选）:</span>
                     <div className={styles.pickHandRow}>
-                      {Array.from({ length: p.handCount }, (_, i) => (
-                        <button
-                          key={i}
-                          className={styles.pickHandCard}
-                          onClick={() => send(skillId, 'respond', { zone: 'hand', handIndex: i })}
-                          title={`第 ${i + 1} 张`}
-                        >
-                          <CardBack />
-                          <span className={styles.pickHandIndex}>{i + 1}</span>
-                        </button>
-                      ))}
+                      {entries
+                        .filter((e) => e.zone === 'hand')
+                        .map((e) => {
+                          const i = e.handIndex ?? 0;
+                          return (
+                            <button
+                              key={i}
+                              className={styles.pickHandCard}
+                              onClick={() => send(skillId, 'respond', e.params)}
+                              title={`第 ${i + 1} 张`}
+                            >
+                              <CardBack />
+                              <span className={styles.pickHandIndex}>{i + 1}</span>
+                            </button>
+                          );
+                        })}
                     </div>
                   </>
                 )}

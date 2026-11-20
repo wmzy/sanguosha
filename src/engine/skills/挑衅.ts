@@ -35,7 +35,7 @@ import { registerAction, hasBlockingPending } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
 import { currentRequestType, requireRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
-import { panelEquipmentAllowed } from './cards/_pickPanel';
+import { panelEquipmentAllowed, validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';
 import {
@@ -246,22 +246,19 @@ export function createTiaoxinSkill(opts: TiaoxinOptions) {
             if (typeof victim !== 'number') return '无弃牌目标';
             const vp = st.players[victim];
             if (!vp) return '弃牌目标不存在';
-            const zone = params.zone;
-            if (zone === 'equipment') {
-              if (typeof params.cardId !== 'string') return 'cardId required';
+            const err = validatePickZoneParams(params, ['equipment', 'hand']);
+            if (err) return err;
+            if (params.zone === 'equipment') {
+              const cardId = params.cardId as string;
               // 界奇才 hook 可能已从 prompt.equipment 过滤受保护装备(防具/宝物);
               // 判据与 过河拆桥/顺手牵羊 共源(cards/_pickPanel)
-              if (!panelEquipmentAllowed(slot.atom, params.cardId)) return '该装备不可选';
-              if (!Object.values(vp.equipment).includes(params.cardId)) return '该牌不在目标装备区';
-              return null;
+              if (!panelEquipmentAllowed(slot.atom, cardId)) return '该装备不可选';
+              if (!Object.values(vp.equipment).includes(cardId)) return '该牌不在目标装备区';
+            } else {
+              const handIndex = params.handIndex as number;
+              if (handIndex < 0 || handIndex >= vp.hand.length) return 'handIndex 越界';
             }
-            if (zone === 'hand') {
-              if (typeof params.handIndex !== 'number') return 'handIndex required';
-              if (params.handIndex < 0 || params.handIndex >= vp.hand.length)
-                return 'handIndex 越界';
-              return null;
-            }
-            return 'zone required (equipment|hand)';
+            return null;
           }
 
           return '当前不是挑衅询问';
@@ -279,11 +276,7 @@ export function createTiaoxinSkill(opts: TiaoxinOptions) {
             };
           } else if (requestType === opts.pickRt) {
             // pickTargetCard respond → 选牌/结果(由 runPickTargetCardPanel 读取)
-            st.localVars[PICK_RESULT_KEY] = {
-              zone: params.zone,
-              cardId: params.cardId ?? null,
-              handIndex: params.handIndex ?? null,
-            };
+            writePickResult(st, params);
           }
         },
       );

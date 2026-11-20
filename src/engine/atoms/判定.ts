@@ -8,7 +8,7 @@
 // applyView 与 apply 对称:deckCount -1 + 判定牌进 processing/帧牌区;
 // 判定牌离开处理区由后续 atom 投影(移动牌 / 收取判定牌),本 atom 不预支弃牌堆计数。
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
-import { broadcast, requirePlayer } from './_helpers';
+import { broadcast, requirePlayer, takeFromDeck } from './_helpers';
 import { bindJudgeCard } from '../flows/judge';
 import { drawFromTop, peekTop } from '../core/deck';
 
@@ -69,7 +69,7 @@ export const 判定: AtomDefinition<{ player: number; judgeType: string }> = {
     // 预支会让增量视图的弃牌堆计数永久虚高 1(实测 屯田/双雄/天妒/界落英)。
     if (!view.zones) return;
     const cardId = (_event as { cardId?: string }).cardId;
-    view.zones.deckCount = Math.max(0, view.zones.deckCount - 1);
+    takeFromDeck(view, 1);
     if (!cardId) return; // 牌堆为空:apply 早退,未翻牌
     const f = view.settlementStack[view.settlementStack.length - 1];
     if (f) f.cards.push(cardId);

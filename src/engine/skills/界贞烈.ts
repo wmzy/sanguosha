@@ -51,7 +51,8 @@ import { registerCardInvalidation } from '../core/card-invalidation';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { isDelayedTrick } from '../data/card-meta';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
-import { PICK_RESULT_KEY, mijiPendingKey } from '../rules/vars-keys';
+import { mijiPendingKey } from '../rules/vars-keys';
+import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import { currentRequestType, requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 const _SKILL_ID = '界贞烈';
@@ -220,15 +221,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }
       if (rt === PICK_RT) {
         // 选牌面板:校验 zone + cardId/handIndex(同 反馈)
-        const zone = params.zone;
-        if (zone === 'equipment') {
-          if (typeof params.cardId !== 'string') return 'cardId required';
-        } else if (zone === 'hand') {
-          if (typeof params.handIndex !== 'number') return 'handIndex required';
-        } else {
-          return 'zone required (equipment|hand)';
-        }
-        return null;
+        return validatePickZoneParams(params, ['equipment', 'hand']);
       }
       return null;
     },
@@ -241,11 +234,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         st.localVars[CHOOSE_KEY] =
           params.choice === true || params.confirmed === true ? 'gain' : 'miji';
       } else if (rt === PICK_RT) {
-        st.localVars[PICK_RESULT_KEY] = {
-          zone: params.zone,
-          cardId: params.cardId ?? null,
-          handIndex: params.handIndex ?? null,
-        };
+        writePickResult(st, params);
       }
     },
   );

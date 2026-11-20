@@ -172,7 +172,9 @@ describe('移除延时锦囊 atom', () => {
     expect(view.players[0].pendingTricks).toHaveLength(0);
   });
 
-  it('applyView:无 cardId 时按 trickName 反查 cardMap', () => {
+  it('applyView:无 cardId 时 no-op(不按 trickName 反查,防误删同名卡)', () => {
+    // PendingTrick.card 必填,toViewEvents 正常总会带 cardId;缺失属异常形状,
+    // 刻意不反查 cardMap——同名卡(如任意 杀)可能被误判为延时锦囊牌。
     const cardMap = makeCardMap(trickCard);
     const view = makeViewWithTrick(0, cardMap);
 
@@ -183,21 +185,6 @@ describe('移除延时锦囊 atom', () => {
       // 无 cardId
     });
 
-    expect(view.players[0].pendingTricks).toHaveLength(0);
-  });
-
-  it('applyView:无 cardId 且 cardMap 中找不到时保留 list', () => {
-    const view = makeViewWithTrick(0, {}); // 空 cardMap
-    // pendingTricks 有 lebu-1 但 cardMap 为空
-    view.players[0].pendingTricks = ['lebu-1'];
-
-    def.applyView!(view, {
-      type: '移除延时锦囊',
-      player: 0,
-      trickName: '乐不思蜀',
-    });
-
-    // 无法定位 → 保留 list 原样
     expect(view.players[0].pendingTricks).toHaveLength(1);
   });
 

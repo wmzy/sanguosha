@@ -28,6 +28,45 @@ export function panelEquipmentAllowed(atom: unknown, cardId: string): boolean {
   return !equipList || equipList.some((e) => e.cardId === cardId);
 }
 
+/** pickTargetCard 选牌面板的 zone 参数形状校验(单一来源):equipment/judge →
+ *  需 string cardId;hand → 需 number handIndex;zone 不在 zones 集合内或缺失 →
+ *  `zone required (…)`。zones 顺序决定错误文案(与各调用点既有文案逐字一致)。
+ *  供 createPickPanelRespond 与 反馈/寒冰剑/界利驭/解围/鞬出 等自带多 requestType
+ *  respond 的选牌分支复用——这些注册键内还分流 confirm 等兄弟分支,无法整体
+ *  迁移到 createPickPanelRespond,只收敛这段阶梯。 */
+export function validatePickZoneParams(
+  params: Record<string, Json>,
+  zones: ReadonlyArray<'hand' | 'equipment' | 'judge'> = ['equipment', 'judge', 'hand'],
+): string | null {
+  const zone = params.zone;
+  if (zone === 'equipment' || zone === 'judge') {
+    if (!zones.includes(zone)) return `zone required (${zones.join('|')})`;
+    if (typeof params.cardId !== 'string') return 'cardId required';
+    return null;
+  }
+  if (zone === 'hand') {
+    if (!zones.includes('hand')) return `zone required (${zones.join('|')})`;
+    if (typeof params.handIndex !== 'number') return 'handIndex required';
+    return null;
+  }
+  return `zone required (${zones.join('|')})`;
+}
+
+/** 选牌结果写入 localVars(形状固定:zone + cardId/handIndex 可空)。默认写
+ *  PICK_RESULT_KEY(选牌面板.ts 读取);鞬出 等以 requestType 字面量为键的
+ *  调用点经 key 参数注入。 */
+export function writePickResult(
+  state: GameState,
+  params: Record<string, Json>,
+  key: string = PICK_RESULT_KEY,
+): void {
+  state.localVars[key] = {
+    zone: params.zone,
+    cardId: params.cardId ?? null,
+    handIndex: params.handIndex ?? null,
+  };
+}
+
 /** createPickPanelRespond 可选项。 */
 export interface PickPanelRespondOptions {
   /** 选牌面板的 requestType(requireRequestType 匹配 + 错误文案)。 */
@@ -49,17 +88,11 @@ export function createPickPanelRespond(
         mismatchError: '当前不是选牌窗口',
       });
       if (check.error) return check.error;
-      const zone = params.zone;
-      if (zone === 'equipment' || zone === 'judge') {
-        if (typeof params.cardId !== 'string') return 'cardId required';
-      } else if (zone === 'hand') {
-        if (typeof params.handIndex !== 'number') return 'handIndex required';
-      } else {
-        return 'zone required (equipment|judge|hand)';
-      }
+      const zoneError = validatePickZoneParams(params);
+      if (zoneError) return zoneError;
       if (
         opts.validateEquipmentInPanel &&
-        zone === 'equipment' &&
+        params.zone === 'equipment' &&
         typeof params.cardId === 'string' &&
         !panelEquipmentAllowed(state.pendingSlots.get(ownerId)?.atom, params.cardId)
       ) {
@@ -68,11 +101,7 @@ export function createPickPanelRespond(
       return null;
     },
     execute: async (state: GameState, _ownerId: number, params: Record<string, Json>) => {
-      state.localVars[PICK_RESULT_KEY] = {
-        zone: params.zone,
-        cardId: params.cardId ?? null,
-        handIndex: params.handIndex ?? null,
-      };
+      writePickResult(state, params);
     },
   };
 }

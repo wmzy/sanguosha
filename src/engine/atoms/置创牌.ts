@@ -20,7 +20,7 @@
 //
 // 注意:牌堆顶 = zones.deck 末尾元素,与「摸牌」语义一致(slice(-n)/pop)。
 import type { AtomDefinition, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { broadcast, pushToDiscardPile, requirePlayer } from './_helpers';
+import { broadcast, pushToDiscardPile, requirePlayer, takeFromDeck } from './_helpers';
 import { drawFromTop, peekTop } from '../core/deck';
 
 export const 置创牌: AtomDefinition<{
@@ -79,7 +79,7 @@ export const 置创牌: AtomDefinition<{
   applyView(view: GameView, event) {
     // 创牌来自牌堆顶:牌堆-1(与 buildView 的 deckCount=deck.length 对齐)
     if (view.zones) {
-      view.zones.deckCount = Math.max(0, view.zones.deckCount - 1);
+      takeFromDeck(view, 1);
       // 重复时此牌进弃牌堆:弃牌堆+1(与 buildView 的 discardPileCount 对齐)
       if (event.duplicate) {
         view.zones.discardPileCount += 1;

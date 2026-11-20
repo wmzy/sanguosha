@@ -23,7 +23,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { peekTop } from '../core/deck';
 import { inAttackRange } from '../rules/distance';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
-import { PICK_RESULT_KEY } from '../rules/vars-keys';
+import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 /** localVars keys */
@@ -65,14 +65,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       // DISCARD_RT = pickTargetCard 选牌面板(由 runPickTargetCardPanel 发起):
       //   需 zone + 对应 cardId/handIndex(与界刚烈/过河拆桥选牌一致)
       if (rt === DISCARD_RT) {
-        const zone = params.zone;
-        if (zone === 'equipment' || zone === 'judge') {
-          if (typeof params.cardId !== 'string') return 'cardId required';
-        } else if (zone === 'hand') {
-          if (typeof params.handIndex !== 'number') return 'handIndex required';
-        } else {
-          return 'zone required (equipment|judge|hand)';
-        }
+        const err = validatePickZoneParams(params, ['equipment', 'judge', 'hand']);
+        if (err) return err;
       }
       return null;
     },
@@ -84,11 +78,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         st.localVars[TARGET_KEY] = params.target ?? null;
       } else if (rt === DISCARD_RT) {
         // pickTargetCard 选牌结果:由 选牌面板.ts 的 runPickTargetCardPanel 读取
-        st.localVars[PICK_RESULT_KEY] = {
-          zone: params.zone,
-          cardId: params.cardId ?? null,
-          handIndex: params.handIndex ?? null,
-        };
+        writePickResult(st, params);
       }
     },
   );
