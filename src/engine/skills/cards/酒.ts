@@ -14,7 +14,7 @@ import { registerBeforeHook } from '../../core/skill';
 import { defaultPlayActive } from '../../rules/action-active';
 import type { CardEffect, ResolveCtx } from '../../types';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../../rules/once-per-turn';
-import { firstTarget, requireRequestType } from '../../util/skillRuntime';
+import { firstTarget, requireHandCard, requireRequestType } from '../../util/skillRuntime';
 import { playRescueCard } from './桃';
 import type { HookResult } from '../../types';
 
@@ -87,14 +87,13 @@ export const wineEffect: CardEffect = {
     validate: (state, ownerId, params) => {
       const check = requireRequestType(state, ownerId, ['桃/求桃'], {
         mismatchError: '当前不是求桃',
+        ownerCheck: ownerId,
       });
       if (check.error) return check.error;
       const cardId = params.cardId as string | undefined;
       if (!cardId) return 'cardId required';
-      const self = state.players[ownerId];
-      if (!self.hand.includes(cardId)) return '牌不在手牌中';
-      const card = state.cardMap[cardId];
-      if (card.name !== '酒') return '只能用酒救援';
+      const handCheck = requireHandCard(state, ownerId, cardId, '酒');
+      if (handCheck) return handCheck;
       return null;
     },
     execute: async (state, ownerId, params) => {

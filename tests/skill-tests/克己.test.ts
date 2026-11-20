@@ -9,21 +9,11 @@
 //   3. 边界:未出杀但选择不发动 → 进入正常弃牌阶段
 //   4. 边界:超时不回应(defaultChoice=false)→ 进入正常弃牌阶段
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -34,22 +24,11 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: opts.character ?? '吕蒙',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
     skills: opts.skills ?? ['克己', '回合管理'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 /** 取当前唯一 pending 的 requestType(无 pending 返回 null) */

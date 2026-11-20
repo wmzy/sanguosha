@@ -8,22 +8,12 @@
 //   3. 凿险不触发:已觉醒
 //   4. 急袭:田→顺手牵羊 → 获得目标一张牌
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, Faction, GameState, Mark, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -37,20 +27,7 @@ function makePlayer(opts: {
   faction?: Faction;
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '邓艾',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: opts.marks ?? [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
+    ...sharedMakePlayer({ ...opts, character: opts.character ?? '邓艾' }),
     faction: '魏',
   };
 }

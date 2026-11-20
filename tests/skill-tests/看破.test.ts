@@ -9,21 +9,11 @@
 //   4. 负面:组合 action(transform+无懈可击.respond)无窗口 → preceding validate 拒绝,
 //      无影子卡残留、原牌还原
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -31,22 +21,7 @@ function makePlayer(opts: {
   hand?: string[];
   skills?: string[];
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '卧龙诸葛',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['看破'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '卧龙诸葛', skills: ['看破'], ...opts });
 }
 
 function buildState(opts?: {

@@ -19,11 +19,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/index'
 import { applyAtom } from '../../src/engine/core/apply';
 import { runJudgeFlow } from '../../src/engine/flows/judge';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { getAtomDef } from '../../src/engine/core/atom';
 import '../../src/engine/atoms';
 import type { Card, GameState, PendingTrick } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
@@ -35,23 +34,12 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
   pendingTricks?: PendingTrick[];
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
+  }) {
+  return sharedMakePlayer({
+    ...opts,
     character: '',
-    health: opts.health ?? 4,
     maxHealth: opts.maxHealth ?? opts.health ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: opts.pendingTricks ?? [],
-    judgeZone: [],
-    tags: [],
-  };
+  });
 }
 
 function makeCard(
@@ -61,7 +49,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
+  return sharedMakeCard(id, name, suit, rank, type);
 }
 
 describe('闪电:延时锦囊判定(plumbing & 端到端)', () => {

@@ -23,7 +23,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, requireRequestType } from '../util/skillRuntime';
 
 /** 狂骨族(被动可选技)差异参数 */
 export interface KuangguOptions {
@@ -78,8 +78,7 @@ export function createKuangguSkill(opts: KuangguOptions) {
           }).error;
         },
         async (st: GameState, params: Record<string, Json>) => {
-          const slot = st.pendingSlots.get(ownerId);
-          const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+          const rt = currentRequestType(st, ownerId);
           if (rt === CONFIRM_REQUEST) {
             st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
           } else if (rt === CHOOSE_REQUEST) {

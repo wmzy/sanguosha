@@ -17,21 +17,11 @@
 //   7. 关键差异:转化锦囊(乱击→万箭齐发)不触发界集智
 //   8. 手牌上限 bonus 实际作用于弃牌阶段(集成 hand-limit.ts)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -41,22 +31,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界黄月英',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['界集智', '无中生有'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '界黄月英', health: 3, maxHealth: 3, skills: ['界集智', '无中生有'], ...opts });
 }
 
 /** 取当前唯一 pending 的 requestType(无 pending 返回 null) */

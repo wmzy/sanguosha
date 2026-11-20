@@ -13,48 +13,15 @@
 //   9. 他人对陆逊使用过河拆桥 → 无懈超时 → 谦逊触发 → 确认 → 手牌移出
 //  10. 他人对陆逊使用火攻 → 无懈超时 → 谦逊触发 → 确认 → 手牌移出(火攻因无手牌可展示而失效)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  character?: string;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '陆逊',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '陆逊', ...o });
 
 function buildState(opts: {
   p0Hand: string[];

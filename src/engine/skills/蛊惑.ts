@@ -58,7 +58,7 @@ import { usedThisTurnKey } from '../rules/vars-keys';
 import { viewCanAttack } from '../rules/viewDistance';
 import { viewCanSlash } from '../rules/action-active';
 import { USE_ACTION_PREFIX } from '../util/declaredActionType';
-import { registerRespondForAllSeats, engineCanPlayNowReason, viewAskedDodge, defineConfirmAction } from '../util/skillRuntime';
+import { registerRespondForAllSeats, engineCanPlayNowReason, viewAskedDodge, defineConfirmAction, currentRequestType } from '../util/skillRuntime';
 import { runVirtualSlash } from './cards/_virtualSlash';
 import { canUseSlash } from './cards/杀';
 
@@ -413,8 +413,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       (st, seat): string | null => {
         const slot = st.pendingSlots.get(seat);
         if (!slot) return '当前不需要回应';
-        const atom = slot.atom as { requestType?: string };
-        if (atom.requestType !== REQUEST_TYPE) return '当前不是蛊惑质疑窗口';
+        if (currentRequestType(st, seat) !== REQUEST_TYPE) return '当前不是蛊惑质疑窗口';
         if (!st.players[seat]?.alive) return '你已死亡';
         return null;
       },
@@ -560,3 +559,8 @@ function rescueActive(ctx: ActionContext, skillKey: string): boolean {
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+
+// [requestType 迁移·不迁项] ① registerGuResponse 校验的 slot 另传 checkWindow 回调并读
+// atom.target;② rescue 的 checkWindow 是参数 slot 的 lambda(无 state,且同时校验 atom.type);
+// ③ rescueActive 读 view.pending(视图层);④ 质疑 respond 校验保留 !slot 守卫以区分错误文案。
+// requestType 反射点均已走 currentRequestType。

@@ -7,20 +7,11 @@
 //     - 桃当酒(增伤):自己回合,preceding=[界龙胆.transform{to:'酒'}] + 酒.use → 下一张杀 +1
 //   to 推导:headless 不传 to 时,后端按原卡名推导(兼容 availableActions)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -30,22 +21,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界赵云',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '界赵云', ...opts });
 }
 
 describe('界龙胆', () => {

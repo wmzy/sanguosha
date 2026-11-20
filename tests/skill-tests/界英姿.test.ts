@@ -10,47 +10,14 @@
 //   4. 手牌>体力上限才弃:health=1,maxHealth=3,手牌 4 → 只弃 1
 //   5. 集成:开局摸 3 → 结束回合 → 弃牌阶段按体力上限(3)结算
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界周瑜',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界周瑜', health: 3, maxHealth: 3, ...o });
 
 /** 当前唯一 pending 的 requestType(无 pending 返回 null) */
 function currentRequestType(state: GameState): string | null {

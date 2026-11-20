@@ -17,7 +17,8 @@ import { isCardBanned } from '../../skills/cards/validate';
 import type { CardEffect, ResolveCtx } from '../../types';
 import { inAttackRange } from '../../rules/distance';
 import { slashTargetMax } from '../../rules/slash-target';
-import { requireRequestType } from '../../util/skillRuntime';
+import { requireRequestType, requireHandCard } from '../../util/skillRuntime';
+import { canUseSlash } from './杀';
 
 /** 请求 A 出杀问询的 requestType */
 const REQUEST_TYPE = '借刀杀人/出杀';
@@ -88,6 +89,26 @@ async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
   }
 }
 
+/** 解析借刀杀人的双目标 wire 形状：targets=[A,B] 或 target=A+killTarget=B
+ *  (Legacy target/killTarget 形状仅在迁移期于本引擎边界接受)。canUse 与 preUse 共用。 */
+function parseBorrowedSwordTargets(
+  params: Record<string, import('../../types').Json>,
+): { target: number; killTarget: number } | null {
+  if (
+    Array.isArray(params.targets) &&
+    (params.targets as unknown[]).length >= 2 &&
+    (params.targets as unknown[]).every((value) => typeof value === 'number')
+  ) {
+    const arr = params.targets as number[];
+    return { target: arr[0], killTarget: arr[1] };
+  }
+  // Legacy wire shape is accepted only at this engine boundary during migration.
+  const target = params.target;
+  const killTarget = params.killTarget;
+  if (typeof target !== 'number' || typeof killTarget !== 'number') return null;
+  return { target, killTarget };
+}
+
 /** 借刀杀人牌特有校验：目标有武器、killTarget 合法、A 不能是自己
  *  killTarget 允许是发起者自己(借别人的刀杀自己)。 */
 function canUseBorrowedSword(
@@ -95,24 +116,9 @@ function canUseBorrowedSword(
   ownerId: number,
   params: Record<string, import('../../types').Json>,
 ): string | null {
-  // 兼容 targets=[A,B] 和 target=A+killTarget=B 两种格式
-  let targetIdx: number | undefined;
-  let killTargetIdx: number | undefined;
-  if (
-    Array.isArray(params.targets) &&
-    (params.targets as unknown[]).length >= 2 &&
-    (params.targets as unknown[]).every((value) => typeof value === 'number')
-  ) {
-    const arr = params.targets as number[];
-    targetIdx = arr[0];
-    killTargetIdx = arr[1];
-  } else {
-    // Legacy wire shape is accepted only at this engine boundary during migration.
-    targetIdx = params.target as number | undefined;
-    killTargetIdx = params.killTarget as number | undefined;
-  }
-  if (typeof targetIdx !== 'number') return 'target required';
-  if (typeof killTargetIdx !== 'number') return 'killTarget required';
+  const parsed = parseBorrowedSwordTargets(params);
+  if (!parsed) return typeof params.target === 'number' ? 'killTarget required' : 'target required';
+  const { target: targetIdx, killTarget: killTargetIdx } = parsed;
   const target = state.players[targetIdx];
   if (!target?.alive) return '目标不合法';
   if (!target.equipment['武器']) return '目标没有武器';
@@ -132,22 +138,10 @@ export const borrowedSwordEffect: CardEffect = {
   // 双目标预处理：targets=[A,B] 或 target=A+killTarget=B。
   // 提取 killTarget 存入 localVars，返回 [A] 作为锦囊真实目标传给 runUseFlow。
   preUse: (state, _ownerId, params) => {
-    let targetIdx: number;
-    let killTargetIdx: number;
-    if (
-      Array.isArray(params.targets) &&
-      (params.targets as unknown[]).length >= 2 &&
-      (params.targets as unknown[]).every((value) => typeof value === 'number')
-    ) {
-      const arr = params.targets as number[];
-      targetIdx = arr[0];
-      killTargetIdx = arr[1];
-    } else {
-      targetIdx = params.target as number;
-      killTargetIdx = params.killTarget as number;
-    }
-    state.localVars[KILL_TARGET_VAR] = killTargetIdx;
-    return [targetIdx];
+    const parsed = parseBorrowedSwordTargets(params);
+    if (!parsed) return [];
+    state.localVars[KILL_TARGET_VAR] = parsed.killTarget;
+    return [parsed.target];
   },
   // respond：被借刀者 A 对「借刀杀人/出杀」问询的回应入口。
   // 由 play-card(使用牌) 按卡名 skillId 注册到每个座次——A 可能是任意玩家，跨座次回应。
@@ -155,12 +149,10 @@ export const borrowedSwordEffect: CardEffect = {
   // 逻辑原驻 skills/借刀杀人.ts，重构 f7536790 后并入 CardEffect.respond（镜像火攻/顺手牵羊）。
   respond: {
     validate: (state, ownerId, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if ((slot.atom as { target?: number }).target !== ownerId) return '不是问你的';
       const check = requireRequestType(state, ownerId, [REQUEST_TYPE], {
         mismatchError: '当前不是借刀杀人询问',
         wrongTypeError: '当前不是借刀杀人询问',
+        ownerCheck: ownerId,
       });
       if (check.error) return check.error;
       // 不传 cardId = 选择交出武器(pass),由 resolve 兑底走交武器分支
@@ -168,25 +160,18 @@ export const borrowedSwordEffect: CardEffect = {
       if (cardId === undefined) return null;
       const targets = params.targets as number[] | undefined;
       if (!Array.isArray(targets) || targets.length === 0) return '请选择杀的目标';
-      const self = state.players[ownerId];
-      if (!self?.hand.includes(cardId)) return '牌不在手牌中';
-      if (state.cardMap[cardId]?.name !== '杀') return '只能使用杀';
+      const handCheck = requireHandCard(state, ownerId, cardId, '杀');
+      if (handCheck) return handCheck;
       // 被借刀者若被禁出牌(义绝),不得选择出杀 → 只能交出武器
       if (isCardBanned(state, ownerId, '杀')) return '你不能使用杀';
       // 必含发起者指定的 killTarget(权威校验,前端 targetFilter 仅提示)
       const killTarget = state.localVars[KILL_TARGET_VAR] as number | undefined;
       if (killTarget !== undefined && !targets.includes(killTarget))
         return '必须包含借刀杀人指定的目标';
-      // 每个目标须在 A 的攻击范围内(镜像 杀.canUse 的距离校验)。
-      // 在 respond 阶段即拒绝非法选择,避免进入结算后 useCard 静默白费整张借刀杀人
-      for (const t of targets) {
-        if (!inAttackRange(state, ownerId, t, cardId)) return '目标不在攻击范围内';
-      }
-      // 目标数上限校验(权威):默认 1;被借刀者装备方天画戟且此杀为最后一张手牌时放宽。
-      // forced 路径不经 杀.canUseSlash(canUseSlash 仅 mode='play' 经 validateCardUse),
-      // 故在此镜像校验,保证借刀杀人出的杀同样受方天画戟条件约束。
-      const maxTargets = slashTargetMax(state, ownerId, cardId);
-      if (targets.length > maxTargets) return `最多指定 ${maxTargets} 个目标`;
+      // 攻击范围 + 目标数上限(权威):直接复用 杀.canUseSlash,借刀出的杀与主动杀同判据。
+      // 在 respond 阶段即拒绝非法选择,避免进入结算后 useCard 静默白费整张借刀杀人。
+      const slashCheck = canUseSlash(state, ownerId, { cardId, targets });
+      if (slashCheck) return slashCheck;
       return null;
     },
     execute: async (state, ownerId, params) => {

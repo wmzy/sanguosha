@@ -37,7 +37,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
-import { askConfirm, askResponse, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, askResponse, defineConfirmAction } from '../util/skillRuntime';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
 
@@ -202,7 +202,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       (s) => {
         const slot = s.pendingSlots.get(seatId);
         if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-        const rt = (slot.atom as unknown as { requestType?: string }).requestType ?? '';
+        const rt = currentRequestType(s, seatId) ?? '';
         // 法正侧 RT
         const ownerRTs = [RT_TRIGGER, RT_TARGET, RT_CARDS, RT_VICTIM, RT_PICK0, RT_PICK1];
         // X 侧 RT(任何座次都可能成为 X)
@@ -212,8 +212,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         return '当前不是眩惑询问';
       },
       async (s, params) => {
-        const slot = s.pendingSlots.get(seatId);
-        const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+        const rt = currentRequestType(s, seatId);
         if (rt === RT_TRIGGER) {
           s.localVars[TRIGGER_KEY] = params.choice === true;
         } else if (rt === RT_TARGET) {
@@ -369,3 +368,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot 另用于 slot?.atom.type !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。

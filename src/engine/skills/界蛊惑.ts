@@ -35,6 +35,7 @@
 import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction } from '../core/skill';
+import { currentRequestType } from '../util/skillRuntime';
 import { registerGuEntries, mountGuActions } from './蛊惑';
 
 const SKILL_ID = '界蛊惑';
@@ -205,15 +206,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           if (!slot) return '当前不需要回应';
           const atom = slot.atom as { type: string; requestType?: string };
           if (atom.type !== '请求回应') return '当前不需要回应';
-          const rt = atom.requestType;
+          const rt = currentRequestType(st, seat);
           if (rt !== QUESTION_REQUEST && rt !== CHOOSE_REQUEST)
             return '当前不是界蛊惑问询窗口';
           if (!st.players[seat]?.alive) return '你已死亡';
           return null;
         },
         async (st: GameState, params: Record<string, Json>) => {
-          const slot = st.pendingSlots.get(seat);
-          const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+          const rt = currentRequestType(st, seat);
           if (rt === QUESTION_REQUEST) {
             // choice=true/confirmed=true → 质疑;pass/超时/choice=false → 不质疑
             const questioned = params.choice === true || params.confirmed === true;
@@ -241,3 +241,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot/atom 另用于 atom.type !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。

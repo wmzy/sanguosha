@@ -8,7 +8,7 @@
 import { applyAtom } from '../../core/apply';
 import { runDamageFlow } from '../../flows/damage';
 import type { CardEffect, Card, GameState, ResolveCtx } from '../../types';
-import { requireRequestType } from '../../util/skillRuntime';
+import { currentRequestType, firstTarget, requireRequestType } from '../../util/skillRuntime';
 
 /** 火攻的结算：展示手牌 → 弃同花色 → 火焰伤害 */
 async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
@@ -130,9 +130,8 @@ function canUseFireAttack(
   ownerId: number,
   params: Record<string, import('../../types').Json>,
 ): string | null {
-  const targets = params.targets as number[] | undefined;
-  if (!Array.isArray(targets) || targets.length !== 1) return '火攻只能指定一名目标';
-  const target = targets[0];
+  const target = firstTarget(params);
+  if (target === undefined) return '火攻只能指定一名目标';
   const targetPlayer = state.players[target];
   if (!targetPlayer?.alive) return '目标不合法';
   if (targetPlayer.hand.length === 0) return '目标必须有手牌';
@@ -168,8 +167,7 @@ export const fireAttackEffect: CardEffect = {
       return null;
     },
     execute: async (state, ownerId, params) => {
-      const slot = state.pendingSlots.get(ownerId)!;
-      const reqType = (slot.atom as { requestType: string }).requestType;
+      const reqType = currentRequestType(state, ownerId);
       const cardId = params.cardId as string;
       const card = state.cardMap[cardId];
       if (reqType === '火攻/展示') {

@@ -7,20 +7,11 @@
 //   会经 弃置 atom 的 discardPile.push(...cardIds) 造成弃牌堆同 id 复制。
 //
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable, fireTimeoutAndWait } from '../engine-harness';
+import { SkillTestHarness, waitForStable, fireTimeoutAndWait, makeCard } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suit === '♠' || suit === '♣' ? '黑' : '红', rank, type: '基本牌' };
-}
 
 function buildState(hand: string[]): GameState {
   const cardMap: Record<string, Card> = {};

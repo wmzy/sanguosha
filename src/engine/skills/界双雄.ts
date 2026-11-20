@@ -55,7 +55,7 @@ import { defaultPlayActive } from '../rules/action-active';
 import { setTurnVarUsage } from '../rules/turn-usage';
 import { JIESHUANGXIONG_COLOR_VIEW_KEY } from '../rules/vars-keys';
 import type { SkillModule } from '../types';
-import { askConfirm, defineConfirmAction, effectiveCardId, mountTransformAction, registerTransformAction, requireRequestType, type TransformActionOptions } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, effectiveCardId, mountTransformAction, registerTransformAction, requireRequestType, type TransformActionOptions } from '../util/skillRuntime';
 
 const _SKILL_ID = '界双雄';
 const DISPLAY_NAME = '双雄';
@@ -145,8 +145,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === ACTIVATE_RT) {
         st.localVars[ACTIVATE_KEY] = params.choice === true;
       } else if (rt === PICK_RT) {

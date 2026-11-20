@@ -10,51 +10,24 @@
 //   ⑤ 智迟未激活时:杀正常生效(对照组,确认第一张杀能造成伤害并激活智迟)
 //   ⑥ 自己回合内受伤 → 智迟不激活(描述"回合外")
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
+const makeCard = (
   id: string,
   name: string,
   suit: '♠' | '♥' | '♣' | '♦' = '♠',
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
   trickSubtype?: '普通锦囊' | '延时锦囊' | '响应锦囊',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type, trickSubtype };
-}
+): Card => ({ ...sharedMakeCard(id, name, suit, rank, type), trickSubtype });
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  equipment?: PlayerState['equipment'];
-  character?: string;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界陈宫',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界陈宫', health: 3, maxHealth: 3, ...o });
 
 describe('界智迟', () => {
   let harness: SkillTestHarness;

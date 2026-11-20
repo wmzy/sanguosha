@@ -17,52 +17,23 @@
 //   7. 端到端:酒增伤但伤害由他人造成 → var 不设置(mark 不在 owner 身上)
 //   8. 无次数限制:同回合连续用两次酒(增伤)均成功
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  faction?: '魏' | '蜀' | '吴' | '群';
-  identity?: '主公' | '忠臣' | '反贼' | '内奸';
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界董卓',
-    health: opts.health ?? 8,
-    maxHealth: opts.maxHealth ?? 8,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-    faction: opts.faction ?? '群',
-    identity: opts.identity ?? '反贼',
-  };
-}
+const makePlayer = (
+  o: Parameters<typeof sharedMakePlayer>[0] & {
+    faction?: '魏' | '蜀' | '吴' | '群';
+    identity?: '主公' | '忠臣' | '反贼' | '内奸';
+  },
+) => ({
+  ...sharedMakePlayer({ character: '界董卓', health: 8, maxHealth: 8, ...o }),
+  faction: o.faction ?? '群',
+  identity: o.identity ?? '反贼',
+});
 
 describe('界酒池', () => {
   let harness: SkillTestHarness;

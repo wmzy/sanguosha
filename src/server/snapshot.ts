@@ -18,10 +18,10 @@ import { sanitizeState } from './persistence';
 import { getRoom } from './room';
 import { createLogger } from './logger';
 import { ENGINE_VERSION } from './version';
+import { SNAPSHOTS_DIR } from './paths';
+import { compactTimestamp, randomSuffix } from './utils';
 
 const log = createLogger('snapshot');
-
-const SNAPSHOT_DIR = join(process.cwd(), 'data', 'snapshots');
 
 /** 快照文件中 pending slot 的纯数据形式(剥离函数和 definition) */
 interface PendingSlotData {
@@ -170,21 +170,18 @@ function serializeStateForSnapshot(
 }
 
 function timestampId(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
   // 追加 4 位随机后缀,避免同一秒内对同一 roomId 连续快照时文件名碰撞覆盖
-  const suffix = Math.random().toString(36).slice(2, 6);
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}-${suffix}`;
+  return `${compactTimestamp(new Date())}-${randomSuffix(4)}`;
 }
 
 async function ensureSnapshotDir(snapshotId: string): Promise<void> {
   // 每个快照独占一个目录:data/snapshots/<snapshotId>/
-  await mkdir(join(SNAPSHOT_DIR, snapshotId), { recursive: true });
+  await mkdir(join(SNAPSHOTS_DIR, snapshotId), { recursive: true });
 }
 
 function snapshotPath(snapshotId: string, filename?: string): string {
   // 每个快照是一个目录。主文件: snapshot.json, sidecars: console.txt / ws.jsonl / dom.html
-  return join(SNAPSHOT_DIR, snapshotId, filename ?? 'snapshot.json');
+  return join(SNAPSHOTS_DIR, snapshotId, filename ?? 'snapshot.json');
 }
 
 /** 创建快照请求体 */

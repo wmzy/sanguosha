@@ -17,11 +17,13 @@
 // 前端 loadReplay/isReplayFile/useReplay 无需任何改动即可重放。
 
 import { mkdir, readFile, writeFile, rm, readdir } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { createLogger } from './logger';
 import { register as registerLifecycle } from './resourceRegistry';
 import { createRoomSerialChain } from './serialChain';
 import { isSafeRoomId, isSafeId } from './safeId';
+import { HISTORY_DIR } from './paths';
+import { randomSuffix } from './utils';
 import { ReplayRecorder } from '../client/replay/recorder';
 import { eventsForViewer } from '../engine/view/events-for-viewer';
 import type { ReplayFile, ReplayMeta, SeatDelta } from '../client/replay/types';
@@ -30,9 +32,7 @@ import { identityCamp } from '../engine/rules/camp';
 
 const log = createLogger('gameHistory');
 
-export const HISTORY_DIR = process.env.SGS_HISTORY_DIR
-  ? resolve(process.env.SGS_HISTORY_DIR)
-  : join(process.cwd(), 'data', 'history');
+// HISTORY_DIR(含 SGS_HISTORY_DIR 重定向)单点在 paths.ts。
 
 /** 每房间保留的历史条数上限(含录像文件),防止磁盘无限增长 */
 export const MAX_ENTRIES_PER_ROOM = 20;
@@ -118,7 +118,7 @@ export function buildHistoryEntry(
     won: winnerCamp === null ? null : identityCamp(p.identity) === winnerCamp,
   }));
   return {
-    id: `${opts.endedAt.toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    id: `${opts.endedAt.toString(36)}-${randomSuffix(7)}`,
     roomId: opts.roomId,
     roomName: opts.roomName,
     gameMode: opts.gameMode,
@@ -192,7 +192,11 @@ async function readIndexFromDisk(roomId: string): Promise<GameHistoryEntry[]> {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(isHistoryEntry);
-  } catch {
+  } catch (err) {
+    // 目录/文件不存在 → 静默空列表(常规首次访问);其它错误(损坏/权限)记日志
+    // 后同样回空列表,但不再静默吞掉(照 persistence.readWrapperFromDisk 模式)。
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    log.err(`read history index failed for room ${roomId}`, err);
     return [];
   }
 }
@@ -241,7 +245,10 @@ export async function getGameReplay(roomId: string, entryId: string): Promise<Re
     const o = parsed as { format?: unknown; version?: unknown };
     if (o?.format !== 'sanguosha-replay' || o?.version !== 2) return null;
     return parsed as ReplayFile;
-  } catch {
+  } catch (err) {
+    // 文件不存在 → 静默 null;其它错误记日志后仍回 null(格式不符路径见上方)。
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    log.err(`read replay failed for room ${roomId} entry ${entryId}`, err);
     return null;
   }
 }

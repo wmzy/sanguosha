@@ -35,8 +35,10 @@ import { defaultPlayActive } from '../rules/action-active';
 import type { SkillModule } from '../types';
 import {
   askConfirm,
+  currentRequestType,
   defineConfirmAction,
   engineCanPlayNowReason,
+  registerRespondForAllSeats,
   requireRequestType,
 } from '../util/skillRuntime';
 import { EQUIP_SLOTS } from '../util/equip-slot';
@@ -195,14 +197,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
 
   // ── respond:target 选择 option / damageTargets(注册到每个座次)──
   const unloaders: Array<() => void> = [];
-  for (const p of state.players) {
-    const seatId = p.index;
-    const u = registerAction(
+  unloaders.push(
+    ...registerRespondForAllSeats(
       state,
       skill.id,
-      seatId,
-      'respond',
-      (st: GameState, params: Record<string, Json>): string | null => {
+      (st: GameState, seatId: number, params: Record<string, Json>): string | null => {
         const check = requireRequestType(st, seatId, [OPTION_RT, TARGETS_RT], {
           mismatchError: '当前不是献州询问',
         });
@@ -231,18 +230,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
         }
         return null;
       },
-      async (st: GameState, params: Record<string, Json>) => {
-        const slot = st.pendingSlots.get(seatId);
-        const rt = (slot?.atom as Record<string, unknown> | undefined)?.['requestType'] as string;
+      async (st: GameState, seatId: number, params: Record<string, Json>) => {
+        const rt = currentRequestType(st, seatId);
         if (rt === OPTION_RT) {
           st.localVars[OPTION_KEY] = params.choice === true || params.confirmed === true;
         } else if (rt === TARGETS_RT) {
           st.localVars[TARGETS_KEY] = params.targets;
         }
       },
-    );
-    unloaders.push(u);
-  }
+    ),
+  );
 
   return () => {
     unloaders.forEach((u) => u());

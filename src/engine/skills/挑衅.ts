@@ -34,7 +34,7 @@ import { runUseFlow } from './cards/use-card';
 import { registerAction, hasBlockingPending } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { requireRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
 import { panelEquipmentAllowed } from './cards/_pickPanel';
 import { inAttackRange } from '../rules/distance';
 import { viewCanAttack } from '../rules/viewDistance';
@@ -267,8 +267,7 @@ export function createTiaoxinSkill(opts: TiaoxinOptions) {
           return '当前不是挑衅询问';
         },
         async (st: GameState, seat: number, params: Record<string, Json>) => {
-          const slot = st.pendingSlots.get(seat);
-          const requestType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+          const requestType = currentRequestType(st, seat);
           if (requestType === opts.slashRt) {
             // 与 validate 同构:前端 targets 数组优先,兼容单数 target
             const rawTarget = Array.isArray(params.targets)
@@ -357,3 +356,7 @@ const OPTIONS: TiaoxinOptions = {
 export const { createSkill, onInit, onMount } = createTiaoxinSkill(OPTIONS);
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另传给 panelEquipmentAllowed
+// (界奇才 受保护装备过滤,非 requestType),保留手写 pendingSlots.get;
+// requestType 读取已全部走 currentRequestType。

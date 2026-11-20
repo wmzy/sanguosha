@@ -19,24 +19,13 @@
 //   9. 结束阶段:手牌数与历史均不相等 → +1 变(含首次空历史真空真)
 //  10. 结束阶段:手牌数与历史相等 → 不加变
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, GameState, Mark, PlayerState } from '../../src/engine/types';
 
 const BIAN_PREFIX = '界巧变/变:';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function bianMarks(player: PlayerState): Mark[] {
   return player.marks.filter((m) => m.id.startsWith(BIAN_PREFIX));
@@ -62,22 +51,11 @@ function makePlayer(opts: {
   marks?: Mark[];
   vars?: Record<string, unknown>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: opts.character ?? '界张郃',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: (opts.vars as Record<string, never>) ?? {},
-    marks: opts.marks ?? [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+    vars: opts.vars as PlayerState['vars'],
+  });
 }
 
 function buildDeck(cardMap: Record<string, Card>, n: number): string[] {

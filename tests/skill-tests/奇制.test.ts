@@ -14,7 +14,7 @@
 //     7. 不发动:confirm=false → 不摸不弃
 //     8. 奇制+进趋联动:发动奇制后进趋 X=1
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 // 临时注册奇制/进趋(主 agent 会统一注册到 index.ts)
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
@@ -27,16 +27,6 @@ import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
 function makePlayer(opts: {
   index: number;
   name: string;
@@ -46,22 +36,7 @@ function makePlayer(opts: {
   maxHealth?: number;
   equipment?: PlayerState['equipment'];
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.name });
 }
 
 /** 当前 pending 的 requestType(无 pending 返回 null) */

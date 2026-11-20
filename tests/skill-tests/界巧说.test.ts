@@ -13,23 +13,13 @@
 //   8. 不是自己回合 → 拒绝
 //   9. 不能与自己拼点
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../engine-harness';
+import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { isTrickBlocked } from '../../src/engine/rules/trick-quota';
 import { slashTargetMax } from '../../src/engine/rules/slash-target';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makeTrick(
   id: string,
@@ -56,22 +46,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界简雍',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: '界简雍', health: opts.health ?? 3, maxHealth: opts.maxHealth ?? 3 });
 }
 
 describe('界巧说', () => {

@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { enumerateAvailableActions } from '../../src/client/headless/availableActions';
 import { HeadlessGameClient } from '../../src/client/headless/HeadlessGameClient';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
-import { SkillTestHarness, dispatchAndWait } from '../engine-harness';
+import { SkillTestHarness, dispatchAndWait, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { buildView } from '../../src/engine/index';
 import { createGameState } from '../../src/engine/types';
@@ -90,22 +90,7 @@ function makeView(
 
 /** 端到端用例用的最小玩家对象(字段齐备,供 harness.setup / createGameState)。 */
 function makePlayerForEnum(opts: { index: number; name: string; skills?: string[] }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: [] as string[],
-    equipment: {} as Record<string, string>,
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [] as string[],
-    judgeZone: [] as string[],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.name });
 }
 
 // 3 玩家 view（用于距离过滤测试：玩家1在范围内，玩家2不在）

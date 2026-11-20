@@ -6,46 +6,14 @@
 //   5. 本回合非锁定技失效:目标 反馈 不触发(锁定技仍生效)
 //   6. 回合结束清标签:下回合目标非锁定技恢复正常
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界马超',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界马超', ...o });
 
 describe('界铁骑', () => {
   let harness: SkillTestHarness;

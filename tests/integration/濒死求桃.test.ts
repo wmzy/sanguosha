@@ -16,7 +16,7 @@
 //   describe('濒死求桃链:端到端(harness)') = SkillTestHarness
 import { describe, it, expect, beforeEach } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/index';
-import { fireTimeoutAndWait, dispatchAndWait, SkillTestHarness } from '../engine-harness';
+import { fireTimeoutAndWait, dispatchAndWait, SkillTestHarness, makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -299,23 +299,12 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
   alive?: boolean;
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
+  }) {
+  return sharedMakePlayer({
+    ...opts,
     character: '',
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    health: opts.health ?? 4,
     maxHealth: opts.maxHealth ?? opts.health ?? 4,
-    alive: opts.alive ?? true,
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 function makeCard(
@@ -325,7 +314,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
+  return sharedMakeCard(id, name, suit, rank, type);
 }
 
 /** 读当前唯一的 求桃 pending 的 target(对链上某一问) */

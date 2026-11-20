@@ -9,34 +9,15 @@
 //   5. 重洗确定性:相同 rngSeed + 相同 zones → 相同摸牌结果
 //   6. 重洗后 rngSeed 被推进(后续随机事件可重放)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, GameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠', rank = 'A'): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
-
 function makePlayer(opts: { index: number; name: string; hand?: string[] }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.name });
 }
 
 describe('摸牌:牌堆不足时重洗弃牌堆补充', () => {

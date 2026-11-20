@@ -11,21 +11,11 @@
 //   6. 手牌不足(无牌可弃)被拒
 //   7. 不能被无懈可击抵消(官方规则)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -36,22 +26,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['杀'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ skills: ['杀'], ...opts });
 }
 
 function buildState(opts?: {

@@ -23,6 +23,7 @@
 // 标/界共享:respond 注册、「判定牌生效后」hook、询问+判定核心、回合外失去牌 hook
 //   (获得/移动牌/给予)均由本文件导出,界屯田.ts 导入复用;两版真实差异只有
 //   ①询问 requestType 前缀(屯田/confirm ↔ 界屯田/confirm)②询问标题③弃置路径触发条件。
+//   急袭.ts 亦导入 tianCount/syncDistanceMod(田计数与距离修正跨邓艾技能共享)。
 import type {
   AtomAfterContext,
   FrontendAPI,
@@ -48,13 +49,13 @@ export function createSkill(id: string, ownerId: number): Skill {
   };
 }
 
-/** 数当前玩家的田数量 */
-function tianCount(state: GameState, player: number): number {
+/** 数当前玩家的田数量(急袭.ts 消耗田时共用) */
+export function tianCount(state: GameState, player: number): number {
   return state.players[player].marks.filter((m) => m.id.startsWith(TIAN_PREFIX)).length;
 }
 
-/** 重新计算并写入距离修正 vars(每张田 = -1 距离 = 进攻修正 +1) */
-function syncDistanceMod(state: GameState, player: number): void {
+/** 重新计算并写入距离修正 vars(每张田 = -1 距离 = 进攻修正 +1)(急袭.ts 消耗田时共用) */
+export function syncDistanceMod(state: GameState, player: number): void {
   const count = tianCount(state, player);
   if (count > 0) {
     state.players[player].vars[DISTANCE_ATTACK_MOD_KEY] = count;

@@ -7,7 +7,7 @@
 //   3. 红颜只影响小乔自己的判定:其他角色判定黑桃不受影响
 //   4. 非黑桃判定牌不受影响
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
+import { SkillTestHarness, fireTimeoutAndWait, waitForStable, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { applyAtom } from '../../src/engine/core/apply'
 import { pushFrame, popFrame } from '../../src/engine/core/frame';
 import { runJudgeFlow } from '../../src/engine/flows/judge';
@@ -15,16 +15,6 @@ import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -35,22 +25,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? opts.health ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: opts.pendingTricks ?? [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, maxHealth: opts.maxHealth ?? opts.health ?? 4 });
 }
 
 describe('红颜', () => {

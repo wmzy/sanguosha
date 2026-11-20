@@ -7,29 +7,14 @@
 //   3. 每个 target 拿到各自的候选人(不混淆)
 //   4. respond 前 pendingSlots.size === selections.length;respond 后逐个减少
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../../engine-harness';
+import { SkillTestHarness, waitForStable, makePlayer as sharedMakePlayer } from '../../engine-harness';
 import '../../../src/engine/atoms';
 import { applyAtom } from '../../../src/engine/core/apply';
 import { createGameState } from '../../../src/engine/types';
 import type { GameState } from '../../../src/engine/types';
 
 function makePlayer(opts: { index: number; name: string }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: '' });
 }
 
 describe('并行选将:多 target 同时选将', () => {

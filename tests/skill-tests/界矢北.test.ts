@@ -14,7 +14,7 @@
 //   8. 跨回合重置:新回合首次受伤回血,而非失血
 //   9. 护甲全吸收(0 实伤)不计入"受到伤害"次数
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
@@ -24,33 +24,8 @@ import type { GameState, PlayerState } from '../../src/engine/types';
 const ARMOR_PREFIX = '界矢北/护甲:';
 const DAMAGE_COUNT_KEY = '界矢北/damageCount/usedThisTurn';
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  character?: string;
-  vars?: Record<string, import("../../src/engine/types").Json>;
-  marks?: import("../../src/engine/types").Mark[];
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界沮授',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: opts.skills ?? ['界矢北'],
-    vars: opts.vars ?? {},
-    marks: opts.marks ?? [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界沮授', health: 3, maxHealth: 3, skills: ['界矢北'], ...o });
 
 function makeArmorMarks(count: number, startSeq = 0) {
   return Array.from({ length: count }, (_, i) => ({

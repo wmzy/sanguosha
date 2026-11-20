@@ -7,6 +7,7 @@
 //   3. 单 after-hook 走快速路径不报错(hooks.length<=1 不排序)。
 //   4. 任意 atom(含 受到伤害后)同样按逆时针排序(泛化,不再仅限 伤害结算结束后)。
 import { describe, it, expect } from 'vitest';
+import { makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms'; // 注册所有 atom(含 damage-timing)
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
@@ -14,21 +15,7 @@ import { registerAfterHook } from '../../src/engine/core/skill';
 import type { GameState, PlayerState } from '../../src/engine/types';
 
 function makePlayer(index: number): PlayerState {
-  return {
-    index,
-    name: `P${index}`,
-    character: '测试',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    pendingTricks: [],
-    skills: [],
-    vars: {},
-    marks: [],
-    tags: [],
-  };
+  return sharedMakePlayer({ index, name: `P${index}`, character: '测试' });
 }
 
 /** 构造 N 玩家 state。after-hook 测试不涉及摸牌/出牌,无需牌堆。 */

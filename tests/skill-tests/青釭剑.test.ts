@@ -14,22 +14,12 @@
 //   4. 青釭剑只对【杀】生效:对非杀目标牌(过河拆桥)不应卸载防具且不泄漏
 //   5. 无视八卦阵:杀指定目标后不弹八卦阵判定询问,直接询问闪
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { getBeforeHooks } from '../../src/engine/core/skill';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -40,22 +30,7 @@ function makePlayer(opts: {
   maxHealth?: number;
   equipment?: Record<string, string>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['杀', '闪'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-  };
+  return sharedMakePlayer({ character: '', skills: ['杀', '闪'], ...opts });
 }
 
 const QINGGANG = makeCard('qc', '青釭剑', '♠', '6', '装备牌');

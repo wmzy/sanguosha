@@ -18,15 +18,7 @@ import type { Atom, Card, GameState, PlayerState, ViewEventSplit } from '../../s
 import { suitColor } from '../../src/engine/types';
 import { runRankCompareFlow, getCardValue } from '../../src/engine/flows/rank';
 import { getAtomDef } from '../../src/engine/core/atom';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank: string,
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
+import { makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 
 function makePlayer(opts: {
   index: number;
@@ -35,22 +27,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.name });
 }
 
 function makeState(): GameState {

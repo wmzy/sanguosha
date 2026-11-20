@@ -2,7 +2,7 @@
 // 马匹技能(进攻马/防御马)测试:验证装备后距离修正 vars 正确设置/清除。
 // 关键验证点:技能实例化(添加技能 after hook)与 vars 设置的时序。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -18,22 +18,7 @@ function makeEquip(
 }
 
 function makePlayer(opts: { index: number; name: string; hand?: string[]; skills?: string[] }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['装备通用'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ skills: ['装备通用'], ...opts });
 }
 
 describe('马匹技能', () => {

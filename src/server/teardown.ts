@@ -7,7 +7,8 @@
 //   downgradeRoomToLobby  — 降级到等待中(session + .json,保留 room/DB)
 // 所有步骤幂等,允许 room/session/文件/DB 已被其他路径清理。
 
-import { gameSessions, playerRoomMap } from './registry';
+import { gameSessions } from './registry';
+import { playerRoomMap } from './playerIndex';
 import { getRoom, leaveRoom, deleteRoom, setRoomStatus } from './room';
 import { deletePersistedRoom } from './persistence';
 import { deleteRoomFromDb } from './roomStore';

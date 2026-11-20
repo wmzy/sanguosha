@@ -40,7 +40,7 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY, JUZHAN_STATE_VIEW_KEY } from '../rules/vars-keys';
 import { createYinYangState } from '../rules/turn-usage';
-import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import { isSlashCardById } from '../util/player-query';
 
 const SKILL_ID = '拒战';
@@ -121,8 +121,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === YANG_CONFIRM_RT) {
         st.localVars[YANG_CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === YIN_CONFIRM_RT) {

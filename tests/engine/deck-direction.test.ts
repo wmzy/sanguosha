@@ -8,10 +8,9 @@
 //   3. 五谷丰登亮出的不是牌堆顶的牌。
 // 本文件锁定「取牌方向唯一」这一可观察契约。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import { runJudgeFlow } from '../../src/engine/flows/judge';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
@@ -23,7 +22,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
+  return sharedMakeCard(id, name, suit, rank, type);
 }
 
 function makePlayer(opts: {
@@ -33,22 +32,7 @@ function makePlayer(opts: {
   skills?: string[];
   character?: string;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? opts.name,
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? opts.name });
 }
 
 /** deck 按「末尾 = 牌堆顶」书写:数组最后一项是下一张会被摸/判定的牌。 */

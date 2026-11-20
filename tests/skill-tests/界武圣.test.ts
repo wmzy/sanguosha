@@ -11,49 +11,14 @@
 //   6. 正常距离内方片杀 → 命中(基础回归)
 //   7. 黑桃杀(物理) → 超距被拒(非方片不享受距离豁免)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  character?: string;
-  hand?: string[];
-  equipment?: Record<string, string>;
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界关羽',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['界武圣'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界关羽', skills: ['界武圣'], ...o });
 
 /** 4 人环形:P1(0)→P3(2) 座位距离 2,徒手范围 1 → 默认超距 */
 function makeFourPlayerState(opts: {

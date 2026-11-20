@@ -9,7 +9,7 @@
 //   3. 负面:体力 == 全场最小 → 不触发(无询问)
 //   4. 边界:体力上限最低降至 1(不越界)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
@@ -22,22 +22,7 @@ function makePlayer(opts: {
   maxHealth: number;
   skills?: string[];
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '董卓',
-    health: opts.health,
-    maxHealth: opts.maxHealth,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: opts.skills ?? ['崩坏'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: '董卓', skills: opts.skills ?? ['崩坏'] });
 }
 
 function buildState(opts: {

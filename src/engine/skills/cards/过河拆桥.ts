@@ -23,7 +23,6 @@ function canUseDismantle(
     if (t === ownerId) return '不能对自己使用';
     if (!state.players[t]?.alive) return '目标已死亡';
     const p = state.players[t];
-    if (!p) return '目标不合法';
     // 仅检查目标是否有牌(手牌/装备/判定区);装备保护由界奇才 before-hook 在选牌面板拦截
     if (!hasObtainableCards(p)) return '目标无可弃置的牌';
   }

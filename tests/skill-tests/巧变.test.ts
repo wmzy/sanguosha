@@ -10,22 +10,11 @@
 //   4. 不发动:阶段正常进行
 //   5. 边界:无手牌时不能发动
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -37,22 +26,7 @@ function makePlayer(opts: {
   maxHealth?: number;
   character?: string;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '张郃',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? '张郃' });
 }
 
 function buildDeck(cardMap: Record<string, Card>, n: number): string[] {

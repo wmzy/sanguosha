@@ -17,7 +17,7 @@ import { initRoomStore, loadAllRoomsFromDb } from './roomStore';
 import { resetRoomToLobby } from './teardown';
 import { sweepOrphanHistory } from './gameHistory';
 
-const log = createLogger('ws');
+const log = createLogger('app');
 
 const app = new Hono();
 app.use('*', cors);

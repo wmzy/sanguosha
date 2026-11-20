@@ -18,53 +18,14 @@
 //   ⑦ validate:给牌目标 = 自己 → 拒绝;killTarget = target → 拒绝
 //   ⑧ 给装备(装备区中) + 选项①命中 → 卸下装备移到 target + 出杀(覆盖"卸装备再给牌"分支)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-  subtype?: string,
-): Card {
-  const c: Card = { id, name, suit, color: suitColor(suit), rank, type };
-  if (subtype) c.subtype = subtype;
-  if (type === '装备牌' && subtype === '武器') c.range = 2;
-  return c;
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  equipment?: PlayerState['equipment'];
-  character?: string;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界陈宫',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界陈宫', health: 3, maxHealth: 3, ...o });
 
 describe('界明策', () => {
   let harness: SkillTestHarness;

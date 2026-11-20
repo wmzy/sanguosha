@@ -12,49 +12,14 @@
 //   7. 负面:无无懈窗口时 transform 被拒
 //   8. availableActions:界看破 transform 声明,过滤黑牌(手牌+装备)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-  subtype?: string,
-): Card {
-  const c: Card = { id, name, suit, color: suitColor(suit), rank, type };
-  if (subtype) c.subtype = subtype;
-  return c;
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  equipment?: Record<string, string>;
-  skills?: string[];
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界卧龙诸葛',
-    health: 3,
-    maxHealth: 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['无懈可击', '界看破'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界卧龙诸葛', health: 3, maxHealth: 3, skills: ['无懈可击', '界看破'], ...o });
 
 function buildState(opts?: {
   p1Hand?: string[];

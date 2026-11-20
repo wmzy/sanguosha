@@ -18,7 +18,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType, askConfirm, defineConfirmAction, firstTarget } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType, askConfirm, defineConfirmAction, firstTarget } from '../util/skillRuntime';
 
 const CONFIRM_RT = '节命/confirm';
 const TARGET_RT = '节命/target';
@@ -49,8 +49,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true;
       } else if (rt === TARGET_RT) {

@@ -15,21 +15,11 @@
 //   8. rollback:万箭齐发.use 失败(非法 cardId)→ 两张原卡还原,影子卡删除
 //   9. availableActions:乱击 transform 声明,prompt 卡过滤 min/max=2
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -39,22 +29,11 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: '',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
     skills: opts.skills ?? ['杀', '闪'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 function buildState(opts?: {

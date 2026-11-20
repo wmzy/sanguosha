@@ -12,21 +12,11 @@
 //   7. 非出牌阶段/非自己回合 → 拒绝
 //   8. 交出武器后,owner 出杀范围正确回到 1(距离 vars 清理)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makeWeapon(
   id: string,
@@ -46,33 +36,8 @@ function makeArmor(
   return { id, name, suit, color: suitColor(suit), rank: 'A', type: '装备牌', subtype: '防具' };
 }
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  equipment?: PlayerState['equipment'];
-  character?: string;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界蔡夫人',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['界献州', '界窃听'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界蔡夫人', health: 3, maxHealth: 3, skills: ['界献州', '界窃听'], ...o });
 
 describe('界献州', () => {
   let harness: SkillTestHarness;

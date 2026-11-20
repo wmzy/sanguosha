@@ -20,7 +20,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
-import { engineCanPlayNowReason } from '../util/skillRuntime';
+import { currentRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const PICK_REQUEST = '攻心/选牌';
@@ -164,7 +164,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
+      const rt = currentRequestType(st, ownerId);
       if (rt === PICK_REQUEST) {
         const cardId = params.cardId as string | undefined;
         if (cardId !== undefined) {
@@ -183,8 +183,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return '当前不是攻心回应';
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === PICK_REQUEST) {
         const cardId = params.cardId as string | undefined;
         if (typeof cardId === 'string') st.localVars[PICK_KEY] = cardId;
@@ -235,3 +234,6 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

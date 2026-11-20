@@ -17,7 +17,7 @@
 //   9. 用醇 reject:醇数不足 X 时被拒
 //  10. 用醇 reject:无求桃 pending 时被拒
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -25,43 +25,10 @@ import { applyAtom } from '../../src/engine/core/apply';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  faction?: '魏' | '蜀' | '吴' | '群';
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界程普',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-    faction: opts.faction ?? '吴',
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0] & { faction?: '魏' | '蜀' | '吴' | '群' }) => ({
+  ...sharedMakePlayer({ character: '界程普', ...o }),
+  faction: o.faction ?? '吴',
+});
 
 /** 取 owner 的醇列表(测试辅助) */
 function 醇列表(state: GameState, ownerId: number): string[] {

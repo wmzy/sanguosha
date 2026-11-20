@@ -2,11 +2,10 @@
 // 兵粮寸断(延时锦囊):对距离1以内一名其他角色使用。
 //   判定:非梅花 → 跳过摸牌阶段;梅花 → 无效弃置。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
+import { SkillTestHarness, fireTimeoutAndWait, waitForStable, makePlayer, makeCard as sharedMakeCard } from '../engine-harness';
 import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -16,33 +15,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  pendingTricks?: Array<{ name: string; source: number; card: Card }>;
-  tags?: string[];
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: opts.pendingTricks ?? [],
-    judgeZone: [],
-    tags: opts.tags ?? [],
-  };
+  return sharedMakeCard(id, name, suit, rank, type);
 }
 
 describe('兵粮寸断', () => {

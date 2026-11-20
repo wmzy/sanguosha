@@ -12,10 +12,10 @@
 //   5. 负面:非自己回合 transform 被拒
 //   6. rollback:transform 后 杀.use 失败(无目标)→ 原卡还原
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer, makeCard as sharedMakeCard } from '../engine-harness';
 import '../../src/engine/atoms';
-import { createGameState, suitColor } from '../../src/engine/types';
-import type { Card, GameState, DamageType, Json, PlayerState } from '../../src/engine/types';
+import { createGameState } from '../../src/engine/types';
+import type { Card, GameState, DamageType, PlayerState } from '../../src/engine/types';
 
 function makeCard(
   id: string,
@@ -25,7 +25,9 @@ function makeCard(
   type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
   damageType?: DamageType,
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type, ...(damageType ? { damageType } : {}) };
+  return damageType === undefined
+    ? sharedMakeCard(id, name, suit, rank, type)
+    : { ...sharedMakeCard(id, name, suit, rank, type), damageType };
 }
 
 function makePlayer(opts: {
@@ -35,24 +37,15 @@ function makePlayer(opts: {
   equipment?: Record<string, string>;
   skills?: string[];
   health?: number;
+  maxHealth?: number;
   vars?: Record<string, unknown>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.health ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: (opts.vars ?? {}) as Record<string, Json>,
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+    maxHealth: opts.maxHealth ?? opts.health ?? 4,
+    vars: opts.vars as PlayerState['vars'],
+  });
 }
 
 /** 造一把朱雀羽扇武器卡 */

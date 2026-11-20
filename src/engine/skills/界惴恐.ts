@@ -41,7 +41,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { setPlayerVarUsage } from '../rules/turn-usage';
 import { askRankCard, runRankCompareFlow } from '../flows/rank';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
 import { runVirtualSlash } from './cards/_virtualSlash';
 import {
   registerAction,
@@ -95,7 +95,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       (st: GameState, params: Record<string, Json>): string | null => {
         const slot = st.pendingSlots.get(ownerId);
         if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-        const rt = (slot.atom as unknown as { requestType?: string }).requestType;
+        const rt = currentRequestType(st, ownerId);
         if (rt === CONFIRM_RT) return null;
         if (rt === OWNER_CARD_RT) {
           const cardId = params.cardId as string | undefined;
@@ -106,8 +106,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return '当前不是惴恐询问';
       },
       async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        const slot = st.pendingSlots.get(ownerId);
-        const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+        const rt = currentRequestType(st, ownerId);
         if (rt === CONFIRM_RT) {
           st.localVars[CONFIRM_KEY] = params.choice === true;
         } else if (rt === OWNER_CARD_RT) {
@@ -131,7 +130,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         (st: GameState, params: Record<string, Json>): string | null => {
           const slot = st.pendingSlots.get(pid);
           if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-          const rt = (slot.atom as unknown as { requestType?: string }).requestType;
+          const rt = currentRequestType(st, pid);
           if (rt !== TARGET_CARD_RT) return '当前不是惴恐拼点询问';
           const cardId = params.cardId as string | undefined;
           if (typeof cardId !== 'string') return '请选择一张拼点牌';
@@ -139,8 +138,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           return null;
         },
         async (st: GameState, params: Record<string, Json>): Promise<void> => {
-          const slot = st.pendingSlots.get(pid);
-          const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+          const rt = currentRequestType(st, pid);
           if (rt === TARGET_CARD_RT) {
             st.localVars[TARGET_CARD_KEY] = params.cardId;
           }
@@ -286,3 +284,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] owner/target 两处 respond 校验里的 slot?.atom 另用于
+// .type !== '请求回应' 守卫,保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。

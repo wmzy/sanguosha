@@ -8,21 +8,11 @@
 //   4. 不发动:替换装备 → 拒绝 → 不摸牌
 //   5. 负面:过河拆桥拆的是手牌(非装备)→ 不触发枭姬
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, Json } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makeEquip(
   id: string,
@@ -46,22 +36,7 @@ function makePlayer(opts: {
   skills?: string[];
   vars?: Record<string, Json>;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '孙尚香',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: opts.vars ?? {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? '孙尚香', health: opts.health ?? 3, maxHealth: opts.maxHealth ?? 3 });
 }
 
 describe('枭姬', () => {

@@ -1,13 +1,10 @@
 // tests/server/protocol.test.ts
-// 服务端协议层覆盖率补充:normalizeRoomConfig / isValidClientMessage / serialize / deserialize
+// 服务端协议层覆盖率补充:normalizeRoomConfig / serialize
 import { describe, it, expect } from 'vitest';
 import {
   normalizeRoomConfig,
-  isValidClientMessage,
   serialize,
-  deserialize,
   DEFAULT_ROOM_CONFIG,
-  type ClientMessage,
   type ServerMessage,
 } from '../../src/server/protocol';
 
@@ -98,171 +95,12 @@ describe('normalizeRoomConfig', () => {
   });
 });
 
-// ─── isValidClientMessage ───────────────────────────────────
-describe('isValidClientMessage', () => {
-  it('非对象返回 false', () => {
-    expect(isValidClientMessage(null)).toBe(false);
-    expect(isValidClientMessage('hello')).toBe(false);
-    expect(isValidClientMessage(42)).toBe(false);
-    expect(isValidClientMessage(undefined)).toBe(false);
-  });
-
-  it('未知 type 返回 false', () => {
-    expect(isValidClientMessage({ type: 'unknown' })).toBe(false);
-  });
-
-  it('ready/start_game/restart_game/leave_room 始终合法', () => {
-    for (const type of ['ready', 'start_game', 'restart_game', 'leave_room']) {
-      expect(isValidClientMessage({ type })).toBe(true);
-    }
-  });
-
-  it('action 需要合法的 baseSeq + engine message', () => {
-    expect(
-      isValidClientMessage({
-        type: 'action',
-        baseSeq: 5,
-        action: {
-          skillId: '杀',
-          actionType: 'use',
-          ownerId: 0,
-          params: { target: 1 },
-          baseSeq: 5,
-        },
-      }),
-    ).toBe(true);
-  });
-
-  it('action 缺少 baseSeq 非法', () => {
-    expect(
-      isValidClientMessage({
-        type: 'action',
-        action: { skillId: '杀', actionType: 'use', ownerId: 0, params: {}, baseSeq: 0 },
-      }),
-    ).toBe(false);
-  });
-
-  it('action 的 engine message 缺字段非法', () => {
-    expect(
-      isValidClientMessage({
-        type: 'action',
-        baseSeq: 0,
-        action: { skillId: '杀', actionType: 'use' },
-      }),
-    ).toBe(false);
-  });
-
-  it('action 的 engine message ownerId 非数字非法', () => {
-    expect(
-      isValidClientMessage({
-        type: 'action',
-        baseSeq: 0,
-        action: { skillId: '杀', actionType: 'use', ownerId: '0', params: {}, baseSeq: 0 },
-      }),
-    ).toBe(false);
-  });
-
-  it('reorder_hand 需要字符串数组', () => {
-    expect(isValidClientMessage({ type: 'reorder_hand', order: ['a', 'b'] })).toBe(true);
-    expect(isValidClientMessage({ type: 'reorder_hand', order: ['a', 1] })).toBe(false);
-    expect(isValidClientMessage({ type: 'reorder_hand', order: 'abc' })).toBe(false);
-    expect(isValidClientMessage({ type: 'reorder_hand' })).toBe(false);
-  });
-
-  it('set_player_id 需要非空字符串', () => {
-    expect(isValidClientMessage({ type: 'set_player_id', playerId: 'p1' })).toBe(true);
-    expect(isValidClientMessage({ type: 'set_player_id', playerId: '' })).toBe(false);
-    expect(isValidClientMessage({ type: 'set_player_id' })).toBe(false);
-  });
-
-  it('join_room / join_debug_room 需要 roomId', () => {
-    expect(isValidClientMessage({ type: 'join_room', roomId: 'r1' })).toBe(true);
-    expect(isValidClientMessage({ type: 'join_room' })).toBe(false);
-    expect(isValidClientMessage({ type: 'join_debug_room', roomId: 'r1' })).toBe(true);
-    expect(isValidClientMessage({ type: 'join_debug_room' })).toBe(false);
-  });
-
-  it('reconnect 需要 playerId', () => {
-    expect(isValidClientMessage({ type: 'reconnect', playerId: 'p1' })).toBe(true);
-    expect(isValidClientMessage({ type: 'reconnect' })).toBe(false);
-  });
-
-  it('create_room 需要 name + maxPlayers', () => {
-    expect(isValidClientMessage({ type: 'create_room', name: '房', maxPlayers: 4 })).toBe(true);
-    expect(isValidClientMessage({ type: 'create_room', name: '房' })).toBe(false);
-    expect(isValidClientMessage({ type: 'create_room', maxPlayers: 4 })).toBe(false);
-  });
-
-  it('create_debug_room config 可选', () => {
-    expect(isValidClientMessage({ type: 'create_debug_room' })).toBe(true);
-    expect(isValidClientMessage({ type: 'create_debug_room', config: {} })).toBe(true);
-    expect(isValidClientMessage({ type: 'create_debug_room', playerCount: 2 })).toBe(true);
-    expect(isValidClientMessage({ type: 'create_debug_room', config: 'bad' })).toBe(false);
-  });
-
-  it('update_room_config 需要非空 config 对象', () => {
-    expect(isValidClientMessage({ type: 'update_room_config', config: {} })).toBe(true);
-    expect(isValidClientMessage({ type: 'update_room_config', config: null })).toBe(false);
-    expect(isValidClientMessage({ type: 'update_room_config' })).toBe(false);
-  });
-});
-
-// ─── serialize / deserialize ────────────────────────────────
-describe('serialize / deserialize', () => {
+// ─── serialize ──────────────────────────────────────────────
+describe('serialize', () => {
   it('serialize 返回合法 JSON 字符串', () => {
     const msg: ServerMessage = { type: 'error', message: '测试错误' };
     const s = serialize(msg);
     expect(typeof s).toBe('string');
     expect(JSON.parse(s)).toEqual(msg);
-  });
-
-  it('deserialize 合法消息返回原对象', () => {
-    const raw = JSON.stringify({ type: 'ready' });
-    const msg = deserialize(raw);
-    expect(msg).toEqual({ type: 'ready' });
-  });
-
-  it('deserialize 非法 type 返回 null', () => {
-    expect(deserialize(JSON.stringify({ type: 'hacked' }))).toBeNull();
-  });
-
-  it('deserialize 破损 JSON 返回 null', () => {
-    expect(deserialize('{ broken json')).toBeNull();
-  });
-
-  it('deserialize null 输入安全处理', () => {
-    expect(deserialize('null')).toBeNull();
-  });
-
-  it('deserialize 非对象 JSON 返回 null', () => {
-    expect(deserialize('"just a string"')).toBeNull();
-    expect(deserialize('42')).toBeNull();
-  });
-
-  it('round-trip:复杂 action 消息', () => {
-    const msg: ClientMessage = {
-      type: 'action',
-      baseSeq: 10,
-      action: {
-        skillId: '顺手牵羊',
-        actionType: 'use',
-        ownerId: 0,
-        params: { target: 1 },
-        baseSeq: 10,
-      },
-    };
-    const s = JSON.stringify(msg);
-    const result = deserialize(s);
-    expect(result).toEqual(msg);
-  });
-
-  it('round-trip:create_room 消息', () => {
-    const msg: ClientMessage = {
-      type: 'create_room',
-      name: '我的房间',
-      maxPlayers: 8,
-    };
-    const result = deserialize(JSON.stringify(msg));
-    expect(result).toEqual(msg);
   });
 });

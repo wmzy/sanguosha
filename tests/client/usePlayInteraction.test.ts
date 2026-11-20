@@ -10,6 +10,7 @@ import type { PlayInteractionParams } from '@/hooks/usePlayInteraction';
 import { defaultPlayActive } from '@engine/rules/action-active';
 import type { SkillActionDef } from '@/skillActionRegistry';
 import type { Card, DistributePrompt, GameView, Json, PendingView } from '@engine/types';
+import { makeCard as sharedMakeCard } from '../engine-harness';
 
 describe('usePlayInteraction · 跨 JSON 目标约束', () => {
   it('强制出杀只提交指定目标并支持牌关联多目标上限', () => {
@@ -260,15 +261,7 @@ describe('usePlayInteraction · distribute(主动技)选牌状态自动取消', 
 
 /** 构造卡牌(默认杀),允许覆盖字段。 */
 function makeCard(partial: Partial<Card> & { id: string }): Card {
-  return {
-    name: '杀',
-    suit: '♠',
-    color: '黑',
-    rank: '7',
-    type: '基本牌',
-    subtype: '杀',
-    ...partial,
-  };
+  return { ...sharedMakeCard(partial.id, '杀', '♠', '7', '基本牌', '杀'), ...partial };
 }
 
 const KILL_CARD = makeCard({ id: 'c-kill', name: '杀', subtype: '杀' });

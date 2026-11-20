@@ -13,7 +13,7 @@
 //   6. 目标必须是男性(若全为女性无候选,拒绝)
 //   7. 牌堆耗尽无匹配 → 所有翻开入弃牌堆,无目标收牌
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 // 临时注册界荐言(主 agent 会统一注册到 index.ts)
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
@@ -24,43 +24,8 @@ import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  character?: string;
-  alive?: boolean;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界徐庶',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: opts.alive ?? true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['界荐言'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界徐庶', skills: ['界荐言'], ...o });
 
 describe('界荐言', () => {
   let harness: SkillTestHarness;

@@ -37,6 +37,7 @@ import { registerAction } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
 import {
+  currentRequestType,
   askConfirm,
   defineConfirmAction,
   engineCanPlayNowReason,
@@ -173,15 +174,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         mismatchError: '当前不是翦灭选色',
       }).error,
     async (st: GameState, seat: number, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(seat);
-      if (!slot) return;
-      const atom = slot.atom as { requestType?: string };
+      const rt = currentRequestType(st, seat);
       const choice = params.choice === true || params.confirmed === true;
-      if (atom.requestType === OWNER_COLOR_RT) {
+      if (rt === OWNER_COLOR_RT) {
         // 仅春华(ownerId)可回应此 RT
         if (seat !== ownerId) return;
         st.localVars[OWNER_COLOR_KEY] = choice;
-      } else if (atom.requestType === TARGET_COLOR_RT) {
+      } else if (rt === TARGET_COLOR_RT) {
         st.localVars[TARGET_COLOR_KEY] = choice;
       }
     },

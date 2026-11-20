@@ -30,6 +30,7 @@ import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { skipPhase } from '../rules/skip-phase';
 import {
+  currentRequestType,
   askConfirm,
   requireRequestType,
   registerPhaseStartHook,
@@ -81,8 +82,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as Record<string, unknown> | undefined)?.['requestType'];
+      const rt = currentRequestType(st, ownerId);
       const yes = params.choice === true || params.confirmed === true;
       if (rt === ACTIVATE_RT) {
         st.localVars[ACTIVATED_KEY] = yes;

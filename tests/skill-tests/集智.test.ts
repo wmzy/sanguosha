@@ -10,10 +10,9 @@
 //   4. 负面:使用基本牌(杀)不触发集智(类型过滤)
 //   5. 负面:使用延时锦囊(乐不思蜀)不触发集智(非延时过滤)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer, makeCard as sharedMakeCard } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function makeCard(
@@ -23,31 +22,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakeCard(id, name, suit, rank, type);
 }
 
 describe('集智', () => {

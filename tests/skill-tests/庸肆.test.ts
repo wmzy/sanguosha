@@ -14,28 +14,18 @@
 //     7. 场上无主公:袁术不获得任何主公技
 //     8. 整局只复制一次(多次回合开始不重复)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 庸肆Module from '../../src/engine/skills/庸肆';
 import * as 伪帝Module from '../../src/engine/skills/伪帝';
 import { applyAtom } from '../../src/engine/core/apply';
-import { createGameState, suitColor } from '../../src/engine/types';
-import type { Card, PlayerState } from '../../src/engine/types';
+import { createGameState } from '../../src/engine/types';
+import type { PlayerState } from '../../src/engine/types';
 
 // 本地注册技能模块(主 agent 统一在 skills/index.ts 注册;测试本地兜底)
 setSkillModuleOverride('庸肆', async () => 庸肆Module);
 setSkillModuleOverride('伪帝', async () => 伪帝Module);
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -48,22 +38,9 @@ function makePlayer(opts: {
   maxHealth?: number;
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
+    ...sharedMakePlayer({ ...opts, character: opts.name }),
     identity: opts.identity,
     faction: opts.faction,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
   };
 }
 

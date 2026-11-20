@@ -16,22 +16,11 @@
 //  11. 选展示牌不在目标手牌 → 拒绝
 //  12. 多次用同类别牌 → 每次都询问(本阶段不限次)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { applyAtom } from '../../src/engine/core/apply';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, Json, TurnPhase } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -44,22 +33,7 @@ function makePlayer(opts: {
   skills?: string[];
   vars?: Record<string, Json>;
 }): GameState['players'][number] {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? opts.name,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: opts.alive ?? true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: opts.vars ?? {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? opts.name });
 }
 
 interface BuildOpts {

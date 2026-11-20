@@ -11,7 +11,7 @@
 // CardEffect 冲突（注册表为模块级全局 Map）。
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
@@ -137,23 +137,12 @@ function makePlayer(opts: {
   skills: string[];
   health?: number;
 }) {
-  return {
+  return sharedMakePlayer({
     ...opts,
     character: '主公',
     health: opts.health ?? 4,
     maxHealth: 4,
-    alive: true,
-    equipment: {},
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
-
-function makeCard(id: string, name: string): Card {
-  return { id, name, suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
+  });
 }
 
 function buildState(opts?: {

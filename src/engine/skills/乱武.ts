@@ -37,6 +37,7 @@ import { registerAction } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';
 import {
   askResponse,
+  currentRequestType,
   defineConfirmAction,
   engineCanPlayNowReason,
   registerRespondForAllSeats,
@@ -145,10 +146,7 @@ export function validateLuanwuSlashRespond(
   params: Record<string, Json>,
   requestType: string,
 ): string | null {
-  const slot = st.pendingSlots.get(seat);
-  if (!slot) return '当前不需要回应';
-  const atom = slot.atom as { requestType?: string };
-  if (atom.requestType !== requestType) return '当前不是乱武询问';
+  if (currentRequestType(st, seat) !== requestType) return '当前不是乱武询问';
   const cardId = params.cardId as string | undefined;
   const target = params.target as number | undefined;
   if (typeof cardId !== 'string') return '请选择一张杀';

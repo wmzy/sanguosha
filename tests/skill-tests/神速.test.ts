@@ -15,7 +15,7 @@
 //   8. 翻面:下一回合准备阶段消费标签 + 回合推进到下家
 //   9. 出杀次数:神速虚拟杀计入出杀次数(charge),再出真杀被拒
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -23,10 +23,6 @@ import { applyAtom } from '../../src/engine/core/apply';
 import { validateCardUse } from '../../src/engine/skills/cards/validate';
 import { slashUsed } from '../../src/engine/rules/slash-quota';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A'): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -38,22 +34,7 @@ function makePlayer(opts: {
   equipment?: Record<string, string>;
   character?: string;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '夏侯渊',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: (opts.equipment ?? {}),
-    skills: opts.skills ?? ['神速'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '夏侯渊', skills: ['神速'], ...opts });
 }
 
 /** 触发判定阶段:applyAtom(阶段开始, ownerId, 判定) → 神速 before-hook 询问 */

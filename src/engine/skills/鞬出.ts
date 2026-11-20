@@ -39,6 +39,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
 import {
+  currentRequestType,
   askConfirm,
   defineConfirmAction,
   registerRespondForAllSeats,
@@ -111,10 +112,11 @@ export function createJianchuSkill(opts: JianchuOptions) {
           (st: GameState, seat: number, params: Record<string, Json>): string | null => {
             const slot = st.pendingSlots.get(seat);
             if (!slot) return '当前不需要回应';
-            const atom = slot.atom as { type?: string; requestType?: string };
+            const atom = slot.atom as { type?: string };
             if (atom.type !== '请求回应') return '当前不是请求回应';
-            if (atom.requestType === opts.confirmRt) return null; // 庞德确认:任意 choice
-            if (atom.requestType === opts.pickRt) {
+            const requestType = currentRequestType(st, seat);
+            if (requestType === opts.confirmRt) return null; // 庞德确认:任意 choice
+            if (requestType === opts.pickRt) {
               // 目标自选弃牌:校验所选牌在目标自己的区域内
               const me = st.players[seat];
               if (!me) return '玩家不存在';
@@ -136,8 +138,7 @@ export function createJianchuSkill(opts: JianchuOptions) {
             return opts.respondFallbackError;
           },
           async (st: GameState, seat: number, params: Record<string, Json>): Promise<void> => {
-            const slot = st.pendingSlots.get(seat);
-            const requestType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+            const requestType = currentRequestType(st, seat);
             if (requestType === opts.confirmRt) {
               st.localVars[opts.confirmedKey] =
                 params.choice === true || params.confirmed === true;
@@ -355,3 +356,6 @@ const OPTIONS: JianchuOptions = {
 export const { createSkill, onInit, onMount } = createJianchuSkill(OPTIONS);
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot/atom 另用于 atom.type !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。

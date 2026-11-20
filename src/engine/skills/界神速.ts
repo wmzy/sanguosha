@@ -27,6 +27,7 @@ import { registerAction, registerBeforeHook } from '../core/skill';
 import { registerFlipSkipTurnHooks } from '../flows/face-down';
 import { skipPhase } from '../rules/skip-phase';
 import {
+  currentRequestType,
   defineConfirmAction,
   firstCardId,
   firstTarget,
@@ -88,9 +89,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         mismatchError: '当前不是界神速询问',
       }).error,
     async (s, params) => {
-      const slot = s.pendingSlots.get(ownerId);
-      const rt =
-        (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType ?? '';
+      const rt = currentRequestType(s, ownerId) ?? '';
       if (rt === OPT1_RT || rt === OPT2_RT || rt === OPT3_RT) {
         s.localVars[CONFIRMED_KEY] = params.choice === true;
       } else if (rt === TARGET_RT) {

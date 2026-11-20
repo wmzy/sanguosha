@@ -17,21 +17,11 @@
 //   3. 红色火杀(♥火焰) → 仁王盾不生效,询问闪,P2 出闪 → 被抵消不扣血
 //   4. 红色火杀(♥火焰) → P2 无闪 → 受1点伤害
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -42,22 +32,11 @@ function makePlayer(opts: {
   maxHealth?: number;
   equipment?: Record<string, string>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: '',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
     skills: opts.skills ?? ['杀', '闪'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 const RENWANG = makeCard('rw', '仁王盾', '♣', '2', '装备牌');

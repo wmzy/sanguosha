@@ -32,7 +32,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, normalizeCardIds, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, normalizeCardIds, requireRequestType } from '../util/skillRuntime';
 import { lostHealth } from '../util/player-query';
 import { mijiPendingKey, getMijiPending } from '../rules/vars-keys';
 
@@ -108,8 +108,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return '当前不是秘计询问';
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === GIVE_CONFIRM_RT) {

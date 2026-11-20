@@ -42,7 +42,7 @@ import { setPlayerVarUsage, projectTurnUsage } from '../rules/turn-usage';
 import { usedThisTurn as usedOncePerTurn } from '../rules/once-per-turn';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY, GONGQI_ACTIVE_VIEW_KEY, SLASH_EXEMPT_SUIT_KEY } from '../rules/vars-keys';
-import { askConfirm, askResponse, engineCanPlayNowReason, firstTarget, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, askResponse, currentRequestType, engineCanPlayNowReason, firstTarget, defineConfirmAction } from '../util/skillRuntime';
 import { hasDiscardableCards } from '../util/player-query';
 
 const SKILL_ID = '界弓骑';
@@ -179,14 +179,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as { type?: string; requestType?: string };
       if (atom.type !== '请求回应') return '当前不是请求回应';
-      const rt = atom.requestType;
+      const rt = currentRequestType(st, ownerId);
       const valid = [CONFIRM_RT, TARGET_RT, PICK_CARD_RT];
       if (!rt || !valid.includes(rt)) return '当前不是弓骑询问';
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRM_KEY] =
           params.choice === true || params.confirmed === true;
@@ -302,3 +301,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom.type !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

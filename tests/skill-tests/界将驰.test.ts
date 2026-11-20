@@ -13,25 +13,14 @@
 //   7. 选项②重铸:手牌为空时不进入 PICK 询问
 //   8. 选项①杀次数-1 与装备连弩(∞)叠加:仍阻断(blocker 优先)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { applyAtom } from '../../src/engine/core/apply';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { slashMax, slashUsed, canSlash } from '../../src/engine/rules/slash-quota';
 import { handLimit } from '../../src/engine/rules/hand-limit';
 import { viewCanSlash, viewSlashMax } from '../../src/engine/rules/action-active';
-import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
+import type { GameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;
@@ -42,22 +31,7 @@ function makePlayer(opts: {
   maxHealth?: number;
   character?: string;
 }): GameState['players'][number] {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界曹彰',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? '界曹彰' });
 }
 
 describe('界将驰', () => {

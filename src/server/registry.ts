@@ -9,11 +9,10 @@ import { register as registerLifecycle } from './resourceRegistry';
 // 游戏会话管理(进程级单例,按 roomId 索引)
 export const gameSessions = new Map<string, GameSession>();
 
-// playerRoomMap(玩家→房间映射)已下沉零依赖叶子模块 playerIndex.ts——此前映射
+// playerRoomMap(玩家→房间映射)本体已下沉零依赖叶子模块 playerIndex.ts——此前映射
 // 本体在此,room.ts 为维护映射 import 本模块、本模块顶层又调用 room.ts 的
-// setSessionChecker,两模块成环(room.ts 只得用函数对象属性绕 TDZ)。下沉后环
-// 消除;此处 re-export 保持 teardown.ts/tests 的既有导入路径与公开面不变。
-export { playerRoomMap } from './playerIndex';
+// setSessionChecker,两模块成环(room.ts 只得用函数对象属性绕 TDZ)。下沉后环消除,
+// 消费方(teardown/tests)直接从 playerIndex 导入。
 
 registerLifecycle('gameSessions', gameSessions, () => {
   gameSessions.clear();

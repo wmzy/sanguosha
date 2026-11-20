@@ -3,6 +3,7 @@
 //   1. 直接调用:同一 cardId 出现在多个区 → 抛错;无重复 → 不抛错;孤儿牌(边界)不抛错。
 //   2. applyAtom 集成:开关开启时,正常完成路径触发断言;默认关闭时不触发。
 import { describe, it, expect } from 'vitest';
+import { makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms'; // 注册 atom 定义(阶段结束 等)
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
@@ -11,26 +12,12 @@ import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 /** 构造一张最小测试牌 */
 function makeCard(id: string, name = '测试牌'): Card {
-  return { id, name, suit: '♠', color: '黑', rank: '1', type: '基本牌' };
+  return sharedMakeCard(id, name, '♠', '1');
 }
 
 /** 构造一个最小玩家槽位 */
 function makePlayer(index: number): PlayerState {
-  return {
-    index,
-    name: `P${index}`,
-    character: '测试',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    pendingTricks: [],
-    skills: [],
-    vars: {},
-    marks: [],
-    tags: [],
-  };
+  return sharedMakePlayer({ index, name: `P${index}`, character: '测试' });
 }
 
 /** 构造最小 state:含两张牌注册在 cardMap,可选开启不变量开关 */

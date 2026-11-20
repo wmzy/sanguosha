@@ -38,7 +38,7 @@ import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/
 import { skipPhase } from '../rules/skip-phase';
 import { fieldCardIds, moveFieldCard } from '../flows/field-card';
 import { tuxiStealCards } from './突袭';
-import { defineConfirmAction, firstCardId, firstTarget } from '../util/skillRuntime';
+import { currentRequestType, defineConfirmAction, firstCardId, firstTarget } from '../util/skillRuntime';
 
 const SKILL_NAME = '巧变';
 
@@ -304,8 +304,7 @@ export function handleQiaobianRespond(
   skillName: string,
   params: Record<string, Json>,
 ): void {
-  const slot = st.pendingSlots.get(ownerId);
-  const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+  const rt = currentRequestType(st, ownerId);
   if (rt === `${skillName}/confirm`) {
     st.localVars[`${skillName}/confirmed`] = params.choice === true;
     return;
@@ -351,8 +350,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
-      if (!qiaobianRequestTypes(SKILL_NAME).includes(rt)) {
+      const rt = currentRequestType(st, ownerId);
+      if (rt === undefined || !qiaobianRequestTypes(SKILL_NAME).includes(rt)) {
         return `当前不是${SKILL_NAME}询问`;
       }
       return null;
@@ -422,3 +421,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

@@ -12,50 +12,11 @@
 //   6. respond validate:无 pending → 拒绝
 //   7. respond validate:PICK 下 zone 缺失 → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-  subtype?: string,
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type, subtype };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  character?: string;
-  hand?: string[];
-  equipment?: Record<string, string>;
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
 
 /** 直接向 state 注入一个 fake 请求回应 pending(单元测试 validate/execute 用)。 */
 function injectPending(state: GameState, idx: number, requestType: string, prompt: unknown): void {

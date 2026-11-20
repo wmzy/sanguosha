@@ -5,7 +5,7 @@ import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '寒冰剑', description: '武器:杀造成伤害时可改为依次弃目标2张牌', isLocked: true };
@@ -39,8 +39,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (state, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      const requestType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const requestType = currentRequestType(state, ownerId);
       if (requestType === '寒冰剑/confirm') {
         state.localVars['寒冰剑/confirmed'] = params.choice === true || params.confirmed === true;
       } else if (requestType === '寒冰剑/选牌') {

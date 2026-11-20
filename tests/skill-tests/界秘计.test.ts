@@ -13,48 +13,16 @@
 // 触发方式:applyAtom({ type: '阶段开始', player: 0, phase: '回合结束' })
 //   引擎中"结束阶段" = phase '回合结束'(详见 勤学/崩坏/界志继)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  character?: string;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界王异',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-    faction: '魏',
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]): PlayerState => ({
+  ...sharedMakePlayer({ character: '界王异', health: 3, maxHealth: 3, ...o }),
+  faction: '魏',
+});
 
 /** 触发结束阶段:阶段开始(回合结束) atom */
 async function triggerEndPhase(harness: SkillTestHarness, player: number): Promise<void> {

@@ -31,7 +31,7 @@ import { registerAction } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import type { GameView } from '../types';
 import type { SkillModule } from '../types';
-import { requireRequestType, askResponse, engineCanPlayNowReason, firstTarget, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType, askResponse, engineCanPlayNowReason, firstTarget, defineConfirmAction } from '../util/skillRuntime';
 import { setPlayerVarUsage } from '../rules/turn-usage';
 import { usedThisTurn as usedOncePerTurn } from '../rules/once-per-turn';
 import { isMaleAlive } from '../util/player-query';
@@ -108,8 +108,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === DECLARE_RT) {
         const decl = params.option ?? params.declaration;
         if (isValidDeclaration(decl)) {

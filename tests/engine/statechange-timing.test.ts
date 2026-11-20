@@ -12,7 +12,7 @@ import { createGameState } from '../../src/engine/types';
 import type { Atom, Card, GameState, PlayerState } from '../../src/engine/types';
 import { registerBeforeHook } from '../../src/engine/core/skill';
 import { flipFaceDown, flipFaceUp, setChain } from '../../src/engine/flows/face-down';
-import { SkillTestHarness, waitForStable, fireTimeoutAndWait } from '../engine-harness';
+import { SkillTestHarness, waitForStable, fireTimeoutAndWait, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { suitColor } from '../../src/engine/types';
 
 // ─── 直测辅助:最小 2 人 state ───────────────────────────────
@@ -26,22 +26,7 @@ function makePlayer(opts: {
   skills?: string[];
   character?: string;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? opts.name,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? opts.name });
 }
 
 function makeState(opts?: { p0Skills?: string[]; p0Hand?: string[] }): GameState {
@@ -146,16 +131,6 @@ describe('模块 E:横置后 atom', () => {
 
 describe('模块 E:解围方向修正(从背面翻至正面触发,翻成背面不触发)', () => {
   let harness: SkillTestHarness;
-
-  function makeCard(
-    id: string,
-    name: string,
-    suit: '♠' | '♥' | '♣' | '♦',
-    rank = 'A',
-    type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-  ): Card {
-    return { id, name, suit, color: suitColor(suit), rank, type };
-  }
 
   /** 当前是否存在 解围/confirm 询问(= 解围效果②已触发) */
   function hasJieWeiConfirm(state: GameState): boolean {

@@ -12,21 +12,11 @@
 //   7. 触发后选择不发动 → 不弃牌
 //   8. 同时失装备+丢2张(同一弃置 atom 弃 2 张装备)→ 仅触发 1 次
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, Json } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makeEquip(
   id: string,
@@ -39,34 +29,8 @@ function makeEquip(
   return { id, name, suit, color: suitColor(suit), rank, type: '装备牌', subtype, range };
 }
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  character?: string;
-  health?: number;
-  maxHealth?: number;
-  hand?: string[];
-  equipment?: Record<string, string>;
-  skills?: string[];
-  vars?: Record<string, Json>;
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界凌统',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: opts.vars ?? {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界凌统', ...o });
 
 describe('界旋风', () => {
   let harness: SkillTestHarness;

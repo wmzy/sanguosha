@@ -25,49 +25,17 @@
 //
 // 事实来源:OL 官方 界刘备·激将
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import { suitColor } from '../../src/engine/types';
 import type { Card, Faction, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  faction?: Faction;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-    faction: opts.faction,
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0] & { faction?: Faction }) => ({
+  ...sharedMakePlayer({ character: '', ...o }),
+  faction: o.faction,
+});
 
 describe('界激将', () => {
   let harness: SkillTestHarness;

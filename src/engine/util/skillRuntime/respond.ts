@@ -2,6 +2,7 @@
 // (自 util/skillRuntime.ts 按内聚拆出;导出经桶文件 skillRuntime.ts re-export,调用方零改动。)
 // 收敛 skills/ 下逐字复制的样板:
 //   requireRequestType:respond validate 的「读 pending slot → 断言 请求回应 → 比对 requestType」三连;
+//   requireHandCard:respond validate 的「cardId 在手牌 + cardMap 查名」两连(桃/酒 求援族);
 //   registerConfirmRespond:confirm 型 respond 三件套;
 //   registerChoiceRespond:confirm 二选一 → 枚举值 respond 三件套(勤学/志继/崩坏 模式);
 //   askConfirm / askResponse:询问三段(delete 键残值 → applyAtom(请求回应) → 读键);
@@ -23,6 +24,10 @@ export interface RequireRequestTypeOptions {
   noSlotError?: string;
   /** slot 的 atom 类型不是 请求回应 时的错误文案(默认同 noSlotError) */
   wrongTypeError?: string;
+  /** 可选:校验 slot.atom.target 指向该座次(求桃/求杀 等窗口只问本人,
+   *  与 杀/桃/闪/借刀杀人 手写的 target 校验同文案)。不符返回统一文案 '不是问你的';
+   *  校验先于 类型/requestType 比对(与各技能手写顺序一致)。 */
+  ownerCheck?: number;
 }
 
 export type RequestTypeCheck =
@@ -51,6 +56,12 @@ export function requireRequestType(
   const atom = state.pendingSlots.get(seat)?.atom;
   const noSlotError = opts.noSlotError ?? '当前不需要回应';
   if (!atom) return { error: noSlotError, requestType: null };
+  if (
+    opts.ownerCheck !== undefined &&
+    (atom as { target?: number }).target !== opts.ownerCheck
+  ) {
+    return { error: '不是问你的', requestType: null };
+  }
   if (atom.type !== '请求回应') {
     return { error: opts.wrongTypeError ?? noSlotError, requestType: null };
   }
@@ -58,6 +69,34 @@ export function requireRequestType(
     return { error: opts.mismatchError, requestType: null };
   }
   return { error: null, requestType: atom.requestType };
+}
+
+/**
+ * respond validate 的手牌校验样板:cardId 必须在 seatId 的手牌中;传 expectedName 时
+ * 再经 cardMap 查名,不符返回 `不是${expectedName}`(与 cards/use-card、cards/validate
+ * 的通用查名文案同源)。全部通过返回 null。
+ *
+ * 收敛 桃/酒/界铁骑/青龙偃月刀 等 respond validate 里重复的:
+ * ```ts
+ * const self = state.players[ownerId];
+ * if (!self.hand.includes(cardId)) return '牌不在手牌中';
+ * const card = state.cardMap[cardId];
+ * if (card?.name !== '桃') return '不是桃';
+ * ```
+ * cardId 是否必选(酒 的 'cardId required')/可选(桃 的 `if (cardId)`)由调用方先行判断。
+ */
+export function requireHandCard(
+  state: GameState,
+  seatId: number,
+  cardId: string,
+  expectedName?: string,
+): string | null {
+  const self = state.players[seatId];
+  if (!self?.hand.includes(cardId)) return '牌不在手牌中';
+  if (expectedName !== undefined && state.cardMap[cardId]?.name !== expectedName) {
+    return `不是${expectedName}`;
+  }
+  return null;
 }
 
 // ────────────────────────── confirm 型询问/respond 样板 ──────────────────────────

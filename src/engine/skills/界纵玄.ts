@@ -22,7 +22,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType, askConfirm } from '../util/skillRuntime';
 import { findNextAlive } from '../util/player-query';
 
 const SKILL_ID = '界纵玄';
@@ -199,8 +199,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === AGAIN_RT) {

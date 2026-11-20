@@ -11,23 +11,13 @@
 //   4. 负面:非弃牌窗口 respond 被拒绝
 //   5. 负面:空 cardIds 被拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { findActionEntry } from '../../src/engine/core/skill';
 import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -40,24 +30,7 @@ function makePlayer(opts: {
   identity?: PlayerState['identity'];
   faction?: PlayerState['faction'];
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-    identity: opts.identity,
-    faction: opts.faction,
-  };
+  return { ...sharedMakePlayer({ character: '', ...opts }), identity: opts.identity, faction: opts.faction };
 }
 
 describe('系统规则', () => {

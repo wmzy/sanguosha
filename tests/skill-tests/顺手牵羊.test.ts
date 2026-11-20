@@ -7,7 +7,7 @@
 //   2. 距离 <= 1 校验:距离 > 1 时被 validate 拒绝
 //   3. validate 拒绝(negative):非自己回合 / pending 期间 / 目标无手牌 / 牌不在手 / 目标是自己
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -24,22 +24,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: opts.alive ?? true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['顺手牵羊', '杀'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ skills: ['顺手牵羊', '杀'], ...opts });
 }
 
 function makeCard(
@@ -49,7 +34,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
+  return sharedMakeCard(id, name, suit, rank, type);
 }
 
 function makeBasicCard(

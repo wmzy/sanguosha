@@ -11,20 +11,11 @@
 //   P0-P1 距离 1(范围内)、P0-P2 距离 2(范围外)、P0-P3 距离 2(范围外)、P0-P4 距离 1(范围内)
 //   → 范围外角色 = {P2, P3},基数 = 2。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../engine-harness';
+import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { applyAtom } from '../../src/engine/core/apply';
 import { createGameState } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suit === '♠' || suit === '♣' ? '黑' : '红', rank, type: '基本牌' };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -32,22 +23,7 @@ function makePlayer(opts: {
   character?: string;
   hand?: string[];
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '吴将',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? '吴将' });
 }
 
 /** 5 人局:P0=孙亮(掣政);范围外={P2,P3};cards 指定各玩家手牌 */

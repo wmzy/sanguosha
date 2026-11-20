@@ -26,7 +26,7 @@
 //   - 自己不存活则不触发;目标(弃牌者)死亡仍可正常结算(牌已入弃牌堆)。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType } from '../util/skillRuntime';
 import { runGuzhengFlow } from './固政';
 import type { SkillModule } from '../types';
 
@@ -135,13 +135,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId)!;
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType === CONFIRM_REQUEST) {
+      const rt = currentRequestType(st, ownerId);
+      if (rt === CONFIRM_REQUEST) {
         st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
-      } else if (atom.requestType === PICK_REQUEST) {
+      } else if (rt === PICK_REQUEST) {
         st.localVars[PICK_KEY] = params.cardId;
-      } else if (atom.requestType === REST_REQUEST) {
+      } else if (rt === REST_REQUEST) {
         st.localVars[REST_KEY] = params.choice === true || params.confirmed === true;
       }
     },

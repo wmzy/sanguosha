@@ -15,7 +15,7 @@ import { getPendingRequestType } from '../utils/pendingRespond';
 import { DEFAULT_FACTION_COLOR, fallbackFaction } from '../utils/characterVisuals';
 import { FACTION_BG } from './gameViewConstants';
 import { displaySkillName } from '../utils/skillDisplay';
-import { singleTargetParams } from '../utils/gameViewHelpers';
+import { singleTargetParams, choosePlayerCandidates } from '../utils/gameViewHelpers';
 import { CardBack } from './CardBack';
 import { useGameView } from './GameViewCtx';
 
@@ -298,7 +298,8 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
           // 同时发 target(首个)与 targets(数组)以兼容各技能 respond 的 param 读取契约。
           if (pending.prompt.type === 'choosePlayer') {
             const p = pending.prompt;
-            const candidates = p.candidates ?? [];
+            // 与无头枚举同源:优先投影 candidates,缺省按 filter 过滤存活玩家。
+            const candidates = choosePlayerCandidates(view, p);
             const names = view.players;
             const max = p.max ?? 1;
             const min = p.min ?? 1;

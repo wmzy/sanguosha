@@ -31,7 +31,7 @@ import { hasSkillModule } from './registry';
 import { DISTANCE_ATTACK_RANGE_KEY, PICK_RESULT_KEY } from '../rules/vars-keys';
 import { fieldCardIds, moveFieldCard } from '../flows/field-card';
 import { askPickTargetCard } from '../flows/pick-card-panel';
-import { askConfirm, blockedByOtherPending, firstCardId, firstTarget, defineConfirmAction, shadowCardId, hasNullifyWindow } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, blockedByOtherPending, firstCardId, firstTarget, defineConfirmAction, shadowCardId, hasNullifyWindow } from '../util/skillRuntime';
 
 // ── 效果①:装备→无懈可击 转化(影子 id/广播窗口判据走 skillRuntime 共享 helper) ──
 const SHADOW_SUFFIX = '解围';
@@ -164,7 +164,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
+      const rt = currentRequestType(st, ownerId);
       const valid = [
         CONFIRM_RT,
         DISCARD_RT,
@@ -172,7 +172,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         SOURCE_CARD_RT,
         DEST_PLAYER_RT,
       ];
-      if (!valid.includes(rt)) return '当前不是解围询问';
+      if (!rt || !valid.includes(rt)) return '当前不是解围询问';
       // 选源牌面板参数校验(同过河拆桥/顺手牵羊 respond;面板候选校验由
       // askPickTargetCard 的 equipment/judge/hand 解析兜底)
       if (rt === SOURCE_CARD_RT) {
@@ -188,8 +188,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true;
         return;
@@ -387,3 +386,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+
+// [requestType 迁移·不迁项] ① respond 校验里的 slot/atom 另用于 atom['type'] !== '请求回应'
+// 守卫;② transform activeWhen 读 view.pending(视图层,非引擎 pendingSlots)。
+// requestType 读取已走 currentRequestType。

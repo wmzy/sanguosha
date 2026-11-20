@@ -11,15 +11,14 @@
 import type { GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { obtainJudgeZoneCard } from '../core/judge-zone';
+import { ownedCardIds } from '../util/player-query';
 
 /** 取玩家"场上"的牌(手牌+装备+判定区)——用于源牌选择 */
 export function fieldCardIds(state: GameState, player: number): string[] {
   const p = state.players[player];
   if (!p) return [];
-  const hand = [...p.hand];
-  const equip = Object.values(p.equipment).filter((id): id is string => !!id);
-  const judge = p.pendingTricks.map((t) => t.card.id);
-  return [...hand, ...equip, ...judge];
+  // 手牌+装备走 ownedCardIds;判定区是延时锦囊的牌面快照(实体牌在弃牌堆,见文件头),单独拼
+  return ownedCardIds(p).concat(p.pendingTricks.map((t) => t.card.id));
 }
 
 /**

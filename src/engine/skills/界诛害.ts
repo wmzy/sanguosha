@@ -22,7 +22,7 @@ import { applyAtom } from '../core/apply';
 import { runUseFlow } from './cards/use-card';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 const SKILL_ID = '界诛害';
 const DISPLAY_NAME = '诛害';
@@ -103,8 +103,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === TRIGGER_RT) {
         st.localVars[CONFIRM_KEY] = params.choice === true;
       } else if (rt === PICK_RT) {

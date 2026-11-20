@@ -6,21 +6,11 @@
 //   满血 → 仍可发动(选摸牌有效,选回复体力被上限截断)
 //   2点伤害 → 逐点独立发动(两次询问,2026-08-24 对齐官方)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState, Json, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
+import type { GameState, Json, PlayerState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;
@@ -32,22 +22,7 @@ function makePlayer(opts: {
   vars?: Record<string, Json>;
   character?: string;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '魏延',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: opts.vars ?? {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? '魏延' });
 }
 
 describe('狂骨', () => {

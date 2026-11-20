@@ -16,21 +16,11 @@
 //   5. 无杀可用:owner 手牌没杀 → 不触发 confirm(直接被闪)
 //   6. confirm 后超时不出杀 → 放弃追杀(不凭空杀人)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -41,22 +31,7 @@ function makePlayer(opts: {
   maxHealth?: number;
   equipment?: Record<string, string>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['杀', '闪'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '', skills: ['杀', '闪'], ...opts });
 }
 
 const QINGLONG = makeCard('ql', '青龙偃月刀', '♠', '5', '装备牌');

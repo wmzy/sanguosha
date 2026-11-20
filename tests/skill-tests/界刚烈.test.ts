@@ -9,7 +9,7 @@
 //   4. 发动 + 黑色判定 + 来源无牌可弃 → 跳过(无事发生)
 //   5. 不发动 → 无事发生
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 // 临时注册界刚烈(主 agent 会统一注册到 index.ts)
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
@@ -17,18 +17,7 @@ import * as 界刚烈Module from '../../src/engine/skills/界刚烈';
 setSkillModuleOverride('界刚烈', async () => 界刚烈Module);
 
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
+import type { GameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;
@@ -39,22 +28,7 @@ function makePlayer(opts: {
   maxHealth?: number;
   tags?: string[];
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界夏侯惇',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: opts.tags ?? [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: '界夏侯惇' });
 }
 
 describe('界刚烈', () => {

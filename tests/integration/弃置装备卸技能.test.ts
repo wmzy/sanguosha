@@ -13,7 +13,7 @@
 //   3. 弃牌堆含被弃装备(弃置 本身仍正常)
 import { describe, it, expect } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/index';
-import { dispatchAndWait } from '../engine-harness';
+import { dispatchAndWait, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { slashMax } from '../../src/engine/rules/slash-quota';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
@@ -28,29 +28,11 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: '' });
 }
 
 function makeEquip(id: string, name: string, subtype: string, range?: number): Card {
   return { id, name, suit: '♣', color: '黑', rank: 'A', type: '装备牌', subtype, range };
-}
-function makeCard(id: string, name: string): Card {
-  return { id, name, suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
 }
 
 describe('弃置装备:卸载自带技能实例', () => {

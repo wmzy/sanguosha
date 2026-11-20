@@ -17,7 +17,7 @@
 //   (注:owner 起手无手牌时仍可发动已由 1/3 覆盖——摸1后必展示该牌;
 //    "摸1后仍无牌则效果落空"为不可达分支:摸牌 count=1 成功必给≥1 张牌,空牌堆时摸牌 atom 直接抛错而非优雅落空)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -25,43 +25,8 @@ import { applyAtom } from '../../src/engine/core/apply';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  character?: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  tags?: string[];
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界马岱',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['界潜袭', '杀'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: opts.tags ?? [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界马岱', skills: ['界潜袭', '杀'], ...o });
 
 /** 触发准备阶段:applyAtom(阶段开始, 0, 准备) → 界潜袭 after-hook 询问发动。
  *  用 void fire-and-forget,再 waitForStable 等 pending 创建。 */

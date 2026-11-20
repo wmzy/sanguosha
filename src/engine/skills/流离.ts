@@ -8,7 +8,7 @@ import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
-import { askConfirm, defineConfirmAction, normalizeCardIds, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, normalizeCardIds, requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -60,9 +60,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (state, params) => {
-      const requestType = (
-        state.pendingSlots.get(ownerId)?.atom as unknown as Record<string, unknown>
-      )?.requestType as string;
+      const requestType = currentRequestType(state, ownerId);
       if (requestType === '流离/confirm') {
         state.localVars['流离/confirmed'] = params.choice === true || params.confirmed === true;
       } else if (requestType === '流离/pickDiscard') {

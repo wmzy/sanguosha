@@ -11,10 +11,9 @@
 //   6. 正面:对自己使用火攻 → 自扣1血(火焰伤害)
 //   (无懈可击抵消为 runSettlementPhase 通用机制,非火攻特有,不在此单测)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer, makeCard as sharedMakeCard } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { buildView } from '../../src/engine/index';
 import { getAtomDef } from '../../src/engine/core/atom';
 import type { Card, GameState } from '../../src/engine/types';
@@ -26,7 +25,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
+  return sharedMakeCard(id, name, suit, rank, type);
 }
 
 function makePlayer(opts: {
@@ -37,22 +36,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['火攻'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: '主公', skills: opts.skills ?? ['火攻'] });
 }
 
 function buildState(opts?: {

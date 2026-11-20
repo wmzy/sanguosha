@@ -37,7 +37,13 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerSuppressionProvider } from '../core/skill-suppression';
-import { askConfirm, askResponse, engineCanPlayNowReason } from '../util/skillRuntime';
+import {
+  askConfirm,
+  askResponse,
+  currentRequestType,
+  engineCanPlayNowReason,
+  registerRespondForAllSeats,
+} from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 /** 请求类型:目标展示一张手牌。 */
@@ -212,14 +218,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   // ── respond:处理两种 requestType(reveal 由目标座次回应,heal 由发起者座次回应)
   //    为每个座次注册独立闭包,以 skillId='义绝' 隔离,不与其他技能 respond 冲突。
   const unloaders: Array<() => void> = [];
-  for (const p of state.players) {
-    const seatId = p.index;
-    const u = registerAction(
+  unloaders.push(
+    ...registerRespondForAllSeats(
       state,
       skill.id,
-      seatId,
-      'respond',
-      (st: GameState, params: Record<string, Json>) => {
+      (st: GameState, seatId: number, params: Record<string, Json>) => {
         const slot = st.pendingSlots.get(seatId);
         if (!slot) return '当前不需要回应';
         const atom = slot.atom as Record<string, unknown>;
@@ -239,18 +242,16 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
         return '当前不是义绝回应';
       },
-      async (st: GameState, params: Record<string, Json>) => {
-        const slot = st.pendingSlots.get(seatId);
-        const reqType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      async (st: GameState, seatId: number, params: Record<string, Json>) => {
+        const reqType = currentRequestType(st, seatId);
         if (reqType === REVEAL_REQUEST) {
           st.localVars[REVEAL_KEY] = params.cardId;
         } else if (reqType === HEAL_REQUEST) {
           st.localVars[HEAL_KEY] = params.choice === true;
         }
       },
-    );
-    unloaders.push(u);
-  }
+    ),
+  );
 
   // ── before-hook:禁出牌目标不能使用/打出手牌 ──
   //    覆盖三种出牌 prompt atom:'请求回应'(无瓣/拼点选牌等)、'询问闪'、'询问杀'。

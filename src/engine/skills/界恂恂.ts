@@ -21,7 +21,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界恂恂';
@@ -84,8 +84,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as Record<string, unknown>)?.requestType as string;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === ARRANGE_RT) {
@@ -198,3 +197,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 pendingSlots.get 读 arrangeAtom.prompt.cardIds
+// (观察到的牌,非 requestType),保留手写反射;requestType 读取已走 currentRequestType。

@@ -15,13 +15,12 @@
 //   6. 荣<3 → 不觉醒
 //   7. 已觉醒 → 不再触发
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 征荣Module from '../../src/engine/skills/征荣';
 import * as 鸿举Module from '../../src/engine/skills/鸿举';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
@@ -30,16 +29,6 @@ setSkillModuleOverride('征荣', async () => 征荣Module);
 setSkillModuleOverride('鸿举', async () => 鸿举Module);
 
 const RONG_PREFIX = '征荣/荣:';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -52,22 +41,12 @@ function makePlayer(opts: {
   vars?: Record<string, unknown>;
   equipment?: Record<string, string>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: '毌丘俭',
     health: opts.health ?? opts.maxHealth ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: (opts.vars as PlayerState['vars']) ?? {},
-    marks: opts.marks ?? [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+    vars: opts.vars as PlayerState['vars'],
+  });
 }
 
 function rongCount(state: GameState, player: number): number {

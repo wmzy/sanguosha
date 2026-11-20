@@ -9,7 +9,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 // 内部 requestType/localVars 键名保持原前缀「遗计/」,不改为「界遗计/」
@@ -68,8 +68,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as Record<string, unknown>)?.requestType as string;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === GIVE_RT) {

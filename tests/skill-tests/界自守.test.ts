@@ -10,49 +10,16 @@
 //   3. 弃牌惩罚:发动 + 本回合造成过伤害 → 结束阶段弃 X 张
 //   4. 无伤害不弃:发动 + 未造成伤害 → 结束阶段不弃牌
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  faction?: PlayerState['faction'];
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-    faction: opts.faction,
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0] & { faction?: PlayerState['faction'] }) => ({
+  ...sharedMakePlayer({ ...o, character: o.name, health: 3, maxHealth: 3 }),
+  faction: o.faction,
+});
 
 /** 当前唯一 pending 的 requestType(无 pending 返回 null) */
 function currentRequestType(state: GameState): string | null {

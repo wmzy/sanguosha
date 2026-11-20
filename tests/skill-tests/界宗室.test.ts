@@ -12,22 +12,11 @@
 //   5. 不同势力均可触发一次:魏防后蜀仍可防
 //   6. 无来源伤害不触发:闪电/系统伤害(source=TARGET_SYSTEM)照常生效
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { runDamageFlow } from '../../src/engine/flows/damage';
-import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 import { createGameState, TARGET_SYSTEM } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -39,20 +28,7 @@ function makePlayer(opts: {
   maxHealth?: number;
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
+    ...sharedMakePlayer({ ...opts, character: opts.name, health: opts.health ?? 3, maxHealth: opts.maxHealth ?? 3 }),
     faction: opts.faction,
   };
 }

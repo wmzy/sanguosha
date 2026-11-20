@@ -5,7 +5,7 @@
 //   2. 非主公按身份分配候选数(忠臣5/反贼4/内奸5);候选人跨玩家不重复。
 //   3. 选将完成后只实例化引擎默认技能,武将自身技能不进入 player.skills。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { waitForStable } from '../../engine-harness';
+import { waitForStable, makePlayer as sharedMakePlayer } from '../../engine-harness';
 import '../../../src/engine/atoms';
 import { bootstrap, dispatch } from '../../../src/engine/index';
 import { createGameState } from '../../../src/engine/types';
@@ -40,22 +40,7 @@ function makeLordMixedPool(n: number): Array<{ name: string; skills: string[] }>
 }
 
 function makePlayer(index: number, name: string) {
-  return {
-    index,
-    name,
-    character: '',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ index, name, character: '' });
 }
 
 async function respondCharSelect(state: GameState, target: number, character: string) {

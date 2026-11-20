@@ -130,9 +130,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
       (st: GameState, params: Record<string, Json>): string | null => {
         const slot = st.pendingSlots.get(seatId);
         if (!slot) return '当前不需要回应';
-        const atom = slot.atom as { type: string; requestType?: string };
+        const atom = slot.atom as { type: string };
         if (atom.type !== '请求回应') return '当前不需要回应';
-        const rt = atom.requestType;
+        const rt = currentRequestType(st, seatId);
 
         if (rt === CHOOSE_RT) {
           if (!isOwner) return '当前不是你的询问';
@@ -267,3 +267,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot/atom 另用于 atom.type !== '请求回应'
+// 守卫及 prompt.cardFilter.min(弃牌张数,非 requestType),保留手写 pendingSlots.get;
+// requestType 读取已走 currentRequestType。

@@ -11,16 +11,11 @@
 //   D. ≥2 门槛:仅弃1张 → 不触发
 //   E. 每阶段限一次:同一阶段第二次弃置不再触发
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
-import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦' = '♠'): Card {
-  return { id, name, suit, color: suitColor(suit), rank: 'A', type: '基本牌' };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -31,22 +26,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? '' });
 }
 
 /** 构建标准场景:P0=界张昭张纮(界固政),P1=制衡手(当前回合),P1 hand 可定制 */

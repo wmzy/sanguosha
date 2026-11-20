@@ -4,22 +4,12 @@
 // 通过 回合管理 触发完整的阶段推进:applyAtom(阶段结束, 判定) → 回合管理 →
 //   阶段开始(摸牌) → 突袭 before hook。发动则偷牌+跳过摸牌;不发动/无目标则默认摸2张。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../engine-harness';
+import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -29,24 +19,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-    faction: '魏',
-    identity: '主公',
-  };
+  return { ...sharedMakePlayer(opts), faction: '魏', identity: '主公' };
 }
 
 describe('突袭', () => {

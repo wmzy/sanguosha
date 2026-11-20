@@ -7,7 +7,7 @@
 //   5. 觉醒当回合结束阶段 → 摸2张 或 回复1体力(二选一)
 //   6. 非觉醒回合的结束阶段不触发收益(标记只在觉醒当回合置)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
@@ -39,16 +39,6 @@ function mkPlayer(opts: {
     tags: [],
     judgeZone: [],
   };
-}
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
 describe('界孙策·界魂姿', () => {

@@ -4,7 +4,7 @@
 //     (两项效果,非二选一;无来源伤害时仍可发动,仅摸一张——官网 FAQ 2016-11-01)
 //   获得伤害牌采用延迟拿取,避免父结算重复入弃牌堆;界版摸一张在询问后立即执行。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../engine-harness';
+import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
@@ -12,16 +12,6 @@ import { createGameState } from '../../src/engine/types';
 import { TARGET_SYSTEM } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -32,20 +22,7 @@ function makePlayer(opts: {
   maxHealth?: number;
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
+    ...sharedMakePlayer({ ...opts, character: '主公' }),
     faction: '魏',
     identity: '主公',
   };

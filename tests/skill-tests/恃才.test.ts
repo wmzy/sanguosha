@@ -10,20 +10,10 @@
 //   1. 首次使用杀(基本牌)→ 询问发动;发动 → 牌置牌堆顶 + 摸一张(即收回该牌)
 //   2. 回归:武圣转化杀 → 同样询问发动,发动后原卡回到手牌
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../engine-harness';
+import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import type { Card, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -31,22 +21,7 @@ function makePlayer(opts: {
   hand?: string[];
   skills?: string[];
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: '' });
 }
 
 describe('恃才', () => {

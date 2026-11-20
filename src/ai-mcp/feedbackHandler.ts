@@ -4,6 +4,8 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { projectView } from './viewProjector';
+import { FEEDBACK_DIR } from '../server/paths';
+import { compactTimestamp, randomSuffix } from '../server/utils';
 import type { HeadlessGameClient } from '../client/headless/HeadlessGameClient';
 import type { AiViewSnapshot, AvailableAction } from '../client/headless/types';
 
@@ -30,30 +32,12 @@ export interface ReportBugResult {
   timestamp: string;
 }
 
-const DEFAULT_FEEDBACK_DIR = 'data/ai-feedback';
 const ID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
-/** 6 位 base62 随机串,防同秒碰撞。 */
-function generateId(): string {
-  let id = '';
-  for (let i = 0; i < 6; i++) {
-    id += ID_CHARS[Math.floor(Math.random() * ID_CHARS.length)];
-  }
-  return id;
-}
-
-/** YYYYMMDDTHHMMSS 本地时间格式,与 data/snapshots/ 命名风格一致。 */
-function formatTimestamp(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return (
-    `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}` +
-    `T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
-  );
-}
-
-/** 落盘目录:优先 SGS_FEEDBACK_DIR,否则默认 data/ai-feedback。 */
+/** 落盘目录:优先 SGS_FEEDBACK_DIR,否则默认 data/ai-feedback(绝对路径,单点在
+ *  server/paths.ts——此前是相对路径,CWD≠仓库根时会写漂)。 */
 export function resolveFeedbackDir(): string {
-  return process.env.SGS_FEEDBACK_DIR ?? DEFAULT_FEEDBACK_DIR;
+  return process.env.SGS_FEEDBACK_DIR ?? FEEDBACK_DIR;
 }
 
 /**
@@ -71,8 +55,8 @@ export async function reportBugResult(
   await fs.mkdir(dir, { recursive: true });
 
   const now = new Date();
-  const id = generateId();
-  const filename = `${formatTimestamp(now)}-${id}.json`;
+  const id = randomSuffix(6, ID_CHARS);
+  const filename = `${compactTimestamp(now)}-${id}.json`;
   const filePath = path.join(dir, filename);
   const timestamp = now.toISOString();
 

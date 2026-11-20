@@ -25,11 +25,12 @@ import type {
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
-import { registerAction } from '../core/skill';
 import {
   askConfirm,
-  requireRequestType,
+  currentRequestType,
   registerPhaseStartHook,
+  registerRespondForAllSeats,
+  requireRequestType,
   defineConfirmAction,
   firstTarget,
 } from '../util/skillRuntime';
@@ -183,23 +184,18 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // respond:每个座次注册一份。孙坚座次处理 confirm/target/option;目标座次处理 discard。
   // 以 requestType 区分四种询问,互不冲突。
   const unloaders: Array<() => void> = [];
-  for (const p of state.players) {
-    const seatId = p.index;
-    const u = registerAction(
+  unloaders.push(
+    ...registerRespondForAllSeats(
       state,
       skill.id,
-      seatId,
-      'respond',
-      (st: GameState, _params: Record<string, Json>) => {
+      (st: GameState, seatId: number, _params: Record<string, Json>) => {
         return requireRequestType(st, seatId, [CONFIRM_RT, TARGET_RT, OPTION_RT, DISCARD_RT], {
           mismatchError: '当前不是英魂询问',
         }).error;
       },
-      async (st: GameState, params: Record<string, Json>) => {
+      async (st: GameState, seatId: number, params: Record<string, Json>): Promise<void> => {
         const slot = st.pendingSlots.get(seatId);
-        const rt = (
-          slot?.atom as unknown as { requestType?: string } | undefined
-        )?.requestType;
+        const rt = currentRequestType(st, seatId);
         if (rt === CONFIRM_RT) {
           st.localVars[CONFIRMED_KEY] = params.choice === true;
         } else if (rt === TARGET_RT) {
@@ -226,9 +222,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           }
         }
       },
-    );
-    unloaders.push(u);
-  }
+    ),
+  );
 
   // 阶段开始(准备) before:英魂主逻辑(委托给 performYinghunPrepare,便于魂姿觉醒复用)
   registerPhaseStartHook(state, skill.id, ownerId, '准备', async (ctx): Promise<void> => {

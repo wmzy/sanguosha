@@ -14,21 +14,10 @@
 //   7. 负面 respond:选项①选非方片牌 → respond 被拒(选牌阶段校验,pending 仍在)
 //   8. availableActions:声明 use action
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../engine-harness';
+import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -38,22 +27,7 @@ function makePlayer(opts: {
   skills?: string[];
   pendingTricks?: PlayerState['pendingTricks'];
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界大乔',
-    health: 3,
-    maxHealth: 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: opts.pendingTricks ?? [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: '界大乔', health: 3, maxHealth: 3 });
 }
 
 describe('界国色', () => {

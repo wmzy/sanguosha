@@ -24,6 +24,7 @@
 import type {
   ActionPrompt,
   Card,
+  CardType,
   CardWrapper,
   ClientMessage,
   FrontendAPI,
@@ -31,9 +32,12 @@ import type {
   GameState,
   GameView,
   Json,
+  PlayerState,
+  Suit,
   TargetFilter,
   ViewEvent,
 } from '../src/engine/types';
+import { suitColor } from '../src/engine/types';
 import {
   dispatch as engineDispatch,
   fireTimeout as engineFireTimeout,
@@ -88,6 +92,66 @@ export interface ActionDef {
   prompt: ActionPrompt;
   transform?: (card: Card) => CardWrapper;
   activeWhen?: (ctx: { view: GameView; perspectiveIdx: number }) => boolean;
+}
+
+// ─── 测试装置工厂(makeCard / makePlayer)────────────────────
+// 与 tests/ 下历史手写工厂的主流变体逐字同构(变体分析与迁移工具说明见
+// local://fixture-brief.md;批量迁移用 /tmp/fixture-codemod.mjs):
+//   makeCard  : suit='♠' / rank='A' / color=suitColor(suit) / type='基本牌'
+//   makePlayer: character='主公' / health=maxHealth=4 / alive / 手牌装备技能全空
+
+/** 构造测试用 Card(主流变体默认:♠/A/基本牌,color 由花色派生;type/subtype 覆盖装备/锦囊场景)。 */
+export function makeCard(
+  id: string,
+  name: string,
+  suit: Suit = '♠',
+  rank = 'A',
+  type: CardType = '基本牌',
+  subtype?: string,
+): Card {
+  return { id, name, suit, color: suitColor(suit), rank, type, subtype };
+}
+
+/** makePlayer 配置:index/name 必填,其余字段可选覆盖(默认值取主流变体)。 */
+export type MakePlayerOpts = {
+  index: number;
+  name: string;
+} & Partial<
+  Pick<
+    PlayerState,
+    | 'character'
+    | 'health'
+    | 'maxHealth'
+    | 'alive'
+    | 'hand'
+    | 'equipment'
+    | 'skills'
+    | 'vars'
+    | 'marks'
+    | 'pendingTricks'
+    | 'tags'
+    | 'judgeZone'
+  >
+>;
+
+/** 构造测试用 PlayerState(主流变体默认:'主公'/体力 4/存活/手牌装备技能标记全空)。 */
+export function makePlayer(opts: MakePlayerOpts): PlayerState {
+  return {
+    index: opts.index,
+    name: opts.name,
+    character: opts.character ?? '主公',
+    health: opts.health ?? 4,
+    maxHealth: opts.maxHealth ?? 4,
+    alive: opts.alive ?? true,
+    hand: opts.hand ?? [],
+    equipment: opts.equipment ?? {},
+    skills: opts.skills ?? [],
+    vars: opts.vars ?? {},
+    marks: opts.marks ?? [],
+    pendingTricks: opts.pendingTricks ?? [],
+    tags: opts.tags ?? [],
+    judgeZone: opts.judgeZone ?? [],
+  };
 }
 
 // ─── FakeFrontendAPI ──────────────────────────────────────────

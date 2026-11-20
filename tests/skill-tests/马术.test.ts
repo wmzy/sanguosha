@@ -6,46 +6,12 @@
 //   3. 触发(实际 dispatch):P0 徒手(范围 1)对距离 2 的 P3 出杀 → 命中(马术把距离缩到 1)
 //   4. 负面:无马术时同场景出杀被拒(距离 2 > 范围 1)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { effectiveDistance } from '../../src/engine/rules/distance';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
 
 /** 4 人存活局:P0/P1/P2/P3 */
 function build4PlayerState(p0Skills: string[], p0Hand: string[] = []): GameState {

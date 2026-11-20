@@ -41,7 +41,7 @@ import {
 } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
 import { defaultPlayActive } from '../rules/action-active';
-import { defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
+import { currentRequestType, defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const SKILL_ID = '界解烦';
@@ -216,15 +216,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         (st: GameState, _params: Record<string, Json>): string | null => {
           const slot = st.pendingSlots.get(seatId);
           if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-          const rt = (slot.atom as { requestType?: string }).requestType ?? '';
+          const rt = currentRequestType(st, seatId) ?? '';
           // 解烦 CHOOSE 询问:requestType 必须是 `界解烦/choose/<seatId>`,
           // 且 target === seatId(本座次 slot)
           if (rt !== `${CHOOSE_RT_PREFIX}${seatId}`) return '当前不是解烦询问';
           return null;
         },
         async (st: GameState, params: Record<string, Json>): Promise<void> => {
-          const slot = st.pendingSlots.get(seatId);
-          const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType ?? '';
+          const rt = currentRequestType(st, seatId) ?? '';
           if (rt !== `${CHOOSE_RT_PREFIX}${seatId}`) return;
           // choice=true / confirmed=true → discard;否则 → draw
           st.localVars[choiceKey(seatId)] =
@@ -288,3 +287,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot 另用于 slot?.atom.type !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。

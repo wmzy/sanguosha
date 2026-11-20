@@ -12,7 +12,7 @@
 //       测的是新引擎 顶层 API + 距离/装备/杀的端到端协作。
 import { describe, it, expect } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/index';
-import { fireTimeoutAndWait, dispatchAndWait } from '../engine-harness';
+import { fireTimeoutAndWait, dispatchAndWait, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { inAttackRange } from '../../src/engine/rules/distance';
 import { slashMax } from '../../src/engine/rules/slash-quota';
 import '../../src/engine/atoms';
@@ -26,22 +26,12 @@ function makePlayer(opts: {
   skills: string[];
   health?: number;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: '',
     health: opts.health ?? 4,
     maxHealth: opts.health ?? 4,
-    alive: true,
-    hand: opts.hand,
-    equipment: {},
-    skills: opts.skills,
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 describe('杀 + 装备 + 距离', () => {

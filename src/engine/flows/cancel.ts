@@ -22,6 +22,7 @@ import type { GameState, Json } from '../types';
 import { TARGET_BROADCAST } from '../types';
 import { applyAtom } from '../core/apply';
 import { setFrameCancelled } from '../core/frame';
+import { discardProcessingCard } from '../core/processing-zone';
 import type { CancellableBy } from '../types';
 
 const RESPONDED_KEY = '抵消/已回应';
@@ -58,12 +59,7 @@ export async function promptCancel(
       if (dodgeIds.length > 0 && frame) {
         await setFrameCancelled(state, frame, true);
         for (const id of dodgeIds) {
-          await applyAtom(state, {
-            type: '移动牌',
-            cardId: id,
-            from: { zone: '处理区' },
-            to: { zone: '弃牌堆' },
-          });
+          await discardProcessingCard(state, id);
         }
       }
     }

@@ -40,7 +40,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, registerRespondForAllSeats } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const BASE_VAR = '界再起/base'; // turn.vars:本回合弃牌堆基线长度
@@ -90,7 +90,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
+      const rt = currentRequestType(st, seatId);
 
       // 孟获本人询问:仅 ownerId 座次回应
       if (rt === TRIGGER_RT || rt === CHOOSE_TARGETS_RT) {
@@ -117,8 +117,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return '当前不是界再起询问';
     },
     async (st: GameState, seatId: number, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(seatId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, seatId);
       if (rt === TRIGGER_RT) {
         st.localVars[TRIGGER_CONFIRMED_KEY] =
           params.choice === true || params.confirmed === true;
@@ -258,3 +257,6 @@ export function onMount(_skill: Skill, _api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

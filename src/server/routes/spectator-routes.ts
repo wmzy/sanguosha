@@ -9,20 +9,19 @@ import {
   approveView,
   rejectView,
   revokeView,
+  broadcastRoomState,
   type Room,
 } from '../room';
 import { requireUser, resolveApprover } from '../auth/guard';
 import type { ServerMessage } from '../protocol';
 import { gameSessions } from '../registry';
+import { readJsonBody, optString } from '../http';
 import {
   authRequired,
-  broadcastRoomState,
   detachFromOtherRooms,
   nullSink,
   notifyRoom,
-  optString,
   parseTargetSeat,
-  readJsonBody,
   requireRoom,
   requireRoomPassword,
   resolvePlayerOrRespond,
@@ -141,11 +140,11 @@ export function applySpectatorRoutes(app: Hono): void {
     // 可选座位号：spectator→player 时占据指定空座位
     const seat = typeof raw.seat === 'number' ? raw.seat : undefined;
 
-    const result = switchRole(roomId, playerId, newRole, seat);
-    if (!result.room) return c.json({ error: '房间不存在' }, 404);
-    if (!result.success) return c.json({ error: '切换失败（仅等待中/已结束允许，或房间已满）' }, 400);
+    const { room: switchedRoom, success } = switchRole(roomId, playerId, newRole, seat);
+    if (!switchedRoom) return c.json({ error: '房间不存在' }, 404);
+    if (!success) return c.json({ error: '切换失败（仅等待中/已结束允许，或房间已满）' }, 400);
 
-    notifyRoom(result.room, { type: 'role_changed', playerId, newRole });
+    notifyRoom(switchedRoom, { type: 'role_changed', playerId, newRole });
     return c.json({ success: true });
   });
 

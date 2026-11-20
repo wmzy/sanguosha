@@ -11,48 +11,11 @@
 //   6. 龙胆转化后触发:P0 杀 P1 → P1 用龙胆杀当闪 → 涯角触发
 //   7. 不同类放弃弃牌:不同类 → 选目标时 pass → 不弃置任何牌
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  character?: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 describe('涯角', () => {
   let harness: SkillTestHarness;

@@ -9,21 +9,11 @@
 //   5. 负面:董卓非主公 → 不触发
 //   6. 负面:自己造成伤害 → 不触发
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { runDamageFlow } from '../../src/engine/flows/damage';
-import { suitColor } from '../../src/engine/types';
 import type { Card, Faction, GameState, Identity, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -36,20 +26,7 @@ function makePlayer(opts: {
   skills?: string[];
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
+    ...sharedMakePlayer({ ...opts }),
     faction: opts.faction,
     identity: opts.identity,
   };

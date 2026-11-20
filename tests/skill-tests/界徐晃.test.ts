@@ -14,23 +14,12 @@
 //   - 界断粮距离规则:标版"目标手牌数≥自己则无限制";界版"本回合未造成过伤害则无限制"
 //   - 截辎:标版"他人跳摸牌后徐晃摸1张";界版完整辎标记系统 + 额外摸牌阶段
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable, disableAutoCompare } from '../engine-harness';
+import { SkillTestHarness, waitForStable, disableAutoCompare, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { applyAtom } from '../../src/engine/core/apply';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState, Mark, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
+import type { GameState, Mark, PlayerState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;
@@ -43,20 +32,7 @@ function makePlayer(opts: {
   marks?: Mark[];
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: '界徐晃',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['回合管理'],
-    vars: {},
-    marks: opts.marks ?? [],
-    pendingTricks: [],
-    tags: opts.tags ?? [],
-    judgeZone: [],
+    ...sharedMakePlayer({ ...opts, character: '界徐晃', skills: opts.skills ?? ['回合管理'] }),
     faction: '魏',
     identity: '主公',
   };

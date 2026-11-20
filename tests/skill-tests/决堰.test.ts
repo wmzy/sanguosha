@@ -3,7 +3,7 @@
 //   谦节:防连环 / 免疫延时锦囊 / 不能成为拼点目标 / 已废除槽不可装装备
 //   破势:觉醒(装备全废 或 体力为1)→ 减上限 + 摸至上限 + 失决堰 + 得怀柔
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 谦节Module from '../../src/engine/skills/谦节';
@@ -23,17 +23,6 @@ setSkillModuleOverride('破势', async () => 破势Module);
 
 const ABOLISH_PREFIX = '决堰/废除:';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-  subtype?: string,
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type, subtype };
-}
-
 function makePlayer(opts: {
   index: number;
   name: string;
@@ -44,22 +33,12 @@ function makePlayer(opts: {
   equipment?: PlayerState['equipment'];
   vars?: Record<string, unknown>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: '陆抗',
     health: opts.health ?? opts.maxHealth ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
     vars: (opts.vars as PlayerState['vars']) ?? {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 /** 构建标准测试 state:P0=陆抗(满血4/4),P1=敌方,出牌阶段 */

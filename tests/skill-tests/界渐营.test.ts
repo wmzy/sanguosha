@@ -16,7 +16,7 @@
 //   9. 第二段花色继承:上一张有花色 → 转化卡视为同花色(transform 单独触发,验证影子)
 //  10. 第二段无上一张:不继承花色(影子卡保留源卡花色)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
@@ -29,16 +29,6 @@ function suitColor(suit: '♠' | '♥' | '♣' | '♦'): '红' | '黑' {
   return suit === '♥' || suit === '♦' ? '红' : '黑';
 }
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
 function makeWeapon(
   id: string,
   name: string,
@@ -49,33 +39,15 @@ function makeWeapon(
   return { id, name, suit, color: suitColor(suit), rank, type: '装备牌', subtype: '武器', range };
 }
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  character?: string;
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界沮授',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    // 默认包含主技能 + 基本牌/装备/系统技能(以便转化目标能结算)
-    skills: opts.skills ?? ['界渐营', '杀', '闪', '桃', '酒', '装备通用'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+// 默认包含主技能 + 基本牌/装备/系统技能(以便转化目标能结算)
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({
+    character: '界沮授',
+    health: 3,
+    maxHealth: 3,
+    skills: ['界渐营', '杀', '闪', '桃', '酒', '装备通用'],
+    ...o,
+  });
 
 function lastSuit(state: GameState): string {
   const v = state.turn.vars[LAST_SUIT_KEY];

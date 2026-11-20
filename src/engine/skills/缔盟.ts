@@ -22,7 +22,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType, defineConfirmAction, engineCanPlayNowReason } from '../util/skillRuntime';
 
 /** 缔盟族差异参数。 */
 export interface DimengOptions {
@@ -204,7 +204,7 @@ export function createDimengSkill(opts: DimengOptions) {
         },
         async (st: GameState, params: Record<string, Json>): Promise<void> => {
           const slot = st.pendingSlots.get(ownerId);
-          const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+          const rt = currentRequestType(st, ownerId);
           if (rt === TARGET_RT) {
             const targets = params.targets as number[] | undefined;
             if (Array.isArray(targets) && targets.length === 2) {
@@ -292,3 +292,6 @@ export const { createSkill, onInit, onMount } = createDimengSkill(OPTIONS);
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] execute 的 slot 另读 prompt.cardFilter.min(弃牌数校验,
+// 非 requestType),保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。

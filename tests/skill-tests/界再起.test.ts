@@ -20,21 +20,11 @@
 //
 // 事实来源:OL hero/492 界孟获·界再起
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
-import type { Card, Faction, GameState, Json, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suit === '♠' || suit === '♣' ? '黑' : '红', rank, type };
-}
+import type { Faction, GameState, Json, PlayerState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;
@@ -49,20 +39,7 @@ function makePlayer(opts: {
   faction?: Faction;
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: opts.alive ?? true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: opts.vars ?? {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
+    ...sharedMakePlayer({ ...opts, character: opts.character ?? '' }),
     faction: opts.faction ?? '蜀',
   };
 }

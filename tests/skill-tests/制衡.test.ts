@@ -14,22 +14,12 @@
 //   注:「非自己回合 / 非出牌阶段 → 拒绝」未覆盖:制衡.validate 不校验发动回合/阶段
 //      (与仁德/义绝等同类主动技不一致),属疑似实现bug,故暂不写入会失败的用例。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { dispatch as engineDispatch } from '../../src/engine/index';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makeEquip(
   id: string,
@@ -51,22 +41,11 @@ function makePlayer(opts: {
   maxHealth?: number;
   equipment?: Record<string, string>;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: '孙权',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
     skills: opts.skills ?? ['制衡'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 describe('制衡', () => {

@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 import type { PersistedRoom } from '../../src/server/persistence';
 import { createGameState } from '../../src/engine/types';
 import type { GameState, PlayerState, Card } from '../../src/engine/types';
+import { makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 
 const TEST_DATA_DIR = join(process.cwd(), 'data', 'rooms');
 type PersistenceModule = typeof import('../../src/server/persistence');
@@ -23,7 +24,7 @@ let initRoomStore!: typeof import('../../src/server/roomStore').initRoomStore;
 let closeRoomStore!: typeof import('../../src/server/roomStore').closeRoomStore;
 let resetLifecycles!: typeof import('../../src/server/resourceRegistry')._resetForTests;
 let gameSessions!: typeof import('../../src/server/registry').gameSessions;
-let playerRoomMap!: typeof import('../../src/server/registry').playerRoomMap;
+let playerRoomMap!: typeof import('../../src/server/playerIndex').playerRoomMap;
 
 const saveRoom = (...args: Parameters<PersistenceModule['saveRoom']>) => persistence.saveRoom(...args);
 const loadRoom = (...args: Parameters<PersistenceModule['loadRoom']>) => persistence.loadRoom(...args);
@@ -58,7 +59,8 @@ async function loadTestModules(configureFs?: (isolatedFs: FsPromisesModule) => v
   ({ getRoom, createRoom } = await import('../../src/server/room'));
   ({ initRoomStore, closeRoomStore } = await import('../../src/server/roomStore'));
   ({ _resetForTests: resetLifecycles } = await import('../../src/server/resourceRegistry'));
-  ({ gameSessions, playerRoomMap } = await import('../../src/server/registry'));
+  ({ gameSessions } = await import('../../src/server/registry'));
+  ({ playerRoomMap } = await import('../../src/server/playerIndex'));
 }
 
 function applyAuthRoutesForTest(app: Hono): void {
@@ -66,25 +68,17 @@ function applyAuthRoutesForTest(app: Hono): void {
 }
 
 function makePlayer(index: number): PlayerState {
-  return {
+  return sharedMakePlayer({
     index,
     name: `玩家${index}`,
     character: '刘备',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
     hand: [`c${index}-1`, `c${index}-2`],
-    equipment: {},
-    pendingTricks: [],
     skills: ['仁德'],
-    vars: {},
-    marks: [],
-    tags: [],
-  };
+  });
 }
 
 function makeCard(id: string): Card {
-  return { id, name: '杀', suit: '♠', color: '黑', rank: '7', type: '基本牌' };
+  return sharedMakeCard(id, '杀', '♠', '7');
 }
 
 function makeState(): GameState {

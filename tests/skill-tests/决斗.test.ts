@@ -11,10 +11,9 @@
 //   负面(expectRejected):
 //     - 非自己回合 / pending 期间 / 目标是自己 / 牌名错 / 牌不在手
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
@@ -24,22 +23,11 @@ function makePlayer(opts: {
   skills?: string[];
   alive?: boolean;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: '主公',
-    health: 4,
-    maxHealth: 4,
-    alive: opts.alive ?? true,
-    hand: opts.hand ?? [],
-    equipment: {},
     skills: opts.skills ?? ['杀'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 function makeCard(
@@ -49,7 +37,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
+  return sharedMakeCard(id, name, suit, rank, type);
 }
 
 function buildState(opts?: {

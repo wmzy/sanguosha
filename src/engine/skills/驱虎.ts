@@ -19,7 +19,7 @@ import { registerRankUseAction, defineRankUseAction } from '../flows/rank';
 import { activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
-import { requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -114,10 +114,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         return '当前不是驱虎回应';
       },
       async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        const slot = st.pendingSlots.get(pid);
-        if (!slot) return;
-        const atom = slot.atom as unknown as Record<string, unknown>;
-        const reqType = atom.requestType as string;
+        const reqType = currentRequestType(st, pid);
         if (reqType === '驱虎/拼点') {
           st.localVars['驱虎/targetCard'] = params.cardId;
         } else if (reqType === '驱虎/选目标') {

@@ -35,7 +35,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { flipFaceDown, registerFlipSkipTurnHooks } from '../flows/face-down';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, askResponse, defineConfirmAction, firstTarget, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, askResponse, currentRequestType, defineConfirmAction, firstTarget, requireRequestType } from '../util/skillRuntime';
 
 // 放逐族共享键(localVars):确认与目标结果
 // (翻面标签 '放逐/翻面' 与跳过标志 '放逐/skipAll' 由 face-down 通用版按 reason '放逐'
@@ -88,8 +88,7 @@ export function createFangzhuSkill(opts: FangzhuOptions) {
         }).error;
       },
       async (st: GameState, params: Record<string, Json>) => {
-        const slot = st.pendingSlots.get(ownerId);
-        const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+        const rt = currentRequestType(st, ownerId);
         if (rt === opts.confirmRt) {
           st.localVars[CONFIRMED_KEY] = params.choice === true;
         } else if (rt === opts.targetRt) {

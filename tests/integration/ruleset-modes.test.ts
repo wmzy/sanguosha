@@ -7,7 +7,7 @@
 //      每人 5 候选;身份局仍为主公串行先行(回归保护)
 //   4. restore 路径:mode 经 state.config 持久化,1v1 快照恢复后 checkGameOver 仍按 1v1 判定
 import { describe, it, expect, beforeEach } from 'vitest';
-import { waitForStable } from '../engine-harness';
+import { waitForStable, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { bootstrap, dispatch, checkGameOver, create as createEngine } from '../../src/engine/index';
 import { createGameState } from '../../src/engine/types';
@@ -29,22 +29,7 @@ const CHARACTERS: Array<{ name: string; skills: string[] }> = [
 ];
 
 function makePlayer(index: number, name: string) {
-  return {
-    index,
-    name,
-    character: '',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ index, name, character: '' });
 }
 
 function seedDeck(state: GameState, n = 20) {

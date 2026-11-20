@@ -26,7 +26,7 @@ import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
 import { registerAction, declareAlternativeResponse } from '../core/skill';
-import { engineCanPlayNow, defineConfirmAction } from '../util/skillRuntime';
+import { engineCanPlayNow, defineConfirmAction, currentRequestType } from '../util/skillRuntime';
 import { inAttackRange } from '../rules/distance';
 import { defaultPlayActive, isLordOwner } from '../rules/action-active';
 
@@ -196,6 +196,7 @@ export function registerJijiangRespondActions(
           const slot = st.pendingSlots.get(seat);
           if (!slot) return '当前不需要回应';
           const atom = slot.atom as { type: string; requestType?: string };
+          const rt = currentRequestType(st, seat);
 
           // ── 响应型(代打出):主公被询问杀 → 逐个请求蜀角色出杀 ──
           if (atom.type === '询问杀') {
@@ -212,7 +213,7 @@ export function registerJijiangRespondActions(
           }
 
           // ── 主动型(代使用):蜀角色选杀 + 指定 killTarget ──
-          if (atom.requestType === opts.useRequestType) {
+          if (rt === opts.useRequestType) {
             const cardId = params.cardId as string | undefined;
             const targets = params.targets as number[] | undefined;
             if (typeof cardId !== 'string') return '请选择一张杀';
@@ -232,7 +233,7 @@ export function registerJijiangRespondActions(
           }
 
           // ── 额外窗口(界版被动型 drawChoice):放行,execute 记录选择 ──
-          if (atom.requestType !== undefined && opts.extraRequestTypes?.includes(atom.requestType)) {
+          if (rt !== undefined && opts.extraRequestTypes?.includes(rt)) {
             return null;
           }
 
@@ -241,6 +242,7 @@ export function registerJijiangRespondActions(
         async (st: GameState, params: Record<string, Json>): Promise<void> => {
           const slot = st.pendingSlots.get(seat);
           const atom = slot?.atom as { type: string; requestType?: string } | undefined;
+          const rt = currentRequestType(st, seat);
 
           // ── 响应型(代打出):逐个请求蜀角色出杀,第一个出杀即止 ──
           if (atom?.type === '询问杀') {
@@ -284,7 +286,7 @@ export function registerJijiangRespondActions(
           }
 
           // ── 主动型(代使用):记录蜀角色的出杀选择 ──
-          if (atom?.requestType === opts.useRequestType) {
+          if (rt === opts.useRequestType) {
             st.localVars[opts.useChoiceVar] = {
               cardId: params.cardId as string,
               targets: params.targets as number[],
@@ -293,11 +295,8 @@ export function registerJijiangRespondActions(
           }
 
           // ── 额外窗口(界版被动型):记录选择 ──
-          if (
-            atom?.requestType !== undefined &&
-            opts.extraRequestTypes?.includes(atom.requestType)
-          ) {
-            opts.onExtraRequest?.(st, seat, atom.requestType, params);
+          if (rt !== undefined && opts.extraRequestTypes?.includes(rt)) {
+            opts.onExtraRequest?.(st, seat, rt, params);
           }
         },
       ),
@@ -419,3 +418,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+
+// [requestType 迁移·不迁项] respond validate/execute 里的 slot.atom 另用于
+// atom.type === '询问杀' 分流(非 requestType),保留手写 pendingSlots.get;
+// requestType 读取已全部走 currentRequestType。

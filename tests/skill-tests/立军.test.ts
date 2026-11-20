@@ -12,21 +12,11 @@
 //   2. 回归:武圣转化杀 → 同样触发,主公获得的是还原后的原卡
 //   3. 负面:非吴势力角色用杀 → 不触发
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../engine-harness';
+import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, Faction, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -35,23 +25,7 @@ function makePlayer(opts: {
   skills?: string[];
   faction?: Faction;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-    faction: opts.faction,
-  };
+  return { ...sharedMakePlayer({ character: '', ...opts }), faction: opts.faction };
 }
 
 describe('立军', () => {

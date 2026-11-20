@@ -23,9 +23,15 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import type { SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import { registerSlashExtraProvider, projectSlashExtra } from '../rules/slash-quota';
-import { askConfirm, effectiveCardId, requireRequestType } from '../util/skillRuntime';
+import {
+  askConfirm,
+  currentRequestType,
+  effectiveCardId,
+  registerRespondForAllSeats,
+  requireRequestType,
+} from '../util/skillRuntime';
 
 const ALLY_CONFIRM_RT = '立军/盟友确认'; // 问盟友:是否把杀交给主公
 const LORD_CONFIRM_RT = '立军/主公确认'; // 问主公:是否令其摸牌+杀次+1
@@ -178,22 +184,18 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // ── respond action:为所有玩家注册(盟友 + 主公都可能被问) ──
-  for (const p of state.players) {
-    const seatId = p.index;
-    const u = registerAction(
+  unloads.push(
+    ...registerRespondForAllSeats(
       state,
       skill.id,
-      seatId,
-      'respond',
-      (st: GameState, _params: Record<string, Json>): string | null => {
+      (st: GameState, seatId: number, _params: Record<string, Json>): string | null => {
         return requireRequestType(st, seatId, [ALLY_CONFIRM_RT, LORD_CONFIRM_RT], {
           wrongTypeError: '当前不是立军窗口',
           mismatchError: '当前不是立军窗口',
         }).error; // confirm:确认/取消都接受
       },
-      async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        const slot = st.pendingSlots.get(seatId)!;
-        const rt = (slot.atom as { requestType?: string }).requestType;
+      async (st: GameState, seatId: number, params: Record<string, Json>): Promise<void> => {
+        const rt = currentRequestType(st, seatId);
         const yes = params.choice === true || params.confirmed === true;
         if (rt === ALLY_CONFIRM_RT) {
           st.localVars[ALLY_CONFIRM_KEY] = yes;
@@ -201,9 +203,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           st.localVars[LORD_CONFIRM_KEY] = yes;
         }
       },
-    );
-    unloads.push(u);
-  }
+    ),
+  );
 
   return () => {
     for (const u of unloads) u();

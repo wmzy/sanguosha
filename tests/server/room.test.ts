@@ -22,9 +22,6 @@ import {
   rejectView,
   revokeView,
   broadcastMessage,
-  addChatMessage,
-  getChatHistory,
-  resetChatUsage,
   buildRoomState,
   moveSeat,
   requestSeatSwap,
@@ -32,6 +29,7 @@ import {
   kickPlayer,
   ensureSeatOnReconnect,
 } from '../../src/server/room';
+import { addChatMessage, getChatHistory, resetChatUsage } from '../../src/server/chat';
 import { normalizeRoomConfig, DEFAULT_ROOM_CONFIG } from '../../src/server/protocol';
 import { resolveTimeoutMs } from '../../src/engine/core/timeout';
 import type { GameState } from '../../src/engine/types';
@@ -519,9 +517,9 @@ describe('旁观者管理', () => {
 
     const result = switchRole(room.id, 'p2', 'spectator');
     expect(result.success).toBe(true);
-    expect(result.room.players.has('p2')).toBe(false);
-    expect(result.room.spectators.has('p2')).toBe(true);
-    expect(result.room.readyPlayers.has('p2')).toBe(false);
+    expect(result.room!.players.has('p2')).toBe(false);
+    expect(result.room!.spectators.has('p2')).toBe(true);
+    expect(result.room!.readyPlayers.has('p2')).toBe(false);
   });
 
   it('switchRole spectator→player 应在等待中且未满时成功', () => {
@@ -530,8 +528,8 @@ describe('旁观者管理', () => {
 
     const result = switchRole(room.id, 'spec1', 'player');
     expect(result.success).toBe(true);
-    expect(result.room.spectators.has('spec1')).toBe(false);
-    expect(result.room.players.has('spec1')).toBe(true);
+    expect(result.room!.spectators.has('spec1')).toBe(false);
+    expect(result.room!.players.has('spec1')).toBe(true);
   });
 
   it('switchRole 进行中不允许切换', () => {
@@ -552,8 +550,8 @@ describe('旁观者管理', () => {
 
     const result = switchRole(room.id, 'spec1', 'player');
     expect(result.success).toBe(true);
-    expect(result.room.players.has('spec1')).toBe(true);
-    expect(result.room.seats).toContain('spec1');
+    expect(result.room!.players.has('spec1')).toBe(true);
+    expect(result.room!.seats).toContain('spec1');
   });
 
   it('switchRole player→spectator 已结束状态允许转旁观', () => {
@@ -563,7 +561,7 @@ describe('旁观者管理', () => {
 
     const result = switchRole(room.id, 'p2', 'spectator');
     expect(result.success).toBe(true);
-    expect(result.room.spectators.has('p2')).toBe(true);
+    expect(result.room!.spectators.has('p2')).toBe(true);
   });
 
   it('switchRole spectator→player 房间满时失败', () => {

@@ -28,24 +28,10 @@ import {
   engineCanPlayNowReason,
   type TransformActionOptions,
 } from '../util/skillRuntime';
-import { DISTANCE_ATTACK_MOD_KEY } from '../rules/vars-keys';
+// 田计数/距离修正 与 屯田共享(同一份"田"语义,避免逐字复制)
+import { tianCount, syncDistanceMod } from './屯田';
 
 const TIAN_PREFIX = '屯田/田:';
-
-/** 数当前玩家的田数量 */
-function tianCount(state: GameState, player: number): number {
-  return state.players[player].marks.filter((m) => m.id.startsWith(TIAN_PREFIX)).length;
-}
-
-/** 重新计算并写入距离修正 vars(每张田 = -1 距离 = 进攻修正 +1) */
-function syncDistanceMod(state: GameState, player: number): void {
-  const count = tianCount(state, player);
-  if (count > 0) {
-    state.players[player].vars[DISTANCE_ATTACK_MOD_KEY] = count;
-  } else {
-    delete state.players[player].vars[DISTANCE_ATTACK_MOD_KEY];
-  }
-}
 
 const OPTIONS: TransformActionOptions = {
   outputName: '顺手牵羊',

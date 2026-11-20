@@ -17,52 +17,28 @@
 //  10. 多目标:转化火杀选 2 目标 → 两个目标都扣血
 //  11. 原始火杀(非转化):造成伤害不触发代价(代价仅限疠火转化杀)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
+const makeCard = (
   id: string,
   name: string,
   suit: '♠' | '♥' | '♣' | '♦' = '♠',
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
   damageType?: '普通' | '火焰' | '雷电',
-): Card {
-  const c: Card = { id, name, suit, color: suitColor(suit), rank, type };
-  if (damageType) c.damageType = damageType;
-  return c;
-}
+): Card =>
+  damageType === undefined
+    ? sharedMakeCard(id, name, suit, rank, type)
+    : { ...sharedMakeCard(id, name, suit, rank, type), damageType };
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  faction?: '魏' | '蜀' | '吴' | '群';
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界程普',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-    faction: opts.faction ?? '吴',
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0] & { faction?: '魏' | '蜀' | '吴' | '群' }) => ({
+  ...sharedMakePlayer({ character: '界程普', ...o }),
+  faction: o.faction ?? '吴',
+});
 
 describe('界疠火', () => {
   let harness: SkillTestHarness;

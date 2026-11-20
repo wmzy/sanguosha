@@ -19,21 +19,10 @@
 //   8. rollback:万箭齐发.use validate 失败 → 两张原卡还原、影子删除
 //   9. availableActions:界乱击 transform 声明,prompt 卡过滤 min/max=2
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -45,20 +34,7 @@ function makePlayer(opts: {
   maxHealth?: number;
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['杀', '闪'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
+    ...sharedMakePlayer({ ...opts, character: opts.name, skills: opts.skills ?? ['杀', '闪'] }),
     faction: opts.faction,
   };
 }

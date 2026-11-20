@@ -16,7 +16,7 @@
 //   6. 负面:装备不存在的牌 → 拒绝
 //   7. 负面:八卦阵判定黑色 + P1 出真闪 → 正常闪避
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -34,16 +34,6 @@ function makeEquip(
   return { id, name, suit, color: suitColor(suit), rank, type: '装备牌', subtype, range };
 }
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
 function makePlayer(opts: {
   index: number;
   name: string;
@@ -53,22 +43,11 @@ function makePlayer(opts: {
   maxHealth?: number;
   equipment?: Record<string, string>;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
     skills: opts.skills ?? ['装备通用'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 describe('八卦阵', () => {

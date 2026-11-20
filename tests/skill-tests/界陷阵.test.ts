@@ -15,23 +15,13 @@
 //   9. 不是自己回合 → 拒绝;不能与自己拼点;目标无手牌 → 拒绝
 //  10. 回合结束 → turn.vars 自动清空
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../engine-harness';
+import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { slashMax, slashUsed } from '../../src/engine/rules/slash-quota';
 import { handLimit } from '../../src/engine/rules/hand-limit';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -42,22 +32,7 @@ function makePlayer(opts: {
   maxHealth?: number;
   equipment?: PlayerState['equipment'];
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界高顺',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '界高顺', ...opts });
 }
 
 describe('界陷阵', () => {

@@ -17,6 +17,7 @@
 import type { Card, GameState, Json } from '../../types';
 import type { CardEffect } from '../../types';
 import { setFrameCancelled } from '../../core/frame';
+import { requireHandCard } from '../../util/skillRuntime';
 import type { Color } from '../../../engine/types';
 
 const COLOR_LIMIT_VAR = '闪/色限制';
@@ -47,10 +48,9 @@ export const dodgeEffect: CardEffect = {
       if (!isDodgeWindow) return '当前不是出闪的窗口';
       const cardId = params.cardId as string | undefined;
       if (cardId) {
-        const self = state.players[ownerId];
-        if (!self.hand.includes(cardId)) return '牌不在手牌中';
+        const handCheck = requireHandCard(state, ownerId, cardId, '闪');
+        if (handCheck) return handCheck;
         const card = state.cardMap[cardId];
-        if (card?.name !== '闪') return '只能打出闪';
         const limit = state.localVars[COLOR_LIMIT_VAR] as Color | undefined;
         if (limit && card.color !== limit) return `只能打出${limit}色的闪`;
       }

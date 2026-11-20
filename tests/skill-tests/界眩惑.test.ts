@@ -11,7 +11,7 @@
 //   4. 触发条件不满足:手牌<2 → 不触发
 //   5. 仅有一项可选:X 无杀 → 强制走选项 2
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 界眩惑Module from '../../src/engine/skills/界眩惑';
@@ -22,43 +22,8 @@ import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  character?: string;
-  alive?: boolean;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界法正',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: opts.alive ?? true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['界眩惑'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界法正', health: 3, maxHealth: 3, skills: ['界眩惑'], ...o });
 
 /** 触发 P0 的摸牌阶段结束:applyAtom(阶段结束, 0, 摸牌)
  *  关键:不能 await applyAtom——after-hook 会创建 pending 阻塞,需 void 启动后等稳定。

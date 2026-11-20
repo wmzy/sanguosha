@@ -13,7 +13,7 @@
 //   - 杀.execute 下一轮 结算 读帧 resolvedTargets[i] 而非原始 targets[i]
 import { describe, it, expect } from 'vitest';
 import { registerSkillsFromState } from '../../src/engine/index';
-import { dispatchAndWait, fireTimeoutAndWait } from '../engine-harness';
+import { dispatchAndWait, fireTimeoutAndWait, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { buildView } from '../../src/engine/view/buildView';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
@@ -26,23 +26,9 @@ function makePlayer(opts: {
   equipment?: Record<string, string>;
   skills?: string[];
   health?: number;
+  maxHealth?: number;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.health ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: '主公', maxHealth: opts.maxHealth ?? opts.health ?? 4 });
 }
 
 describe('流离:成为杀的目标时转移', () => {

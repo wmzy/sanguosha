@@ -8,21 +8,12 @@
 //   4. 自己的判定:不触发
 //   5. 不发动:拒绝摸牌
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { runJudgeFlow } from '../../src/engine/flows/judge';
 import type { Card, Faction, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -34,23 +25,7 @@ function makePlayer(opts: {
   character?: string;
   faction?: Faction;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '曹丕',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-    faction: opts.faction ?? '魏',
-  };
+  return { ...sharedMakePlayer({ character: '曹丕', ...opts }), faction: opts.faction ?? '魏' };
 }
 
 function buildDeck(cardMap: Record<string, Card>, n: number): string[] {

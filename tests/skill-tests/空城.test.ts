@@ -6,21 +6,11 @@
 //   2. 正面:无手牌时被决斗 → 成为目标被 cancel → 不结算,不受伤害
 //   3. 负面:有手牌时空城不生效 → 被杀正常结算扣血
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -31,22 +21,7 @@ function makePlayer(opts: {
   maxHealth?: number;
   character?: string;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '诸葛亮',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '诸葛亮', health: 3, maxHealth: 3, ...opts });
 }
 
 describe('空城', () => {

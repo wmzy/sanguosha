@@ -13,50 +13,18 @@
 //   4. 无有效目标(其他角色都无手牌)→ 不询问,默认摸 2 张
 //   5. respond:无 pending → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../engine-harness';
+import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界张辽',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['界突袭', '回合管理'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-    faction: '魏',
-    identity: '主公',
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]): PlayerState => ({
+  ...sharedMakePlayer({ character: '界张辽', skills: ['界突袭', '回合管理'], ...o }),
+  faction: '魏',
+  identity: '主公',
+});
 
 describe('界突袭', () => {
   let harness: SkillTestHarness;

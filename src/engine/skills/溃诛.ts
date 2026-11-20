@@ -26,7 +26,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { getHealthValue } from '../types';
-import { requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType } from '../util/skillRuntime';
 
 const OPTION_RT = '溃诛/选择'; // chooseOption:摸牌/伤害/不发动
 const DRAW_RT = '溃诛/摸牌选目标'; // choosePlayer:1..X 名角色
@@ -172,17 +172,17 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         { wrongTypeError: '当前不是溃诛窗口', mismatchError: '当前不是溃诛窗口' },
       );
       if (check.error) return check.error;
-      const atom = st.pendingSlots.get(ownerId)!.atom as { requestType?: string };
+      const rt = currentRequestType(st, ownerId);
       const X = (st.localVars[X_KEY] as number | undefined) ?? 0;
 
-      if (atom.requestType === OPTION_RT) {
+      if (rt === OPTION_RT) {
         const opt = params.option;
         if (opt !== OPT_DRAW && opt !== OPT_DAMAGE && opt !== OPT_SKIP) {
           return '请选择一项';
         }
         return null;
       }
-      if (atom.requestType === DRAW_RT) {
+      if (rt === DRAW_RT) {
         const targets = params.targets as number[] | undefined;
         if (!Array.isArray(targets) || targets.length === 0) return '请选择至少一名角色';
         if (targets.length > X) return `至多选择 ${X} 名角色`;
@@ -194,7 +194,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
         return null;
       }
-      if (atom.requestType === DAMAGE_RT) {
+      if (rt === DAMAGE_RT) {
         const targets = params.targets as number[] | undefined;
         if (!Array.isArray(targets) || targets.length === 0) return '请选择至少一名角色';
         if (targets.length > X) return `至多选择 ${X} 名角色`;
@@ -211,13 +211,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId)!;
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType === OPTION_RT) {
+      const rt = currentRequestType(st, ownerId);
+      if (rt === OPTION_RT) {
         st.localVars[OPTION_KEY] = params.option;
-      } else if (atom.requestType === DRAW_RT) {
+      } else if (rt === DRAW_RT) {
         st.localVars[DRAW_KEY] = params.targets;
-      } else if (atom.requestType === DAMAGE_RT) {
+      } else if (rt === DAMAGE_RT) {
         st.localVars[DAMAGE_KEY] = params.targets;
       }
     },

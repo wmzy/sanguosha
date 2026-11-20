@@ -14,6 +14,7 @@
 //   7. 死亡时 before-hook 可 cancel 跳过系统处理牌(保留时机扩展能力)。
 //   8. 身份揭示:亮身份牌 atom 携带阵亡者 identity。
 import { describe, it, expect, beforeEach } from 'vitest';
+import { makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms'; // 注册所有 atom(含 death-timing)
 import { createGameState } from '../../src/engine/types';
 import type { Atom, GameState, PlayerState } from '../../src/engine/types';
@@ -30,20 +31,7 @@ function makePlayer(opts: {
   identity?: PlayerState['identity'];
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
+    ...sharedMakePlayer({ ...opts, character: opts.name }),
     ...(opts.identity ? { identity: opts.identity } : {}),
   };
 }

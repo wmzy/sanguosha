@@ -38,37 +38,13 @@ import {
   viewSlashTargetMax,
 } from '../../src/engine/rules/action-active';
 import { slashTargetMax, registerSlashTargetProvider } from '../../src/engine/rules/slash-target';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 
 // ─── 公共构造 ──────────────────────────────────────────────
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
-
 function makePlayer(opts: { index: number; name: string; hand?: string[]; skills?: string[] }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '测试',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-  };
+  return sharedMakePlayer({ ...opts, character: '测试' });
 }
 
 function makeState(): GameState {

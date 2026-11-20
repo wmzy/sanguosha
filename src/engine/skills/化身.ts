@@ -56,7 +56,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
 import { getCharacterMeta } from '../data/character-meta';
 import { HUASHEN_POOL_KEY as POOL_KEY, getHuashenPool } from '../rules/vars-keys';
-import { askConfirm, askResponse, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, askResponse, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 // ── 角色分派 ──
 const JIE_CHAR = '界左慈';
@@ -181,7 +181,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
+      const rt = currentRequestType(st, ownerId);
 
       // ── 界版:选择行动(1=替换 2=移去 3=不操作) ──
       if (rt === ACTION_REQUEST) {
@@ -227,8 +227,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return '当前不是化身询问';
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId)!;
-      const rt = (slot.atom as Record<string, unknown>).requestType as string;
+      const rt = currentRequestType(st, ownerId);
       if (rt === ACTION_REQUEST) {
         st.localVars[ACTION_CHOICE_KEY] = Number(params.option);
       } else if (rt === SWAP_COUNT_REQUEST) {
@@ -569,3 +568,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

@@ -8,25 +8,13 @@
 //   4. 不出闪(超时)后,两个 viewer 的 pending 都应清除
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: { index: number; name: string; hand: string[]; skills: string[] }) {
-  return {
-    ...opts,
-    character: '主公',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    equipment: {},
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer(opts);
 }
 
 function buildState(opts?: { p2Hand?: string[]; extraCardMap?: Record<string, Card> }): GameState {

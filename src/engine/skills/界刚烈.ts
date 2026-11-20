@@ -24,7 +24,7 @@ import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm, registerOnDamagedAsTarget } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, registerOnDamagedAsTarget } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '界刚烈/confirm';
 const PICK_REQUEST = '界刚烈/选牌';
@@ -53,7 +53,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const requestType = atom['requestType'] as string;
+      const requestType = currentRequestType(st, ownerId);
       if (requestType === CONFIRM_REQUEST) return null; // 是否发动
       if (requestType !== PICK_REQUEST) return '当前不是界刚烈回应';
       // 选牌:校验 zone + cardId/handIndex(同过河拆桥/反馈)
@@ -70,10 +70,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const requestType = (slot?.atom as Record<string, unknown> | undefined)?.['requestType'] as
-        | string
-        | undefined;
+      const requestType = currentRequestType(st, ownerId);
       if (requestType === CONFIRM_REQUEST) {
         st.localVars['界刚烈/confirmed'] = params.choice === true;
         return;
@@ -168,3 +165,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

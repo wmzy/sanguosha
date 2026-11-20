@@ -18,27 +18,16 @@
 // 测试技巧:hook 创建 pending 时不能用 await applyAtom(会阻塞),
 //   用 void + waitForStable 模式(同 遗计/救援/界诛害 测试)。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 界恩怨Module from '../../src/engine/skills/界恩怨';
 setSkillModuleOverride('界恩怨', async () => 界恩怨Module);
 
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import { runDamageFlow } from '../../src/engine/flows/damage';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
+import type { GameState, PlayerState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;
@@ -50,22 +39,13 @@ function makePlayer(opts: {
   character?: string;
   alive?: boolean;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: opts.character ?? '界法正',
     health: opts.health ?? 3,
     maxHealth: opts.maxHealth ?? 3,
-    alive: opts.alive ?? true,
-    hand: opts.hand ?? [],
-    equipment: {},
     skills: opts.skills ?? ['界恩怨'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-  };
+  });
 }
 
 /** 模拟"法正从 from 获得 2 张牌"的批次(同 depth=0,同批次计数)。

@@ -6,7 +6,7 @@
 import type { Card } from '../../types';
 import { applyAtom } from '../../core/apply';
 import { defaultPlayActive } from '../../rules/action-active';
-import { firstTarget, requireRequestType } from '../../util/skillRuntime';
+import { firstTarget, requireHandCard, requireRequestType } from '../../util/skillRuntime';
 import type { CardEffect, GameState, ResolveCtx } from '../../types';
 
 /** 桃的牌特有校验：目标必须已受伤 */
@@ -60,21 +60,17 @@ export const peachEffect: CardEffect = {
   // runDyingFlow 据此判断是否有人救援。
   respond: {
     validate: (state, ownerId, params) => {
-      // pending 必须是 请求回应 且 requestType='求桃'
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if ((slot.atom as { target: number }).target !== ownerId) return '不是问你的';
+      // pending 必须是 请求回应 且 requestType='求桃'(ownerCheck:只问本人)
       const check = requireRequestType(state, ownerId, ['桃/求桃'], {
         wrongTypeError: '当前不是求桃',
         mismatchError: '当前不是求桃',
+        ownerCheck: ownerId,
       });
       if (check.error) return check.error;
       const cardId = params.cardId as string | undefined;
       if (cardId) {
-        const self = state.players[ownerId];
-        if (!self.hand.includes(cardId)) return '牌不在手牌中';
-        const card = state.cardMap[cardId];
-        if (card.name !== '桃') return '只能用桃救援';
+        const handCheck = requireHandCard(state, ownerId, cardId, '桃');
+        if (handCheck) return handCheck;
       }
       return null;
     },

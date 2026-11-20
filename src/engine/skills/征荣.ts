@@ -22,7 +22,7 @@ import { applyAtom } from '../core/apply';
 import { topFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
 
@@ -71,7 +71,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as { type: string; requestType?: string };
       if (atom.type !== '请求回应') return '当前不需要回应';
-      const rt = atom.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         return null; // confirm:接受 choice/confirmed 布尔
       }
@@ -95,8 +95,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return '当前不是征荣回应';
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === PICK_TARGET_RT) {
@@ -223,3 +222,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom.type !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

@@ -8,21 +8,11 @@
 //   4. 负面:董卓出杀 → 男性 target 一张闪即可(肉林不生效)
 //   5. 边界:董卓出万箭齐发 → 女性目标一张闪即抵消(肉林仅对杀生效,镜像无双)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -32,22 +22,7 @@ function makePlayer(opts: {
   skills?: string[];
   health?: number;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character,
-    health: opts.health ?? 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer(opts);
 }
 
 describe('肉林', () => {

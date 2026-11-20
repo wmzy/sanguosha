@@ -48,7 +48,7 @@ import {
   registerBeforeHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 const SKILL_ID = '界潜袭';
 const DISPLAY_NAME = '潜袭';
@@ -131,7 +131,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const reqType = atom['requestType'] as string | undefined;
+      const reqType = currentRequestType(st, ownerId);
       if (reqType === CONFIRM_RT) {
         if (typeof params.choice !== 'boolean') return '需要选择一项';
         return null;
@@ -145,8 +145,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return '当前不是界潜袭回应';
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const reqType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const reqType = currentRequestType(st, ownerId);
       if (reqType === CONFIRM_RT) {
         st.localVars[CONFIRM_KEY] = params.choice === true;
       } else if (reqType === PICK_RT) {
@@ -390,3 +389,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

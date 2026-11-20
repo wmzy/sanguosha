@@ -30,8 +30,9 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction } from '../core/skill';
 import { popFrame, pushFrame } from '../core/frame';
+import { discardProcessingCard } from '../core/processing-zone';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
-import { engineCanPlayNowReason } from '../util/skillRuntime';
+import { currentRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
 
 /** 拼点/点数牌通用点数:A=1, 2-10=面值, J=11, Q=12, K=13。
  *  各拼点技(天义/驱虎/烈刃/制霸 等)与点数技(界烈弓/界称象/酣战)共用。
@@ -96,18 +97,9 @@ export async function runRankCompareFlow(
   const result: '赢' | '没赢' = initVal > targetVal ? '赢' : '没赢';
 
   // 牌入弃牌堆(在 拼点后 之前发出——酣战获杀/纵适获牌 等钩子读 discardPile 取牌,须先入弃牌堆)
-  await applyAtom(state, {
-    type: '移动牌',
-    cardId: initiatorCard,
-    from: { zone: '处理区' },
-    to: { zone: '弃牌堆' },
-  });
-  await applyAtom(state, {
-    type: '移动牌',
-    cardId: targetCard,
-    from: { zone: '处理区' },
-    to: { zone: '弃牌堆' },
-  });
+  for (const cardId of [initiatorCard, targetCard]) {
+    await discardProcessingCard(state, cardId);
+  }
 
   // 时机3:拼点后(after-hook 触发拼点后效果:酣战获杀/纵适获牌)
   await applyAtom(state, {
@@ -240,8 +232,7 @@ export function registerRankCardRespond(
         if (!slot) return '当前不需要回应';
         const atom = slot.atom as unknown as Record<string, unknown>;
         if (atom.type !== '请求回应') return '当前不需要回应';
-        const reqType = atom.requestType as string;
-        if (reqType !== opts.requestType) return opts.mismatchError;
+        if (currentRequestType(st, pid) !== opts.requestType) return opts.mismatchError;
         if ((atom.target as number) !== pid) return '不是问你的';
         const cardId = params.cardId as string;
         if (typeof cardId !== 'string') return '请选择一张拼点牌';
@@ -252,7 +243,7 @@ export function registerRankCardRespond(
         const slot = st.pendingSlots.get(pid);
         if (!slot) return;
         const atom = slot.atom as unknown as Record<string, unknown>;
-        if (atom.type !== '请求回应' || (atom.requestType as string) !== opts.requestType) return;
+        if (atom.type !== '请求回应' || currentRequestType(st, pid) !== opts.requestType) return;
         st.localVars[opts.answerKey] = params.cardId;
       },
     );

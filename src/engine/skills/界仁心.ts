@@ -33,7 +33,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { flipFaceDown, registerFlipSkipTurnHooks } from '../flows/face-down';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import { EQUIP_SLOTS } from '../util/equip-slot';
 import type { SkillModule } from '../types';
 
@@ -98,8 +98,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as Record<string, unknown>)?.requestType as string;
+      const rt = currentRequestType(st, ownerId);
       if (rt === '界仁心/confirm') {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === '界仁心/selectCard') {

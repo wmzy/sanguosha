@@ -13,7 +13,7 @@
 //   5. 手牌上限豁免:获得 N 张黑牌后 handLimit = 体力 + N(本回合不计入上限)
 //   6. 手牌上限豁免动态:获得后使用掉,豁免数随之减少
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -21,36 +21,8 @@ import { applyAtom } from '../../src/engine/core/apply';
 import { handLimit } from '../../src/engine/rules/hand-limit';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A'): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  character?: string;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界甄姬',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['界洛神'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界甄姬', health: 3, maxHealth: 3, skills: ['界洛神'], ...o });
 
 /** 触发准备阶段:applyAtom(阶段开始, 0, 准备) → 洛神 after-hook 启动循环 */
 async function triggerPreparePhase(harness: SkillTestHarness): Promise<void> {

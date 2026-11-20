@@ -12,6 +12,7 @@
 import type { Card, GameState, Json } from '../../types';
 import { findPendingSlot } from '../../core/skill';
 import { setFrameCancelled } from '../../core/frame';
+import { requireHandCard } from '../../util/skillRuntime';
 import type { CardEffect } from '../../types';
 
 const CARD_NAME = '无懈可击';
@@ -34,9 +35,8 @@ export function nullifyRespondValidate(
   if (!cardId) return 'cardId required';
   const self = state.players[ownerId];
   if (!self.alive) return '你已死亡';
-  if (!self.hand.includes(cardId)) return '牌不在手牌中';
-  const card = state.cardMap[cardId];
-  if (card.name !== CARD_NAME) return '只能打出无懈可击';
+  const handCheck = requireHandCard(state, ownerId, cardId, CARD_NAME);
+  if (handCheck) return handCheck;
   return null;
 }
 

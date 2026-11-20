@@ -15,21 +15,10 @@
 //   7. 负面拒绝:选择不发动(CONFIRM 取消)→ 界小乔正常受伤,红桃牌保留
 //   8. 摸牌封顶:选项①目标已损失体力>5 → 摸牌数封顶 5(至多5)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import type { Card, EquipSlot, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -40,22 +29,7 @@ function makePlayer(opts: {
   maxHealth?: number;
   equipment?: Partial<Record<EquipSlot, string>>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界小乔',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? opts.health ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: '界小乔', maxHealth: opts.maxHealth ?? opts.health ?? 4 });
 }
 
 describe('界天香', () => {

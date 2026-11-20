@@ -17,7 +17,7 @@
 //   6. 回血(获得路径):顺手牵羊顺走 → 回 1 血
 //   7. 回血(替换路径):装备新防具替换 → 回 1 血
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { applyAtom } from '../../src/engine/core/apply';
 import { runDamageFlow } from '../../src/engine/flows/damage';
@@ -33,22 +33,7 @@ function makePlayer(opts: {
   health?: number;
   equipment?: Record<string, string>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '',
-    health: opts.health ?? 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '', ...opts });
 }
 
 // 白银狮子牌(防具)

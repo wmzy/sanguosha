@@ -3,6 +3,7 @@
 // 其他 viewer 错误匹配到主公 slot → 共用倒计时 + 渲染别人的选将界面。
 // 修复后:buildView 只匹配 viewer 专属 slot 或广播型 slot(target===TARGET_BROADCAST)。
 import { describe, it, expect, beforeEach } from 'vitest';
+import { makePlayer as sharedMakePlayer } from '../engine-harness';
 import { bootstrap, dispatch, buildView } from '../../src/engine/index';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
@@ -15,22 +16,7 @@ const CHARACTERS = allCharacters.map((c) => ({
 }));
 
 function makePlayer(index: number, name: string) {
-  return {
-    index,
-    name,
-    character: '',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ index, name, character: '' });
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

@@ -7,21 +7,11 @@
 //   3. 杀命中 + 无古锭刀 + 目标无手牌 → 正常伤害(扣1血,对照)
 //   4. 决斗伤害 + 古锭刀 → 不触发(仅杀伤害才加伤)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, Json, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -32,22 +22,13 @@ function makePlayer(opts: {
   health?: number;
   vars?: Record<string, unknown>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: '主公',
     health: opts.health ?? 4,
     maxHealth: opts.health ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
     vars: (opts.vars ?? {}) as Record<string, Json>,
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 describe('古锭刀:杀造成伤害时目标无手牌则伤害+1', () => {

@@ -8,10 +8,9 @@ import {
   allReady,
   getRoom,
   broadcastMessage,
-  addChatMessage,
-  resetChatUsage,
-  getChatHistory,
+  broadcastRoomState,
 } from '../room';
+import { addChatMessage, resetChatUsage, getChatHistory } from '../chat';
 import {
   createSnapshot,
   patchSnapshotDescription,
@@ -19,11 +18,9 @@ import {
 } from '../snapshot';
 import { GameSession } from '../session';
 import { gameSessions } from '../registry';
+import { readJsonBody, optString } from '../http';
 import {
-  broadcastRoomState,
   notifyRoom,
-  optString,
-  readJsonBody,
   requireRoom,
   requireRoomMember,
   requireSessionHost,

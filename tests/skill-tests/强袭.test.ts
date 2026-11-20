@@ -2,7 +2,7 @@
 //   出牌阶段限两次:失去1点体力或弃一张武器牌,
 //   对一名本回合内未以此法指定过的其他角色造成1点伤害。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -14,16 +14,6 @@ import {
   getActionsForPlayer,
 } from '../../src/client/skillActionRegistry';
 import { buildView, dispatch } from '../../src/engine/index';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makeWeapon(
   id: string,
@@ -45,22 +35,7 @@ function makePlayer(opts: {
   equipment?: Record<string, string>;
   character?: string;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '典韦',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? '典韦' });
 }
 
 function buildCount(state: GameState, ownerId: number): number {

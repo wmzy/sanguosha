@@ -39,7 +39,7 @@ import { applyAtom } from '../core/apply'
 import { pushFrame, popFrame } from '../core/frame';
 import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, defineConfirmAction, registerOnDamagedAsTarget, registerRespondForAllSeats } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, registerOnDamagedAsTarget, registerRespondForAllSeats } from '../util/skillRuntime';
 
 const SKILL_ID = '界恩怨';
 const DISPLAY_NAME = '恩怨';
@@ -170,7 +170,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         const isOwner = seatId === ownerId;
         const slot = s.pendingSlots.get(seatId);
         if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-        const rt = (slot.atom as unknown as { requestType?: string }).requestType ?? '';
+        const rt = currentRequestType(s, seatId) ?? '';
         const ownerRTs = [RT_A_CONFIRM, RT_B_CONFIRM];
         const sourceRTs = [RT_B_SOURCE, RT_B_CARD];
         if (isOwner && ownerRTs.includes(rt)) return null;
@@ -178,8 +178,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         return '当前不是恩怨询问';
       },
       async (s: GameState, seatId: number, params: Record<string, Json>): Promise<void> => {
-        const slot = s.pendingSlots.get(seatId);
-        const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+        const rt = currentRequestType(s, seatId);
         if (rt === RT_A_CONFIRM) {
           s.localVars[A_CONFIRM_KEY] = params.choice === true;
         } else if (rt === RT_B_CONFIRM) {
@@ -327,3 +326,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot?.atom 另用于 .type !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

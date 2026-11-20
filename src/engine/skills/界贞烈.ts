@@ -52,7 +52,7 @@ import { registerAction, registerAfterHook, registerBeforeHook } from '../core/s
 import { isDelayedTrick } from '../data/card-meta';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY, mijiPendingKey } from '../rules/vars-keys';
-import { requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
 
 const _SKILL_ID = '界贞烈';
 const DISPLAY_NAME = '贞烈';
@@ -233,8 +233,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === CHOOSE_RT) {

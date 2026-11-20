@@ -28,7 +28,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, firstTarget, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, firstTarget, requireRequestType } from '../util/skillRuntime';
 
 /** owner.vars key:箜声牌 cardId 列表(由 箜声.ts 维护,良姻只读) */
 const KONGSHENG_KEY = '箜声/牌';
@@ -282,10 +282,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return null;
       },
       async (st: GameState, params: Record<string, Json>) => {
-        const slot = st.pendingSlots.get(seatId);
-        const rt = (
-          slot?.atom as { requestType?: string } | undefined
-        )?.requestType;
+        const rt = currentRequestType(st, seatId);
         if (rt === CONFIRM_RT) {
           st.localVars[CONFIRMED_KEY] =
             params.choice === true || params.confirmed === true;

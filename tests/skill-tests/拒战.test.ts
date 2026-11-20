@@ -13,25 +13,15 @@
 //   8. 阴仅在阴态:阳态时指定目标不触发阴;目标无牌不触发
 //   9. 转换态跨回合持久 + 回合开始重新同步 view
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
-import type { Card, Faction, GameState, PlayerState } from '../../src/engine/types';
+import type { Faction, GameState, PlayerState } from '../../src/engine/types';
 
 // 注册拒战技能(subagent 不碰 index.ts,测试中直接赋值)
 setSkillModuleOverride('拒战', () => import('../../src/engine/skills/拒战').then((m) => m.default));
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suit === '♠' || suit === '♣' ? '黑' : '红', rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -45,20 +35,7 @@ function makePlayer(opts: {
   faction?: Faction;
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '严颜',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['拒战'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
+    ...sharedMakePlayer({ ...opts, character: opts.character ?? '严颜', skills: opts.skills ?? ['拒战'] }),
     faction: opts.faction ?? '蜀',
     identity: '忠臣',
   };

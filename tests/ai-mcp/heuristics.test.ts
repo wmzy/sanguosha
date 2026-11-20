@@ -4,19 +4,12 @@ import { describe, it, expect } from 'vitest';
 import { scoreAction, rankActions, pickBestAction } from '../../src/ai-mcp/heuristics';
 import type { AiViewSnapshot, AvailableAction } from '../../src/client/headless/types';
 import type { Card } from '../../src/engine/types';
+import { makeCard as sharedMakeCard } from '../engine-harness';
 
 // ── fixtures ────────────────────────────────────────────────────────
 
 function makeCard(over: Partial<Card> = {}): Card {
-  return {
-    id: 'c1',
-    name: '杀',
-    suit: '♠',
-    color: '黑',
-    rank: '5',
-    type: '基本牌',
-    ...over,
-  };
+  return { ...sharedMakeCard('c1', '杀', '♠', '5'), ...over };
 }
 
 function makePlayer(

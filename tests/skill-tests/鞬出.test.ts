@@ -5,22 +5,11 @@
 //   4. 目标无牌可弃 → 鞬出不触发,正常受伤
 //   5. 他人出杀 → 鞬出不触发
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-  subtype?: string,
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type, ...(subtype ? { subtype } : {}) };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -30,22 +19,7 @@ function makePlayer(opts: {
   skills?: string[];
   health?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '庞德',
-    health: opts.health ?? 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '庞德', ...opts });
 }
 
 describe('鞬出', () => {

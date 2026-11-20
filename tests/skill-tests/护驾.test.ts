@@ -7,20 +7,10 @@
 //   2. 拒绝出闪:魏势力角色拒绝 → 曹操承受伤害
 //   3. 无魏势力角色:护驾不可用(validate 拒绝)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, disableAutoCompare } from '../engine-harness';
+import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, Faction, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
+import type { Faction, GameState, PlayerState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;
@@ -33,20 +23,7 @@ function makePlayer(opts: {
   faction?: Faction;
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '曹操',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
+    ...sharedMakePlayer({ ...opts, character: opts.character ?? '曹操' }),
     faction: opts.faction ?? '魏',
   };
 }

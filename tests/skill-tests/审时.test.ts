@@ -11,28 +11,17 @@
 //   4. 阴:受伤害后交给其一张牌 → 翻为阳 → 回合结束其未失去此牌 → 自己摸至四张
 //   5. 阴:不发动 → 不翻转
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import 荐降Mod from '../../src/engine/skills/荐降';
 import 审时Mod from '../../src/engine/skills/审时';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState } from '../../src/engine/types';
+import type { GameState, PlayerState } from '../../src/engine/types';
 
 // 运行时注册(subagent 不碰 index.ts 源文件;主 agent 统一注册)
 setSkillModuleOverride('荐降', async () => 荐降Mod);
 setSkillModuleOverride('审时', async () => 审时Mod);
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -44,22 +33,13 @@ function makePlayer(opts: {
   character?: string;
   vars?: Record<string, unknown>;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: opts.character ?? '蒯越蒯良',
     health: opts.health ?? 3,
     maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: (opts.vars ?? {}) as Record<string, never>,
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+    vars: opts.vars as PlayerState['vars'],
+  });
 }
 
 function getState(state: GameState, ownerId: number): '阳' | '阴' {

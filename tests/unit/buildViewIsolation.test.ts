@@ -1,27 +1,13 @@
 // buildView 的 turn 必须是快照：processedView 回放「回合结束」会写 view.turn.vars = {}，
 // 若共享 state.turn 引用会清掉权威回合用量镜像，导致重连/增量视图漂移。
 import { describe, it, expect } from 'vitest';
+import { makePlayer as sharedMakePlayer } from '../engine-harness';
 import { buildView } from '../../src/engine/view/buildView';
 import { createGameState } from '../../src/engine/types';
 import type { PlayerState } from '../../src/engine/types';
 
 function makePlayer(index: number): PlayerState {
-  return {
-    index,
-    name: `P${index}`,
-    character: '',
-    faction: '群',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    pendingTricks: [],
-    skills: [],
-    vars: {},
-    marks: [],
-    tags: [],
-  };
+  return { ...sharedMakePlayer({ index, name: `P${index}` }), character: '', faction: '群' };
 }
 
 describe('buildView — turn 快照隔离', () => {

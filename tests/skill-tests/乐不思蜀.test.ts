@@ -1,12 +1,11 @@
 // tests/skill-tests/乐不思蜀.test.ts
 // 验证乐不思蜀延时锦囊:对目标判定区放入 + 判定阶段判定 + 跳过出牌阶段
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
+import { SkillTestHarness, fireTimeoutAndWait, waitForStable, makePlayer, makeCard as sharedMakeCard } from '../engine-harness';
 import { applyAtom } from '../../src/engine/core/apply';
 import { 判定 as 判定Atom } from '../../src/engine/atoms/判定';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
 
 function makeCard(
@@ -16,32 +15,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  pendingTricks?: Array<{ name: string; source: number; card: Card }>;
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: opts.pendingTricks ?? [],
-    judgeZone: [],
-    tags: [],
-  };
+  return sharedMakeCard(id, name, suit, rank, type);
 }
 
 describe('乐不思蜀', () => {

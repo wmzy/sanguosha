@@ -6,7 +6,7 @@
 // 通过直接 dispatch 阶段开始(准备/回合结束)触发阶段技;
 // 箜声置牌走 移出至暂存区 → 触发良姻(挂在其 after-hook)。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../engine-harness';
+import { SkillTestHarness, waitForStable, makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import { applyAtom } from '../../src/engine/core/apply';
@@ -27,16 +27,8 @@ function makeCard(
   type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
   subtype?: string,
 ): Card {
-  return {
-    id,
-    name,
-    suit,
-    color: suit === '♠' || suit === '♣' ? '黑' : '红',
-    rank,
-    type,
-    subtype,
-    ...(type === '装备牌' && subtype === '武器' ? { range: 2 } : {}),
-  };
+  const card = sharedMakeCard(id, name, suit, rank, type, subtype);
+  return type === '装备牌' && subtype === '武器' ? { ...card, range: 2 } : card;
 }
 
 function makePlayer(opts: {
@@ -51,20 +43,7 @@ function makePlayer(opts: {
   faction?: Faction;
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '周妃',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['良姻', '箜声'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
+    ...sharedMakePlayer({ character: '周妃', health: 3, maxHealth: 3, skills: ['良姻', '箜声'], ...opts }),
     faction: opts.faction ?? '吴',
     identity: '忠臣',
   };

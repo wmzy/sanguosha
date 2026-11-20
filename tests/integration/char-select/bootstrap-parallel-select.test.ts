@@ -5,7 +5,7 @@
 //   2. 主公选完后,其余 3 人同时出现选将 pending(3 个并行 slot)
 //   3. 其余人各自独立选,全部选完后进入游戏(发牌 + 回合开始)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { waitForStable } from '../../engine-harness';
+import { waitForStable, makePlayer as sharedMakePlayer } from '../../engine-harness';
 import '../../../src/engine/atoms';
 import { bootstrap, dispatch } from '../../../src/engine/index';
 import { createGameState } from '../../../src/engine/types';
@@ -35,22 +35,7 @@ const CHARACTERS: Array<{ name: string; skills: string[] }> = [
 ];
 
 function makePlayer(index: number, name: string) {
-  return {
-    index,
-    name,
-    character: '',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ index, name, character: '' });
 }
 
 /** 发选将 respond */

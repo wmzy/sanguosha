@@ -28,7 +28,7 @@ import { inAttackRange } from '../rules/distance';
 import { canSlash } from '../rules/slash-quota';
 import { usedThisTurn } from '../rules/once-per-turn';
 import { runUseFlow } from './cards/use-card';
-import { requireRequestType, firstTarget, defineConfirmAction } from '../util/skillRuntime';
+import { requireRequestType, firstTarget, defineConfirmAction, currentRequestType } from '../util/skillRuntime';
 import { runVirtualSlash } from './cards/_virtualSlash';
 import { createRendeSkill, type RendeOptions } from './仁德';
 import type { SkillModule } from '../types';
@@ -193,8 +193,7 @@ const OPTIONS: RendeOptions = {
           mismatchError: '当前不是仁德询问',
         }).error,
       async (s: GameState, params: Record<string, Json>) => {
-        const slot = s.pendingSlots.get(ownerId);
-        const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType ?? '';
+        const rt = currentRequestType(s, ownerId) ?? '';
         if (rt === CHOICE_RT) {
           // chooseOption:option 为 '杀'/'桃'/'酒'/'不使用'(参考化身.ts 的处理方式)
           const c = params.option;

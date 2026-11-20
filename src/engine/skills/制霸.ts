@@ -41,7 +41,13 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
-import { askConfirm, defineConfirmAction, engineCanPlayNow } from '../util/skillRuntime';
+import {
+  askConfirm,
+  currentRequestType,
+  defineConfirmAction,
+  engineCanPlayNow,
+  registerRespondForAllSeats,
+} from '../util/skillRuntime';
 import { getHunziAwakened } from '../rules/vars-keys';
 import { askRankCard, getCardValue } from '../flows/rank';
 
@@ -262,14 +268,11 @@ export function registerZhibaRankRespond(
 ): Array<() => void> {
   const { ownerId, skillId } = opts;
   const unloaders: Array<() => void> = [];
-  for (const p of state.players) {
-    const seatId = p.index;
-    const u = registerAction(
+  unloaders.push(
+    ...registerRespondForAllSeats(
       state,
       skillId,
-      seatId,
-      'respond',
-      (st: GameState, params: Record<string, Json>): string | null => {
+      (st: GameState, seatId: number, params: Record<string, Json>): string | null => {
         const slot = st.pendingSlots.get(seatId);
         if (!slot) return '当前不需要回应';
         const atom = slot.atom as Record<string, unknown>;
@@ -291,11 +294,8 @@ export function registerZhibaRankRespond(
         }
         return '当前不是制霸回应';
       },
-      async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return;
-        const atom = slot.atom as Record<string, unknown>;
-        const rt = atom['requestType'] as string;
+      async (st: GameState, seatId: number, params: Record<string, Json>): Promise<void> => {
+        const rt = currentRequestType(st, seatId);
         if (rt === opts.refuseRT) {
           // choice===true → 接受;false → 拒绝
           st.localVars[opts.refuseKey] = params.choice === true || params.confirmed === true;
@@ -305,9 +305,8 @@ export function registerZhibaRankRespond(
           st.localVars[opts.takeKey] = params.choice === true || params.confirmed === true;
         }
       },
-    );
-    unloaders.push(u);
-  }
+    ),
+  );
   return unloaders;
 }
 

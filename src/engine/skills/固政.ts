@@ -26,7 +26,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { requireRequestType, askConfirm } from '../util/skillRuntime';
+import { requireRequestType, askConfirm, currentRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const CONFIRM_REQUEST = '固政/确认';
@@ -235,11 +235,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId)!;
-      const atom = slot.atom as { requestType?: string };
-      if (atom.requestType === CONFIRM_REQUEST) {
+      const rt = currentRequestType(st, ownerId);
+      if (rt === CONFIRM_REQUEST) {
         st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
-      } else if (atom.requestType === PICK_REQUEST) {
+      } else if (rt === PICK_REQUEST) {
         st.localVars[PICK_KEY] = params.cardId;
       }
     },

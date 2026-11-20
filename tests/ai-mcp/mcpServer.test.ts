@@ -645,9 +645,9 @@ describe('reportBugResult', () => {
     }
   });
 
-  it('resolveFeedbackDir 默认 data/ai-feedback,环境变量覆盖', () => {
+  it('resolveFeedbackDir 默认 <repo>/data/ai-feedback(绝对路径,CWD 无关),环境变量覆盖', () => {
     delete process.env.SGS_FEEDBACK_DIR;
-    expect(resolveFeedbackDir()).toBe('data/ai-feedback');
+    expect(resolveFeedbackDir()).toBe(path.join(process.cwd(), 'data', 'ai-feedback'));
     process.env.SGS_FEEDBACK_DIR = '/tmp/custom-fb';
     expect(resolveFeedbackDir()).toBe('/tmp/custom-fb');
     delete process.env.SGS_FEEDBACK_DIR;

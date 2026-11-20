@@ -20,7 +20,7 @@
 //   8. 夺装备替换 owner 同槽位装备(旧装备入弃牌堆)
 //   9. 2 项但目标无装备可夺 → 仅摸 1 张(选项1 缺位,不摸两张)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -56,33 +56,8 @@ function makeArmor(
   return { id, name, suit, color: suitColor(suit), rank: 'A', type: '装备牌', subtype: '防具' };
 }
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  equipment?: PlayerState['equipment'];
-  character?: string;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界蔡夫人',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['界献州', '界窃听'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界蔡夫人', health: 3, maxHealth: 3, skills: ['界献州', '界窃听'], ...o });
 
 /** 触发 player 的 回合结束 atom(窃听 before-hook 在此时触发)。 */
 async function triggerTurnEnd(harness: SkillTestHarness, player: number): Promise<void> {

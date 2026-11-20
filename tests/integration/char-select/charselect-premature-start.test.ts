@@ -1,7 +1,7 @@
 // 选将防提前结束测试:验证部分玩家选完后游戏不进入下一阶段。
 // 引擎层保证 Promise.all(slotPromises) 在所有 slot resolve 前不会 resolve。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { waitForStable } from '../../engine-harness';
+import { waitForStable, makePlayer as sharedMakePlayer } from '../../engine-harness';
 import '../../../src/engine/atoms';
 import { bootstrap, dispatch } from '../../../src/engine/index';
 import { createGameState } from '../../../src/engine/types';
@@ -14,22 +14,7 @@ const CHARACTERS = allCharacters.map((c) => ({
 }));
 
 function makePlayer(index: number, name: string) {
-  return {
-    index,
-    name,
-    character: '',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ index, name, character: '' });
 }
 
 async function respondCharSelect(state: GameState, target: number, character: string) {

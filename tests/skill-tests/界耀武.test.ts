@@ -13,49 +13,15 @@
 //   5. amount=0 → 不触发(0 伤害不算受伤)
 //   6. 红色非杀伤害牌(♦决斗)→ 来源摸 1 张(任何红色牌均触发,不限杀)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  character?: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界华雄',
-    health: opts.health ?? 6,
-    maxHealth: opts.maxHealth ?? 6,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界华雄', health: 6, maxHealth: 6, ...o });
 
 /** 给牌堆顶部预填指定 cardId 序列,使 摸牌 atom 按序取这些牌。 */
 function preloadDeck(state: GameState, cardIds: string[]): void {

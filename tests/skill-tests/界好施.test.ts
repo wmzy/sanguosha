@@ -8,21 +8,10 @@
 //   3. 被动未激活:鲁肃被杀指定时不触发给牌(负面路径)
 //   4. 被动清除:鲁肃下回合开始时被动失效
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
+import type { GameState, PlayerState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;
@@ -35,20 +24,7 @@ function makePlayer(opts: {
   maxHealth?: number;
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界鲁肃',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
+    ...sharedMakePlayer({ ...opts, character: opts.character ?? '界鲁肃', health: opts.health ?? 3, maxHealth: opts.maxHealth ?? 3 }),
     faction: '吴',
     identity: '主公',
   };

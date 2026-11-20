@@ -27,7 +27,6 @@ function canUseSnatch(
   if (!distanceWithinOneOk(state, ownerId, target, params.cardId as string | undefined))
     return '距离太远';
   const p = state.players[target];
-  if (!p) return '目标不合法';
   if (!hasObtainableCards(p)) return '目标无可获取的牌';
   return null;
 }

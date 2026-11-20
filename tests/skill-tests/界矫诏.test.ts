@@ -14,7 +14,7 @@
 //   9. 边界:原牌不在手牌 → 拒绝
 //   10. 追踪:矫诏转化使用的牌名被记入本轮已用集合
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
@@ -26,44 +26,15 @@ import {
 } from '../../src/client/skillActionRegistry';
 import { buildView } from '../../src/engine/index';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  const color = suit === '♥' || suit === '♦' ? '红' : '黑';
-  return { id, name, suit, color, rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  character?: string;
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界郭皇后',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    // 默认包含主技能 + 基本牌/闪技能(以便转化目标能结算)
-    skills: opts.skills ?? ['界矫诏', '杀', '闪', '桃'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+// 默认包含主技能 + 基本牌/闪技能(以便转化目标能结算)
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({
+    character: '界郭皇后',
+    health: 3,
+    maxHealth: 3,
+    skills: ['界矫诏', '杀', '闪', '桃'],
+    ...o,
+  });
 
 const USED_KEY = '界矫诏/usedThisTurn';
 const USED_NAMES_KEY = '界矫诏/已用牌名';

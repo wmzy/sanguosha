@@ -11,22 +11,12 @@
 //   6. 目标无牌(空手+空装+空判定)→ 不触发
 //   7. 选目标判定区延时锦囊 → 弃置
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makeMount(
   id: string,
@@ -55,34 +45,8 @@ function makeWeapon(
   };
 }
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  equipment?: Record<string, string>;
-  pendingTricks?: PlayerState['pendingTricks'];
-  character?: string;
-  vars?: Record<string, unknown>;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界公孙瓒',
-    health: opts.health ?? 4,
-    maxHealth: opts.health ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: (opts.vars ?? {}) as Record<string, import('../../src/engine/types').Json>,
-    marks: [],
-    pendingTricks: opts.pendingTricks ?? [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ ...o, character: '界公孙瓒', health: o.health ?? 4, maxHealth: o.health ?? 4 });
 
 describe('界趫猛', () => {
   let harness: SkillTestHarness;

@@ -14,16 +14,15 @@ import {
   type Room,
 } from '../room';
 import { checkRoomAccess, resolveRoomActor } from '../auth/guard';
+import { hashPassword } from '../auth/password';
 import type { PublicUser } from '../auth/store';
 import type { ServerMessage } from '../protocol';
 import type { ConnectionSink } from '../connection';
 import { gameSessions } from '../registry';
 import type { GameSession } from '../session';
 
-// 请求体读取/字段提取已下沉到零依赖叶子 server/http.ts(auth 路由与
-// routes/helpers 共用,避免 auth→routes 依赖);此处 re-export 保持既有
-// 路由文件的导入路径不变。
-export { readJsonBody, optString } from '../http';
+// 请求体读取/字段提取(readJsonBody/optString)单点在 server/http.ts,
+// 路由文件直接从 '../http' 导入。
 
 /** 统一 401 未登录响应(文案与既有路由一致,带 AUTH_REQUIRED code)。 */
 export function authRequired(c: Context): Response {
@@ -37,9 +36,22 @@ export function requireRoom(c: Context, roomId: string): Room | Response {
   return getRoom(roomId) ?? c.json({ error: '房间不存在' }, 404);
 }
 
-// broadcastRoomState 定义已下沉 room.ts(紧邻 buildRoomState,room.ts 内部广播与
-// 路由共用单点);此处 re-export 保持路由文件的既有导入路径不变。
-export { broadcastRoomState } from '../room';
+// broadcastRoomState 定义单点在 room.ts(紧邻 buildRoomState,room.ts 内部广播与
+// 路由共用);路由文件直接从 '../room' 导入。
+
+/** 房间密码入参解析 + 哈希(创建房间/修改密码共用):非字符串按空串,
+ *  超 32 位回 400;否则返回 scrypt 哈希(空密码 = null,即无密码/清除密码)。
+ *  返回值 instanceof Response 时调用方直接 return。 */
+export async function parseRoomPassword(
+  c: Context,
+  raw: Record<string, unknown>,
+): Promise<Response | string | null> {
+  const password = typeof raw.password === 'string' ? raw.password : '';
+  if (password.length > 32) {
+    return c.json({ error: '房间密码长度不能超过 32 位' }, 400);
+  }
+  return password ? await hashPassword(password) : null;
+}
 
 /** 路由成功路径的标准尾奏：先广播事件消息，再广播 room_state。
  *  excludeId 语义同 broadcastMessage（事件消息排除该成员，room_state 仍全员）。 */

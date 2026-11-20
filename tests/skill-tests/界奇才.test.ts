@@ -16,10 +16,9 @@
 //   7. 边界:过河拆桥仍可弃界黄月英的武器(未受保护)
 //   8. 边界:过河拆桥目标仅防具+宝物(均受保护)且无手牌 → 使用被拒(无可弃牌)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer, makeCard as sharedMakeCard } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function makeCard(
@@ -29,32 +28,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  equipment?: Record<string, string>;
-  skills?: string[];
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakeCard(id, name, suit, rank, type);
 }
 
 describe('界奇才', () => {

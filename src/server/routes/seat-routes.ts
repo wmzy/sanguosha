@@ -2,13 +2,11 @@
 // 路由路径/方法/校验顺序/响应形状与拆分前完全一致。
 
 import type { Hono } from 'hono';
-import { moveSeat, requestSeatSwap, respondSeatSwap } from '../room';
+import { moveSeat, requestSeatSwap, respondSeatSwap, broadcastRoomState } from '../room';
+import { readJsonBody, optString } from '../http';
 import {
   notifyRoom,
   parseTargetSeat,
-  broadcastRoomState,
-  optString,
-  readJsonBody,
   resolvePlayerOrRespond,
 } from './helpers';
 

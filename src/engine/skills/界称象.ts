@@ -29,7 +29,7 @@ import { applyAtom } from '../core/apply';
 import { peekTopN } from '../core/deck';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { getCardValue } from '../flows/rank';
-import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界称象';
@@ -98,8 +98,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as Record<string, unknown>)?.requestType as string;
+      const rt = currentRequestType(st, ownerId);
       if (rt === '界称象/confirm') {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === '界称象/select') {
@@ -228,3 +227,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] validate 的 pendingSlots.get 另读 prompt.cardIds
+// (select 面板候选,非 requestType),保留手写读取;requestType 读取已走 currentRequestType。

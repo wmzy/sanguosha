@@ -13,21 +13,11 @@
 //   7. 界张角非主公 → 不可用
 //   8. 群盟友在非自己回合使用(发动时机) → 被拒
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../engine-harness';
+import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -37,21 +27,10 @@ function makePlayer(opts: {
   hand?: string[];
   skills?: string[];
   health?: number;
+  maxHealth?: number;
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.health ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
+    ...sharedMakePlayer({ ...opts, maxHealth: opts.maxHealth ?? opts.health ?? 4 }),
     faction: opts.faction,
   };
 }

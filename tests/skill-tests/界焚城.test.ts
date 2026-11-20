@@ -15,48 +15,19 @@
 //   7. 起点选择无效 → 拒绝
 //   8. 弃牌张数 ≤ 上家 → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name = '杀',
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank: 'A', type: '基本牌' };
-}
+const makeCard = (id: string, name = '杀', suit: '♠' | '♥' | '♣' | '♦' = '♠'): Card =>
+  sharedMakeCard(id, name, suit);
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  character?: string;
-  vars?: Record<string, unknown>;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界李儒',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: (opts.vars as PlayerState['vars']) ?? {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-    faction: '群',
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]): PlayerState => ({
+  ...sharedMakePlayer({ character: '界李儒', health: 3, maxHealth: 3, ...o }),
+  faction: '群',
+});
 
 describe('界焚城', () => {
   let harness: SkillTestHarness;

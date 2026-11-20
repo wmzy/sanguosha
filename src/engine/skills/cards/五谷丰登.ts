@@ -110,7 +110,6 @@ async function resolveBountifulHarvest(ctx: ResolveCtx): Promise<void> {
 
   // 取当前帧（五谷丰登结算帧）记录 pickedBy
   const frame = state.settlementStack[state.settlementStack.length - 1];
-  if (!revealedIds.some((id) => frameCards(state).includes(id))) return;
   await runPickProcessingCard(state, target, revealedIds, frame);
 }
 

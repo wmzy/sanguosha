@@ -8,7 +8,7 @@
 //   4. 令其他最少手牌角色摸牌
 //   5. 自己使用牌以自己为目标(桃) → 不触发(仅"其他角色")
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import 荐降Mod from '../../src/engine/skills/荐降';
@@ -22,16 +22,6 @@ import type { Card } from '../../src/engine/types';
 setSkillModuleOverride('荐降', async () => 荐降Mod);
 setSkillModuleOverride('审时', async () => 审时Mod);
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
 function makePlayer(opts: {
   index: number;
   name: string;
@@ -41,22 +31,7 @@ function makePlayer(opts: {
   maxHealth?: number;
   character?: string;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '蒯越蒯良',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '蒯越蒯良', health: 3, maxHealth: 3, ...opts });
 }
 
 describe('荐降', () => {

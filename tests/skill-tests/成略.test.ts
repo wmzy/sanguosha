@@ -9,7 +9,7 @@
 // dodge 被 preResolve 自动跳过,runUseFlow 直接到使用结算结束后,恃才询问成为唯一 pending,
 // 此时 target.pass() 会误超时恃才询问而非 dodge)。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, assertNoEngineErrors } from '../engine-harness';
+import { SkillTestHarness, assertNoEngineErrors, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import { createGameState } from '../../src/engine/types';
@@ -20,16 +20,6 @@ import type { Card, Faction, PlayerState } from '../../src/engine/types';
 setSkillModuleOverride('成略', () => import('../../src/engine/skills/成略').then((m) => m.default));
 setSkillModuleOverride('恃才', () => import('../../src/engine/skills/恃才').then((m) => m.default));
 setSkillModuleOverride('寸目', () => import('../../src/engine/skills/寸目').then((m) => m.default));
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suit === '♠' || suit === '♣' ? '黑' : '红', rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -44,20 +34,14 @@ function makePlayer(opts: {
   vars?: Record<string, unknown>;
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '许攸',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['成略', '恃才', '寸目'],
-    vars: (opts.vars as PlayerState['vars']) ?? {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
+    ...sharedMakePlayer({
+      ...opts,
+      character: opts.character ?? '许攸',
+      health: opts.health ?? 3,
+      maxHealth: opts.maxHealth ?? 3,
+      skills: opts.skills ?? ['成略', '恃才', '寸目'],
+      vars: opts.vars as PlayerState['vars'],
+    }),
     faction: opts.faction ?? '群',
     identity: '忠臣',
   };

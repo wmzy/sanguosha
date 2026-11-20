@@ -17,52 +17,16 @@
 //
 // 事实来源:OL 官方 hero/442 界孙权·救援
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, Faction, GameState, Json, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suit === '♠' || suit === '♣' ? '黑' : '红', rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  character?: string;
-  health?: number;
-  maxHealth?: number;
-  alive?: boolean;
-  hand?: string[];
-  skills?: string[];
-  vars?: Record<string, Json>;
-  faction?: Faction;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: opts.alive ?? true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: opts.vars ?? {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-    faction: opts.faction ?? '吴',
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0] & { faction?: Faction }) => ({
+  ...sharedMakePlayer({ ...o, character: o.character ?? '' }),
+  faction: o.faction ?? '吴',
+});
 
 describe('界救援', () => {
   let harness: SkillTestHarness;

@@ -11,6 +11,7 @@
 //      加上限 → 设上限 + 加上限后;减上限但体力未超 → 设上限 + 减上限后(无扣减)。
 //   5. before-hook modify amount:确定回复数值时 的 before-hook modify → 回复量被修正。
 import { describe, it, expect, beforeEach } from 'vitest';
+import { makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms'; // 注册所有 atom(含 life-timing)
 import { createGameState } from '../../src/engine/types';
 import type { Atom, GameState, PlayerState } from '../../src/engine/types';
@@ -30,22 +31,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.name });
 }
 
 function makeState(): GameState {

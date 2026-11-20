@@ -31,7 +31,7 @@ import { registerAction, registerAfterHook } from '../core/skill';
 import { spliceHandOrderEntry } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY as PICK_KEY } from '../rules/vars-keys';
-import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import { EQUIP_SLOTS } from '../util/equip-slot';
 
 const _SKILL_NAME = '界补益';
@@ -114,8 +114,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as Record<string, unknown>)?.requestType as string;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === PICK_RT) {
@@ -243,3 +242,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] validate 的 pendingSlots.get 另读 pickAtom 的 prompt
+// (选牌面板参数,非 requestType),保留手写读取;requestType 读取已走 currentRequestType。

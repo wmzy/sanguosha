@@ -40,6 +40,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import {
+  currentRequestType,
   askConfirm,
   normalizeCardIds,
   defineConfirmAction,
@@ -175,8 +176,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return null;
       },
       async (st: GameState, seatId: number, params: Record<string, Json>): Promise<void> => {
-        const slot = st.pendingSlots.get(seatId);
-        const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+        const rt = currentRequestType(st, seatId);
         if (rt === CONFIRM_RT) {
           st.localVars[CONFIRMED_KEY] = params.choice === true;
         } else if (rt === TARGET_RT) {

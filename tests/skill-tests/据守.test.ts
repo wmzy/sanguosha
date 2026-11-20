@@ -14,21 +14,11 @@
 //   7. 负面:已使用过 → 拒绝
 //   8. 正面:不跳过整回合(下一回合 cPI 推进到下家,但据守发动者不会因据守被跳过)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makeWeapon(
   id: string,
@@ -58,22 +48,7 @@ function makePlayer(opts: {
   maxHealth?: number;
   character?: string;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '曹仁',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['据守'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? '曹仁', skills: opts.skills ?? ['据守'] });
 }
 
 function buildDeck(cardMap: Record<string, Card>, n: number): string[] {

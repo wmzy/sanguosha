@@ -14,52 +14,28 @@
 //   9. 限一次:第二次发动 → 拒绝
 //  10. 非出牌阶段 → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
+const makeCard = (
   id: string,
   name: string,
   suit: '♠' | '♥' | '♣' | '♦' = '♠',
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
   trickSubtype?: '普通锦囊' | '延时锦囊' | '响应锦囊',
-): Card {
-  const c: Card = { id, name, suit, color: suitColor(suit), rank, type };
-  if (trickSubtype) c.trickSubtype = trickSubtype;
-  return c;
-}
+): Card =>
+  trickSubtype === undefined
+    ? sharedMakeCard(id, name, suit, rank, type)
+    : { ...sharedMakeCard(id, name, suit, rank, type), trickSubtype };
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  character?: string;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界李儒',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-    faction: '群',
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]): PlayerState => ({
+  ...sharedMakePlayer({ character: '界李儒', health: 3, maxHealth: 3, ...o }),
+  faction: '群',
+});
 
 function trick(id: string, name = '过河拆桥'): Card {
   return makeCard(id, name, '♠', 'A', '锦囊牌', '普通锦囊');

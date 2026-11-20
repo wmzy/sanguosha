@@ -42,6 +42,33 @@ function frameCardOf(state: GameState): Card | undefined {
   return cardOf(state, typeof cardId === 'string' ? cardId : undefined);
 }
 
+/** 单个拦截点:七段逐字同构的 registerBeforeHook 样板的表项。
+ *  目标匹配与触发牌来源的逐 atom 规则见文件头「目标匹配规则」「card id 来源」两节。 */
+interface InvalidationPoint {
+  /** 拦截的 atom 类型(7 个拦截点固定)。 */
+  atomType: '成为目标' | '检测有效性' | '询问杀' | '受到伤害时' | '获得' | '弃置' | '设横置';
+  /** 受保护方是否命中本 atom;不命中直接放行(void=pass)。 */
+  match: (atom: Record<string, unknown>, ownerId: number) => boolean;
+  /** 触发牌来源:true = atom.cardId 直接携带;false = 顶帧 params.cardId 间接携带。 */
+  directCard: boolean;
+}
+
+/** 七个拦截点表——各段仅差 atomType / 目标匹配 / 触发牌来源。
+ *  「获得」是双条件(别人从 owner 处获得:from===owner 且 player!==owner),不可归并。 */
+const INVALIDATION_POINTS: readonly InvalidationPoint[] = [
+  // 成为目标 / 检测有效性 / 受到伤害时:owner 是受影响方;atom 直接携带触发牌
+  { atomType: '成为目标', match: (a, o) => a.target === o, directCard: true },
+  { atomType: '检测有效性', match: (a, o) => a.target === o, directCard: true },
+  // 询问杀:owner 是受影响方;触发牌由结算帧携带
+  { atomType: '询问杀', match: (a, o) => a.target === o, directCard: false },
+  { atomType: '受到伤害时', match: (a, o) => a.target === o, directCard: true },
+  // 获得:别人从 owner 处获得;触发牌由结算帧携带
+  { atomType: '获得', match: (a, o) => a.from === o && a.player !== o, directCard: false },
+  // 弃置 / 设横置:owner 是动作方;触发牌由结算帧携带
+  { atomType: '弃置', match: (a, o) => a.player === o, directCard: false },
+  { atomType: '设横置', match: (a, o) => a.player === o, directCard: false },
+];
+
 /**
  * 注册牌无效化:谓词返回 true 时在所有 7 个拦截点 cancel。返回 unloader。
  *
@@ -58,69 +85,24 @@ export function registerCardInvalidation(
 ): () => void {
   const unloaders: Array<() => void> = [];
 
-  // 1. 成为目标:atom.target === ownerId;cardId = atom.cardId
-  unloaders.push(
-    registerBeforeHook(state, skillId, ownerId, '成为目标', async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.target !== ownerId) return;
-      if (predicate(ctx.state, cardOf(ctx.state, atom.cardId), ownerId)) return { kind: 'cancel' };
-    }),
-  );
-
-  // 2. 检测有效性:atom.target === ownerId;cardId = atom.cardId
-  unloaders.push(
-    registerBeforeHook(state, skillId, ownerId, '检测有效性', async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.target !== ownerId) return;
-      if (predicate(ctx.state, cardOf(ctx.state, atom.cardId), ownerId)) return { kind: 'cancel' };
-    }),
-  );
-
-  // 3. 询问杀:atom.target === ownerId;cardId = topFrame(state).params.cardId
-  unloaders.push(
-    registerBeforeHook(state, skillId, ownerId, '询问杀', async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.target !== ownerId) return;
-      if (predicate(ctx.state, frameCardOf(ctx.state), ownerId)) return { kind: 'cancel' };
-    }),
-  );
-
-  // 4. 受到伤害时:atom.target === ownerId;cardId = atom.cardId
-  unloaders.push(
-    registerBeforeHook(state, skillId, ownerId, '受到伤害时', async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.target !== ownerId) return;
-      if (predicate(ctx.state, cardOf(ctx.state, atom.cardId), ownerId)) return { kind: 'cancel' };
-    }),
-  );
-
-  // 5. 获得:atom.from === ownerId 且 atom.player !== ownerId;cardId = topFrame(state).params.cardId
-  unloaders.push(
-    registerBeforeHook(state, skillId, ownerId, '获得', async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.from !== ownerId) return;
-      if (atom.player === ownerId) return;
-      if (predicate(ctx.state, frameCardOf(ctx.state), ownerId)) return { kind: 'cancel' };
-    }),
-  );
-
-  // 6. 弃置:atom.player === ownerId;cardId = topFrame(state).params.cardId
-  unloaders.push(
-    registerBeforeHook(state, skillId, ownerId, '弃置', async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.player !== ownerId) return;
-      if (predicate(ctx.state, frameCardOf(ctx.state), ownerId)) return { kind: 'cancel' };
-    }),
-  );
-
-  // 7. 设横置:atom.player === ownerId;cardId = topFrame(state).params.cardId
-  unloaders.push(
-    registerBeforeHook(state, skillId, ownerId, '设横置', async (ctx): Promise<HookResult | void> => {
-      const atom = ctx.atom;
-      if (atom.player !== ownerId) return;
-      if (predicate(ctx.state, frameCardOf(ctx.state), ownerId)) return { kind: 'cancel' };
-    }),
-  );
+  for (const point of INVALIDATION_POINTS) {
+    unloaders.push(
+      registerBeforeHook(
+        state,
+        skillId,
+        ownerId,
+        point.atomType,
+        async (ctx): Promise<HookResult | void> => {
+          const atom = ctx.atom as unknown as Record<string, unknown>;
+          if (!point.match(atom, ownerId)) return;
+          const card = point.directCard
+            ? cardOf(ctx.state, atom.cardId as string | undefined)
+            : frameCardOf(ctx.state);
+          if (predicate(ctx.state, card, ownerId)) return { kind: 'cancel' };
+        },
+      ),
+    );
+  }
 
   return () => {
     for (const u of unloaders) u();

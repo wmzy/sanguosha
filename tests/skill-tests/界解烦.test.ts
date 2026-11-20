@@ -17,7 +17,7 @@
 //   8. 非自己回合 → 拒绝
 //   9. 选自己为目标:合法(自身不在范围)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
@@ -33,34 +33,8 @@ function makeWeapon(
   return { id, name, suit, color: suitColor(suit), rank, type: '装备牌', subtype: '武器', range };
 }
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  equipment?: Record<string, string>;
-  character?: string;
-  vars?: Record<string, unknown>;
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界韩当',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: (opts.vars ?? {}) as Record<string, never>,
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界韩当', ...o });
 
 describe('界解烦', () => {
   let harness: SkillTestHarness;

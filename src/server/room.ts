@@ -7,11 +7,10 @@ import { createRng } from '../engine/util/rng';
 import { register } from './resourceRegistry';
 import { verifyPassword } from './auth/password';
 import { bindPlayerRoom, playerRoomMap, unbindPlayerRoom } from './playerIndex';
+import { randomSuffix } from './utils';
 
-// 玩家→房间映射写入口与聊天操作函数已分别下沉 playerIndex.ts / chat.ts;
-// 此处 re-export 保持既有导入路径(sse.ts/routes/tests 从 './room' 导入)不变。
-export { bindPlayerRoom, unbindPlayerRoom } from './playerIndex';
-export { addChatMessage, getChatHistory, resetChatUsage, type ChatValidation } from './chat';
+// 玩家→房间映射写入口与聊天操作函数已分别下沉 playerIndex.ts / chat.ts,
+// 消费方直接从对应模块导入(此处不再 re-export)。
 
 export interface Room {
   id: string;
@@ -70,12 +69,12 @@ register('roomList', roomList, () => {
 register('roomIdRng', roomIdRng, () => {});
 
 function generateRoomId(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 6; i++) {
-    result += chars.charAt(roomIdRng.nextInt(chars.length));
-  }
-  return result;
+  // 6 位大写字母+数字房间码;随机源用模块级种子化 rng(nextInt 注入)
+  return randomSuffix(
+    6,
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+    (max) => roomIdRng.nextInt(max),
+  );
 }
 
 /** 房间人数合法区间(创建房间 maxPlayers / 调试房 playerCount / updateConfig
@@ -124,8 +123,8 @@ export function buildRoomState(room: Room): ServerMessage {
   };
 }
 
-/** 广播 room_state 给房间内所有连接(单点:REST 路由经 routes/helpers re-export
- *  共用,本模块内部广播(applyDisplayName/expireSeatSwap)也走此入口)。 */
+/** 广播 room_state 给房间内所有连接(单点:REST 路由与本模块内部广播
+ *  (applyDisplayName/expireSeatSwap)均走此入口)。 */
 export function broadcastRoomState(room: Room): void {
   broadcastMessage(room, buildRoomState(room));
 }
@@ -943,9 +942,9 @@ export function switchRole(
   playerId: string,
   newRole: 'player' | 'spectator',
   seat?: number,
-): { room: Room; success: boolean } {
+): { room: Room | null; success: boolean } {
   const room = roomList.get(roomId);
-  if (!room) return { room: null as never, success: false };
+  if (!room) return { room: null, success: false };
   if (room.status !== '等待中' && room.status !== '已结束') return { room, success: false };
 
   if (newRole === 'spectator') {

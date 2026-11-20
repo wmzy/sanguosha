@@ -11,7 +11,7 @@ import { createGameState } from '../../src/engine/types';
 import type { Atom, GameState, PlayerState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import { registerBeforeHook } from '../../src/engine/core/skill';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 
 // ─── 直测辅助:最小 2 人 state ───────────────────────────────
 
@@ -24,22 +24,7 @@ function makePlayer(opts: {
   skills?: string[];
   character?: string;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? opts.name,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? opts.name });
 }
 
 /** 构建初始 state:player0 有 回合管理(驱动阶段推进)。

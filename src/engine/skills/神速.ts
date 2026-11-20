@@ -28,6 +28,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction } from '../core/skill';
 import { registerFlipSkipTurnHooks } from '../flows/face-down';
 import {
+  currentRequestType,
   requireRequestType,
   askConfirm,
   firstCardId,
@@ -197,8 +198,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         { mismatchError: '当前不是神速询问' },
       ).error,
     async (s, params) => {
-      const slot = s.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType ?? '';
+      const rt = currentRequestType(s, ownerId) ?? '';
       if (rt === OPT1_TRIGGER_RT || rt === OPT2_TRIGGER_RT || rt === OPT3_TRIGGER_RT) {
         s.localVars['神速/confirmed'] = params.choice === true;
       } else if (rt === OPT1_TARGET_RT || rt === OPT2_TARGET_RT || rt === OPT3_TARGET_RT) {

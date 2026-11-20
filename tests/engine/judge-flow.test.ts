@@ -17,6 +17,7 @@ import { runJudgeFlow } from '../../src/engine/flows/judge';
 import { applyAtom } from '../../src/engine/core/apply';
 import { suitColor } from '../../src/engine/types';
 import { registerAfterHook } from '../../src/engine/core/skill';
+import { makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 
 function makePlayer(opts: {
   index: number;
@@ -24,32 +25,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-  };
-}
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
+  return sharedMakePlayer({ ...opts, character: opts.name });
 }
 
 function makeState(opts?: { deckCards?: Card[] }): GameState {

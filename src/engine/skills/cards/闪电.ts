@@ -38,14 +38,21 @@ async function passLightningToNext(state: GameState, from: number, card: Card): 
   }
 }
 
-/** 闪电被无懈可击抵消（判定前）：不判定、不受伤、不弃置，传递给下家。 */
-async function onLightningCancelled(state: GameState, target: number, cardId: string): Promise<void> {
+/** 闪电实体卡解析（cancelled/resolve 两路径共用）：
+ *  判定区 trick 条目(实体卡) → cardMap(使用中的牌) → extra 兜底(仅 resolve 传判定翻出的牌)
+ *  → 合成默认。 */
+function getLightningCard(state: GameState, target: number, cardId: string, extra?: Card): Card {
   const trickEntry = state.players[target]?.pendingTricks.find((t) => t.name === TRICK_NAME);
-  const card: Card =
+  return (
     trickEntry?.card ??
     state.cardMap[cardId] ??
-    { id: cardId, name: TRICK_NAME, suit: '♠', color: '黑', rank: 'A', type: '锦囊牌' };
-  await passLightningToNext(state, target, card);
+    extra ?? { id: cardId, name: TRICK_NAME, suit: '♠', color: '黑', rank: 'A', type: '锦囊牌' }
+  );
+}
+
+/** 闪电被无懈可击抵消（判定前）：不判定、不受伤、不弃置，传递给下家。 */
+async function onLightningCancelled(state: GameState, target: number, cardId: string): Promise<void> {
+  await passLightningToNext(state, target, getLightningCard(state, target, cardId));
 }
 
 /** 闪电的生效后效果：判定 → 命中则伤害+移除，否则传递下家 */
@@ -55,18 +62,7 @@ async function resolveLightning(ctx: ResolveCtx): Promise<void> {
   const judgeCard = judgeCardId ? state.cardMap[judgeCardId] : undefined;
 
   // 保留原 trick 条目引用（实体卡）——传递时复用同一张卡，不丢失实体
-  const trickEntry = state.players[target]?.pendingTricks.find((t) => t.name === TRICK_NAME);
-  const lightningCard: Card =
-    trickEntry?.card ??
-    state.cardMap[cardId] ??
-    judgeCard ?? {
-      id: cardId,
-      name: TRICK_NAME,
-      suit: '♠',
-      color: '黑',
-      rank: 'A',
-      type: '锦囊牌',
-    };
+  const lightningCard = getLightningCard(state, target, cardId, judgeCard);
 
   if (isSpade2to9(judgeCard)) {
     // 黑桃 2-9：受到 3 点无来源雷电伤害 + 移除闪电（进弃牌堆）

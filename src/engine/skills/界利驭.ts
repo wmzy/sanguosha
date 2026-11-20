@@ -49,7 +49,7 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm, defineConfirmAction, requireRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
 
 const SKILL_ID = '界利驭';
 const DISPLAY_NAME = '利驭';
@@ -106,8 +106,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return null; // CONFIRM_RT:接受 choice/confirmed 布尔
       },
       async (s, pid: number, params: Record<string, Json>): Promise<void> => {
-        const slot = s.pendingSlots.get(pid);
-        const requestType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+        const requestType = currentRequestType(s, pid);
         if (requestType === CONFIRM_RT) {
           s.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
         } else if (requestType === PICK_RT) {

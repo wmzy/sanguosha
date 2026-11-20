@@ -4,7 +4,7 @@
 //   从谏(被动技):成为多目标锦囊的目标时,可交给其中一名目标角色一张牌,
 //     然后摸一张牌,若给出的是装备牌,改为摸两张牌。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, fireTimeoutAndWait } from '../engine-harness';
+import { SkillTestHarness, fireTimeoutAndWait, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 雄乱Module from '../../src/engine/skills/雄乱';
@@ -22,17 +22,6 @@ const ABOLISH_PREFIX = '雄乱/废除:';
 const TARGET_VAR = '雄乱/目标';
 const USED_KEY = '雄乱/used';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-  subtype?: string,
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type, subtype };
-}
-
 function makePlayer(opts: {
   index: number;
   name: string;
@@ -44,22 +33,13 @@ function makePlayer(opts: {
   maxHealth?: number;
   vars?: Record<string, unknown>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '张绣',
+  return sharedMakePlayer({
+    character: '张绣',
+    skills: ['雄乱', '从谏'],
+    ...opts,
     health: opts.health ?? opts.maxHealth ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['雄乱', '从谏'],
     vars: (opts.vars as PlayerState['vars']) ?? {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 /** 构建标准 state:P0=张绣(满血4/4,出牌阶段),P1=敌方 */

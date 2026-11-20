@@ -21,9 +21,15 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { askRankCard, runRankCompareOrForfeit } from '../flows/rank';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAfterHook } from '../core/skill';
 import { pickRandom } from '../util/rng';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import {
+  askConfirm,
+  currentRequestType,
+  defineConfirmAction,
+  registerRespondForAllSeats,
+  requireRequestType,
+} from '../util/skillRuntime';
 
 const CONFIRM_RT = '烈刃/confirm';
 const CONFIRMED_KEY = '烈刃/confirmed';
@@ -47,19 +53,16 @@ export function onInit(skill: Skill, state: GameState): () => void {
   // ── respond(注册到所有玩家):owner 确认发动 / owner 选拼点牌 / 受害者 选拼点牌 ──
   // dispatch 按 (skillId, ownerId, actionType) 查;受害者可能是任意玩家。
   const unloaders: Array<() => void> = [];
-  for (const p of state.players) {
-    const seatId = p.index;
-    const u = registerAction(
+  unloaders.push(
+    ...registerRespondForAllSeats(
       state,
       skill.id,
-      seatId,
-      'respond',
-      (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as Record<string, unknown>;
-        if (atom['type'] !== '请求回应') return '当前不需要回应';
-        const reqType = atom['requestType'] as string;
+      (st: GameState, seatId: number, params: Record<string, Json>): string | null => {
+        const check = requireRequestType(st, seatId, [CONFIRM_RT, OWNER_PD_RT, VICTIM_PD_RT], {
+          mismatchError: '当前不是烈刃回应',
+        });
+        if (check.error) return check.error;
+        const reqType = check.requestType;
         if (reqType === CONFIRM_RT) {
           // 仅祝融确认发动
           if (seatId !== ownerId) return '只有祝融可以确认';
@@ -80,13 +83,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (!st.players[seatId].hand.includes(cardId)) return '拼点牌不在手牌中';
           return null;
         }
+        // requireRequestType 已保证 reqType ∈ 三者之一,此处不可达
         return '当前不是烈刃回应';
       },
-      async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        const slot = st.pendingSlots.get(seatId);
-        if (!slot) return;
-        const atom = slot.atom as Record<string, unknown>;
-        const reqType = atom['requestType'] as string;
+      async (st: GameState, seatId: number, params: Record<string, Json>): Promise<void> => {
+        const reqType = currentRequestType(st, seatId);
         if (reqType === CONFIRM_RT) {
           st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
         } else if (reqType === OWNER_PD_RT) {
@@ -95,9 +96,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           st.localVars[VICTIM_CARD_KEY] = params.cardId;
         }
       },
-    );
-    unloaders.push(u);
-  }
+    ),
+  );
 
   // ── 造成伤害 after-hook:烈刃主逻辑 ──
   registerAfterHook(state, skill.id, ownerId, '造成伤害后', async (ctx) => {

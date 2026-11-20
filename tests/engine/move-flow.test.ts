@@ -14,6 +14,7 @@
 //   5. 弃置 afterApply 发 移动到目标区域后(reason='弃置', to='弃牌堆')。
 //   6. 获得/给予 afterApply 发 移动到目标区域后(reason='获得'/'给予')。
 import { describe, it, expect, beforeEach } from 'vitest';
+import { makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms'; // 注册所有 atom(含 move-timing)
 import { createGameState } from '../../src/engine/types';
 import type { Atom, Card, GameState, PlayerState, ZoneLoc } from '../../src/engine/types';
@@ -28,33 +29,11 @@ function makePlayer(opts: {
   maxHealth?: number;
   hand?: string[];
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.name });
 }
 
 function makeCard(id: string, name = '杀', suit: '♠' | '♥' | '♦' | '♣' = '♠'): Card {
-  return {
-    id,
-    name,
-    suit,
-    color: suit === '♥' || suit === '♦' ? '红' : '黑',
-    rank: '7',
-    type: name === '诸葛连弩' ? '装备牌' : '基本牌',
-  };
+  return sharedMakeCard(id, name, suit, '7', name === '诸葛连弩' ? '装备牌' : '基本牌');
 }
 
 function makeState(): GameState {

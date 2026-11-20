@@ -6,29 +6,14 @@
 //   3. 并行选将场景:某玩家选完后,再次以该 ownerId 发选将 action 被拒。
 //   4. 选将完成后 player.skills 保持首次选择写入的技能,不被覆盖。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { waitForStable } from '../../engine-harness';
+import { waitForStable, makePlayer as sharedMakePlayer } from '../../engine-harness';
 import '../../../src/engine/atoms';
 import { bootstrap, dispatch } from '../../../src/engine/index';
 import { createGameState } from '../../../src/engine/types';
 import type { GameState } from '../../../src/engine/types';
 
 function makePlayer(index: number, name: string) {
-  return {
-    index,
-    name,
-    character: '',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ index, name, character: '' });
 }
 
 async function respondCharSelect(state: GameState, target: number, character: string) {

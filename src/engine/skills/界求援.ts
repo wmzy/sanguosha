@@ -38,7 +38,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
-import { askConfirm, askResponse, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, askResponse, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
 import { runVirtualSlash } from './cards/_virtualSlash';
 import {
   registerAction,
@@ -204,7 +204,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       (st: GameState, params: Record<string, Json>): string | null => {
         const slot = st.pendingSlots.get(ownerId);
         if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-        const rt = (slot.atom as unknown as { requestType?: string }).requestType;
+        const rt = currentRequestType(st, ownerId);
         if (rt === CONFIRM_RT) return null;
         if (rt === CHOOSE_TARGET_RT) {
           if (typeof params.target !== 'number') return '请选择一名角色';
@@ -213,8 +213,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return '当前不是求援询问';
       },
       async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        const slot = st.pendingSlots.get(ownerId);
-        const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+        const rt = currentRequestType(st, ownerId);
         if (rt === CONFIRM_RT) {
           st.localVars[CONFIRM_KEY] = params.choice === true;
         } else if (rt === CHOOSE_TARGET_RT) {
@@ -239,7 +238,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         (st: GameState, params: Record<string, Json>): string | null => {
           const slot = st.pendingSlots.get(pid);
           if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-          const rt = (slot.atom as unknown as { requestType?: string }).requestType;
+          const rt = currentRequestType(st, pid);
           if (rt === OPTION_RT) return null; // 选项 confirm
           if (rt === GIVE_CARD_RT) {
             const cardId = params.cardId as string | undefined;
@@ -250,8 +249,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           return '当前不是求援询问';
         },
         async (st: GameState, params: Record<string, Json>): Promise<void> => {
-          const slot = st.pendingSlots.get(pid);
-          const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+          const rt = currentRequestType(st, pid);
           if (rt === OPTION_RT) {
             // choice=true → option=1(给牌);choice=false → option=2(额外目标)
             st.localVars[OPTION_KEY] = params.choice === true ? 1 : 2;
@@ -342,3 +340,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] owner/helper 两处 respond 校验里的 slot?.atom 另用于
+// .type !== '请求回应' 守卫,保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。

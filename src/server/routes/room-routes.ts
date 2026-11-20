@@ -12,32 +12,31 @@ import {
   joinRoom,
   joinDebugRoom,
   broadcastMessage,
+  broadcastRoomState,
   updateConfig,
   kickPlayer,
   isRoomFull,
-  bindPlayerRoom,
   setRoomPassword,
   isValidPlayerCount,
   PLAYER_COUNT_ERROR,
   type KickFailureReason,
 } from '../room';
+import { bindPlayerRoom } from '../playerIndex';
 import { destroyRoomCompletely } from '../teardown';
-import { hashPassword } from '../auth/password';
 import { requireUser } from '../auth/guard';
 import { normalizeRoomConfig, type RoomConfig } from '../protocol';
 import { GameSession } from '../session';
 import { gameSessions } from '../registry';
 import { createLogger } from '../logger';
 import { generatePlayerId } from '../utils';
+import { readJsonBody, optString } from '../http';
 import { sseStreamHandler } from '../sse';
 import {
   authRequired,
-  broadcastRoomState,
   detachFromOtherRooms,
   nullSink,
   notifyRoom,
-  optString,
-  readJsonBody,
+  parseRoomPassword,
   requireHost,
   requireRoom,
   requireRoomPassword,
@@ -100,11 +99,8 @@ export function applyRoomRoutes(app: Hono): void {
     const roomType: 'normal' | 'quick' =
       raw.roomType === 'normal' ? 'normal' : 'quick';
     // 进房密码:可选,1-32 位;服务端只存 scrypt 哈希
-    const rawPassword = typeof raw.password === 'string' ? raw.password : '';
-    if (rawPassword.length > 32) {
-      return c.json({ error: '房间密码长度不能超过 32 位' }, 400);
-    }
-    const passwordHash = rawPassword ? await hashPassword(rawPassword) : null;
+    const passwordHash = await parseRoomPassword(c, raw);
+    if (passwordHash instanceof Response) return passwordHash;
 
     // 普通房间必须登录:playerId = 稳定 userId,显示名 = displayName
     const user = await requireUser(c);
@@ -366,11 +362,9 @@ export function applyRoomRoutes(app: Hono): void {
       return c.json({ error: '仅等待中可修改密码' }, 400);
     }
 
-    const rawPassword = typeof raw.password === 'string' ? raw.password : '';
-    if (rawPassword.length > 32) {
-      return c.json({ error: '房间密码长度不能超过 32 位' }, 400);
-    }
-    setRoomPassword(room, rawPassword ? await hashPassword(rawPassword) : null);
+    const passwordHash = await parseRoomPassword(c, raw);
+    if (passwordHash instanceof Response) return passwordHash;
+    setRoomPassword(room, passwordHash);
     broadcastRoomState(room);
     return c.json({ success: true, hasPassword: room.passwordHash !== null });
   });

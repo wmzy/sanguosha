@@ -227,24 +227,20 @@ export type ServerMessage =
   | { type: 'seat_swap_result'; success: boolean; requesterId: string; responderId: string }
 
 /**
- * 客户端发往服务端的消息。
- * 'action' 类型携带新 ENGINE-DESIGN 的 ClientMessage { skillId, actionType, ownerId, params, baseSeq }。
- * 主动 / 回应 action 都走这个形状。
+ * 客户端操作的调试遥测载荷(logWsMessage 'out' 方向)。
+ * SSE 为单向(服务端→客户端),客户端操作全部走 REST 路由(routes/game-routes.ts 等):
+ * action→POST { action }、reorder→POST { order }、ready/cancel-ready/start/restart→POST 空体、
+ * config→PUT { config, maxPlayers }。本类型不对应任何 wire 消息,仅是
+ * useDebugMultiConnection 遥测日志仍在构造的形状(加入时逐一核实过消费者)。
+ * 'action' 携带引擎层 ClientMessage { skillId, actionType, ownerId, params, baseSeq }。
  */
 export type ClientMessage =
   | { type: 'action'; action: EngineClientMessage; baseSeq: EventSeq }
   | { type: 'reorder_hand'; order: string[] }
   | { type: 'ready' }
-  | { type: 'join_room'; roomId: string }
-  | { type: 'create_room'; name: string; maxPlayers: number; config?: RoomConfig }
-  | { type: 'join_debug_room'; roomId: string; lastSeq?: EventSeq }
   | { type: 'start_game' }
   | { type: 'restart_game' }
-  | { type: 'leave_room' }
-  | { type: 'reconnect'; playerId: string; lastSeq?: EventSeq }
-  | { type: 'create_debug_room'; config?: RoomConfig; playerCount?: number }
-  | { type: 'update_room_config'; config: RoomConfig }
-  | { type: 'set_player_id'; playerId: string };
+  | { type: 'update_room_config'; config: RoomConfig };
 
 export interface RoomInfo {
   id: string;
@@ -267,63 +263,6 @@ export interface RoomInfo {
   playerNames?: Record<string, string>;
 }
 
-export function isValidClientMessage(data: unknown): data is ClientMessage {
-  if (typeof data !== 'object' || data === null) return false;
-  const d = data as Record<string, unknown>;
-  const t = d['type'];
-  switch (t) {
-    case 'action':
-      return typeof d['baseSeq'] === 'number' && isValidEngineClientMessage(d['action']);
-    case 'reorder_hand': {
-      const order = d['order'];
-      return Array.isArray(order) && order.every((id: unknown) => typeof id === 'string');
-    }
-    case 'ready':
-    case 'start_game':
-    case 'restart_game':
-    case 'leave_room':
-      return true;
-    case 'set_player_id':
-      return typeof d['playerId'] === 'string' && d['playerId'].length > 0;
-    case 'join_room':
-    case 'join_debug_room':
-      return typeof d['roomId'] === 'string';
-    case 'reconnect':
-      return typeof d['playerId'] === 'string';
-    case 'create_room':
-      return typeof d['name'] === 'string' && typeof d['maxPlayers'] === 'number';
-    case 'create_debug_room':
-      // config 可选(旧版只传 playerCount)。playerCount 可选(新版只传 config)
-      return d['config'] === undefined || typeof d['config'] === 'object';
-    case 'update_room_config':
-      return typeof d['config'] === 'object' && d['config'] !== null;
-    default:
-      return false;
-  }
-}
-
-function isValidEngineClientMessage(data: unknown): data is EngineClientMessage {
-  if (typeof data !== 'object' || data === null) return false;
-  const d = data as Record<string, unknown>;
-  return (
-    typeof d['skillId'] === 'string' &&
-    typeof d['actionType'] === 'string' &&
-    typeof d['ownerId'] === 'number' &&
-    typeof d['params'] === 'object' &&
-    d['params'] !== null &&
-    typeof d['baseSeq'] === 'number'
-  );
-}
-
 export function serialize(msg: ServerMessage): string {
   return JSON.stringify(msg);
-}
-
-export function deserialize(data: string): ClientMessage | null {
-  try {
-    const parsed: unknown = JSON.parse(data);
-    return isValidClientMessage(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
 }

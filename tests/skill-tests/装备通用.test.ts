@@ -11,7 +11,7 @@
 //   5. 负面:不在手牌的装备牌 → 拒绝
 //   6. 负面:不是装备牌(基本牌当装备) → 拒绝(无 subtype)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
@@ -38,22 +38,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['装备通用'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ skills: ['装备通用'], ...opts });
 }
 
 describe('装备通用', () => {

@@ -11,39 +11,11 @@
 //   6. 杀来源非自己(P0 受到 P1 杀的伤害)不触发利驭
 //   7. 两人场景:装备分支无第三者可选 → 跳过决斗,仍正常获牌
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  equipment?: Record<string, string>;
-  skills?: string[];
-  alive?: boolean;
-  health?: number;
-  maxHealth?: number;
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: opts.alive ?? true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
 
 function makeBasic(
   id: string,

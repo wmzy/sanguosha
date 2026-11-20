@@ -37,7 +37,7 @@ import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { defineConfirmAction, firstTarget, requireRequestType, engineCanPlayNowReason, registerRespondForAllSeats } from '../util/skillRuntime';
+import { currentRequestType, defineConfirmAction, firstTarget, requireRequestType, engineCanPlayNowReason, registerRespondForAllSeats } from '../util/skillRuntime';
 
 const SKILL_ID = '界灭计';
 const DISPLAY_NAME = '灭计';
@@ -251,8 +251,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return null;
       },
       async (st: GameState, seat: number, params: Record<string, Json>): Promise<void> => {
-        const slot = st.pendingSlots.get(seat);
-        const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+        const rt = currentRequestType(st, seat);
         if (rt === CHOOSE_RT) {
           // confirm=true → 弃锦囊(choice='trick');confirm=false → 弃两张(choice='twoCards')
           st.localVars[CHOICE_KEY] =

@@ -14,21 +14,14 @@ import {
   SkillTestHarness,
   waitForStable,
   fireTimeoutAndWait,
-  } from '../engine-harness';
+  makeCard,
+  makePlayer as sharedMakePlayer,
+} from '../engine-harness';
 import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -38,22 +31,7 @@ function makePlayer(opts: {
   pendingTricks?: Array<{ name: string; source: number; card: Card }>;
   health?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '',
-    health: opts.health ?? 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: opts.pendingTricks ?? [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '', ...opts });
 }
 
 describe('界鬼才', () => {

@@ -15,22 +15,12 @@
 //   5. 负面·未失去体力:杀受限(quota=1,第二杀被拒)
 //   6. 负面·受到伤害不触发诈降
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { applyAtom } from '../../src/engine/core/apply';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import { createGameState } from '../../src/engine/types';
 import type { Card, Faction, Json } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suit === '♠' || suit === '♣' ? '黑' : '红', rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -45,23 +35,7 @@ function makePlayer(opts: {
   vars?: Record<string, Json>;
   faction?: Faction;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界黄盖',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: opts.alive ?? true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['界苦肉', '诈降'],
-    vars: opts.vars ?? {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-    faction: opts.faction ?? '吴',
-  };
+  return { ...sharedMakePlayer({ character: '界黄盖', skills: ['界苦肉', '诈降'], ...opts }), faction: opts.faction ?? '吴' };
 }
 
 const DECK_IDS = ['d1', 'd2', 'd3', 'd4', 'd5', 'd6'];

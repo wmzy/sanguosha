@@ -31,7 +31,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { spliceHandOrderEntry } from '../flows/pick-card-panel';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, requireRequestType } from '../util/skillRuntime';
 
 /** 是否发动趫猛的 requestType */
 const CONFIRM_REQUEST = '界趫猛/confirm';
@@ -135,8 +135,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_REQUEST) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === PICK_REQUEST) {

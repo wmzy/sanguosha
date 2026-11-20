@@ -16,20 +16,10 @@
 //   6. 负面:已死亡→不可发动(validate 拒绝:player is dead)
 //   7. 负面:体力为0(濒死)→不可发动(validate 拒绝:体力不足)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import type { Card, Faction, Json } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suit === '♠' || suit === '♣' ? '黑' : '红', rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -44,23 +34,7 @@ function makePlayer(opts: {
   vars?: Record<string, Json>;
   faction?: Faction;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: opts.alive ?? true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: opts.vars ?? {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-    faction: opts.faction ?? '吴',
-  };
+  return { ...sharedMakePlayer({ character: '', ...opts }), faction: opts.faction ?? '吴' };
 }
 
 const DECK_IDS = ['d1', 'd2', 'd3', 'd4', 'd5', 'd6'];

@@ -2,7 +2,7 @@
 import { frameCards } from '../../src/engine/core/frame';
 // 杀(基本牌)技能测试示范
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
@@ -27,19 +27,7 @@ function buildState(opts?: {
 }
 
 function makePlayer(opts: { index: number; name: string; hand: string[]; skills: string[] }) {
-  return {
-    ...opts,
-    character: '主公',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    equipment: {},
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer(opts);
 }
 
 describe('杀', () => {

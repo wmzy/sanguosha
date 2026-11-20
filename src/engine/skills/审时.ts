@@ -31,7 +31,7 @@ import { runDamageFlow } from '../flows/damage';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, defineConfirmAction, firstTarget, normalizeCardIds, registerOnDamagedAsTarget, engineCanPlayNowReason } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, firstTarget, normalizeCardIds, registerOnDamagedAsTarget, engineCanPlayNowReason } from '../util/skillRuntime';
 import { SHENSHI_STATE_VIEW_KEY } from '../rules/vars-keys';
 import { createYinYangState } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
@@ -108,7 +108,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = atom['requestType'] as string;
+      const rt = currentRequestType(st, ownerId);
       if (rt === YIN_CONFIRM_RT || rt === YANG_DEATH_CONFIRM_RT) {
         return null; // confirm:接受 choice/confirmed
       }
@@ -129,8 +129,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return '当前不是审时回应';
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === YIN_CONFIRM_RT) {
         st.localVars[YIN_CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === YIN_GIVE_RT) {
@@ -381,3 +380,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

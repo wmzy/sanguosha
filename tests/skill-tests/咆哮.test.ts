@@ -6,7 +6,7 @@
 //   3. 触发(实际 dispatch):P0 连续出 2 张杀均生效,P1 受 2 点伤害
 //   4. 负面:无咆哮时第二张杀被拒(出杀次数上限 1)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { slashMax } from '../../src/engine/rules/slash-quota';
 import { createGameState } from '../../src/engine/types';
@@ -14,40 +14,6 @@ import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import { viewCanSlash } from '../../src/engine/rules/action-active';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
 
 describe('咆哮', () => {
   let harness: SkillTestHarness;

@@ -24,7 +24,7 @@
 //   - 牌堆+弃牌堆皆空 → 无法摸牌,跳过询问(工厂公共守卫)
 import type { GameView } from '../types';
 import { applyAtom } from '../core/apply';
-import { askConfirm } from '../util/skillRuntime';
+import { currentRequestType, askConfirm } from '../util/skillRuntime';
 import { createLianyingSkill, type LianyingOptions } from './连营';
 
 const TRIGGER_RT = '界连营/trigger';
@@ -95,8 +95,7 @@ const OPTIONS: LianyingOptions = {
     }
   },
   respondExecute: (st, ownerId, params) => {
-    const slot = st.pendingSlots.get(ownerId);
-    const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+    const rt = currentRequestType(st, ownerId);
     if (rt === TRIGGER_RT) {
       st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
     } else if (rt === SELECT_RT) {

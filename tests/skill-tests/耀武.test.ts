@@ -11,7 +11,7 @@
 //   6. 华雄为伤害目标(锁定技归属方)而非来源;收益归来源方
 //   7. respond 校验:option 非法 / 无 pending → 拒绝
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 耀武Module from '../../src/engine/skills/耀武';
@@ -21,42 +21,6 @@ import type { Card, GameState } from '../../src/engine/types';
 
 // 本地注册 耀武 技能模块(主 agent 统一在 skills/index.ts 注册;测试本地兜底)
 setSkillModuleOverride('耀武', async () => 耀武Module);
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 /** P1(source) 出杀打 P2(华雄·耀武)。opts 控制杀的颜色/类型、P1 体力、牌堆顶。 */
 function buildState(opts?: {

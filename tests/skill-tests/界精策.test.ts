@@ -19,22 +19,12 @@
 //     9. bonus 实际影响弃牌阶段(health=2, 用1花色 → 弃牌上限=3)
 //     10. 仅在自己回合累积(其他玩家回合不计入)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { handLimit } from '../../src/engine/rules/hand-limit';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makeEquip(
   id: string,
@@ -46,32 +36,8 @@ function makeEquip(
   return { id, name, suit, color: suitColor(suit), rank, type: '装备牌', subtype, range: 2 };
 }
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  equipment?: Record<string, string>;
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界郭淮',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['界精策', '回合管理'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界郭淮', skills: ['界精策', '回合管理'], ...o });
 
 /** 取当前唯一 pending 的 requestType(无 pending 返回 null) */
 function currentRequestType(state: GameState): string | null {

@@ -41,7 +41,7 @@ import {
 } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
-import { askConfirm, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, requireRequestType, defineConfirmAction } from '../util/skillRuntime';
 
 const SKILL_ID = '界酒诗';
 const DISPLAY_NAME = '酒诗';
@@ -138,8 +138,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         mismatchError: '当前不是酒诗询问',
       }).error,
     async (s: GameState, params: Record<string, Json>) => {
-      const slot = s.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as { requestType?: string }).requestType;
+      const rt = currentRequestType(s, ownerId);
       const choice = params.choice === true;
       if (rt === USE_RT_CONFIRM) s.localVars[USE_CONFIRM_KEY] = choice;
       else if (rt === DAMAGE_FLIP_RT) s.localVars[DAMAGE_FLIP_KEY] = choice;

@@ -12,7 +12,7 @@
 //   5. 正面:雷杀(雷电)→ 穿透藤甲,正常 1 点伤害(属性杀不被无效)
 //   6. 边界:藤甲不保护其他玩家
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import { createGameState } from '../../src/engine/types';
@@ -26,7 +26,9 @@ function makeCard(
   rank = 'A',
   damageType?: Card['damageType'],
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌', damageType };
+  return damageType === undefined
+    ? sharedMakeCard(id, name, suit, rank)
+    : { ...sharedMakeCard(id, name, suit, rank), damageType };
 }
 
 function makePlayer(opts: {
@@ -36,22 +38,7 @@ function makePlayer(opts: {
   skills?: string[];
   equipment?: Record<string, string>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['杀', '闪'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '', skills: ['杀', '闪'], ...opts });
 }
 
 const TENGJIA: Card = {

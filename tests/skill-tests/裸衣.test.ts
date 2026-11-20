@@ -9,21 +9,11 @@
 //   5. 许褚回合结束清标签(本回合语义)
 //   6. 其他玩家回合结束不清许褚标签
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -34,22 +24,7 @@ function makePlayer(opts: {
   maxHealth?: number;
   tags?: string[];
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '许褚',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: opts.tags ?? [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '许褚', ...opts });
 }
 
 describe('裸衣', () => {

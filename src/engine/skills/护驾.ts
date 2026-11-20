@@ -33,7 +33,7 @@ import { applyAtom } from '../core/apply';
 import { setTurnVarUsage } from '../rules/turn-usage';
 import { registerAction, registerAfterHook, declareAlternativeResponse } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 /** 护驾族差异参数(标/界共享实现,差异全部显式注入)。 */
 export interface HujiaOptions {
@@ -253,9 +253,7 @@ export function createHujiaSkill(opts: HujiaOptions) {
             return null;
           },
           async (st: GameState, params: Record<string, Json>): Promise<void> => {
-            const slot = st.pendingSlots.get(pid);
-            if (!slot) return;
-            const requestType = (slot.atom as Record<string, unknown>)['requestType'] as string;
+            const requestType = currentRequestType(st, pid);
             if (requestType === DODGE_RT) {
               const cardId = params.cardId as string | undefined;
               if (cardId) {
@@ -339,3 +337,6 @@ export const { createSkill, onInit, onMount } = createHujiaSkill(OPTIONS);
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom.type !== '询问闪'
+// 出闪窗口判定(非 requestType),保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。

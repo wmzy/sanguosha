@@ -13,7 +13,7 @@
 //   7. 发动后禁出牌:任何牌使用被拒
 //   8. 装备/延时锦囊不触发往烈选择(但仍计首张)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import { createGameState } from '../../src/engine/types';
@@ -21,16 +21,6 @@ import type { Card, Faction, PlayerState } from '../../src/engine/types';
 
 // 注册往烈技能(subagent 不碰 index.ts,测试中直接赋值)
 setSkillModuleOverride('往烈', () => import('../../src/engine/skills/往烈').then((m) => m.default));
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suit === '♠' || suit === '♣' ? '黑' : '红', rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -44,20 +34,7 @@ function makePlayer(opts: {
   faction?: Faction;
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '陈到',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['往烈'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
+    ...sharedMakePlayer({ ...opts, character: opts.character ?? '陈到', skills: opts.skills ?? ['往烈'] }),
     faction: opts.faction ?? '蜀',
     identity: '忠臣',
   };

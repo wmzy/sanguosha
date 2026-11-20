@@ -42,7 +42,7 @@ import { registerAction } from '../core/skill';
 import { hasSkillModule } from './registry';
 import { equipReplacingOld } from './_equipReplace';
 import type { SkillModule } from '../types';
-import { requireRequestType, engineCanPlayNowReason, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType, engineCanPlayNowReason, defineConfirmAction } from '../util/skillRuntime';
 import { lostHealth } from '../util/player-query';
 import { EQUIP_SLOTS } from '../util/equip-slot';
 
@@ -277,8 +277,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as Record<string, unknown>)?.requestType as string;
+      const rt = currentRequestType(st, ownerId);
       if (rt === TARGET_RT) {
         st.localVars[TARGET_KEY] = params.targets;
       } else if (rt === DISCARD_RT) {
@@ -302,3 +301,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] validate 的 pendingSlots.get 另读 prompt.cardFilter.min
+// (弃牌数下限,非 requestType),保留手写读取;requestType 读取已走 currentRequestType。

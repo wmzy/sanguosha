@@ -11,22 +11,11 @@
 //   7. 春华用桃回满血(X→0) → 不触发(回复结算中途的瞬态不再误触发)
 //   8. 春华用桃回复但仍受伤(X>0) → 回复后才触发,以回复后的 X 判定摸牌数
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, waitForStable } from '../engine-harness';
+import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { applyAtom } from '../../src/engine/core/apply';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
+import type { GameState, PlayerState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;
@@ -37,22 +26,12 @@ function makePlayer(opts: {
   maxHealth?: number;
   character?: string;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: opts.character ?? '界张春华',
     health: opts.health ?? 3,
     maxHealth: opts.maxHealth ?? opts.health ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 describe('界伤逝', () => {

@@ -30,7 +30,7 @@ import { applyAtom } from '../core/apply'
 import { setFrameCancelled, topFrame } from '../core/frame';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const USED_KEY = '奋威/used';
 const CONFIRM_RT = '奋威/confirm';
@@ -121,8 +121,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       }).error;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === CHOOSE_RT) {

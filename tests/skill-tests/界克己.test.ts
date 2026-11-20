@@ -12,21 +12,10 @@
 //   5. 界版独有差异:出牌阶段外打出杀(白盒模拟)→ 不写入 playedSlash,不阻止克己
 //      (标版会在非出牌阶段也写入并阻止;界版按官方"出牌阶段内"判定)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
+import type { GameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;
@@ -37,22 +26,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界吕蒙',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['界克己', '回合管理'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? '界吕蒙', skills: opts.skills ?? ['界克己', '回合管理'] });
 }
 
 /** 取当前唯一 pending 的 requestType(无 pending 返回 null) */

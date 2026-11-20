@@ -284,6 +284,30 @@ export function registerAction(
   return () => unregisterActionEntry(state, skillId, ownerId, actionType);
 }
 
+/** registerBeforeHook/registerAfterHook 共用:按 phase 选 hooks map,入队并返回
+ *  按条目出队的 unloader。 */
+function registerHook(
+  phase: 'before' | 'after',
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  atomType: string,
+  handler: AtomHookEntry['handler'],
+): () => void {
+  const entry: AtomHookEntry = { skillId, ownerId, atomType, phase, handler };
+  const reg = getRegistry(state);
+  const map = phase === 'before' ? reg.beforeHooks : reg.afterHooks;
+  const list = map.get(atomType) ?? [];
+  list.push(entry);
+  map.set(atomType, list);
+  return () => {
+    const arr = map.get(atomType);
+    if (!arr) return;
+    const idx = arr.indexOf(entry);
+    if (idx >= 0) arr.splice(idx, 1);
+  };
+}
+
 /**
  * 注册一个 before atom 钩子。ownerId 在注册时绑定,handler 通过 ctx.ownerId 拿(无需闭包)。
  * before 钩子可返回 HookResult(pass/modify/cancel),after 钩子返回 void。
@@ -297,20 +321,7 @@ export function registerBeforeHook<T extends AtomName>(
 ): () => void {
   // handler 收窄到 AtomBeforeContext<T>(按 atomType);存储擦除为宽类型——
   // 注册表按 atomType 分发,运行时 ctx.atom 必然匹配 T,擦除安全。
-  const entry: AtomHookEntry = {
-    skillId, ownerId, atomType, phase: 'before',
-    handler: handler as AtomHookEntry['handler'],
-  };
-  const reg = getRegistry(state);
-  const list = reg.beforeHooks.get(atomType) ?? [];
-  list.push(entry);
-  reg.beforeHooks.set(atomType, list);
-  return () => {
-    const arr = reg.beforeHooks.get(atomType);
-    if (!arr) return;
-    const idx = arr.indexOf(entry);
-    if (idx >= 0) arr.splice(idx, 1);
-  };
+  return registerHook('before', state, skillId, ownerId, atomType, handler as AtomHookEntry['handler']);
 }
 
 /**
@@ -323,20 +334,7 @@ export function registerAfterHook<T extends AtomName>(
   atomType: T,
   handler: (ctx: AtomAfterContext<AtomOfName<T>>) => Promise<void>,
 ): () => void {
-  const entry: AtomHookEntry = {
-    skillId, ownerId, atomType, phase: 'after',
-    handler: handler as AtomHookEntry['handler'],
-  };
-  const reg = getRegistry(state);
-  const list = reg.afterHooks.get(atomType) ?? [];
-  list.push(entry);
-  reg.afterHooks.set(atomType, list);
-  return () => {
-    const arr = reg.afterHooks.get(atomType);
-    if (!arr) return;
-    const idx = arr.indexOf(entry);
-    if (idx >= 0) arr.splice(idx, 1);
-  };
+  return registerHook('after', state, skillId, ownerId, atomType, handler as AtomHookEntry['handler']);
 }
 
 /**

@@ -17,7 +17,7 @@ import { viewCanAttack } from '../../rules/viewDistance';
 import { incSlashUsed, isSlashExempted } from '../../rules/slash-quota';
 import { slashTargetMax } from '../../rules/slash-target';
 import { defaultPlayActive, viewCanSlash } from '../../rules/action-active';
-import { isAskedKillSlot } from '../../util/skillRuntime';
+import { isAskedKillSlot, requireHandCard } from '../../util/skillRuntime';
 import type { CardEffect, ResolveCtx } from '../../types';
 
 /** 杀的合法性追加检测：仅校验目标在攻击范围内。
@@ -82,10 +82,8 @@ export const slashEffect: CardEffect = {
       if (!isAskedKillSlot(slot)) return '当前不是出杀的窗口';
       const cardId = params.cardId as string | undefined;
       if (cardId) {
-        const self = state.players[ownerId];
-        if (!self.hand.includes(cardId)) return '牌不在手牌中';
-        const card = state.cardMap[cardId];
-        if (card?.name !== '杀') return '只能打出杀';
+        const handCheck = requireHandCard(state, ownerId, cardId, '杀');
+        if (handCheck) return handCheck;
       }
       return null;
     },

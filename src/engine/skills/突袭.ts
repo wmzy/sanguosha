@@ -20,6 +20,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction } from '../core/skill';
 import { pickRandom } from '../util/rng';
 import {
+  currentRequestType,
   askConfirm,
   requireRequestType,
   registerPhaseStartHook,
@@ -54,8 +55,7 @@ export function registerTuxiRespond(
         mismatchError: '当前不是突袭回应',
       }).error,
     async (s, params) => {
-      const slot = s.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(s, ownerId);
       if (rt === TRIGGER_RT) {
         s.localVars[TRIGGERED_KEY] = params.choice === true;
       } else if (rt === SELECT_RT) {

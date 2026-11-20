@@ -11,7 +11,7 @@
 //   5. 非结束阶段(其他 phase)→ 不触发
 //   6. 非自己结束阶段 → 不触发
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
@@ -27,20 +27,7 @@ function makePlayer(opts: {
   identity?: '主公' | '忠臣' | '反贼' | '内奸';
 }): PlayerState {
   return {
-    index: opts.index,
-    name: opts.name,
-    character: '界董卓',
-    health: opts.health ?? 8,
-    maxHealth: opts.maxHealth ?? 8,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
+    ...sharedMakePlayer({ ...opts, character: '界董卓', health: opts.health ?? 8, maxHealth: opts.maxHealth ?? 8 }),
     faction: opts.faction ?? '群',
     identity: opts.identity ?? '反贼',
   };

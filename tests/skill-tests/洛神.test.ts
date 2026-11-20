@@ -8,16 +8,11 @@
 //   4. 边界:deck 顶为红色 → 发动后立即停止(获得 0 张)
 //   5. 边界:获得黑桃后选择停止(continue=false)→ 不再判定,余牌留牌堆
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
-import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(id: string, name: string, suit: '♠' | '♥' | '♣' | '♦', rank = 'A'): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
+import type { GameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;
@@ -28,22 +23,13 @@ function makePlayer(opts: {
   maxHealth?: number;
   character?: string;
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: opts.character ?? '甄姬',
     health: opts.health ?? 3,
     maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
     skills: opts.skills ?? ['洛神'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 /** 触发准备阶段:applyAtom(阶段开始, 0, 准备) → 洛神 after-hook 启动循环

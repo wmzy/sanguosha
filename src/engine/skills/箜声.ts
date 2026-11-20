@@ -29,7 +29,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { equipReplacingOld } from './_equipReplace';
 import type { SkillModule } from '../types';
-import { requireRequestType, askConfirm, normalizeCardIds } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType, askConfirm, normalizeCardIds } from '../util/skillRuntime';
 import { slotOf } from '../util/equip-slot';
 
 /** owner.vars key:箜声牌 cardId 列表(与良姻共享) */
@@ -230,10 +230,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return '当前不是箜声询问';
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (
-        slot?.atom as { requestType?: string } | undefined
-      )?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] =
           params.choice === true || params.confirmed === true;

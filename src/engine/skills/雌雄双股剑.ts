@@ -16,7 +16,7 @@
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
 import { getGender } from '../data/character-meta';
 
 /** owner 是否发动的确认询问 requestType */
@@ -55,7 +55,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       (st: GameState, params: Record<string, Json>): string | null => {
         const slot = st.pendingSlots.get(pid);
         if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-        const reqType = (slot.atom as { requestType?: string }).requestType;
+        const reqType = currentRequestType(st, pid);
         if (reqType === CONFIRM_REQUEST) {
           // owner confirm:接受任意 choice(true/false)
           return null;
@@ -71,8 +71,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         return '当前不是雌雄双股剑询问';
       },
       async (st: GameState, params: Record<string, Json>) => {
-        const slot = st.pendingSlots.get(pid);
-        const reqType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+        const reqType = currentRequestType(st, pid);
         if (reqType === CONFIRM_REQUEST) {
           st.localVars[CONFIRMED_VAR] = params.choice === true;
         } else if (reqType === CHOICE_REQUEST) {
@@ -173,3 +172,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot 另用于 slot?.atom.type !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。

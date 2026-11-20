@@ -19,6 +19,7 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
 import {
   askConfirm,
+  currentRequestType,
   defineConfirmAction,
   registerOnDamagedAsTarget,
   requireRequestType,
@@ -63,8 +64,7 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
       return null;
     },
     async (state, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      const requestType = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const requestType = currentRequestType(state, ownerId);
       if (requestType === '反馈/confirm') {
         state.localVars['反馈/confirmed'] =
           params.choice === true || params.confirmed === true;

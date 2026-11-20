@@ -19,7 +19,7 @@
 //   11. 负面-无手牌作代价 → 拒绝
 //   12. 超时兜底-给牌:目标不选 → 自动交第一张
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import { createGameState } from '../../src/engine/types';
@@ -29,16 +29,6 @@ import type { Card, EquipSlot, GameState, PlayerState } from '../../src/engine/t
 // 注册飞军/兵略(测试注入,见 lifecycle.setSkillModuleOverride)
 setSkillModuleOverride('飞军', async () => await import('../../src/engine/skills/飞军'));
 setSkillModuleOverride('兵略', async () => await import('../../src/engine/skills/兵略'));
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -50,22 +40,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '王平',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['飞军', '兵略'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ character: '王平', skills: ['飞军', '兵略'], ...opts });
 }
 
 describe('飞军 + 兵略', () => {

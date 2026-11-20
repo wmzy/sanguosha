@@ -30,7 +30,7 @@ import { applyAtom } from '../core/apply';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界绝策';
 const DISPLAY_NAME = '绝策';
@@ -80,8 +80,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === CHOOSE_RT) {

@@ -8,7 +8,7 @@
 //   4. 杀命中 + 无麒麟弓 → 不触发弃马
 //   5. 目标持防御马(无进攻马)→ 确认发动 → 弃防御马(进攻马优先的反面边界)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState, Json, PlayerState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
@@ -20,24 +20,10 @@ function makePlayer(opts: {
   equipment?: Record<string, string>;
   skills?: string[];
   health?: number;
+  maxHealth?: number;
   vars?: Record<string, unknown>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '主公',
-    health: opts.health ?? 4,
-    maxHealth: opts.health ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? [],
-    vars: (opts.vars ?? {}) as Record<string, Json>,
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, maxHealth: opts.maxHealth ?? opts.health ?? 4, vars: (opts.vars ?? {}) as Record<string, Json> });
 }
 
 describe('麒麟弓:杀造成伤害时可弃目标1匹马', () => {

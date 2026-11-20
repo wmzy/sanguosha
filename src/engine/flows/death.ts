@@ -19,6 +19,7 @@
 // runDyingFlow 读取该值并作为参数传入,runDeathFlow 不再读写 localVars。
 import type { GameState } from '../types';
 import { applyAtom } from '../core/apply';
+import { ownedCardIds } from '../util/player-query';
 
 /** 死亡结算编排函数——对齐 death.md 5 时机。
  *
@@ -70,10 +71,7 @@ async function applyDeathPenalty(
   if (dead.identity === '反贼') {
     await applyAtom(state, { type: '摸牌', player: killer, count: 3 });
   } else if (dead.identity === '忠臣' && killerPlayer.identity === '主公') {
-    const allCards = [
-      ...killerPlayer.hand,
-      ...(Object.values(killerPlayer.equipment).filter(Boolean)),
-    ];
+    const allCards = ownedCardIds(killerPlayer);
     if (allCards.length > 0) {
       await applyAtom(state, { type: '弃置', player: killer, cardIds: allCards });
     }

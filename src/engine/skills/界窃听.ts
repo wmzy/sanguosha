@@ -30,7 +30,7 @@ import { registerAction, registerAfterHook, registerBeforeHook } from '../core/s
 import { hasSkillModule } from './registry';
 import { equipReplacingOld } from './_equipReplace';
 import type { SkillModule } from '../types';
-import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界窃听';
 const DISPLAY_NAME = '窃听';
@@ -176,8 +176,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as Record<string, unknown> | undefined)?.requestType as string;
+      const rt = currentRequestType(st, ownerId);
       if (rt === TRIGGER_RT) {
         st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === STEAL_OR_DRAW_RT) {

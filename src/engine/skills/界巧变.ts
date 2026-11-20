@@ -38,7 +38,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { registerAction, registerBeforeHook, registerAfterHook } from '../core/skill';
-import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import {
   askConfirmToSkipPhase,
   askDiscardCardForSkip,
@@ -126,8 +126,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       ).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === MODE_RT) {
         // params.choice === true → 移除 1 枚"变";否则弃一张手牌
         st.localVars[MODE_KEY] = params.choice === true ? '变' : 'discard';

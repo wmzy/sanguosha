@@ -13,7 +13,7 @@
 //   5. ②弃装备 + 虚拟杀 + 跳过出牌标签
 //   6. ③翻面:下一回合准备阶段被消费,整回合被跳过,cPI 推进到下家
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { applyAtom } from '../../src/engine/core/apply';
 // 临时注册界神速(主 agent 会统一注册到 index.ts)
@@ -35,33 +35,8 @@ function _makeCard(
   return { id, name, suit, color: suitColor(suit), rank, type };
 }
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  equipment?: PlayerState['equipment'];
-  character?: string;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界夏侯渊',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['界神速'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界夏侯渊', skills: ['界神速'], ...o });
 
 /** 触发判定阶段 → 界神速 before-hook 询问 */
 async function triggerJudgePhase(harness: SkillTestHarness, player = 0): Promise<void> {

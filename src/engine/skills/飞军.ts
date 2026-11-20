@@ -34,7 +34,13 @@ import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rule
 import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
 import { BINGLUE_TARGETS_KEY, getBinglueTargets } from '../rules/vars-keys';
-import { requireRequestType, engineCanPlayNowReason, firstTarget } from '../util/skillRuntime';
+import {
+  requireRequestType,
+  engineCanPlayNowReason,
+  firstTarget,
+  currentRequestType,
+  registerRespondForAllSeats,
+} from '../util/skillRuntime';
 import { equipmentCardIds } from '../util/player-query';
 
 // 请求类型(requestType 前缀 = skillId,见 T1)
@@ -297,14 +303,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   unloaders.push(useUnload);
 
   // ── respond action:每个座次注册,处理所有飞军请求类型 ──
-  for (const p of state.players) {
-    const seatId = p.index;
-    const u = registerAction(
+  unloaders.push(
+    ...registerRespondForAllSeats(
       state,
       skill.id,
-      seatId,
-      'respond',
-      (st: GameState, params: Record<string, Json>): string | null => {
+      (st: GameState, seatId: number, params: Record<string, Json>): string | null => {
         const check = requireRequestType(
           st,
           seatId,
@@ -337,9 +340,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         }
         return null;
       },
-      async (st: GameState, params: Record<string, Json>): Promise<void> => {
-        const slot = st.pendingSlots.get(seatId);
-        const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      async (st: GameState, seatId: number, params: Record<string, Json>): Promise<void> => {
+        const rt = currentRequestType(st, seatId);
         if (rt === OPTION_RT) {
           st.localVars[OPTION_KEY] = params.option;
         } else if (rt === TARGET_RT) {
@@ -351,9 +353,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
           st.localVars[DISCARD_EQUIP_KEY] = params.cardId;
         }
       },
-    );
-    unloaders.push(u);
-  }
+    ),
+  );
 
   return () => {
     unloaders.forEach((u) => u());

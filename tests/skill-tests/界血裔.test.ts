@@ -14,40 +14,17 @@
 //   8. 群角色死亡后裔数不变(游戏开始时锁定)
 //   9. 手牌上限动态:裔变动后立即反映
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { applyAtom } from '../../src/engine/core/apply';
 import { handLimit } from '../../src/engine/rules/hand-limit';
 import { createGameState } from '../../src/engine/types';
 import type { GameState, PlayerState } from '../../src/engine/types';
 
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  faction?: PlayerState['faction'];
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-    faction: opts.faction,
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0] & { faction?: PlayerState['faction'] }) => ({
+  ...sharedMakePlayer({ ...o, character: o.name }),
+  faction: o.faction,
+});
 
 /** 当前玩家裔标记数 */
 function yiCount(state: GameState, player: number): number {

@@ -43,7 +43,7 @@ import { registerAttackRangeExemptor } from '../rules/distance';
 import { DANGXIAN_EXTRA_PHASE_VIEW_KEY, DANGXIAN_NO_RANGE_VIEW_KEY } from '../rules/vars-keys';
 import { setTurnVarUsage, projectTurnUsage } from '../rules/turn-usage';
 import { pickRandom } from '../util/rng';
-import { askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 
 const DISPLAY_NAME = '当先';
 
@@ -98,8 +98,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       }).error;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === SOURCE_RT) {

@@ -14,49 +14,14 @@
 //   8. availableActions:界火计 transform 声明,prompt 卡过滤是红牌(手牌+装备)
 //   9. 展示结束:随机展示结算后广播收尾信号(带 player+cardId,晚于展示)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-  subtype?: string,
-): Card {
-  const c: Card = { id, name, suit, color: suitColor(suit), rank, type };
-  if (subtype) c.subtype = subtype;
-  return c;
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  equipment?: Record<string, string>;
-  skills?: string[];
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '界卧龙诸葛',
-    health: 3,
-    maxHealth: 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['火攻', '界火计'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界卧龙诸葛', health: 3, maxHealth: 3, skills: ['火攻', '界火计'], ...o });
 
 function buildState(opts?: {
   p1Hand?: string[];

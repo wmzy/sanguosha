@@ -29,7 +29,7 @@ import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { isCancelled } from '../core/frame';
-import { askConfirm, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界雷击';
 const DISPLAY_NAME = '雷击';
@@ -155,12 +155,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return;
-      const atom = slot.atom as unknown as { requestType?: string };
-      if (atom.requestType === JUDGE_RT) {
+      const rt = currentRequestType(st, ownerId);
+      if (rt === JUDGE_RT) {
         st.localVars[JUDGE_KEY] = params.choice === true || params.confirmed === true;
-      } else if (atom.requestType === TARGET_RT) {
+      } else if (rt === TARGET_RT) {
         const target = params.target;
         st.localVars[TARGET_KEY] = typeof target === 'number' ? target : null;
       }

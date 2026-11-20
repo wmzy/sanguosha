@@ -47,7 +47,7 @@ import { registerAction, registerAfterHook, registerBeforeHook } from '../core/s
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm, defineConfirmAction, firstTarget } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, firstTarget } from '../util/skillRuntime';
 import { equipmentCardIds, hasDiscardableCards } from '../util/player-query';
 
 const _SKILL_ID = '界旋风';
@@ -174,14 +174,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as { type?: string; requestType?: string };
       if (atom.type !== '请求回应') return '当前不是请求回应';
-      const rt = atom.requestType;
+      const rt = currentRequestType(st, ownerId);
       const valid = [CONFIRM_RT, CONTINUE_RT, PICK_TARGET_RT, PICK_CARD_RT];
       if (!rt || !valid.includes(rt)) return '当前不是旋风询问';
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRM_KEY] = params.choice === true || params.confirmed === true;
         return;
@@ -281,3 +280,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom.type !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

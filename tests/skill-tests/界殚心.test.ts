@@ -13,50 +13,15 @@
 //   4. 拒绝发动:受伤 → 询问 → 取消 → 无变化(摸 0,计数不变)
 //   5. 触发条件不满足:其他玩家受伤 → 不触发
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
 
 const MOD_COUNT_KEY = '界殚心/修改次数';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  const color = suit === '♥' || suit === '♦' ? '红' : '黑';
-  return { id, name, suit, color, rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  hand?: string[];
-  skills?: string[];
-  health?: number;
-  maxHealth?: number;
-  character?: string;
-}) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界郭皇后',
-    health: opts.health ?? 3,
-    maxHealth: opts.maxHealth ?? 3,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['界矫诏', '界殚心', '杀', '闪', '桃'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
+  sharedMakePlayer({ character: '界郭皇后', health: 3, maxHealth: 3, skills: ['界矫诏', '界殚心', '杀', '闪', '桃'], ...o });
 
 function modCount(state: GameState, ownerId: number): number {
   const v = state.players[ownerId]?.vars[MOD_COUNT_KEY];

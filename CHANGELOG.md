@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — 2026-11-20
+
+### Fixed — 权威性与吞错
+
+- 浏览器 `choosePlayer` 渲染改走共享投影 `choosePlayerCandidates`（与无头枚举同源）：
+  投影层未下发 `candidates` 时按 `filter` 过滤存活玩家兜底，不再渲染空候选列表。
+- `server/gameHistory` 读索引/回放文件区分 `ENOENT` 与真实损坏/权限错误，后者记日志，
+  不再被静默折叠成「无历史」后遭 append 覆盖；`feedbackHandler` 默认目录改为
+  `paths.ts` 派生的绝对路径（CWD 无关）。
+- `chat` 配额计数移到成员资格校验之后，非成员的被拒消息不再消耗 `maxPerGame` 配额。
+
+### Removed — 死代码
+
+- 删除 `server/protocol.ts` 中已无 WS 消费者的 `deserialize`/`isValidClientMessage` 与
+  7 个仅存于历史的 `ClientMessage` 成员；删除 `SseSink.setSeq/lastSeq` 死方法。
+
+### Refactored — 去重收敛（429 文件，净删 ~7,100 行）
+
+- 测试夹具单点化：`tests/engine-harness.ts` 新增共享 `makeCard`/`makePlayer` 工厂，
+  逐字变体经 codemod 批量迁移（224 文件），默认值差异变体改薄包装（~270 文件），
+  替换全部 537 处手写定义。
+- respond 样板收敛：`registerRespondForAllSeats` 收编最后 7 处手写逐座次循环
+  （烈刃/英魂/飞军/界献州/立军/制霸/义绝）；115 处手写 `pendingSlots.requestType`
+  反射统一为 `currentRequestType`（消除 4 处 `!` 断言崩溃风险）；新增
+  `requireHandCard`/`requireRequestType({ownerCheck})`，桃/酒/杀/闪/无懈可击/借刀杀人
+  六张牌 respond 校验改用（酒 求桃窗口补齐 owner 校验）。
+- 卡牌与技能去重：借刀杀人 目标双形状解析/距离校验单点化（复用 `杀.canUseSlash`）、
+  闪电 fallback 卡构造、急袭 复用 屯田 导出的 `tianCount/syncDistanceMod`；
+  `card-invalidation` 七段拦截样板表驱动化；`registerBefore/AfterHook` 折叠；
+  `EQUIP_SLOTS`/`ownedCardIds`/`discardProcessingCard` 收编全部内联副本；
+  服务端随机 ID/目录推导/密码校验各自单点化，兼容 re-export 垫片层全部移除。
+
 ## [Unreleased] — 2026-10-25
 
 ### Fixed — 出牌方向与视图一致性

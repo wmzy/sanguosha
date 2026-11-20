@@ -3,10 +3,9 @@
 //   翻 N 张到处理区亮出,从使用者开始按座次依次选1张到手牌,剩余进弃牌堆。
 // 无懈可击时机:每名角色选牌前(生效前)各广播问一次(被抵消 → 该角色不参与选牌)。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
@@ -17,24 +16,14 @@ function makePlayer(opts: {
   maxHealth?: number;
   skills?: string[];
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
+  // 五谷丰登是通用锦囊技能(任何玩家拿到这张牌都能用、且任何玩家都可能成为目标需要 respond)
+  // 所以每个玩家都必须 instantiate
+  return sharedMakePlayer({
+    ...opts,
     character: '',
-    health: opts.health ?? 4,
     maxHealth: opts.maxHealth ?? opts.health ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    // 五谷丰登是通用锦囊技能(任何玩家拿到这张牌都能用、且任何玩家都可能成为目标需要 respond)
-    // 所以每个玩家都必须 instantiate
     skills: opts.skills ?? ['五谷丰登', '无懈可击'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  });
 }
 
 function makeCard(
@@ -44,7 +33,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
+  return sharedMakeCard(id, name, suit, rank, type);
 }
 
 describe('五谷丰登', () => {

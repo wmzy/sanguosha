@@ -42,7 +42,7 @@ import { runDamageFlow } from '../flows/damage';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, engineCanPlayNowReason, registerRespondForAllSeats, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType, engineCanPlayNowReason, registerRespondForAllSeats, defineConfirmAction } from '../util/skillRuntime';
 
 const SKILL_ID = '界焚城';
 const DISPLAY_NAME = '焚城';
@@ -246,8 +246,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         return null;
       },
       async (st: GameState, seat: number, params: Record<string, Json>): Promise<void> => {
-        const slot = st.pendingSlots.get(seat);
-        const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+        const rt = currentRequestType(st, seat);
         if (rt === START_RT) {
           const targets = params.targets as number[] | undefined;
           if (Array.isArray(targets)) st.localVars[START_KEY] = targets;

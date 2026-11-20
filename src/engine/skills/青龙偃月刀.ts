@@ -30,6 +30,7 @@ import type { FrontendAPI, Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction } from '../core/skill';
 import {
+  currentRequestType,
   askConfirm,
   requireRequestType,
   registerOnOwnSlashDodged,
@@ -76,8 +77,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
       return null;
     },
     async (state, params) => {
-      const slot = state.pendingSlots.get(ownerId);
-      const requestType = (slot!.atom as unknown as Record<string, unknown>).requestType as string;
+      const requestType = currentRequestType(state, ownerId);
       if (requestType === '青龙偃月刀/confirm') {
         state.localVars['青龙偃月刀/confirmed'] =
           params.choice === true || params.confirmed === true;

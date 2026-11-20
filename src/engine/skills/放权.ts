@@ -38,7 +38,7 @@ import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { clearPerTurnStateProjected } from '../rules/turn-usage';
-import { askConfirm, askResponse, defineConfirmAction, registerPhaseStartHook } from '../util/skillRuntime';
+import { askConfirm, askResponse, currentRequestType, defineConfirmAction, registerPhaseStartHook } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 // localVars keys(标/界共用 '放权/' 前缀,保持与测试断言一致)
@@ -95,7 +95,7 @@ export function createFangquanSkill(opts: FangquanOptions) {
       (s: GameState, params: Record<string, Json>): string | null => {
         const slot = s.pendingSlots.get(ownerId);
         if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-        const rt = (slot.atom as unknown as { requestType?: string }).requestType;
+        const rt = currentRequestType(s, ownerId);
         if (rt === TRIGGER_RT) return null;
         if (rt === DISCARD_RT) {
           const cardId = params.cardId as string | undefined;
@@ -113,8 +113,7 @@ export function createFangquanSkill(opts: FangquanOptions) {
         return '当前不是放权回应';
       },
       async (s: GameState, params: Record<string, Json>) => {
-        const slot = s.pendingSlots.get(ownerId);
-        const rt = (slot?.atom as unknown as { requestType?: string } | undefined)?.requestType;
+        const rt = currentRequestType(s, ownerId);
         if (rt === TRIGGER_RT) {
           s.localVars[TRIGGERED_KEY] = params.choice === true || params.confirmed === true;
         } else if (rt === DISCARD_RT) {
@@ -366,3 +365,6 @@ export const { createSkill, onInit, onMount } = createFangquanSkill(OPTIONS);
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 slot?.atom.type !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

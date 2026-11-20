@@ -11,6 +11,7 @@ import type { Card, GameState, Json, Skill, FrontendAPI } from '../types';
 import { hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import {
+  currentRequestType,
   mountTransformAction,
   registerTransformAction,
   type TransformActionOptions,
@@ -47,7 +48,7 @@ const TRANSFORM_OPTIONS: TransformActionOptions = {
     // runDyingFlow 的 while 循环保证濒死者整个问询期间 health<=0。
     const slot = state.pendingSlots.get(ownerId);
     const atomType = (slot?.atom as { type?: string })?.type;
-    const reqType = (slot?.atom as { requestType?: string })?.requestType;
+    const reqType = currentRequestType(state, ownerId);
     const atomTarget = (slot?.atom as { target?: number })?.target;
     const askedPeach =
       !!slot &&
@@ -106,3 +107,6 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+
+// [requestType 迁移·不迁项] ① validate 的 slot 另读 atomType/atomTarget(求桃窗口判定,
+// 非 requestType);② activeWhen 读 ctx.view.pending(视图层)。requestType 读取已走 currentRequestType。

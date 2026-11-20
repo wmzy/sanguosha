@@ -1,5 +1,5 @@
 // server/http.ts — HTTP 请求体读取/字段提取的零依赖叶子助手。
-// 供 routes/helpers.ts(REST 路由族)与 auth/routes.ts 共用;本文件不得
+// 供 routes/ 各路由文件与 auth/routes.ts 共用;本文件不得
 // import room/session 等业务模块,保持依赖方向 routes→叶子、auth→叶子。
 import type { Context } from 'hono';
 

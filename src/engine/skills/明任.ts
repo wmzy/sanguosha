@@ -20,7 +20,7 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import type { Color, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { normalizeCardIds } from '../util/skillRuntime';
+import { currentRequestType, normalizeCardIds } from '../util/skillRuntime';
 
 const SKILL_ID = '明任';
 /** 任标记 id(单张,固定 id;替换时先 去标记 再 加标记)。 */
@@ -106,7 +106,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as { type: string; requestType?: string };
       if (atom.type !== '请求回应') return '当前不需要回应';
-      const rt = atom.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         return null; // confirm:接受 choice/confirmed
       }
@@ -121,8 +121,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return '当前不是明任回应';
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as { requestType?: string } | undefined)?.requestType;
+      const rt = currentRequestType(st, ownerId);
       if (rt === CONFIRM_RT) {
         st.localVars[CONFIRMED_KEY] = params.choice === true || params.confirmed === true;
       } else if (rt === PLACE_RT) {
@@ -225,3 +224,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
 
 const _skillModule: SkillModule = { createSkill, onInit, onMount };
 export default _skillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom.type !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

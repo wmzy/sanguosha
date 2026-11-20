@@ -8,6 +8,7 @@
 //   1. modify 叠加对纯加减法保持交换律(英姿+1 / 裸衣-1 类比:结果与顺序无关)。
 //   2. 多个正修正叠加(英姿+1 + 好施+2 = +3)。
 import { describe, it, expect } from 'vitest';
+import { makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
@@ -15,25 +16,11 @@ import { registerBeforeHook } from '../../src/engine/core/skill';
 import type { Card, GameState, PlayerState, HookResult } from '../../src/engine/types';
 
 function makeCard(id: string): Card {
-  return { id, name: '测试牌', suit: '♠', color: '黑', rank: '1', type: '基本牌' };
+  return sharedMakeCard(id, '测试牌', '♠', '1');
 }
 
 function makePlayer(index: number): PlayerState {
-  return {
-    index,
-    name: `P${index}`,
-    character: '测试',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    pendingTricks: [],
-    skills: [],
-    vars: {},
-    marks: [],
-    tags: [],
-  };
+  return sharedMakePlayer({ index, name: `P${index}`, character: '测试' });
 }
 
 /** 构造 N 玩家 state,牌堆预置足够牌供摸牌。 */

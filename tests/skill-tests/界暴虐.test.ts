@@ -14,52 +14,23 @@
 //   7. 非主公 → 不触发
 //   8. 系统伤害(source<0)→ 不触发
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  health?: number;
-  maxHealth?: number;
-  skills?: string[];
-  faction?: '魏' | '蜀' | '吴' | '群';
-  identity?: '主公' | '忠臣' | '反贼' | '内奸';
-  character?: string;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界董卓',
-    health: opts.health ?? 8,
-    maxHealth: opts.maxHealth ?? 8,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-    faction: opts.faction ?? '群',
-    identity: opts.identity ?? '反贼',
-  };
-}
+const makePlayer = (
+  o: Parameters<typeof sharedMakePlayer>[0] & {
+    faction?: '魏' | '蜀' | '吴' | '群';
+    identity?: '主公' | '忠臣' | '反贼' | '内奸';
+  },
+) => ({
+  ...sharedMakePlayer({ character: '界董卓', health: 8, maxHealth: 8, ...o }),
+  faction: o.faction ?? '群',
+  identity: o.identity ?? '反贼',
+});
 
 /** 预填牌堆顶:判定时翻此牌 */
 function preloadDeck(state: GameState, cardIds: string[]): void {

@@ -15,8 +15,7 @@ import { readFile, rm, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Room } from '../../src/server/room';
 import type { GameState } from '../../src/engine/types';
-
-const SNAPSHOT_DIR = join(process.cwd(), 'data', 'snapshots');
+import { SNAPSHOTS_DIR } from '../../src/server/paths';
 
 // 跟踪本文件创建的房间 id,afterEach 清理持久化文件,避免 data/rooms/ 残留
 // 被下次 dev server 启动恢复成僵尸 session。
@@ -48,7 +47,7 @@ function getState(session: GameSession): GameState {
 }
 
 async function readSnapshot(snapshotId: string): Promise<unknown> {
-  const raw = await readFile(join(SNAPSHOT_DIR, snapshotId, 'snapshot.json'), 'utf-8');
+  const raw = await readFile(join(SNAPSHOTS_DIR, snapshotId, 'snapshot.json'), 'utf-8');
   return JSON.parse(raw);
 }
 
@@ -58,11 +57,11 @@ describe('debug 快照功能', () => {
     const ids = trackedRoomIds.splice(0);
     await Promise.all(ids.map((id) => deletePersistedRoom(id).catch(() => {})));
     try {
-      const entries = await readdir(SNAPSHOT_DIR).catch(() => []);
+      const entries = await readdir(SNAPSHOTS_DIR).catch(() => []);
       for (const e of entries) {
         // snapshotId 形如 `${timestampId()}-${roomId}`,按本文件创建的房间 id 匹配
         if (ids.some((id) => e.includes(id))) {
-          await rm(join(SNAPSHOT_DIR, e), { recursive: true });
+          await rm(join(SNAPSHOTS_DIR, e), { recursive: true });
         }
       }
     } catch {
@@ -273,7 +272,7 @@ describe('debug 快照功能', () => {
     expect(snapshot.telemetry.viewport).toEqual({ width: 1280, height: 720 });
 
     // sidecar 文件落盘且内容正确(位于快照子目录内)
-    const dir = join(SNAPSHOT_DIR, snapshotId);
+    const dir = join(SNAPSHOTS_DIR, snapshotId);
     const consoleContent = await readFile(join(dir, snapshot.telemetry.console.filename), 'utf-8');
     expect(consoleContent).toContain('Test error 1');
     expect(consoleContent).toContain('Test warning');
@@ -310,7 +309,7 @@ describe('debug 快照功能', () => {
     expect(snapshot.telemetry).toBeUndefined();
     // 目录里只有主文件,没有 sidecar
     const { readdir } = await import('node:fs/promises');
-    const files = await readdir(join(SNAPSHOT_DIR, snapshotId));
+    const files = await readdir(join(SNAPSHOTS_DIR, snapshotId));
     expect(files).toEqual(['snapshot.json']);
   }, 15000);
 });

@@ -9,17 +9,10 @@ import {
   getEquipmentSkillNames,
 } from '../../src/engine/data/card-meta';
 import type { Card } from '../../src/engine/types';
+import { makeCard as sharedMakeCard } from '../engine-harness';
 
 function makeCard(overrides: Partial<Card> = {}): Card {
-  return {
-    id: 'test-1',
-    name: '杀',
-    suit: '♠',
-    color: '黑',
-    rank: '7',
-    type: '基本牌',
-    ...overrides,
-  };
+  return { ...sharedMakeCard('test-1', '杀', '♠', '7'), ...overrides };
 }
 
 describe('isEquipment', () => {

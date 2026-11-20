@@ -9,11 +9,10 @@
 //   把最后置入的延时锦囊（闪电）配上一张会让其「传递/命中」的判定牌，
 //   其余延时锦囊配上可区分花色的判定牌 —— 结算顺序错位时观测状态会不同。
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness, fireTimeoutAndWait, waitForStable } from '../engine-harness';
+import { SkillTestHarness, fireTimeoutAndWait, waitForStable, makeCard as sharedMakeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makeCard(
@@ -23,7 +22,7 @@ function makeCard(
   rank = 'A',
   type: '基本牌' | '锦囊牌' | '装备牌' = '锦囊牌',
 ): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
+  return sharedMakeCard(id, name, suit, rank, type);
 }
 
 function makePlayer(opts: {
@@ -35,22 +34,11 @@ function makePlayer(opts: {
   tags?: string[];
   health?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: '主公',
-    health: opts.health ?? 4,
     maxHealth: opts.health ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    vars: {},
-    marks: [],
-    pendingTricks: opts.pendingTricks ?? [],
-    judgeZone: [],
-    tags: opts.tags ?? [],
-  };
+  });
 }
 
 /** 逐个消耗判定阶段的无懈窗口，直到无 pending（每个延时锦囊结算时各开一个无懈窗口）。 */

@@ -3,20 +3,10 @@
 //   条件满足 → 可令目标不能出闪(强制命中)
 //   条件不满足 → 不触发,正常询问闪
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
+import type { GameState, PlayerState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;
@@ -27,23 +17,11 @@ function makePlayer(opts: {
   maxHealth?: number;
   vars?: Record<string, unknown>;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
+  return sharedMakePlayer({
+    ...opts,
     character: '黄忠',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? [],
-    // 类型要求 Record<string, Json>,此处仅用于注入距离 vars
-    vars: (opts.vars ?? {}) as Record<string, import('../../src/engine/types').Json>,
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+    vars: opts.vars as PlayerState['vars'],
+  });
 }
 
 describe('烈弓', () => {

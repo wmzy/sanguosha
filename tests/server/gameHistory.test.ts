@@ -17,14 +17,15 @@ import {
   filterReplayForViewer,
   MAX_ENTRIES_PER_ROOM,
   identityCamp,
-  HISTORY_DIR,
   type GameHistoryEntry,
 } from '../../src/server/gameHistory';
+import { HISTORY_DIR } from '../../src/server/paths';
 import { applyRestRoutes } from '../../src/server/rest';
 import { applyAuthRoutes } from '../../src/server/auth/routes';
 import { initRoomStore, closeRoomStore } from '../../src/server/roomStore';
 import { _resetForTests as resetLifecycles } from '../../src/server/resourceRegistry';
-import { gameSessions, playerRoomMap } from '../../src/server/registry';
+import { gameSessions } from '../../src/server/registry';
+import { playerRoomMap } from '../../src/server/playerIndex';
 import { createRoom, getRoom, deleteRoom } from '../../src/server/room';
 import { GameSession } from '../../src/server/session';
 import { isReplayFile } from '../../src/client/replay/replayFile';

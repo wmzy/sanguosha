@@ -17,6 +17,7 @@ import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import {
   askConfirm,
+  currentRequestType,
   defineConfirmAction,
   registerOnDamagedAsTarget,
   registerRespondForAllSeats,
@@ -49,16 +50,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!slot) return '当前不需要回应';
       const atom = slot.atom as Record<string, unknown>;
       if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const requestType = atom['requestType'] as string;
+      const requestType = currentRequestType(st, seatId);
       if (requestType === CHOOSE_REQUEST) return null; // 来源二选一
       if (isOwner && requestType === CONFIRM_REQUEST) return null; // 是否发动
       return '当前不是刚烈回应';
     },
     async (st: GameState, seatId: number, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(seatId);
-      const requestType = (slot?.atom as Record<string, unknown> | undefined)?.['requestType'] as
-        | string
-        | undefined;
+      const requestType = currentRequestType(st, seatId);
       if (requestType === CONFIRM_REQUEST) {
         st.localVars['刚烈/confirmed'] = params.choice === true;
       } else {
@@ -139,3 +137,6 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
 }
 
 export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+
+// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
+// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

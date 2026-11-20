@@ -2,8 +2,7 @@
 // 状态(chatUsage/chatHistory)仍是 Room 的字段(随房间生命周期,房间销毁即回收);
 // 本模块只承载操作函数,经 getRoom(roomId) 定位房间,与房间成员语义零耦合。
 // 与 room.ts 构成函数体级依赖环:本模块顶层不执行任何访问 room 绑定的语句,
-// 运行时安全(与原 registry↔room 的顶层执行环不同)。room.ts re-export 保持
-// sse.ts/routes/tests 从 './room' 导入的既有路径不变。
+// 运行时安全;消费方(sse/routes/tests)直接从 './chat' 导入。
 import { getRoom } from './room';
 
 /** 聊天验证结果。 */
@@ -50,6 +49,10 @@ export function addChatMessage(
     return { ok: false, error: `每条消息最多 ${chat.maxChars} 字` };
   }
 
+  // 成员资格校验(纯校验先行,在 touch chatUsage/chatHistory 任何状态之前拒绝)
+  const seatIndex = room.seats.indexOf(playerId);
+  if (seatIndex < 0) return { ok: false, error: '不在房间中' };
+
   const now = Date.now();
   let usage = room.chatUsage.get(playerId);
   if (!usage) {
@@ -73,10 +76,6 @@ export function addChatMessage(
   // 记录用量
   usage.total++;
   usage.timestamps.push(now);
-
-  // 确定座次（从座位表派生，保证与座次顺序一致）
-  const seatIndex = room.seats.indexOf(playerId);
-  if (seatIndex < 0) return { ok: false, error: '不在房间中' };
 
   // 存入历史
   const entry = { playerId, seatIndex, text: trimmed, timestamp: now };

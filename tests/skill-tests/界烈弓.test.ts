@@ -12,52 +12,16 @@
 //   6. 负面·条件都不满足 → 不询问,正常询问闪
 //   7. 负面·条件满足但不发动 → 正常询问闪
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import type { Card, Faction, Json, PlayerState } from '../../src/engine/types';
 
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type: '基本牌' };
-}
-
-function makePlayer(opts: {
-  index: number;
-  name: string;
-  character?: string;
-  health?: number;
-  maxHealth?: number;
-  alive?: boolean;
-  hand?: string[];
-  equipment?: Record<string, string>;
-  skills?: string[];
-  vars?: Record<string, Json>;
-  faction?: Faction;
-}): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '界黄忠',
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: opts.alive ?? true,
-    hand: opts.hand ?? [],
-    equipment: opts.equipment ?? {},
-    skills: opts.skills ?? ['界烈弓'],
-    vars: opts.vars ?? {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-    faction: opts.faction ?? '蜀',
-  };
-}
+const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0] & { faction?: Faction }) => ({
+  ...sharedMakePlayer({ character: '界黄忠', skills: ['界烈弓'], ...o }),
+  faction: o.faction ?? '蜀',
+});
 
 describe('界烈弓', () => {
   let harness: SkillTestHarness;

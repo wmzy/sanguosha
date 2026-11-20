@@ -6,7 +6,7 @@
 // 这验证了"回放 = 实时"的根本正确性。
 
 import { describe, it, expect } from 'vitest';
-import { SkillTestHarness, dispatchAndWait, fireTimeoutAndWait } from '../../engine-harness';
+import { SkillTestHarness, dispatchAndWait, fireTimeoutAndWait, makePlayer as sharedMakePlayer } from '../../engine-harness';
 import { ReplayRecorder } from '../../../src/client/replay/recorder';
 import { getViewAt } from '../../../src/client/replay/replayEngine';
 import { buildView } from '../../../src/engine/index';
@@ -14,22 +14,7 @@ import type { GameState, GameView } from '../../../src/engine/types';
 import { createGameState } from '../../../src/engine/types';
 
 function makePlayer(index: number, name: string, hand: string[], skills: string[]) {
-  return {
-    index,
-    name,
-    character: name,
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand,
-    equipment: {},
-    skills,
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ index, name, hand, skills, character: name });
 }
 
 function makeState(): GameState {

@@ -10,6 +10,7 @@
 //   4. 伤害结算开始时 cancel → 跳过整个伤害流程。
 //   5. 不迁移调用方:现有 造成伤害 atom 未被修改,仍可独立 apply。
 import { describe, it, expect, beforeEach } from 'vitest';
+import { makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms'; // 注册所有 atom(含 damage-timing)
 import { createGameState } from '../../src/engine/types';
 import type { Atom, GameState, PlayerState } from '../../src/engine/types';
@@ -22,22 +23,7 @@ function makePlayer(opts: {
   health?: number;
   maxHealth?: number;
 }): PlayerState {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.name,
-    health: opts.health ?? 4,
-    maxHealth: opts.maxHealth ?? 4,
-    alive: true,
-    hand: [],
-    equipment: {},
-    skills: [],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-  };
+  return sharedMakePlayer({ ...opts, character: opts.name });
 }
 
 function makeState(): GameState {

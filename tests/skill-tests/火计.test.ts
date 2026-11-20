@@ -8,21 +8,10 @@
 //   4. 负面:非自己回合 transform 被拒
 //   5. availableActions:火计 transform action 声明,prompt 卡过滤是红牌(♥/♦ 通过)
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' | '装备牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
-}
 
 function makePlayer(opts: {
   index: number;
@@ -30,22 +19,7 @@ function makePlayer(opts: {
   hand?: string[];
   skills?: string[];
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: '卧龙诸葛',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['火计'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    tags: [],
-    judgeZone: [],
-  };
+  return sharedMakePlayer({ ...opts, character: '卧龙诸葛', skills: opts.skills ?? ['火计'] });
 }
 
 function buildState(opts?: {

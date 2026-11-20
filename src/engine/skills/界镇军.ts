@@ -41,7 +41,7 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
 import { totalCardCount, ownedCardIds, equipmentCardIds } from '../util/player-query';
 
 const SKILL_ID = '界镇军';
@@ -186,11 +186,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      const rt = (slot?.atom as Record<string, unknown> | undefined)?.['requestType'] as
-        | string
-        | undefined;
-
+      const rt = currentRequestType(st, ownerId);
       if (rt === RT_ASK_USE) {
         st.localVars[LV_USE] = params.choice === true;
       } else if (rt === RT_ASK_TARGET) {

@@ -8,10 +8,10 @@ import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import type { ServerMessage, EventSeq } from './protocol';
 import { serialize } from './protocol';
 import type { ConnectionSink } from './connection';
-import { getRoom, removeSpectator, leaveRoom, bindPlayerRoom, unbindPlayerRoom, type Room } from './room';
+import { getRoom, removeSpectator, leaveRoom, broadcastMessage, buildRoomState, ensureSeatOnReconnect, getRecentLeaveGrace, type Room } from './room';
 import type { GameSession } from './session';
-import { broadcastMessage } from './room';
-import { getChatHistory, buildRoomState, ensureSeatOnReconnect, getRecentLeaveGrace } from './room';
+import { bindPlayerRoom, unbindPlayerRoom } from './playerIndex';
+import { getChatHistory } from './chat';
 import { resolveSessionIdentity } from './auth/guard';
 import { gameSessions } from './registry';
 import { generatePlayerId } from './utils';
@@ -40,7 +40,6 @@ function startHeartbeat(stream: SSEStreamingApi): () => void {
  */
 export class SseSink implements ConnectionSink {
   private closed = false;
-  private seq = 0;
 
   constructor(private stream: SSEStreamingApi) {}
 
@@ -70,15 +69,6 @@ export class SseSink implements ConnectionSink {
 
   get isAlive(): boolean {
     return !this.closed && !this.stream.aborted;
-  }
-
-  /** 更新已发送的 seq 水位（供断线重连计算补发起点） */
-  setSeq(seq: number): void {
-    this.seq = seq;
-  }
-
-  get lastSeq(): number {
-    return this.seq;
   }
 }
 
@@ -225,13 +215,10 @@ async function runSseSession(
   playerId: string,
   displayName: string | null,
   session: GameSession | undefined,
-  lastSeq: number,
   role: SseRoleAdapter,
 ): Promise<void> {
   const roomId = room.id;
   const sink = new SseSink(stream);
-  // epoch 校验通过才认可 seq,否则 0(强制快照)
-  sink.setSeq(lastSeq);
 
   role.registerSink(sink);
   // registerSink 直改名单(不经成员函数),这里显式绑定房间映射
@@ -354,7 +341,7 @@ export async function sseStreamHandler(c: Context): Promise<Response> {
       const role = isSpectator
         ? spectatorRole(room, playerId, lastSeq)
         : playerRole(room, playerId, session, lastSeq);
-      await runSseSession(stream, room, playerId, displayName, session, lastSeq, role);
+      await runSseSession(stream, room, playerId, displayName, session, role);
     } catch (err) {
       log.err('SSE handler error', err);
     }

@@ -8,10 +8,9 @@
 //   杀·边界:无双仅对杀生效 —— 吕布出万箭齐发,一张闪即抵消(无双不触发双闪)
 //   决斗·正面:吕布发起决斗,对方需双杀 / 吕布被决斗,发起者需双杀
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkillTestHarness } from '../engine-harness';
+import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import type { Card, GameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {
@@ -21,32 +20,7 @@ function makePlayer(opts: {
   hand?: string[];
   skills?: string[];
 }) {
-  return {
-    index: opts.index,
-    name: opts.name,
-    character: opts.character ?? '主公',
-    health: 4,
-    maxHealth: 4,
-    alive: true,
-    hand: opts.hand ?? [],
-    equipment: {},
-    skills: opts.skills ?? ['杀'],
-    vars: {},
-    marks: [],
-    pendingTricks: [],
-    judgeZone: [],
-    tags: [],
-  };
-}
-
-function makeCard(
-  id: string,
-  name: string,
-  suit: '♠' | '♥' | '♣' | '♦' = '♠',
-  rank = 'A',
-  type: '基本牌' | '锦囊牌' = '基本牌',
-): Card {
-  return { id, name, suit, color: suitColor(suit), rank, type };
+  return sharedMakePlayer({ ...opts, character: opts.character ?? '主公', skills: opts.skills ?? ['杀'] });
 }
 
 /** 构建杀测试 state:P1(吕布) 对 P2 出杀 */
