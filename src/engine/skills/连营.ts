@@ -25,6 +25,7 @@ import type {
   GameState,
   Json,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
@@ -271,4 +272,4 @@ const OPTIONS: LianyingOptions = {
 
 export const { createSkill, onInit, onMount } = createLianyingSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -18,7 +18,7 @@
 //
 // 本文件同时导出 createGuicaiSkill 工厂(鬼才族共享实现),界鬼才 复用之,仅注入
 //   includeEquipment(装备区牌可作替换牌:candidates 投影 + 移除技能→卸下 序列)等差异参数。
-import type { EquipSlot, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { EquipSlot, FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { frameCards } from '../core/frame';
 import { registerAction, registerJudgeModifier } from '../core/skill';
@@ -217,4 +217,4 @@ const OPTIONS: GuicaiOptions = {
 
 export const { createSkill, onInit, onMount } = createGuicaiSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

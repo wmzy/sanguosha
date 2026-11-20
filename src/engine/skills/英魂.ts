@@ -22,11 +22,13 @@ import type {
   GameState,
   Json,
   Skill,
+  SkillModule,
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import {
   askConfirm,
+  askChooseTarget,
   askMandatoryCardChoice,
   currentRequestType,
   registerPhaseStartHook,
@@ -98,23 +100,13 @@ export async function performYinghunPrepare(
   if (!confirmed) return;
 
   // 2) 选一名其他角色(存活且非自己)
-  delete state.localVars[TARGET_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: TARGET_RT,
-    target: ownerId,
-    prompt: {
-      type: 'choosePlayer',
-      title: '英魂:选择一名其他角色',
-      min: 1,
-      max: 1,
-      filter: (_view: GameView, t: number) =>
-        t !== ownerId && state.players[t]?.alive === true,
-    },
+  const target = await askChooseTarget(state, TARGET_RT, ownerId, {
+    title: '英魂:选择一名其他角色',
+    filter: (_view: GameView, t: number) =>
+      t !== ownerId && state.players[t]?.alive === true,
     timeout: 15,
+    resultKey: TARGET_KEY,
   });
-  const target = state.localVars[TARGET_KEY] as number | undefined;
-  delete state.localVars[TARGET_KEY];
   if (typeof target !== 'number') return;
   if (!state.players[target]?.alive) return;
 
@@ -233,4 +225,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

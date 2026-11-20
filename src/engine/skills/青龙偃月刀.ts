@@ -26,7 +26,7 @@
 //
 // 与贯石斧的差异:贯石斧弃 2 张牌让原杀强命(原杀还在处理区);
 // 青龙腰月刀是额外使用一张新杀(新杀进处理区,旧闪移走)。
-import type { FrontendAPI, Skill, GameState } from '../types';
+import type { Skill, GameState, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction } from '../core/skill';
 import {
@@ -34,7 +34,7 @@ import {
   askConfirm,
   requireRequestType,
   registerOnOwnSlashDodged,
-  defineConfirmAction,
+  makeConfirmMount,
 } from '../util/skillRuntime';
 import { runUseFlow, chargeOnSettle } from './cards/use-card';
 
@@ -145,12 +145,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '青龙偃月刀',
-    title: '青龙偃月刀：是否追杀？',
-    confirmLabel: '追杀',
-    cancelLabel: '不追杀',
-    style: 'danger',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '青龙偃月刀',
+  title: '青龙偃月刀：是否追杀？',
+  confirmLabel: '追杀',
+  cancelLabel: '不追杀',
+  style: 'danger',
+});
+
+export default { createSkill, onInit, onMount } satisfies SkillModule;

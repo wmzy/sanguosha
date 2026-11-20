@@ -1,4 +1,4 @@
-// src/engine/rank-flow.ts
+// src/engine/flows/rank.ts
 // 拼点两步化编排函数(对齐 出牌流程重设计.md 模块 G / rankcompare.md)。
 //
 // 将单 atom(拼点)模式升级为「编排函数 + 时机标记 atom」模式(与 runUseFlow /
@@ -32,7 +32,7 @@ import { registerAction } from '../core/skill';
 import { popFrame, pushFrame } from '../core/frame';
 import { discardProcessingCard } from '../core/processing-zone';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
-import { currentRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
+import { askResponse, currentRequestType, engineCanPlayNowReason, requireRequestType } from '../util/skillRuntime';
 
 /** 拼点/点数牌通用点数:A=1, 2-10=面值, J=11, Q=12, K=13。
  *  各拼点技(天义/驱虎/烈刃/制霸 等)与点数技(界烈弓/界称象/酣战)共用。
@@ -143,27 +143,23 @@ export interface AskRankCardOptions {
 }
 
 /** 询问一名玩家出拼点牌并读取其回应。
- *  内部:delete localVars[answerKey] → 请求回应(useCard prompt) → 读回应 → delete。
+ *  内部经 askResponse(resultKey=answerKey) 三段式:delete localVars[answerKey] →
+ *  请求回应(useCard prompt) → 读回应 → delete。
  *  返回回应牌 id;回应牌不在其手牌中(含超时未回应)时回落 fallbackCard,
  *  兜底牌也不在手牌中则返回 undefined(调用方自行中止或走超时分支)。 */
 export async function askRankCard(
   state: GameState,
   opts: AskRankCardOptions,
 ): Promise<string | undefined> {
-  delete state.localVars[opts.answerKey];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: opts.requestType,
-    target: opts.target,
+  const cardId = await askResponse<string | undefined>(state, opts.requestType, opts.target, {
     prompt: {
       type: 'useCard',
       title: opts.title,
       cardFilter: { filter: () => true, min: 1, max: 1 },
     },
     timeout: opts.timeout,
+    resultKey: opts.answerKey,
   });
-  const cardId = state.localVars[opts.answerKey] as string | undefined;
-  delete state.localVars[opts.answerKey];
   if (cardId && state.players[opts.target].hand.includes(cardId)) return cardId;
   const fallback = opts.fallbackCard;
   if (fallback && state.players[opts.target].hand.includes(fallback)) return fallback;
@@ -228,12 +224,11 @@ export function registerRankCardRespond(
       pid,
       'respond',
       (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(pid);
-        if (!slot) return '当前不需要回应';
-        const atom = slot.atom as unknown as Record<string, unknown>;
-        if (atom.type !== '请求回应') return '当前不需要回应';
-        if (currentRequestType(st, pid) !== opts.requestType) return opts.mismatchError;
-        if ((atom.target as number) !== pid) return '不是问你的';
+        const check = requireRequestType(st, pid, [opts.requestType], {
+          ownerCheck: pid,
+          mismatchError: opts.mismatchError,
+        });
+        if (check.error) return check.error;
         const cardId = params.cardId as string;
         if (typeof cardId !== 'string') return '请选择一张拼点牌';
         if (!st.players[pid].hand.includes(cardId)) return '拼点牌不在手牌中';

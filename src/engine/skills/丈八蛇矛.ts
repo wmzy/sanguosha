@@ -20,7 +20,7 @@
 // handleTransformPlay 提交 preceding params.cardIds=[id1,id2] + 主 action
 // cardId = ${id1}#${id2}#丈八蛇矛(工厂 shadowIdOf 按同一约定拼接,后缀=技能 id)。
 // 五件套由 skillRuntime 工厂统一实现(cardCount=2 维度)。
-import type { GameView, GameState, Skill, FrontendAPI } from '../types';
+import type { GameView, GameState, Skill, FrontendAPI, SkillModule } from '../types';
 import { declareAlternativeResponse } from '../core/skill';
 import { viewCanAttack } from '../rules/viewDistance';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
@@ -103,4 +103,4 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

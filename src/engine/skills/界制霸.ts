@@ -34,6 +34,7 @@ import type {
   Json,
   Skill,
 } from '../types';
+import type { SkillModule } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
@@ -247,4 +248,4 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

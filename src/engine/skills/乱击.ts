@@ -22,6 +22,7 @@
 // 乱击出的万箭齐发可被无懈可击抵消——由 万箭齐发.use 自身的 询问无懈可击 流程保证。
 // 五件套由 skillRuntime 工厂统一实现(cardCount=2 维度)。
 import type { Card, FrontendAPI, GameState, Skill } from '../types';
+import type { SkillModule } from '../types';
 import { defaultPlayActive } from '../rules/action-active';
 import {
   registerTransformAction,
@@ -104,4 +105,4 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

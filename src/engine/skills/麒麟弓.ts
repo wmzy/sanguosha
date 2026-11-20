@@ -4,11 +4,11 @@
 // 麒麟弓(武器,攻击范围 5):
 //   每当你使用【杀】对目标角色造成伤害时,你可以弃置其1张坐骑牌(+1马或-1马)。
 //   不防止伤害——只是额外弃马(与寒冰剑的关键区别)。
-import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
+import type { HookResult, Skill, GameState, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerBeforeHook } from '../core/skill';
 import { equippedWeaponIs } from '../util/player-query';
-import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, makeConfirmMount, registerConfirmRespond } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '麒麟弓', description: '武器:杀造成伤害时可弃目标1匹马', isLocked: true };
@@ -74,11 +74,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '麒麟弓',
-    style: 'default',
-    title: '麒麟弓:是否弃目标1匹马?',
-    confirmLabel: '弃马',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '麒麟弓',
+  style: 'default',
+  title: '麒麟弓:是否弃目标1匹马?',
+  confirmLabel: '弃马',
+});
+
+export default { createSkill, onInit, onMount } satisfies SkillModule;

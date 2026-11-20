@@ -30,7 +30,7 @@
 //     | localVars['不屈/存活']   | 写 | 系统规则.ts runDyingFlow(读) | ✅ 已实现 |
 //     | localVars['不屈/重复']   | 读 | 置创牌 atom(写)              | ✅ 已实现 |
 //     | player.vars['不屈/创牌'] | 读 | 置创牌 atom(写)              | ✅ 已实现 |
-import type { GameState, Skill } from '../types';
+import type { GameState, Skill, SkillModule } from '../types';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import { registerBuquDyingHook, WOUND_KEY } from './不屈';
 
@@ -65,4 +65,4 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   };
 }
 
-export default { createSkill, onInit } satisfies import('../types').SkillModule;
+export default { createSkill, onInit } satisfies SkillModule;

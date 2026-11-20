@@ -1,5 +1,4 @@
 // src/engine/view/buildView.ts
-// src/engine/view/buildView.ts
 import type { GameState, GameView, ActionLogEntry, ClientMessage, Card } from '../types';
 import { projectVisiblePending } from './pending';
 import { projectPlayer } from './projectPlayer';

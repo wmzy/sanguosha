@@ -6,10 +6,10 @@
 //   - 界版:摸两张牌,然后可以将【至多两张任意手牌】交给【至多两名其他角色】(可选、
 //     可从任意手牌中选,总数至多 2 张、目标至多 2 人)。
 //   交牌是可选的:confirm 询问;无其他存活角色或自己无手牌时跳过交牌环节。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { currentRequestType, requireRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, makeConfirmMount, requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 // 内部 requestType/localVars 键名保持原前缀「遗计/」,不改为「界遗计/」
@@ -157,9 +157,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', { label: '界遗计', title: '是否发动遗计?' });
-}
+export const onMount = makeConfirmMount('respond', { label: '界遗计', title: '是否发动遗计?' });
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

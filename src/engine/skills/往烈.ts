@@ -21,13 +21,13 @@
 //   - isCardBanned(validate.ts)检查 turn.vars[禁出牌] → 阻止后续出牌
 //
 // turn.vars 在「回合结束」atom 自动清空 → 首张已用/禁出牌效果每回合重置。
-import type { Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
+import type { Card, GameState, HookResult, Skill } from '../types';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerDistanceExemptor } from '../rules/distance';
 import { WANGLIE_FIRST_VIEW_KEY } from '../rules/vars-keys';
 import { projectTurnUsage } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
-import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, makeConfirmMount, registerConfirmRespond } from '../util/skillRuntime';
 
 /** turn.vars:本回合首张牌是否已使用(首张牌无距离限制的开关)。 */
 const FIRST_USED_VAR = '往烈/首张已用';
@@ -185,13 +185,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   };
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '往烈',
-    title: '是否发动往烈,令此牌不能被响应,然后本阶段不能再使用牌?',
-    style: 'default',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '往烈',
+  title: '是否发动往烈,令此牌不能被响应,然后本阶段不能再使用牌?',
+  style: 'default',
+});
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

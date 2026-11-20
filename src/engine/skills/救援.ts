@@ -19,7 +19,7 @@
 //   - 描述无"可以",故为锁定触发,无询问、无次数限制。
 //   - 嵌套安全:bonus 回复体力不携带 source 字段,故 hook 内 `typeof source !== 'number'`
 //     早退条件会阻止再次触发(桃/救援加成的区分依据)。
-import type { Skill, GameState } from '../types';
+import type { Skill, GameState, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 
@@ -59,4 +59,4 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   return () => {};
 }
 
-export default { createSkill, onInit } satisfies import('../types').SkillModule;
+export default { createSkill, onInit } satisfies SkillModule;

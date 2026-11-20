@@ -30,6 +30,7 @@ import type {
   GameView,
   Json,
   Skill,
+  SkillModule,
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
@@ -186,4 +187,4 @@ const OPTIONS: FangzhuOptions = {
 
 export const { createSkill, onInit, onMount } = createFangzhuSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

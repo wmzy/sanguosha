@@ -18,13 +18,13 @@
 //     dispatch 按 (skillId, ownerId, actionType) 查。
 //   - 来源无任何可弃置的牌时跳过(规则:无法弃置则无事发生)。
 //   - judgeType='界刚烈' 与标版 '刚烈' 区分(日志/调试用,不影响机制)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
-import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
+import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
-import { registerAction, registerAfterHook } from '../core/skill';
+import { registerAction } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
-import { askConfirm, currentRequestType, registerOnDamagedAsTarget } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, registerJudgeCardHook, registerOnDamagedAsTarget, requireRequestType } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '界刚烈/confirm';
 const PICK_REQUEST = '界刚烈/选牌';
@@ -49,13 +49,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const requestType = currentRequestType(st, ownerId);
-      if (requestType === CONFIRM_REQUEST) return null; // 是否发动
-      if (requestType !== PICK_REQUEST) return '当前不是界刚烈回应';
+      const check = requireRequestType(st, ownerId, [CONFIRM_REQUEST, PICK_REQUEST], {
+        mismatchError: '当前不是界刚烈回应',
+      });
+      if (check.error) return check.error;
+      if (check.requestType === CONFIRM_REQUEST) return null; // 是否发动
       // 选牌:校验 zone + cardId/handIndex(同过河拆桥/反馈)
       return validatePickZoneParams(params, ['equipment', 'hand', 'judge']);
     },
@@ -71,14 +69,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   );
 
   // ── 判定牌生效后 after hook:捕获判定牌颜色(仍在结算帧牌区顶,尚未入弃牌堆)──
-  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.judgeType !== '界刚烈') return;
-    if (atom.player !== ownerId) return;
-    const judgeCardId = currentJudgeCardId(ctx.state);
-    const judgeCard = judgeCardId ? ctx.state.cardMap[judgeCardId] : undefined;
-    if (!judgeCard) return;
-  });
+  registerJudgeCardHook(state, skill.id, ownerId, '界刚烈', async () => {});
 
   // ── 受到伤害后 after hook:界刚烈主逻辑(前导守卫由 registerOnDamagedAsTarget
   //    封装:target=自己 + amount>0 + 有来源且非自伤)──
@@ -150,7 +141,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
   });
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

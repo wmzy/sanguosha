@@ -37,7 +37,7 @@ import type {
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
-import { currentRequestType, askConfirm, askResponse, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, askResponse, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import type { SkillModule } from '../types';
 
@@ -200,16 +200,19 @@ export function onInit(skill: Skill, state: GameState): () => void {
       seatId,
       'respond',
       (s) => {
-        const slot = s.pendingSlots.get(seatId);
-        if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-        const rt = currentRequestType(s, seatId) ?? '';
         // 法正侧 RT
         const ownerRTs = [RT_TRIGGER, RT_TARGET, RT_CARDS, RT_VICTIM, RT_PICK0, RT_PICK1];
         // X 侧 RT(任何座次都可能成为 X)
         const xRTs = [RT_XCHOICE, RT_SLASH];
-        if (isOwner && ownerRTs.includes(rt)) return null;
-        if (xRTs.includes(rt)) return null;
-        return '当前不是眩惑询问';
+        const check = requireRequestType(s, seatId, [...ownerRTs, ...xRTs], {
+          mismatchError: '当前不是眩惑询问',
+        });
+        if (check.error) return check.error;
+        // 法正侧 RT 仅法正座次回应;X 侧 RT 任何座次(check.error 已守卫,requestType 需显式收窄)
+        if (check.requestType !== null && !isOwner && ownerRTs.includes(check.requestType)) {
+          return '当前不是眩惑询问';
+        }
+        return null;
       },
       async (s, params) => {
         const rt = currentRequestType(s, seatId);
@@ -366,8 +369,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot 另用于 slot?.atom.type !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

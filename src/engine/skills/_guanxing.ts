@@ -18,13 +18,13 @@
 // newDeck 构造:[...bottom, ...middle, ...top.reverse()]
 //   - bottom 放最底;middle 是观察范围之外的牌(原 deck 去掉顶 X 张);
 //   - top 倒序后追加到末尾,使 top[0] 落到 deck[len-1]=最先摸。
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { GameState, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import {
   askConfirm,
   currentRequestType,
-  defineConfirmAction,
+  makeConfirmMount,
   requireRequestType,
 } from '../util/skillRuntime';
 
@@ -133,7 +133,7 @@ export function createGuanxingSkill(opts: GuanxingOptions) {
     const top = arrangement?.top ?? [];
     const bottom = arrangement?.bottom ?? [];
     // 校验划分:top+bottom 必须恰好是 observed 的一个无重复划分
-    //(带 requiredTop 时 respond 已拒非法划分,此处兜底同校验 top 张数)
+    // (带 requiredTop 时 respond 已拒非法划分,此处兜底同校验 top 张数)
     const observedSet = new Set(observed);
     const combined = [...top, ...bottom];
     const valid =
@@ -265,12 +265,10 @@ export function createGuanxingSkill(opts: GuanxingOptions) {
       return () => {};
     },
 
-    onMount(_skill: Skill, api: FrontendAPI): void {
-      defineConfirmAction(api, 'respond', {
-        label: opts.name,
-        title: `是否发动${opts.name}?`,
-        style: 'default',
-      });
-    },
+    onMount: makeConfirmMount('respond', {
+      label: opts.name,
+      title: `是否发动${opts.name}?`,
+      style: 'default',
+    }),
   };
 }

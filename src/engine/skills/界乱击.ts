@@ -36,11 +36,10 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界乱击'(避开标乱击冲突);
 //   内部 Skill.name = '乱击'(OL 官方技能名,玩家可见)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { registerAction } from '../core/skill';
-import { applyAtom } from '../core/apply';
 import { runUseFlow, chargeOnSettle } from './cards/use-card';
-import { requireRequestType, registerTransformAction, mountTransformAction, engineCanPlayNowReason, firstTarget, type TransformActionOptions } from '../util/skillRuntime';
+import { askResponse, requireRequestType, registerTransformAction, mountTransformAction, engineCanPlayNowReason, firstTarget, type TransformActionOptions } from '../util/skillRuntime';
 import { alivePlayersClockwiseFrom } from '../util/player-query';
 import { OPTIONS } from './乱击';
 
@@ -113,11 +112,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
       // 仅当默认目标 ≥ 1 时才有意义询问(0 个目标时万箭齐发无效果,但仍走流程)
       let targets = defaultTargets;
       if (defaultTargets.length >= 1) {
-        delete state.localVars[SKIP_TARGET_KEY];
-        await applyAtom(state, {
-          type: '请求回应',
-          requestType: SKIP_TARGET_RT,
-          target: from,
+        // prompt 带 description(可放弃说明),askChooseTarget 不支持该字段,走 askResponse。
+        const skipTarget = await askResponse<number>(state, SKIP_TARGET_RT, from, {
           prompt: {
             // choosePlayer(非 selectTarget):服务端驱动的 pending 目标选择只有
             // choosePlayer 被投影层(resolveChoosePlayerCandidates)、前端 AwaitingPrompt
@@ -131,9 +127,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
             filter: (_view, t) => defaultTargets.includes(t),
           },
           timeout: 20,
+          resultKey: SKIP_TARGET_KEY,
         });
-        const skipTarget = state.localVars[SKIP_TARGET_KEY];
-        delete state.localVars[SKIP_TARGET_KEY];
         if (typeof skipTarget === 'number') {
           targets = defaultTargets.filter((t) => t !== skipTarget);
         }
@@ -201,9 +196,4 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   return;
 }
 
-const _skillModule: import('../types').SkillModule = {
-  createSkill,
-  onInit,
-  onMount,
-};
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

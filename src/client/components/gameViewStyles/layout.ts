@@ -18,6 +18,10 @@
 import { css } from '@linaria/core';
 import { colors } from '../../theme';
 import { ghostPill } from '../pillStyles';
+import { cornerBracket } from './tokens';
+
+/* 战场区四角金色 L 装裱线:低透明度(颜色经 --orn 变量注入,运行时解析) */
+const battleFieldCornerBracket = cornerBracket('var(--orn)', '0', '30px', '1px');
 
 // ─── 页面骨架 ───
 export const pageRoot = css`
@@ -160,16 +164,7 @@ export const battleField = css`
     inset: 10px 14px;
     pointer-events: none;
     --orn: rgba(206, 172, 92, 0.22);
-    background:
-      linear-gradient(var(--orn), var(--orn)) left 0 top 0 / 30px 1px,
-      linear-gradient(var(--orn), var(--orn)) left 0 top 0 / 1px 30px,
-      linear-gradient(var(--orn), var(--orn)) right 0 top 0 / 30px 1px,
-      linear-gradient(var(--orn), var(--orn)) right 0 top 0 / 1px 30px,
-      linear-gradient(var(--orn), var(--orn)) left 0 bottom 0 / 30px 1px,
-      linear-gradient(var(--orn), var(--orn)) left 0 bottom 0 / 1px 30px,
-      linear-gradient(var(--orn), var(--orn)) right 0 bottom 0 / 30px 1px,
-      linear-gradient(var(--orn), var(--orn)) right 0 bottom 0 / 1px 30px;
-    background-repeat: no-repeat;
+    background: ${battleFieldCornerBracket};
   }
 `;
 

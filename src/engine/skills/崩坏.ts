@@ -14,7 +14,7 @@
 // 本文件同时导出 createBenghuaiSkill 工厂(崩坏族共享实现),界崩坏 复用之,
 // 仅注入 描述/询问 requestType/禁用检查 差异参数(选择键共享 '崩坏/choice'——
 // 标/界董卓只会拥有一版崩坏)。
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill, SkillModule } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
@@ -136,4 +136,4 @@ const OPTIONS: BenghuaiOptions = {
 
 export const { createSkill, onInit, onMount } = createBenghuaiSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

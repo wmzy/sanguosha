@@ -25,17 +25,16 @@
 //     判定阶段、独立判定技能)。若 frame 还有其他牌(如杀结算中八卦阵判定),
 //     抽取判定牌会破坏 runJudgeFlow 收尾 splice——本实现加 frame.cards.length === 1
 //     防御:多牌场景下跳过获取(让判定牌正常入弃牌堆),避免状态损坏。
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply'
 import { currentJudgeCardId } from '../flows/judge';
 import { frameCards } from '../core/frame';
 import { flipFaceUpAll } from '../flows/face-down';
 import { registerAfterHook } from '../core/skill';
-import type { SkillModule } from '../types';
 import {
   askConfirm,
+  makeConfirmMount,
   registerConfirmRespond,
-  defineConfirmAction,
   registerPhaseStartHook,
 } from '../util/skillRuntime';
 
@@ -216,16 +215,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  defineConfirmAction(api, 'respond', {
-    label: DISPLAY_NAME,
-    title: '是否发动落英?',
-    confirmLabel: '获得',
-    cancelLabel: '不获得',
-    style: 'default',
-  });
-  return undefined;
-}
+export const onMount = makeConfirmMount('respond', {
+  label: DISPLAY_NAME,
+  title: '是否发动落英?',
+  confirmLabel: '获得',
+  cancelLabel: '不获得',
+  style: 'default',
+});
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

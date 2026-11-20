@@ -18,7 +18,7 @@
 //
 // 目标自选弃牌:官方 FAQ 与标版鞬出同理——目标决定弃基本牌(此杀不命中且目标获得杀)
 //   还是非基本牌(强制命中且本回合+1 杀次数)。界庞德仅决定是否发动。
-import type { GameState } from '../types';
+import type { GameState, SkillModule } from '../types';
 import { createJianchuSkill, type JianchuOptions } from './鞬出';
 import { registerSlashExtraProvider, projectSlashExtra } from '../rules/slash-quota';
 
@@ -64,4 +64,4 @@ const OPTIONS: JianchuOptions = {
 
 export const { createSkill, onInit, onMount } = createJianchuSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

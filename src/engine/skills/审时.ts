@@ -31,7 +31,7 @@ import { runDamageFlow } from '../flows/damage';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { defaultPlayActive } from '../rules/action-active';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, currentRequestType, defineConfirmAction, firstTarget, normalizeCardIds, registerOnDamagedAsTarget, engineCanPlayNowReason } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, firstTarget, normalizeCardIds, registerOnDamagedAsTarget, requireRequestType, engineCanPlayNowReason } from '../util/skillRuntime';
 import { SHENSHI_STATE_VIEW_KEY } from '../rules/vars-keys';
 import { createYinYangState } from '../rules/turn-usage';
 import type { SkillModule } from '../types';
@@ -104,11 +104,18 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = currentRequestType(st, ownerId);
+      const check = requireRequestType(
+        st,
+        ownerId,
+        [YIN_CONFIRM_RT, YIN_GIVE_RT, YANG_DEATH_CONFIRM_RT, YANG_DEATH_TARGET_RT],
+        {
+          noSlotError: '当前不需要回应',
+          wrongTypeError: '当前不需要回应',
+          mismatchError: '当前不是审时回应',
+        },
+      );
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === YIN_CONFIRM_RT || rt === YANG_DEATH_CONFIRM_RT) {
         return null; // confirm:接受 choice/confirmed
       }
@@ -378,8 +385,5 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;
 
-// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

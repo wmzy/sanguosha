@@ -1,19 +1,17 @@
 // src/client/pages/multiplayer/PlayingStage.tsx
 // 对局分支(stage=playing 且已有 view):GameViewComponent 全量 props 挂载
 // + 顶栏 headerSlot 的旁观视角申请审批入口 + 错误 toast。房间数据走 MultiplayerRoomCtx。
-import { useNavigate } from 'react-router-dom';
 import { memberName } from '../../utils/memberNames';
 import { GameViewComponent } from '../../components/GameView';
-import { btnStyle, colors } from '../../theme';
+import { colors } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
-import { ErrorToast } from './ErrorToast';
-import { ReconnectBanner } from './ReconnectBanner';
-import { btnVars, gameWrap } from './multiplayerStyles';
+import { StageScaffold } from './StageScaffold';
+import { ViewRequestChip } from './ViewRequestChip';
+import { gameWrap } from './multiplayerStyles';
 import type { ActionMsg } from '../../types';
 
 export function PlayingStage() {
   const mp = useMultiplayerRoomCtx();
-  const navigate = useNavigate();
   // 页面 stage 分发已保证仅在 playing 且有 view 时挂载本组件;此守卫仅为类型收窄
   if (!mp.view) return null;
 
@@ -28,16 +26,7 @@ export function PlayingStage() {
   const handleAction = (action: ActionMsg) => mp.sendAction(action);
 
   return (
-    <>
-      <ReconnectBanner
-        connectionState={mp.connectionState}
-        reconnectAttempt={mp.reconnectAttempt}
-        onCancel={mp.cancelReconnect}
-        onLeave={() => {
-          mp.leaveRoom();
-          navigate('/');
-        }}
-      />
+    <StageScaffold>
       <div className={gameWrap}>
         <GameViewComponent
           view={mp.view}
@@ -54,33 +43,20 @@ export function PlayingStage() {
           headerSlot={myViewRequests.length > 0 ? (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               {myViewRequests.map(([sid]) => (
-                <span
+                <ViewRequestChip
                   key={sid}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    background: colors.accent.gold, color: '#000',
-                    padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 'bold',
-                  }}
-                >
-                  👁 {memberName(sid, mp.roomState?.playerNames)} 申请查看你的视角
-                  <button
-                    className={btnStyle}
-                    style={btnVars(colors.accent.green, { padding: '2px 8px', fontSize: '11px' })}
-                    onClick={() => mp.approveView(sid, mySeat)}
-                  >同意</button>
-                  <button
-                    className={btnStyle}
-                    style={btnVars(colors.accent.red, { padding: '2px 8px', fontSize: '11px' })}
-                    onClick={() => mp.rejectView(sid)}
-                  >拒绝</button>
-                </span>
+                  spectatorId={sid}
+                  seat={mySeat}
+                  label={<>👁 {memberName(sid, mp.roomState?.playerNames)} 申请查看你的视角</>}
+                  wrapStyle={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: colors.accent.gold, color: '#000', padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 'bold' }}
+                  btnPadding="2px 8px"
+                  btnFontSize="11px"
+                />
               ))}
             </div>
           ) : undefined}
         />
-        {/* 对局中操作被后端拒绝时的错误反馈(此前该分支静默无提示) */}
-        {mp.error && <ErrorToast message={mp.error} onClose={mp.clearError} />}
       </div>
-    </>
+    </StageScaffold>
   );
 }

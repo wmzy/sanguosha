@@ -13,11 +13,11 @@
 //          target 无手牌时只能让对方摸牌,直接 owner 摸1(跳过选择)。
 //   2. respond action 注册到全座次:owner confirm 由 ownerId 座次回应;
 //      target 的选择由 target 座次回应(可能任意座次),按 requestType 分流。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { equippedWeaponIs } from '../util/player-query';
-import { currentRequestType, askConfirm, defineConfirmAction } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import { getGender } from '../data/character-meta';
 
 /** owner 是否发动的确认询问 requestType */
@@ -54,9 +54,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
       pid,
       'respond',
       (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(pid);
-        if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-        const reqType = currentRequestType(st, pid);
+        const check = requireRequestType(st, pid, [CONFIRM_REQUEST, CHOICE_REQUEST], {
+          mismatchError: '当前不是雌雄双股剑询问',
+        });
+        if (check.error) return check.error;
+        const reqType = check.requestType;
         if (reqType === CONFIRM_REQUEST) {
           // owner confirm:接受任意 choice(true/false)
           return null;
@@ -67,9 +69,8 @@ export function onInit(skill: Skill, state: GameState): () => void {
           if (cardId !== undefined) {
             if (!st.players[pid].hand.includes(cardId)) return '牌不在手牌中';
           }
-          return null;
         }
-        return '当前不是雌雄双股剑询问';
+        return null;
       },
       async (st: GameState, params: Record<string, Json>) => {
         const reqType = currentRequestType(st, pid);
@@ -170,7 +171,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   defineConfirmAction(api, 'respond', { label: '雌雄双股剑', title: '雌雄双股剑:是否发动?', style: 'default' });
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot 另用于 slot?.atom.type !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

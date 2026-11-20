@@ -12,7 +12,7 @@
 //
 // 与天香的联动:界天香检查 skills.includes('红颜')||includes('界红颜'),
 //   界小乔拥有界红颜时,黑桃手牌/装备也作为合法弃牌。
-import type { FrontendAPI, Skill, GameState } from '../types';
+import type { FrontendAPI, Skill, GameState, SkillModule } from '../types';
 import { registerHandLimitProvider } from '../rules/hand-limit';
 import { registerSpadeToHeartJudgeHook } from './红颜';
 
@@ -62,4 +62,4 @@ export function onMount(_skill: Skill, _api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -22,7 +22,7 @@
 //   - "至多X名"是硬规则:max 在引擎侧 clamp(防止越权客户端多选)
 //   - 摸牌不减少手牌,不会自递归
 //   - 牌堆+弃牌堆皆空 → 无法摸牌,跳过询问(工厂公共守卫)
-import type { GameView } from '../types';
+import type { GameView, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { currentRequestType, askConfirm } from '../util/skillRuntime';
 import { createLianyingSkill, type LianyingOptions } from './连营';
@@ -113,4 +113,4 @@ const OPTIONS: LianyingOptions = {
 
 export const { createSkill, onInit, onMount } = createLianyingSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -23,10 +23,10 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界忘隙'(避开未来标版 '忘隙' 冲突);
 //   内部 Skill.name = '忘隙'(OL 官方技能名,玩家可见)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, makeConfirmMount, requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const _SKILL_ID = '界忘隙';
@@ -178,19 +178,15 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  defineConfirmAction(api, 'respond', {
-    label: DISPLAY_NAME,
-    style: 'primary',
-    title: '是否发动忘隙?',
-    confirmLabel: '发动',
-    cancelLabel: '不发动',
-  });
-  return undefined;
-}
+export const onMount = makeConfirmMount('respond', {
+  label: DISPLAY_NAME,
+  style: 'primary',
+  title: '是否发动忘隙?',
+  confirmLabel: '发动',
+  cancelLabel: '不发动',
+});
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;
 
 // [requestType 迁移·不迁项] respond 校验里的 pendingSlots.get 读 pickAtom.prompt.cardIds
 // (刚摸到的候选牌,非 requestType),保留手写反射;requestType 读取已走 currentRequestType。

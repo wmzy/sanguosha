@@ -16,7 +16,7 @@
 // 无懈窗口守卫/黑牌 cardFilter/广播窗口 activeWhen 前导逐字共享;持牌范围差异
 // (标:仅手牌;界:含装备区)由 includeEquipment 参数表达(ownsCard 持有判定 +
 // includeEquipment 卸下维度 + activeWhen 装备黑牌检测三处联动)。
-import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { Card, FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { ownsCard } from '../util/player-query';
 import {
   blockedByOtherPending,
@@ -115,4 +115,4 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   mountTransformAction(api, skill.id, OPTIONS);
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

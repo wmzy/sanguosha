@@ -34,5 +34,4 @@ const OPTIONS: QiangxiOptions = {
 
 export const { createSkill, onInit, onMount } = createQiangxiSkill(OPTIONS);
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

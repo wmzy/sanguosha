@@ -335,8 +335,7 @@ const OPTIONS: HujiaOptions = {
 
 export const { createSkill, onInit, onMount } = createHujiaSkill(OPTIONS);
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;
 
 // [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom.type !== '询问闪'
 // 出闪窗口判定(非 requestType),保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。

@@ -7,7 +7,7 @@
 //   - 伤害来源牌是「杀」(普通/火/雷杀 name 均为 '杀')
 //   - 目标没有手牌
 // 锁定技,无需询问玩家,无需 onMount(无 respond 窗口)。
-import type { HookResult, Skill, GameState } from '../types';
+import type { HookResult, Skill, GameState, SkillModule } from '../types';
 import { registerBeforeHook } from '../core/skill';
 import { equippedWeaponIs } from '../util/player-query';
 
@@ -61,4 +61,4 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export default { createSkill, onInit } satisfies import('../types').SkillModule;
+export default { createSkill, onInit } satisfies SkillModule;

@@ -11,14 +11,14 @@
 //     再 push 到获得者手牌;判定区牌的 pendingTricks 维护通过「移除延时锦囊」atom 完成。
 //   - FAQ:行殇是主动发动,可选择不获得(请求回应 confirm)。
 import type {
-  FrontendAPI,
   GameState,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { obtainJudgeZoneCard } from '../core/judge-zone';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, makeConfirmMount, registerConfirmRespond } from '../util/skillRuntime';
 import { equipmentCardIds } from '../util/player-query';
 
 const CONFIRM_RT = '行殇/confirm';
@@ -113,8 +113,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', { label: '行殇', title: '是否发动行殇?' });
-}
+export const onMount = makeConfirmMount('respond', { label: '行殇', title: '是否发动行殇?' });
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

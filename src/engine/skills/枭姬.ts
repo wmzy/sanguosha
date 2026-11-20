@@ -15,11 +15,11 @@
 //      故用 before hook 在 apply 前快照被弃装备牌数,after hook 读取并触发。
 //   3. 获得(顺手牵羊顺装备):获得 atom,from===自己,cardId 来自装备区 → 装备→他人手牌。
 //      同理用 before hook 快照(after 时已无法判断来自手牌还是装备)。
-import type { FrontendAPI, Skill, GameState } from '../types';
+import type { Skill, GameState } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerBeforeHook, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
+import { makeConfirmMount, registerConfirmRespond } from '../util/skillRuntime';
 import { equipmentCardIds } from '../util/player-query';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -115,13 +115,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '枭姬',
-    title: '是否发动枭姬？(摸两张牌)',
-    style: 'default',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '枭姬',
+  title: '是否发动枭姬？(摸两张牌)',
+  style: 'default',
+});
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

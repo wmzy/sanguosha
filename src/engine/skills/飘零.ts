@@ -16,15 +16,15 @@
 //               若目标==自己 → 弃一张手牌(useCard)
 //        不确认 → 移动牌(弃牌堆→牌堆顶)
 import type {
-  FrontendAPI,
   GameState,
   Json,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { askChooseTarget, askConfirm, currentRequestType, makeConfirmMount } from '../util/skillRuntime';
 
 const CONFIRM_RT = '飘零/confirm';
 const GIVE_RT = '飘零/give';
@@ -147,22 +147,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     }
 
     // 5. 交给一名角色:选目标(含自己)
-    delete ctx.state.localVars[TARGET_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: TARGET_RT,
-      target: ownerId,
-      prompt: {
-        type: 'choosePlayer',
-        title: '飘零:选择交给哪名角色',
-        min: 1,
-        max: 1,
-        filter: (view, t) => view.players[t]?.alive === true,
-      },
+    const target = await askChooseTarget(ctx.state, TARGET_RT, ownerId, {
+      title: '飘零:选择交给哪名角色',
+      filter: (view, t) => view.players[t]?.alive === true,
       timeout: 15,
+      resultKey: TARGET_KEY,
     });
-    const target = ctx.state.localVars[TARGET_KEY] as number | undefined;
-    delete ctx.state.localVars[TARGET_KEY];
     if (typeof target !== 'number') {
       // 未选目标(超时)→ 兜底置牌堆顶,避免牌滞留弃牌堆
       await applyAtom(ctx.state, {
@@ -211,8 +201,6 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', { label: '飘零', title: '是否发动飘零?' });
-}
+export const onMount = makeConfirmMount('respond', { label: '飘零', title: '是否发动飘零?' });
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

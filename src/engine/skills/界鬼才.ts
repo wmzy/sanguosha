@@ -12,6 +12,7 @@
 // 键名与标版的关系:localVars 键沿用 '鬼才/replaceCard' 前缀(工厂缺省值);
 //   requestType 用 '界鬼才/replace'(标/界询问键隔离)。
 import { createGuicaiSkill, type GuicaiOptions } from './鬼才';
+import type { SkillModule } from '../types';
 
 const OPTIONS: GuicaiOptions = {
   name: '界鬼才',
@@ -24,4 +25,4 @@ const OPTIONS: GuicaiOptions = {
 
 export const { createSkill, onInit, onMount } = createGuicaiSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

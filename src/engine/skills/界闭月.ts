@@ -28,5 +28,4 @@ const OPTIONS: EndPhaseDrawOptions = {
 
 export const { createSkill, onInit, onMount } = createEndPhaseDrawSkill(OPTIONS);
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -27,6 +27,7 @@ import type {
   GameState,
   Json,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
@@ -348,8 +349,8 @@ const OPTIONS: TiaoxinOptions = {
 
 export const { createSkill, onInit, onMount } = createTiaoxinSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;
 
-// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另传给 panelEquipmentAllowed
-// (界奇才 受保护装备过滤,非 requestType),保留手写 pendingSlots.get;
-// requestType 读取已全部走 currentRequestType。
+// [requestType 迁移·不迁项] respond 校验序言已走 requireRequestType;其后的
+// pendingSlots.get(seat)! 仅为向 panelEquipmentAllowed 传 slot.atom(界奇才
+// 受保护装备过滤,非 requestType 检查),保留该手写读取。

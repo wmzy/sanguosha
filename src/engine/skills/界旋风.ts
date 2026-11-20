@@ -36,18 +36,16 @@
 // 命名:文件名/loader key/character skill name 均为 '界旋风'(避开标旋风冲突);
 //   内部 Skill.name = '旋风'(OL 官方技能名,玩家可见)。
 import type {
-  FrontendAPI,
   GameState,
   Json,
   Skill,
   GameView,
 } from '../types';
-import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { PICK_RESULT_KEY } from '../rules/vars-keys';
-import { askConfirm, currentRequestType, defineConfirmAction, firstTarget } from '../util/skillRuntime';
+import { askChooseTarget, askConfirm, currentRequestType, firstTarget, makeConfirmMount, requireRequestType } from '../util/skillRuntime';
 import { equipmentCardIds, hasDiscardableCards } from '../util/player-query';
 
 const _SKILL_ID = '界旋风';
@@ -88,25 +86,15 @@ function hasValidTargets(state: GameState, ownerId: number): boolean {
  *  返回 true 表示完成一次弃牌,false 表示玩家未选目标或目标无效。 */
 async function pickAndDiscard(state: GameState, ownerId: number, step: 1 | 2): Promise<boolean> {
   // 选目标
-  delete state.localVars[TARGET_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: PICK_TARGET_RT,
-    target: ownerId,
-    prompt: {
-      type: 'choosePlayer',
-      title: `旋风:选择第 ${step} 名要弃置其牌的其他角色`,
-      min: 1,
-      max: 1,
-      filter: (_view: GameView, t: number) =>
-        t !== ownerId &&
-        state.players[t]?.alive === true &&
-        hasDiscardableCards(state.players[t]),
-    },
+  const targetIdx = await askChooseTarget(state, PICK_TARGET_RT, ownerId, {
+    title: `旋风:选择第 ${step} 名要弃置其牌的其他角色`,
+    filter: (_view: GameView, t: number) =>
+      t !== ownerId &&
+      state.players[t]?.alive === true &&
+      hasDiscardableCards(state.players[t]),
     timeout: 20,
+    resultKey: TARGET_KEY,
   });
-  const targetIdx = state.localVars[TARGET_KEY] as number | undefined;
-  delete state.localVars[TARGET_KEY];
   if (typeof targetIdx !== 'number') return false;
 
   const target = state.players[targetIdx];
@@ -170,14 +158,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type?: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不是请求回应';
-      const rt = currentRequestType(st, ownerId);
-      const valid = [CONFIRM_RT, CONTINUE_RT, PICK_TARGET_RT, PICK_CARD_RT];
-      if (!rt || !valid.includes(rt)) return '当前不是旋风询问';
-      return null;
+      return requireRequestType(
+        st,
+        ownerId,
+        [CONFIRM_RT, CONTINUE_RT, PICK_TARGET_RT, PICK_CARD_RT],
+        { mismatchError: '当前不是旋风询问', wrongTypeError: '当前不是请求回应' },
+      ).error;
     },
     async (st: GameState, params: Record<string, Json>) => {
       const rt = currentRequestType(st, ownerId);
@@ -268,18 +254,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: DISPLAY_NAME,
-    style: 'default',
-    title: '是否发动旋风？',
-    confirmLabel: '发动',
-    cancelLabel: '不发动',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: DISPLAY_NAME,
+  style: 'default',
+  title: '是否发动旋风？',
+  confirmLabel: '发动',
+  cancelLabel: '不发动',
+});
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom.type !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

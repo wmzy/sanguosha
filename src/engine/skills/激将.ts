@@ -21,7 +21,7 @@
 //   - 代使用(requestType==='激将/出杀', 蜀角色 seat):主动激将时,蜀角色选杀+
 //     指定 killTarget,use execute 读 localVars['激将/出杀选择'] → runUseFlow(none)
 //     走完整杀结算,damageType 由 cardMap 自动传导(火杀/雷杀不丢)。
-import type { GameState, FrontendAPI, GameView, Json, Skill } from '../types';
+import type { GameState, FrontendAPI, GameView, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame, frameCards } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
@@ -417,7 +417,7 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   });
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;
 
 // [requestType 迁移·不迁项] respond validate/execute 里的 slot.atom 另用于
 // atom.type === '询问杀' 分流(非 requestType),保留手写 pendingSlots.get;

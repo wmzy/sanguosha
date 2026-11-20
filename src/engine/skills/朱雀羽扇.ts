@@ -26,6 +26,7 @@ import type {
   GameView,
   Skill,
 } from '../types';
+import type { SkillModule } from '../types';
 import { registerAfterHook } from '../core/skill';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
 import { equippedWeaponIs } from '../util/player-query';
@@ -190,4 +191,4 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   });
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

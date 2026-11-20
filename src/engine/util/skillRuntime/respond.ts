@@ -6,13 +6,14 @@
 //   registerConfirmRespond:confirm 型 respond 三件套;
 //   registerChoiceRespond:confirm 二选一 → 枚举值 respond 三件套(勤学/志继/崩坏 模式);
 //   askConfirm / askResponse:询问三段(delete 键残值 → applyAtom(请求回应) → 读键);
+//   askChooseTarget:单目标选择询问三段式(askResponse 的 choosePlayer 特化);
 //   askMandatoryCardChoice:强制选牌询问四段(询问 + 超时兜底 hand.slice);
 //   currentRequestType:读座次当前 pending 的 requestType;
 //   hasNullifyWindow:无懈可击广播窗口扫描(看破/界看破/解围 转化 validate 共用);
 //   blockedByOtherPending:其他阻塞型 pending 扫描(与 hasNullifyWindow 并列,同三技能共用);
 //   registerRespondForAllSeats:respond 注册到全部座次的 for 循环样板(鞬出 骨架)。
 // 命名:函数/类型英文;业务字面量(atom 类型 '请求回应'/错误文案)保持中文。
-import type { ActionPrompt, GameState, Json } from '../../types';
+import type { ActionPrompt, GameView, GameState, Json } from '../../types';
 import { registerAction } from '../../core/skill';
 import { applyAtom } from '../../core/apply';
 
@@ -29,6 +30,9 @@ export interface RequireRequestTypeOptions {
    *  与 杀/桃/闪/借刀杀人 手写的 target 校验同文案)。不符返回统一文案 '不是问你的';
    *  校验先于 类型/requestType 比对(与各技能手写顺序一致)。 */
   ownerCheck?: number;
+  /** 可选:精确列表不命中(或列表为空)时的前缀兜底。按序尝试,
+   *  首个 atom.requestType.startsWith(prefix) 命中即通过。 */
+  requestTypePrefixes?: readonly string[];
 }
 
 export type RequestTypeCheck =
@@ -47,6 +51,17 @@ export type RequestTypeCheck =
  * if (check.error) return check.error;
  * const rt = check.requestType;
  * ```
+ *
+ * 前缀兜底(requestTypePrefixes)用于「动态拼接 requestType」的询问——
+ * 奋激 每个目标一个 rt(`${prefix}/${target}`),无法穷举精确列表:
+ * ```ts
+ * const check = requireRequestType(state, ownerId, [], {
+ *   mismatchError: '当前不是奋激询问',
+ *   requestTypePrefixes: ['奋激/confirm'],
+ * });
+ * ```
+ * 精确列表命中优先;列表不命中(或为空)才按序尝试前缀,首个 startsWith 命中
+ * 返回实际命中的完整 rt(供 execute 按 rt 写 localVars 键,如 奋激 的 localVars[rt])。
  */
 export function requireRequestType(
   state: GameState,
@@ -67,6 +82,11 @@ export function requireRequestType(
     return { error: opts.wrongTypeError ?? noSlotError, requestType: null };
   }
   if (!requestTypes.includes(atom.requestType)) {
+    for (const prefix of opts.requestTypePrefixes ?? []) {
+      if (atom.requestType.startsWith(prefix)) {
+        return { error: null, requestType: atom.requestType };
+      }
+    }
     return { error: opts.mismatchError, requestType: null };
   }
   return { error: null, requestType: atom.requestType };
@@ -282,6 +302,55 @@ export async function askResponse<T = Json | undefined>(
   const result = state.localVars[key] as T | undefined;
   delete state.localVars[key];
   return result;
+}
+
+// ────────────────────────── 单目标选择询问 ──────────────────────────
+
+/** askChooseTarget 可选项。 */
+export interface AskChooseTargetOptions {
+  /** prompt.title */
+  title: string;
+  /** prompt.filter(可选;choosePlayer 目标合法性投影,与引擎 validate 同判据) */
+  filter?: (view: GameView, t: number) => boolean;
+  /** 选择数下限(缺省 1) */
+  min?: number;
+  /** 选择数上限(缺省 1) */
+  max?: number;
+  /** 超时秒数;缺省不注入 → 请求回应 atom 默认 */
+  timeout?: number;
+  /** 超时/跳过的缺省回应(透传 atom defaultChoice) */
+  defaultChoice?: Json;
+  /** localVars 结果键;缺省由 requestType 派生:`${requestType}/目标`。
+   *  respond execute 写入的键必须与此一致才能读到。 */
+  resultKey?: string;
+}
+
+/** 单目标选择询问三段式(askResponse 的 choosePlayer 特化):delete 结果键残值
+ *  → applyAtom(请求回应,choosePlayer prompt)→ 读键 → delete 键,返回选中的
+ *  座次号(未回应为 undefined)。
+ *
+ *  契约:**respond execute 不变**——调用方技能自己的 respond 继续往 resultKey 写
+ *  `firstTarget(params)`;本 helper 只收敛编排侧三段式(delete 键 → applyAtom →
+ *  读键 → delete 键)。多目标(读 targets 数组)/超时兜底 -1 等变体不要用本
+ *  helper,仍由各技能手写。 */
+export async function askChooseTarget(
+  state: GameState,
+  requestType: string,
+  ownerId: number,
+  opts: AskChooseTargetOptions,
+): Promise<number | undefined> {
+  return askResponse<number>(state, requestType, ownerId, {
+    prompt: {
+      type: 'choosePlayer',
+      title: opts.title,
+      min: opts.min ?? 1,
+      max: opts.max ?? 1,
+      ...(opts.filter ? { filter: opts.filter } : {}),
+    },
+    resultKey: opts.resultKey ?? `${requestType}/目标`,
+    ...(opts.defaultChoice !== undefined ? { defaultChoice: opts.defaultChoice } : {}),
+    ...(opts.timeout !== undefined ? { timeout: opts.timeout } : {}),
+  });
 }
 
 // ────────────────────────── 强制选牌询问(弃牌/给牌义务) ──────────────────────────

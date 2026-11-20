@@ -15,6 +15,7 @@
 //   守卫链/发动询问/respond/禁闪拦截由工厂逐字共享;本文件仅注入条件判定与加标签。
 //
 // 标签生命周期:阶段1(指定目标)产出,阶段2(询问闪)消费并清除——天然按单次杀结算。
+import type { SkillModule } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { getDistanceAttackRange } from '../rules/vars-keys';
@@ -50,4 +51,4 @@ const OPTIONS: LiegongOptions = {
 
 export const { createSkill, onInit, onMount } = createLiegongSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

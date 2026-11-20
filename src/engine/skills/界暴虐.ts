@@ -33,11 +33,11 @@
 //   - "1点伤害":atom.amount === 1(字面解读)
 //   - 黑桃 = ♠
 //   - 获得判定牌:在 await applyAtom(判定) 完成后,从 discardPile 末尾拿
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { registerAfterHook } from '../core/skill';
-import { defineConfirmAction } from '../util/skillRuntime';
+import { makeConfirmMount } from '../util/skillRuntime';
 import { askTyrannyJudgeAfterDamage, registerTyrannyConfirmRespond } from './暴虐';
 
 const CONFIRM_RT = '界暴虐/confirm';
@@ -97,13 +97,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '暴虐',
-    style: 'default',
-    title: '是否发动暴虐?(判定,黑桃回复1点体力并获得判定牌)',
-    confirmLabel: '判定',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '暴虐',
+  style: 'default',
+  title: '是否发动暴虐?(判定,黑桃回复1点体力并获得判定牌)',
+  confirmLabel: '判定',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

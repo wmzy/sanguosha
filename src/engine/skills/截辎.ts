@@ -47,10 +47,11 @@ import type {
   Json,
   Mark,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm, currentRequestType, defineConfirmAction, firstTarget, requireRequestType } from '../util/skillRuntime';
+import { askChooseTarget, askConfirm, currentRequestType, defineConfirmAction, firstTarget, requireRequestType } from '../util/skillRuntime';
 
 /** localVars key:最近一个正常开始的摸牌阶段所属玩家 */
 const NORMAL_KEY = '截辎/normalDrawPhase';
@@ -176,22 +177,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!confirmed) return;
 
     // 询问 owner 选目标(任意存活角色:可为自己/跳过者/其他)
-    delete ctx.state.localVars[TARGET_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CHOOSE_TARGET_RT,
-      target: ownerId,
-      prompt: {
-        type: 'choosePlayer',
-        title: '截辎:选择一名角色(手牌全场最少且没"辎"→获得"辎";否则其摸一张牌)',
-        min: 1,
-        max: 1,
-        filter: (view: GameView, t: number) => view.players[t]?.alive === true,
-      },
+    const target = await askChooseTarget(ctx.state, CHOOSE_TARGET_RT, ownerId, {
+      title: '截辎:选择一名角色(手牌全场最少且没"辎"→获得"辎";否则其摸一张牌)',
+      filter: (view: GameView, t: number) => view.players[t]?.alive === true,
       timeout: 20,
+      resultKey: TARGET_KEY,
     });
-    const target = ctx.state.localVars[TARGET_KEY] as number | undefined;
-    delete ctx.state.localVars[TARGET_KEY];
     if (typeof target !== 'number') return;
     if (!ctx.state.players[target]?.alive) return;
 
@@ -217,3 +208,5 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
     cancelLabel: '取消',
   });
 }
+
+export default { createSkill, onInit, onMount } satisfies SkillModule;

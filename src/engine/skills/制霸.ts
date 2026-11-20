@@ -36,6 +36,7 @@ import type {
   GameState,
   Json,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
@@ -351,4 +352,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

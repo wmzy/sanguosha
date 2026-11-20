@@ -26,15 +26,15 @@
 //   急袭.ts 亦导入 tianCount/syncDistanceMod(田计数与距离修正跨邓艾技能共享)。
 import type {
   AtomAfterContext,
-  FrontendAPI,
   GameState,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply'
-import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
+import { runJudgeFlow } from '../flows/judge';
 import { registerAfterHook } from '../core/skill';
 import { DISTANCE_ATTACK_MOD_KEY } from '../rules/vars-keys';
-import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, makeConfirmMount, registerConfirmRespond, registerJudgeCardHook } from '../util/skillRuntime';
 
 const CONFIRM_RT = '屯田/confirm';
 const CONFIRMED_KEY = '屯田/confirmed';
@@ -89,17 +89,9 @@ export function registerTianJudgeAfterHook(
   skillId: string,
   ownerId: number,
 ): void {
-  registerAfterHook(state, skillId, ownerId, '判定牌生效后', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.player !== ownerId) return;
-    if (atom.judgeType !== '屯田') return;
+  registerJudgeCardHook(state, skillId, ownerId, '屯田', async (ctx, judgeCard) => {
     // 必须由 askAndJudgeTunTian 预设 CONFIRMED_KEY(玩家已选择发动)
     if (!ctx.state.localVars[CONFIRMED_KEY]) return;
-
-    const judgeCardId = currentJudgeCardId(ctx.state);
-    if (!judgeCardId) return;
-    const judgeCard = ctx.state.cardMap[judgeCardId];
-    if (!judgeCard) return;
 
     // 判定牌仅保留于私有本次判定 scope,不写 localVars。
     // 红桃:不拿(让 runJudgeFlow 收尾的 cleanupJudgeCard 把判定牌正常移入弃牌堆)
@@ -108,7 +100,7 @@ export function registerTianJudgeAfterHook(
     // 非红桃:把判定牌收作"田"(防止 runJudgeFlow 收尾把它移入弃牌堆)。
     // 走「收取判定牌」atom —— 直接 mutate frame.cards 漏掉视图投影,前端处理区会一直
     // 显示这张已被收走的判定牌。
-    await applyAtom(ctx.state, { type: '收取判定牌', player: ownerId, cardId: judgeCardId });
+    await applyAtom(ctx.state, { type: '收取判定牌', player: ownerId, cardId: judgeCard.id });
 
     // 预计算加田后的田数量(atom apply 前尚无新田,故 +1)
     const newCount = tianCount(ctx.state, ownerId) + 1;
@@ -121,7 +113,7 @@ export function registerTianJudgeAfterHook(
       mark: {
         id: tianId,
         scope: ownerId,
-        payload: { cardId: judgeCardId },
+        payload: { cardId: judgeCard.id },
       },
       distanceVars: { attackMod: newCount },
     });
@@ -243,11 +235,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '屯田',
-    title: '是否发动屯田?',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '屯田',
+  title: '是否发动屯田?',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -20,7 +20,12 @@ import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
-import { currentRequestType, engineCanPlayNowReason, toPromptCards } from '../util/skillRuntime';
+import {
+  currentRequestType,
+  engineCanPlayNowReason,
+  requireRequestType,
+  toPromptCards,
+} from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const PICK_REQUEST = '攻心/选牌';
@@ -154,11 +159,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = currentRequestType(st, ownerId);
+      const check = requireRequestType(st, ownerId, [PICK_REQUEST, CHOOSE_RT], {
+        mismatchError: '当前不是攻心回应',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === PICK_REQUEST) {
         const cardId = params.cardId as string | undefined;
         if (cardId !== undefined) {
@@ -173,8 +178,8 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         // cardId 未传 = 放弃(不展示),合法
         return null;
       }
-      if (rt === CHOOSE_RT) return null;
-      return '当前不是攻心回应';
+      // rt === CHOOSE_RT:弃置/置牌堆顶 二选一,无参数需校验
+      return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
       const rt = currentRequestType(st, ownerId);
@@ -226,8 +231,4 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

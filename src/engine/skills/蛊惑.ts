@@ -48,7 +48,15 @@
 //
 // respond(质疑)注册到每个座次(被问询者非于吉),onInit 返回合并卸载函数
 //   (unloadSkillInstance 仅按 (skillId,于吉座次) 清 action,清不到其他座次)。
-import type { ActionContext, FrontendAPI, GameState, Json, PendingSlot, Skill } from '../types';
+import type {
+  ActionContext,
+  FrontendAPI,
+  GameState,
+  Json,
+  PendingSlot,
+  Skill,
+  SkillModule,
+} from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, declareAlternativeResponse } from '../core/skill';
@@ -58,7 +66,7 @@ import { usedThisTurnKey } from '../rules/vars-keys';
 import { viewCanAttack } from '../rules/viewDistance';
 import { viewCanSlash } from '../rules/action-active';
 import { USE_ACTION_PREFIX } from '../util/declaredActionType';
-import { registerRespondForAllSeats, engineCanPlayNowReason, viewAskedDodge, defineConfirmAction, currentRequestType } from '../util/skillRuntime';
+import { registerRespondForAllSeats, engineCanPlayNowReason, viewAskedDodge, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import { runVirtualSlash } from './cards/_virtualSlash';
 import { canUseSlash } from './cards/杀';
 
@@ -411,9 +419,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       state,
       skill.id,
       (st, seat): string | null => {
-        const slot = st.pendingSlots.get(seat);
-        if (!slot) return '当前不需要回应';
-        if (currentRequestType(st, seat) !== REQUEST_TYPE) return '当前不是蛊惑质疑窗口';
+        const check = requireRequestType(st, seat, [REQUEST_TYPE], {
+          mismatchError: '当前不是蛊惑质疑窗口',
+          wrongTypeError: '当前不是蛊惑质疑窗口',
+        });
+        if (check.error) return check.error;
         if (!st.players[seat]?.alive) return '你已死亡';
         return null;
       },
@@ -558,9 +568,8 @@ function rescueActive(ctx: ActionContext, skillKey: string): boolean {
   );
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;
 
 // [requestType 迁移·不迁项] ① registerGuResponse 校验的 slot 另传 checkWindow 回调并读
 // atom.target;② rescue 的 checkWindow 是参数 slot 的 lambda(无 state,且同时校验 atom.type);
-// ③ rescueActive 读 view.pending(视图层);④ 质疑 respond 校验保留 !slot 守卫以区分错误文案。
-// requestType 反射点均已走 currentRequestType。
+// ③ rescueActive 读 view.pending(视图层)。

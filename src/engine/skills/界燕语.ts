@@ -32,7 +32,7 @@ import {
   registerAfterHook,
   registerBeforeHook,
 } from '../core/skill';
-import { askConfirm, defineConfirmAction, currentRequestType } from '../util/skillRuntime';
+import { askConfirm, askChooseTarget, defineConfirmAction, currentRequestType } from '../util/skillRuntime';
 import { isMaleAlive } from '../util/player-query';
 import { getGender } from '../data/character-meta';
 import { setPlayerVarUsage } from '../rules/turn-usage';
@@ -184,23 +184,13 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     delete st.localVars[CONFIRMED_KEY];
 
     // 2. 选一名男性角色
-    delete st.localVars[TARGET_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: TARGET_RT,
-      target: ownerId,
-      prompt: {
-        type: 'choosePlayer',
-        title: '燕语:选择一名男性角色(其摸两张牌)',
-        min: 1,
-        max: 1,
-        filter: (view, t) =>
-          view.players[t]?.alive === true && getGender(view.players[t].character) === '男',
-      },
+    const target = await askChooseTarget(st, TARGET_RT, ownerId, {
+      title: '燕语:选择一名男性角色(其摸两张牌)',
+      filter: (view, t) =>
+        view.players[t]?.alive === true && getGender(view.players[t].character) === '男',
       timeout: 15,
+      resultKey: TARGET_KEY,
     });
-    const target = st.localVars[TARGET_KEY] as number | undefined;
-    delete st.localVars[TARGET_KEY];
     if (typeof target !== 'number') return;
     if (!st.players[target]?.alive) return;
 
@@ -231,5 +221,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

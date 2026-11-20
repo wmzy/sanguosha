@@ -19,7 +19,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界挑衅'(避开标挑衅冲突);
 //   内部 Skill.name = '挑衅'(OL 官方技能名,玩家可见)。
-import type { GameState } from '../types';
+import type { GameState, SkillModule } from '../types';
 import { createTiaoxinSkill, type TiaoxinOptions } from './挑衅';
 import { defaultPlayActive } from '../rules/action-active';
 import { setPlayerVarUsage } from '../rules/turn-usage';
@@ -63,4 +63,4 @@ const OPTIONS: TiaoxinOptions = {
 
 export const { createSkill, onInit, onMount } = createTiaoxinSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

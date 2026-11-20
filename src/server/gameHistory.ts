@@ -16,9 +16,10 @@
 // 「开局基线视图 + eventsForViewer 差量事件」,保证与本地录制文件格式完全一致,
 // 前端 loadReplay/isReplayFile/useReplay 无需任何改动即可重放。
 
-import { mkdir, readFile, writeFile, rm, readdir } from 'node:fs/promises';
+import { mkdir, writeFile, rm, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createLogger } from './logger';
+import { readJsonIfExists } from './fsQuiet';
 import { register as registerLifecycle } from './resourceRegistry';
 import { createRoomSerialChain } from './serialChain';
 import { isSafeRoomId, isSafeId } from './safeId';
@@ -188,14 +189,13 @@ function isHistoryEntry(value: unknown): value is GameHistoryEntry {
 /** 读盘(绕过缓存)。目录不存在/损坏 → 空列表。 */
 async function readIndexFromDisk(roomId: string): Promise<GameHistoryEntry[]> {
   try {
-    const raw = await readFile(indexPath(roomId), 'utf8');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed = await readJsonIfExists<unknown>(indexPath(roomId));
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(isHistoryEntry);
   } catch (err) {
-    // 目录/文件不存在 → 静默空列表(常规首次访问);其它错误(损坏/权限)记日志
-    // 后同样回空列表,但不再静默吞掉(照 persistence.readWrapperFromDisk 模式)。
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    // 目录/文件不存在(ENOENT,常规首次访问)已由 readJsonIfExists 静默吸收为
+    // null → 空列表;其它错误(损坏/权限)记日志后同样回空列表,但不再静默吞掉
+    // (照 persistence.readWrapperFromDisk 模式)。
     log.err(`read history index failed for room ${roomId}`, err);
     return [];
   }
@@ -240,14 +240,13 @@ export async function listGameHistory(roomId: string): Promise<GameHistoryEntry[
 export async function getGameReplay(roomId: string, entryId: string): Promise<ReplayFile | null> {
   if (!isSafeRoomId(roomId) || !isSafeId(entryId)) return null;
   try {
-    const raw = await readFile(replayPath(roomId, entryId), 'utf8');
-    const parsed: unknown = JSON.parse(raw);
+    const parsed = await readJsonIfExists<unknown>(replayPath(roomId, entryId));
     const o = parsed as { format?: unknown; version?: unknown };
     if (o?.format !== 'sanguosha-replay' || o?.version !== 2) return null;
     return parsed as ReplayFile;
   } catch (err) {
-    // 文件不存在 → 静默 null;其它错误记日志后仍回 null(格式不符路径见上方)。
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    // 文件不存在(ENOENT)已由 readJsonIfExists 静默吸收为 null;其它错误记日志后
+    // 仍回 null(格式不符路径见上方)。
     log.err(`read replay failed for room ${roomId} entry ${entryId}`, err);
     return null;
   }

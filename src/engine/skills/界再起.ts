@@ -40,7 +40,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, currentRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, registerRespondForAllSeats, requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 const BASE_VAR = '界再起/base'; // turn.vars:本回合弃牌堆基线长度
@@ -86,11 +86,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     state,
     skill.id,
     (st: GameState, seatId: number, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(seatId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = currentRequestType(st, seatId);
+      const check = requireRequestType(
+        st,
+        seatId,
+        [TRIGGER_RT, CHOOSE_TARGETS_RT, OPTION_RT_PREFIX + seatId],
+        { mismatchError: '当前不是界再起询问' },
+      );
+      if (check.error) return check.error;
+      const rt = check.requestType;
 
       // 孟获本人询问:仅 ownerId 座次回应
       if (rt === TRIGGER_RT || rt === CHOOSE_TARGETS_RT) {
@@ -255,8 +258,4 @@ export function onMount(_skill: Skill, _api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

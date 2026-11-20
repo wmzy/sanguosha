@@ -4,6 +4,12 @@
 // CharSelectOverlay.tsx 逐字迁移(属性未改动),linaria 禁止 css`` 插值组合。
 
 import { css } from '@linaria/core';
+import { cornerBracket, ornamentTitle } from './tokens';
+
+/* 选将面板四角金色 L 角饰(8 层角件,与暗皮革底渐变叠层) */
+const panelCornerBracket = cornerBracket('#c4a254', '9px', '16px', '2px');
+/* 选将标题两侧饰线:亮金方钻 + 渐隐铜线(—◆—) */
+const selectTitleOrnament = ornamentTitle('#e8c47a', '#8a7448');
 
 export const overlayRoot = css`
   position: fixed;
@@ -49,14 +55,7 @@ export const panel = css`
     inset 0 0 0 4px #5a4a30,
     0 18px 60px rgba(0, 0, 0, 0.6);
   background:
-    linear-gradient(#c4a254, #c4a254) left 9px top 9px / 16px 2px no-repeat,
-    linear-gradient(#c4a254, #c4a254) left 9px top 9px / 2px 16px no-repeat,
-    linear-gradient(#c4a254, #c4a254) right 9px top 9px / 16px 2px no-repeat,
-    linear-gradient(#c4a254, #c4a254) right 9px top 9px / 2px 16px no-repeat,
-    linear-gradient(#c4a254, #c4a254) left 9px bottom 9px / 16px 2px no-repeat,
-    linear-gradient(#c4a254, #c4a254) left 9px bottom 9px / 2px 16px no-repeat,
-    linear-gradient(#c4a254, #c4a254) right 9px bottom 9px / 16px 2px no-repeat,
-    linear-gradient(#c4a254, #c4a254) right 9px bottom 9px / 2px 16px no-repeat,
+    ${panelCornerBracket},
     linear-gradient(#1a150f, #120d08);
 `;
 
@@ -88,9 +87,7 @@ export const selectTitle = css`
     flex: 1 1 110px;
     max-width: 220px;
     height: 7px;
-    background:
-      linear-gradient(#e8c47a, #e8c47a) right center / 5px 5px no-repeat,
-      linear-gradient(90deg, transparent, #8a7448) left center / calc(100% - 9px) 2px no-repeat;
+    background: ${selectTitleOrnament};
   }
 
   &::after {

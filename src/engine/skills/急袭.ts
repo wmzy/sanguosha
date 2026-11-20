@@ -19,7 +19,7 @@
 //   - rollback 只删影子卡:田标记/手牌/距离 vars 均由 dispatch 快照整体还原(core/rollback.ts)
 //   - 顺手牵羊的距离检查在 use.validate 中:此时田已消耗、距离修正已更新,
 //     若距离变远导致 use validate 失败,rollback + 快照恢复一切(安全)
-import type { Card, FrontendAPI, GameState, Skill } from '../types';
+import type { Card, FrontendAPI, GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { defaultPlayActive } from '../rules/action-active';
 import {
@@ -143,4 +143,4 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

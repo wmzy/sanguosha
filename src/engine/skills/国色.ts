@@ -23,7 +23,7 @@
 // 原牌归宿:原方块牌经 处理区→弃牌堆,进入弃牌堆(满足"使用后原牌进入弃牌堆")。
 //   乐不思蜀被无懈可击抵消或判定结束后,由 乐不思蜀.ts 的 移除延时锦囊 清 pendingTricks。
 //   无次数限制(描述明确)。
-import type { Card, FrontendAPI, GameView, GameState, Json, Skill } from '../types';
+import type { Card, FrontendAPI, GameView, GameState, Json, Skill, SkillModule } from '../types';
 import { popFrame, pushFrame } from '../core/frame';
 import { placeDelayedTrickTransform } from './_delayedTrickTransform';
 import { defaultPlayActive } from '../rules/action-active';
@@ -142,4 +142,4 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   });
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -11,6 +11,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界黄天';
 //   内部 Skill.name = '黄天'(OL 官方技能名,玩家可见)。
+import type { SkillModule } from '../types';
 import { createHuangtianSkill, type HuangtianOptions } from './黄天';
 
 const OPTIONS: HuangtianOptions = {
@@ -24,4 +25,4 @@ const OPTIONS: HuangtianOptions = {
 
 export const { createSkill, onInit, onMount } = createHuangtianSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

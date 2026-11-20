@@ -30,15 +30,15 @@
 //   - after hook 挂在「阶段开始」(phase='回合结束',即"结束阶段"):
 //       检查手牌数是否与历史均不相等,是则 +1 变 + 记录历史。
 import type {
-  FrontendAPI,
   GameState,
   HookResult,
   Json,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { registerAction, registerBeforeHook, registerAfterHook } from '../core/skill';
-import { currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, makeConfirmMount, requireRequestType } from '../util/skillRuntime';
 import {
   askConfirmToSkipPhase,
   askDiscardCardForSkip,
@@ -255,14 +255,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: SKILL_NAME,
-    style: 'primary',
-    title: '是否发动界巧变?',
-    confirmLabel: '发动',
-    cancelLabel: '不发动',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: SKILL_NAME,
+  style: 'primary',
+  title: '是否发动界巧变?',
+  confirmLabel: '发动',
+  cancelLabel: '不发动',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

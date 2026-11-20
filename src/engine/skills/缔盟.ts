@@ -276,8 +276,7 @@ const OPTIONS: DimengOptions = {
 
 export const { createSkill, onInit, onMount } = createDimengSkill(OPTIONS);
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;
 
 // [requestType 迁移·不迁项] execute 的 slot 另读 prompt.cardFilter.min(弃牌数校验,
 // 非 requestType),保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。

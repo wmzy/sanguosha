@@ -11,9 +11,9 @@
 //   本文件只保留界版差异:CONFIRM_RT 前缀、询问标题(无"回合外"字样)、弃置路径分支。
 //
 // 田的存储/距离修正等不变量见 屯田.ts 头注。
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { GameState, Skill, SkillModule } from '../types';
 import { registerAfterHook } from '../core/skill';
-import { defineConfirmAction } from '../util/skillRuntime';
+import { makeConfirmMount } from '../util/skillRuntime';
 import {
   askAndJudgeTunTian,
   registerTianJudgeAfterHook,
@@ -69,14 +69,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '界屯田',
-    style: 'primary',
-    title: '是否发动屯田?',
-    confirmLabel: '发动',
-    cancelLabel: '不发动',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '界屯田',
+  style: 'primary',
+  title: '是否发动屯田?',
+  confirmLabel: '发动',
+  cancelLabel: '不发动',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -20,7 +20,7 @@
 // 与界不屈的差异:濒死置创+回复至1体力两版逐字相同(界不屈.ts 复用本文件导出的
 //   registerBuquDyingHook);界版额外有手牌上限规则(有创牌时手牌上限=创牌数量),标版无此规则。
 //   二者共用 置创牌 atom(重复时移去此牌——对两版本语义一致)。
-import type { GameState, Skill } from '../types';
+import type { GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 
@@ -90,4 +90,4 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return registerBuquDyingHook(state, skill.id, skill.ownerId);
 }
 
-export default { createSkill, onInit } satisfies import('../types').SkillModule;
+export default { createSkill, onInit } satisfies SkillModule;

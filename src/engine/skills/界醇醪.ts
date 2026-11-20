@@ -26,9 +26,9 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界醇醪'(避开标醇醪冲突);
 //   内部 Skill.name = '醇醪'(OL 官方技能名,玩家可见)。
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { GameState, Skill, SkillModule } from '../types';
 import { registerAction, registerAfterHook, declareAlternativeResponse } from '../core/skill';
-import { defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { makeConfirmMount, requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界醇醪';
 const DISPLAY_NAME = '醇醪';
@@ -153,13 +153,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => { unloadDecl(); };
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '醇醪',
-    title: '醇醪:移去 X 张"醇"视为一张【酒】救援?',
-    confirmLabel: '移醇当酒',
-    respondFor: '桃/求桃',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '醇醪',
+  title: '醇醪:移去 X 张"醇"视为一张【酒】救援?',
+  confirmLabel: '移醇当酒',
+  respondFor: '桃/求桃',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

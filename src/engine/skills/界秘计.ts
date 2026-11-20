@@ -32,7 +32,7 @@ import type {
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { currentRequestType, askConfirm, normalizeCardIds, requireRequestType } from '../util/skillRuntime';
+import { askChooseTarget, currentRequestType, askConfirm, normalizeCardIds, requireRequestType } from '../util/skillRuntime';
 import { lostHealth } from '../util/player-query';
 import { mijiPendingKey, getMijiPending } from '../rules/vars-keys';
 
@@ -212,23 +212,13 @@ async function runMijiOnce(
   // 4) 选目标(其他存活角色)
   const aliveOthers = state.players.filter((p) => p.alive && p.index !== ownerId);
   if (aliveOthers.length === 0) return; // 无可分发目标 → 跳过分发
-  delete state.localVars[GIVE_TARGET_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: GIVE_TARGET_RT,
-    target: ownerId,
-    prompt: {
-      type: 'choosePlayer',
-      title: '秘计:选择分发目标(其他角色)',
-      min: 1,
-      max: 1,
-      filter: (_view: GameView, t: number) =>
-        t !== ownerId && state.players[t]?.alive === true,
-    },
+  const target = await askChooseTarget(state, GIVE_TARGET_RT, ownerId, {
+    title: '秘计:选择分发目标(其他角色)',
+    filter: (_view: GameView, t: number) =>
+      t !== ownerId && state.players[t]?.alive === true,
     timeout: 20,
+    resultKey: GIVE_TARGET_KEY,
   });
-  const target = state.localVars[GIVE_TARGET_KEY] as number | undefined;
-  delete state.localVars[GIVE_TARGET_KEY];
   if (typeof target !== 'number' || target === ownerId) return;
   if (!state.players[target]?.alive) return;
 
@@ -266,5 +256,4 @@ export function onMount(_skill: Skill, _api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

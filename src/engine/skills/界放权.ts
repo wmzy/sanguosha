@@ -25,5 +25,4 @@ const OPTIONS: FangquanOptions = {
 
 export const { createSkill, onInit, onMount } = createFangquanSkill(OPTIONS);
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

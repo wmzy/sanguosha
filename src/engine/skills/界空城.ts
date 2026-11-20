@@ -7,7 +7,7 @@
 //
 //   2. after-hook 挂「被抵消」:检测自己使用的杀被闪抵消 → 摸一张牌。
 //      实现模式与界张飞咆哮(界咆哮.ts)完全一致。
-import type { Skill, GameState } from '../types';
+import type { Skill, GameState, SkillModule } from '../types';
 import { applyAtom } from '../core/apply'
 import { registerOnOwnSlashDodged } from '../util/skillRuntime';
 import { registerKongchengGuard } from './空城';
@@ -39,4 +39,4 @@ export function onInit(skill: Skill, state: GameState): () => void {
   };
 }
 
-export default { createSkill, onInit } satisfies import('../types').SkillModule;
+export default { createSkill, onInit } satisfies SkillModule;

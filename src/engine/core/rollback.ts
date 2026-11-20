@@ -116,60 +116,84 @@ function createPendingTracker(state: GameState): PendingTracker {
   };
 }
 
-/** dispatch 拒绝路径的整体快照:preceding 执行前对 state 全部可变字段的逐项快照。 */
-export interface DispatchSnapshot {
-  /** 是否启用快照(= 消息带 preceding)。false 时 restoreState 不做任何还原。 */
-  readonly enabled: boolean;
+/** 公共基线字段:构造点无条件赋值,且被 dispatch 中无法按 enabled 收窄的调用方读取
+ *  (rejectRolledBack 无条件调 pending.cleanupResidual;flush 缓冲在 hasPreceding
+ *  分支回填 viewBuffering——TS 无法经无关布尔变量 hasPreceding 收窄联合)。 */
+interface DispatchSnapshotBase {
+  /** pending 基线:拒绝路径无条件调用 cleanupResidual(enabled=false 时
+   *  created 恒空,no-op)。 */
+  readonly pending: PendingTracker;
+  /** 进缓冲前的原 viewBuffering 值。 */
+  readonly viewBuffering: boolean;
+}
+
+/** enabled=false(消息无 preceding):拒绝路径不会 mutate 玩家可见状态,
+ *  不构造重快照字段;restoreState 提前 return 不做任何还原。 */
+interface DispatchSnapshotDisabled extends DispatchSnapshotBase {
+  readonly enabled: false;
+}
+
+/** enabled=true(消息带 preceding):preceding 执行前对 state 全部可变字段的
+ *  逐项快照,各字段必填非空(构造点无条件赋值)。 */
+interface DispatchSnapshotEnabled extends DispatchSnapshotBase {
+  readonly enabled: true;
   /** 玩家逐字段快照(不整对象替换:在线 execute 可能持有 player/zone 引用,
    *  替换引用会让正在恢复的父流程读写到孤儿对象)。 */
-  readonly players: readonly PlayerSnapshot[] | null;
-  readonly cardMap: Record<string, Card> | null;
-  readonly cardWrappers: GameState['cardWrappers'] | null;
-  readonly localVars: GameState['localVars'] | null;
-  readonly turn: GameState['turn'] | null;
-  readonly atomStack: GameState['atomStack'] | null;
-  readonly settlementStack: GameState['settlementStack'] | null;
-  readonly zones: GameState['zones'] | null;
-  readonly marks: GameState['marks'] | null;
+  readonly players: readonly PlayerSnapshot[];
+  readonly cardMap: Record<string, Card>;
+  readonly cardWrappers: GameState['cardWrappers'];
+  readonly localVars: GameState['localVars'];
+  readonly turn: GameState['turn'];
+  readonly atomStack: GameState['atomStack'];
+  readonly settlementStack: GameState['settlementStack'];
+  readonly zones: GameState['zones'];
+  readonly marks: GameState['marks'];
   readonly currentPlayerIndex: number;
   readonly phase: GameState['phase'];
   readonly rngSeed: number;
   readonly actionLogLength: number;
   readonly atomHistoryLength: number;
   readonly seq: number;
-  readonly viewBuffering: boolean;
-  readonly pending: PendingTracker;
 }
+
+/** dispatch 拒绝路径的整体快照:判别联合,消费端(restoreState)按 enabled 收窄,
+ *  无需任何非空断言。 */
+export type DispatchSnapshot = DispatchSnapshotDisabled | DispatchSnapshotEnabled;
 
 /** dispatch 入口(preceding 执行前)对 state 做整体快照。
  *  enabled = 消息带 preceding:无 preceding 的拒绝路径不会 mutate 玩家可见状态,
- *  仅保留标量与 pending 基线(cleanupResidual 对空 created 集合为 no-op)。 */
+ *  仅保留公共基线 pending/viewBuffering(cleanupResidual 对空 created 集合为 no-op)。 */
 export function snapshotState(state: GameState, enabled: boolean): DispatchSnapshot {
+  if (!enabled) {
+    return {
+      enabled: false,
+      pending: createPendingTracker(state),
+      viewBuffering: state.viewBuffering === true,
+    };
+  }
   return {
-    enabled,
-    players: enabled ? state.players.map(snapshotPlayer) : null,
-    cardMap: enabled ? { ...state.cardMap } : null,
-    cardWrappers: enabled ? structuredClone(state.cardWrappers) : null,
-    localVars: enabled ? structuredClone(state.localVars) : null,
-    turn: enabled ? structuredClone(state.turn) : null,
-    atomStack: enabled ? [...state.atomStack] : null,
-    settlementStack: enabled ? [...state.settlementStack] : null,
-    zones: enabled
-      ? {
-          deck: [...state.zones.deck],
-          discardPile: [...state.zones.discardPile],
-          processing: [...state.zones.processing],
-        }
-      : null,
+    enabled: true,
+    pending: createPendingTracker(state),
+    viewBuffering: state.viewBuffering === true,
+    players: state.players.map(snapshotPlayer),
+    cardMap: { ...state.cardMap },
+    cardWrappers: structuredClone(state.cardWrappers),
+    localVars: structuredClone(state.localVars),
+    turn: structuredClone(state.turn),
+    atomStack: [...state.atomStack],
+    settlementStack: [...state.settlementStack],
+    zones: {
+      deck: [...state.zones.deck],
+      discardPile: [...state.zones.discardPile],
+      processing: [...state.zones.processing],
+    },
     currentPlayerIndex: state.currentPlayerIndex,
     phase: state.phase,
     rngSeed: state.rngSeed,
-    marks: enabled ? structuredClone(state.marks) : null,
+    marks: structuredClone(state.marks),
     actionLogLength: state.actionLog.length,
-    atomHistoryLength: enabled ? state.atomHistory.length : 0,
+    atomHistoryLength: state.atomHistory.length,
     seq: state.seq,
-    viewBuffering: state.viewBuffering === true,
-    pending: createPendingTracker(state),
   };
 }
 
@@ -179,38 +203,34 @@ export function snapshotState(state: GameState, enabled: boolean): DispatchSnaps
 export function restoreState(state: GameState, snap: DispatchSnapshot): void {
   if (!snap.enabled) return;
   // 牌面先还原(就地 delete + assign,保持 state.cardMap 引用不变)。
-  if (snap.cardMap) {
-    for (const id of Object.keys(state.cardMap)) {
-      if (!(id in snap.cardMap)) delete state.cardMap[id];
-    }
-    Object.assign(state.cardMap, snap.cardMap);
+  for (const id of Object.keys(state.cardMap)) {
+    if (!(id in snap.cardMap)) delete state.cardMap[id];
   }
-  if (snap.players) {
-    for (let i = 0; i < snap.players.length; i++) {
-      const p = state.players[i];
-      if (!p) continue;
-      restorePlayer(p, snap.players[i]);
-      // rollback 回调可恢复装备槽位；用装备牌面重建依赖 vars，避免快照中的旧
-      // 直接构造状态没有通过「装备」atom而缺少距离变量。
-      const weaponId = p.equipment['武器'];
-      if (weaponId) {
-        const weapon = state.cardMap[weaponId];
-        if (weapon?.range !== undefined) p.vars[DISTANCE_ATTACK_RANGE_KEY] = weapon.range;
-      }
+  Object.assign(state.cardMap, snap.cardMap);
+  for (let i = 0; i < snap.players.length; i++) {
+    const p = state.players[i];
+    if (!p) continue;
+    restorePlayer(p, snap.players[i]);
+    // rollback 回调可恢复装备槽位；用装备牌面重建依赖 vars，避免快照中的旧
+    // 直接构造状态没有通过「装备」atom而缺少距离变量。
+    const weaponId = p.equipment['武器'];
+    if (weaponId) {
+      const weapon = state.cardMap[weaponId];
+      if (weapon?.range !== undefined) p.vars[DISTANCE_ATTACK_RANGE_KEY] = weapon.range;
     }
   }
-  state.zones.deck = [...snap.zones!.deck];
-  state.zones.discardPile = [...snap.zones!.discardPile];
-  state.zones.processing = [...snap.zones!.processing];
-  state.cardWrappers = structuredClone(snap.cardWrappers!);
-  state.localVars = snap.localVars!;
-  state.turn = structuredClone(snap.turn!);
+  state.zones.deck = [...snap.zones.deck];
+  state.zones.discardPile = [...snap.zones.discardPile];
+  state.zones.processing = [...snap.zones.processing];
+  state.cardWrappers = structuredClone(snap.cardWrappers);
+  state.localVars = snap.localVars;
+  state.turn = structuredClone(snap.turn);
   state.currentPlayerIndex = snap.currentPlayerIndex;
   state.phase = snap.phase;
   state.rngSeed = snap.rngSeed;
-  state.marks = structuredClone(snap.marks!);
-  state.atomStack = snap.atomStack!;
-  state.settlementStack = snap.settlementStack!;
+  state.marks = structuredClone(snap.marks);
+  state.atomStack = snap.atomStack;
+  state.settlementStack = snap.settlementStack;
   for (const [key, slot] of state.pendingSlots) {
     if (!snap.pending.created.has(slot)) continue;
     state.pendingSlots.delete(key);

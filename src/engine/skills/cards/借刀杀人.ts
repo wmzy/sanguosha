@@ -17,7 +17,7 @@ import { isCardBanned } from '../../skills/cards/validate';
 import type { CardEffect, ResolveCtx } from '../../types';
 import { inAttackRange } from '../../rules/distance';
 import { slashTargetMax } from '../../rules/slash-target';
-import { requireRequestType, requireHandCard } from '../../util/skillRuntime';
+import { askResponse, requireRequestType, requireHandCard } from '../../util/skillRuntime';
 import { canUseSlash } from './杀';
 
 /** 请求 A 出杀问询的 requestType */
@@ -53,31 +53,29 @@ async function resolveBorrowedSword(ctx: ResolveCtx): Promise<void> {
     maxByCard[cardId] = slashTargetMax(state, target, cardId);
   }
   const responseCandidates = [...new Set(Object.values(candidatesByCard).flat())];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: REQUEST_TYPE,
+  const choice = await askResponse<{ cardId: string; targets: number[] }>(
+    state,
+    REQUEST_TYPE,
     target,
-    prompt: {
-      type: 'useCardAndTarget',
-      title: `借刀杀人:对 ${killTargetName} 使用一张杀,或交出武器`,
-      cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
-      targetFilter: {
-        min: 1,
-        max: 3,
-        candidates: responseCandidates,
-        required: [killTarget],
-        candidatesByCard,
-        maxByCard,
-        filter: () => true,
+    {
+      prompt: {
+        type: 'useCardAndTarget',
+        title: `借刀杀人:对 ${killTargetName} 使用一张杀,或交出武器`,
+        cardFilter: { filter: (c) => c.name === '杀', min: 1, max: 1 },
+        targetFilter: {
+          min: 1,
+          max: 3,
+          candidates: responseCandidates,
+          required: [killTarget],
+          candidatesByCard,
+          maxByCard,
+          filter: () => true,
+        },
       },
+      timeout: 20,
+      resultKey: CHOICE_VAR,
     },
-    timeout: 20,
-  });
-
-  const choice = state.localVars[CHOICE_VAR] as
-    | { cardId: string; targets: number[] }
-    | undefined;
-  delete state.localVars[CHOICE_VAR];
+  );
 
   if (choice) {
     // respond.validate 已保证:杀在手、killTarget ∈ targets、全部在攻击范围、A 未被禁出牌。

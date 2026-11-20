@@ -27,6 +27,7 @@
 //
 // 注:界曹仁的界据守(独立文件)仍保留"翻面+跳过下一回合"机制,与本标版规则不同。
 import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { SkillModule } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
@@ -201,4 +202,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

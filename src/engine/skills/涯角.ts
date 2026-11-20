@@ -17,14 +17,14 @@
 //
 // 类别判断:cardMap 的 type 字段(基本牌/锦囊牌/装备牌)。
 // "交给一名角色"含自己(FAQ 明确)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { peekTop } from '../core/deck';
 import { inAttackRange } from '../rules/distance';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
-import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { askChooseTarget, askConfirm, currentRequestType, makeConfirmMount, requireRequestType } from '../util/skillRuntime';
 
 /** localVars keys */
 const CONFIRMED_KEY = '涯角/confirmed';
@@ -144,24 +144,14 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     } else {
       // 类别不同:弃置攻击范围内包含自己的一名角色区域里的一张牌
       // 官方:"若这两张牌类型不同,你可以弃置攻击范围内包含你的一名角色区域里的一张牌"
-      delete ctx.state.localVars[TARGET_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: TARGET_RT,
-        target: ownerId,
-        prompt: {
-          type: 'choosePlayer',
-          title: '涯角:选择攻击范围内包含你的一名角色,弃其一张牌',
-          min: 1,
-          max: 1,
-          // "攻击范围内包含你" = 该角色能攻击到 owner(inAttackRange(target, owner))
-          filter: (_view, t) =>
-            ctx.state.players[t]?.alive === true && inAttackRange(ctx.state, t, ownerId),
-        },
+      const discardTarget = await askChooseTarget(ctx.state, TARGET_RT, ownerId, {
+        title: '涯角:选择攻击范围内包含你的一名角色,弃其一张牌',
+        // "攻击范围内包含你" = 该角色能攻击到 owner(inAttackRange(target, owner))
+        filter: (_view, t) =>
+          ctx.state.players[t]?.alive === true && inAttackRange(ctx.state, t, ownerId),
         timeout: 20,
+        resultKey: TARGET_KEY,
       });
-      const discardTarget = ctx.state.localVars[TARGET_KEY] as number | null;
-      delete ctx.state.localVars[TARGET_KEY];
       if (typeof discardTarget !== 'number') return;
       const target = ctx.state.players[discardTarget];
       if (!target?.alive) return;
@@ -181,11 +171,9 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '涯角',
-    title: '是否发动涯角?',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '涯角',
+  title: '是否发动涯角?',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

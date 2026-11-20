@@ -247,7 +247,7 @@ function asRecord(v: unknown): Record<string, unknown> {
   return (v ?? {}) as Record<string, unknown>;
 }
 
-function optString(o: Record<string, unknown>, key: string): string | undefined {
+function optStr(o: Record<string, unknown>, key: string): string | undefined {
   return typeof o[key] === 'string' ? (o[key]) : undefined;
 }
 
@@ -258,17 +258,17 @@ function optNumber(o: Record<string, unknown>, key: string): number | undefined 
 function parseCreateRoomOpts(args: unknown): CreateRoomOpts {
   const o = asRecord(args);
   return {
-    name: optString(o, 'name'),
+    name: optStr(o, 'name'),
     maxPlayers: optNumber(o, 'maxPlayers'),
     minPlayers: optNumber(o, 'minPlayers'),
-    playerId: optString(o, 'playerId'),
+    playerId: optStr(o, 'playerId'),
     timeoutSec: optNumber(o, 'timeoutSec'),
   };
 }
 
 function parseJoinRoomOpts(args: unknown): JoinRoomOpts {
   const o = asRecord(args);
-  const roomId = optString(o, 'roomId');
+  const roomId = optStr(o, 'roomId');
   if (!roomId) {
     throw new Error(
       'joinRoom 需要 roomId。如果你是要建房做房主，请改用 createRoom 工具；' +
@@ -277,20 +277,20 @@ function parseJoinRoomOpts(args: unknown): JoinRoomOpts {
   }
   return {
     roomId,
-    playerId: optString(o, 'playerId'),
+    playerId: optStr(o, 'playerId'),
     timeoutSec: optNumber(o, 'timeoutSec'),
   };
 }
 
 function parseSpectateRoomOpts(args: unknown): SpectateRoomOpts {
   const o = asRecord(args);
-  const roomId = optString(o, 'roomId');
+  const roomId = optStr(o, 'roomId');
   if (!roomId) {
     throw new Error('spectateRoom 需要 roomId。');
   }
   return {
     roomId,
-    playerId: optString(o, 'playerId'),
+    playerId: optStr(o, 'playerId'),
   };
 }
 
@@ -460,8 +460,8 @@ export async function handleMcpRequest(
             description,
             severity: args['severity'] as ReportBugInput['severity'],
             category: args['category'] as ReportBugInput['category'],
-            expected: optString(args, 'expected'),
-            actual: optString(args, 'actual'),
+            expected: optStr(args, 'expected'),
+            actual: optStr(args, 'actual'),
           };
           const result = await reportBugResult(input, ctx.hgc);
           return okResponse(id, result);

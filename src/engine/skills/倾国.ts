@@ -6,7 +6,7 @@
 // 后端 dispatch 先执行 倾国.transform(创建影子闪),再 闪.respond validate 看到"闪"通过。
 // 闪技能零感知倾国——它看到的永远是 cardMap 里的一张"闪"。
 // 五件套由 skillRuntime 工厂统一实现(context='any':被询问闪时打出,不限自己回合)。
-import type { Card, GameState, Skill, FrontendAPI } from '../types';
+import type { Card, GameState, Skill, FrontendAPI, SkillModule } from '../types';
 import { declareAlternativeResponse } from '../core/skill';
 import {
   registerTransformAction,
@@ -68,4 +68,4 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

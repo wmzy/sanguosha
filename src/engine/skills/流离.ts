@@ -4,11 +4,11 @@
 // 流离(大乔·被动技):当你成为【杀】的目标时,可以弃一张牌,
 // 将此杀转移给攻击范围内的一名其他角色。
 // 时机:成为目标 after hook(结算阶段),修改杀帧的 resolvedTargets。
-import type { FrontendAPI, Skill, GameState } from '../types';
+import type { Skill, GameState, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { inAttackRange } from '../rules/distance';
-import { askConfirm, currentRequestType, defineConfirmAction, normalizeCardIds, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, makeConfirmMount, normalizeCardIds, requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return {
@@ -168,10 +168,10 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '流离',
-    title: '是否发动流离？',
-    style: 'default',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '流离',
+  title: '是否发动流离？',
+  style: 'default',
+});
+
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -21,9 +21,9 @@
 // 内部 localVars/requestType 键名统一使用 '界突袭/xxx' 前缀(T1:界版不得复用标版前缀):
 //   requestType 与 localVars 键均独立于标版突袭,避免同对局两版本共存时的命名空间冲突。
 //   respond 注册/选目标询问/偷牌循环复用 突袭.ts 导出的共享助手(键前缀作参数)。
-import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
+import type { GameState, HookResult, Skill, SkillModule } from '../types';
 import { registerBeforeHook } from '../core/skill';
-import { askConfirm, defineConfirmAction, isOwnDrawPhaseDraw } from '../util/skillRuntime';
+import { askConfirm, isOwnDrawPhaseDraw, makeConfirmMount } from '../util/skillRuntime';
 import { registerTuxiRespond, tuxiAskSelectTargets, tuxiStealCards } from './突袭';
 
 const PREFIX = '界突袭';
@@ -102,14 +102,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '界突袭',
-    style: 'primary',
-    title: '是否发动界突袭?',
-    confirmLabel: '发动',
-    cancelLabel: '不发动',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '界突袭',
+  style: 'primary',
+  title: '是否发动界突袭?',
+  confirmLabel: '发动',
+  cancelLabel: '不发动',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

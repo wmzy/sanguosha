@@ -8,7 +8,12 @@
 import { applyAtom } from '../../core/apply';
 import { runDamageFlow } from '../../flows/damage';
 import type { CardEffect, Card, GameState, ResolveCtx } from '../../types';
-import { currentRequestType, firstTarget, requireRequestType } from '../../util/skillRuntime';
+import {
+  askResponse,
+  currentRequestType,
+  firstTarget,
+  requireRequestType,
+} from '../../util/skillRuntime';
 
 /** 火攻的结算：展示手牌 → 弃同花色 → 火焰伤害 */
 async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
@@ -24,21 +29,20 @@ async function resolveFireAttack(ctx: ResolveCtx): Promise<void> {
 
   // ── 1) 请求目标展示一张手牌 ──
   const revealFallback = targetPlayer.hand[0];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: '火攻/展示',
+  let revealed = await askResponse<{ cardId: string; suit: string }>(
+    state,
+    '火攻/展示',
     target,
-    prompt: {
-      type: 'useCard',
-      title: '火攻:展示一张手牌',
-      cardFilter: { filter: () => true, min: 1, max: 1 },
+    {
+      prompt: {
+        type: 'useCard',
+        title: '火攻:展示一张手牌',
+        cardFilter: { filter: () => true, min: 1, max: 1 },
+      },
+      timeout: 15,
+      resultKey: '火攻/展示',
     },
-    timeout: 15,
-  });
-
-  let revealed = state.localVars['火攻/展示'] as
-    | { cardId: string; suit: string }
-    | undefined;
+  );
   if (!revealed) {
     const rc = state.cardMap[revealFallback];
     revealed = { cardId: revealFallback, suit: rc?.suit ?? '' };
@@ -99,11 +103,7 @@ export async function askFireDiscardAndDamage(
   cardId: string,
   opts: FireDiscardAskOptions,
 ): Promise<void> {
-  delete state.localVars[opts.discardKey];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: opts.requestType,
-    target: source,
+  const discardId = await askResponse<string>(state, opts.requestType, source, {
     prompt: {
       type: 'useCard',
       title: `${opts.titlePrefix}:弃置一张 ${opts.matchValue} 手牌对其造成1点火焰伤害(不弃则无效)`,
@@ -114,9 +114,8 @@ export async function askFireDiscardAndDamage(
       },
     },
     timeout: 15,
+    resultKey: opts.discardKey,
   });
-
-  const discardId = state.localVars[opts.discardKey] as string | undefined;
   // 使用者弃了 → 造成 1 点火焰伤害;没弃(超时)→ 无事发生
   if (discardId && state.players[target]?.alive) {
     await applyAtom(state, { type: '弃置', player: source, cardIds: [discardId], voluntary: true });

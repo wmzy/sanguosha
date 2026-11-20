@@ -6,14 +6,14 @@
 //   - 每回合限一次:摸牌阶段天然一次;英姿/usedThisTurn 防重入,
 //     后缀 /usedThisTurn 由「回合结束」atom 自动清空。
 import type {
-  FrontendAPI,
   GameState,
   HookResult,
   Skill,
+  SkillModule,
 } from '../types';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerBeforeHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond, defineConfirmAction, isOwnDrawPhaseDraw } from '../util/skillRuntime';
+import { askConfirm, isOwnDrawPhaseDraw, makeConfirmMount, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '英姿/confirm';
 
@@ -67,8 +67,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', { label: '英姿', title: '是否发动英姿?(额外摸一张牌)' });
-}
+export const onMount = makeConfirmMount('respond', { label: '英姿', title: '是否发动英姿?(额外摸一张牌)' });
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

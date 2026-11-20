@@ -14,6 +14,7 @@
 // 仅注入 名称/描述/额外回合 差异参数(觉醒标记共享 '凿险/awakened'——
 // 同一角色只会拥有一版凿险)。
 import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
+import type { SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
@@ -133,4 +134,4 @@ const OPTIONS: ZaoxianOptions = {
 
 export const { createSkill, onInit, onMount } = createZaoxianSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

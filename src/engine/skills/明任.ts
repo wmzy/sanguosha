@@ -20,7 +20,11 @@ import type { FrontendAPI, GameState, Json, Skill } from '../types';
 import type { Color, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { currentRequestType, normalizeCardIds } from '../util/skillRuntime';
+import {
+  currentRequestType,
+  normalizeCardIds,
+  requireRequestType,
+} from '../util/skillRuntime';
 
 const SKILL_ID = '明任';
 /** 任标记 id(单张,固定 id;替换时先 去标记 再 加标记)。 */
@@ -102,11 +106,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不需要回应';
-      const rt = currentRequestType(st, ownerId);
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, PLACE_RT], {
+        mismatchError: '当前不是明任回应',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === CONFIRM_RT) {
         return null; // confirm:接受 choice/confirmed
       }
@@ -118,7 +122,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (!ids.every((id) => self.hand.includes(id))) return '牌不在手牌中';
         return null;
       }
-      return '当前不是明任回应';
+      return null;
     },
     async (st: GameState, params: Record<string, Json>): Promise<void> => {
       const rt = currentRequestType(st, ownerId);
@@ -222,8 +226,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom.type !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

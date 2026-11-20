@@ -1,4 +1,4 @@
-// src/engine/无懈可击.ts
+// src/engine/flows/cancel.ts
 // 通用抵消询问 helper —— 统一闪/无懈可击的抵消机制。
 //
 // 闪抵消杀：定向询问杀目标是否出闪（broadcast=false）

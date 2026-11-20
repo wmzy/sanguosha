@@ -18,6 +18,7 @@
 // 因此洛神的 判定牌生效后 hook 读 frameCards(此时判定牌还在处理区);随后 runJudgeFlow 收尾把
 // 判定牌移入弃牌堆。洛神主循环在 runJudgeFlow 返回后,从弃牌堆顶读判定牌。
 import type { GameState } from '../types';
+import type { SkillModule } from '../types';
 import { getHealthValue } from '../types';
 import { createLuoshenSkill, type LuoshenOptions } from './洛神';
 import { registerHandLimitProvider } from '../rules/hand-limit';
@@ -66,4 +67,4 @@ const OPTIONS: LuoshenOptions = {
 
 export const { createSkill, onInit, onMount } = createLuoshenSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

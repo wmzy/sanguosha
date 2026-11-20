@@ -27,7 +27,6 @@
 //   respond handler(按钮不可点击)。
 //   注:localVars key 两版均用 '放权/' 前缀(内部状态,不参与前端路由,保持与测试断言一致)。
 import type {
-  FrontendAPI,
   GameState,
   GameView,
   HookResult,
@@ -38,7 +37,7 @@ import { applyAtom } from '../core/apply';
 import { startTurn } from '../flows/turn';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { clearPerTurnStateProjected } from '../rules/turn-usage';
-import { askConfirm, askResponse, currentRequestType, defineConfirmAction, registerPhaseStartHook } from '../util/skillRuntime';
+import { askChooseTarget, askConfirm, askResponse, currentRequestType, makeConfirmMount, registerPhaseStartHook, requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 
 // localVars keys(标/界共用 '放权/' 前缀,保持与测试断言一致)
@@ -93,9 +92,12 @@ export function createFangquanSkill(opts: FangquanOptions) {
       ownerId,
       'respond',
       (s: GameState, params: Record<string, Json>): string | null => {
-        const slot = s.pendingSlots.get(ownerId);
-        if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-        const rt = currentRequestType(s, ownerId);
+        const check = requireRequestType(s, ownerId, [TRIGGER_RT, DISCARD_RT, CHOOSE_TARGET_RT], {
+          wrongTypeError: '当前不需要回应',
+          mismatchError: '当前不是放权回应',
+        });
+        if (check.error) return check.error;
+        const rt = check.requestType;
         if (rt === TRIGGER_RT) return null;
         if (rt === DISCARD_RT) {
           const cardId = params.cardId as string | undefined;
@@ -187,16 +189,11 @@ export function createFangquanSkill(opts: FangquanOptions) {
           await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [discardCardId], voluntary: true });
 
           // 请求选额外回合目标(排除自己、排除死亡)。
-          // askResponse 读后即删结果键,有效目标须重写 EXTRA_TARGET_KEY 供回合结束时消费。
-          const extraTarget = await askResponse<number | undefined>(st, CHOOSE_TARGET_RT, ownerId, {
-            prompt: {
-              type: 'choosePlayer',
-              title: '放权:选择一名其他角色进行一个额外回合',
-              min: 1,
-              max: 1,
-              filter: (view: GameView, target: number) =>
-                target !== ownerId && view.players[target]?.alive === true,
-            },
+          // askChooseTarget 读后即删结果键,有效目标须重写 EXTRA_TARGET_KEY 供回合结束时消费。
+          const extraTarget = await askChooseTarget(st, CHOOSE_TARGET_RT, ownerId, {
+            title: '放权:选择一名其他角色进行一个额外回合',
+            filter: (view: GameView, target: number) =>
+              target !== ownerId && view.players[target]?.alive === true,
             timeout: 15,
             resultKey: EXTRA_TARGET_KEY,
           });
@@ -276,15 +273,10 @@ export function createFangquanSkill(opts: FangquanOptions) {
           await applyAtom(st, { type: '弃置', player: ownerId, cardIds: [discardCardId], voluntary: true });
 
           // 请求选额外回合目标(排除自己、排除死亡)
-          const extraTarget = await askResponse<number | undefined>(st, CHOOSE_TARGET_RT, ownerId, {
-            prompt: {
-              type: 'choosePlayer',
-              title: '放权:选择一名其他角色进行一个额外回合',
-              min: 1,
-              max: 1,
-              filter: (view: GameView, target: number) =>
-                target !== ownerId && view.players[target]?.alive === true,
-            },
+          const extraTarget = await askChooseTarget(st, CHOOSE_TARGET_RT, ownerId, {
+            title: '放权:选择一名其他角色进行一个额外回合',
+            filter: (view: GameView, target: number) =>
+              target !== ownerId && view.players[target]?.alive === true,
             timeout: 15,
             resultKey: EXTRA_TARGET_KEY,
           });
@@ -298,7 +290,7 @@ export function createFangquanSkill(opts: FangquanOptions) {
           }
 
           // 记录正常下家(currentPlayerIndex 已被 end action 的 下一玩家 推进到正常下家)。
-          // askResponse 读后已删 EXTRA_TARGET_KEY,此处重写以供「情况2」识别额外目标。
+          // askChooseTarget 读后已删 EXTRA_TARGET_KEY,此处重写以供「情况2」识别额外目标。
           const originalNext = st.currentPlayerIndex;
           st.localVars[EXTRA_TARGET_KEY] = extraTarget;
           st.localVars[ORIGINAL_NEXT_KEY] = originalNext;
@@ -342,12 +334,10 @@ export function createFangquanSkill(opts: FangquanOptions) {
     return () => {};
   }
 
-  function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-    defineConfirmAction(api, 'respond', {
-      label: opts.displayName,
-      title: opts.mountTitle,
-    });
-  }
+  const onMount = makeConfirmMount('respond', {
+    label: opts.displayName,
+    title: opts.mountTitle,
+  });
 
   return { createSkill, onInit, onMount };
 }
@@ -363,8 +353,4 @@ const OPTIONS: FangquanOptions = {
 
 export const { createSkill, onInit, onMount } = createFangquanSkill(OPTIONS);
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 slot?.atom.type !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

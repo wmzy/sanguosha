@@ -39,7 +39,7 @@ import { applyAtom } from '../core/apply'
 import { pushFrame, popFrame } from '../core/frame';
 import { registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, currentRequestType, defineConfirmAction, registerOnDamagedAsTarget, registerRespondForAllSeats } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, registerOnDamagedAsTarget, registerRespondForAllSeats, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_ID = '界恩怨';
 const DISPLAY_NAME = '恩怨';
@@ -167,15 +167,20 @@ export function onInit(skill: Skill, state: GameState): () => void {
       state,
       skill.id,
       (s: GameState, seatId: number): string | null => {
+        const check = requireRequestType(
+          s,
+          seatId,
+          [RT_A_CONFIRM, RT_B_CONFIRM, RT_B_SOURCE, RT_B_CARD],
+          { mismatchError: '当前不是恩怨询问' },
+        );
+        if (check.error) return check.error;
+        const rt = check.requestType;
+        // 法正本人的 aConfirm/bConfirm 仅法正座次回应;来源询问任何座次都可能
         const isOwner = seatId === ownerId;
-        const slot = s.pendingSlots.get(seatId);
-        if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-        const rt = currentRequestType(s, seatId) ?? '';
         const ownerRTs = [RT_A_CONFIRM, RT_B_CONFIRM];
-        const sourceRTs = [RT_B_SOURCE, RT_B_CARD];
-        if (isOwner && ownerRTs.includes(rt)) return null;
-        if (sourceRTs.includes(rt)) return null;
-        return '当前不是恩怨询问';
+        // check.error 已守卫,此处 rt 必为 string(类型上 string|null 需显式收窄)
+        if (rt !== null && !isOwner && ownerRTs.includes(rt)) return '当前不是恩怨询问';
+        return null;
       },
       async (s: GameState, seatId: number, params: Record<string, Json>): Promise<void> => {
         const rt = currentRequestType(s, seatId);
@@ -324,8 +329,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot?.atom 另用于 .type !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -35,6 +35,7 @@ import type {
   HookResult,
   Json,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { runDamageFlow } from '../flows/damage';
@@ -362,4 +363,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

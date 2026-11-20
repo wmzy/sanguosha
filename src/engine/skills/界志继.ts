@@ -11,6 +11,7 @@
 //  '志继/choice'——同一角色只会拥有一版志继)。
 // 防重入:AWAKENED_KEY 在 awaken 入口即设,准备阶段触发后即使结束阶段无手牌也不会再触发。
 import { createZhijiSkill, type ZhijiOptions } from './志继';
+import type { SkillModule } from '../types';
 
 const OPTIONS: ZhijiOptions = {
   description: '觉醒技:准备阶段或结束阶段且无手牌时,回复1体力或摸2牌,减1体力上限并永久获得"观星"',
@@ -20,4 +21,4 @@ const OPTIONS: ZhijiOptions = {
 
 export const { createSkill, onInit, onMount } = createZhijiSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

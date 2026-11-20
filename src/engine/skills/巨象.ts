@@ -19,7 +19,7 @@
 //   纯免疫(不改写伤害来源)→ 挂「受到伤害时」cancel —— 本文件口径;
 //   需在同一 hook 兼改 source(伤害来源改写)→ 挂「伤害结算开始时」—— 祸首.ts 口径
 //   (其效果A 免疫与效果B 改 source=孟获 共用一个 before-hook,故整体挂该时机)。
-import type { FrontendAPI, GameState, HookResult, Skill } from '../types';
+import type { FrontendAPI, GameState, HookResult, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
@@ -100,4 +100,4 @@ export function onMount(_skill: Skill, _api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

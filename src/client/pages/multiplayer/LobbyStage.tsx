@@ -10,7 +10,7 @@ import { useRoomList } from '../../hooks/useRoomList';
 import { inputStyle } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
 import { PasswordPromptDialog } from './PasswordPromptDialog';
-import { ErrorToast } from './ErrorToast';
+import { StageErrorToast } from './StageScaffold';
 import {
   title,
   subtitle,
@@ -231,7 +231,7 @@ export function LobbyStage() {
           />
         </aside>
       </div>
-      {mp.error && <ErrorToast message={mp.error} onClose={mp.clearError} />}
+      <StageErrorToast />
       {mp.passwordPrompt && (
         <PasswordPromptDialog
           roomId={mp.passwordPrompt.roomId}

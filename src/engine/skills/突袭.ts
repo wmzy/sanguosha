@@ -15,7 +15,7 @@
 // 标版/界版的 respond action(trigger confirm + select 写 localVars)逐字相同,
 // 选目标询问与偷牌循环同构,仅 localVars/requestType 键前缀不同('突袭' vs '界突袭',
 // 同对局两版本共存时键空间隔离)——键前缀作参数。界突袭.ts 消费这些助手。
-import type { FrontendAPI, GameView, GameState, HookResult, Skill } from '../types';
+import type { GameView, GameState, HookResult, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction } from '../core/skill';
 import { pickRandom } from '../util/rng';
@@ -24,7 +24,7 @@ import {
   askConfirm,
   requireRequestType,
   registerPhaseStartHook,
-  defineConfirmAction,
+  makeConfirmMount,
 } from '../util/skillRuntime';
 
 const PREFIX = '突袭';
@@ -183,6 +183,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', { label: '突袭', title: '是否发动突袭?' });
-}
+export const onMount = makeConfirmMount('respond', { label: '突袭', title: '是否发动突袭?' });
+
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -14,11 +14,11 @@
 //   - 系统伤害(source<0,如闪电)不触发
 //   - 黑桃 = ♠
 //   - 判定牌在 frame.cards 末尾(判定牌生效后时仍在结算帧牌区顶,runJudgeFlow 收尾后才入弃牌堆)
-import type { AtomAfterContext, AtomOfName, FrontendAPI, GameState, Skill } from '../types';
+import type { AtomAfterContext, AtomOfName, GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply'
-import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
+import { runJudgeFlow } from '../flows/judge';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, makeConfirmMount, registerConfirmRespond, registerJudgeCardHook } from '../util/skillRuntime';
 
 const CONFIRM_RT = '暴虐/confirm';
 const CONFIRMED_KEY = '暴虐/confirmed';
@@ -110,17 +110,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
   });
 
   // ── 判定牌生效后:暴虐判定 → 黑桃 → 回复1点体力 ──
-  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.judgeType !== '暴虐') return;
-    if (atom.player !== ownerId) return;
-
-    // 读判定牌(判定牌生效后,仍在结算帧牌区顶,runJudgeFlow 收尾才入弃牌堆)
-    const judgeCardId = currentJudgeCardId(ctx.state);
-    if (!judgeCardId) return;
-    const judgeCard = ctx.state.cardMap[judgeCardId];
-    if (!judgeCard) return;
-
+  registerJudgeCardHook(state, skill.id, ownerId, '暴虐', async (ctx, judgeCard) => {
     // 非黑桃不回复
     if (judgeCard.suit !== '♠') return;
 
@@ -133,13 +123,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '暴虐',
-    style: 'default',
-    title: '是否发动暴虐?(判定,黑桃回复1点体力)',
-    confirmLabel: '判定',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '暴虐',
+  style: 'default',
+  title: '是否发动暴虐?(判定,黑桃回复1点体力)',
+  confirmLabel: '判定',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

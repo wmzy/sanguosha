@@ -4,7 +4,6 @@
 // 聊天配置、待处理视角申请、座位图(SeatMap)、底部准备/开始/旁观/退出按钮。
 // 持有 editConfig;复制反馈走 useCopyFeedback;对局历史 history 由页面 useRoomHistory 传入(刷新语义不变)。
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { OnboardingGuide } from '../../components/OnboardingGuide';
 import { RoomHistoryPanel } from '../../components/RoomHistoryPanel';
 import { ChatConfigSection } from '../../components/ChatConfigSection';
@@ -12,8 +11,9 @@ import { useCopyFeedback } from '../../hooks/useCopyFeedback';
 import { memberName } from '../../utils/memberNames';
 import { btnStyle, colors } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
-import { ErrorToast } from './ErrorToast';
-import { ReconnectBanner } from './ReconnectBanner';
+import { StageScaffold } from './StageScaffold';
+import { useLeaveAndNavigate } from './useLeaveAndNavigate';
+import { ViewRequestChip } from './ViewRequestChip';
 import { RoomConfigSection } from './RoomConfigSection';
 import { SeatMap } from './SeatMap';
 import {
@@ -46,7 +46,7 @@ interface WaitingStageProps {
 
 export function WaitingStage({ history }: WaitingStageProps) {
   const mp = useMultiplayerRoomCtx();
-  const navigate = useNavigate();
+  const leaveAndGoHome = useLeaveAndNavigate();
 
   // 房间码/邀请链接复制反馈:成功后按钮短暂显示 ✓,2 秒后恢复(共享 hook,见 useCopyFeedback;
   // 单一 copiedKey 状态:连续点两个按钮时,后点的反馈覆盖先点的,旧计时器不残留)。
@@ -102,16 +102,7 @@ export function WaitingStage({ history }: WaitingStageProps) {
   };
 
   return (
-    <>
-      <ReconnectBanner
-        connectionState={mp.connectionState}
-        reconnectAttempt={mp.reconnectAttempt}
-        onCancel={mp.cancelReconnect}
-        onLeave={() => {
-          mp.leaveRoom();
-          navigate('/');
-        }}
-      />
+    <StageScaffold>
       <div className={page}>
         <h1 className={pageTitle}>等待大厅</h1>
         <p className={subtitle}>{mp.isSpectator ? '👁 旁观中 · 点击空位加入游戏' : '等待玩家加入并准备'}</p>
@@ -215,19 +206,17 @@ export function WaitingStage({ history }: WaitingStageProps) {
           )}
           {/* 待处理申请提示 */}
           {Object.entries(pendingRequests).map(([sid, seat]) => (
-            <div key={sid} style={{ background: colors.bg.input, borderRadius: '8px', padding: '10px', marginBottom: '8px', fontSize: '13px' }}>
-              <span>{memberName(sid, mp.roomState?.playerNames)} 申请查看 P{seat} 视角</span>
-              <button
-                className={btnStyle}
-                style={{ ...btnVars(colors.accent.green, { padding: '4px 12px', fontSize: '12px' }), marginLeft: '8px' }}
-                onClick={() => mp.approveView(sid, seat)}
-              >同意</button>
-              <button
-                className={btnStyle}
-                style={{ ...btnVars(colors.accent.red, { padding: '4px 12px', fontSize: '12px' }), marginLeft: '4px' }}
-                onClick={() => mp.rejectView(sid)}
-              >拒绝</button>
-            </div>
+            <ViewRequestChip
+              key={sid}
+              spectatorId={sid}
+              seat={seat}
+              label={<span>{memberName(sid, mp.roomState?.playerNames)} 申请查看 P{seat} 视角</span>}
+              wrapStyle={{ background: colors.bg.input, borderRadius: '8px', padding: '10px', marginBottom: '8px', fontSize: '13px' }}
+              btnPadding="4px 12px"
+              btnFontSize="12px"
+              firstBtnMarginLeft="8px"
+              secondBtnMarginLeft="4px"
+            />
           ))}
           {/* 座位图 */}
           <SeatMap />
@@ -283,17 +272,13 @@ export function WaitingStage({ history }: WaitingStageProps) {
             <button
               className={btnStyle}
               style={btnVars(colors.bg.input)}
-              onClick={() => {
-                mp.leaveRoom();
-                navigate('/');
-              }}
+              onClick={leaveAndGoHome}
             >
               退出
             </button>
           </div>
         </div>
-        {mp.error && <ErrorToast message={mp.error} onClose={mp.clearError} />}
       </div>
-    </>
+    </StageScaffold>
   );
 }

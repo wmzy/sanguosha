@@ -170,5 +170,4 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   };
 }
 
-const _skillModule: SkillModule = { createSkill, onInit };
-export default _skillModule;
+export default { createSkill, onInit } satisfies SkillModule;

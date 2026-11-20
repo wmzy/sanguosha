@@ -35,6 +35,7 @@ import type {
   HookResult,
   Json,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
@@ -45,6 +46,7 @@ import {
   askConfirm,
   defineConfirmAction,
   registerRespondForAllSeats,
+  requireRequestType,
 } from '../util/skillRuntime';
 
 const TAG = '鞬出/禁闪';
@@ -112,11 +114,12 @@ export function createJianchuSkill(opts: JianchuOptions) {
           state,
           skill.id,
           (st: GameState, seat: number, params: Record<string, Json>): string | null => {
-            const slot = st.pendingSlots.get(seat);
-            if (!slot) return '当前不需要回应';
-            const atom = slot.atom as { type?: string };
-            if (atom.type !== '请求回应') return '当前不是请求回应';
-            const requestType = currentRequestType(st, seat);
+            const check = requireRequestType(st, seat, [opts.confirmRt, opts.pickRt], {
+              mismatchError: opts.respondFallbackError,
+              wrongTypeError: '当前不是请求回应',
+            });
+            if (check.error) return check.error;
+            const requestType = check.requestType;
             if (requestType === opts.confirmRt) return null; // 庞德确认:任意 choice
             if (requestType === opts.pickRt) {
               // 目标自选弃牌:校验所选牌在目标自己的区域内
@@ -343,7 +346,4 @@ const OPTIONS: JianchuOptions = {
 
 export const { createSkill, onInit, onMount } = createJianchuSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot/atom 另用于 atom.type !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

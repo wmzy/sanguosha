@@ -13,12 +13,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { HeadlessGameClient } from '../headless/HeadlessGameClient';
 import type { ClientPhase } from '../headless/types';
-import { useHgcPlayback, normalizeHgcError } from './useHgcPlayback';
+import { useHgcPlayback } from './useHgcPlayback';
+import { normalizeJoinError } from './normalizeJoinError';
 import { useMarkCharSelectSubmitted, useClearSubmittedCharSelects } from './useSubmittedCharSelect';
 import { createLogger } from '../utils/logger';
 import { logWsMessage, logUserAction } from '../utils/debugTelemetry';
 import { useAuth } from './useAuth';
-import { isRoomNotFound } from '../utils/roomErrors';
 import type { GameView } from '../../engine/types';
 import type { ServerMessage, ClientMessage } from '../../server/protocol';
 import type { ActionMsg } from '../types';
@@ -288,9 +288,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
         })
         .catch((err: unknown) => {
           if (cancelled) return;
-          const message = isRoomNotFound(err)
-            ? '房间已不存在或已关闭'
-            : normalizeHgcError(err);
+          const message = normalizeJoinError(err);
           log.error('connect failed', { roomId, viewer: viewerIndex, error: message });
           // 多座次并发失败只上报一次(其余座次多为同一原因)
           if (connectErrorFiredRef.current) return;

@@ -11,6 +11,7 @@
 //
 // 无防具检查:防具 slot 名为 '防具',equipment['防具'] 为空即无防具。
 import type { GameState } from '../types';
+import type { SkillModule } from '../types';
 import { createBaguaDodgeSkill, type BaguaDodgeOptions } from './八卦阵';
 
 /** owner 当前是否无防具(八阵生效条件) */
@@ -31,4 +32,4 @@ const OPTIONS: BaguaDodgeOptions = {
 
 export const { createSkill, onInit, onMount } = createBaguaDodgeSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

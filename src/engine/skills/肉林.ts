@@ -3,7 +3,7 @@
 // 实现方式:在「询问闪」after-hook 中处理（镜像无双）。
 //   询问闪 resolve 后,肉林检测到标记被设置 → 第一次: 清除标记+drain+追加第二次询问。
 
-import type { GameState, Skill } from '../types';
+import type { GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { isCancelled, setFrameCancelled } from '../core/frame';
@@ -74,4 +74,4 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export default { createSkill, onInit } satisfies import('../types').SkillModule;
+export default { createSkill, onInit } satisfies SkillModule;

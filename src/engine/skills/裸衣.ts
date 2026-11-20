@@ -8,15 +8,15 @@
 //   - after hook 挂在「回合结束」:许褚自己回合结束时清除增伤标签(官方"本回合"语义)。
 //   - 每回合限一次:裸衣/usedThisTurn(后缀约定,回合结束 atom 自动清空)。
 import type {
-  FrontendAPI,
   GameState,
   HookResult,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { usedThisTurn, markOncePerTurn } from '../rules/once-per-turn';
 import { registerAfterHook, registerBeforeHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond, defineConfirmAction, registerDamageBonusHook, isOwnDrawPhaseDraw } from '../util/skillRuntime';
+import { askConfirm, isOwnDrawPhaseDraw, makeConfirmMount, registerConfirmRespond, registerDamageBonusHook } from '../util/skillRuntime';
 
 const BONUS_TAG = '裸衣/bonus';
 const CONFIRM_REQUEST = '裸衣/confirm';
@@ -86,8 +86,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', { label: '裸衣', title: '是否发动裸衣?(少摸一张牌,杀/决斗伤害 +1)' });
-}
+export const onMount = makeConfirmMount('respond', { label: '裸衣', title: '是否发动裸衣?(少摸一张牌,杀/决斗伤害 +1)' });
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

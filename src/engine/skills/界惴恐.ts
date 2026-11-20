@@ -32,7 +32,6 @@
 // 命名:文件名/loader key/character skill name = '界惴恐'(避标版冲突);
 //   内部 Skill.name = '惴恐'(OL 官方技能名,玩家可见)。
 import type {
-  FrontendAPI,
   GameState,
   HookResult,
   Json,
@@ -41,7 +40,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { setPlayerVarUsage } from '../rules/turn-usage';
 import { askRankCard, runRankCompareFlow } from '../flows/rank';
-import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, makeConfirmMount, requireRequestType } from '../util/skillRuntime';
 import { runVirtualSlash } from './cards/_virtualSlash';
 import {
   registerAction,
@@ -93,9 +92,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
       ownerId,
       'respond',
       (st: GameState, params: Record<string, Json>): string | null => {
-        const slot = st.pendingSlots.get(ownerId);
-        if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-        const rt = currentRequestType(st, ownerId);
+        const check = requireRequestType(st, ownerId, [CONFIRM_RT, OWNER_CARD_RT], {
+          wrongTypeError: '当前不需要回应',
+          mismatchError: '当前不是惴恐询问',
+        });
+        if (check.error) return check.error;
+        const rt = check.requestType;
         if (rt === CONFIRM_RT) return null;
         if (rt === OWNER_CARD_RT) {
           const cardId = params.cardId as string | undefined;
@@ -128,10 +130,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         pid,
         'respond',
         (st: GameState, params: Record<string, Json>): string | null => {
-          const slot = st.pendingSlots.get(pid);
-          if (slot?.atom.type !== '请求回应') return '当前不需要回应';
-          const rt = currentRequestType(st, pid);
-          if (rt !== TARGET_CARD_RT) return '当前不是惴恐拼点询问';
+          const check = requireRequestType(st, pid, [TARGET_CARD_RT], {
+            wrongTypeError: '当前不需要回应',
+            mismatchError: '当前不是惴恐拼点询问',
+          });
+          if (check.error) return check.error;
           const cardId = params.cardId as string | undefined;
           if (typeof cardId !== 'string') return '请选择一张拼点牌';
           if (!st.players[pid]?.hand.includes(cardId)) return '拼点牌不在你的手牌中';
@@ -271,19 +274,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   return () => unloaders.forEach((fn) => fn());
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  defineConfirmAction(api, 'respond', {
-    label: DISPLAY_NAME,
-    style: 'primary',
-    title: DISPLAY_NAME,
-    confirmLabel: '确认',
-    cancelLabel: '取消',
-  });
-  return () => {};
-}
+export const onMount = makeConfirmMount('respond', {
+  label: DISPLAY_NAME,
+  style: 'primary',
+  title: DISPLAY_NAME,
+  confirmLabel: '确认',
+  cancelLabel: '取消',
+});
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
-
-// [requestType 迁移·不迁项] owner/target 两处 respond 校验里的 slot?.atom 另用于
-// .type !== '请求回应' 守卫,保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

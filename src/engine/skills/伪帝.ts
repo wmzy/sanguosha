@@ -13,7 +13,7 @@
 //   各主公技内部对「主公位」的判定不一致——护驾(标版)无座次门槛,袁术可直接发动;
 //   激将/救援/制霸等以 ownerId===0 为门槛,袁术(非 0 号位)暂无法发动,需引擎层
 //   「有效主公」判定统一后方可。此为引擎横切关注点,不在本技能职责内。
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { LORD_SKILLS } from '../data/character-meta';
@@ -73,4 +73,4 @@ export function onMount(_skill: Skill, _api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

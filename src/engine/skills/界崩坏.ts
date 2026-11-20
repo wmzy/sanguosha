@@ -14,6 +14,7 @@
 //   - turn.vars['崩坏/disabled'] 由 界酒池 after-hook on '去标记' 写入(酒增伤生效时)
 //   - turn.vars 随「回合结束」atom 自动清空(语义贴合"本回合")
 import { createBenghuaiSkill, type BenghuaiOptions } from './崩坏';
+import type { SkillModule } from '../types';
 
 const DISABLE_VAR = '崩坏/disabled'; // turn.vars:本回合禁用崩坏(由界酒池写入)
 
@@ -26,4 +27,4 @@ const OPTIONS: BenghuaiOptions = {
 
 export const { createSkill, onInit, onMount } = createBenghuaiSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

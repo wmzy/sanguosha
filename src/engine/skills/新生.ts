@@ -21,7 +21,7 @@
 //   | localVars['新生/choice'] | localVars   | 写/读 | 本文件      | ✅     |
 //
 // 通用机制:不涉及出杀次数/装备/横切规则。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
 import { pickRandom } from '../util/rng';
@@ -144,4 +144,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

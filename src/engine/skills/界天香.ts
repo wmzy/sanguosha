@@ -12,7 +12,7 @@
 //   3. respond 校验含 owner 存活检查('玩家不可用')。
 // 其余(respond validate/execute 骨架、before-hook 六步流程、红桃判定认 红颜|界红颜)
 // 与标版共用 天香.ts 的参数化实现。
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill, SkillModule } from '../types';
 import { registerTianxiangWiring, mountTianxiangRespondAction, type TianxiangVariant } from './天香';
 import { ownsCard, ownedCardIds } from '../util/player-query';
 
@@ -54,4 +54,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
   mountTianxiangRespondAction(api, '界天香', '是否发动界天香?');
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

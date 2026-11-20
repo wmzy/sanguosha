@@ -22,17 +22,17 @@
 // 命名:文件/loader key/character skill name = '界激昂'(避开标激昂冲突);
 //   内部 Skill.name = '激昂'(OL 官方技能名,玩家可见)。
 import type {
-  FrontendAPI,
   GameState,
   Json,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { registerAction, registerAfterHook } from '../core/skill';
 import {
   askConfirm,
   currentRequestType,
-  defineConfirmAction,
+  makeConfirmMount,
   requireRequestType,
 } from '../util/skillRuntime';
 import { isJiangTrigger, registerJiangFirstStage } from './激昂';
@@ -143,14 +143,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: DISPLAY_NAME,
-    style: 'primary',
-    title: '是否发动激昂?',
-    confirmLabel: '发动',
-    cancelLabel: '不发动',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: DISPLAY_NAME,
+  style: 'primary',
+  title: '是否发动激昂?',
+  confirmLabel: '发动',
+  cancelLabel: '不发动',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

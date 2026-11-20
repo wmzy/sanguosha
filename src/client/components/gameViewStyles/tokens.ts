@@ -69,6 +69,47 @@ export const eventCardMetaFade = bottomFadeGradient('0, 0, 0', '0.85', '0.55', '
 /** 大卡底部紧凑区蒙版(暖黑) */
 export const playerCardBottomFade = bottomFadeGradient('10, 8, 5', '0.9', '0.78', '72%');
 
+/** 四角 L 角饰生成器:8 层实色 linear-gradient 角件(每角横臂+竖臂各一层),
+ *  供元素 background 叠层使用(层叠顺序:左上/右上/左下/右下,先横后竖)。
+ *  color 可传 CSS 变量(如 var(--orn));offset 为角件离各边的距离,arm/thickness
+ *  为臂长与线宽。消费者:charSelect 面板角饰、layout 战场区四角装裱线。 */
+export function cornerBracket(
+  color: string,
+  offset = '0',
+  arm = '16px',
+  thickness = '2px',
+): string {
+  const g = `linear-gradient(${color}, ${color})`;
+  return [
+    `${g} left ${offset} top ${offset} / ${arm} ${thickness} no-repeat`,
+    `${g} left ${offset} top ${offset} / ${thickness} ${arm} no-repeat`,
+    `${g} right ${offset} top ${offset} / ${arm} ${thickness} no-repeat`,
+    `${g} right ${offset} top ${offset} / ${thickness} ${arm} no-repeat`,
+    `${g} left ${offset} bottom ${offset} / ${arm} ${thickness} no-repeat`,
+    `${g} left ${offset} bottom ${offset} / ${thickness} ${arm} no-repeat`,
+    `${g} right ${offset} bottom ${offset} / ${arm} ${thickness} no-repeat`,
+    `${g} right ${offset} bottom ${offset} / ${thickness} ${arm} no-repeat`,
+  ].join(',\n      ');
+}
+
+/** 标题两侧饰线(—◆— 意向)生成器:近文字端一枚亮色方钻 + 向外渐隐细线。
+ *  供标题 ::before/::after 的 background 层使用;::after 由调用处 scaleX(-1) 镜像。
+ *  diamondColor/lineColor 为方钻与渐隐线颜色,diamondSize/lineThickness/lineInset
+ *  为方钻边长、线宽与线短量(calc(100% - lineInset))。消费者:charSelect 选将标题、
+ *  multiplayerStyles 等待大厅页标题。 */
+export function ornamentTitle(
+  diamondColor: string,
+  lineColor: string,
+  diamondSize = '5px',
+  lineThickness = '2px',
+  lineInset = '9px',
+): string {
+  return [
+    `linear-gradient(${diamondColor}, ${diamondColor}) right center / ${diamondSize} ${diamondSize} no-repeat`,
+    `linear-gradient(90deg, transparent, ${lineColor}) left center / calc(100% - ${lineInset}) ${lineThickness} no-repeat`,
+  ].join(',\n      ');
+}
+
 /** 身份章色板:主公金/忠臣蓝/反贼红/内奸紫。座位卡名牌身份章(seat.ts 的
  *  seatIdentity* 系列)与角色大卡身份章(actionBar 的 playerCardStamp* 别名)共用,
  *  色板单一来源,两卡不再各持一份色值。 */

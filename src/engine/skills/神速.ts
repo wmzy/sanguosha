@@ -17,12 +17,12 @@
 import type {
   AtomBeforeContext,
   AtomOfName,
-  FrontendAPI,
   GameState,
   GameView,
   HookResult,
   PlayerState,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction } from '../core/skill';
@@ -33,8 +33,8 @@ import {
   askConfirm,
   firstCardId,
   firstTarget,
+  makeConfirmMount,
   registerPhaseStartHook,
-  defineConfirmAction,
 } from '../util/skillRuntime';
 import { equipmentCardIds } from '../util/player-query';
 import { runVirtualSlash } from './cards/_virtualSlash';
@@ -355,6 +355,6 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', { label: '神速', title: '是否发动神速?', style: 'default' });
-}
+export const onMount = makeConfirmMount('respond', { label: '神速', title: '是否发动神速?', style: 'default' });
+
+export default { createSkill, onInit, onMount } satisfies SkillModule;

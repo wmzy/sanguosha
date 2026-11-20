@@ -17,7 +17,7 @@
 // 本文件同时导出 createZhijiSkill 工厂(志继族共享实现),界志继 复用之,
 // 仅注入 描述/询问 requestType/触发阶段 差异参数(觉醒标记与选择键共享
 // '志继/awakened'、'志继/choice'——同一角色只会拥有一版志继)。
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { isAwakened, markAwakened } from '../rules/vars-keys';
@@ -140,4 +140,4 @@ const OPTIONS: ZhijiOptions = {
 
 export const { createSkill, onInit, onMount } = createZhijiSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

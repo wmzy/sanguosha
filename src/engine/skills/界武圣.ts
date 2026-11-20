@@ -16,6 +16,7 @@
 //   - diamondSlashNoDistanceLimit: 官方被动"你使用的方片【杀】无距离限制"
 //     (经 distance provider 实现,任何方片杀生效,含物理方片杀与武圣/丈八转化出的方片杀)。
 import { createWushengSkill } from './武圣';
+import type { SkillModule } from '../types';
 
 export const { createSkill, onInit, onMount } = createWushengSkill({
   name: '界武圣',
@@ -24,4 +25,4 @@ export const { createSkill, onInit, onMount } = createWushengSkill({
   diamondSlashNoDistanceLimit: true,
 });
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

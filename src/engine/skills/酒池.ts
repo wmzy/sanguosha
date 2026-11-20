@@ -8,6 +8,7 @@
 // 描述:"你可以将一张黑桃手牌当【酒】使用。" 黑桃 = ♠(仅黑桃,非黑色)。
 // 无次数限制。
 import type { Card, GameState, Json, Skill, FrontendAPI } from '../types';
+import type { SkillModule } from '../types';
 import { hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import {
@@ -106,7 +107,7 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;
 
 // [requestType 迁移·不迁项] ① validate 的 slot 另读 atomType/atomTarget(求桃窗口判定,
 // 非 requestType);② activeWhen 读 ctx.view.pending(视图层)。requestType 读取已走 currentRequestType。

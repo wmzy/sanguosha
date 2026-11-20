@@ -11,6 +11,7 @@
 //   - "任意张牌"= 手牌+装备均可弃(标版引擎本就支持,界版沿用)。
 //   - 标版 validate 有 cardIds 去重校验,界版历史现状无(为行为等价保留差异,不注入)。
 //   - 独立界版技能文件,不修改标制衡。限一次标记键为 '界制衡'(与标制衡键隔离,互不影响)。
+import type { SkillModule } from '../types';
 import { createZhihengSkill } from './制衡';
 
 export const { createSkill, onInit, onMount } = createZhihengSkill({
@@ -21,4 +22,4 @@ export const { createSkill, onInit, onMount } = createZhihengSkill({
   bonusDrawWhenAllHandDiscarded: true,
 });
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

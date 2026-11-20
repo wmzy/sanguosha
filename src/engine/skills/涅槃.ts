@@ -193,5 +193,4 @@ const OPTIONS: NiepanOptions = {
 
 export const { createSkill, onInit, onMount } = createNiepanSkill(OPTIONS);
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -25,7 +25,7 @@
 //   - X ∈ [1, 当前体力]:X=当前体力 → 濒死(求桃),被救回仍继续摸牌/增益(官方"然后"语义)。
 //   - 距离修正单一 number 槽位是引擎既有约定(马术+进攻马同理):读现值叠加、按 X 还原,
 //     不引入新的累加机制。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
@@ -231,4 +231,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

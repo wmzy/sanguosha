@@ -28,17 +28,15 @@ import type {
   GameState,
   HookResult,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply'
-import { runJudgeFlow, currentJudgeCardId } from '../flows/judge';
-import {
-  registerAfterHook,
-} from '../core/skill';
+import { runJudgeFlow } from '../flows/judge';
 import { skipPhase } from '../rules/skip-phase';
 import { defaultPlayActive } from '../rules/action-active';
 import { setTurnVarUsage } from '../rules/turn-usage';
 import { SHUANGXIONG_COLOR_VIEW_KEY } from '../rules/vars-keys';
-import { askConfirm, defineConfirmAction, mountTransformAction, registerConfirmRespond, registerPhaseStartHook, registerTransformAction, type TransformActionOptions } from '../util/skillRuntime';
+import { askConfirm, defineConfirmAction, mountTransformAction, registerConfirmRespond, registerJudgeCardHook, registerPhaseStartHook, registerTransformAction, type TransformActionOptions } from '../util/skillRuntime';
 
 const CONFIRM_RT = '双雄/confirm';
 const TRIGGERED_KEY = '双雄/triggered';
@@ -130,17 +128,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 
   // 判定牌生效后 hook(judgeType='双雄'):玩家获得判定牌 + 记颜色
-  registerAfterHook(state, skill.id, ownerId, '判定牌生效后', async (ctx) => {
-    const atom = ctx.atom;
-    if (atom.player !== ownerId) return;
-    if (atom.judgeType !== '双雄') return;
-
-    // 判定牌生效后,判定牌仍在 frameCards 末尾(尚未入弃牌堆),可能是改判后的最终牌
-    const judgeCardId = currentJudgeCardId(ctx.state);
-    if (!judgeCardId) return;
-    const judgeCard = ctx.state.cardMap[judgeCardId];
-    if (!judgeCard) return;
-
+  registerJudgeCardHook(state, skill.id, ownerId, '双雄', async (ctx, judgeCard) => {
     // 记录本回合决斗异色(后端 transform validate 读)
     const judgeColor = judgeCard.color;
     // 同步到 view 侧(经「回合用量」atom),供前端 activeWhen/cardFilter 读取
@@ -149,7 +137,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     // 获得判定牌(处理区→手牌);拿走后判定 atom 的 afterHooks 清理为 no-op
     await applyAtom(ctx.state, {
       type: '移动牌',
-      cardId: judgeCardId,
+      cardId: judgeCard.id,
       from: { zone: '处理区' },
       to: { zone: '手牌', player: ownerId },
     });
@@ -177,4 +165,4 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

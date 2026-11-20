@@ -11,6 +11,7 @@
 // 距离 1 以内:effectiveDistance 最小为 1(座位相邻或自己),<= 1 即满足。
 // 装备 -1 马(进攻修正)通过 player.vars['距离/进攻修正'] 进一步缩短距离——自动支持。
 import { createKuangguSkill, type KuangguOptions } from './狂骨';
+import type { SkillModule } from '../types';
 
 const OPTIONS: KuangguOptions = {
   name: '界狂骨',
@@ -22,4 +23,4 @@ const OPTIONS: KuangguOptions = {
 
 export const { createSkill, onInit, onMount } = createKuangguSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

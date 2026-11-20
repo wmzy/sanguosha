@@ -32,6 +32,7 @@ import {
 } from '../core/skill';
 import type { SkillModule } from '../types';
 import {
+  askChooseTarget,
   askConfirm,
   askMandatoryCardChoice,
   defineConfirmAction,
@@ -155,22 +156,12 @@ export function registerHaoshiDrawHooks(
           target = candidates[0];
         } else {
           // 并列:询问选择
-          delete st.localVars[TARGET_KEY];
-          await applyAtom(st, {
-            type: '请求回应',
-            requestType: CHOOSE_TARGET_RT,
-            target: ownerId,
-            prompt: {
-              type: 'choosePlayer',
-              title: '好施:选择手牌最少的角色(给予手牌)',
-              min: 1,
-              max: 1,
-              filter: (_view: GameView, t: number) => candidates.includes(t),
-            },
+          const chosen = await askChooseTarget(st, CHOOSE_TARGET_RT, ownerId, {
+            title: '好施:选择手牌最少的角色(给予手牌)',
+            filter: (_view: GameView, t: number) => candidates.includes(t),
             timeout: 15,
+            resultKey: TARGET_KEY,
           });
-          const chosen = st.localVars[TARGET_KEY] as number | undefined;
-          delete st.localVars[TARGET_KEY];
           if (typeof chosen !== 'number') return;
           target = chosen;
         }
@@ -297,5 +288,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

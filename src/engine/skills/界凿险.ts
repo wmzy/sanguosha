@@ -17,6 +17,7 @@
 //   - 急袭技能模块需在 skills/index.ts 注册
 //   - 额外回合仅触发一次(标志在消费后立即清除)
 import { createZaoxianSkill, type ZaoxianOptions } from './凿险';
+import type { SkillModule } from '../types';
 
 const OPTIONS: ZaoxianOptions = {
   name: '界凿险',
@@ -27,4 +28,4 @@ const OPTIONS: ZaoxianOptions = {
 
 export const { createSkill, onInit, onMount } = createZaoxianSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

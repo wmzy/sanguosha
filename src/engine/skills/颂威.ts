@@ -8,11 +8,11 @@
 //   - 黑色 = ♠ 或 ♣
 //   - faction 从 player.faction 读取
 //   - 仅主公曹丕可用(isLord 判定),非主公时 hook 注册但不触发(主公技限制)
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply'
 import { frameCards } from '../core/frame';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, makeConfirmMount, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '颂威/confirm';
 const CONFIRMED_KEY = '颂威/confirmed';
@@ -73,13 +73,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '颂威',
-    title: '颂威:是否摸一张牌?',
-    confirmLabel: '摸牌',
-    cancelLabel: '不摸',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '颂威',
+  title: '颂威:是否摸一张牌?',
+  confirmLabel: '摸牌',
+  cancelLabel: '不摸',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

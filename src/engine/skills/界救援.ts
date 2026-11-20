@@ -26,7 +26,7 @@
 //   - 嵌套安全:改对孙权的 回复体力 target=孙权(=ownerId),本 hook 条件 target≠ownerId → 不重入。
 //   - 与濒死求桃无关:濒死求桃时 target=孙权(被救者),本 hook 要求 target≠孙权,
 //     故天然不与濒死求桃场景冲突,无需检查 求桃/已救 标志。
-import type { GameState, HookResult, Skill } from '../types';
+import type { GameState, HookResult, Skill, SkillModule } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerBeforeHook } from '../core/skill';
@@ -114,4 +114,4 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   };
 }
 
-export default { createSkill, onInit } satisfies import('../types').SkillModule;
+export default { createSkill, onInit } satisfies SkillModule;

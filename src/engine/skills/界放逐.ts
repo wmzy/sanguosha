@@ -12,6 +12,7 @@
 // 与全引擎翻面模型一致(flipFaceDown 只追加标签,回合管理的 flipFaceUpAll
 // 一次清全部 /翻面 标签,双翻无法对消)。
 import { createFangzhuSkill, type FangzhuOptions } from './放逐';
+import type { SkillModule } from '../types';
 
 const OPTIONS: FangzhuOptions = {
   name: '界放逐',
@@ -27,4 +28,4 @@ const OPTIONS: FangzhuOptions = {
 
 export const { createSkill, onInit, onMount } = createFangzhuSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

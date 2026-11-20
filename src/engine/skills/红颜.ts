@@ -15,7 +15,7 @@
 //
 // 本文件同时导出 registerSpadeToHeartJudgeHook(黑桃判定牌→红桃 before hook,
 // 红颜族共享注册),界红颜 复用之(镜像 鬼道/八卦阵/闭月)。
-import type { Card, FrontendAPI, GameState, HookResult, Skill } from '../types';
+import type { Card, FrontendAPI, GameState, HookResult, Skill, SkillModule } from '../types';
 import { registerBeforeHook } from '../core/skill';
 import { peekTop } from '../core/deck';
 
@@ -69,4 +69,4 @@ export function onMount(_skill: Skill, _api: FrontendAPI): void {
   // 锁定技:无主动 action
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

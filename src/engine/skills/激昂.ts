@@ -22,14 +22,14 @@
 // 本文件同时导出 registerJiangFirstStage 工厂(激昂族第一段「成为目标」hook 共享注册,
 // 含 isJiangTrigger 谓词),界激昂 复用之,仅注入键命名空间前缀(镜像 鬼道/八卦阵/闭月)。
 import type {
-  FrontendAPI,
   GameState,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, makeConfirmMount, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '激昂/confirm';
 const CONFIRMED_KEY = '激昂/confirmed';
@@ -132,11 +132,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '激昂',
-    title: '是否发动激昂?(摸一张牌)',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '激昂',
+  title: '是否发动激昂?(摸一张牌)',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

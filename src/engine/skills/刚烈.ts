@@ -11,16 +11,17 @@
 //     因此把 'respond' action 注册到每个座次(以 skillId='刚烈' 隔离,不与他技冲突)。
 //   - 判定结果由 runJudgeFlow 直接返回(不再经全局临时变量/判定牌生效后 hook 捕获)。
 //   - 来源手牌不足两张时只能选择受到伤害(规则 FAQ)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply'
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import {
   askConfirm,
   currentRequestType,
-  defineConfirmAction,
+  makeConfirmMount,
   registerOnDamagedAsTarget,
   registerRespondForAllSeats,
+  requireRequestType,
 } from '../util/skillRuntime';
 
 const CONFIRM_REQUEST = '刚烈/confirm';
@@ -46,14 +47,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     skill.id,
     (st: GameState, seatId: number, _params: Record<string, Json>) => {
       const isOwner = seatId === ownerId;
-      const slot = st.pendingSlots.get(seatId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const requestType = currentRequestType(st, seatId);
-      if (requestType === CHOOSE_REQUEST) return null; // 来源二选一
-      if (isOwner && requestType === CONFIRM_REQUEST) return null; // 是否发动
-      return '当前不是刚烈回应';
+      // CHOOSE_REQUEST:来源二选一(任何座次);CONFIRM_REQUEST:是否发动(仅夏侯惇本人)。
+      const check = requireRequestType(
+        st,
+        seatId,
+        isOwner ? [CHOOSE_REQUEST, CONFIRM_REQUEST] : [CHOOSE_REQUEST],
+        { mismatchError: '当前不是刚烈回应' },
+      );
+      return check.error;
     },
     async (st: GameState, seatId: number, params: Record<string, Json>) => {
       const requestType = currentRequestType(st, seatId);
@@ -126,17 +127,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   };
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '刚烈',
-    title: '刚烈:弃置两张手牌,或受到 1 点伤害?',
-    confirmLabel: '弃两张手牌',
-    cancelLabel: '受 1 点伤害',
-    style: 'danger',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '刚烈',
+  title: '刚烈:弃置两张手牌,或受到 1 点伤害?',
+  confirmLabel: '弃两张手牌',
+  cancelLabel: '受 1 点伤害',
+  style: 'danger',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

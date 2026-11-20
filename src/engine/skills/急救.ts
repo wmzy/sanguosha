@@ -12,7 +12,7 @@
 //   - 仅红色手牌(♥♦)。官方描述为"一张红色牌",但官方规则 FAQ 明确为"红色手牌";
 //     装备区红色牌需额外卸载装备流程,超出当前范围,此处不实现。
 //   - 与 酒.respond 同构:移动牌 手牌→弃牌堆 + 设 localVars['求桃/已救']。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, declareAlternativeResponse } from '../core/skill';
 import { requireRequestType } from '../util/skillRuntime';
@@ -42,11 +42,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
     (state: GameState, params: Record<string, Json>) => {
       // 回合外:自己回合内不得用急救(应用真桃)
       if (state.currentPlayerIndex === ownerId) return '急救只能在回合外使用';
-      // 必须是针对自己的 桃/求桃 pending
-      const slot = state.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      if ((slot.atom as { target?: number }).target !== ownerId) return '不是问你的';
+      // 必须是针对自己的 桃/求桃 pending(ownerCheck 校验 atom.target 指向本座次)
       const check = requireRequestType(state, ownerId, ['桃/求桃'], {
+        ownerCheck: ownerId,
         wrongTypeError: '当前不是求桃',
         mismatchError: '当前不是求桃',
       });
@@ -92,3 +90,5 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
     },
   });
 }
+
+export default { createSkill, onInit, onMount } satisfies SkillModule;

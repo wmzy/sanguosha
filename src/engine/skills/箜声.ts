@@ -29,7 +29,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { equipReplacingOld } from './_equipReplace';
 import type { SkillModule } from '../types';
-import { currentRequestType, requireRequestType, askConfirm, normalizeCardIds } from '../util/skillRuntime';
+import { askChooseTarget, currentRequestType, requireRequestType, askConfirm, normalizeCardIds } from '../util/skillRuntime';
 import { slotOf } from '../util/equip-slot';
 
 /** owner.vars key:箜声牌 cardId 列表(与良姻共享) */
@@ -142,22 +142,12 @@ async function performKongshengEnd(
   if (!state.players[ownerId]?.alive) return; // 极端:获得牌触发死亡
 
   // 选一名角色使用剩余(装备)牌
-  delete state.localVars[TARGET_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: TARGET_RT,
-    target: ownerId,
-    prompt: {
-      type: 'choosePlayer',
-      title: '箜声:令一名角色使用剩余(装备)牌并失去1点体力',
-      min: 1,
-      max: 1,
-      filter: (_view, t) => state.players[t]?.alive === true,
-    },
+  const target = await askChooseTarget(state, TARGET_RT, ownerId, {
+    title: '箜声:令一名角色使用剩余(装备)牌并失去1点体力',
+    filter: (_view, t) => state.players[t]?.alive === true,
     timeout: 30,
+    resultKey: TARGET_KEY,
   });
-  const target = state.localVars[TARGET_KEY] as number | undefined;
-  delete state.localVars[TARGET_KEY];
   if (typeof target !== 'number' || !state.players[target]?.alive) return;
 
   // 逐张装备牌:给予目标 → 装备(含旧装备替换 + 技能挂载)
@@ -252,5 +242,4 @@ export function onMount(_skill: Skill, _api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

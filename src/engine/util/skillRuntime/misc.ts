@@ -11,6 +11,7 @@ import type {
   GameState,
   Json,
   PickProcessingCardPrompt,
+  Skill,
 } from '../../types';
 import { hasBlockingPending } from '../../core/skill';
 
@@ -245,4 +246,28 @@ export function defineConfirmAction(
       ...(opts.confirmDisabled !== undefined ? { confirmDisabled: opts.confirmDisabled } : {}),
     },
   });
+}
+
+/** defineConfirmAction 的 onMount 整体替换版:返回值可直接作 `SkillModule.onMount`
+ *  (void 返回是 `(() => void) | void` 的子集)。收敛约 36 个技能文件里
+ *  「onMount 函数体整体只有一次 defineConfirmAction 调用」的样板——这类文件不再
+ *  手写空壳函数,onMount 直接等于工厂返回值;onMount 内还有其他注册逻辑
+ *  (多 action/事件监听)的技能仍内联调用 defineConfirmAction。
+ *  参数与 defineConfirmAction 后两参一致(actionName + opts)。
+ *
+ * 用法:
+ * ```ts
+ * export const onMount = makeConfirmMount('respond', {
+ *   label: DISPLAY_NAME,
+ *   title: '是否发动突袭?',
+ * });
+ * ```
+ */
+export function makeConfirmMount(
+  actionName: string,
+  opts: ConfirmActionOptions,
+): (skill: Skill, api: FrontendAPI) => void {
+  return (_skill: Skill, api: FrontendAPI) => {
+    defineConfirmAction(api, actionName, opts);
+  };
 }

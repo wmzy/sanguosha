@@ -3,14 +3,14 @@
 // (战报由页面累计的 battleEvents 汇总为 stats 传入);无 view 回退简洁 gameOverBox 文案。
 // 持有录像下载反馈 replayPending 与 handleDownloadReplay。房间数据走 MultiplayerRoomCtx。
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { GameResultOverlay } from '../../components/GameResultOverlay';
 import { downloadLatestReplay } from '../../hooks/useRoomHistory';
 import { summarizeBattleStats, useBattleStatsEvents } from '../../utils/battleStats';
 import { btnStyle, colors } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
 import { ErrorToast } from './ErrorToast';
-import { ReconnectBanner } from './ReconnectBanner';
+import { StageScaffold } from './StageScaffold';
+import { useLeaveAndNavigate } from './useLeaveAndNavigate';
 import { page, title, gameOverBox, winnerText, buttonRow } from './multiplayerStyles';
 
 interface EndedStageProps {
@@ -20,7 +20,7 @@ interface EndedStageProps {
 
 export function EndedStage({ battleEvents }: EndedStageProps) {
   const mp = useMultiplayerRoomCtx();
-  const navigate = useNavigate();
+  const leaveAndGoHome = useLeaveAndNavigate();
 
   // 录像生成中提示:服务端 appendGameHistory 落盘前列表为空时显示,3 秒自动消失
   const [replayPending, setReplayPending] = useState(false);
@@ -39,51 +39,27 @@ export function EndedStage({ battleEvents }: EndedStageProps) {
   }, [mp.gameOver, mp.roomId]);
 
   const winner = mp.gameOver?.winner ?? '无人';
-  // view 存在时用丰富的结算面板;缺失时回退到简洁文案。
+  // view 存在时用丰富的结算面板;缺失时回退到简洁文案(该分支保持不渲染错误 toast)。
   if (mp.view) {
     // 战报统计:仅结算阶段计算,从本局累计的战报事件汇总(无相关事件则传 undefined,列不渲染)
     const statsAll = summarizeBattleStats(battleEvents);
     const stats = Object.keys(statsAll).length > 0 ? statsAll : undefined;
     return (
-      <>
-        <ReconnectBanner
-          connectionState={mp.connectionState}
-          reconnectAttempt={mp.reconnectAttempt}
-          onCancel={mp.cancelReconnect}
-          onLeave={() => {
-            mp.leaveRoom();
-            navigate('/');
-          }}
-        />
+      <StageScaffold extraToasts={replayPending && <ErrorToast message="录像生成中，请稍后再试" />}>
         <GameResultOverlay
           winner={winner}
           players={mp.view.players}
           perspectiveIdx={mp.view.viewer}
           stats={stats}
           onRestart={mp.sendRestart}
-          onExit={() => {
-            mp.leaveRoom();
-            navigate('/');
-          }}
+          onExit={leaveAndGoHome}
           onDownloadReplay={mp.gameOver ? handleDownloadReplay : undefined}
         />
-        {/* 结算面板阶段的错误反馈,与其他 stage 分支行为一致 */}
-        {mp.error && <ErrorToast message={mp.error} onClose={mp.clearError} />}
-        {replayPending && <ErrorToast message="录像生成中，请稍后再试" />}
-      </>
+      </StageScaffold>
     );
   }
   return (
-    <>
-      <ReconnectBanner
-        connectionState={mp.connectionState}
-        reconnectAttempt={mp.reconnectAttempt}
-        onCancel={mp.cancelReconnect}
-        onLeave={() => {
-          mp.leaveRoom();
-          navigate('/');
-        }}
-      />
+    <StageScaffold errorToast={false}>
       <div className={page}>
         <h1 className={title}>游戏结束</h1>
         <div className={gameOverBox}>
@@ -101,16 +77,13 @@ export function EndedStage({ battleEvents }: EndedStageProps) {
             <button
               className={btnStyle}
               style={{ '--btn-bg': colors.accent.blue } as React.CSSProperties}
-              onClick={() => {
-                mp.leaveRoom();
-                navigate('/');
-              }}
+              onClick={leaveAndGoHome}
             >
               返回大厅
             </button>
           </div>
         </div>
       </div>
-    </>
+    </StageScaffold>
   );
 }

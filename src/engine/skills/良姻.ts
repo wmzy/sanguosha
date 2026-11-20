@@ -28,7 +28,7 @@ import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import type { SkillModule } from '../types';
-import { currentRequestType, askConfirm, askMandatoryCardChoice, firstTarget, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, askChooseTarget, askMandatoryCardChoice, firstTarget, requireRequestType } from '../util/skillRuntime';
 
 /** owner.vars key:箜声牌 cardId 列表(由 箜声.ts 维护,良姻只读) */
 const KONGSHENG_KEY = '箜声/牌';
@@ -95,23 +95,13 @@ async function performLiangyin(
   delete state.localVars[CONFIRMED_KEY];
 
   // 2) 选一名其他角色
-  delete state.localVars[TARGET_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: TARGET_RT,
-    target: ownerId,
-    prompt: {
-      type: 'choosePlayer',
-      title: '良姻:选择一名其他角色',
-      min: 1,
-      max: 1,
-      filter: (_view, t) =>
-        t !== ownerId && state.players[t]?.alive === true,
-    },
+  const target = await askChooseTarget(state, TARGET_RT, ownerId, {
+    title: '良姻:选择一名其他角色',
+    filter: (_view, t) =>
+      t !== ownerId && state.players[t]?.alive === true,
     timeout: 15,
+    resultKey: TARGET_KEY,
   });
-  const target = state.localVars[TARGET_KEY] as number | undefined;
-  delete state.localVars[TARGET_KEY];
   if (typeof target !== 'number' || !state.players[target]?.alive) return;
 
   // 3) 选摸/弃(confirm:确认=各摸一张,取消=各弃一张)
@@ -157,22 +147,12 @@ async function performLiangyin(
   });
   if (candidates.length === 0) return;
 
-  delete state.localVars[HEAL_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: HEAL_RT,
-    target: ownerId,
-    prompt: {
-      type: 'choosePlayer',
-      title: `良姻:令一名手牌数为${x}的角色回复1点体力(可不选)`,
-      min: 1,
-      max: 1,
-      filter: (_view, t) => candidates.includes(t),
-    },
+  const healTarget = await askChooseTarget(state, HEAL_RT, ownerId, {
+    title: `良姻:令一名手牌数为${x}的角色回复1点体力(可不选)`,
+    filter: (_view, t) => candidates.includes(t),
     timeout: 15,
+    resultKey: HEAL_KEY,
   });
-  const healTarget = state.localVars[HEAL_KEY] as number | undefined;
-  delete state.localVars[HEAL_KEY];
   if (typeof healTarget === 'number' && state.players[healTarget]?.alive) {
     await applyAtom(state, {
       type: '回复体力',
@@ -297,5 +277,4 @@ export function onMount(_skill: Skill, _api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

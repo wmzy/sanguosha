@@ -34,6 +34,7 @@ import type {
   Json,
   PlayerState,
   Skill,
+  SkillModule,
 } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
@@ -329,4 +330,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
   mountTianxiangRespondAction(api, '天香', '是否发动天香?');
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

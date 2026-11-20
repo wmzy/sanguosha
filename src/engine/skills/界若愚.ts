@@ -9,6 +9,7 @@
 // 触发时机/主公判定/觉醒仪式与标版完全一致,复用标版工厂实现;
 // 注册键 '界若愚'(与标版若愚键隔离,不修改标版)。
 import { createAwakenLordSkill, type AwakenLordOptions } from './若愚';
+import type { SkillModule } from '../types';
 
 /** 回复目标体力值:回复至 3 点(当前已≥3 则回复量为 0,不回复) */
 const TARGET_HEALTH = 3;
@@ -23,4 +24,4 @@ const OPTIONS: AwakenLordOptions = {
 
 export const { createSkill, onInit, onMount } = createAwakenLordSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

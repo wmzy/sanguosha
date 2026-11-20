@@ -14,7 +14,7 @@
 //
 // 本文件同时导出 createZhijianSkill 工厂(直谏族共享实现),界直谏 复用之,
 // 仅注入 名称/描述/文案/可否替换原装备 差异参数。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAction } from '../core/skill';
@@ -155,4 +155,4 @@ const OPTIONS: ZhijianOptions = {
 
 export const { createSkill, onInit, onMount } = createZhijianSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

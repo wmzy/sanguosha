@@ -22,7 +22,7 @@ import { applyAtom } from '../core/apply';
 import { topFrame } from '../core/frame';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
-import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
 import type { SkillModule } from '../types';
 import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 
@@ -67,11 +67,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>): string | null => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as { type: string; requestType?: string };
-      if (atom.type !== '请求回应') return '当前不需要回应';
-      const rt = currentRequestType(st, ownerId);
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, PICK_TARGET_RT, PICK_CARD_RT], {
+        noSlotError: '当前不需要回应',
+        wrongTypeError: '当前不需要回应',
+        mismatchError: '当前不是征荣回应',
+      });
+      if (check.error) return check.error;
+      const rt = check.requestType;
       if (rt === CONFIRM_RT) {
         return null; // confirm:接受 choice/confirmed 布尔
       }
@@ -208,8 +210,5 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
   });
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;
 
-// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom.type !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。

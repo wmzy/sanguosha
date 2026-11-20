@@ -30,7 +30,7 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import type { SkillModule } from '../types';
 import { QIZHI_COUNT_KEY as COUNT_VAR, getQizhiCount } from '../rules/vars-keys';
 import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
-import { currentRequestType, defineConfirmAction, firstTarget, requireRequestType } from '../util/skillRuntime';
+import { askChooseTarget, currentRequestType, defineConfirmAction, firstTarget, requireRequestType } from '../util/skillRuntime';
 import { hasDiscardableCards } from '../util/player-query';
 
 const SKILL_ID = '奇制';
@@ -150,25 +150,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     if (!hasValidTargets(ctx.state, ownerId)) return;
 
     // 3. 选目标(其他存活且有牌的角色)
-    delete ctx.state.localVars[TARGET_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: TARGET_RT,
-      target: ownerId,
-      prompt: {
-        type: 'choosePlayer',
-        title: '奇制:选择要弃置其一张牌的其他角色',
-        min: 1,
-        max: 1,
-        filter: (_view: GameView, t: number) =>
-          t !== ownerId &&
-          ctx.state.players[t]?.alive === true &&
-          hasDiscardableCards(ctx.state.players[t]),
-      },
+    const targetIdx = await askChooseTarget(ctx.state, TARGET_RT, ownerId, {
+      title: '奇制:选择要弃置其一张牌的其他角色',
+      filter: (_view: GameView, t: number) =>
+        t !== ownerId &&
+        ctx.state.players[t]?.alive === true &&
+        hasDiscardableCards(ctx.state.players[t]),
       timeout: 20,
+      resultKey: TARGET_KEY,
     });
-    const targetIdx = ctx.state.localVars[TARGET_KEY] as number | undefined;
-    delete ctx.state.localVars[TARGET_KEY];
     if (typeof targetIdx !== 'number') return;
 
     const target = ctx.state.players[targetIdx];
@@ -204,5 +194,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

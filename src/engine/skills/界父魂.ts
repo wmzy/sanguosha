@@ -39,6 +39,7 @@ import type {
   Skill,
   FrontendAPI,
   HookResult,
+  SkillModule,
 } from '../types';
 import { registerAfterHook, registerBeforeHook, declareAlternativeResponse } from '../core/skill';
 import { topFrame } from '../core/frame';
@@ -288,4 +289,4 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

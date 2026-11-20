@@ -23,6 +23,7 @@ import type {
   HookResult,
   PlayerState,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { frameCards } from '../core/frame';
@@ -324,4 +325,4 @@ const OPTIONS: TieqiOptions = {
 
 export const { createSkill, onInit, onMount } = createTieqiSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

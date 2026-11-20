@@ -1,4 +1,4 @@
-// src/engine/death-flow.ts
+// src/engine/flows/death.ts
 // 死亡结算编排函数(对齐 出牌流程重设计.md 模块 B / death.md 5 时机)。
 //
 // 将单 atom(击杀)模式升级为「编排函数 + 时机标记 atom」模式(与 runUseFlow /

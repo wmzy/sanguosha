@@ -27,7 +27,7 @@
 //     而趫猛需要"按选中牌类型动态决定 obtain 还是 discard",故独立实现。
 //   - 一个技能实例只能注册一个 respond action(actionKey 冲突),
 //     故 confirm 与选牌合并为单 respond 按 requestType 分支(同狂骨/反馈/制霸模式)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { spliceHandOrderEntry } from '../flows/pick-card-panel';
@@ -283,5 +283,4 @@ export function onMount(_skill: Skill, _api: FrontendAPI): void {
   return;
 }
 
-const _skillModule: import('../types').SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

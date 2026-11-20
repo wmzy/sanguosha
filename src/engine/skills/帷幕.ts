@@ -9,7 +9,7 @@
 //
 //   锦囊卡 id 来源:成为目标/检测有效性/受到伤害时 由 atom.cardId 直接给出;
 //   询问杀/获得/弃置/设横置 由顶帧 frame.params.cardId 给出(由原语内部解析)。
-import type { Skill, GameState, Card } from '../types';
+import type { Skill, GameState, Card, SkillModule } from '../types';
 import { registerCardInvalidation } from '../core/card-invalidation';
 
 export function createSkill(id: string, ownerId: number): Skill {
@@ -38,4 +38,4 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   );
 }
 
-export default { createSkill, onInit } satisfies import('../types').SkillModule;
+export default { createSkill, onInit } satisfies SkillModule;

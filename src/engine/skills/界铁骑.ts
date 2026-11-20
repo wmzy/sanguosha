@@ -17,7 +17,7 @@
 //
 // SUPPRESSION_TAG 生命周期:发动时加,界马超回合结束 after hook 清。
 //   标签由 index 的 hook 过滤器读取,实现「目标非锁定技失效」。
-import type { GameState, HookResult } from '../types';
+import type { GameState, HookResult, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { registerSuppressionProvider } from '../core/skill-suppression';
@@ -194,4 +194,4 @@ const OPTIONS: TieqiOptions = {
 
 export const { createSkill, onInit, onMount } = createTieqiSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

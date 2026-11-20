@@ -12,7 +12,7 @@ import { applyAtom } from '../../core/apply'
 import { frameCards } from '../../core/frame';
 import { peekTop } from '../../core/deck';
 import type { CardEffect, ResolveCtx } from '../../types';
-import { requireRequestType, toPromptCards } from '../../util/skillRuntime';
+import { askResponse, requireRequestType, toPromptCards } from '../../util/skillRuntime';
 import { alivePlayersClockwiseFrom } from '../../util/player-query';
 
 /** 选牌面板：弹 pickProcessingCard pending，超时兜底选候选列表第一张 */
@@ -27,20 +27,15 @@ async function runPickProcessingCard(
 
   const cards = toPromptCards(state, available);
 
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: '五谷丰登/select',
-    target,
+  const pickedId = await askResponse<string>(state, '五谷丰登/select', target, {
     prompt: {
       type: 'pickProcessingCard',
       title: '五谷丰登:选择 1 张牌',
       cards,
     },
     timeout: 20,
+    resultKey: '五谷丰登/选择',
   });
-
-  const pickedId = state.localVars['五谷丰登/选择'] as string | undefined;
-  delete state.localVars['五谷丰登/选择'];
   const stillAvailable = revealedIds.filter((id) => frameCards(state).includes(id));
   const cardId = pickedId && stillAvailable.includes(pickedId) ? pickedId : stillAvailable[0];
   if (cardId) {

@@ -13,14 +13,14 @@
 //     前端 pickTargetCard 渲染与无头客户端 availableActions 自动路由(不再硬编码)。
 //   - 选牌面板逻辑与过河拆桥/顺手牵羊共用(见 ../pick-card-panel.ts);反馈为 obtain 模式,
 //     includeJudge=false(经典规则仅手牌+装备)。
-import type { FrontendAPI, Skill } from '../types';
+import type { Skill, SkillModule } from '../types';
 import { registerAction } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
 import {
   askConfirm,
   currentRequestType,
-  defineConfirmAction,
+  makeConfirmMount,
   registerOnDamagedAsTarget,
   requireRequestType,
 } from '../util/skillRuntime';
@@ -101,10 +101,10 @@ export function onInit(skill: Skill, state: import('../types').GameState): () =>
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '反馈',
-    title: '是否发动反馈？',
-    style: 'default',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '反馈',
+  title: '是否发动反馈？',
+  style: 'default',
+});
+
+export default { createSkill, onInit, onMount } satisfies SkillModule;

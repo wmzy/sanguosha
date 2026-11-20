@@ -28,7 +28,7 @@
 // 标/界的主循环、use 校验、respond 校验与 onMount 定义逐字相同,仅询问 requestType
 // 前缀不同('乱武/出杀' vs '界乱武/出杀',同对局两版共存时键空间隔离;限定技标记与
 // 询问文案共享)。界乱武.ts 消费这些导出,只写"结算后视为出杀"差异段。
-import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { Card, FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { runUseFlow } from './cards/use-card';
@@ -235,4 +235,4 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

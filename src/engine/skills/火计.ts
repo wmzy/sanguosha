@@ -5,7 +5,7 @@
 // 后端 dispatch 先执行 火计.transform(创建影子火攻),再 火攻.use validate
 // 看到"火攻"通过。火攻技能零感知火计——它看到的永远是 cardMap 里的"火攻"。
 // 五件套由 skillRuntime 工厂统一实现(仅手牌来源 + 红牌谓词 + 默认出牌时机)。
-import type { Card, FrontendAPI, GameView, GameState, Skill } from '../types';
+import type { Card, FrontendAPI, GameView, GameState, Skill, SkillModule } from '../types';
 import { defaultPlayActive } from '../rules/action-active';
 import {
   registerTransformAction,
@@ -63,4 +63,4 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

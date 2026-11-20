@@ -22,15 +22,15 @@
 //   这是界陆逊的核心combo(谦逊搬空手牌 → 连营令多名角色摸牌)。
 import type {
   AtomAfterContext,
-  FrontendAPI,
   GameState,
   Json,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { topFrame } from '../core/frame';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, registerConfirmRespond, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, makeConfirmMount, registerConfirmRespond } from '../util/skillRuntime';
 
 const CONFIRM_RT = '界谦逊/trigger';
 const CONFIRMED_KEY = '界谦逊/confirmed';
@@ -161,13 +161,11 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '谦逊',
-    title: '是否发动谦逊?',
-    confirmLabel: '发动(将所有手牌移出游戏)',
-    style: 'default',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '谦逊',
+  title: '是否发动谦逊?',
+  confirmLabel: '发动(将所有手牌移出游戏)',
+  style: 'default',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

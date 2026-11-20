@@ -4,11 +4,11 @@
 //   判定牌此刻仍在 frameCards 末尾)。
 // 实现:询问是否获得 → 移动牌(处理区→手牌)。判定阶段 frame 通常仅含判定牌,
 //   拿走后 frame 空,runJudgeFlow 收尾 splice 末尾为 no-op。
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply'
 import { currentJudgeCardId } from '../flows/judge';
 import { registerAfterHook } from '../core/skill';
-import { askConfirm, defineConfirmAction, registerConfirmRespond } from '../util/skillRuntime';
+import { askConfirm, makeConfirmMount, registerConfirmRespond } from '../util/skillRuntime';
 
 const CHOOSE_RT = '天妒/choose';
 const CHOICE_KEY = '天妒/choice';
@@ -66,12 +66,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '天妒',
-    style: 'default',
-    title: '是否发动天妒?',
-    confirmLabel: '获得判定牌',
-    cancelLabel: '不获得',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '天妒',
+  style: 'default',
+  title: '是否发动天妒?',
+  confirmLabel: '获得判定牌',
+  cancelLabel: '不获得',
+});
+
+export default { createSkill, onInit, onMount } satisfies SkillModule;

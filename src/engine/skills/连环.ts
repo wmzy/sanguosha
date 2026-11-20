@@ -14,7 +14,7 @@
 // createChainTransformOptions/mountChainRecycleAction —— 转化配置与重铸 defineAction
 //   的构造工厂,连环/界连环两份同构声明的单一实现(仅 label/title/targetFilter 上限
 //   不同,经参数注入)。界连环.ts 消费这些工厂。
-import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { Card, FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { popFrame, pushFrame } from '../core/frame';
 import { recastCard } from '../flows/recast';
 import { registerAction } from '../core/skill';
@@ -173,4 +173,4 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

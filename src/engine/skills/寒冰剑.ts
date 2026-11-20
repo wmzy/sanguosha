@@ -1,12 +1,12 @@
 // 寒冰剑(武器,攻击范围 2):
 //   每当你使用【杀】对目标角色造成伤害时,若其有牌(手牌或装备区),你可以防止此伤害,
 //   改为依次弃置其两张牌(手牌或装备区,由你逐张选择)。
-import type { FrontendAPI, HookResult, Skill, GameState } from '../types';
+import type { HookResult, Skill, GameState, SkillModule } from '../types';
 import { registerAction, registerBeforeHook } from '../core/skill';
 import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { equippedWeaponIs } from '../util/player-query';
 import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
-import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, makeConfirmMount, requireRequestType } from '../util/skillRuntime';
 
 export function createSkill(id: string, ownerId: number): Skill {
   return { id, ownerId, name: '寒冰剑', description: '武器:杀造成伤害时可改为依次弃目标2张牌', isLocked: true };
@@ -95,12 +95,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '寒冰剑',
-    style: 'default',
-    title: '寒冰剑：是否改为弃目标2张？',
-    confirmLabel: '弃牌',
-    cancelLabel: '正常伤害',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '寒冰剑',
+  style: 'default',
+  title: '寒冰剑：是否改为弃目标2张？',
+  confirmLabel: '弃牌',
+  cancelLabel: '正常伤害',
+});
+
+export default { createSkill, onInit, onMount } satisfies SkillModule;

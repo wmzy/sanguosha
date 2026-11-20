@@ -22,7 +22,7 @@
 //   2b. 防具/宝物保护(主动拦截):onInit 注册 before-hook 到「请求回应」atom,
 //       拦截所有 discard 模式的选牌面板(过河拆桥/寒冰剑/挑衅/奇制等),在 toViewEvents
 //       之前就地过滤 prompt.equipment 中的防具/宝物 → 前端不展示、不可选。
-import type { Skill, GameState } from '../types';
+import type { Skill, GameState, SkillModule } from '../types';
 import { registerBeforeHook } from '../core/skill';
 
 /** 奇才横切标签:持有者使用锦囊牌时忽略距离限制(由 顺手牵羊 validate 消费) */
@@ -98,8 +98,4 @@ export function onMount() {
   // 奇才是纯被动锁定技,无前端 action 定义
 }
 
-export default {
-  createSkill,
-  onInit,
-  onMount,
-} satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

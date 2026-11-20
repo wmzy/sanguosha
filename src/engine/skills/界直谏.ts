@@ -15,6 +15,7 @@
 //     替换会触发目标"失去装备"相关技能(如枭姬),这是预期行为。
 //   - 装备到目标的 装备 atom player=目标,不会触发任何"自己使用装备"的被动(本技能也无此被动)。
 import { createZhijianSkill, type ZhijianOptions } from './直谏';
+import type { SkillModule } from '../types';
 
 const OPTIONS: ZhijianOptions = {
   name: '界直谏',
@@ -27,4 +28,4 @@ const OPTIONS: ZhijianOptions = {
 
 export const { createSkill, onInit, onMount } = createZhijianSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

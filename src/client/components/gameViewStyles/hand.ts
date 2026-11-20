@@ -8,6 +8,11 @@ import {
   handCardMetaFade,
 } from './tokens';
 
+/* 暗蓝卡面渐变:翻牌动效卡与判定待定卡共用(边框色随卡型,卡面同一设计) */
+const darkBlueCardFace = 'linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%)';
+/* 暗棕卡面渐变:手牌卡与分配外部候选卡共用(distExternalCard 基于 handCard 样式派生) */
+const darkBrownCardFace = 'linear-gradient(180deg, rgba(30, 20, 15, 0.95) 0%, rgba(20, 12, 8, 0.95) 100%)';
+
 // ─── Hand cards ───
 export const handHeader = css`
   display: flex;
@@ -136,7 +141,7 @@ export const eventCardBody = css`
   height: 160px;
   padding: 0;
   border-radius: 8px;
-  background: linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%);
+  background: ${darkBlueCardFace};
   border: 2px solid #c9a227;
   box-shadow: 0 4px 20px rgba(201, 162, 39, 0.4);
   text-align: center;
@@ -201,7 +206,7 @@ export const judgePendingBody = css`
   width: 80px;
   height: 120px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%);
+  background: ${darkBlueCardFace};
   border: 2px solid #b78bff;
   box-shadow: 0 2px 12px rgba(155, 89, 182, 0.4);
   overflow: hidden;
@@ -238,7 +243,7 @@ export const handCard = css`
   border-radius: 9px;
   padding: 0;
   cursor: pointer;
-  background: linear-gradient(180deg, rgba(30, 20, 15, 0.95) 0%, rgba(20, 12, 8, 0.95) 100%);
+  background: ${darkBrownCardFace};
   min-width: 92px;
   width: 92px;
   /* 固定高度:文字层绝对定位,不再被插画撑高 */
@@ -451,7 +456,7 @@ export const distExternalCard = css`
   border-radius: 8px;
   padding: 6px 10px;
   cursor: pointer;
-  background: linear-gradient(180deg, rgba(30, 20, 15, 0.95) 0%, rgba(20, 12, 8, 0.95) 100%);
+  background: ${darkBrownCardFace};
   min-width: 64px;
   width: 72px;
   text-align: center;

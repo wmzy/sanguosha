@@ -49,14 +49,27 @@
 //   - 只有一个可选技能时自动选取(无需询问)。
 //   - 界版"移去至多两张":简化为移去池末尾的卡片(不弹面板让玩家选具体哪张),
 //     但始终保留展示牌(避免歧义——展示牌被移去后技能归属未明确)。
-import type { Faction, FrontendAPI, GameState, Json, Skill } from '../types';
+import type {
+  Faction,
+  FrontendAPI,
+  GameState,
+  Json,
+  Skill,
+  SkillModule,
+} from '../types';
 import { applyAtom } from '../core/apply';
 import { createRng } from '../util/rng';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { allCharacters } from '../data/characters';
 import { getCharacterMeta } from '../data/character-meta';
 import { HUASHEN_POOL_KEY as POOL_KEY, getHuashenPool } from '../rules/vars-keys';
-import { askConfirm, askResponse, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import {
+  askConfirm,
+  askResponse,
+  currentRequestType,
+  defineConfirmAction,
+  requireRequestType,
+} from '../util/skillRuntime';
 
 // ── 角色分派 ──
 const JIE_CHAR = '界左慈';
@@ -177,11 +190,14 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = currentRequestType(st, ownerId);
+      const check = requireRequestType(
+        st,
+        ownerId,
+        [ACTION_REQUEST, SWAP_COUNT_REQUEST, SWITCH_REQUEST, CHARACTER_REQUEST, SKILL_REQUEST],
+        { mismatchError: '当前不是化身询问' },
+      );
+      if (check.error) return check.error;
+      const rt = check.requestType;
 
       // ── 界版:选择行动(1=替换 2=移去 3=不操作) ──
       if (rt === ACTION_REQUEST) {
@@ -224,7 +240,7 @@ export function onInit(skill: Skill, state: GameState): () => void {
         if (candidates.length > 0 && !candidates.includes(selected)) return '该技能不在候选中';
         return null;
       }
-      return '当前不是化身询问';
+      return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
       const rt = currentRequestType(st, ownerId);
@@ -567,7 +583,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

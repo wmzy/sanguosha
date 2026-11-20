@@ -27,7 +27,7 @@
 //   - 技能实例归属:添加技能 atom 触发 系统规则 after-hook → instantiateSkill,
 //     英姿/英魂 以 ownerId=孙策座次 实例化,内部用 skill.ownerId 工作,归属正确
 //   - 英姿/英魂 已实现(周瑜·英姿、孙坚·英魂),直接挂载
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { performYinghunPrepare } from './英魂';
@@ -173,4 +173,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

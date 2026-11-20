@@ -31,7 +31,7 @@ import type {
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook, registerBeforeHook } from '../core/skill';
 import { pickRandom } from '../util/rng';
-import { currentRequestType, askConfirm } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, requireRequestType } from '../util/skillRuntime';
 import { getCardValue } from '../flows/rank';
 import type { SkillModule } from '../types';
 
@@ -61,13 +61,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     skill.id,
     ownerId,
     'respond',
-    (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = currentRequestType(st, ownerId);
-      if (rt !== FORCE_CONFIRM_RT && rt !== GAIN_CONFIRM_RT) return '当前不是酣战询问';
+    (st: GameState, _params: Record<string, Json>): string | null => {
+      const check = requireRequestType(st, ownerId, [FORCE_CONFIRM_RT, GAIN_CONFIRM_RT], {
+        mismatchError: '当前不是酣战询问',
+      });
+      if (check.error) return check.error;
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
@@ -171,8 +169,4 @@ export function onMount(_skill: Skill, _api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot/atom 另用于 atom['type'] !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -15,6 +15,7 @@ import type {
   GameState,
   HookResult,
   Skill,
+  SkillModule,
 } from '../types';
 import { registerBeforeHook } from '../core/skill';
 import { registerHandLimitProvider } from '../rules/hand-limit';
@@ -66,4 +67,4 @@ export function onMount(_skill: Skill, _api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

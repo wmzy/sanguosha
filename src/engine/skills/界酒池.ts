@@ -21,6 +21,7 @@
 //   - "酒杀造成伤害"= 酒/nextKillDamageBonus mark 被消耗(由 酒.ts before-hook on 造成伤害 触发)
 //   - turn.vars['崩坏/disabled'] 随「回合结束」atom 自动清空(语义贴合"本回合")
 import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { SkillModule } from '../types';
 import { registerAfterHook, hasBlockingPending, declareAlternativeResponse } from '../core/skill';
 import { defaultPlayActive } from '../rules/action-active';
 import {
@@ -119,4 +120,4 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   mountTransformAction(api, skill.id, TRANSFORM_OPTIONS);
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

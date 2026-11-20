@@ -16,13 +16,13 @@
 //
 // 已知限制:配合八卦阵判定出的虚拟闪不触发雷击(八卦阵在询问闪 before hook 中 cancel,
 //   故询问闪 after hook 不执行)。同鬼才 hook 顺序限制,属引擎判定/取消机制固有局限。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { isCancelled } from '../core/frame';
-import { requireRequestType } from '../util/skillRuntime';
+import { askChooseTarget, requireRequestType } from '../util/skillRuntime';
 
 const CHOOSE_RT = '雷击/chooseTarget';
 const TARGET_KEY = '雷击/target';
@@ -80,23 +80,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     if (!isCancelled(ctx.state, (ctx.frame.params.cardId as string) ?? '', ownerId)) return;
 
     // 询问张角:是否发动雷击 + 选择判定目标
-    delete ctx.state.localVars[TARGET_KEY];
-    await applyAtom(ctx.state, {
-      type: '请求回应',
-      requestType: CHOOSE_RT,
-      target: ownerId,
-      prompt: {
-        type: 'choosePlayer',
-        title: '雷击:选择一名角色进行判定(或放弃)',
-        min: 1,
-        max: 1,
-        filter: (view, t) => view.players[t]?.alive === true && t !== ownerId,
-      },
+    const target = await askChooseTarget(ctx.state, CHOOSE_RT, ownerId, {
+      title: '雷击:选择一名角色进行判定(或放弃)',
+      filter: (view, t) => view.players[t]?.alive === true && t !== ownerId,
       timeout: 20,
+      resultKey: TARGET_KEY,
     });
-
-    const target = ctx.state.localVars[TARGET_KEY];
-    delete ctx.state.localVars[TARGET_KEY];
     if (typeof target !== 'number') return; // 放弃发动
 
     // 二次校验:目标仍存活
@@ -146,4 +135,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   });
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

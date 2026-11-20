@@ -14,6 +14,7 @@
 //   - clearEquipVars:装备离身时清除武器距离 vars(卸下/移出至暂存区 共用)。
 //   - clearEquipViewVars:clearEquipVars 的 view 侧配对(武器离身清 distanceVars.attackRange)。
 //   - decrementHandCount:others 视角的手牌计数扣减(仅减计数不动 hand 数组)。
+//   - cardInfos:toViewEvents 的「牌面四字段投影」(id/name/suit/rank)。
 //   - makeCardAskAtom:卡牌询问型等待 atom 工厂(询问杀/询问闪 逐行同构)。
 //   - makeHealthDeltaAtom:体力增减 atom 工厂(回复体力/失去体力 同构,差异仅方向/钳制/文案)。
 import type {
@@ -77,6 +78,15 @@ export function hookSilentView(
     return broadcast(null);
   }
   return broadcast(build());
+}
+
+/** toViewEvents 的牌面投影:cards → 仅保留 id/name/suit/rank 四字段的新数组。
+ *  移出至暂存区/归还暂存牌 的 ViewEvent.cards 携带同构牌面,共用本映射;
+ *  隐去 type/range/shadowOf 等引擎内部字段,视图事件不外泄无关信息。 */
+export function cardInfos(
+  cards: { id: string; name: string; suit: string; rank: string }[],
+): { id: string; name: string; suit: string; rank: string }[] {
+  return cards.map((c) => ({ id: c.id, name: c.name, suit: c.suit, rank: c.rank }));
 }
 
 // ── applyView 手牌样板(handCount 计数 + hand 数组按 cardId 精确同步) ──

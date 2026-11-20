@@ -29,7 +29,8 @@
 //     谦逊 source===target(自己选自己的牌);破军 source≠target(徐盛选目标牌)。
 //   - varsKey: 暂存键名,由调用方技能自行定义(如 '界破军/移出'),归还方须用同一键。
 import type { AtomDefinition, Card, EquipSlot, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { clearEquipVars, clearEquipViewVars, decrementHandCount, removeCardsFromHand, removeFromEquipment, requirePlayer, viewPlayer } from './_helpers';
+import { cardInfos, clearEquipVars, clearEquipViewVars, decrementHandCount, removeCardsFromHand, removeFromEquipment, requirePlayer, viewPlayer } from './_helpers';
+import { equipSlotOf } from '../util/player-query';
 
 export const 移出至暂存区: AtomDefinition<{
   source: number;
@@ -79,18 +80,12 @@ export const 移出至暂存区: AtomDefinition<{
     const cards: Card[] = atom.cardIds
       .map((id) => state.cardMap[id])
       .filter((c): c is Card => !!c);
-    const cardInfos = cards.map((c) => ({ id: c.id, name: c.name, suit: c.suit, rank: c.rank }));
+    const infos = cardInfos(cards);
     // 区分手牌/装备(装备公开,所有人可见 cardId;手牌仅 target/source 可见)
-    const equipSlotOf = (id: string): EquipSlot | undefined => {
-      for (const slot of Object.keys(target.equipment) as EquipSlot[]) {
-        if (target.equipment[slot] === id) return slot;
-      }
-      return undefined;
-    };
     const handIds: string[] = [];
     const equipEntries: Array<{ slot: EquipSlot; cardId: string }> = [];
     for (const id of atom.cardIds) {
-      const slot = equipSlotOf(id);
+      const slot = equipSlotOf(target, id);
       if (slot) equipEntries.push({ slot, cardId: id });
       else handIds.push(id);
     }
@@ -100,7 +95,7 @@ export const 移出至暂存区: AtomDefinition<{
       source: atom.source,
       target: atom.target,
       cardIds: atom.cardIds,
-      cards: cardInfos,
+      cards: infos,
       handIds,
       equipEntries,
     };

@@ -195,5 +195,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   defineConfirmAction(api, 'respond', { label: DISPLAY_NAME, title: '是否发动诛害?', style: 'danger' });
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -5,17 +5,20 @@
 //     (贯石斧/青龙偃月刀/界咆哮/界空城 四处时机一致,均为 '被抵消' after);
 //   registerOnDamagedAsTarget:「受到伤害后」四行前导守卫 after-hook(刚烈 骨架);
 //   registerPhaseStartHook:「阶段开始」before-hook 前导三查(type/player/phase 归属);
-//   registerDamageBonusHook:「造成伤害时」增伤 before-hook(裸衣/界裸衣 同款守卫链)。
+//   registerDamageBonusHook:「造成伤害时」增伤 before-hook(裸衣/界裸衣 同款守卫链);
+//   registerJudgeCardHook:「判定牌生效后」判定牌捕获 after-hook(双雄/屯田/悲歌/界落英 同款守卫链)。
 // 命名:函数/类型英文;业务字面量(atom 类型/牌名)保持中文。
 import type {
   AtomAfterContext,
   AtomBeforeContext,
   AtomOfName,
+  Card,
   GameState,
   HookResult,
 } from '../../types';
 import { registerAfterHook, registerBeforeHook } from '../../core/skill';
 import { isCancelled } from '../../core/frame';
+import { currentJudgeCardId } from '../../flows/judge';
 
 // ────────────────────── 「自己使用的杀被闪抵消」after-hook ──────────────────────
 
@@ -207,5 +210,53 @@ export function registerDamageBonusHook(
       kind: 'modify',
       atom: { ...ctx.atom, amount: (atom.amount ?? 0) + 1 } as typeof ctx.atom,
     };
+  });
+}
+
+// ────────────────────────── 「判定牌生效后」判定牌捕获 after-hook ──────────────────────────
+
+/**
+ * 注册「判定牌生效后」判定牌捕获 hook(通用骨架,双雄/屯田/悲歌/界落英 同款守卫链),
+ * 前导守卫全过才进入 handler:
+ *   ① selfJudgeOnly !== false 时要求 atom.player === ownerId——仅捕获"自己的判定";
+ *      传 false 则不限判定归属(界落英场景:他人的判定才触发,归属守卫写在 handler 里);
+ *   ② atom.judgeType === judgeType——技能专属判定,不误伤其他判定流程;
+ *   ③ currentJudgeCardId 命中且 cardMap 有此牌,否则放行。
+ *
+ * 传入 handler 的 judgeCard 遵循既有约定(与 双雄/屯田 注释同款):
+ * 判定牌生效后仍在结算帧牌区顶(frameCards 末尾)、尚未入弃牌堆,且可能是
+ * 改判(鬼才/鬼道)后的最终牌;handler 要拿走它必须走「移动牌」/「收取判定牌」
+ * atom(直接 mutate frame 会漏视图投影),不拿则由 runJudgeFlow 收尾正常移入弃牌堆。
+ *
+ * 用法(双雄式:judgeType 匹配 + 拿走判定牌):
+ * ```ts
+ * registerJudgeCardHook(state, skill.id, ownerId, '双雄', async (ctx, judgeCard) => {
+ *   await applyAtom(ctx.state, {
+ *     type: '移动牌',
+ *     cardId: judgeCard.id,
+ *     from: { zone: '处理区' },
+ *     to: { zone: '手牌', player: ownerId },
+ *   });
+ * });
+ * ```
+ *
+ * @param opts.selfJudgeOnly 默认 true(仅捕获自己的判定);false = 不限制判定归属。
+ */
+export function registerJudgeCardHook(
+  state: GameState,
+  skillId: string,
+  ownerId: number,
+  judgeType: string,
+  handler: (ctx: AtomAfterContext<AtomOfName<'判定牌生效后'>>, judgeCard: Card) => Promise<void>,
+  opts: { selfJudgeOnly?: boolean } = {},
+): void {
+  registerAfterHook(state, skillId, ownerId, '判定牌生效后', async (ctx) => {
+    const atom = ctx.atom;
+    if (opts.selfJudgeOnly !== false && atom.player !== ownerId) return;
+    if (atom.judgeType !== judgeType) return;
+    const judgeCardId = currentJudgeCardId(ctx.state);
+    const judgeCard = judgeCardId ? ctx.state.cardMap[judgeCardId] : undefined;
+    if (!judgeCard) return;
+    await handler(ctx, judgeCard);
   });
 }

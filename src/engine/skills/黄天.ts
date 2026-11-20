@@ -15,7 +15,7 @@
 //
 // 本文件同时导出 createHuangtianSkill 工厂(黄天族共享实现),界黄天 复用之,
 // 仅注入 技能id/描述/文案/可交牌谓词 差异参数(标=闪/闪电;界=闪或黑桃手牌)。
-import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { Card, FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { usedThisTurn, markOncePerTurn, activeUnlessUsedThisTurn } from '../rules/once-per-turn';
 import { registerAction } from '../core/skill';
@@ -150,4 +150,4 @@ const OPTIONS: HuangtianOptions = {
 
 export const { createSkill, onInit, onMount } = createHuangtianSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

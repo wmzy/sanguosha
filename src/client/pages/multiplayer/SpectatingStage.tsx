@@ -1,18 +1,17 @@
 // src/client/pages/multiplayer/SpectatingStage.tsx
 // 旁观对局分支(stage=spectating 且已有 view):旁观控制条(已授权提示/申请查看下拉/退出)
 // + GameViewComponent 只读挂载 + 错误 toast。房间数据走 MultiplayerRoomCtx。
-import { useNavigate } from 'react-router-dom';
 import { memberName } from '../../utils/memberNames';
 import { GameViewComponent } from '../../components/GameView';
 import { btnStyle, inputStyle, colors } from '../../theme';
 import { useMultiplayerRoomCtx } from './MultiplayerRoomCtx';
-import { ErrorToast } from './ErrorToast';
-import { ReconnectBanner } from './ReconnectBanner';
+import { StageScaffold } from './StageScaffold';
+import { useLeaveAndNavigate } from './useLeaveAndNavigate';
 import { btnVars, gameWrap } from './multiplayerStyles';
 
 export function SpectatingStage() {
   const mp = useMultiplayerRoomCtx();
-  const navigate = useNavigate();
+  const leaveAndGoHome = useLeaveAndNavigate();
   // 页面 stage 分发已保证仅在 spectating 且有 view 时挂载本组件;此守卫仅为类型收窄
   if (!mp.view) return null;
   // 旁观者申请查看某玩家视角的下拉
@@ -25,16 +24,7 @@ export function SpectatingStage() {
     playerIds.length > 0 &&
     playerIds.every((pid) => /^AI/i.test(mp.roomState?.playerNames?.[pid] ?? ''));
   return (
-    <>
-      <ReconnectBanner
-        connectionState={mp.connectionState}
-        reconnectAttempt={mp.reconnectAttempt}
-        onCancel={mp.cancelReconnect}
-        onLeave={() => {
-          mp.leaveRoom();
-          navigate('/');
-        }}
-      />
+    <StageScaffold>
       <div
         className={gameWrap}
         style={{ display: 'flex', flexDirection: 'column', height: '100vh', minHeight: 0 }}
@@ -85,10 +75,7 @@ export function SpectatingStage() {
           <button
             className={btnStyle}
             style={btnVars(colors.disabled, { padding: '4px 12px', fontSize: '12px' })}
-            onClick={() => {
-              mp.leaveRoom();
-              navigate('/');
-            }}
+            onClick={leaveAndGoHome}
           >
             退出
           </button>
@@ -106,9 +93,7 @@ export function SpectatingStage() {
           onSkipEvents={mp.skipEvents}
           disconnectedSeats={mp.disconnectedSeats}
         />
-        {/* 对局中操作被后端拒绝时的错误反馈(此前该分支静默无提示) */}
-        {mp.error && <ErrorToast message={mp.error} onClose={mp.clearError} />}
       </div>
-    </>
+    </StageScaffold>
   );
 }

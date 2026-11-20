@@ -33,6 +33,7 @@ import type {
   GameView,
   Skill,
 } from '../types';
+import type { SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { defaultPlayActive, viewCanSlash } from '../rules/action-active';
@@ -241,4 +242,4 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   });
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

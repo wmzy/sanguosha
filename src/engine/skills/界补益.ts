@@ -234,8 +234,7 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;
 
 // [requestType 迁移·不迁项] validate 的 pendingSlots.get 另读 pickAtom 的 prompt
 // (选牌面板参数,非 requestType),保留手写读取;requestType 读取已走 currentRequestType。

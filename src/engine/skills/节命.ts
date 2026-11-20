@@ -15,10 +15,11 @@ import type {
   GameView,
   Json,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
-import { currentRequestType, requireRequestType, askConfirm, defineConfirmAction, firstTarget } from '../util/skillRuntime';
+import { currentRequestType, requireRequestType, askConfirm, askChooseTarget, defineConfirmAction, firstTarget } from '../util/skillRuntime';
 
 const CONFIRM_RT = '节命/confirm';
 const TARGET_RT = '节命/target';
@@ -86,23 +87,13 @@ export function onInit(skill: Skill, state: GameState): () => void {
       if (!confirmed) continue; // 本次不发动,继续下一次(每点独立可选)
 
       // 选目标(任意存活角色,含自己)
-      delete ctx.state.localVars[TARGET_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: TARGET_RT,
-        target: ownerId,
-        prompt: {
-          type: 'choosePlayer',
-          title: '节命:选择一名角色(手牌摸至体力上限)',
-          min: 1,
-          max: 1,
-          filter: (_view: GameView, t: number) =>
-            ctx.state.players[t]?.alive === true,
-        },
+      const target = await askChooseTarget(ctx.state, TARGET_RT, ownerId, {
+        title: '节命:选择一名角色(手牌摸至体力上限)',
+        filter: (_view: GameView, t: number) =>
+          ctx.state.players[t]?.alive === true,
         timeout: 15,
+        resultKey: TARGET_KEY,
       });
-      const target = ctx.state.localVars[TARGET_KEY] as number | undefined;
-      delete ctx.state.localVars[TARGET_KEY];
       if (typeof target !== 'number') continue;
       if (!ctx.state.players[target]?.alive) continue;
 
@@ -123,4 +114,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): void {
   defineConfirmAction(api, 'respond', { label: '节命', title: '是否发动节命?' });
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

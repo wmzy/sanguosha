@@ -27,7 +27,7 @@
 //
 // 标签生命周期:由 指定目标 after 产出,由对应 before hook 消费清除——天然按单次杀结算,
 // 多目标杀时各目标的标签互不干扰(标签挂在目标身上)。
-import type { HookResult } from '../types';
+import type { HookResult, SkillModule } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerBeforeHook } from '../core/skill';
@@ -125,4 +125,4 @@ const OPTIONS: LiegongOptions = {
 
 export const { createSkill, onInit, onMount } = createLiegongSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

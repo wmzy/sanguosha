@@ -17,7 +17,7 @@
 // 触发时机:具体技能(界破军/界谦逊)注册的 回合结束 after-hook 检测到
 //   对应 vars[varsKey] 非空时调用本 atom。
 import type { AtomDefinition, Card, GameView, ViewEventSplit, ViewEvent } from '../types';
-import { broadcast, pushToDiscardPile, requirePlayer, viewPlayer } from './_helpers';
+import { broadcast, cardInfos, pushToDiscardPile, requirePlayer, viewPlayer } from './_helpers';
 
 export const 归还暂存牌: AtomDefinition<{ player: number; varsKey: string }> = {
   type: '归还暂存牌',
@@ -50,14 +50,14 @@ export const 归还暂存牌: AtomDefinition<{ player: number; varsKey: string }
       (state.players[atom.player].vars[atom.varsKey] as string[] | undefined) ?? [];
     const alive = state.players[atom.player].alive === true;
     const cards: Card[] = list.map((id) => state.cardMap[id]).filter((c): c is Card => !!c);
-    const cardInfos = cards.map((c) => ({ id: c.id, name: c.name, suit: c.suit, rank: c.rank }));
+    const infos = cardInfos(cards);
     // 死亡:牌进弃牌堆,所有人可见牌面
     if (!alive) {
       const view: ViewEvent = {
         type: '归还暂存牌',
         player: atom.player,
         count: list.length,
-        cards: cardInfos,
+        cards: infos,
         toDiscard: true,
       };
       return broadcast(view);
@@ -65,7 +65,7 @@ export const 归还暂存牌: AtomDefinition<{ player: number; varsKey: string }
     const ownerView: ViewEvent = {
       type: '归还暂存牌',
       player: atom.player,
-      cards: cardInfos,
+      cards: infos,
     };
     const othersView: ViewEvent = {
       type: '归还暂存牌',

@@ -41,7 +41,7 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界利驭'(避开标版未实现的"利驭");
 //   内部 Skill.name = '利驭'(OL 官方技能名,玩家可见)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { GameState, Json, Skill } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { registerAfterHook } from '../core/skill';
@@ -49,7 +49,7 @@ import { runPickTargetCardPanel } from '../flows/pick-card-panel';
 import { runUseFlow } from './cards/use-card';
 import type { SkillModule } from '../types';
 import { validatePickZoneParams, writePickResult } from './cards/_pickPanel';
-import { askConfirm, currentRequestType, defineConfirmAction, requireRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
+import { askChooseTarget, askConfirm, currentRequestType, makeConfirmMount, requireRequestType, registerRespondForAllSeats } from '../util/skillRuntime';
 
 const SKILL_ID = '界利驭';
 const DISPLAY_NAME = '利驭';
@@ -181,24 +181,15 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         .map((p) => p.index);
       if (candidates.length === 0) return; // 场上无其他可选角色,跳过决斗
 
-      delete ctx.state.localVars[DUEL_TARGET_KEY];
-      await applyAtom(ctx.state, {
-        type: '请求回应',
-        requestType: CHOOSE_DUEL_RT,
-        target, // 受伤目标选择
-        prompt: {
-          type: 'choosePlayer',
-          title: '利驭:选择另一名角色,界吕布视为对其使用决斗',
-          min: 1,
-          max: 1,
-          filter: (view, t) =>
-            t !== ownerId && t !== target && view.players[t]?.alive === true,
-        },
+      // 受伤目标选择
+      const duelTarget = await askChooseTarget(ctx.state, CHOOSE_DUEL_RT, target, {
+        title: '利驭:选择另一名角色,界吕布视为对其使用决斗',
+        filter: (view, t) =>
+          t !== ownerId && t !== target && view.players[t]?.alive === true,
         defaultChoice: candidates[0],
         timeout: 15,
+        resultKey: DUEL_TARGET_KEY,
       });
-      const duelTarget = ctx.state.localVars[DUEL_TARGET_KEY] as number | undefined;
-      delete ctx.state.localVars[DUEL_TARGET_KEY];
       if (typeof duelTarget !== 'number') return;
       if (duelTarget === ownerId || duelTarget === target) return;
       if (!ctx.state.players[duelTarget]?.alive) return;
@@ -227,13 +218,10 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   };
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
-  defineConfirmAction(api, 'respond', {
-    label: DISPLAY_NAME,
-    title: '是否发动利驭?',
-    style: 'default',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: DISPLAY_NAME,
+  title: '是否发动利驭?',
+  style: 'default',
+});
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

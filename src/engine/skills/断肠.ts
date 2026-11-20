@@ -14,6 +14,7 @@
 import type {
   Skill,
   GameState,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
@@ -66,4 +67,4 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export default { createSkill, onInit } satisfies import('../types').SkillModule;
+export default { createSkill, onInit } satisfies SkillModule;

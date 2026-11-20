@@ -1,7 +1,8 @@
 // src/server/persistence.ts
-import { writeFile, readFile, unlink, rename, mkdir, readdir, stat } from 'node:fs/promises';
+import { writeFile, unlink, rename, mkdir, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ROOMS_DATA_DIR } from './paths';
+import { readJsonIfExists, unlinkIfExists } from './fsQuiet';
 import type { ActionLogEntry, GameState } from '../engine/types';
 import { RealClock } from '../engine/core/clock';
 import { register as registerLifecycle } from './resourceRegistry';
@@ -108,12 +109,11 @@ function writeWrapperGuarded(
 async function readWrapperFromDisk(roomId: string): Promise<PersistedWrapper | null> {
   const path = filePath(roomId);
   try {
-    const raw = await readFile(path, 'utf-8');
-    const parsed: unknown = JSON.parse(raw);
+    // ENOENT 由 readJsonIfExists 静默吸收为 null → 走下方形状校验返回 null。
+    const parsed = await readJsonIfExists<unknown>(path);
     if (!isPersistedWrapper(parsed)) return null;
     return parsed;
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
     log.err(`read failed for room ${roomId}`, err);
     throw normalizeError(err);
   }
@@ -122,9 +122,9 @@ async function readWrapperFromDisk(roomId: string): Promise<PersistedWrapper | n
 async function deleteFile(roomId: string): Promise<void> {
   const path = filePath(roomId);
   try {
-    await unlink(path);
+    // ENOENT(文件本就不存在)由 unlinkIfExists 静默吸收为 false。
+    await unlinkIfExists(path);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
     log.err(`delete failed for room ${roomId}`, err);
     throw normalizeError(err);
   }

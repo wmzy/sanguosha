@@ -14,7 +14,7 @@
 //
 //   被 cancel 后:锦囊本身仍按各自 execute 正常进弃牌堆(牌已消耗),陆逊不受影响——
 //   与空城"杀牌仍进弃牌堆、诸葛亮不受伤害"行为一致。
-import type { HookResult, Skill, GameState } from '../types';
+import type { HookResult, Skill, GameState, SkillModule } from '../types';
 import { topFrame } from '../core/frame';
 import { registerBeforeHook } from '../core/skill';
 
@@ -67,4 +67,4 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export default { createSkill, onInit } satisfies import('../types').SkillModule;
+export default { createSkill, onInit } satisfies SkillModule;

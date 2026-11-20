@@ -14,6 +14,7 @@
 import { applyAtom } from '../core/apply';
 import { isSpade2to9 } from '../flows/rank';
 import { createJudgeReplaceSkill, type JudgeReplaceOptions } from './鬼道';
+import type { SkillModule } from '../types';
 
 const OPTIONS: JudgeReplaceOptions = {
   name: '鬼道',
@@ -33,4 +34,4 @@ const OPTIONS: JudgeReplaceOptions = {
 
 export const { createSkill, onInit, onMount } = createJudgeReplaceSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

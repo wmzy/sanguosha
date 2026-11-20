@@ -31,20 +31,21 @@
 //   - 死亡触发在 死亡时 after-hook:此时自己的手牌/装备仍在(系统处理牌尚未清空)
 //   - 受伤触发按一次伤害一次;死亡触发整局一次(死亡后技能失效)
 import type {
-  FrontendAPI,
   GameState,
   GameView,
   Json,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import {
   currentRequestType,
   askConfirm,
+  askChooseTarget,
   askMandatoryCardChoice,
   normalizeCardIds,
-  defineConfirmAction,
+  makeConfirmMount,
   firstTarget,
   registerRespondForAllSeats,
   requireRequestType,
@@ -84,22 +85,12 @@ async function runJieMing(state: GameState, ownerId: number): Promise<void> {
   if (!confirmed) return;
 
   // 选目标(任意存活角色,含自己)
-  delete state.localVars[TARGET_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: TARGET_RT,
-    target: ownerId,
-    prompt: {
-      type: 'choosePlayer',
-      title: '节命:选择一名角色(摸X张牌,然后将手牌弃至X张)',
-      min: 1,
-      max: 1,
-      filter: (_view: GameView, t: number) => state.players[t]?.alive === true,
-    },
+  const target = await askChooseTarget(state, TARGET_RT, ownerId, {
+    title: '节命:选择一名角色(摸X张牌,然后将手牌弃至X张)',
+    filter: (_view: GameView, t: number) => state.players[t]?.alive === true,
     timeout: 15,
+    resultKey: TARGET_KEY,
   });
-  const target = state.localVars[TARGET_KEY] as number | undefined;
-  delete state.localVars[TARGET_KEY];
   if (typeof target !== 'number') return;
   const targetPlayer = state.players[target];
   if (!targetPlayer?.alive) return;
@@ -226,8 +217,6 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   };
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', { label: '界节命', title: '是否发动节命?' });
-}
+export const onMount = makeConfirmMount('respond', { label: '界节命', title: '是否发动节命?' });
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

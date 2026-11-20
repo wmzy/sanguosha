@@ -18,7 +18,7 @@
 //
 // 本文件同时导出 createJudgeReplaceSkill 工厂(判定替换技族共享实现),界鬼道 复用之,
 // 仅注入文案前缀/提示后缀/黑桃2~9 摸牌等差异参数。
-import type { Card, FrontendAPI, GameState, Json, Skill } from '../types';
+import type { Card, FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { frameCards } from '../core/frame';
 import { registerAction, registerJudgeModifier } from '../core/skill';
@@ -175,4 +175,4 @@ const OPTIONS: JudgeReplaceOptions = {
 
 export const { createSkill, onInit, onMount } = createJudgeReplaceSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

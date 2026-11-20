@@ -26,7 +26,7 @@
 //   对无懈自身跳过 cancel(反无懈)询问 → 无懈必然生效(不被反无懈)。
 //   询问抵消 close-reopen 循环:respond 设 已回应=true,无懈 resolve 设下层帧 cancelled=true →
 //   循环检测到已抵消即退出(无新窗口)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { registerAction } from '../core/skill';
 import { runUseFlow } from './cards/use-card';
 import {
@@ -93,4 +93,4 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   mountTransformAction(api, skill.id, OPTIONS);
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

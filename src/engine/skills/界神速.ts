@@ -16,10 +16,10 @@
 //   - 翻面实现(同据守/放逐):加 '/翻面' 后缀标签,下一回合 阶段开始(准备) before-hook
 //     消费标签、设 skipAll 标志并 cancel 阶段;阶段结束(准备) before-hook 亲自推进回合。
 import type {
-  FrontendAPI,
   GameState,
   HookResult,
   Skill,
+  SkillModule,
 } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
@@ -28,9 +28,9 @@ import { registerFlipSkipTurnHooks } from '../flows/face-down';
 import { skipPhase } from '../rules/skip-phase';
 import {
   currentRequestType,
-  defineConfirmAction,
   firstCardId,
   firstTarget,
+  makeConfirmMount,
   requireRequestType,
 } from '../util/skillRuntime';
 import { equipmentCardIds } from '../util/player-query';
@@ -221,14 +221,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '界神速',
-    style: 'default',
-    title: '是否发动界神速?',
-    confirmLabel: '发动',
-    cancelLabel: '不发动',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '界神速',
+  style: 'default',
+  title: '是否发动界神速?',
+  confirmLabel: '发动',
+  cancelLabel: '不发动',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

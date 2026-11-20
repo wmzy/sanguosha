@@ -3,6 +3,7 @@
 // 供各 stage 子组件(lobby/waiting/playing/spectating/ended/notFound)按需取用。
 import { css } from '@linaria/core';
 import { colors, pageStyle, pageBgStyle, glassPanelStyle, goldHeadingStyle, goldColors } from '../../theme';
+import { ornamentTitle } from '../../components/gameViewStyles/tokens';
 import type { GameMode } from '../../../engine/rules/types';
 import type { CharPoolPreset } from '../../../server/protocol';
 import type { CSSProperties } from 'react';
@@ -36,6 +37,7 @@ export const subtitle = css`
 
 /** 等待大厅页标题:金书风 + 两侧装饰渐变线(同选将面板标题做法,官方 OL 风格)。
  *  与 `title`(底部下划线式)并存,按页面选用。 */
+const pageTitleOrnament = ornamentTitle('#e8c47a', '#8a7448');
 export const pageTitle = css`
   display: flex;
   align-items: center;
@@ -57,9 +59,7 @@ export const pageTitle = css`
     max-width: 220px;
     min-width: 24px;
     height: 7px;
-    background:
-      linear-gradient(#e8c47a, #e8c47a) right center / 5px 5px no-repeat,
-      linear-gradient(90deg, transparent, #8a7448) left center / calc(100% - 9px) 2px no-repeat;
+    background: ${pageTitleOrnament};
   }
 
   &::after {

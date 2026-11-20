@@ -24,12 +24,12 @@
 import type {
   AtomBeforeContext,
   AtomOfName,
-  FrontendAPI,
   GameState,
   HookResult,
   Json,
   PlayerState,
   Skill,
+  SkillModule,
   GameView,
 } from '../types';
 import { applyAtom } from '../core/apply'
@@ -38,7 +38,7 @@ import { registerAction, registerBeforeHook, hasBlockingPending } from '../core/
 import { skipPhase } from '../rules/skip-phase';
 import { fieldCardIds, moveFieldCard } from '../flows/field-card';
 import { tuxiStealCards } from './突袭';
-import { currentRequestType, defineConfirmAction, firstCardId, firstTarget } from '../util/skillRuntime';
+import { currentRequestType, firstCardId, firstTarget, makeConfirmMount, requireRequestType } from '../util/skillRuntime';
 
 const SKILL_NAME = '巧变';
 
@@ -346,14 +346,12 @@ export function onInit(skill: Skill, state: GameState): () => void {
     ownerId,
     'respond',
     (st: GameState, _params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const rt = currentRequestType(st, ownerId);
-      if (rt === undefined || !qiaobianRequestTypes(SKILL_NAME).includes(rt)) {
-        return `当前不是${SKILL_NAME}询问`;
-      }
+      const check = requireRequestType(st, ownerId, qiaobianRequestTypes(SKILL_NAME), {
+        noSlotError: '当前不需要回应',
+        wrongTypeError: '当前不需要回应',
+        mismatchError: `当前不是${SKILL_NAME}询问`,
+      });
+      if (check.error) return check.error;
       return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
@@ -413,14 +411,9 @@ export function onInit(skill: Skill, state: GameState): () => void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: SKILL_NAME,
-    title: '是否发动巧变?',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: SKILL_NAME,
+  title: '是否发动巧变?',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

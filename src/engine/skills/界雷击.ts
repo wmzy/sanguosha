@@ -23,13 +23,13 @@
 //
 // 命名:文件名/loader key/character skill name 均为 '界雷击';
 //   内部 Skill.name = '雷击'(OL 官方技能名,玩家可见)。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { runJudgeFlow } from '../flows/judge';
 import { runDamageFlow } from '../flows/damage';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { isCancelled } from '../core/frame';
-import { currentRequestType, askConfirm, requireRequestType } from '../util/skillRuntime';
+import { currentRequestType, askConfirm, askChooseTarget, requireRequestType } from '../util/skillRuntime';
 
 const _SKILL_ID = '界雷击';
 const DISPLAY_NAME = '雷击';
@@ -52,23 +52,12 @@ export function createSkill(id: string, ownerId: number): Skill {
 
 /** 询问界张角选择雷电伤害目标(或放弃)。返回目标座次,放弃返回 null。 */
 async function chooseDamageTarget(state: GameState, ownerId: number): Promise<number | null> {
-  delete state.localVars[TARGET_KEY];
-  await applyAtom(state, {
-    type: '请求回应',
-    requestType: TARGET_RT,
-    target: ownerId,
-    prompt: {
-      type: 'choosePlayer',
-      title: '界雷击:选择雷电伤害目标(或放弃)',
-      min: 1,
-      max: 1,
-      filter: (view, t) => view.players[t]?.alive === true,
-    },
+  const t = await askChooseTarget(state, TARGET_RT, ownerId, {
+    title: '界雷击:选择雷电伤害目标(或放弃)',
+    filter: (view, t) => view.players[t]?.alive === true,
     timeout: 20,
+    resultKey: TARGET_KEY,
   });
-
-  const t = state.localVars[TARGET_KEY];
-  delete state.localVars[TARGET_KEY];
   return typeof t === 'number' ? t : null;
 }
 
@@ -218,4 +207,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   });
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

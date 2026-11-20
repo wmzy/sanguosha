@@ -37,7 +37,7 @@ import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { hasSkillModule } from './registry';
 import type { SkillModule } from '../types';
-import { currentRequestType, requireRequestType, askConfirm } from '../util/skillRuntime';
+import { askChooseTarget, currentRequestType, requireRequestType, askConfirm } from '../util/skillRuntime';
 import { slotOf } from '../util/equip-slot';
 import { findNextAlive } from '../util/player-query';
 
@@ -101,22 +101,12 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     delete st.localVars[CONFIRM_KEY];
 
     // ── 第二步:选目标(任意存活角色,含自己)──
-    delete st.localVars[TARGET_KEY];
-    await applyAtom(st, {
-      type: '请求回应',
-      requestType: TARGET_RT,
-      target: ownerId,
-      prompt: {
-        type: 'choosePlayer',
-        title: '直言:选择一名角色摸一张牌并展示之',
-        min: 1,
-        max: 1,
-        filter: (_view, t) => st.players[t]?.alive === true,
-      },
+    const target = await askChooseTarget(st, TARGET_RT, ownerId, {
+      title: '直言:选择一名角色摸一张牌并展示之',
+      filter: (_view, t) => st.players[t]?.alive === true,
       timeout: 30,
+      resultKey: TARGET_KEY,
     });
-    const target = st.localVars[TARGET_KEY] as number | undefined;
-    delete st.localVars[TARGET_KEY];
     if (typeof target !== 'number' || !st.players[target]?.alive) return;
 
     // ── 第三步:目标摸一张牌 ──
@@ -215,5 +205,4 @@ export function onMount(_skill: Skill, _api: FrontendAPI): (() => void) | void {
   return () => {};
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

@@ -17,6 +17,7 @@
 // 与转化来源无关。
 // 五件套由 skillRuntime 工厂统一实现。
 import type { Card, FrontendAPI, GameState, Skill } from '../types';
+import type { SkillModule } from '../types';
 import { defaultPlayActive } from '../rules/action-active';
 import {
   registerTransformAction,
@@ -81,4 +82,4 @@ export function onMount(skill: Skill, api: FrontendAPI): void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

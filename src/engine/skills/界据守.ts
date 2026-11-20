@@ -12,7 +12,7 @@
 //     仅询问 requestType('界据守/弃牌')与弹窗标题前缀不同。
 //   - 翻面标签触发下一回合跳过(机制与悲歌/放逐一致,before-hook 消费标签 + cancel 阶段)。
 //   - 内部标签/localVars/requestType 键名保持原前缀 '据守/xxx'(不改为 '界据守/xxx')。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply'
 import { popFrame, pushFrame } from '../core/frame';
 import { flipFaceDown, registerFlipSkipTurnHooks } from '../flows/face-down';
@@ -93,4 +93,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

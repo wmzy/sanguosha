@@ -19,7 +19,7 @@
 //
 // 本文件同时导出 createKuangguSkill 工厂(狂骨族共享实现),界狂骨 复用之,
 // 仅注入 名称/描述/技能 id(键前缀)/满血禁疗 差异参数。
-import type { FrontendAPI, GameState, Json, Skill } from '../types';
+import type { FrontendAPI, GameState, Json, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { effectiveDistance } from '../rules/distance';
@@ -171,4 +171,4 @@ const OPTIONS: KuangguOptions = {
 
 export const { createSkill, onInit, onMount } = createKuangguSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

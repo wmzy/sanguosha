@@ -23,7 +23,7 @@
 //   符合官方语义。
 //
 // 模式参考:标连环.ts(转化/重铸)、界火计.ts(覆盖 DEFAULT_SKILLS 中 card skill 的 use)。
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill, SkillModule } from '../types';
 import { registerAction } from '../core/skill';
 import { mountTransformAction, registerTransformAction } from '../util/skillRuntime';
 import {
@@ -93,4 +93,4 @@ export function onMount(skill: Skill, api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

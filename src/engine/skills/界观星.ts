@@ -14,6 +14,7 @@
 // 全置底标志为 localVars['界观星/全置底'])。
 // 牌堆方向约定(deck 末尾为顶,newDeck 构造)见 _guanxing.ts 文件头。
 import { createGuanxingSkill, type GuanxingOptions } from './_guanxing';
+import type { SkillModule } from '../types';
 
 const OPTIONS: GuanxingOptions = {
   name: '界观星',
@@ -28,4 +29,4 @@ const OPTIONS: GuanxingOptions = {
 
 export const { createSkill, onInit, onMount } = createGuanxingSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

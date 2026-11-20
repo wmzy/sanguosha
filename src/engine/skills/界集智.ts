@@ -34,11 +34,11 @@
 //
 // 非延时锦囊(12)清单单一来源:util/non-delay-tricks.ts
 // (标准版 10 + 军争篇 火攻/铁索连环;旧实现手抄漏了火攻/铁索连环,已修)
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { GameState, Skill, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAction, registerAfterHook } from '../core/skill';
 import { handLimitBonusKey, getHandLimitBonus } from '../rules/vars-keys';
-import { askConfirm, currentRequestType, defineConfirmAction } from '../util/skillRuntime';
+import { askConfirm, currentRequestType, makeConfirmMount } from '../util/skillRuntime';
 import { NON_DELAY_TRICK_NAMES } from '../util/non-delay-tricks';
 
 const CONFIRM_REQUEST = '界集智/confirm'; // 是否摸一张牌
@@ -159,13 +159,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
   return () => {};
 }
 
-export function onMount(_skill: Skill, api: FrontendAPI): void {
-  defineConfirmAction(api, 'respond', {
-    label: '集智',
-    title: '是否发动集智?',
-    confirmLabel: '摸牌',
-    cancelLabel: '不摸',
-  });
-}
+export const onMount = makeConfirmMount('respond', {
+  label: '集智',
+  title: '是否发动集智?',
+  confirmLabel: '摸牌',
+  cancelLabel: '不摸',
+});
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

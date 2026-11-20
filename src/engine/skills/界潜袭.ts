@@ -48,7 +48,13 @@ import {
   registerBeforeHook,
 } from '../core/skill';
 import type { SkillModule } from '../types';
-import { askConfirm, currentRequestType, defineConfirmAction, toPromptCards } from '../util/skillRuntime';
+import {
+  askConfirm,
+  currentRequestType,
+  defineConfirmAction,
+  requireRequestType,
+  toPromptCards,
+} from '../util/skillRuntime';
 
 const SKILL_ID = '界潜袭';
 const DISPLAY_NAME = '潜袭';
@@ -127,11 +133,11 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
     ownerId,
     'respond',
     (st: GameState, params: Record<string, Json>) => {
-      const slot = st.pendingSlots.get(ownerId);
-      if (!slot) return '当前不需要回应';
-      const atom = slot.atom as Record<string, unknown>;
-      if (atom['type'] !== '请求回应') return '当前不需要回应';
-      const reqType = currentRequestType(st, ownerId);
+      const check = requireRequestType(st, ownerId, [CONFIRM_RT, PICK_RT], {
+        mismatchError: '当前不是界潜袭回应',
+      });
+      if (check.error) return check.error;
+      const reqType = check.requestType;
       if (reqType === CONFIRM_RT) {
         if (typeof params.choice !== 'boolean') return '需要选择一项';
         return null;
@@ -142,7 +148,7 @@ export function onInit(skill: Skill, state: GameState): (() => void) | void {
         if (!st.players[ownerId]?.hand.includes(cardId)) return '牌不在手牌中';
         return null;
       }
-      return '当前不是界潜袭回应';
+      return null;
     },
     async (st: GameState, params: Record<string, Json>) => {
       const reqType = currentRequestType(st, ownerId);
@@ -378,8 +384,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-const _skillModule: SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
-
-// [requestType 迁移·不迁项] respond 校验里的 slot.atom 另用于 atom['type'] !== '请求回应'
-// 守卫,保留手写 pendingSlots.get;requestType 读取已全部走 currentRequestType。
+export default { createSkill, onInit, onMount } satisfies SkillModule;

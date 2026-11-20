@@ -1,4 +1,4 @@
-// src/engine/life-flow.ts
+// src/engine/flows/life.ts
 // 体力编排函数(对齐 出牌流程重设计.md 模块 M + decreaselife.md/recoverlife.md/loselife.md)。
 //
 // 将单 atom 模式升级为「编排函数 + 时机标记 atom」模式(与 runUseFlow 一致):

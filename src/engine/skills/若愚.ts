@@ -14,7 +14,7 @@
 //   关键:增上限必须在回复前(先增加上限,再回复),否则回复被旧上限 clamp。
 //   本文件同时导出 createAwakenLordSkill 工厂(觉醒主公技族共享实现),
 //   界若愚 复用之,仅注入 name/description/awakenedKey/healAmount 差异参数。
-import type { GameState, PlayerState, Skill } from '../types';
+import type { GameState, PlayerState, Skill, SkillModule } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
@@ -95,4 +95,4 @@ const OPTIONS: AwakenLordOptions = {
 
 export const { createSkill, onInit, onMount } = createAwakenLordSkill(OPTIONS);
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

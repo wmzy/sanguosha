@@ -10,7 +10,7 @@
 //
 // 模式参考:志继/若愚(觉醒技 after-hook + 二选一 + 设上限 + 添加技能)。
 //   志继挂在「回合开始」,本技挂在「阶段开始」(因触发点是"阶段"而非"回合开始")。
-import type { FrontendAPI, GameState, Skill } from '../types';
+import type { FrontendAPI, GameState, Skill, SkillModule } from '../types';
 import { getHealthValue } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
@@ -107,4 +107,4 @@ export function onMount(_skill: Skill, api: FrontendAPI): (() => void) | void {
   return undefined;
 }
 
-export default { createSkill, onInit, onMount } satisfies import('../types').SkillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;

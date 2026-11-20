@@ -25,7 +25,7 @@
 // 已知限制(沿用引擎既有约定,与马术+进攻马、屯田+进攻马 同构):
 //   vars['距离/防御修正'] 是单一 number 槽位,不累加。若同时拥有 义从 + 防御马,
 //   两者写入同一 key,后写覆盖前写。这是 engine 距离修正的既有约定,本技能不单独解决。
-import type { Skill, GameState } from '../types';
+import type { Skill, GameState, SkillModule } from '../types';
 import { applyAtom } from '../core/apply';
 import { registerAfterHook } from '../core/skill';
 import { DISTANCE_ATTACK_MOD_KEY as ATTACK_KEY, DISTANCE_DEFENSE_MOD_KEY as DEFENSE_KEY } from '../rules/vars-keys';
@@ -119,5 +119,4 @@ export function onMount(_skill: Skill, _api: unknown): void {
   return;
 }
 
-const _skillModule: import('../types').SkillModule = { createSkill, onInit, onMount };
-export default _skillModule;
+export default { createSkill, onInit, onMount } satisfies SkillModule;
