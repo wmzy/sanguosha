@@ -13,7 +13,6 @@ import { pushFrame, popFrame } from '../../src/engine/core/frame';
 import { runJudgeFlow } from '../../src/engine/flows/judge';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 function makePlayer(opts: {

@@ -13,7 +13,6 @@ import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../e
 import '../../src/engine/atoms';
 import { applyAtom } from '../../src/engine/core/apply';
 import type { Card, GameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: { index: number; name: string; hand?: string[] }) {

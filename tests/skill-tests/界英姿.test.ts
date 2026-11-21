@@ -13,8 +13,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState } from '../../src/engine/types';
+import type { GameState } from '../../src/engine/types';
 
 const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
   sharedMakePlayer({ character: '界周瑜', health: 3, maxHealth: 3, ...o });

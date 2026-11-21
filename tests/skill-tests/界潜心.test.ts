@@ -21,7 +21,7 @@ setSkillModuleOverride('界荐言', async () => 界荐言Module);
 
 import { createGameState } from '../../src/engine/types';
 import { runDamageFlow } from '../../src/engine/flows/damage';
-import type { GameState, PlayerState } from '../../src/engine/types';
+import type { GameState } from '../../src/engine/types';
 
 const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
   sharedMakePlayer({ character: '界徐庶', skills: ['界潜心'], ...o });

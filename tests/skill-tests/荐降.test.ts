@@ -14,8 +14,6 @@ import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import 荐降Mod from '../../src/engine/skills/荐降';
 import 审时Mod from '../../src/engine/skills/审时';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card } from '../../src/engine/types';
 
 // 运行时注册(subagent 不碰 index.ts 源文件;主 agent 统一注册)。
 // 此处赋值让测试可加载技能模块;主 agent 在 index.ts 注册后,同 key 覆盖无副作用。

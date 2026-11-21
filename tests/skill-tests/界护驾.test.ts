@@ -28,8 +28,7 @@ import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer as sharedMak
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
-import { suitColor } from '../../src/engine/types';
-import type { Card, Faction, GameState, PlayerState } from '../../src/engine/types';
+import type { Faction, GameState } from '../../src/engine/types';
 
 const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0] & { faction?: Faction }) => ({
   ...sharedMakePlayer({ character: '界曹操', ...o }),

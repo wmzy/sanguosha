@@ -18,10 +18,9 @@ import * as 界诛害Module from '../../src/engine/skills/界诛害';
 setSkillModuleOverride('界诛害', async () => 界诛害Module);
 
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import { runDamageFlow } from '../../src/engine/flows/damage';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { GameState } from '../../src/engine/types';
 
 const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
   sharedMakePlayer({ character: '界徐庶', skills: ['界诛害'], ...o });

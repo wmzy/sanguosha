@@ -18,7 +18,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import type { Atom, Card, GameState } from '../../src/engine/types';
 import { findActionEntry } from '../../src/engine/core/skill';
 import { registerSystemRespondActions } from '../../src/engine/skills/系统规则';

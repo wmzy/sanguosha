@@ -17,8 +17,7 @@ import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlay
 import { applyAtom } from '../../src/engine/core/apply';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { GameState, PlayerState } from '../../src/engine/types';
 
 const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]): PlayerState => ({
   ...sharedMakePlayer({ character: '界张辽', skills: ['界突袭', '回合管理'], ...o }),

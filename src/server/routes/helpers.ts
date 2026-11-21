@@ -138,7 +138,7 @@ export async function resolveRoomRequestActor(
 > {
   const room = getRoom(roomId);
   if (!room && opts.requireRoom) return { response: c.json({ error: '房间不存在' }, 404) };
-  const requireAuth = !room || !room.isDebug;
+  const requireAuth = !room?.isDebug;
   const actor = await resolveRoomActor(c, { requireAuth }, bodyPlayerId);
   return actor.error ? { response: authRequired(c) } : { room, playerId: actor.playerId };
 }

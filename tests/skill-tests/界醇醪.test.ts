@@ -20,10 +20,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import { runDamageFlow } from '../../src/engine/flows/damage';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { GameState } from '../../src/engine/types';
 
 const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0] & { faction?: '魏' | '蜀' | '吴' | '群' }) => ({
   ...sharedMakePlayer({ character: '界程普', ...o }),

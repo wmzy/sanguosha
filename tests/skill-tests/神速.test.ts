@@ -18,7 +18,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import { validateCardUse } from '../../src/engine/skills/cards/validate';
 import { slashUsed } from '../../src/engine/rules/slash-quota';

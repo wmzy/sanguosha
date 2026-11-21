@@ -21,7 +21,7 @@ import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../e
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
-import type { Card, Faction, GameState, Json, PlayerState } from '../../src/engine/types';
+import type { Faction, GameState } from '../../src/engine/types';
 
 const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0] & { faction?: Faction }) => ({
   ...sharedMakePlayer({ ...o, character: o.character ?? '' }),

@@ -16,7 +16,7 @@ import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlay
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { Card, GameState } from '../../src/engine/types';
 
 const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
   sharedMakePlayer({ character: '曹丕', ...o });

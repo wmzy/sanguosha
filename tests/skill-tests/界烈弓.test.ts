@@ -15,8 +15,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, Faction, Json, PlayerState } from '../../src/engine/types';
+import type { Card, Faction } from '../../src/engine/types';
 
 const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0] & { faction?: Faction }) => ({
   ...sharedMakePlayer({ character: '界黄忠', skills: ['界烈弓'], ...o }),

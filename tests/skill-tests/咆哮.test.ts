@@ -10,10 +10,9 @@ import { SkillTestHarness, makeCard, makePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { slashMax } from '../../src/engine/rules/slash-quota';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import { viewCanSlash } from '../../src/engine/rules/action-active';
-import type { Card, GameState } from '../../src/engine/types';
+import type { GameState } from '../../src/engine/types';
 
 describe('咆哮', () => {
   let harness: SkillTestHarness;

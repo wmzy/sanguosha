@@ -16,7 +16,6 @@ import { SkillTestHarness, makeCard, makePlayer } from '../engine-harness';
 
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
 
 /** 默认技能集(刘备/曹操等的"系统级"基本技能,用于 setUp 真实开局) */

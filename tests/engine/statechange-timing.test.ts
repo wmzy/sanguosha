@@ -13,7 +13,6 @@ import type { Atom, Card, GameState, PlayerState } from '../../src/engine/types'
 import { registerBeforeHook } from '../../src/engine/core/skill';
 import { flipFaceDown, flipFaceUp, setChain } from '../../src/engine/flows/face-down';
 import { SkillTestHarness, waitForStable, fireTimeoutAndWait, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
-import { suitColor } from '../../src/engine/types';
 
 // ─── 直测辅助:最小 2 人 state ───────────────────────────────
 

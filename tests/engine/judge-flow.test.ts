@@ -15,7 +15,6 @@ import { createGameState } from '../../src/engine/types';
 import type { Atom, Card, GameState, PlayerState } from '../../src/engine/types';
 import { runJudgeFlow } from '../../src/engine/flows/judge';
 import { applyAtom } from '../../src/engine/core/apply';
-import { suitColor } from '../../src/engine/types';
 import { registerAfterHook } from '../../src/engine/core/skill';
 import { makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 

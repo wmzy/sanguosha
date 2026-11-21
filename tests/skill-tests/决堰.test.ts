@@ -9,7 +9,7 @@ import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 谦节Module from '../../src/engine/skills/谦节';
 import * as 决堰Module from '../../src/engine/skills/决堰';
 import * as 破势Module from '../../src/engine/skills/破势';
-import { createGameState, suitColor } from '../../src/engine/types';
+import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import { slashMax } from '../../src/engine/rules/slash-quota';
 import { handLimit } from '../../src/engine/rules/hand-limit';

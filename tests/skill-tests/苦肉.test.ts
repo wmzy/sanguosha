@@ -19,7 +19,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import type { Card, Faction, Json } from '../../src/engine/types';
+import type { Faction, Json } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;

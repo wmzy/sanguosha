@@ -18,8 +18,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, makeCard, makePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState } from '../../src/engine/types';
+import type { GameState } from '../../src/engine/types';
 
 describe('酒', () => {
   let harness: SkillTestHarness;

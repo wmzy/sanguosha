@@ -17,7 +17,6 @@ import { SkillTestHarness, makeCard as sharedMakeCard, makePlayer as sharedMakeP
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
-import { suitColor } from '../../src/engine/types';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';
 
 const makeCard = (id: string, name = '杀', suit: '♠' | '♥' | '♣' | '♦' = '♠'): Card =>

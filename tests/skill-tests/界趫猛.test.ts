@@ -16,7 +16,7 @@ import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { runDamageFlow } from '../../src/engine/flows/damage';
 import { suitColor } from '../../src/engine/types';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { Card, GameState } from '../../src/engine/types';
 
 function makeMount(
   id: string,

@@ -58,12 +58,10 @@ export function useAutoSkip(input: UseAutoSkipInput): void {
   };
   // 调度器跨 effect 保留实例(deadline 去重状态不能随渲染重置)
   const schedulerRef = useRef<AutoSkipScheduler | null>(null);
-  if (schedulerRef.current === null) {
-    schedulerRef.current = createAutoSkipScheduler(
-      () => latestViewRef.current.pending ?? null,
-      (pending) => fireRef.current(pending),
-    );
-  }
+  schedulerRef.current ??= createAutoSkipScheduler(
+    () => latestViewRef.current.pending ?? null,
+    (pending) => fireRef.current(pending),
+  );
 
   useEffect(() => {
     const scheduler = schedulerRef.current;
@@ -83,7 +81,6 @@ export function useAutoSkip(input: UseAutoSkipInput): void {
         view, viewer: perspectiveIdx, skillActions, pendingRespondInfo, prefs,
       }),
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     view, perspectiveIdx, skillActions, pendingRespondInfo, prefs,
     canOperate, isPerspectiveAwaiting, broadcastKey,

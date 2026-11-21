@@ -23,8 +23,7 @@ import * as 进趋Module from '../../src/engine/skills/进趋';
 setSkillModuleOverride('奇制', async () => 奇制Module);
 setSkillModuleOverride('进趋', async () => 进趋Module);
 
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { GameState, PlayerState } from '../../src/engine/types';
 import { createGameState } from '../../src/engine/types';
 
 function makePlayer(opts: {

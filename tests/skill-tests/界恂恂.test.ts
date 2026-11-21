@@ -24,9 +24,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
-import type { Card, GameState } from '../../src/engine/types';
+import type { GameState } from '../../src/engine/types';
 
 /** 直接向 state 注入一个 fake 请求回应 pending(单元测试 validate 用)。 */
 function injectPending(state: GameState, idx: number, requestType: string, prompt: unknown): void {

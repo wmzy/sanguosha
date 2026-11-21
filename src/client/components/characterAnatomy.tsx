@@ -85,7 +85,7 @@ export function JudgeTagRow({ cardIds, cardMap, classes }: JudgeTagRowProps) {
             key={cardId}
             className={classes.tag}
             style={{ '--suit-color': suitColor } as React.CSSProperties}
-            title={card?.description || card?.name || cardId}
+            title={card?.description ?? card?.name ?? cardId}
           >
             {card?.name ?? cardId}
             {card ? ` ${card.suit}${card.rank}` : ''}

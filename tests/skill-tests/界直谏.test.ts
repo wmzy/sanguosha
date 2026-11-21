@@ -14,7 +14,7 @@ import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../e
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { Card, GameState } from '../../src/engine/types';
 
 /** 装备牌工厂 */
 function makeEquip(

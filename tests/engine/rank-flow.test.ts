@@ -14,8 +14,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import '../../src/engine/atoms'; // 注册所有 atom(含 rank-timing)
 import { createGameState } from '../../src/engine/types';
-import type { Atom, Card, GameState, PlayerState, ViewEventSplit } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
+import type { Atom, GameState, PlayerState, ViewEventSplit } from '../../src/engine/types';
 import { runRankCompareFlow, getCardValue } from '../../src/engine/flows/rank';
 import { getAtomDef } from '../../src/engine/core/atom';
 import { makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';

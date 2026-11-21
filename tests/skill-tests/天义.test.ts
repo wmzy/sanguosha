@@ -16,10 +16,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, waitForStable, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { slashMax, canSlash, isSlashBlocked } from '../../src/engine/rules/slash-quota';
 import { inAttackRange } from '../../src/engine/rules/distance';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { GameState, PlayerState } from '../../src/engine/types';
 
 function makePlayer(opts: {
   index: number;

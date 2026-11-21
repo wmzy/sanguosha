@@ -16,10 +16,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 import { handLimit } from '../../src/engine/rules/hand-limit';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { GameState } from '../../src/engine/types';
 
 const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
   sharedMakePlayer({ character: '界甄姬', health: 3, maxHealth: 3, skills: ['界洛神'], ...o });

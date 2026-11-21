@@ -10,8 +10,7 @@ import { SkillTestHarness, makeCard, makePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { effectiveDistance } from '../../src/engine/rules/distance';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState } from '../../src/engine/types';
+import type { GameState } from '../../src/engine/types';
 
 /** 4 人存活局:P0/P1/P2/P3 */
 function build4PlayerState(p0Skills: string[], p0Hand: string[] = []): GameState {

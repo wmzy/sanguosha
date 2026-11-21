@@ -18,9 +18,8 @@ import * as 界眩惑Module from '../../src/engine/skills/界眩惑';
 setSkillModuleOverride('界眩惑', async () => 界眩惑Module);
 
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { GameState } from '../../src/engine/types';
 
 const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
   sharedMakePlayer({ character: '界法正', health: 3, maxHealth: 3, skills: ['界眩惑'], ...o });

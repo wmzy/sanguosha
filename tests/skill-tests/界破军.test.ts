@@ -21,7 +21,7 @@ import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
 import { suitColor } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { Card, GameState } from '../../src/engine/types';
 
 function makeWeapon(
   id: string,

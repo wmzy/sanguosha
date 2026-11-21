@@ -14,8 +14,7 @@ import { SkillTestHarness, makeCard, makePlayer as sharedMakePlayer } from '../e
 import '../../src/engine/atoms';
 import { applyAtom } from '../../src/engine/core/apply';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState, Json, TurnPhase } from '../../src/engine/types';
+import type { Card, GameState, TurnPhase } from '../../src/engine/types';
 
 const makePlayer = (o: Parameters<typeof sharedMakePlayer>[0]) =>
   sharedMakePlayer({ ...o, character: o.character ?? o.name });

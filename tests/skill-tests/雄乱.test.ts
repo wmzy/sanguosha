@@ -9,7 +9,7 @@ import '../../src/engine/atoms';
 import { setSkillModuleOverride } from '../../src/engine/skills/lifecycle';
 import * as 雄乱Module from '../../src/engine/skills/雄乱';
 import * as 从谏Module from '../../src/engine/skills/从谏';
-import { createGameState, suitColor } from '../../src/engine/types';
+import { createGameState } from '../../src/engine/types';
 import { slashMax } from '../../src/engine/rules/slash-quota';
 import { isDistanceExempted } from '../../src/engine/rules/distance';
 import type { Card, GameState, PlayerState } from '../../src/engine/types';

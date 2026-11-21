@@ -18,8 +18,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SkillTestHarness, disableAutoCompare, makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState } from '../../src/engine/types';
-import { suitColor } from '../../src/engine/types';
-import type { Card, GameState, PlayerState } from '../../src/engine/types';
+import type { GameState, PlayerState } from '../../src/engine/types';
 import { applyAtom } from '../../src/engine/core/apply';
 
 function makePlayer(opts: {

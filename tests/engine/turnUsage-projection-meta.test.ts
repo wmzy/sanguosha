@@ -19,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { Card, GameState, GameView, Json } from '../../src/engine/types';
-import { createGameState, suitColor } from '../../src/engine/types';
+import { createGameState } from '../../src/engine/types';
 import * as varsKeys from '../../src/engine/rules/vars-keys';
 import {
   slashMax,

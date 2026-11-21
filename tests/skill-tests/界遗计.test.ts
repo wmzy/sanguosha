@@ -26,7 +26,6 @@ import { SkillTestHarness, makeCard, makePlayer } from '../engine-harness';
 import '../../src/engine/atoms';
 import { createGameState, TARGET_SYSTEM } from '../../src/engine/types';
 import { runDamageFlow } from '../../src/engine/flows/damage';
-import { suitColor } from '../../src/engine/types';
 import type { Card, GameState } from '../../src/engine/types';
 
 /** 直接向 state 注入一个 fake 请求回应 pending(单元测试 validate/execute 用)。 */
