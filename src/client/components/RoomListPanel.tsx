@@ -243,11 +243,15 @@ export const RoomListPanel = memo(
                       {room.roomType === 'normal' ? ' | 普通' : ' | 快速'}
                       {room.spectatorCount ? ` | ${room.spectatorCount} 旁观` : ''}
                     </div>
-                    {room.hostId && (
-                      <div className={hostTag}>
-                        房主: {room.playerNames?.[room.hostId] ?? room.hostId}
-                      </div>
-                    )}
+                    {(() => {
+                      // 非成员列表不下发 hostId/playerNames;hostName 是昵称级公开字段
+                      const hostLabel =
+                        room.hostName ??
+                        (room.hostId ? room.playerNames?.[room.hostId] ?? room.hostId : null);
+                      return hostLabel ? (
+                        <div className={hostTag}>房主: {hostLabel}</div>
+                      ) : null;
+                    })()}
                   </div>
                   <div className={roomActions}>
                     {isInRoom ? (

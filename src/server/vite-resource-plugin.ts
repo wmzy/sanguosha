@@ -58,9 +58,14 @@ export function buildPacksIndex(items: Array<{ packId: string; manifest: Manifes
   return { packs: items.map((i) => ({ id: i.packId, manifest: i.manifest })) };
 }
 
+/** 资源包 id 白名单:只允许字母/数字/下划线/连字符。
+ *  '..'、'.' 以及任何分隔符都拒绝——resolvePackFile 的 startsWith 校验对
+ *  packId='..' 会把父目录当成包根(packDir=<root>/.. 时 target 仍以其为前缀)。 */
+const PACK_ID_RE = /^[A-Za-z0-9_-]+$/;
+
 /** 解析 /packs/{packId}/{relPath} 的绝对路径。越界（穿越/非法 packId）返回 null。 */
 export function resolvePackFile(packsRoot: string, packId: string, relPath: string): string | null {
-  if (packId.includes('/') || packId.includes(sep) || packId.includes('\\')) return null;
+  if (!PACK_ID_RE.test(packId)) return null;
   const packDir = join(packsRoot, packId);
   const target = normalize(join(packDir, relPath));
   if (!target.startsWith(packDir + sep) && target !== packDir) return null;
@@ -92,7 +97,17 @@ export function resourcePlugin(): Plugin {
           return;
         }
         const pathPart = url.split('?')[0].slice('/packs/'.length);
-        const decoded = decodeURIComponent(pathPart);
+        // 畸形百分号编码(如 GET /packs/%E0%A4%A)会让 decodeURIComponent 抛
+        // URIError;async 中间件的 rejection 不被 connect 处理 → 未捕获异常打崩
+        // 整个 dev server 进程(单请求 DoS)。回 400。
+        let decoded: string;
+        try {
+          decoded = decodeURIComponent(pathPart);
+        } catch {
+          res.statusCode = 400;
+          res.end('bad request');
+          return;
+        }
         const slashIdx = decoded.indexOf('/');
         if (slashIdx <= 0) {
           res.statusCode = 404;

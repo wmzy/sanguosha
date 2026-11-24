@@ -116,6 +116,8 @@ export function createGuanxingSkill(opts: GuanxingOptions) {
           typeof opts.arrangeTitle === 'function' ? opts.arrangeTitle(drawCount) : opts.arrangeTitle,
         ...(arrangeDescription !== null ? { description: arrangeDescription } : {}),
         mode: 'select',
+        // 显式声明提交形状(观星族 = { top, bottom }):客户端据此分流,不猜 requestType。
+        topBottom: true,
         cardIds: observed,
         minTotal: requiredTop ?? 0,
         maxTotal: requiredTop ?? drawCount,

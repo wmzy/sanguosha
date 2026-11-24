@@ -703,7 +703,7 @@ export function usePlayInteraction(
     selectedUseAction,
     selectedActive,
     playRules,
-    view.players,
+    view,
     perspectiveIdx,
     selectedTarget,
     selectedKillTarget,
@@ -760,7 +760,7 @@ export function usePlayInteraction(
       setSelectedTarget(selectedTarget === name ? null : name);
     },
     [
-      view.players,
+      view,
       isTargetable,
       pendingSkillAction,
       submitSkillTarget,
@@ -777,8 +777,6 @@ export function usePlayInteraction(
       selectedCard,
       transformWrapperName,
       selectedTarget,
-      selectedKillTarget,
-      view,
       perspectiveIdx,
     ],
   );
@@ -917,6 +915,7 @@ export function usePlayInteraction(
     },
     [
       selectedCardId,
+      selectedCard,
       selectedTarget,
       nameToIndex,
       perspectiveHand,

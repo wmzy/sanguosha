@@ -35,8 +35,9 @@ interface ViewAuthRouteSpec {
   failedError: string;
   /** 是否要求 targetSeat(approve-view 需指定批准的座次)。 */
   requireTargetSeat?: boolean;
-  /** 房间操作;返回 null → failedError。 */
-  execute: (roomId: string, spectatorId: string, targetSeat: number) => Room | null;
+  /** 房间操作;返回 null → failedError。approverId 为审批者(非调试房=会话 userId;
+   *  调试房='' 游客模型),房间层负责座主校验。 */
+  execute: (roomId: string, approverId: string, spectatorId: string, targetSeat: number) => Room | null;
   /** 成功后的附加广播消息(先于 room_state);缺省仅广播 room_state。 */
   notify?: (spectatorId: string, targetSeat: number) => ServerMessage;
   /** 是否清除旁观者 baseline 并在游戏进行中重发其初始视图(approve/revoke)。 */
@@ -58,7 +59,7 @@ async function handleViewAuthRoute(c: Context, spec: ViewAuthRouteSpec): Promise
   const approver = await resolveApprover(c, roomId);
   if ('error' in approver) return c.json({ error: approver.error }, approver.status);
 
-  const room = spec.execute(roomId, spectatorId, targetSeat);
+  const room = spec.execute(roomId, approver.playerId, spectatorId, targetSeat);
   if (!room) return c.json({ error: spec.failedError }, 400);
 
   // 清除旁观者 baseline,强制重发新 viewer 的 initialView(approve)或公开视图(revoke)
@@ -176,7 +177,8 @@ export function applySpectatorRoutes(app: Hono): void {
       missingParamError: '缺少参数',
       failedError: '审批失败',
       requireTargetSeat: true,
-      execute: (roomId, spectatorId, targetSeat) => approveView(roomId, spectatorId, targetSeat),
+      execute: (roomId, approverId, spectatorId, targetSeat) =>
+        approveView(roomId, approverId, spectatorId, targetSeat),
       notify: (spectatorId, targetSeat) => ({
         type: 'view_granted',
         spectatorId,
@@ -190,7 +192,7 @@ export function applySpectatorRoutes(app: Hono): void {
     handleViewAuthRoute(c, {
       missingParamError: '缺少 spectatorId',
       failedError: '操作失败',
-      execute: (roomId, spectatorId) => rejectView(roomId, spectatorId),
+      execute: (roomId, approverId, spectatorId) => rejectView(roomId, approverId, spectatorId),
     }));
 
   // POST /api/rooms/:id/revoke-view — 玩家撤销已授权(审批者校验同 approve-view)
@@ -198,7 +200,7 @@ export function applySpectatorRoutes(app: Hono): void {
     handleViewAuthRoute(c, {
       missingParamError: '缺少 spectatorId',
       failedError: '操作失败',
-      execute: (roomId, spectatorId) => revokeView(roomId, spectatorId),
+      execute: (roomId, approverId, spectatorId) => revokeView(roomId, approverId, spectatorId),
       notify: (spectatorId) => ({ type: 'view_revoked', spectatorId }),
       refreshView: true,
     }));

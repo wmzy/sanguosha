@@ -501,7 +501,8 @@ describe('旁观者管理', () => {
   it('removeSpectator 应清理旁观者连接、授权和申请', () => {
     const room = createRoom('测试', 4, 'host1', createMockSink());
     joinAsSpectator(room.id, 'spec1', createMockSink());
-    approveView(room.id, 'spec1', 0);
+    requestView(room.id, 'spec1', 0);
+    approveView(room.id, 'host1', 'spec1', 0);
     requestView(room.id, 'spec1', 1);
 
     const result = removeSpectator(room.id, 'spec1');
@@ -582,33 +583,57 @@ describe('旁观者管理', () => {
     expect(result!.pendingViewRequests.get('spec1')).toBe(0);
   });
 
-  it('approveView 应设置授权并清除申请', () => {
+  it('approveView 应设置授权并清除申请(仅座主可批准)', () => {
     const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
     joinAsSpectator(room.id, 'spec1', createMockSink());
     requestView(room.id, 'spec1', 0);
 
-    const result = approveView(room.id, 'spec1', 0);
+    // 非座主(p2, 座次 1)不能批准 0 号座的申请
+    expect(approveView(room.id, 'p2', 'spec1', 0)).toBeNull();
+    expect(getRoom(room.id)!.viewGrants.has('spec1')).toBe(false);
+
+    const result = approveView(room.id, 'host1', 'spec1', 0);
     expect(result).not.toBeNull();
     expect(result!.viewGrants.get('spec1')).toBe(0);
     expect(result!.pendingViewRequests.has('spec1')).toBe(false);
   });
 
-  it('rejectView 应清除申请', () => {
+  it('approveView 无对应申请时拒绝(不能凭空授权)', () => {
     const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinAsSpectator(room.id, 'spec1', createMockSink());
+    expect(approveView(room.id, 'host1', 'spec1', 0)).toBeNull();
+    // 申请座次与批准座次不一致也拒绝
+    requestView(room.id, 'spec1', 1);
+    expect(approveView(room.id, 'host1', 'spec1', 0)).toBeNull();
+    expect(getRoom(room.id)!.viewGrants.has('spec1')).toBe(false);
+  });
+
+  it('rejectView 应清除申请(仅座主可拒绝)', () => {
+    const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
     joinAsSpectator(room.id, 'spec1', createMockSink());
     requestView(room.id, 'spec1', 0);
 
-    const result = rejectView(room.id, 'spec1');
+    expect(rejectView(room.id, 'p2', 'spec1')).toBeNull();
+    expect(getRoom(room.id)!.pendingViewRequests.has('spec1')).toBe(true);
+
+    const result = rejectView(room.id, 'host1', 'spec1');
     expect(result).not.toBeNull();
     expect(result!.pendingViewRequests.has('spec1')).toBe(false);
   });
 
-  it('revokeView 应清除授权', () => {
+  it('revokeView 应清除授权(仅座主可撤销)', () => {
     const room = createRoom('测试', 4, 'host1', createMockSink());
+    joinRoom(room.id, 'p2', createMockSink());
     joinAsSpectator(room.id, 'spec1', createMockSink());
-    approveView(room.id, 'spec1', 0);
+    requestView(room.id, 'spec1', 0);
+    approveView(room.id, 'host1', 'spec1', 0);
 
-    const result = revokeView(room.id, 'spec1');
+    expect(revokeView(room.id, 'p2', 'spec1')).toBeNull();
+    expect(getRoom(room.id)!.viewGrants.has('spec1')).toBe(true);
+
+    const result = revokeView(room.id, 'host1', 'spec1');
     expect(result).not.toBeNull();
     expect(result!.viewGrants.has('spec1')).toBe(false);
   });
@@ -742,7 +767,8 @@ describe('旁观者管理', () => {
     setSessionChecker(() => true);
     const room = createRoom('房主测试房', 4, 'zhao-zi-long', createMockSink());
 
-    const list = getRoomList('multiplayer');
+    // 成员视角(公开视角会脱敏 hostId,见下方 redactRoomInfo 用例)
+    const list = getRoomList('multiplayer', 'zhao-zi-long');
     const found = list.find((r) => r.id === room.id);
     expect(found).toBeDefined();
     expect(found!.hostId).toBe('zhao-zi-long');
@@ -755,19 +781,42 @@ describe('旁观者管理', () => {
     joinRoom(room.id, 'guest1', createMockSink());
     joinRoom(room.id, 'guest2', createMockSink());
 
-    const list = getRoomList('multiplayer');
+    const list = getRoomList('multiplayer', 'host-pids');
     const found = list.find((r) => r.id === room.id);
     expect(found).toBeDefined();
     expect(found!.playerIds).toEqual(expect.arrayContaining(['host-pids', 'guest1', 'guest2']));
     expect(found!.playerIds).toHaveLength(3);
 
-    // 模拟 SSE 断线:room.players 清除但 seats 保留
+    // 模拟 SSE 断线:room.players 清除但 seats 保留。此时该 id 已不是成员,
+    // 列表按公开视角脱敏(playerIds 不下发)——这正是防止 userId 泄漏的口径;
+    // 占座数仍按 seats 统计,玩家数不会因断线掉到 0。
     room.players.clear();
-    const list2 = getRoomList('multiplayer');
+    const list2 = getRoomList('multiplayer', 'host-pids');
     const found2 = list2.find((r) => r.id === room.id);
     expect(found2).toBeDefined();
-    // 断线后 playerIds 仍包含所有玩家(用于 lobby 判断"已在房间中")
-    expect(found2!.playerIds).toEqual(expect.arrayContaining(['host-pids', 'guest1', 'guest2']));
+    expect(found2!.playerIds).toBeUndefined();
+    expect(found2!.playerCount).toBe(3);
+    setSessionChecker(null);
+  });
+
+  it('getRoomList 公开视角抹掉 userId 级字段,成员视角保留', () => {
+    setSessionChecker(() => true);
+    const room = createRoom('公开房', 4, 'owner-1', createMockSink());
+    room.playerNames.set('owner-1', '房主昵称');
+
+    // 未带 viewer(=未登录) → 只有昵称级 hostName 可见
+    const pub = getRoomList('multiplayer').find((r) => r.id === room.id)!;
+    expect(pub.playerIds).toBeUndefined();
+    expect(pub.playerNames).toBeUndefined();
+    expect(pub.hostId).toBeNull();
+    expect(pub.hostName).toBe('房主昵称');
+    expect(pub.roomType).toBe('quick');
+
+    // 成员视角保持完整(客户端「已加入/我建的」标记依赖这些字段)
+    const mine = getRoomList('multiplayer', 'owner-1').find((r) => r.id === room.id)!;
+    expect(mine.hostId).toBe('owner-1');
+    expect(mine.playerIds).toEqual(['owner-1']);
+    expect(mine.playerNames?.['owner-1']).toBe('房主昵称');
     setSessionChecker(null);
   });
 
@@ -1005,14 +1054,13 @@ describe('房间类型行为', () => {
   });
 
   it('RoomInfo 包含 roomType 字段', () => {
-    createRoom('快速房', 4, 'qhost', createMockSink());
-    createRoom('普通房', 4, 'nhost', createMockSink(), undefined, 'normal');
+    const quick = createRoom('快速房', 4, 'qhost', createMockSink());
+    const normal = createRoom('普通房', 4, 'nhost', createMockSink(), undefined, 'normal');
 
+    // 按 id 定位:公开视角会抹掉 hostId(不能再用 hostId 反查)
     const list = getRoomList();
-    const quickRoom = list.find((r) => r.hostId === 'qhost');
-    const normalRoom = list.find((r) => r.hostId === 'nhost');
-    expect(quickRoom?.roomType).toBe('quick');
-    expect(normalRoom?.roomType).toBe('normal');
+    expect(list.find((r) => r.id === quick.id)?.roomType).toBe('quick');
+    expect(list.find((r) => r.id === normal.id)?.roomType).toBe('normal');
   });
 });
 
@@ -1285,7 +1333,8 @@ describe('踢出玩家', () => {
     const room = createRoom('房间', 4, 'host', createMockSink());
     const specSink = createMockSink();
     joinAsSpectator(room.id, 'spec1', specSink);
-    approveView(room.id, 'spec1', 0);
+    requestView(room.id, 'spec1', 0);
+    approveView(room.id, 'host', 'spec1', 0);
     expect(room.spectators.has('spec1')).toBe(true);
     expect(room.viewGrants.has('spec1')).toBe(true);
 

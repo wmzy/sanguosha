@@ -235,7 +235,7 @@ export function HomePage() {
         )
         .sort((a, b) => (a.status === '进行中' ? -1 : 0) - (b.status === '进行中' ? -1 : 0))[0];
       if (live) {
-        navigate(`/play/${live.id}?spectate=1`);
+        void navigate(`/play/${live.id}?spectate=1`);
       } else {
         setAiHintText('暂无 AI 对局：在终端运行 pnpm demo:ai 启动 5 个 omp 进程即可。');
       }
@@ -255,7 +255,7 @@ export function HomePage() {
     if (!file) return;
     try {
       const replay: ReplayFile = await loadReplay(file);
-      navigate('/replay', { state: { file: replay } });
+      void navigate('/replay', { state: { file: replay } });
     } catch (err) {
       alert(`加载录像失败: ${err instanceof Error ? err.message : String(err)}`);
     }

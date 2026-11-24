@@ -128,8 +128,8 @@ interface EquipmentSlots {     // 字段名英文
 
 **保留英文**：
 
-- **服务端 wire 协议 message type**：`ServerMessage.type = 'initialView' | 'events' | 'error' | 'room_joined' | 'gameOver' | 'room_list' | 'player_joined' | 'player_left' | 'player_disconnected' | 'player_reconnected' | 'game_started'`
-- **客户端 wire 协议 message type**：`ClientMessage.type = 'action' | 'response' | 'ready' | 'join_room' | 'create_room' | 'create_debug_room' | 'join_debug_room' | 'reconnect' | 'list_rooms' | 'delete_room' | 'start_game' | 'leave_room'`
+- **服务端 wire 协议 message type（SSE）**：`ServerMessage.type = 'event' | 'initialView' | 'error' | 'room_joined' | 'room_state' | 'room_list' | 'chat_history' | 'gameOver' | 'game_started' | 'player_joined' | 'player_left' | 'player_disconnected' | 'player_reconnected' | ...`——权威定义见 `src/server/protocol.ts` 的 `ServerMessage`（含 seat_swap/spectator/view_* 等族）。
+- **客户端 wire 协议**：上行全部走 REST（`POST /api/rooms/:id/action`、`reorder`、`ready`、`start_game` ……），车身类型见 `src/server/protocol.ts` 的 `ClientMessage`（**不是** WS 消息）。引擎层动作消息是 `src/engine/types/skill.ts` 的 `ClientMessage`（skillId/actionType/ownerId/params/baseSeq）。
 - **客户端 UI 动画分类 type**：`Animation.type = 'cardMove' | 'cardFlip' | 'damagePopup' | 'healGlow' | 'drawCards' | 'discardCards' | 'equipItem' | 'unequipItem' | 'death' | 'skillActivate' | 'pendingPrompt' | 'trickReveal' | 'nextPlayer'`（CSS 钩子 + 纯前端派发 key，不进入引擎逻辑）
 - **抽象工具类型名 / 抽象工具文件名**：`EquipmentSlots`、`PlayerState`、`GameState`、`_armorDamageBlock.ts`、`_fireKillDamageBonus.ts`（这些是工具型抽象，不是具体技能概念）
 - **结构化数据的字段 key**（如 `ZoneRef.zone` 字段名）—— 字段**值**按 §4 走中文，字段名本身是结构 key，保留英文
@@ -215,7 +215,7 @@ vars['unlimitedKills']  // 应改为 '诸葛连弩/active'
 - 使用 `pnpm lint --fix` 修复代码风格
 - 组件使用 named export（不用 default export）
 - 服务端状态管理使用 plain object + event emitter，不用状态管理库
-- **引擎分层**：`src/engine/{core,atoms,flows,rules,skills,view,data,util}/`——武将技能与装备技能统一在 `skills/`（装备技能在根、卡牌效果在 `skills/cards/`），角色声明在 `data/characters/`。引擎入口是 `src/engine/index.ts`（纯门面 re-export `core/` 的 `create`/`dispatch`/`restore` 等）。详细 ADR：`docs/decisions/0013-skill-character-decouple.md`。
+- **引擎分层**：`src/engine/{core,atoms,flows,rules,skills,view,data,util,types}/`——武将技能与装备技能统一在 `skills/`（装备技能在根、卡牌效果在 `skills/cards/`），角色声明在 `data/characters/`。引擎入口是 `src/engine/index.ts`（纯门面 re-export `core/` 的 `create`/`dispatch`/`restore` 等）。详细 ADR：`docs/decisions/0030-skill-character-decouple.md`。
 
 ## 关键架构决策
 
@@ -285,24 +285,43 @@ vars['unlimitedKills']  // 应改为 '诸葛连弩/active'
 - **声明型转化技把「声明」编码进 actionType**：界渐营/界矫诏 需要玩家声明牌名（outputName），
   客户端无法凭空提供 → 每个声明牌名注册一个 action（`transform:杀` / `transform:无中生有`…），
   `transform` 回调固定返回该牌名。新增同类技能照此办理，勿再依赖「前端声明面板」这类未实现的 UI。
+- **`AtomDefinition.toViewEvents` 必填，禁止「原始 atom 广播」兜底**：视图事件是唯一的信息分级
+  出口；省略它会沿 `resolveViewEvents` 的兜底把 atom 字段原样广播给所有 viewer（2026-11 的
+  `抽身份.seed` 泄漏：seed 决定身份分配/选将候选/整副牌序）。不产生视图事件必须显式
+  `broadcast(null)`。默认 seed 用 `crypto.randomInt`（见 `randomSessionSeed`），不得用 `Date.now()`。
+- **prompt 类型覆盖契约**：`src/engine/types/prompt.ts` 的 `PROMPT_TYPES` 是 prompt 种类的唯一
+  运行时清单；浏览器 `client/view/promptCoverage.ts` 与无头 `client/headless/promptCoverage.ts`
+  各有一张 `Record<PromptType, string>`——新增 prompt 类型时两侧编译报错（配
+  `tests/client/prompt-coverage.test.ts`）。提交形状由引擎显式声明（如
+  `DistributePrompt.topBottom`），客户端不得按 requestType 字面量猜（观星族三个 requestType 不同）。
+- **调试房 playerId 是游客模型，不得触及真实房间**：`bindPlayerRoom`/`unbindPlayerRoom` 带守卫
+  （真实房间映射不被调试房覆盖/误删），调试房 join/autoJoin 对「已属于真实房间」的 playerId 直接 409；
+  公开房间列表对非成员抹掉 `playerIds/playerNames/hostId`（只留 `hostName` 昵称）。
 
 ## 测试
 
 ```bash
-pnpm test              # 运行所有测试
+pnpm test              # 运行 core 项目（默认；技能测试见下）
+pnpm test:skills       # 运行技能测试项目
+pnpm test:all          # 运行全部 Vitest 测试（core + skills）
 pnpm test -- tests/unit/state.test.ts  # 运行单个文件
 pnpm test:watch        # 监听模式
 ```
 
+日常只跑变更相关测试：`pnpm test --changed --maxWorkers=2`（core）或
+`pnpm test:all --changed --maxWorkers=2`（含技能）。确需全量时显式限制并发。
+
 ## 文件结构
 
-- `src/client/` — 前端 React 应用
+- `src/client/` — 前端 React 应用（含 `headless/` 无头客户端与 AI 枚举）
 - `src/engine/` — 游戏引擎（纯逻辑）
   - `skills/` — 武将与装备技能实现（`SkillDef`），按技能单文件（汉字命名），`skills/cards/` 为卡牌效果
   - `data/characters/` — 角色声明（`CharacterConfig`），按势力组织
-  - `core/`、`atoms/`、`flows/`、`rules/`、`view/` — 引擎核心（调度/原子操作/流程/规则/视图投影）
+  - `core/`、`atoms/`、`flows/`、`rules/`、`view/`、`types/` — 引擎核心（调度/原子操作/流程/规则/视图投影/类型）
   - `index.ts` — 引擎对外唯一入口（门面 re-export）
-- `src/server/` — 后端服务器
+- `src/server/` — 后端服务器（Hono REST + SSE）
+- `src/ai-mcp/` — AI agent 用的 MCP server（stdio）
+- `src/db/` — PGlite + drizzle（用户/会话/房间元数据）
 - `tests/` — 测试
 - `docs/` — 设计文档和实现计划
 

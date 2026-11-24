@@ -5,7 +5,7 @@
 // 登录是身份增强而非强制门禁 —— 与「支持用户名密码/OAuth 登录」需求一致。
 import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
-import { createRateLimit } from '../middleware/rate-limit';
+import { createRateLimit, trustedForwardedProto } from '../middleware/rate-limit';
 import { createLogger } from '../logger';
 import {
   createUser,
@@ -27,6 +27,21 @@ const log = createLogger('auth-routes');
 
 /** 认证端点限流:见 applyAuthRoutes 内分级配置。 */
 
+/** 会话 Cookie 的 Secure 判定。
+ *  线上 TLS 通常由反代终结(应用进程只见 http),旧的 `url.startsWith('https://')`
+ *  判断会让 Cookie 永远不带 Secure。优先级:
+ *    1. SGS_COOKIE_SECURE=true/false 显式指定(反代终结时推荐 true);
+ *    2. 直连 https;
+ *    3. 可信代理( SGS_TRUSTED_PROXIES )转发的 X-Forwarded-Proto: https。
+ *  不可信 peer 的转发头一律忽略,避免被伪造头引导成不加密的 secure cookie。 */
+function sessionCookieSecure(c: Parameters<typeof setCookie>[0]): boolean {
+  const forced = process.env.SGS_COOKIE_SECURE?.trim().toLowerCase();
+  if (forced === 'true') return true;
+  if (forced === 'false') return false;
+  if (c.req.url.startsWith('https://')) return true;
+  return trustedForwardedProto(c) === 'https';
+}
+
 export function applyAuthRoutes(app: Hono): void {
   const auth = new Hono();
   // 分级限流(同为 IP 维度,窗口 60s):
@@ -35,10 +50,13 @@ export function applyAuthRoutes(app: Hono): void {
   //     多标签页/频繁刷新即可打满 30/min → 全认证面板瘫痪 60s(可用性缺陷,
   //     e2e 并行 worker 同 IP 下必现)。放宽到 600/min。
   const authStrictLimit = createRateLimit(30);
+  // logout 无需登录且幂等,单独限流:与 login/register 共用桶时,30 次匿名 logout
+  // 就能让同 IP(未配可信代理时是全体)一分钟内无法登录。
+  const authLogoutLimit = createRateLimit(60);
   const authReadLimit = createRateLimit(600);
   auth.use('/login', authStrictLimit);
   auth.use('/register', authStrictLimit);
-  auth.use('/logout', authStrictLimit);
+  auth.use('/logout', authLogoutLimit);
   auth.use('/password', authStrictLimit);
   auth.use('/me', authReadLimit);
   auth.use('/profile', authReadLimit);
@@ -47,7 +65,7 @@ export function applyAuthRoutes(app: Hono): void {
     setCookie(c, SESSION_COOKIE, token, {
       httpOnly: true,
       sameSite: 'Lax',
-      secure: c.req.url.startsWith('https://'),
+      secure: sessionCookieSecure(c),
       path: '/',
       maxAge: Math.floor((expiresAt - Date.now()) / 1000),
     });

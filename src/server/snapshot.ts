@@ -3,7 +3,7 @@
 // 只读旁路——不调 dispatch、不改 state、不影响游戏流程。
 // 设计依据:docs/superpowers/specs/2026-06-24-debug-snapshot-design.md
 
-import { writeFile, readFile, mkdir } from 'node:fs/promises';
+import { writeFile, readFile, mkdir, readdir, stat, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type {
   GameState,
@@ -22,6 +22,48 @@ import { SNAPSHOTS_DIR } from './paths';
 import { compactTimestamp, randomSuffix } from './utils';
 
 const log = createLogger('snapshot');
+
+/** 调试快照保留期:调试产物无长期价值,过期目录由 pruneSnapshots 清理。 */
+export const SNAPSHOT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** sidecar 单文件上限(console/ws/dom)。请求体已在 HTTP 层限 2MB,这里再按文件
+ *  截断,避免一个超长 DOM/console 把单个快照撑到几十 MB(磁盘配额之内可被刷爆)。 */
+const MAX_CONSOLE_BYTES = 512 * 1024;
+const MAX_WS_BYTES = 512 * 1024;
+const MAX_DOM_BYTES = 1024 * 1024;
+
+/** 按 UTF-8 字节数截断(可能切断多字节字符末尾,调试文本可接受)。 */
+function truncateToBytes(text: string, maxBytes: number): string {
+  if (Buffer.byteLength(text, 'utf-8') <= maxBytes) return text;
+  return Buffer.from(text, 'utf-8').subarray(0, maxBytes).toString('utf-8');
+}
+
+/** 删除超过保留期的快照目录。返回删除数量。单目录失败不影响其余。 */
+export async function pruneSnapshots(
+  now: number = Date.now(),
+  maxAgeMs: number = SNAPSHOT_RETENTION_MS,
+): Promise<number> {
+  let entries: string[];
+  try {
+    entries = await readdir(SNAPSHOTS_DIR);
+  } catch {
+    return 0; // 目录不存在(未产生过快照)
+  }
+  let removed = 0;
+  for (const name of entries) {
+    const dir = join(SNAPSHOTS_DIR, name);
+    try {
+      const st = await stat(dir);
+      if (!st.isDirectory() || now - st.mtimeMs <= maxAgeMs) continue;
+      await rm(dir, { recursive: true, force: true });
+      removed++;
+    } catch {
+      /* 单个失败不影响其余 */
+    }
+  }
+  if (removed > 0) log.info(`清理过期快照 ${removed} 个`);
+  return removed;
+}
 
 /** 快照文件中 pending slot 的纯数据形式(剥离函数和 definition) */
 interface PendingSlotData {
@@ -221,14 +263,17 @@ export async function createSnapshot(
     if (req.telemetry) {
       const t = req.telemetry;
 
-      const consoleText = t.consoleLog
-        .map((e) => {
-          const entry = e as { time: number; level: string; message: string };
-          return `[${new Date(entry.time).toISOString()}] [${entry.level}] ${entry.message}`;
-        })
-        .join('\n');
-      const wsLines = t.wsMessages.map((e) => JSON.stringify(e)).join('\n');
-      const domHtml = t.domHtml;
+      const consoleText = truncateToBytes(
+        t.consoleLog
+          .map((e) => {
+            const entry = e as { time: number; level: string; message: string };
+            return `[${new Date(entry.time).toISOString()}] [${entry.level}] ${entry.message}`;
+          })
+          .join('\n'),
+        MAX_CONSOLE_BYTES,
+      );
+      const wsLines = truncateToBytes(t.wsMessages.map((e) => JSON.stringify(e)).join('\n'), MAX_WS_BYTES);
+      const domHtml = truncateToBytes(t.domHtml, MAX_DOM_BYTES);
 
       await Promise.all([
         writeFile(snapshotPath(snapshotId, 'console.txt'), consoleText),

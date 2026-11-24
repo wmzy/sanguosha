@@ -29,6 +29,9 @@ public/cards-ai/
 # 官方卡牌参考图目录(用于 --verify 对比,不入 git)
 docs/card-refs/
 
+# 武将技能资料的抓取缓存(2.9MB HTML/JSON,可重新抓取,不入 git)
+docs/research/武将技能/.hero-cache/
+
 # 资源包音效(测试数据,Mogara/QSanguosha CC BY-NC-ND,不入 git)
 public/packs/
 

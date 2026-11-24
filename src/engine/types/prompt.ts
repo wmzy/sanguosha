@@ -143,6 +143,11 @@ export interface DistributePrompt {
   allowSelf?: boolean;
   /** allocate 模式:目标合法性过滤(存活/非自己等由前端组合判断)。 */
   targetFilter?: (view: GameView, target: number) => boolean;
+  /** select 模式的提交形状:true = `{ top, bottom }` 划分(观星族:选中的牌按点选
+   *  顺序置顶,其余观察牌置底),缺省 = `{ cardIds }`(制衡/贯石斧等)。
+   *  由引擎显式声明,客户端不得按 requestType 字面量猜(观星/界观星/恂恂 三个
+   *  requestType 各不相同,按前缀判断漏两个)。 */
+  topBottom?: true;
 }
 export interface ChoosePlayerPrompt {
   type: 'choosePlayer';
@@ -230,3 +235,24 @@ export interface PickTargetCardPrompt {
   /** 手牌张数(盲选用,前端渲染 N 个牌背) */
   handCount: number;
 }
+
+/** 所有 prompt 类型的运行时清单(与上方各 interface 的 type 字面量一一对应)。
+ *  用途:浏览器(AwaitingPrompt)与无头(availableActions)各自的处理表都声明为
+ *  `Record<PromptType, …>`——新增 prompt 类型时两侧同时编译报错,逼出实现;
+ *  配一条契约测试断言两侧覆盖表与本体清单完全相等。
+ *  ⚠️ 新增/删除 prompt 类型时必须同步本表(它同时是 PromptType 的唯一来源)。 */
+export const PROMPT_TYPES = [
+  'useCard',
+  'selectTarget',
+  'useCardAndTarget',
+  'confirm',
+  'distribute',
+  'choosePlayer',
+  'chooseCharacter',
+  'pickProcessingCard',
+  'chooseSuit',
+  'chooseOption',
+  'pickTargetCard',
+] as const;
+
+export type PromptType = (typeof PROMPT_TYPES)[number];

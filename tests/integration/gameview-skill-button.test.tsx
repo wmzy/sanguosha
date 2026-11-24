@@ -12,7 +12,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { GameViewComponent } from '../../src/client/components/GameView';
 import { clearRegistry } from '../../src/client/skillActionRegistry';
 import type { QueuedEvent } from '../../src/client/hooks/useEventPlayback';
-import type { GameView, Card } from '../../src/engine/types';
+import type { GameView, Card, PendingView } from '../../src/engine/types';
 
 function makeCard(id: string, name: string): Card {
   return { id, name, suit: '♠', color: '黑', rank: 'A', type: '基本牌' };
@@ -163,6 +163,41 @@ describe('GameView:仁德/制衡 distribute 主动技按钮', () => {
         }),
       );
     });
+  });
+});
+
+// ─── chooseSuit(反间:目标猜花色)───
+// 回归:此前 AwaitingPrompt 无 chooseSuit 分支,玩家只能超时走默认 ♠。
+describe('GameView:chooseSuit(反间)', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('渲染四种花色按钮,点击发送 respond {suit}', async () => {
+    const pending: PendingView = {
+      type: 'awaits',
+      atom: {
+        type: '请求回应',
+        requestType: '反间/选花色',
+        target: 0,
+        prompt: { type: 'chooseSuit', title: '反间:选择一种花色' },
+      },
+      prompt: { type: 'chooseSuit', title: '反间:选择一种花色(猜对则不受伤害，猜错受1点伤害)' },
+      target: 0,
+      isBlocking: true,
+    };
+    const onAction = vi.fn();
+    render(<GameViewComponent view={makeView({ pending })} onAction={onAction} />);
+
+    // 四个花色按钮都在
+    for (const suit of ['♠', '♥', '♣', '♦']) {
+      expect(await screen.findByRole('button', { name: suit })).toBeDefined();
+    }
+    fireEvent.click(screen.getByRole('button', { name: '♥' }));
+
+    expect(onAction).toHaveBeenCalledWith(
+      expect.objectContaining({ skillId: '反间', actionType: 'respond', params: { suit: '♥' } }),
+    );
   });
 });
 

@@ -356,16 +356,34 @@ describe('房间登录强制', () => {
     expect(playerId).toBe(host.userId);
     expect(playerName).toBe(host.displayName);
 
-    // room_state 与列表投影 playerNames
+    // room_state 与(成员视角的)列表投影 playerNames
     const state = buildRoomState(getRoom(roomId)!) as {
       playerNames?: Record<string, string>;
     };
     expect(state.playerNames?.[host.userId]).toBe(host.displayName);
+
+    // 成员(带会话)视角:playerNames 保留
     const list = (await (
-      await app.request('/api/rooms?type=multiplayer')
+      await app.request('/api/rooms?type=multiplayer', { headers: { Cookie: host.cookie } })
     ).json()) as Array<{ id: string; playerNames?: Record<string, string> }>;
     const item = list.find((r) => r.id === roomId);
     expect(item?.playerNames?.[host.userId]).toBe(host.displayName);
+
+    // 未登录视角:userId 级字段全部抹掉(否则可被用来做调试房 playerId 劫持)
+    const anonList = (await (await app.request('/api/rooms?type=multiplayer')).json()) as Array<{
+      id: string;
+      hostId?: string | null;
+      hostName?: string | null;
+      playerIds?: string[];
+      playerNames?: Record<string, string>;
+    }>;
+    const anonItem = anonList.find((r) => r.id === roomId);
+    expect(anonItem).toBeDefined();
+    expect(anonItem!.playerIds).toBeUndefined();
+    expect(anonItem!.playerNames).toBeUndefined();
+    expect(anonItem!.hostId).toBeNull();
+    // 昵称级字段仍可用于大厅展示
+    expect(anonItem!.hostName).toBe(host.displayName);
   });
 
   it('伪造 body.playerId 无效:加入者身份恒为会话用户', async () => {
@@ -636,6 +654,23 @@ describe('房间登录强制', () => {
       body: JSON.stringify({ spectatorId: outsider.userId, targetSeat: 0 }),
     });
     expect(selfApprove.status).toBe(403);
+
+    // 本房玩家但不是该座次的主人 → 400(服务端座主校验,不依赖客户端 UI)
+    const otherPlayer = await registerUser(app, 'auth_view_other');
+    const joinOther = await app.request(`/api/rooms/${roomId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: otherPlayer.cookie },
+      body: JSON.stringify({}),
+    });
+    expect(joinOther.status).toBe(200);
+    expect(getRoom(roomId)!.seats[1]).toBe(otherPlayer.userId);
+    const wrongSeat = await app.request(`/api/rooms/${roomId}/approve-view`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: otherPlayer.cookie },
+      body: JSON.stringify({ spectatorId: outsider.userId, targetSeat: 0 }),
+    });
+    expect(wrongSeat.status).toBe(400);
+    expect(getRoom(roomId)!.viewGrants.has(outsider.userId)).toBe(false);
 
     // 本房玩家(host)批准 → 授权生效
     const approve = await app.request(`/api/rooms/${roomId}/approve-view`, {
@@ -1242,5 +1277,104 @@ describe('房间密码', () => {
     const row = rows.find((r) => r.id === roomId);
     expect(row?.passwordHash).toMatch(/^[0-9a-f]+:[0-9a-f]+$/);
     expect(row?.playerNames?.[host.userId]).toBe(host.displayName);
+  });
+
+  it('房间密码至少 4 位(1 位密码可被在线枚举,每次猜测一次 scrypt)', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'pw_tooshort');
+    const res = await app.request('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ name: '短密码房', maxPlayers: 4, password: 'abc' }),
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toContain('至少 4 位');
+  });
+});
+
+describe('加固回归(调试房 playerId / 请求体上限 / Cookie Secure)', () => {
+  it('调试房不得用真实房间成员的 playerId(409),正身仍在房内', async () => {
+    const app = makeApp();
+    const host = await registerUser(app, 'dbg_guard');
+    const created = await app.request('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: host.cookie },
+      body: JSON.stringify({ name: '受害房', maxPlayers: 4 }),
+    });
+    const { roomId } = (await created.json()) as { roomId: string };
+    expect(getRoom(roomId)!.players.has(host.userId)).toBe(true);
+
+    const dbg = await app.request('/api/debug-room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerCount: 5 }),
+    });
+    const { roomId: debugRoomId } = (await dbg.json()) as { roomId: string };
+
+    // 未登录 + 伪造真实用户 id 加入调试房 → 409(此前会 detach 把该用户踢出真实房间)
+    const hijack = await app.request(`/api/debug-room/${debugRoomId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: host.userId }),
+    });
+    expect(hijack.status).toBe(409);
+    expect(getRoom(roomId)!.players.has(host.userId)).toBe(true);
+    expect(getRoom(roomId)!.seats).toContain(host.userId);
+
+    // autoJoin 变体同样拒绝(且不留下孤儿调试房:校验在建房之前)
+    const hijack2 = await app.request('/api/debug-room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerCount: 5, autoJoin: true, playerId: host.userId }),
+    });
+    expect(hijack2.status).toBe(409);
+
+    // 非冲突的游客 id 正常加入
+    const ok = await app.request(`/api/debug-room/${debugRoomId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerId: 'dbg-guest-1' }),
+    });
+    expect(ok.status).toBe(200);
+  });
+
+  it('请求体超过 2MB 回 413(全局 bodyLimit)', async () => {
+    const { app: realApp } = await import('../../src/server/app');
+    const big = 'x'.repeat(3 * 1024 * 1024);
+    const res = await realApp.request('/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: big, maxPlayers: 4 }),
+    });
+    expect(res.status).toBe(413);
+  });
+
+  it('SGS_COOKIE_SECURE=true 时会话 Cookie 带 Secure(反代终结 TLS 场景)', async () => {
+    const app = makeApp();
+    const prev = process.env.SGS_COOKIE_SECURE;
+    try {
+      process.env.SGS_COOKIE_SECURE = 'true';
+      const reg = await app.request('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'cookie_secure', password: 'pass123' }),
+      });
+      expect(reg.status).toBe(200);
+      expect(reg.headers.get('set-cookie')).toMatch(/;\s*Secure/i);
+    } finally {
+      if (prev === undefined) delete process.env.SGS_COOKIE_SECURE;
+      else process.env.SGS_COOKIE_SECURE = prev;
+    }
+  });
+
+  it('缺省(明文/不可信代理)时不加 Secure', async () => {
+    const app = makeApp();
+    const reg = await app.request('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'cookie_plain', password: 'pass123' }),
+    });
+    expect(reg.status).toBe(200);
+    expect(reg.headers.get('set-cookie')).not.toMatch(/;\s*Secure/i);
   });
 });

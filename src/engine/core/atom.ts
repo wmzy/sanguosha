@@ -27,33 +27,24 @@ export function applyAtom(state: GameState, atom: Atom): void {
 
 /**
  * 解析 atom 的前端视图事件。
- * 优先使用 AtomDefinition.toViewEvents；未实现则 fallback 为带 effect 的原始 atom。
+ * 每个 AtomDefinition 必须显式实现 toViewEvents(类型强制)——彻底移除「未实现即广播
+ * 原始 atom」的兜底:该兜底会把 seed(prompt/内部字段)原样下发给所有 viewer。
  * 当 ViewEvent.type 与 atom.type 不同时，自动设置 atomType 供前端查找 applyView。
  */
-export function resolveViewEvents(state: GameState, atom: Atom): ViewEventSplit | undefined {
+export function resolveViewEvents(state: GameState, atom: Atom): ViewEventSplit {
   const def = getAtomDef(atom.type);
-  const explicit = def.toViewEvents?.(state, atom);
+  const explicit = def.toViewEvents(state, atom);
 
   /** ViewEvent.type != atom.type 时补 atomType */
   const ensureAtomType = (event: ViewEvent): ViewEvent =>
     event.type === atom.type ? event : { ...event, atomType: atom.type };
 
-  if (explicit) {
-    const ownerViews = new Map<number, ViewEvent | null>();
-    for (const [player, evt] of explicit.ownerViews) {
-      ownerViews.set(player, evt ? ensureAtomType(evt) : null);
-    }
-    return {
-      ownerViews,
-      othersView: explicit.othersView ? ensureAtomType(explicit.othersView) : null,
-    };
+  const ownerViews = new Map<number, ViewEvent | null>();
+  for (const [player, evt] of explicit.ownerViews) {
+    ownerViews.set(player, evt ? ensureAtomType(evt) : null);
   }
-
-  // Fallback：构造原始 atom 作为视图事件，所有人看到相同内容。
-  // effect 不下发,前端通过 AtomDefinition.effect 静态查表获取。
-  const viewEvent = { ...atom } as ViewEvent;
   return {
-    ownerViews: new Map(),
-    othersView: viewEvent,
+    ownerViews,
+    othersView: explicit.othersView ? ensureAtomType(explicit.othersView) : null,
   };
 }

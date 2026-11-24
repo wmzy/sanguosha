@@ -248,7 +248,16 @@ export function useDistributeInteraction(p: DistributeInteractionParams): Distri
     const minTotal = prompt.minTotal ?? 1;
     if (mode === 'select') {
       if (distSelected.size < minTotal) return;
-      send(skillId, actionType, { cardIds: [...distSelected] });
+      if (prompt.topBottom === true) {
+        // 观星族:选中牌按点选顺序置顶(top[0] 最先摸),未选中的观察牌全部置底。
+        // 观察范围取 activeDistribute.cardIds(已由 resolveDistributeCardIds 解析)。
+        const top = [...distSelected];
+        const observed = activeDistribute.cardIds;
+        const bottom = observed.filter((id) => !distSelected.has(id));
+        send(skillId, actionType, { top, bottom });
+      } else {
+        send(skillId, actionType, { cardIds: [...distSelected] });
+      }
     } else if (externalTargetSelection) {
       if (distSelected.size < minTotal || !distTargetName) return;
       const idx = nameToIndex(distTargetName);

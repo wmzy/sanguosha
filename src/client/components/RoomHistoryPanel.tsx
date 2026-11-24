@@ -164,7 +164,7 @@ export function RoomHistoryPanel({ roomId, playerId, history, isHost }: RoomHist
         const file = await fetch(`/api/rooms/${roomId}/history/${entryId}${q}`);
         if (!file.ok) throw new Error(`HTTP ${file.status}`);
         const data = (await file.json()) as ReplayFile;
-        navigate('/replay', { state: { file: data } });
+        void navigate('/replay', { state: { file: data } });
       } catch {
         setReplayError('加载录像失败,该录像可能已被删除');
       } finally {

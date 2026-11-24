@@ -77,7 +77,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
       })
       .catch(() => {
         // 房间不存在或会话已结束:回退到调试大厅列表
-        navigate('/debug', { replace: true });
+        void navigate('/debug', { replace: true });
       });
   }, [initialRoomId, navigate]);
 
@@ -91,7 +91,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
         body: JSON.stringify({ playerCount }),
       });
       storeSession(data.roomId, `debug-${data.roomId}-lobby`);
-      navigate(`/debug/${data.roomId}`, { replace: true });
+      void navigate(`/debug/${data.roomId}`, { replace: true });
       setActiveRoomId(data.roomId);
     } catch (err) {
       showErrorFor(err, '创建失败', setError);
@@ -117,7 +117,7 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
       setActiveRoomId(null);
       setError(message);
       setTimeout(() => setError(null), 3000);
-      navigate('/debug', { replace: true });
+      void navigate('/debug', { replace: true });
     },
     [navigate],
   );
@@ -127,12 +127,12 @@ export function useDebugLobbyController(initialRoomId?: string): DebugLobbyContr
     apiFetch<void>(`/api/rooms/${activeRoomId}`, { method: 'DELETE' }).catch(() => {});
     clearSession();
     setActiveRoomId(null);
-    navigate('/');
+    void navigate('/');
   }, [activeRoomId, navigate]);
 
   const handleJoinDebugRoom = useCallback((roomId: string) => {
     setActiveRoomId(roomId);
-    navigate(`/debug/${roomId}`, { replace: true });
+    void navigate(`/debug/${roomId}`, { replace: true });
   }, [navigate]);
 
   const handleExit = useCallback(() => {

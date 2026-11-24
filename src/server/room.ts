@@ -6,7 +6,7 @@ import { DEFAULT_ROOM_CONFIG, normalizeRoomConfig } from './protocol';
 import { createRng } from '../engine/util/rng';
 import { register } from './resourceRegistry';
 import { verifyPassword } from './auth/password';
-import { bindPlayerRoom, playerRoomMap, unbindPlayerRoom } from './playerIndex';
+import { bindPlayerRoom, playerRoomMap, setRoomMetaResolver, unbindPlayerRoom } from './playerIndex';
 import { randomSuffix } from './utils';
 
 // 玩家→房间映射写入口与聊天操作函数已分别下沉 playerIndex.ts / chat.ts,
@@ -59,6 +59,9 @@ export interface Room {
 }
 
 const roomList = new Map<string, Room>();
+
+// 绑定守卫用:playerIndex 不 import 本模块(避免模块环),由本模块注入查询函数。
+setRoomMetaResolver((roomId) => roomList.get(roomId));
 
 const roomIdRng = createRng(Date.now());
 
@@ -407,7 +410,7 @@ export function joinDebugRoom(
     // 清理被踢玩家的座位与房间映射
     const replacedSeat = room.seats.indexOf(replacedPlayerId);
     if (replacedSeat >= 0) room.seats[replacedSeat] = null;
-    unbindPlayerRoom(replacedPlayerId);
+    unbindPlayerRoom(replacedPlayerId, room.id);
     try {
       oldSink?.close();
     } catch {
@@ -435,8 +438,9 @@ export function leaveRoom(
 ): Room | null {
   const room = roomList.get(roomId);
   // 解除房间映射与房间存在性/成员身份无关(此前所有调用方都在 leaveRoom 后
-  // 无条件 delete;跨房误调/房间已自动销毁同样解除映射)
-  unbindPlayerRoom(playerId);
+  // 无条件 delete;跨房误调/房间已自动销毁同样解除映射)。按 roomId 收窄:
+  // 过期连接的清理不得误删该玩家在新房间的映射。
+  unbindPlayerRoom(playerId, roomId);
   if (!room) return null;
 
   removePlayerMembership(room, playerId);
@@ -514,7 +518,7 @@ export function kickPlayer(
     clearSpectatorMembership(room, targetPlayerId);
   }
   room.playerNames.delete(targetPlayerId);
-  unbindPlayerRoom(targetPlayerId);
+  unbindPlayerRoom(targetPlayerId, room.id);
 
   roomChangeHandler?.(room, 'update');
   return { ok: true, room, kickedSink };
@@ -658,6 +662,7 @@ export function buildRoomInfo(room: Room): RoomInfo {
     maxPlayers: room.maxPlayers,
     status: room.status,
     hostId: room.hostId,
+    hostName: room.hostId ? (room.playerNames.get(room.hostId) ?? null) : null,
     isDebug: room.isDebug === true,
     roomType: room.roomType,
     config: room.config,
@@ -669,7 +674,19 @@ export function buildRoomInfo(room: Room): RoomInfo {
   };
 }
 
-export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
+/** 公开(未登录/非成员)房间视图:抹掉 userId 级字段。
+ *  playerIds/playerNames/hostId 都是 userId(或以其为键),未登录可达的房间列表
+ *  会把全体玩家的稳定 id 交给任何人——这正是调试房 playerId 劫持的取数入口。
+ *  仅保留昵称级 hostName 供大厅展示房主名。 */
+export function redactRoomInfo(info: RoomInfo): RoomInfo {
+  const { playerIds: _ids, playerNames: _names, hostId: _host, ...rest } = info;
+  return { ...rest, hostId: null };
+}
+
+export function getRoomList(
+  type?: 'debug' | 'multiplayer',
+  viewerId?: string | null,
+): RoomInfo[] {
   const result: RoomInfo[] = [];
   for (const room of roomList.values()) {
     if (type === 'debug' && !room.isDebug) continue;
@@ -681,7 +698,9 @@ export function getRoomList(type?: 'debug' | 'multiplayer'): RoomInfo[] {
     // 无人可重连,不展示在列表中,避免用户看到无法进入的房间。
     // 普通房间不自动清理,必须保持可见以便房主管理。
     if (room.roomType !== 'normal' && room.status !== '等待中' && room.players.size === 0 && room.seats.every((s) => s === null)) continue;
-    result.push(buildRoomInfo(room));
+    result.push(
+      viewerId && isRoomMember(room, viewerId) ? buildRoomInfo(room) : redactRoomInfo(buildRoomInfo(room)),
+    );
   }
   return result;
 }
@@ -922,8 +941,8 @@ export function removeSpectator(
   reason: 'disconnect' | 'explicit' = 'explicit',
 ): Room | null {
   const room = roomList.get(roomId);
-  // 同 leaveRoom:解除映射与房间存在性无关(调用方此前无条件 delete)
-  unbindPlayerRoom(spectatorId);
+  // 同 leaveRoom:解除映射与房间存在性无关;按 roomId 收窄避免误删新房间映射
+  unbindPlayerRoom(spectatorId, roomId);
   if (!room) return null;
   clearSpectatorMembership(room, spectatorId);
   // 仍在座位上(身份互斥的另一半不存在,防御性判断)则保留;否则彻底清除
@@ -983,27 +1002,50 @@ export function requestView(roomId: string, spectatorId: string, targetSeat: num
   return room;
 }
 
-/** 玩家审批通过：设置 viewGrant。 */
-export function approveView(roomId: string, spectatorId: string, targetSeat: number): Room | null {
+/** 审批者是否为该座次的主人。调试房走游客模型(approverId=''),无稳定 userId 可校验。 */
+function isSeatOwner(room: Room, approverId: string, seat: number): boolean {
+  if (approverId === '') return true;
+  return room.seats[seat] === approverId;
+}
+
+/** 玩家审批通过：设置 viewGrant。
+ *  approverId 必须是目标座次的主人,且必须存在该旁观者针对该座次的申请——
+ *  服务端不能依赖「客户端只给座主显示同意按钮」,否则任意本房玩家都能把
+ *  旁观者授权到别人的座次(隐私泄漏)。调试房 approverId='' 保持游客模型。 */
+export function approveView(
+  roomId: string,
+  approverId: string,
+  spectatorId: string,
+  targetSeat: number,
+): Room | null {
   const room = roomList.get(roomId);
   if (!room) return null;
+  if (!Number.isInteger(targetSeat) || targetSeat < 0 || targetSeat >= room.seats.length) return null;
+  if (!isSeatOwner(room, approverId, targetSeat)) return null;
+  if (room.pendingViewRequests.get(spectatorId) !== targetSeat) return null;
   room.viewGrants.set(spectatorId, targetSeat);
   room.pendingViewRequests.delete(spectatorId);
   return room;
 }
 
-/** 玩家拒绝申请。 */
-export function rejectView(roomId: string, spectatorId: string): Room | null {
+/** 玩家拒绝申请:只能拒绝发往自己座次的申请。 */
+export function rejectView(roomId: string, approverId: string, spectatorId: string): Room | null {
   const room = roomList.get(roomId);
   if (!room) return null;
+  const seat = room.pendingViewRequests.get(spectatorId);
+  if (seat === undefined) return null;
+  if (!isSeatOwner(room, approverId, seat)) return null;
   room.pendingViewRequests.delete(spectatorId);
   return room;
 }
 
-/** 玩家撤销已授权。 */
-export function revokeView(roomId: string, spectatorId: string): Room | null {
+/** 玩家撤销已授权:只能撤销发往自己座次的授权。 */
+export function revokeView(roomId: string, approverId: string, spectatorId: string): Room | null {
   const room = roomList.get(roomId);
   if (!room) return null;
+  const seat = room.viewGrants.get(spectatorId);
+  if (seat === undefined) return null;
+  if (!isSeatOwner(room, approverId, seat)) return null;
   room.viewGrants.delete(spectatorId);
   return room;
 }

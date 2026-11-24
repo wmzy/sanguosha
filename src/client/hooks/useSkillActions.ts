@@ -35,7 +35,7 @@ export function useSkillActions(view: GameView, perspectiveIdx: number): UseSkil
   useEffect(() => {
     let cancelled = false;
     clearRegistry();
-    (async () => {
+    void (async () => {
       for (const p of view.players) {
         await registerSkillActions(p.index, p.skills);
       }
@@ -51,6 +51,7 @@ export function useSkillActions(view: GameView, perspectiveIdx: number): UseSkil
     // 每次 view 变化(即使仅血量/手牌变化)都会 clearRegistry + 全量异步重注册,
     // async 间隙 skillActions 短暂为空 → 技能按钮闪烁。skillActionsKey 不变时
     // name/skills 未变,无需重注册(registerSkillActions 只用 p.index 与 p.skills)。
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 见上:依赖已编码的 key,避免全量重注册
   }, [skillActionsKey, perspectiveIdx]);
 
   return { skillActions };

@@ -246,7 +246,7 @@ describe('turnUsage 投影后 view 谓词与后端权威谓词同源', () => {
 
   it('usedCount:投影值=slashUsed() 合计 → viewSlashUsed/viewCanSlash 一致', () => {
     const state = makeState();
-    incSlashUsed(state);
+    void incSlashUsed(state);
     expect(slashUsed(state)).toBe(1);
     const view = makeView({ [varsKeys.SLASH_USED_COUNT_KEY]: 1 });
     expect(viewSlashUsed(view, 0)).toBe(1);

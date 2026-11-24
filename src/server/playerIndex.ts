@@ -19,20 +19,47 @@ register('playerRoomMap', playerRoomMap, () => {
   playerRoomMap.clear();
 });
 
-/** 记录玩家当前所在房间（加入/入座/转身份成功时由成员函数调用）。
+/** 房间元信息查询(room.ts 在模块初始化时注入)。绑定守卫需要区分调试房/真实房。
+ *  保持本模块零业务依赖(不 import room.ts,避免 room↔playerIndex 模块环)。 */
+export interface RoomMeta {
+  isDebug?: boolean;
+}
+
+let roomMetaResolver: ((roomId: string) => RoomMeta | undefined) | null = null;
+
+export function setRoomMetaResolver(resolver: (roomId: string) => RoomMeta | undefined): void {
+  roomMetaResolver = resolver;
+}
+
+/** 记录玩家当前所在房间(加入/入座/转身份成功时由成员函数调用)。
  *  role 省略时(sse.ts 重挂连接不区分身份)沿用同房既有身份,
- *  避免旁观者的 SSE 重连把映射身份误记为玩家。 */
+ *  避免旁观者的 SSE 重连把映射身份误记为玩家。
+ *
+ *  守卫:真实房间(非调试)成员的映射不得被调试房覆盖。调试房是未登录游客模型
+ *  (任意 playerId 可加入),不设此界时任何人可把他人映射改指向自己的调试房,
+ *  进而借 detachFromOtherRooms 把他人踢出真实房间。 */
 export function bindPlayerRoom(
   playerId: string,
   roomId: string,
   role?: 'player' | 'spectator',
 ): void {
   const previous = playerRoomMap.get(playerId);
+  if (previous && previous.roomId !== roomId) {
+    const prevMeta = roomMetaResolver?.(previous.roomId);
+    const nextMeta = roomMetaResolver?.(roomId);
+    if (prevMeta && prevMeta.isDebug !== true && nextMeta?.isDebug === true) return;
+  }
   const resolved = role ?? (previous?.roomId === roomId ? previous.role : 'player');
   playerRoomMap.set(playerId, { roomId, role: resolved });
 }
 
-/** 清除玩家的房间映射（离开/被踢/断线清理时由成员函数调用）。 */
-export function unbindPlayerRoom(playerId: string): void {
+/** 清除玩家的房间映射(离开/被踢/断线清理时由成员函数调用)。
+ *  roomId 可选:传入时仅当映射仍指向该房间才删除——过期连接的清理不得误删
+ *  该玩家在新房间的映射(调试房多人连接复用 playerId 的场景可稳定触发)。 */
+export function unbindPlayerRoom(playerId: string, roomId?: string): void {
+  if (roomId !== undefined) {
+    const current = playerRoomMap.get(playerId);
+    if (current && current.roomId !== roomId) return;
+  }
   playerRoomMap.delete(playerId);
 }

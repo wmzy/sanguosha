@@ -54,6 +54,7 @@ export function GameViewProvider({
 }
 
 /** 取 GameView 共享数据;必须在 GameViewProvider 内使用。 */
+// eslint-disable-next-line react-refresh/only-export-components -- context 与配套 hook 必须同文件(设计约束)
 export function useGameView(): GameViewCtxValue {
   const ctx = useContext(GameViewCtx);
   if (ctx === null) {

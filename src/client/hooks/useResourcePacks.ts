@@ -26,7 +26,7 @@ export function useResourcePacks() {
     setReady(false);
     // reset 强制下次 init 重新 fetch
     resourceManager.reset();
-    resourceManager.init().then(() => {
+    void resourceManager.init().then(() => {
       setPacks(resourceManager.listPacks());
       setReady(true);
     });

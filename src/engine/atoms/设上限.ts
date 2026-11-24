@@ -1,7 +1,7 @@
 // src/engine/atoms/设上限.ts
 // 设上限:设置玩家 maxHealth,clamp 当前 health 不超过新上限
 import type { AtomDefinition, GameView } from '../types';
-import { requirePlayer, viewPlayer } from './_helpers';
+import { broadcast, requirePlayer, viewPlayer } from './_helpers';
 
 export const 设上限: AtomDefinition<{ player: number; amount: number }> = {
   type: '设上限',
@@ -13,6 +13,10 @@ export const 设上限: AtomDefinition<{ player: number; amount: number }> = {
     const player = state.players[atom.player];
     player.maxHealth = atom.amount;
     player.health = Math.min(player.health, atom.amount);
+  },
+  // 显式投影(原依赖 resolveViewEvents 的原始 atom 兜底):只下发视图侧用到的两个字段。
+  toViewEvents(_state, atom) {
+    return broadcast({ type: '设上限', player: atom.player, amount: atom.amount });
   },
   applyView(view: GameView, event) {
     const p = viewPlayer(view, event.player as number);

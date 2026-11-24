@@ -1,8 +1,9 @@
 // src/server/persistence.ts
-import { writeFile, unlink, rename, mkdir, readdir, stat } from 'node:fs/promises';
+import { mkdir, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ROOMS_DATA_DIR } from './paths';
 import { readJsonIfExists, unlinkIfExists } from './fsQuiet';
+import { writeFileAtomic } from './fsAtomic';
 import type { ActionLogEntry, GameState } from '../engine/types';
 import { RealClock } from '../engine/core/clock';
 import { register as registerLifecycle } from './resourceRegistry';
@@ -73,16 +74,9 @@ function filePath(roomId: string): string {
 
 async function writeNow(roomId: string, wrapper: PersistedWrapper): Promise<void> {
   const path = filePath(roomId);
-  const tempPath = `${path}.${process.pid}.${Date.now()}.tmp`;
   try {
-    await writeFile(tempPath, JSON.stringify(wrapper));
-    await rename(tempPath, path);
+    await writeFileAtomic(path, JSON.stringify(wrapper));
   } catch (err) {
-    try {
-      await unlink(tempPath);
-    } catch {
-      // 临时文件清理失败不覆盖原始写入错误
-    }
     log.err(`save failed for room ${roomId}`, err);
     throw normalizeError(err);
   }

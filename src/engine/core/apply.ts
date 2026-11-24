@@ -248,7 +248,7 @@ export async function applyAtom(state: GameState, atom: Atom): Promise<boolean> 
       seq: state.seq,
       timestamp: state.clock.now() - state.startedAt,
       atom: current,
-      viewEvents: viewEvents!,
+      viewEvents,
     });
 
     if (def.pending) {

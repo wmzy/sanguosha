@@ -29,7 +29,7 @@ export function ReplayPage() {
   const file = useReplayFileFromLocation();
 
   const handleExit = useCallback(() => {
-    navigate('/');
+    void navigate('/');
   }, [navigate]);
 
   if (!file) {

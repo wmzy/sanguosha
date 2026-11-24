@@ -136,20 +136,20 @@ describe('useReplay · 事件队列节奏(对齐 useEventPlayback)', () => {
     act(() => result.current.togglePlay());
 
     // 推进 1999ms:第一步还未到(< 2000)
-    act(() => vi.advanceTimersByTime(1999));
+    void act(() => vi.advanceTimersByTime(1999));
     expect(result.current.step).toBe(0);
 
     // 再推进 1ms(累计 2000ms):第一步触发,step=1,currentEvent=A
-    act(() => vi.advanceTimersByTime(1));
+    void act(() => vi.advanceTimersByTime(1));
     expect(result.current.step).toBe(1);
     expect(result.current.currentEvent?.event.type).toBe('A');
     expect(result.current.ingestedEvents).toHaveLength(1);
     expect(result.current.ingestedEvents[0].event.type).toBe('A');
 
     // 第二步只需 500ms
-    act(() => vi.advanceTimersByTime(499));
+    void act(() => vi.advanceTimersByTime(499));
     expect(result.current.step).toBe(1);
-    act(() => vi.advanceTimersByTime(1));
+    void act(() => vi.advanceTimersByTime(1));
     expect(result.current.step).toBe(2);
     expect(result.current.currentEvent?.event.type).toBe('B');
 
@@ -166,9 +166,9 @@ describe('useReplay · 事件队列节奏(对齐 useEventPlayback)', () => {
     act(() => result.current.togglePlay());
 
     // 2000 / 2 = 1000ms 即触发
-    act(() => vi.advanceTimersByTime(999));
+    void act(() => vi.advanceTimersByTime(999));
     expect(result.current.step).toBe(0);
-    act(() => vi.advanceTimersByTime(1));
+    void act(() => vi.advanceTimersByTime(1));
     expect(result.current.step).toBe(1);
   });
 
@@ -180,9 +180,9 @@ describe('useReplay · 事件队列节奏(对齐 useEventPlayback)', () => {
     act(() => result.current.togglePlay());
 
     // 50ms 不够,需 400ms
-    act(() => vi.advanceTimersByTime(399));
+    void act(() => vi.advanceTimersByTime(399));
     expect(result.current.step).toBe(0);
-    act(() => vi.advanceTimersByTime(1));
+    void act(() => vi.advanceTimersByTime(1));
     expect(result.current.step).toBe(1);
   });
 
@@ -271,7 +271,7 @@ describe('useReplay · 事件队列节奏(对齐 useEventPlayback)', () => {
     expect(result.current.playing).toBe(true);
 
     // 推进一步:currentEvent=A
-    act(() => vi.advanceTimersByTime(400));
+    void act(() => vi.advanceTimersByTime(400));
     expect(result.current.step).toBe(1);
     expect(result.current.currentEvent?.event.type).toBe('A');
   });

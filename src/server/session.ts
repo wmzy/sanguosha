@@ -36,6 +36,15 @@ import { appendEventJournal, resetEventJournal } from './eventJournal';
 import { appendGameHistory, buildHistoryEntry, buildReplayFile } from './gameHistory';
 import { createRng } from '../engine/util/rng';
 import { VirtualClock, RealClock } from '../engine/core/clock';
+import { randomInt } from 'node:crypto';
+
+/** 本局随机种子:必须是不可预测的 CSPRNG 值 —— 它决定身份分配、选将候选与整副
+ *  牌序(Mulberry32 完全确定)。曾用 Date.now():同一条 event 的 epoch 也是
+ *  毫秒时间戳(相差 2ms),任何参赛者枚举几十个候选即可还原全部隐藏信息。
+ *  范围 [1, 2^32) 对齐 Mulberry32 的 32 位种子域。 */
+export function randomSessionSeed(): number {
+  return randomInt(1, 2 ** 32);
+}
 
 /** 计算座次轮转偏移:物理座位 i → 游戏座次 (i + offset) % n。
  *  用 seed 派生(确定性,持久化/恢复可复现),使主公(游戏座次 0)随机分布到各物理座位——
@@ -134,7 +143,7 @@ export class GameSession {
     this.roomName = room.name;
     this.maxPlayers = room.maxPlayers;
     this.debug = debug;
-    this.sessionSeed = sessionSeed ?? Date.now();
+    this.sessionSeed = sessionSeed ?? randomSessionSeed();
   }
 
   /** 局标识:每局唯一(startGame/restoreState 各自设置的 gameStartedAt)。
@@ -506,8 +515,8 @@ export class GameSession {
     this.lastBroadcastSeq = 0;
     // 丢弃上一局的录像基线并归零裁剪水位(下一局 startGame 也会重置;此处先复位避免残留影响判空)
     this.resetRoundBookkeeping();
-    // 重新生成 seed,新一局随机序列不同
-    this.sessionSeed = Date.now();
+    // 重新生成 seed,新一局随机序列不同(不可预测,见 randomSessionSeed)
+    this.sessionSeed = randomSessionSeed();
     setRoomStatus(this.room.id, '等待中');
     this.room.readyPlayers.clear();
     // 清除旧持久化数据,避免重启时恢复到已结束的局面

@@ -16,10 +16,11 @@
 // 「开局基线视图 + eventsForViewer 差量事件」,保证与本地录制文件格式完全一致,
 // 前端 loadReplay/isReplayFile/useReplay 无需任何改动即可重放。
 
-import { mkdir, writeFile, rm, readdir } from 'node:fs/promises';
+import { mkdir, rm, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createLogger } from './logger';
 import { readJsonIfExists } from './fsQuiet';
+import { writeFileAtomic } from './fsAtomic';
 import { register as registerLifecycle } from './resourceRegistry';
 import { createRoomSerialChain } from './serialChain';
 import { isSafeRoomId, isSafeId } from './safeId';
@@ -216,9 +217,10 @@ export async function appendGameHistory(
     const removed = entries.slice(0, entries.length - trimmed.length);
     await mkdir(roomDir(roomId), { recursive: true });
     if (replay) {
-      await writeFile(replayPath(roomId, entry.id), JSON.stringify(replay));
+      await writeFileAtomic(replayPath(roomId, entry.id), JSON.stringify(replay));
     }
-    await writeFile(indexPath(roomId), JSON.stringify(trimmed));
+    // index 必须原子写:读到半截 JSON 会按损坏回空列表 → 该房历史静默全部消失。
+    await writeFileAtomic(indexPath(roomId), JSON.stringify(trimmed));
     for (const r of removed) {
       await rm(replayPath(roomId, r.id), { force: true });
     }
@@ -293,7 +295,7 @@ export async function deleteGameHistoryEntry(roomId: string, entryId: string): P
     const entries = await readIndexFromDisk(roomId);
     const next = entries.filter((e) => e.id !== entryId);
     if (next.length === entries.length) return false;
-    await writeFile(indexPath(roomId), JSON.stringify(next));
+    await writeFileAtomic(indexPath(roomId), JSON.stringify(next));
     await rm(replayPath(roomId, entryId), { force: true });
     cache.set(roomId, next);
     return true;

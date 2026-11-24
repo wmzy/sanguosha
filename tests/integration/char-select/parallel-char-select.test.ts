@@ -103,7 +103,7 @@ describe('并行选将:多 target 同时选将', () => {
         { target: 1, candidates: [{ name: '孙权', skills: ['制衡'] }] },
       ],
     });
-    p.then(() => {
+    void p.then(() => {
       resolved = true;
     });
     await waitForStable(harness.state);

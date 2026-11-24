@@ -4,7 +4,7 @@
 import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { broadcast } from './_helpers';
 
-export const 结算帧出栈: AtomDefinition<Record<string, never>> = {
+export const 结算帧出栈: AtomDefinition<{ type: '结算帧出栈' }> = {
   type: '结算帧出栈',
   validate(state) {
     if (state.settlementStack.length === 0) return 'settlementStack 为空,无可弹出帧';

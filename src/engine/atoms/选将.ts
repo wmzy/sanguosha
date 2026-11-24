@@ -100,6 +100,12 @@ export const 抽身份: AtomDefinition<{
       state.players[i].identity = id as PlayerState['identity'];
     }
   },
+  // 只投影 atom 名:seed 是整局身份/选将/牌序的随机源,任何人都不得从事件流拿到它
+  // (身份是隐藏信息;此前省略本方法 → resolveViewEvents 兜底把 {type,playerCount,seed}
+  // 广播给所有 viewer)。实现身份揭示的其它 atom 各自按权限投影。
+  toViewEvents() {
+    return broadcast({ type: '抽身份' });
+  },
 };
 
 // ── 初始化洗牌 ──────────────────────────────────────────

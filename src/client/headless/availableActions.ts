@@ -1048,6 +1048,19 @@ export function appendRespondActions(
       }
       return;
     }
+    // chooseSuit 类(反间:目标猜花色):每个花色一个 action。
+    // 此前无此分支 → 落入下方兜底发空 params,引擎恒拒「需要选择 ♠/♥/♣/♦」。
+    if (pending.prompt?.type === 'chooseSuit') {
+      for (const suit of ['♠', '♥', '♣', '♦'] as const) {
+        out.push({
+          description: `选择花色 ${suit}`,
+          message: respondMsg(info.skillId, { suit }),
+          validTargets: [],
+          category: 'respond',
+        });
+      }
+      return;
+    }
     // 被动 distribute prompt（贯石斧杀被闪抵消后选 2 张弃置强命 / 遗计分配 等
     // 请求回应型 distribute）。与主动 distribute（制衡/仁德 use，由 enumerateDistributeActions
     // 处理）不同：这里 actionType='respond'，skillId 由 resolvePendingRespond 推导
@@ -1060,11 +1073,12 @@ export function appendRespondActions(
       const me = view.players[ownerId];
       const equip = (me?.equipment ?? {}) as Partial<Record<string, string>>;
       if (mode === 'select') {
-        const requestType = getPendingRequestType(pending);
-        if (requestType === '观星/arrange') {
-          // 观星的 distribute 契约不是 cardIds，而是 { top, bottom }。默认「全留顶、
-          // 保持原顺序」：top[0]=最先摸到=牌堆顶，因此 top 是 observed 的逆序；
+        if (distPrompt.topBottom === true) {
+          // 观星族(观星/界观星/恂恂)的 distribute 契约不是 cardIds，而是 { top, bottom }。
+          // 默认「全留顶、保持原顺序」：top[0]=最先摸到=牌堆顶，因此 top 是 observed 的逆序；
           // 这样整理牌堆后顺序不变，是无需 LLM 补参的可执行动作。
+          // 判据用 prompt.topBottom(引擎显式声明),不按 requestType 前缀猜——
+          // 三个技能的 requestType 分别是 观星/界观星/恂恂,按字面量匹配会漏两个。
           const observed = distPrompt.cardIds ?? [];
           out.push({
             description: `发动【${info.skillId}】（观星：全部留在牌堆顶，保持原顺序）`,

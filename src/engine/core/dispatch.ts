@@ -202,7 +202,10 @@ export async function dispatch(
       rollbacks.push({ entry: pEntry, params: p.params });
       try {
         await pEntry.execute(state, p.params);
-      } catch {
+      } catch (error) {
+        // preceding 技能实现抛错:必须上报(此前裸 catch 完全吞掉,线上只能看到
+        // 「动作被拒」而无根因)。reject() 只携带回滚回调自身的错误,故在此直接上报。
+        state.onError?.(error instanceof Error ? error : new Error(String(error)));
         snapshot.pending.trackNew();
         return rejectRolledBack();
       }

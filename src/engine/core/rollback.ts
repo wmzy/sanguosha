@@ -42,6 +42,22 @@ const PLAYER_SNAPSHOT_FIELDS: ReadonlyArray<{
   { key: 'character', copy: 'scalar' },
 ];
 
+/** 快照覆盖清单之外的 PlayerState 字段:座次/身份/昵称等由开局或分配武将一次性写入,
+ *  不属于任何技能的 preceding 代价,故不参与回滚快照。 */
+type ExcludedPlayerField = 'index' | 'name' | 'nickname' | 'identity' | 'faction';
+
+/** 编译期覆盖检查(单向):PlayerState 新增可变字段必须登记进 PLAYER_SNAPSHOT_FIELDS
+ *  或列入 ExcludedPlayerField,否则 tsc 直接报错。
+ *  背景:字段表靠手工维护,漏登记 = 拒绝路径不回滚该字段,客户端可见状态静默漂移。 */
+type SnapshottedPlayerField = (typeof PLAYER_SNAPSHOT_FIELDS)[number]['key'] | 'judgeZone';
+type UncoveredPlayerField = Exclude<keyof PlayerState, SnapshottedPlayerField | ExcludedPlayerField>;
+const _assertPlayerSnapshotCoversAll: UncoveredPlayerField extends never ? true : never = true;
+/** 反向检查:排除清单不得残留已删除/拼错的字段名(否则排除清单静默失效)。 */
+type StaleExcludedPlayerField = Exclude<ExcludedPlayerField, keyof PlayerState>;
+const _assertNoStaleExcludedField: StaleExcludedPlayerField extends never ? true : never = true;
+void _assertPlayerSnapshotCoversAll;
+void _assertNoStaleExcludedField;
+
 /** 按语义拷贝单个字段值(快照/还原共用)。 */
 function copyByKind(value: unknown, copy: CopyKind): unknown {
   switch (copy) {

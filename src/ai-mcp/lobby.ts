@@ -54,7 +54,7 @@ export async function joinAndReady(
   }
   const joinDeadline = Date.now() + 10_000;
   await waitFor(() => hgc.playerId !== null, joinDeadline, '加入房间超时');
-  hgc.sendReady();
+  void hgc.sendReady();
   const rs = hgc.roomState;
   return {
     roomId: hgc.roomId ?? '',

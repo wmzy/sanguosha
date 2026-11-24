@@ -185,7 +185,7 @@ describe('模块 K:杀次数三层计数模型', () => {
     it('基础场景(quotaMax=1):首次扣额定,quotaUsed=1;第二次无处可扣进 extra', () => {
       const s = makeState();
       // quotaMax=1(base), extraMax=0
-      incSlashUsed(s);
+      void incSlashUsed(s);
       expect(slashQuotaUsed(s)).toBe(1);
       expect(slashExtraUsed(s)).toBe(0);
       expect(slashUsed(s)).toBe(1);
@@ -198,16 +198,16 @@ describe('模块 K:杀次数三层计数模型', () => {
       // slashMax = 3
       expect(slashMax(s, 0)).toBe(3);
 
-      incSlashUsed(s);
+      void incSlashUsed(s);
       expect(slashQuotaUsed(s)).toBe(1);
       expect(slashExtraUsed(s)).toBe(0);
 
-      incSlashUsed(s);
+      void incSlashUsed(s);
       expect(slashQuotaUsed(s)).toBe(2);
       expect(slashExtraUsed(s)).toBe(0);
 
       // 额定满 → 扣额外
-      incSlashUsed(s);
+      void incSlashUsed(s);
       expect(slashQuotaUsed(s)).toBe(2);
       expect(slashExtraUsed(s)).toBe(1);
       expect(slashUsed(s)).toBe(3);
@@ -222,15 +222,15 @@ describe('模块 K:杀次数三层计数模型', () => {
       // slashMax = 1 + 2 = 3
       expect(slashMax(s, 0)).toBe(3);
 
-      incSlashUsed(s);
+      void incSlashUsed(s);
       expect(slashQuotaUsed(s)).toBe(1);
       expect(slashExtraUsed(s)).toBe(0);
 
-      incSlashUsed(s);
+      void incSlashUsed(s);
       expect(slashQuotaUsed(s)).toBe(1);
       expect(slashExtraUsed(s)).toBe(1);
 
-      incSlashUsed(s);
+      void incSlashUsed(s);
       expect(slashQuotaUsed(s)).toBe(1);
       expect(slashExtraUsed(s)).toBe(2);
       expect(slashUsed(s)).toBe(3);
@@ -245,7 +245,7 @@ describe('模块 K:杀次数三层计数模型', () => {
       expect(slashMax(s, 0)).toBe(Infinity);
 
       for (let i = 0; i < 5; i++) {
-        incSlashUsed(s);
+        void incSlashUsed(s);
         expect(canSlash(s, 0)).toBe(true);
       }
       expect(slashUsed(s)).toBe(5);

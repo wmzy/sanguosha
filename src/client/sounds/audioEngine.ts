@@ -147,7 +147,7 @@ class AudioEngine {
     if (!this.unlocked || !this.ctx) return; // decodeAudioData 依赖 ctx
     for (const soundId of soundIds) {
       const url = resolveSoundUrl(soundId);
-      if (url) this.ensureBuffer(soundId, url);
+      if (url) void this.ensureBuffer(soundId, url);
     }
   }
 

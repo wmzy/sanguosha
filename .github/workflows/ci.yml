@@ -13,6 +13,11 @@ jobs:
     # ubuntu-latest 已于 2026-10-19 切换到 Ubuntu 26.04,playwright 1.60 尚不支持
     # 该平台的 chromium;固定 24.04 直到升级 playwright。
     runs-on: ubuntu-24.04
+    # 同一分支的新推送取消旧运行(否则挂死的 Playwright/webServer 会烧满默认 360 分钟)。
+    concurrency:
+      group: ci-${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    timeout-minutes: 30
     strategy:
       matrix:
         node-version: [22]
@@ -47,7 +52,9 @@ jobs:
         run: pnpm build
 
       - name: Test with coverage
-        run: pnpm test:coverage --maxWorkers=2
+        # --no-passWithNoTests:CI 是全量运行,0 收集(include 写错/目录改名)必须失败,
+        # 不能被 vitest.config 的 passWithNoTests 静默放过。
+        run: pnpm exec vitest run --coverage --maxWorkers=2 --no-passWithNoTests
 
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium

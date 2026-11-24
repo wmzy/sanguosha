@@ -48,7 +48,7 @@ export function useAuth(): AuthState {
   // 会被第一个 cleanup 永久禁言)。用 effect 局部 active 标志,随每次 effect 实例独立。
   useEffect(() => {
     let active = true;
-    (async () => {
+    void (async () => {
       try {
         const resp = await apiFetch<MeResponse>('/api/auth/me');
         if (!active) return;

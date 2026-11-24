@@ -140,7 +140,7 @@ export function ProfilePage() {
 
   // 未登录(会话过期/直达 URL)回首页
   useEffect(() => {
-    if (!auth.loading && !auth.user) navigate('/', { replace: true });
+    if (!auth.loading && !auth.user) void navigate('/', { replace: true });
   }, [auth.loading, auth.user, navigate]);
 
   if (auth.loading || !auth.user) return null;

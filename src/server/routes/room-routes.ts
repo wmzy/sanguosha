@@ -6,6 +6,7 @@ import {
   createRoom,
   createDebugRoom,
   getRoom,
+  getAllRooms,
   getRoomList,
   buildRoomInfo,
   leaveRoom,
@@ -19,6 +20,7 @@ import {
   setRoomPassword,
   isValidPlayerCount,
   PLAYER_COUNT_ERROR,
+  findRoomByPlayerId,
   type KickFailureReason,
 } from '../room';
 import { bindPlayerRoom } from '../playerIndex';
@@ -47,12 +49,26 @@ import {
 
 const log = createLogger('rest');
 
+/** 单账号普通房间上限(normal 房间永不自动回收,须限量)。 */
+const NORMAL_ROOM_LIMIT_PER_USER = 5;
+
+/** 调试房 playerId 是未登录游客模型(调用方任意指定)。若该 id 当前属于一个
+ *  真实房间,则调试房加入会 detachFromOtherRooms → leaveRoom(explicit) 把真实玩家
+ *  踢出房间;映射覆盖还会让该玩家的房间操作落到调试房。必须拒绝。 */
+function debugPlayerIdConflict(playerId: string): boolean {
+  const existing = findRoomByPlayerId(playerId);
+  return !!existing && !existing.isDebug;
+}
+
 /** 注册房间生命周期/成员管理路由。 */
 export function applyRoomRoutes(app: Hono): void {
-  app.get('/api/rooms', (c) => {
+  app.get('/api/rooms', async (c) => {
     const typeParam = c.req.query('type');
     const type = typeParam === 'debug' || typeParam === 'multiplayer' ? typeParam : undefined;
-    return c.json(getRoomList(type));
+    // 非成员只返回昵称级公开字段(见 redactRoomInfo):playerIds/hostId 是 userId,
+    // 泄露后可用于调试房 playerId 劫持。
+    const user = await requireUser(c);
+    return c.json(getRoomList(type, user?.id ?? null));
   });
 
   app.get('/api/rooms/:id', (c) => {
@@ -105,6 +121,15 @@ export function applyRoomRoutes(app: Hono): void {
     // 普通房间必须登录:playerId = 稳定 userId,显示名 = displayName
     const user = await requireUser(c);
     if (!user) return authRequired(c);
+    if (roomType === 'normal') {
+      // 普通房间永不自动销毁(仅房主显式删除),无配额时一个账号可无限堆积房间与 DB 行。
+      const owned = getAllRooms().filter(
+        (r) => r.roomType === 'normal' && r.hostId === user.id,
+      ).length;
+      if (owned >= NORMAL_ROOM_LIMIT_PER_USER) {
+        return c.json({ error: `每人最多创建 ${NORMAL_ROOM_LIMIT_PER_USER} 个普通房间` }, 400);
+      }
+    }
 
     try {
       const room = createRoom(
@@ -181,6 +206,15 @@ export function applyRoomRoutes(app: Hono): void {
       return c.json({ error: PLAYER_COUNT_ERROR }, 400);
     }
 
+    // 先校验 autoJoin 的 playerId 冲突(在建房之前:失败请求不得留下孤儿调试房)
+    const requestedPlayerId =
+      raw.autoJoin === true && typeof raw.playerId === 'string' && raw.playerId.trim()
+        ? raw.playerId.trim()
+        : undefined;
+    if (requestedPlayerId && debugPlayerIdConflict(requestedPlayerId)) {
+      return c.json({ error: '该玩家 id 已被真实房间占用' }, 409);
+    }
+
     try {
       const config = normalizeRoomConfig(raw.config);
       const room = createDebugRoom(config.name || `调试${playerCount}人`, playerCount, config);
@@ -189,13 +223,11 @@ export function applyRoomRoutes(app: Hono): void {
       const session = new GameSession(room, true);
       gameSessions.set(room.id, session);
 
-      // 可选:创建者自动加入第一个座次（默认 false，由 SSE/WS 连接负责加入）
+      // 可选:创建者自动加入第一个座次（默认 false，由 SSE 连接负责加入）
       let playerId: string | undefined;
       let seatIndex: number | undefined;
       if (raw.autoJoin === true) {
-        playerId = typeof raw.playerId === 'string' && raw.playerId.trim()
-          ? raw.playerId.trim()
-          : generatePlayerId();
+        playerId = requestedPlayerId ?? generatePlayerId();
         // joinDebugRoom 内部绑定 playerRoomMap
         joinDebugRoom(room.id, playerId, nullSink());
         seatIndex = session.assignDebugSeat(playerId);
@@ -224,6 +256,10 @@ export function applyRoomRoutes(app: Hono): void {
     const playerId = typeof raw.playerId === 'string' && raw.playerId.trim()
       ? raw.playerId.trim()
       : generatePlayerId();
+    // 真实房间成员不得被调试房"加入"劫持(见 debugPlayerIdConflict)
+    if (debugPlayerIdConflict(playerId)) {
+      return c.json({ error: '该玩家 id 已被真实房间占用' }, 409);
+    }
     // 清理旧房间关联(调试房重进连本房残留一并清理,靠 joinDebugRoom 重新占座)
     detachFromOtherRooms(playerId);
 

@@ -23,7 +23,7 @@ function calcNextPlayer(state: { players: { alive: boolean }[]; currentPlayerInd
   return { nextIdx, roundIncrement: nextIdx >= prev };
 }
 
-export const 下一玩家: AtomDefinition<Record<string, never>> = {
+export const 下一玩家: AtomDefinition<{ type: '下一玩家' }> = {
   type: '下一玩家',
   validate() {
     return null;

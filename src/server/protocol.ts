@@ -248,8 +248,11 @@ export interface RoomInfo {
   playerCount: number;
   maxPlayers: number;
   status: string;
-  /** 房主 playerId;debug 房间无房主时为 null */
+  /** 房主 playerId;debug 房间无房主时为 null。仅成员可见(非成员响应中置 null) */
   hostId?: string | null;
+  /** 房主昵称(非敏感:与 playerNames 一样只暴露显示名,不含 userId)。
+   *  公开房间列表靠它展示房主名,从而无需下发 hostId/playerIds。 */
+  hostName?: string | null;
   isDebug?: boolean;
   /** 房间类型: normal=持久化; quick=纯内存 */
   roomType?: 'normal' | 'quick';

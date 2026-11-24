@@ -222,7 +222,11 @@ export function GameViewComponentImpl({
   const isMyTurn = isPerspectiveTurn;
   const currentPlayer = view.players[view.currentPlayerIndex];
   const currentPlayerName = currentPlayer.name;
-  const perspectiveHand: Card[] = perspectivePlayer.hand ?? [];
+  // 引用稳定:数组字面量每次渲染都是新引用,会让下游 useMemo/useCallback 依赖失效
+  const perspectiveHand = useMemo<Card[]>(
+    () => perspectivePlayer.hand ?? [],
+    [perspectivePlayer.hand],
+  );
 
   // 手牌拖拽重排(已抽出到 useHandReorder)
   const { orderedHand, handleDragStart, handleDrop } = useHandReorder(

@@ -36,6 +36,16 @@ pnpm server       # 独立运行后端服务器
 
 CI 包含类型检查、lint、构建、限并发全量覆盖率、普通认证房间的 HGC/Chromium 流程与插件验证。`main` 的发布工作流调用同一提交的 CI，成功后才构建并验证发布产物；其他分支与 PR 直接运行 CI。
 
+## 生产部署
+
+```bash
+pnpm build                 # 产出 dist/（前端静态资源 + dist/packs/index.json）
+pnpm server                # 单进程：/api 走 Hono，其余走 dist/ 静态资源 + SPA fallback
+```
+
+`pnpm server` 只托管 `dist/`（不跑 Vite dev server），推荐由反向代理终结 TLS。
+若线上直接跑 `pnpm dev`，Vite 的 `resource` 插件也会工作，但 dev server 不应作为生产入口。
+
 ## 游戏功能
 
 - **165 名武将**：标准版 76 名 + 界限突破 89 名，覆盖魏蜀吴群四势力
@@ -53,6 +63,7 @@ CI 包含类型检查、lint、构建、限并发全量覆盖率、普通认证�
 | `PORT` | `3930` | 服务器端口 |
 | `HOST` | `true` | 绑定地址（`true` = 所有网卡） |
 | `SGS_TRUSTED_PROXIES` | 空 | 逗号分隔的可信代理 IP；仅这些 peer 的转发头用于限流。代理必须覆盖 `X-Real-IP` 或追加真实来源到 `X-Forwarded-For`；修改后重启。 |
+| `SGS_COOKIE_SECURE` | 自动 | 会话 Cookie 的 `Secure`。反代终结 TLS 时设 `true`；`false` 强制关闭。缺省按直连 https 或**可信代理**的 `X-Forwarded-Proto: https` 判定。 |
 
 ## AI agent 接入
 

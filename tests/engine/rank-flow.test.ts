@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import '../../src/engine/atoms'; // 注册所有 atom(含 rank-timing)
 import { createGameState } from '../../src/engine/types';
-import type { Atom, GameState, PlayerState, ViewEventSplit } from '../../src/engine/types';
+import type { Atom, GameState, PlayerState } from '../../src/engine/types';
 import { runRankCompareFlow, getCardValue } from '../../src/engine/flows/rank';
 import { getAtomDef } from '../../src/engine/core/atom';
 import { makeCard, makePlayer as sharedMakePlayer } from '../engine-harness';
@@ -84,7 +84,7 @@ describe('模块 G:拼点两步化 runRankCompareFlow', () => {
 
     const atom = { type: '拼点扣置', initiator: 0, target: 1, initiatorCard: 'c1', targetCard: 'c2' } as Atom;
     const def = getAtomDef('拼点扣置');
-    const split = def.toViewEvents!(state, atom) as ViewEventSplit;
+    const split = def.toViewEvents(state, atom);
 
     // 发起方视图:有 initiatorCardFace,无 targetCardFace
     const initiatorView = split.ownerViews.get(0);
@@ -118,7 +118,7 @@ describe('模块 G:拼点两步化 runRankCompareFlow', () => {
 
     const atom = { type: '拼点亮出', initiator: 0, target: 1, initiatorCard: 'c1', targetCard: 'c2' } as Atom;
     const def = getAtomDef('拼点亮出');
-    const split = def.toViewEvents!(state, atom) as ViewEventSplit;
+    const split = def.toViewEvents(state, atom);
 
     // ownerViews 为空 → 所有人走 othersView(全员公开)
     expect(split.ownerViews.size).toBe(0);

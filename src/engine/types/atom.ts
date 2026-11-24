@@ -371,15 +371,17 @@ export interface AtomDefinition<A = unknown> {
    *  典型场景:并行选将(拆成 选将询问)。 */
   parallelSplit?: (atom: A) => Array<{ target: number; slotAtom: Atom }>;
   /**
-   * 将后端 atom 转换为前端可消费的视图事件。
+   * 将后端 atom 转换为前端可消费的视图事件。**必填**——不存在「回退为原始 atom
+   * 广播」的默认路径:那会把 seed/prompt/手牌等内部字段下发给所有 viewer
+   * (2026-11 的 抽身份.seed 泄漏即此路径)。
    *
    * ⚠️ 在 apply 之前调用——此时 state 尚未变更，可以读取即将被消费的数据
    * （如摸牌前读取牌堆顶的牌面信息）。
    *
    * 返回 ViewEventSplit 实现 per-player 信息分级和参数脱敏。
    * ViewEvent 是纯数据（可序列化），不含函数。
-   * 未实现 = fallback 到带 effect 的原始 atom（前端回退到全量 buildView）。 */
-  toViewEvents?(state: GameState, atom: A): ViewEventSplit | undefined;
+   * 不需要视图事件时返回 `broadcast(null)`（= 全员不可见），不要省略本方法。 */
+  toViewEvents(state: GameState, atom: A): ViewEventSplit;
   /**
    * 前端视图状态更新。与后端 apply 对称——apply 修改 GameState，applyView 修改 GameView。
    *

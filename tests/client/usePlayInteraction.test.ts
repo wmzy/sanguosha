@@ -2012,6 +2012,69 @@ function pendingDistributeParams(
   });
 }
 
+describe('usePlayInteraction · distribute(topBottom 观星族被动 pending)', () => {
+  /** 观星 arrange prompt:引擎显式声明 topBottom(三个观星族 skill 共用)。 */
+  function arrangePrompt(overrides: Partial<DistributePrompt> = {}): DistributePrompt {
+    return {
+      type: 'distribute',
+      mode: 'select',
+      topBottom: true,
+      title: '观星：排列牌堆顶牌',
+      cardIds: ['d1', 'd2', 'd3'],
+      minTotal: 0,
+      maxTotal: 3,
+      ...overrides,
+    };
+  }
+
+  it('按点选顺序置顶、未选中的观察牌置底,提交 {top,bottom}', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      pendingDistributeParams(send, arrangePrompt(), { pendingRespondInfo: { skillId: '观星' } }),
+    );
+    // 点选顺序 = 摸牌顺序(top[0] 最先摸)
+    act(() => result.current.handleDistToggle('d2'));
+    act(() => result.current.handleDistToggle('d1'));
+    act(() => result.current.handleDistSubmit());
+    expect(sentCalls(send)).toEqual([
+      {
+        skillId: '观星',
+        actionType: 'respond',
+        params: { top: ['d2', 'd1'], bottom: ['d3'] },
+      },
+    ]);
+  });
+
+  it('不选任何牌 = 全部置底(仍是合法划分)', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      pendingDistributeParams(send, arrangePrompt(), { pendingRespondInfo: { skillId: '界观星' } }),
+    );
+    act(() => result.current.handleDistSubmit());
+    expect(sentCalls(send)).toEqual([
+      {
+        skillId: '界观星',
+        actionType: 'respond',
+        params: { top: [], bottom: ['d1', 'd2', 'd3'] },
+      },
+    ]);
+  });
+
+  it('未声明 topBottom 的 select 模式仍提交 cardIds', () => {
+    const send = vi.fn();
+    const { result } = renderPlay(
+      pendingDistributeParams(send, arrangePrompt({ topBottom: undefined }), {
+        pendingRespondInfo: { skillId: '贯石斧' },
+      }),
+    );
+    act(() => result.current.handleDistToggle('d1'));
+    act(() => result.current.handleDistSubmit());
+    expect(sentCalls(send)).toEqual([
+      { skillId: '贯石斧', actionType: 'respond', params: { cardIds: ['d1'] } },
+    ]);
+  });
+});
+
 describe('usePlayInteraction · distribute(遗计 allocate 被动分配)', () => {
   it('选牌后点玩家分配,提交发送 allocation', () => {
     const send = vi.fn();

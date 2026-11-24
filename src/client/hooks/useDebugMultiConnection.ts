@@ -459,7 +459,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
       const clientMsg: ClientMessage = { type: 'reorder_hand', order };
       logWsMessage(perspectiveRef.current, 'out', clientMsg);
       logUserAction('reorder', order);
-      hgc.reorderHand(order);
+      void hgc.reorderHand(order);
     },
     [clientByViewer],
   );
@@ -496,7 +496,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     const msg: ClientMessage = { type: 'ready' };
     logWsMessage(seat, 'out', msg);
     logUserAction('ready', seat);
-    hgc.sendReady();
+    void hgc.sendReady();
   }, []);
 
   const sendCancelReady = useCallback((seat: number) => {
@@ -504,7 +504,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     if (!hgc) return;
     logWsMessage(seat, 'out', { type: 'cancel-ready' });
     logUserAction('cancel_ready', seat);
-    hgc.sendCancelReady();
+    void hgc.sendCancelReady();
   }, []);
 
   const sendStartGame = useCallback(() => {
@@ -513,7 +513,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     const msg: ClientMessage = { type: 'start_game' };
     logWsMessage(0, 'out', msg);
     logUserAction('start_game', null);
-    hgc.sendStartGame();
+    void hgc.sendStartGame();
   }, []);
 
   const sendRestart = useCallback(() => {
@@ -522,7 +522,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     const msg: ClientMessage = { type: 'restart_game' };
     logWsMessage(0, 'out', msg);
     logUserAction('restart_game', null);
-    hgc.sendRestart();
+    void hgc.sendRestart();
   }, []);
 
   const sendUpdateConfig = useCallback((config: import('../../server/protocol').RoomConfig) => {
@@ -531,7 +531,7 @@ export function useDebugMultiConnection(params: UseDebugMultiConnectionParams): 
     const msg: ClientMessage = { type: 'update_room_config', config };
     logWsMessage(0, 'out', msg);
     logUserAction('update_config', config);
-    hgc.sendUpdateConfig(config);
+    void hgc.sendUpdateConfig(config);
   }, []);
 
   return {

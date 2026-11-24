@@ -73,9 +73,9 @@ export function addChatMessage(
     }
   }
 
-  // 记录用量
+  // 记录用量(每分钟限流关闭时不记录时间戳:否则滑动窗口数组会一直增长到房间销毁)
   usage.total++;
-  usage.timestamps.push(now);
+  if (chat.maxPerMinute > 0) usage.timestamps.push(now);
 
   // 存入历史
   const entry = { playerId, seatIndex, text: trimmed, timestamp: now };

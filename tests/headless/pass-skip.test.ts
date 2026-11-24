@@ -206,33 +206,96 @@ describe('HeadlessGameClient.getAvailableActions() — 观星 arrange', () => {
     clearRegistry();
   });
 
-  it('观星/arrange 生成可直接提交的 top/bottom（保持原牌序）', () => {
+  // 三个观星族技能的 requestType 各不相同(观星/界观星/恂恂),判据必须是引擎显式声明的
+  // prompt.topBottom,不能按 requestType 字面量匹配(旧实现只认 '观星/arrange')。
+  it.each([['观星/arrange'], ['界观星/arrange'], ['恂恂/arrange']])(
+    '%s 生成可直接提交的 top/bottom(保持原牌序)',
+    (requestType) => {
+      const hgc = new HeadlessGameClient('ws://localhost:0');
+      (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
+      const pending: PendingView = {
+        type: 'awaits',
+        atom: {
+          type: '请求回应',
+          requestType,
+          target: 0,
+          prompt: { type: 'distribute', title: '观星：排列牌堆顶牌', cardIds: ['d1', 'd2'], mode: 'select' },
+        },
+        prompt: {
+          type: 'distribute',
+          title: '观星：排列牌堆顶牌',
+          mode: 'select',
+          topBottom: true,
+          cardIds: ['d1', 'd2'],
+          minTotal: 0,
+          maxTotal: 2,
+        },
+        target: 0,
+        isBlocking: true,
+      };
+      (hgc as unknown as { _view: GameView | null })._view = makeView(pending);
+      const action = hgc.getAvailableActions().find((a) => a.description.includes('观星'));
+      expect(action).toBeDefined();
+      expect(action!.message.actionType).toBe('respond');
+      expect(action!.message.params).toEqual({ top: ['d2', 'd1'], bottom: [] });
+    },
+  );
+
+  it('未声明 topBottom 的 select distribute 仍提交 cardIds(不误判)', () => {
     const hgc = new HeadlessGameClient('ws://localhost:0');
     (hgc as unknown as { _seatIndex: number })._seatIndex = 0;
     const pending: PendingView = {
       type: 'awaits',
       atom: {
         type: '请求回应',
-        requestType: '观星/arrange',
+        requestType: '贯石斧/select',
         target: 0,
-        prompt: { type: 'distribute', title: '观星：排列牌堆顶牌', cardIds: ['d1', 'd2'], mode: 'select' },
+        prompt: { type: 'distribute', title: '弃两张牌', cardIds: ['d1', 'd2'], mode: 'select', minTotal: 2 },
       },
       prompt: {
         type: 'distribute',
-        title: '观星：排列牌堆顶牌',
+        title: '弃两张牌',
         mode: 'select',
         cardIds: ['d1', 'd2'],
-        minTotal: 0,
+        minTotal: 2,
         maxTotal: 2,
       },
       target: 0,
       isBlocking: true,
     };
     (hgc as unknown as { _view: GameView | null })._view = makeView(pending);
-    const action = hgc.getAvailableActions().find((a) => a.description.includes('观星'));
+    const action = hgc.getAvailableActions().find((a) => a.message.actionType === 'respond');
     expect(action).toBeDefined();
-    expect(action!.message.actionType).toBe('respond');
-    expect(action!.message.params).toEqual({ top: ['d2', 'd1'], bottom: [] });
+    expect(action!.message.params.cardIds).toEqual(['d1', 'd2']);
+    expect(action!.message.params.top).toBeUndefined();
+  });
+});
+
+describe('HeadlessGameClient.getAvailableActions() — chooseSuit(反间)', () => {
+  beforeEach(() => {
+    clearRegistry();
+  });
+
+  it('为四种花色各生成一个可直接提交的 respond', () => {
+    const hgc = new HeadlessGameClient('ws://localhost:0');
+    (hgc as unknown as { _seatIndex: number })._seatIndex = 1;
+    const pending: PendingView = {
+      type: 'awaits',
+      atom: {
+        type: '请求回应',
+        requestType: '反间/选花色',
+        target: 1,
+        prompt: { type: 'chooseSuit', title: '反间:选择一种花色' },
+      },
+      prompt: { type: 'chooseSuit', title: '反间:选择一种花色' },
+      target: 1,
+      isBlocking: true,
+    };
+    (hgc as unknown as { _view: GameView | null })._view = makeView(pending, 1);
+    const actions = hgc
+      .getAvailableActions()
+      .filter((a) => a.message.actionType === 'respond' && a.message.skillId === '反间');
+    expect(actions.map((a) => a.message.params.suit)).toEqual(['♠', '♥', '♣', '♦']);
   });
 });
 

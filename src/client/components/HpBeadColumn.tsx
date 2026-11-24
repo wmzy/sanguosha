@@ -16,6 +16,7 @@ export interface HpBeadMetrics {
 /** 珠体尺寸按 maxHealth 缩放:珠体基础 10×14px + 间距 3px,整列布局高度 = 17N−3(N=maxHealth);
  *  卡高 200px,仅 N ≥ 12(17×12−3=201>200)才会溢出卡面,此时按 6/N 等比缩小珠体与间距,
  *  使珠列完整排在卡右缘内;N ≤ 11 沿用基础尺寸(董卓 8 血/主公+1 后 9 血、标准 4 血无回归)。 */
+// eslint-disable-next-line react-refresh/only-export-components -- 珠体度量是组件的纯派生量,与组件同文件
 export function hpBeadMetrics(maxHealth: number): HpBeadMetrics {
   const hpScale = maxHealth >= 12 ? 6 / maxHealth : 1;
   return {
@@ -26,6 +27,7 @@ export function hpBeadMetrics(maxHealth: number): HpBeadMetrics {
 }
 
 /** 满珠色档(与 data-hue 同判据):剩余体力比例 >50% 绿 / >25% 黄 / ≤25% 红(濒危警示)。 */
+// eslint-disable-next-line react-refresh/only-export-components -- 色档判据与珠体渲染同源,同文件
 export function hpBeadHue(health: number, maxHealth: number): HpBeadHue {
   const hpRatio = maxHealth > 0 ? health / maxHealth : 1;
   return hpRatio > 0.5 ? 'green' : hpRatio > 0.25 ? 'yellow' : 'red';

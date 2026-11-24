@@ -416,7 +416,7 @@ describe('useMultiplayerRoom', () => {
     const es = MockEventSource.last!;
     act(() => es.fireOpen());
     // 推进轮询定时器,触发 roomId 同步(spectating 阶段也必须运行同步)
-    act(() => vi.advanceTimersByTime(250));
+    void act(() => vi.advanceTimersByTime(250));
 
     expect(result.current.stage).toBe('spectating');
     expect(result.current.roomId).toBe('ROOM1');
@@ -521,7 +521,7 @@ describe('useMultiplayerRoom', () => {
     await flushConnect();
     const es = MockEventSource.last!;
     act(() => es.fireOpen());
-    act(() => vi.advanceTimersByTime(250));
+    void act(() => vi.advanceTimersByTime(250));
 
     // 降级成功:进入旁观阶段
     expect(result.current.stage).toBe('spectating');
@@ -553,7 +553,7 @@ describe('useMultiplayerRoom', () => {
     await flushConnect();
     const es = MockEventSource.last!;
     act(() => es.fireOpen());
-    act(() => vi.advanceTimersByTime(250));
+    void act(() => vi.advanceTimersByTime(250));
 
     expect(result.current.stage).toBe('spectating');
     expect(result.current.isSpectator).toBe(true);

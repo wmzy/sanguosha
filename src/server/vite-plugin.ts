@@ -14,6 +14,10 @@
 import type { Plugin, ViteDevServer } from 'vite';
 import type { IncomingMessage, ServerResponse } from 'http';
 
+/** dev API 适配层的请求体上限(与 app.ts 的 bodyLimit 同量级):vite 的 connect
+ *  中间件会先整段读入 body 再交给 Hono,不设上限时超大 JSON 直接吃满内存。 */
+const DEV_BODY_LIMIT_BYTES = 2 * 1024 * 1024;
+
 /** 从 SSR 世界取到的形状(app 命名导出 + 生命周期函数)。 */
 interface ServerModule {
   app: {
@@ -119,8 +123,19 @@ export function honoApiPlugin(): Plugin {
           .finally(() => process.exit(0));
       });
 
+      // 进程级兜底(未捕获异常 / 未处理拒绝):经 ssrLoadModule 装载 shutdown.ts 后安装,
+      // 保持本文件不静态 import server 模块。清理失败只记日志。
+      void server
+        .ssrLoadModule('/src/server/shutdown.ts')
+        .then((m) => (m as { installProcessErrorHandlers?: () => void }).installProcessErrorHandlers?.())
+        .catch((err: unknown) => {
+          console.warn('[hono-api] 安装进程级错误兜底失败', err);
+        });
+
       // 挂载 Hono REST API 到 /api(经 ssrLoadModule 与引擎同一模块世界)
       server.middlewares.use('/api', async (req: IncomingMessage, res: ServerResponse) => {
+        // 声明在 try 之外:catch 需要据它区分 413(请求体过大)与 500。
+        let tooLarge = false;
         try {
           const mod = await loadServer(server);
           const fullPath = `/api${req.url ?? ''}`;
@@ -132,6 +147,11 @@ export function honoApiPlugin(): Plugin {
               let data = '';
               req.on('data', (chunk: Buffer) => {
                 data += chunk;
+                if (data.length > DEV_BODY_LIMIT_BYTES) {
+                  tooLarge = true;
+                  reject(new Error('request body too large'));
+                  req.destroy();
+                }
               });
               req.on('end', () => {
                 resolve(data);
@@ -184,6 +204,12 @@ export function honoApiPlugin(): Plugin {
           const responseBody = await response.text();
           res.end(responseBody);
         } catch (error) {
+          if (tooLarge) {
+            res.statusCode = 413;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: '请求体过大' }));
+            return;
+          }
           console.error('[hono-api] API Error', error);
           res.statusCode = 500;
           res.setHeader('Content-Type', 'application/json');

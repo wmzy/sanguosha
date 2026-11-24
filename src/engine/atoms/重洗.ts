@@ -6,7 +6,7 @@ import type { AtomDefinition, ViewEventSplit, ViewEvent } from '../types';
 import { broadcast } from './_helpers';
 import { createRng, shuffle } from '../util/rng';
 
-export const 重洗: AtomDefinition<Record<string, never>> = {
+export const 重洗: AtomDefinition<{ type: '重洗' }> = {
   type: '重洗',
   validate(state) {
     if (state.zones.discardPile.length === 0) return 'discardPile is empty';

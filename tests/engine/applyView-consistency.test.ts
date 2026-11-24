@@ -317,11 +317,11 @@ describe('applyView 一致性 bug', () => {
       });
 
       // toViewEvents 应携带阵亡者身份(死亡即公开)
-      const split = def.toViewEvents!(mockState, { type: '亮身份牌', player: 1 });
-      expect((split!.othersView as any).identity).toBe('反贼');
+      const split = def.toViewEvents(mockState, { type: '亮身份牌', player: 1 });
+      expect((split.othersView as any).identity).toBe('反贼');
 
       // applyView 揭示身份:前端走事件流时能看到阵亡者的真实身份
-      def.applyView!(view, split!.othersView!);
+      def.applyView!(view, split.othersView!);
       expect(view.players[1].identity).toBe('反贼');
       expect(view.players[1].identityHidden).toBe(false);
     });
@@ -330,7 +330,7 @@ describe('applyView 一致性 bug', () => {
   describe('获得/给予 atom: 信息分级泄露', () => {
     it('获得 toViewEvents 手牌→手牌: othersView 不携带 cardId（第三方不知道顺手牵羊拿了哪张手牌）', () => {
       const def = getAtomDef('获得');
-      const split = def.toViewEvents!(
+      const split = def.toViewEvents(
         {
           players: [
             {
@@ -379,7 +379,7 @@ describe('applyView 一致性 bug', () => {
 
     it('获得 toViewEvents 装备→手牌: othersView 携带 cardId（装备为公开信息，需 cardId 才能同步第三方视角装备槽清空）', () => {
       const def = getAtomDef('获得');
-      const split = def.toViewEvents!(
+      const split = def.toViewEvents(
         {
           players: [
             {
@@ -749,7 +749,7 @@ describe('分配武将 atom: faction 从角色配置赋值并投影到 view', ()
 
   it('toViewEvents 携带 faction(公开信息,所有视角可见)', () => {
     const def = getAtomDef('分配武将');
-    const split = def.toViewEvents!(makeBareState(), {
+    const split = def.toViewEvents(makeBareState(), {
       type: '分配武将',
       target: 0,
       character: '刘备',
@@ -757,8 +757,8 @@ describe('分配武将 atom: faction 从角色配置赋值并投影到 view', ()
     });
     expect(split).toBeDefined();
     // othersView 携带 faction(ownerViews 为空 = owner 也看 othersView)
-    expect(split!.ownerViews.size).toBe(0);
-    expect(split!.othersView?.faction).toBe('蜀');
+    expect(split.ownerViews.size).toBe(0);
+    expect(split.othersView?.faction).toBe('蜀');
   });
 
   it('applyView 写入 view.players[].faction', () => {
@@ -827,7 +827,7 @@ describe('初始化洗牌 atom: deckCount 未同步到增量视图', () => {
     expect(def.toViewEvents).toBeDefined();
     expect(def.applyView).toBeDefined();
 
-    const split = def.toViewEvents!(state, { type: '初始化洗牌', seed: 42 })!;
+    const split = def.toViewEvents(state, { type: '初始化洗牌', seed: 42 });
     expect(split.othersView).toBeDefined();
     def.applyView!(view, split.othersView!);
     expect(view.zones!.deckCount).toBe(realDeckCount);
@@ -863,7 +863,7 @@ describe('亮将 atom: name 同步到所有视角(与 buildView 口径一致)', 
     // 随后亮将事件统一公开
     const view = mockView({ viewer: 0 });
     const redactDef = getAtomDef('分配武将');
-    const redactSplit = redactDef.toViewEvents!(state, {
+    const redactSplit = redactDef.toViewEvents(state, {
       type: '分配武将',
       target: 1,
       character: '孙权',

@@ -132,11 +132,11 @@ describe('移除延时锦囊 atom', () => {
       { name: '乐不思蜀', source: 1, card: trickCard },
     ];
 
-    const split = def.toViewEvents!(state, {
+    const split = def.toViewEvents(state, {
       type: '移除延时锦囊',
       player: 0,
       trickName: '乐不思蜀',
-    })!;
+    });
 
     expect(split.othersView).toBeTruthy();
     expect((split.othersView as { cardId?: string }).cardId).toBe('lebu-1');
@@ -149,11 +149,11 @@ describe('移除延时锦囊 atom', () => {
       { name: '闪电', source: -1, card: { ...trickCard, id: 'sd-1', name: '闪电' } },
     ];
 
-    const split = def.toViewEvents!(state, {
+    const split = def.toViewEvents(state, {
       type: '移除延时锦囊',
       player: 0,
       trickName: '乐不思蜀',
-    })!;
+    });
 
     expect((split.othersView as { cardId?: string }).cardId).toBeUndefined();
   });

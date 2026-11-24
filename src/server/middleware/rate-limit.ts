@@ -14,27 +14,57 @@ function normalizeAddress(raw: string | undefined): string | undefined {
   return isIP(normalized) ? normalized : undefined;
 }
 
-/** SGS_TRUSTED_PROXIES:逗号分隔的代理 IP 白名单;缺省不信任任何代理头。 */
-function trustedProxyList(): BlockList {
+/** SGS_TRUSTED_PROXIES:逗号分隔的代理 IP 白名单;缺省不信任任何代理头。
+ *  按环境变量值缓存(测试会改 env)。无法解析的条目静默忽略,但会打一次警告,
+ *  避免运维以为已生效。 */
+let trustedCache: { raw: string; list: BlockList } | null = null;
+
+function trustedProxies(): BlockList {
+  const raw = process.env.SGS_TRUSTED_PROXIES ?? '';
+  if (trustedCache?.raw === raw) return trustedCache.list;
   const trusted = new BlockList();
-  for (const raw of (process.env.SGS_TRUSTED_PROXIES ?? '').split(',')) {
-    const address = normalizeAddress(raw);
-    if (address) trusted.addAddress(address, isIP(address) === 4 ? 'ipv4' : 'ipv6');
+  for (const entry of raw.split(',')) {
+    if (!entry.trim()) continue;
+    const address = normalizeAddress(entry);
+    if (address) {
+      trusted.addAddress(address, isIP(address) === 4 ? 'ipv4' : 'ipv6');
+    } else {
+      // 只在值变化时提示一次(缓存在下一行更新,不会重复)
+      console.warn(`[rate-limit] 忽略无法解析的 SGS_TRUSTED_PROXIES 条目: ${JSON.stringify(entry)}`);
+    }
   }
+  trustedCache = { raw, list: trusted };
   return trusted;
 }
 
-function clientKey(c: Context, trusted: BlockList): string {
-  // Node adapter 直接传 incoming/outgoing;Vite 适配层传相同绑定。
-  // 无 socket 仅发生于 app.request 单元测试,不能因此信任用户提供的头。
+function isTrustedAddress(address: string, trusted: BlockList): boolean {
+  return trusted.check(address, isIP(address) === 4 ? 'ipv4' : 'ipv6');
+}
+
+/** 连接对端地址。无 socket(单元测试的 app.request / 非 HTTP 适配层)返回 undefined。 */
+export function peerAddress(c: Context): string | undefined {
   const bindings = c.env?.server ?? c.env;
-  const peer = bindings?.incoming?.socket
-    ? normalizeAddress(getConnInfo(c).remote.address)
-    : undefined;
+  return bindings?.incoming?.socket ? normalizeAddress(getConnInfo(c).remote.address) : undefined;
+}
+
+/** 对端是否可信代理(socket 不存在时一律不可信)。 */
+export function isTrustedPeer(c: Context): boolean {
+  const peer = peerAddress(c);
+  return !!peer && isTrustedAddress(peer, trustedProxies());
+}
+
+/** 可信代理转发的原始 scheme(X-Forwarded-Proto 首个值);不可信 peer 一律返回 undefined。 */
+export function trustedForwardedProto(c: Context): string | undefined {
+  if (!isTrustedPeer(c)) return undefined;
+  const raw = c.req.header('X-Forwarded-Proto');
+  return raw?.split(',')[0]?.trim().toLowerCase();
+}
+
+function clientKey(c: Context): string {
+  const peer = peerAddress(c);
   if (!peer) return 'direct';
-  const isTrusted = (address: string) =>
-    trusted.check(address, isIP(address) === 4 ? 'ipv4' : 'ipv6');
-  if (!isTrusted(peer)) return peer;
+  const trusted = trustedProxies();
+  if (!isTrustedAddress(peer, trusted)) return peer;
 
   const forwarded = c.req.header('X-Forwarded-For');
   if (forwarded !== undefined) {
@@ -42,7 +72,7 @@ function clientKey(c: Context, trusted: BlockList): string {
     // 不能读最左地址,否则客户端在可信代理追加前伪造的前缀仍能逃逸。
     const chain = forwarded.split(',');
     let address = peer;
-    for (let i = chain.length - 1; i >= 0 && isTrusted(address); i--) {
+    for (let i = chain.length - 1; i >= 0 && isTrustedAddress(address, trusted); i--) {
       const previous = normalizeAddress(chain[i]);
       if (!previous) return peer;
       address = previous;
@@ -63,12 +93,11 @@ function cleanup(clients: Map<string, { count: number; resetAt: number }>): void
 export function createRateLimit(maxRequests = 6000): MiddlewareHandler {
   // 每个 limiter 独立计数,避免全局高频只读端点消耗登录/注册的严格配额。
   const clients = new Map<string, { count: number; resetAt: number }>();
-  const trusted = trustedProxyList();
   const cleanupInterval = setInterval(() => cleanup(clients), 5 * 60_000);
   cleanupInterval.unref();
 
   return async (c, next) => {
-    const ip = clientKey(c, trusted);
+    const ip = clientKey(c);
     const now = Date.now();
     let entry = clients.get(ip);
     if (!entry || now > entry.resetAt) {

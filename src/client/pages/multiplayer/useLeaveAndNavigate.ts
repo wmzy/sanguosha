@@ -9,6 +9,6 @@ export function useLeaveAndNavigate(): () => void {
   const navigate = useNavigate();
   return () => {
     mp.leaveRoom();
-    navigate('/');
+    void navigate('/');
   };
 }

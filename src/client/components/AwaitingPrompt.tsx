@@ -308,6 +308,24 @@ export function AwaitingPrompt(props: AwaitingPromptProps) {
               </div>
             );
           }
+          // chooseSuit 类 pending(反间:目标猜花色):四种花色各一个按钮。
+          // 此前无此分支,落到下方「选高亮牌」提示 → 玩家只能超时走默认 ♠。
+          if (pending.prompt.type === 'chooseSuit') {
+            const suits = ['♠', '♥', '♣', '♦'] as const;
+            return (
+              <div className={styles.promptActions}>
+                {suits.map((suit) => (
+                  <button
+                    key={suit}
+                    className={styles.promptBtnPrimary}
+                    onClick={() => send(skillId, 'respond', { suit })}
+                  >
+                    {suit}
+                  </button>
+                ))}
+              </div>
+            );
+          }
           // choosePlayer 类 pending(流离/奋威/突袭/激将 等):渲染候选目标按钮。
           // 单选(max===1)点击即发;多选(max>1)累积后确认。candidates 由引擎投影层注入。
           // 同时发 target(首个)与 targets(数组)以兼容各技能 respond 的 param 读取契约。

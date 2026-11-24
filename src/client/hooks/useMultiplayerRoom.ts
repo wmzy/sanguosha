@@ -155,7 +155,7 @@ export function useMultiplayerRoom(
   /** 从 HGC 同步的旁观者标志(joinAsSpectator 的 REST 响应立即生效,无需等 SSE room_state)。 */
   const [hgcIsSpectator, setHgcIsSpectator] = useState(false);
   // 命令 effect 内同步旁观标志(闭包直调,避免依赖漂移)
-  const setSpectatorFlag = useCallback(setHgcIsSpectator, []);
+  const setSpectatorFlag = useCallback(setHgcIsSpectator, [setHgcIsSpectator]);
   const [view, setView] = useState<GameView | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -258,7 +258,7 @@ export function useMultiplayerRoom(
         setDisconnectedSeats(new Set());
         break;
     }
-  }, [resetPlayback]);
+  }, [resetPlayback, playbackRef]);
 
   const serverUrl = window.location.origin;
 
@@ -487,6 +487,10 @@ export function useMultiplayerRoom(
       }
       hgcRef.current = null;
     };
+    // 这是连接生命周期 effect:只随 command/serverUrl 重建。handleJoinError/enqueueEvent/
+    // ingestEvents/showError 等是每次渲染可能换引用的回调,加入依赖会让 SSE 连接被反复
+    // 断开重连(它们只在该 effect 内的异步回调里用)。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [command, serverUrl, resetRoomState]);
 
   const createRoom = useCallback((name: string, maxPlayers: number, config?: RoomConfig, roomType?: 'normal' | 'quick', password?: string) => {
@@ -522,14 +526,14 @@ export function useMultiplayerRoom(
   const startGame = useCallback(() => {
     const hgc = hgcRef.current;
     if (!hgc) return;
-    hgc.sendStartGame();
+    void hgc.sendStartGame();
     log.info('startGame');
   }, []);
 
   const sendRestart = useCallback(() => {
     const hgc = hgcRef.current;
     if (!hgc) return;
-    hgc.sendRestart();
+    void hgc.sendRestart();
     log.info('sendRestart');
   }, []);
 
@@ -551,7 +555,7 @@ export function useMultiplayerRoom(
   const reorderHand = useCallback((order: string[]) => {
     const hgc = hgcRef.current;
     if (!hgc) return;
-    hgc.reorderHand(order);
+    void hgc.reorderHand(order);
   }, []);
 
   const cancelReconnect = useCallback(() => {

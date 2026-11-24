@@ -19,6 +19,7 @@ export function MultiplayerRoomProvider({
 }
 
 /** 取当前多人房间上下文;必须在 <MultiplayerRoomProvider> 内使用。 */
+// eslint-disable-next-line react-refresh/only-export-components -- context 与配套 hook 必须同文件(设计约束)
 export function useMultiplayerRoomCtx(): MultiplayerRoom {
   const mp = useContext(MultiplayerRoomContext);
   if (!mp) {

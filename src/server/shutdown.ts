@@ -93,3 +93,31 @@ export function setupGracefulShutdown(server: { close: (callback?: () => void) =
   process.on('SIGTERM', () => shutdown(server, 'SIGTERM'));
   process.on('SIGINT', () => shutdown(server, 'SIGINT'));
 }
+
+let processHandlersInstalled = false;
+
+/** 进程级兜底:未捕获异常 / 未处理的 Promise 拒绝 → 记日志 + 走同一套优雅关闭 → 退出(1)。
+ *  不装的后果:Node 22 默认 unhandled-rejections=throw,任何遗漏的 fire-and-forget 拒绝
+ *  直接杀进程并跳过刷盘(PGlite 脏关闭,下次启动要 crash recovery)。
+ *  安装点必须是真实进程入口(index.ts / vite-plugin.configureServer):
+ *  本模块会被大量测试 import,模块顶层安装会污染测试进程。幂等。 */
+export function installProcessErrorHandlers(): void {
+  if (processHandlersInstalled) return;
+  processHandlersInstalled = true;
+  const fatal = (label: string, err: unknown): void => {
+    log.error(`未捕获的${label}，开始优雅关闭`, {
+      error: err instanceof Error ? err.stack ?? err.message : String(err),
+    });
+    void runGracefulShutdown({
+      flushPendingWrites,
+      shutdownAll,
+      closeRoomStore,
+    })
+      .catch(() => {
+        /* 清理失败也必须退出(超时兜底会强退) */
+      })
+      .finally(() => process.exit(1));
+  };
+  process.on('uncaughtException', (err) => fatal('异常', err));
+  process.on('unhandledRejection', (reason) => fatal('Promise 拒绝', reason));
+}

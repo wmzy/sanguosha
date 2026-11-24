@@ -184,7 +184,7 @@ function playerRole(
         // 座位必须保留,否则断线玩家在宽限期内重连将无法归位。
         currentSession.handleDisconnect(playerId);
         if (room.isDebug) {
-          unbindPlayerRoom(playerId);
+          unbindPlayerRoom(playerId, room.id);
         }
         return;
       }

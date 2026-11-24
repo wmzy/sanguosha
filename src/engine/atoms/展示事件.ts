@@ -5,13 +5,17 @@
 // 导出为独立 map,core/atom.ts 的 getAtomDef 在 atomMap 未命中时 fallback 查此处,
 // 调用空 applyView 安全跳过——避免 getAtomDef 抛错中断 events 批次处理。
 import type { AtomDefinition } from '../types';
+import { broadcast } from './_helpers';
 
-/** 纯展示型 atom 模板:无 validate/apply 副作用,空 applyView */
+/** 纯展示型 atom 模板:无 validate/apply 副作用,空 applyView。
+ *  toViewEvents 不会被调用(这些 type 只出现在其它 atom 的 toViewEvents 结果里,
+ *  引擎不会 apply 它们),但 AtomDefinition 要求必填,给全员不可见占位。 */
 function displayOnly(type: string): AtomDefinition {
   return {
     type,
     validate: () => null,
     apply: () => {},
+    toViewEvents: () => broadcast(null),
     applyView: () => {},
   };
 }

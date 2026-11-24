@@ -1,12 +1,14 @@
 // server/app.ts — 组合根。
-// 从原 678 行文件拆分:共享状态→registry、REST 路由→rest、WS 处理→ws。
+// 共享状态→registry、REST 路由→rest、实时下行→sse(客户端上行全部走 REST,无 WS)。
 // 本文件保留:Hono 实例 + 全局中间件 + 生命周期(闲置清理/启动恢复)。
 
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { cors, requestLogger, errorHandler, rateLimit } from './middleware';
 import { gameSessions } from './registry';
 import { applyRestRoutes } from './rest';
 import { applyAuthRoutes } from './auth/routes';
+import { pruneExpiredSessions } from './auth/store';
 import { GameSession } from './session';
 import { createLogger } from './logger';
 import { listPersistedRooms, loadRoom, deletePersistedRoom, restoreFromLog, type PersistedRoom } from './persistence';
@@ -16,13 +18,24 @@ import { cleanupIdleRooms, cleanupDisconnectedRooms } from './cleanup';
 import { initRoomStore, loadAllRoomsFromDb } from './roomStore';
 import { resetRoomToLobby } from './teardown';
 import { sweepOrphanHistory } from './gameHistory';
+import { pruneSnapshots } from './snapshot';
 
 const log = createLogger('app');
+
+/** 请求体硬上限:此前无任何限制(任意 JSON 可吃满内存/磁盘,快照端点可无限落盘)。 */
+const MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024;
 
 const app = new Hono();
 app.use('*', cors);
 app.use('*', requestLogger);
 app.use('*', rateLimit);
+app.use(
+  '/api/*',
+  bodyLimit({
+    maxSize: MAX_REQUEST_BODY_BYTES,
+    onError: (c) => c.json({ error: '请求体过大' }, 413),
+  }),
+);
 app.onError(errorHandler);
 
 // REST 路由注册到主 app 实例(中间件照常生效)
@@ -39,7 +52,12 @@ const DISCONNECTED_ROOM_SCAN_MS = 30 * 1000;
  *  不能放在模块级: vite build 时加载 vite.config → import app 也会触发副作用,
  *  导致 build 进程意外启动游戏 session 并反复写持久化文件。 */
 export async function startServerLifecycle(): Promise<void> {
-  setInterval(cleanupIdleRooms, CLEANUP_INTERVAL_MS).unref();
+  setInterval(() => {
+    cleanupIdleRooms();
+    // 过期会话清理:此前 pruneExpiredSessions 无任何调用方,而 MCP 每次启动自动注册
+    // 新账号,sessions/users 只增不减。失败只记日志。
+    void pruneExpiredSessions().catch((err) => log.err('pruneExpiredSessions failed', err));
+  }, CLEANUP_INTERVAL_MS).unref();
   // 无连接快速/debug 房间回收(30s 扫描):unref 保证不阻止进程退出,
   // ssrLoadModule 环境下随 vite dev server 生命周期存续,无需显式 teardown。
   setInterval(() => {
@@ -55,6 +73,8 @@ export async function startServerLifecycle(): Promise<void> {
   void sweepOrphanHistory(getAllRooms().map((r) => r.id)).catch((err) =>
     log.err('sweepOrphanHistory failed', err),
   );
+  // 调试快照是旁路产物:过期目录随同一清理节奏回收(不阻塞启动)。
+  void pruneSnapshots().catch((err) => log.err('pruneSnapshots failed', err));
 }
 
 /** 从 DB 恢复普通房间元数据。快闪房间不入库,无需恢复。

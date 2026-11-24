@@ -134,7 +134,7 @@ describe('端到端:弃牌阶段重复 end 不死锁', () => {
     const state = buildState();
     await registerSkillsFromState(state);
 
-    engineDispatch(state, {
+    void engineDispatch(state, {
       skillId: '回合管理',
       actionType: 'end',
       ownerId: 0,
@@ -149,7 +149,7 @@ describe('端到端:弃牌阶段重复 end 不死锁', () => {
     expect((slot.atom as { requestType?: string }).requestType).toBe('__弃牌');
 
     // 第二次 end:validate 拒绝
-    engineDispatch(state, {
+    void engineDispatch(state, {
       skillId: '回合管理',
       actionType: 'end',
       ownerId: 0,
@@ -169,7 +169,7 @@ describe('端到端:弃牌阶段重复 end 不死锁', () => {
     const state = buildState();
     await registerSkillsFromState(state);
 
-    engineDispatch(state, {
+    void engineDispatch(state, {
       skillId: '回合管理',
       actionType: 'end',
       ownerId: 0,
@@ -179,7 +179,7 @@ describe('端到端:弃牌阶段重复 end 不死锁', () => {
     await tick();
     expect(state.pendingSlots.size).toBeGreaterThan(0);
 
-    engineDispatch(state, {
+    void engineDispatch(state, {
       skillId: '系统规则',
       actionType: 'respond',
       ownerId: 0,

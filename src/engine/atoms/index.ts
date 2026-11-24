@@ -3,7 +3,7 @@
 // core/atom.ts 的 getAtomDef 从此查表。类型 Record<AtomName, AtomDefinition>
 // 保证 Atom 联合的每个 type 都有定义——新增 atom 必须同时加 Atom 联合成员
 // 和此处条目,否则编译报错(消灭"atom 未注册"运行时错误)。
-import type { AtomDefinition, AtomName } from '../types';
+import type { Atom, AtomDefinition, AtomName } from '../types';
 import { 伤害结算开始时, 造成伤害时, 受到伤害时, 造成伤害后, 受到伤害后, 伤害结算结束时, 伤害结算结束后 } from './damage-timing';
 import { 亮身份牌前, 亮身份牌, 死亡时, 系统处理牌, 死亡后, 进入濒死状态时, 新的濒死状态时 } from './death-timing';
 import { 判定时, 判定牌生效前, 判定牌生效后 } from './judge-timing';
@@ -79,9 +79,16 @@ import { 陷入濒死 } from './陷入濒死';
 
 export { 展示型atoms } from './展示事件';
 
-// AtomDefinition<A> 在 A 上逆变(validate/apply 形参),无法直接装入 AtomDefinition<unknown>;
-// 用 any 放宽存储类型(键完整性检查不受影响)。
-export const atomMap: Record<AtomName, AtomDefinition<any>> = {
+// AtomDefinition<A> 在 A 上逆变(validate/apply 形参)。按 AtomName 的每个键给出
+// 该键对应的 atom 变体:值形状不再退化成 any —— 把某个定义误挂到别的键下时,
+// 参数类型不兼容会直接 tsc 报错。定义本身仍各自标注具体 Atom 形状。
+// (形如 { type: K; ... } 的变体可赋给 AtomDefinition<Extract<Atom, { type: K }>>:
+//  目标参数是源参数的子类型,满足逆变。)
+export type AtomDefinitionMap = {
+  [K in AtomName]: AtomDefinition<Extract<Atom, { type: K }>>;
+};
+
+export const atomMap: AtomDefinitionMap = {
   伤害结算开始时,
   造成伤害时,
   受到伤害时,

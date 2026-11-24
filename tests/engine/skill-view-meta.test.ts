@@ -90,21 +90,21 @@ describe('添加技能 atom — 马匹 distanceVars 视图同步', () => {
   const state = makeState();
 
   it('进攻马(赤兔)toViewEvents 携带 mountDistanceVars', () => {
-    const split = def.toViewEvents!(state, { type: '添加技能', player: 0, skillId: '赤兔' });
-    const evt = split!.othersView!;
+    const split = def.toViewEvents(state, { type: '添加技能', player: 0, skillId: '赤兔' });
+    const evt = split.othersView!;
     expect(evt.mountDistanceVars).toEqual({ attackMod: 1 });
     expect(evt.clearMountDistanceVars).toBeUndefined();
   });
 
   it('防御马(的卢)toViewEvents 携带 mountDistanceVars', () => {
-    const split = def.toViewEvents!(state, { type: '添加技能', player: 0, skillId: '的卢' });
-    const evt = split!.othersView!;
+    const split = def.toViewEvents(state, { type: '添加技能', player: 0, skillId: '的卢' });
+    const evt = split.othersView!;
     expect(evt.mountDistanceVars).toEqual({ defenseMod: 1 });
   });
 
   it('非马匹技能 toViewEvents 不携带 mountDistanceVars', () => {
-    const split = def.toViewEvents!(state, { type: '添加技能', player: 0, skillId: '仁德' });
-    const evt = split!.othersView!;
+    const split = def.toViewEvents(state, { type: '添加技能', player: 0, skillId: '仁德' });
+    const evt = split.othersView!;
     expect(evt.mountDistanceVars).toBeUndefined();
   });
 
@@ -141,21 +141,21 @@ describe('移除技能 atom — 马匹 distanceVars 视图清除', () => {
   const state = makeState();
 
   it('进攻马(赤兔)toViewEvents 携带 clearMountDistanceVars', () => {
-    const split = def.toViewEvents!(state, { type: '移除技能', player: 0, skillId: '赤兔' });
-    const evt = split!.othersView!;
+    const split = def.toViewEvents(state, { type: '移除技能', player: 0, skillId: '赤兔' });
+    const evt = split.othersView!;
     expect(evt.clearMountDistanceVars).toEqual({ attackMod: 1 });
     expect(evt.mountDistanceVars).toBeUndefined();
   });
 
   it('防御马(的卢)toViewEvents 携带 clearMountDistanceVars', () => {
-    const split = def.toViewEvents!(state, { type: '移除技能', player: 0, skillId: '的卢' });
-    const evt = split!.othersView!;
+    const split = def.toViewEvents(state, { type: '移除技能', player: 0, skillId: '的卢' });
+    const evt = split.othersView!;
     expect(evt.clearMountDistanceVars).toEqual({ defenseMod: 1 });
   });
 
   it('非马匹技能 toViewEvents 不携带 clearMountDistanceVars', () => {
-    const split = def.toViewEvents!(state, { type: '移除技能', player: 0, skillId: '仁德' });
-    const evt = split!.othersView!;
+    const split = def.toViewEvents(state, { type: '移除技能', player: 0, skillId: '仁德' });
+    const evt = split.othersView!;
     expect(evt.clearMountDistanceVars).toBeUndefined();
   });
 

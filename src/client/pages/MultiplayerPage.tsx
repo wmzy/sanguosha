@@ -52,7 +52,7 @@ export function MultiplayerPage() {
     const prev = prevRoomIdRef.current;
     prevRoomIdRef.current = mpRoomId;
     if (!mpRoomId || mpRoomId === prev) return;
-    if (mpRoomId !== urlRoomId) navigate(`/play/${mpRoomId}`);
+    if (mpRoomId !== urlRoomId) void navigate(`/play/${mpRoomId}`);
   }, [mpRoomId, urlRoomId, navigate]);
 
   // 浏览器后退到 /play(URL 离开房间页)而房间连接仍在:/play 与 /play/:roomId
@@ -82,7 +82,7 @@ export function MultiplayerPage() {
             style={{ '--btn-bg': colors.accent.orange } as React.CSSProperties}
             onClick={() => {
               mp.leaveRoom();
-              navigate('/play');
+              void navigate('/play');
             }}
           >
             进入大厅

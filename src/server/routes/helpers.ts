@@ -50,6 +50,10 @@ export async function parseRoomPassword(
   if (password.length > 32) {
     return c.json({ error: '房间密码长度不能超过 32 位' }, 400);
   }
+  // 下限:1 位密码可被在线暴力枚举,且每次猜测都触发一次 scrypt(占 libuv 线程池)。
+  if (password.length > 0 && password.length < 4) {
+    return c.json({ error: '房间密码至少 4 位' }, 400);
+  }
   return password ? await hashPassword(password) : null;
 }
 
